@@ -9,6 +9,7 @@ const calc = require("./payroll.calc");
 const lock = require("./payroll.lock");
 const run = require("./payroll.run");
 const repo = require("./payroll.repo");
+const payslips = require("../payslips/payslips.service");
 const settings = require("./payroll.config.repo");
 const m = require("../../shared/money/money");
 const { applyMask } = require("../../shared/rbac/field-mask");
@@ -282,8 +283,9 @@ describe("the salary mask reaches a run (§6.13)", () => {
 });
 
 describe("every write function of a run hits the guard (§6.9 rule 4)", () => {
-  /** The writes the run and the lock make, by name. */
-  const functions = { ...run, applyApproval: lock.applyApproval, returnToDraft: lock.returnToDraft };
+  /** The writes the run, the lock and the payslips' mail and downloads make, by name. */
+  const { emailAll, markEmailed, unmarkEmailed, emailCopy, exportAll } = payslips;
+  const functions = { ...run, applyApproval: lock.applyApproval, returnToDraft: lock.returnToDraft, emailAll, markEmailed, unmarkEmailed, emailCopy, exportAll };
   const runWith = (status) => ({ payroll_run_id: "00000000-0000-4000-8000-000000000001", status });
   const REFUSED = {
     editable: [
@@ -302,6 +304,11 @@ describe("every write function of a run hits the guard (§6.9 rule 4)", () => {
       ["submitted", "NOT_APPROVED"],
       ["paid", "NOT_APPROVED"],
     ],
+    published: [
+      ["draft", "NOT_APPROVED"],
+      ["computed", "NOT_APPROVED"],
+      ["submitted", "NOT_APPROVED"],
+    ],
     submitted: [
       ["draft", "RUN_NOT_SUBMITTED"],
       ["computed", "RUN_NOT_SUBMITTED"],
@@ -312,12 +319,12 @@ describe("every write function of a run hits the guard (§6.9 rule 4)", () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  test("every function the run and the lock export is a registered write, and every registered write is exported", () => {
+  test("every function the run, the lock and the payslips' mail and downloads export is a registered write, and every registered write is exported", () => {
     expect(Object.keys(functions).sort()).toEqual([...lock.WRITES.keys()].sort());
   });
 
-  test("every guard a write names is one of the five", () => {
-    for (const guard of lock.WRITES.values()) expect(["none", "editable", "computed", "approved", "submitted"]).toContain(guard);
+  test("every guard a write names is one of the six", () => {
+    for (const guard of lock.WRITES.values()) expect(["none", "editable", "computed", "approved", "published", "submitted"]).toContain(guard);
   });
 
   const writes = [...lock.WRITES.entries()].filter(([, guard]) => guard !== "none");

@@ -356,7 +356,6 @@ const ENTITY_ROUTES = Object.freeze({
 
   // Payroll
   payroll_run: screen("payroll", "payroll-runs"),
-  // search:none not built yet (src/modules/payslips)
   payslip: {
     ...screen("payroll", "payslips"),
     self: screen("ess", "my-payslips"),

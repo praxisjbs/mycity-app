@@ -447,8 +447,8 @@ owning module's service, in a transaction, with `emit()`.
 | `POST /payroll/runs/:id/adjustments` | `PayrollAdjustmentAdd` → `PayrollAdjustment` | `payroll` edit · all | no | Draft or Computed; the run goes back to Draft (it must be computed again) |
 | `DELETE /payroll/runs/:id/adjustments/:adjustment_id` | → 204 | `payroll` edit · all | no | Same rule |
 | `DELETE /payroll/runs/:id` | → 204 | `payroll` delete · all | no | Discard: a run never submitted; releases nothing because nothing was frozen |
-| `POST /payroll/runs/:id/email-payslips` | `PayslipEmailAll` (`resend`, default false) → 202 `{ queued }` | `payroll` edit · all | no | Approved or Paid only (409 `NOT_APPROVED`); sends to those not yet emailed unless `resend` |
-| `POST /payroll/runs/:id/payslips-export` | `EmptyBody` → 202 `ExportFile` | `payroll` export · all | no | One PDF of every published payslip, a page each (§6.10); downloaded where it was asked for (foundation §6.12) |
+| `POST /payroll/runs/:id/email-payslips` | `PayslipEmailAll` (`resend`, default false) → 202 `PayslipEmailQueued` (`{ queued }`: how many mails the press will send) | `payroll` edit · all | no | Approved or Paid only (409 `NOT_APPROVED`); sends to those not yet emailed unless `resend`; the worker marks and mails each payslip whose PDF is done and tries again for the rest (§7) |
+| `POST /payroll/runs/:id/payslips-export` | `EmptyBody` → 202 `ExportFile` | `payroll` export · all | no | One PDF of every published payslip, a page each (§6.10); downloaded where it was asked for (foundation §6.12). Approved or Paid only (409 `NOT_APPROVED`); 403 `FIELD_RESTRICTED` for a reader whose role hides pay or bank details, since the document carries both |
 | `POST /payroll/runs/:id/statutory-report` | `EmptyBody` → 202 `ExportFile` | `payroll` export · all | no | Advanced runs only (409 `ADVANCED_OFF`) |
 
 The approval's own decisions are the workflow routes already built (`POST /workflow/instances/:id/approve`,
@@ -460,14 +460,15 @@ checked). The run's screen offers them as buttons, as Expenses does.
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
 | `GET /payslips` | `PayslipListQuery` (`run_id`, `period`, `employee_id`, `status`, `q`; sort `employee`, `-net_pay`, `number`) → `PayslipPage` | `payroll` view · all | yes, 25 | Draft and published alike for a Payroll reader; amounts masked as the salary is |
-| `GET /payslips/:id` | → `PayslipDetail` (its lines) | `payroll` view · all | no | 404 outside the run's scope; the breakdown of a grouped line is `GET …/lines/:line_id/items` (25 a page, the pay items behind it) |
-| `GET /payslips/:id/pdf` | → the PDF (`GET /documents/:id/content`) | `payroll` edit · all | no | A restricted file (HANDOFF §5 item 7: the module's `edit` grant, not only `view`); 409 `NOT_APPROVED` for a draft |
-| `GET /ess/payslips` | `EssPayslipQuery` (`year`) → `PayslipPage` | `ess` · own | yes, 25 | Published payslips only; each carries its month's status (Paid, Paid with a deduction, In the run) |
-| `GET /ess/payslips/summary` | `EssPayslipQuery` → `EssPayslipSummary` | `ess` · own | no | Gross, Net Received, Payslips, Deductions, Next Payday for the year |
+| `GET /payslips/:id` | → `PayslipDetail` (its earning and deduction lines; employer charges are never on the slip) | `payroll` view · all | no | 404 outside the run's scope; a reader's own payslip is never masked from them |
+| `GET /payslips/:id/lines/:line_id/items` | `PayslipLineParams`, `PageQuery` → `PayslipLineItemPage` | `payroll` view · all | yes, 25 | The pay items behind a grouped line (Lateness, Early Departure, Absence, Overtime): the run's own once Submit froze them, before that the pending ones the next Compute takes. An adjustment's line shows its reason, a fine's or an advance's its month and state, an unpaid leave's or suspension's the line as made; Monthly Pay and a statutory line stand on nothing and answer an empty page |
+| `GET /payslips/:id/pdf` | → the PDF, streamed from the vault | `payroll` edit · all | no | A restricted file (HANDOFF §5 item 7: the module's `edit` grant, not only `view`); 409 `NOT_APPROVED` for a draft, 409 `NOT_READY` while it renders; 403 `FIELD_RESTRICTED` for a reader whose role hides pay or bank details, unless it is their own |
+| `GET /ess/payslips` | `EssPayslipQuery` (`year`, this Lagos year when absent) → `PayslipPage` | `ess` · own | yes, 25 | Published payslips only, newest month first; each carries its run's status (`run_status`: `approved`, or `paid`) and `has_deduction`, which are what the month's status (Paid, Paid with a deduction, In the run) is read from (§13.3 item 2) |
+| `GET /ess/payslips/summary` | `EssPayslipQuery` → `EssPayslipSummary` | `ess` · own | no | Over the year's published payslips: Gross, Net Received, Payslips, Deductions; Next Payday is the first pay date on or after today whose month's run is not paid (§6.11 rule 1) |
 | `GET /ess/payslips/:id` | → `PayslipDetail` | `ess` · own | no | |
 | `GET /ess/payslips/:id/pdf` | → the PDF | `ess` · own | no | 409 `NOT_READY` while the PDF is still rendering |
-| `POST /ess/payslips/:id/email` | `EmptyBody` → `{ sent }` | `ess` · own | no | To the person's work email, the PDF attached; once a minute at most |
-| `POST /ess/payslips/export` | `EssPayslipQuery` (`year`) → 202 `ExportFile` | `ess` · own | no | Download All on My Payslips: one PDF of the person's published payslips of the year, a page each, kept 24 hours (§6.10 rule 6) |
+| `POST /ess/payslips/:id/email` | `EmptyBody` → `PayslipCopySent` (`{ sent }`) | `ess` · own | no | To the person's work email, the PDF attached; 409 `NOT_READY` while it renders, 429 `EMAIL_TOO_SOON` within a minute of the last mail of that payslip (Email All counts) |
+| `POST /ess/payslips/export` | `EssPayslipQuery` (`year`) → 202 `ExportFile` | `ess` · own | no | Download All on My Payslips: one PDF of the person's published payslips of the year, oldest month first, a page each, kept 24 hours (§6.10 rule 6); 409 `NO_PAYSLIPS` for a year with none |
 | `GET /ess/deductions` | `PageQuery` → `EssDeductionPage` | `ess` · own | yes, 25 | Each month that carried one, and each scheduled instalment, with amount, reason and query number |
 
 The ESS routes live in `src/modules/ess/` and call `payslips.service` with the caller's own `employee_id`; the
@@ -501,7 +502,8 @@ The ESS routes live in `src/modules/ess/` and call `payslips.service` with the c
 `RUN_NOT_EDITABLE`, `RUN_NOT_COMPUTED`, `RUN_NOT_SUBMITTED` (the approval's two ends, which the handlers answer with a quiet no-op),
 `NO_ONE_TO_PAY`, `RUN_HAS_PROBLEMS`, `RUN_CHANGED`, `NOT_IN_RUN`, `NOT_EXCLUDED`, `PAID_IN_THE_FUTURE`, `NOT_APPROVED`, `NOT_READY`, `NO_RATES`,
 `NO_CONVENTIONS`, `ADVANCED_OFF`, `FINE_NOT_MOVABLE`, `OWN_RECORD`, `INSTALMENTS_STARTED` (cancel or release after one is in a run),
-`START_NOT_ALLOWED`, `TOO_MANY_MONTHS`, `GRANTED_IN_THE_FUTURE`, `NOT_A_FINE`, `NOT_AN_ADVANCE`, `NOT_ACTIVE` (Deductions, PR 3).
+`START_NOT_ALLOWED`, `TOO_MANY_MONTHS`, `GRANTED_IN_THE_FUTURE`, `NOT_A_FINE`, `NOT_AN_ADVANCE`, `NOT_ACTIVE` (Deductions, PR 3),
+`EMAIL_TOO_SOON` (429, a copy within a minute of the last mail of a payslip), `NO_PAYSLIPS` (409, a download with nothing to put in it).
 Messages are four words or fewer on a field, one short sentence elsewhere.
 
 ---
@@ -678,7 +680,9 @@ suspension into absent days), so payroll does, from the owners' records:
    numbers); emits `payroll_run.approved` and one `payslip.published` per person.
 4. **Locked means locked.** Every payroll write calls one guard (`assertEditable(run)` in `payroll.lock.js`),
    which refuses (409 `RUN_NOT_EDITABLE`) anything on an `approved` or `paid` run except Mark Paid, Email All
-   and the exports. A test enumerates every write function of the five modules and asserts it hits the guard.
+   and the exports. The writes that belong on a run that is out (Email All, a payslip's mail and its copy, Download All)
+   are made with the `published` guard, which lets an approved or paid run through and refuses the rest with 409
+   `NOT_APPROVED`. A test enumerates every write function of the five modules and asserts it hits the guard.
 5. **The approval keeps its flow.** A run keeps the `payroll.run` version it opened with (the engine records
    it); changing the flow on Settings · Approvals affects the next Submit only.
 6. **Concurrency.** Every transition `SELECT ... FOR UPDATE`s the run row; two people computing at once queue,
@@ -702,11 +706,17 @@ suspension into absent days), so payroll does, from the owners' records:
    `restricted`, numbering none, not signable), template `templates/documents/payslip.html` on the letterhead, its
    variables the contract's `PayslipVars` (`defineVariables("document", "payslip", c.payslips.PayslipVars)`). The
    employee reads their own; anyone else needs `payroll` edit (HANDOFF §5 item 7). Until it has rendered,
-   `GET …/pdf` is 409 `NOT_READY` and the screen says Preparing.
+   `GET …/pdf` is 409 `NOT_READY` and the screen says Preparing. The request is made in the lock's transaction with no
+   actor, so the approver is not the uploader of a person's payslip and the vault's rule (the person, or `payroll` edit)
+   is the only way in. A reader whose role hides pay or bank details (`employee.salary`, `employee.bank`) is not handed a
+   document that carries them, unless it is their own (§6.13 rule 3).
 5. **Email a Copy** (ESS) and **Email All Payslips** send a mail from `templates/email/payslip-ready.html` to the
    person's `work_email` with the PDF attached, through the outbox and `system-mail.service`. The body states the
    month and where to read it, never an amount. Each send sets `payslip.emailed_at`; Email All sends only to those
-   not yet emailed unless `resend` is true (the screen asks Email Again?), so a repeat press never doubles a mail.
+   not yet emailed unless `resend` is true (the screen asks Email Again?), so a repeat press never doubles a mail. A
+   payslip is marked emailed in its own transaction and the mail is queued from the `payslip.emailed` it records (§7),
+   so a retry skips what was marked; a mail that cannot be made (no work address, the PDF never rendered) puts the
+   payslip back to not emailed.
 6. **Download All** is one PDF of every published payslip of the run, one A4 page each, in staff-number order:
    `documents.generate` with doc type `payroll_payslips_export` (`export: true`, kept 24 hours, template
    `payslip-batch`), reserved in the request, finished by the worker, downloaded on the device that pressed it
@@ -869,14 +879,16 @@ the period, counts and statuses, never an amount (§6.13).
 | `payroll_run.approved` | The approval completes (`workflow.onCompleted("payroll.run", "payroll.apply_decision", ...)`) | Lock (§6.9 rule 3), audit, Home's card updates |
 | `payroll_run.paid` | Mark Paid | Audit; Home's card stops counting it |
 | `payslip.published` | Per person, in the lock | Notification "Your payslip is ready" to the person; the PDF is requested |
-| `payslip.emailed` | A copy is mailed | Audit |
+| `payslip.emailed` | A payslip is marked emailed, by Email All or Email a Copy (`copy` says which) | Audit; the outbox handler `payslips.mail` queues the mail on `email-send` (job `payslip-ready-<event>`, so a handler run again queues it once) with the PDF attached |
+| `payroll_run.email_requested` | Email All Payslips committed (carries `resend`, the count queued and the database's clock at the press) | Audit; the outbox handler `payroll.email_payslips` |
+| `payroll_run.export_requested`, `payslip.export_requested` | Download All was pressed on a run, or on My Payslips for a year | Audit; the document is reserved in the same transaction (`documents.generate`, pending) and the pdf-render job renders it |
 | `payroll_adjustment.added`, `.removed` | An adjustment is saved or removed | Audit |
 | `payslip.excluded`, `.included` | A person is left out of a run, or put back | Audit |
 | `payroll_deduction.accepted`, `.released`, `.waived`, `.settled`, `.cancelled` | A fine or advance moves | Audit; notifies the employee for accepted, waived and a recorded advance; the fine events also reach `sanctions.fines`'s own (`sanction_fine.accepted` and so on). `.settled` is emitted by the lock (PR 2, entity `deduction`); the others are PR 3's (a fine's events name the fine as their entity, an advance's the deduction; an advance recorded is an `.accepted` with source `salary_advance`, and a cancelled advance tells no one) |
 | `payroll_deduction.fine_pending` | After commit, from an outbox handler on `sanction.issued` whose payload has a `fine_amount` (`deductions.fine_waiting`); its `dedup_key` is the fine, so a retry tells once | Notifies `payroll` edit holders (scope `all`) "Fine Waiting for Payroll", the person and the query number, never the amount |
 | `payroll_setting.changed`, `statutory_rate.saved`, `salary_grade.saved`, `pay_components.saved` | Configurations change | Audit; `payroll_setting.changed` is `security: true` so the access watchers are told |
 | `document.generated` (doc type `payslip`) | A payslip PDF finishes rendering | Marks it ready for the screen; nothing else |
-| `payroll.email_payslips` (outbox handler) | Email All commits | Walks the run's published payslips not yet emailed (`// pagination:complete`, a run's payslips to mail, never a list) and queues one mail each; each is recorded on its payslip before the next, so a retry skips what was sent |
+| `payroll.email_payslips` (outbox handler) | Email All commits | Walks the run's published payslips not yet emailed (on a resend, not emailed since the press) whose PDF is done, 25 a pass (`pagination:batch`, a batch of work, never a list), and marks each emailed in its own transaction, which emits the `payslip.emailed` that queues its mail; a payslip whose PDF is still rendering makes the handler fail to be retried (10 s, 20 s, 40 s …) and, on the last attempt, is left unmailed for another press |
 
 **How the run hears its approval.** Three registrations in `payroll.events.js`, as `expenses.events.js` does:
 `workflow.onCompleted("payroll.run", "payroll.apply_decision", ...)` (approved, rejected, and the engine's timeout
@@ -983,6 +995,7 @@ ever wanted, the question CLAUDE.md requires ("which job does it use?", the owne
   `not_offered` with a reason the gate accepts (praxis-ai.md §6.15); PR 6 decides each and nothing is added to
   `scripts/check/ai-forms-gaps.json`. Each action key has an integration test and an evaluation case
   (`scripts/ai/eval-assistant.js`); `npm run gen:ai-catalogue` is run and its diff reviewed.
+- **What PR 4 carries.** Gate 9 holds a filled controller to an AI manifest or a written `// ai:none <reason>`, and gate 10 to a search provider: `payslips.controller.js` says `ai:none` with the reason that PR 6 writes `payslips.mine` and `payslips.list` (and removes the line), and `payslips.search.js` answers for `payroll` readers. A payslip has no create or edit form, so gate 23 asks for no card.
 - **What PR 2 carries.** Gates 9, 10, 19 and 23 hold a module to its AI manifest and its search provider from the day its controller is
   filled, which is PR 2, so PR 2 carries `payroll_runs.create` (New Run, with its integration test and evaluation case) and
   `payroll.search.js` for `payroll_run`; PR 6 adds the five other cards, the reads, the summary and the other providers. **What PR 3 carries** for the same gates: `deductions.ai.js` with the one route "record a salary advance" (Payroll · Deductions, `action=advance`) and `deductions.search.js` for an accepted fine or an advance (a fine still waiting is the sanction's, found with its query); the three cards and the reads of this section stay PR 6's.
@@ -991,7 +1004,8 @@ ever wanted, the question CLAUDE.md requires ("which job does it use?", the owne
   payroll" to Payroll · Configurations.
 - **Search** (`payroll.search.js`, `payslips.search.js`, `deductions.search.js`, each a `recordProvider`):
   `payroll_run` (number, "October 2026 payroll", words payroll, run, salaries), `payslip` (number and the
-  person's name; `owner`-pinned for ESS so a person finds only their own; words payslip, pay slip, salary slip),
+  person's name; PR 4 carries the provider for `payroll` readers, within their scope, draft and published alike, never an amount; PR 6
+  adds the `owner`-pinned search so a person finds only their own, which needs a link that opens My Payslips; words payslip, pay slip, salary slip),
   `deduction` (the person and reason; words deduction, fine, advance, loan). Screens in
   `src/shared/search/screens.js`: Payroll Runs, Payslips, Deductions and Configurations (words advanced payroll,
   statutory, paye, pension, grades, pay day, salary structure), replacing the Salary Structure and Statutory
@@ -1275,7 +1289,8 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
 
 | # | Question | Decides | Needed before | Meanwhile |
 |---|---|---|---|---|
-| 1 | Sign-off of the payslip sample (§13.1 item 20) | TB shows Cynthia | PR 4 | The sample is the draft in `docs/MyCity-ERP-Documents/payroll-samples/` |
+| 1 | Sign-off of the payslip sample (§13.1 item 20) | TB shows Cynthia | PR 4 | The sample is the draft in `docs/MyCity-ERP-Documents/payroll-samples/`; PR 4 built `templates/documents/payslip.html` from it as drafted (the letterhead supplies the logo, the organisation's line and the date; the number, the month and the person's block are in the body) and it is changed when MyCity answers |
+| 2 | What My Payslips' **In the run** means (§5, §10.1; `docs/guides/ess.md` §6, §13) | TB with AJ and LA | PR 7 | §5 and §6.10 rule 3 say the person sees nothing before approval, so `GET /ess/payslips` lists published payslips only and a month still in the approval has no row; §10.1's help text and the ESS guide's edge case say In the run is "waiting for approval". PR 4 returns each payslip's run status (`approved`, `paid`) and `has_deduction`, so a published payslip whose run is `approved` and not yet `paid` can read In the run (the money not yet transferred); if the person should also see a month that is still in the approval, the API needs a row with no figures, which is a change to §6.10 rule 3 |
 
 Answered and moved to §13.1: the approver (item 7), a leaver's instalments and a negative net (16), recurring
 allowances (17), the ESS modal (18), staging mail (19), the statutory rates, the accountant's conventions, the pay day
@@ -1389,7 +1404,9 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   handler, the export reservation.
 - Tests: a payslip's lines equal the run's; the PDF renders and is restricted; Email All sends once per person and
   repeats only with `resend`; an ESS reader never opens another's; masks; the batch PDF has a page each.
-- Done when: an approved run publishes payslips, each person opens theirs, Email All and Download All work.
+- Done when: an approved run publishes payslips, each person opens theirs, Email All and Download All work. Built
+  09/11/2026 (`m6/payslips`): the PDFs are requested in the lock's transaction (306 in under a second, so no render
+  job of ours); the screens are PR 7's.
 
 ### PR 5 · Configurations and the advanced option (`m6/advanced`)
 
@@ -1474,7 +1491,9 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `ProblemSeverity`, `ProblemCode`, `PayrollRunCounts`, `PayrollTrendMonth`, `PayrollSettingsVersion`.
 - `payslips.js`: `Payslip`, `PayslipLine`, `PayslipDetail`, `PayslipListQuery`, `PayslipPage`, `PayslipVars`,
   `PayslipBatchVars`, `EssPayslipQuery`, `EssPayslipSummary`, `EssDeductionRow`, `EssDeductionPage`; and
-  `PayslipLineItem` and `PayslipLineItemPage` (the pay items behind a grouped line, §5), `PayslipPrintedLine`,
+  `PayslipLineItem` and `PayslipLineItemPage` (the pay items behind a grouped line, §5), `PayslipLineParams`,
+  `PayslipEmailQueued` (Email All's 202), `PayslipCopySent` (Email a Copy), `PayslipReadyEmailVars` (the mail's
+  variables), `PayslipPrintedLine`,
   `PayslipStatus`, `PayslipLineKind`, `PayslipLineCode`, `EssDeductionSource`.
 - `deductions.js`: `DeductionRow`, `DeductionListQuery`, `DeductionPage`, `DeductionSummary`, `FineParams`, `DeductionAccept`,
   `DeductionWaive`, `AdvanceRecord`, `AdvanceCancel`; and `DeductionFigure`, `DeductionSource`, `DeductionStatus`
@@ -1497,7 +1516,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `statutory` as in README §5.9 (`statutory.rates`, `statutory.report`). The stubs for jobs
   (`src/jobs/handlers/payroll-compute.js`, `payslip-render.js`) are deleted at the end if unused (decision 3 of §13.2).
 - **Other modules touched:** `attendance.pay.js`, `sanctions.fines.js`, `organisation` (tax and pension numbers, PR 5),
-  `ess` (the routes), `dashboard/sources/payroll.source.js`, `settings.service.js`, `shared/access/access.catalog.js`,
+  `ess` (the routes, in `ess.earnings.js`, `ess.controller.js`, `ess.routes.js`), `dashboard/sources/payroll.source.js`, `settings.service.js`, `shared/access/access.catalog.js`,
   `shared/rbac/field-mask.js`, `shared/workflow/definitions.js`, `shared/route-map.js`, `shared/search/screens.js`.
 - **Schema:** `migrations/6000_payroll.sql`, `6010_payroll_deductions.sql`, `6020_payroll_advanced.sql`,
   `6030_leave_unpaid.sql`; `seeds/reference/6099_seed_payroll.sql`; `seeds/staging/NN_payroll.js`.
@@ -1513,6 +1532,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 09/11/2026 · JP · PR 4 (payslips, the PDF, email and ESS, `m6/payslips`) built `payslips.repo/.service/.breakdown/.pdf/.events/.controller/.routes/.search`, `ess.earnings.js` and the ESS routes, the pay-date helpers in `payroll.config.repo.js`, the two document templates and the mail; the guide meets what was built. Contract: `PayslipLineParams`, `PayslipEmailQueued`, `PayslipCopySent` and `PayslipReadyEmailVars` added (§5, Appendix C); the routes of Email All and Download All stay on the run (§5) and answer 202 with `PayslipEmailQueued` and `ExportFile`. New errors `EMAIL_TOO_SOON` (a copy within a minute of the last mail of a payslip, Email All counting) and `NO_PAYSLIPS` (§5). A sixth write guard `published` (an approved or paid run) is added to the lock, and the five writes that belong on a run that is out (Email All, a payslip's mail, its un-marking, a copy and Download All) are made with it and held by the enumerating test (§6.9 rule 4). The lock requests every payslip's PDF in its own transaction with no actor, so the approver is never the uploader of a person's payslip; 306 requested in 957 ms, so no render job of ours (§6.10 rule 4). Email All marks each payslip emailed in its own transaction and the `payslip.emailed` it records queues the mail (one path for both Email All and Email a Copy), so the handler of §7 marks and the mail is queued by `payslips.mail`; the new events are `payroll_run.email_requested`, `payroll_run.export_requested`, `payslip.emailed` and `payslip.export_requested` (§7). A payslip's PDF and Download All are refused to a reader whose role hides `employee.salary` or `employee.bank` unless the payslip is their own, since the document carries both (§6.10 rule 4, §6.13 rule 3). `GET /ess/payslips/summary` sums the year's published payslips and Next Payday is the first pay date on or after today whose month's run is not paid, with the pay day in force at that month's end (§5, §6.11 rule 1). Gates 9 and 10 hold a filled controller to an AI manifest and a search provider: `payslips.controller.js` carries `ai:none` until PR 6 writes the reads, and `payslips.search.js` answers for `payroll` readers (§9). §13.3 gains question 2: what My Payslips' In the run means, since §5 (published only) and §10.1 (waiting for approval) read differently. The staff app's typecheck refuses an INTERIM entry the contract also declares, so, as PR 2 did for Payroll Runs, the Payslips tab and My Payslips prototype screens and their mock now read the contract's shapes (`Payslip`, `PayslipDetail`, `EssPayslipSummary`, `EssDeductionRow`) and call `/payslips` and `/ess/payslips`; their layout, their placeholders for the PDF and Download All, and everything §10 asks for stay PR 7's, and the API row stays unticked in PROGRESS until PR 7 so the tabs do not open on staging as a half-built prototype.
 - 09/11/2026 · JP · PR 3 (deductions, `m6/deductions`) built `deductions.repo/.acceptance/.service/.controller/.routes/.events/.ai/.search`, the Deductions screen and its mock; the guide meets what was built. Contract: `DeductionRow.salary_set` (an attendance item priced for a person with no gross has a null amount that is not the mask's, so the screen says No Salary Set and never Restricted), `DeductionSummary.open_period` (the screen works out no month, §6.6 rule 2) and `FineParams` (the path of a fine's Accept and Waive), §5 and Appendix C. Rules: a start month is the open month or later and no month of a deduction may already have a run sent for approval (422 `START_NOT_ALLOWED`), and a total too small for a kobo a month is refused (422 `TOO_MANY_MONTHS`) (§6.6); a write takes the runs of the months it touches before its own rows, in the order a run's lock takes them, so a Compute or a Submit never reads between a write and its commit (`payroll.lock.lockMonths`); errors `NOT_A_FINE`, `NOT_AN_ADVANCE`, `NOT_ACTIVE` and `GRANTED_IN_THE_FUTURE` added to §5. The list opens pending first and then newest by a default sort the contract does not name. Events: an advance recorded is `payroll_deduction.accepted` with its source, a cancelled advance tells no one, the waiting notice has a `dedup_key` (§7); the route map's `deduction` opens ESS · My Payslips for the person told. Gates 9 and 10 carry `deductions.ai.js` (one route) and `deductions.search.js` from the day the controller is filled, as for PR 2 (§9). The screen was built in this pull request at JBS Praxis's request (Appendix A, PR 3); the rest of PR 7 is unchanged.
 - 09/11/2026 · JP · PR 2 (calculation and the run, `m6/run`) built `payroll.calc/.config.repo/.inputs/.lock/.run/.repo/.service/.controller/.routes/.events`, the Home source, `attendance.pay`'s hand-off functions and `sanctions.fines.release`; the guide meets what was built. Contract: `PayrollRunInclude` (the body of `POST …/include`, which §5 named without one) and `PayrollAdjustmentParams` (the two path parameters of a removal), added to §5 and Appendix C. Errors added to §5: `RUN_NOT_COMPUTED` (Submit on a Draft), `RUN_NOT_SUBMITTED`, `NO_ONE_TO_PAY` (§11 said Submit refuses an empty month), `NOT_IN_RUN`, `NOT_EXCLUDED`, `PAID_IN_THE_FUTURE`; `RUN_CHANGED` carries the new totals in `fields` to a reader who may see pay, and a refused Submit is answered after its recompute commits. The write guard is `payroll.lock.defineWrite`, which locks the run row and runs the guard a write names (`editable`, `computed`, `approved`, `submitted`), so every write registers in `WRITES` and a unit test holds the files to it (§6.9 rule 4). A leaver is one whose `left_on` falls on or before the month's last day (§6.6 rule 9); fines come before advances on a slip; a run reports problems only while Draft or Computed, and an advanced run reports No Rates Set until PR 5 (§6.15). New events `payslip.excluded`, `payslip.included` and `payroll_deduction.settled` (§7); the instalments' moves and the settlement of a finished deduction are written by the run (§4.1, which already named `payroll` a writer of the instalments). Compute for 308 people measured at 550 ms, so §13.2 item 3 is decided: no `payroll-compute` job, and both job stubs go in PR 8. Gates 9, 10, 19 and 23 hold a module to its AI manifest and search provider from the day its controller is filled, which is PR 2, so PR 2 carries the card `payroll_runs.create` and `payroll.search.js` for `payroll_run` (§9, Appendix A). Home's Payroll In Progress card is live.
 - 09/11/2026 · JP · JBS Praxis's answers on PR 1's open points recorded (§13.1 items 25 to 27): the first statutory rates are entered before the option is switched on, so Statutory Items and PAYE Bands are always on Configurations and the rates routes work whatever the option's state, while the conventions go in the Switch On request and Salary Structure and Pay Components stay behind "on or has been" (§2, §3.5, §5, §6.11 rule 4, §10.1, §10.2); `leave_type.unpaid` is seed-only for now; #11 My Payslips keeps its Owner, AJ (Appendix A). §13.3's question 2 is answered and removed.

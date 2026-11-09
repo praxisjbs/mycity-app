@@ -1,0 +1,16 @@
+---
+subject: "Your payslip for {{ period_label }}"
+title: Payslip Ready
+format: markdown
+---
+{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+Your payslip for {{ period_label }} is ready. Its reference is **{{ number }}**, and a copy is attached.
+
+You can read it any time in My Payslips.
+
+[Open My Payslips]({{ read_url }})
+
+If the link does not open, copy this address into your browser: {{ read_url }}
+
+If anything on it looks wrong, reply to this email{{#if org.email}} or write to us at {{ org.email }}{{/if}}.

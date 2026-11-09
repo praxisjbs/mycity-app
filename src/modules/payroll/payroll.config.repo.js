@@ -7,11 +7,15 @@
  *
  *   settingOn(db, date)   the version in force on a date, or the defaults
  *   payDayOf(setting)     the pay day, 30 when none is set
+ *   payDateOf(setting, period)   the day a month is paid: the pay day, or the month's last day when it is past
+ *   payDateFor(db, period)       the same, with the setting in force on the month's last day
+ *   nextPayDate(db, today, isPaid)  the next pay date on or after today whose run is not paid
  *
  * A run reads the setting on its period's first day, so the mode a month was computed in is the mode of
  * that month, whenever it is computed (§6.11 rule 2).
  */
 const effective = require("../../shared/db/effective-dated");
+const lagos = require("../../shared/time/lagos");
 
 /** The pay day when MyCity has set none (§13.1 item 24): shown on Configurations as "30 (default)". */
 const DEFAULT_PAY_DAY = 30;
@@ -46,4 +50,45 @@ async function settingOn(db, date) {
 /** The pay day of a setting: its own, or the default 30. */
 const payDayOf = (setting) => (setting && setting.pay_day ? setting.pay_day : DEFAULT_PAY_DAY);
 
-module.exports = { DEFAULT_PAY_DAY, DEFAULTS, settingOn, payDayOf };
+/**
+ * The day a month is paid (§6.11 rule 1): the pay day, or the month's last day when the pay day is past it
+ * (30 pays on 28 or 29 February, 31 on 30 April). A plain calendar date: a Sunday or a holiday keeps its date,
+ * because MyCity's CEO transfers by hand (§13.2 item 23).
+ * @param {{pay_day?: number|null}} setting
+ * @param {string} period  a month's first day
+ */
+function payDateOf(setting, period) {
+  const { first, last } = lagos.monthBounds(period);
+  const day = Math.min(payDayOf(setting), Number(last.slice(8, 10)));
+  return `${first.slice(0, 8)}${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * A month's pay date, with the pay day in force at the month's end: a pay day changed from a date applies to
+ * the months that end on or after it.
+ * @param {{query: Function}} db
+ * @param {string} period  a month's first day
+ */
+async function payDateFor(db, period) {
+  return payDateOf(await settingOn(db, lagos.monthBounds(period).last), period);
+}
+
+/**
+ * Next Payday on My Payslips: the first pay date on or after `today` (Lagos) of a month whose run is not yet
+ * paid. A month whose run is paid has had its payday, whatever the day; the search runs at most 14 months on.
+ * @param {{query: Function}} db
+ * @param {string} today
+ * @param {(period: string) => Promise<boolean>|boolean} isPaid  whether the month's run is paid
+ * @returns {Promise<string|null>}
+ */
+async function nextPayDate(db, today, isPaid) {
+  let period = lagos.monthBounds(today).first;
+  for (let i = 0; i < 14; i += 1) {
+    const date = await payDateFor(db, period);
+    if (date >= today && !(await isPaid(period))) return date;
+    period = lagos.addMonths(period, 1);
+  }
+  return null;
+}
+
+module.exports = { DEFAULT_PAY_DAY, DEFAULTS, settingOn, payDayOf, payDateOf, payDateFor, nextPayDate };

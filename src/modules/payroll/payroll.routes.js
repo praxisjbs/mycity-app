@@ -16,8 +16,12 @@
  *   POST   /runs/:id/adjustments        `payroll` edit: Add Adjustment (the run goes back to Draft)
  *   DELETE /runs/:id/adjustments/:adjustment_id   `payroll` edit: take one off (the run goes back to Draft)
  *   DELETE /runs/:id                    `payroll` delete: Discard, a run never sent
+ *   POST   /runs/:id/email-payslips     `payroll` edit: Email All Payslips, an approved or paid run (202, the worker mails)
+ *   POST   /runs/:id/payslips-export    `payroll` export: Download All, one PDF of the run's payslips (202, the file the
+ *                                       screen waits on)
  *
- * A run is approved, sent back or rejected in its approval (/workflow/instances/:id/approve, request-changes,
+ * Email All and Download All are written in payslips.service (the `published` guard); their routes sit here because they
+ * are the run's buttons. A run is approved, sent back or rejected in its approval (/workflow/instances/:id/approve, request-changes,
  * reject), never here: whoever the stage names decides, with `payroll` approve. Locked means locked: a Submitted,
  * Approved or Paid run answers 409 RUN_NOT_EDITABLE to everything but its approval and Mark Paid.
  */
@@ -72,5 +76,11 @@ route(router, "delete", "/runs/:id/adjustments/:adjustment_id", { params: p.Payr
 
 route(router, "delete", "/runs/:id", { ...byId, no_content: true, summary: "Discard a run that was never sent" },
   requirePermission("payroll", "delete"), controller.discard);
+
+route(router, "post", "/runs/:id/email-payslips", { ...byId, body: p.PayslipEmailAll, response: c.payslips.PayslipEmailQueued, summary: "Email every payslip of an approved run" },
+  requirePermission("payroll", "edit"), controller.emailPayslips);
+
+route(router, "post", "/runs/:id/payslips-export", { ...byId, body: c.common.EmptyBody, response: c.documents.ExportFile, summary: "Download every payslip of an approved run as one PDF" },
+  requirePermission("payroll", "export"), controller.payslipsExport);
 
 module.exports = { basePath: "/payroll", surface: "staff", router };

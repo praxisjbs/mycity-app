@@ -8,6 +8,7 @@ const { ok, created, accepted } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { withActor } = require("../../shared/events/emit");
 const { readUpload } = require("../../middleware/upload");
+const vault = require("../../shared/documents/vault");
 const service = require("./ess.service");
 
 const id = (req) => req.validated.params.id;
@@ -78,4 +79,13 @@ module.exports = {
 
   respondToQuery: async (req, res) =>
     ok(res, await service.queries.respond(withActor(req), id(req), req.validated.body)),
+
+  // My Payslips: the person's own, never masked from them (the mask is for other people's pay).
+  listPayslips: async (req, res) => sendPaged(res, await service.earnings.list(req.user, req.validated.query)),
+  payslipSummary: async (req, res) => ok(res, await service.earnings.summary(req.user, req.validated.query || {})),
+  getPayslip: async (req, res) => ok(res, await service.earnings.get(req.user, id(req))),
+  payslipPdf: async (req, res) => vault.serve(req, res, await service.earnings.pdf(req.user, id(req)), { inline: true }),
+  emailPayslip: async (req, res) => ok(res, await service.earnings.email(withActor(req), id(req))),
+  exportPayslips: async (req, res) => accepted(res, await service.earnings.exportYear(withActor(req), req.validated.body || {})),
+  listDeductions: async (req, res) => sendPaged(res, await service.earnings.deductions(req.user, req.validated.query)),
 };

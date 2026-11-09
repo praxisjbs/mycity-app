@@ -7,10 +7,11 @@
  * reject), never here.
  */
 const { pool } = require("../../config/db");
-const { ok, created, noContent } = require("../../shared/http/respond");
+const { ok, created, accepted, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { maskForUser } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
+const payslips = require("../payslips/payslips.service");
 const service = require("./payroll.service");
 
 const id = (req) => req.validated.params.id;
@@ -45,6 +46,13 @@ module.exports = {
   removeAdjustment: async (req, res) => {
     await service.removeAdjustment(withActor(req), id(req), req.validated.params.adjustment_id);
     return noContent(res);
+  },
+
+  emailPayslips: async (req, res) => accepted(res, await payslips.requestEmailAll(withActor(req), id(req), body(req))),
+
+  payslipsExport: async (req, res) => {
+    await payslips.assertMayPrint(req.user, null);
+    return accepted(res, await payslips.requestRunExport(withActor(req), id(req)));
   },
 
   discard: async (req, res) => {
