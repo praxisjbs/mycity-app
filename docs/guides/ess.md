@@ -139,10 +139,13 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `POST /profile/photo` | multipart `file` (purpose `avatar`, 5 MB, an image) → `DocumentRef` (the stored file, as every upload answers) | `ess` · own | | Built 19/10/2026. Through `organisation.photo.setPhoto`; a file that is not an image is a 415 |
 | `DELETE /profile/photo` | → `EssProfile` | `ess` · own | | Built 19/10/2026. Clears the pointer; the file stays in the vault |
 | `POST /profile/export` | `EmptyBody` → `ExportFile` (documents, 202) | `ess` · own | | Built 19/10/2026. Download My Data (§3 step 8): the file reserved and the request audited at once, built after commit and downloaded where it was asked for. Pressed again the same Lagos day, the same file again; when the CEO already made one for this person that day, a 429 `DATA_EXPORT_LIMIT` |
-| `GET /payslips` | `EssPayslipQuery` (`year`) → `PayslipPage` | `ess` · own | yes | Locked payslips only |
-| `GET /payslips/:id/pdf` | → PDF | `ess` · own | | |
-| `POST /payslips/:id/email` | → `{ sent }` | `ess` · own | | To the work email |
-| `GET /deductions` | `PageQuery` → `DeductionPage` | `ess` · own | yes | Month, amount, reason, query |
+| `GET /payslips` | `EssPayslipQuery` (`year`) → `PayslipPage` | `ess` · own | yes | Built 09/11/2026 (M6 PR 4). Published payslips of the year, newest month first; each carries its run's status and whether it has a deduction (`docs/guides/payroll.md` §5, §13.3 item 2) |
+| `GET /payslips/summary` | `EssPayslipQuery` → `EssPayslipSummary` | `ess` · own | | Built 09/11/2026. Gross, Net Received, Payslips and Deductions over the year's published payslips; Next Payday by the pay day |
+| `GET /payslips/:id` | → `PayslipDetail` | `ess` · own | | Built 09/11/2026. Its earning and deduction lines; someone else's, or one not yet published, is a 404 |
+| `GET /payslips/:id/pdf` | → PDF | `ess` · own | | Built 09/11/2026. 409 `NOT_READY` while the document engine renders it |
+| `POST /payslips/:id/email` | `EmptyBody` → `PayslipCopySent` | `ess` · own | | Built 09/11/2026. To the work email with the PDF attached, once a minute (429 `EMAIL_TOO_SOON`) |
+| `POST /payslips/export` | `EssPayslipQuery` (`year`) → `ExportFile` (documents, 202) | `ess` · own | | Built 09/11/2026. Download All: the year's payslips as one PDF, a page each, kept 24 hours; 409 `NO_PAYSLIPS` for a year with none |
+| `GET /deductions` | `PageQuery` → `EssDeductionPage` | `ess` · own | yes | Built 09/11/2026. Each instalment of a fine or an advance that is not cancelled, newest month first, with its place ("1 of 3") and the fine's query number |
 | `GET /leave` | `EssLeaveListQuery` (`status`, `year`) → `LeavePage` | `ess` · own | yes | Built 17/10/2026. The caller's own requests |
 | `GET /leave/calendar` | `EssLeaveCalendarQuery` (`month`) → `LeavePage` | `ess` · own, wider by rule | yes | Built 18/10/2026. Approved and waiting leave touching the month: the caller's own and everyone under them in the reporting tree; everyone for the CEO and People with scope all (Operations & People) (the team lead, 18/10/2026) |
 | `GET /leave/balances` | `EssLeaveBalanceQuery` (`year`) → `LeaveBalances` | `ess` · own | | Built 17/10/2026. Every active type: entitled, taken, booked, pending, remaining |
@@ -437,6 +440,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 09/11/2026 · JP · M6 PR 4 built My Payslips' API in `ess.earnings.js` (`docs/guides/payroll.md` Appendix A): §5's seven routes (the list, the summary, one payslip, its PDF, Email a Copy, Download All and Deductions) are built over `payslips.service` with the caller's own employee id, and this module still reads none of payroll's tables. A person's figures are never masked from them. §4's `payslip` row is read through the payslips service, not directly. No screen changed (PR 7); the open question of what In the run means is `docs/guides/payroll.md` §13.3 item 2.
 - 09/11/2026 · JP · §3 step 4: the pay day is the 30th unless MyCity sets another (it read "normally the 27th"; `docs/guides/payroll.md` §13.1 item 24). No screen changed.
 - 08/11/2026 · JP · Payroll's lines brought into line with the 4 November review and `docs/guides/payroll.md` (M6's single source of truth): §6's simple-payroll bullet, §13's My Payslips visibility settled; §10.2's My Payslips row now says the payslip opens in a modal at every desktop width (JBS Praxis, 08/11/2026; built with M6's PR 7). No screen of ESS changed yet.
 - 05/11/2026 · AJ · My Requests (#56) moved from Expenses into ESS, after My Leave (M8 handoff decision 8). Its screen, rules and API are M8's, in `docs/guides/expenses.md`; `app/src/features/ess/index.tsx` renders `features/expenses/MyRequests.tsx`.

@@ -571,7 +571,7 @@ edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4
 | Module | Files beyond the template |
 |---|---|
 | `payroll` | `.calc` (pure, no DB), `.inputs` (attendance, accepted deductions), `.run`, `.lock`, `.config.repo` (effective dated) |
-| `payslips` | `.pdf`, `.breakdown` |
+| `payslips` | `.pdf` (the `payslip` and `payroll_payslips_export` document types, their variables and the calls that request the PDFs), `.breakdown` (the pay items behind a grouped line) |
 | `salary_structure` | |
 | `deductions` | `.acceptance` (nothing deducts itself) |
 | `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
@@ -583,8 +583,14 @@ mode; `salary_structure.js` and `statutory.js` come with PR 5), migrations `6000
 `shared/workflow/definitions.js`, the capability in `shared/access/access.catalog.js`, `employer_cost` and
 `account_last4` in `shared/rbac/field-mask.js`, and the four tabs (Payroll Runs, Payslips, Deductions,
 Configurations: Salary Structure and Statutory are retired) in the route map, ⌘K, Coming Soon and the shell's
-catalogue, with `tests/integration/payroll-schema.test.js` and `tests/unit/payroll-contract.test.js`. No
-controller, route, service or repo of the five modules is filled yet: that is PR 2 onward.
+catalogue, with `tests/integration/payroll-schema.test.js` and `tests/unit/payroll-contract.test.js`. PR 2 filled
+`payroll` (the run) and PR 4 (`m6/payslips`, 09/11/2026) `payslips`: Payroll · Payslips under `/api/v1/payslips`,
+Email All Payslips and Download All on the run (`/payroll/runs/:id/email-payslips`, `/payslips-export`), and My
+Payslips' routes in `ess` (`ess.earnings.js`, under `/api/v1/ess/payslips` and `/ess/deductions`); the PDFs are
+requested in the run's lock. Its templates are `templates/documents/payslip.html`, `payslip-batch.html` (Download
+All, a page each) and `templates/email/payslip-ready.html`, tested by `tests/integration/payslips.test.js` and
+`src/modules/payslips/payslips.test.js`. `deductions`, `salary_structure` and `statutory` are not filled yet: PR 3
+and PR 5.
 
 Web push, each person's preferences, `notifications.reminders` and the `settings` Notifications
 screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2026

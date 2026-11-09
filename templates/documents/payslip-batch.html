@@ -1,0 +1,70 @@
+<style>
+  .pb-slip + .pb-slip { break-before: page; page-break-before: always; }
+  .pb-title { font-size: 14pt; font-weight: 700; color: #014339; margin: 0 0 1mm 0; }
+  .pb-period { font-size: 10.5pt; color: #71717A; margin: 0 0 4mm 0; }
+  .pb-who { margin: 0 0 5mm 0; padding: 3mm 4mm; border: 0.3mm solid #E4E4E7; border-radius: 2mm; }
+  .pb-who table { margin: 0; width: 100%; }
+  .pb-who td { border: 0; padding: 0.7mm 0; }
+  .pb-who td.pb-key { width: 22mm; color: #71717A; }
+  .pb-who td.pb-val { font-weight: 600; padding-right: 6mm; }
+  .pb-h { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; color: #014339; margin: 5mm 0 1mm 0; }
+  .pb-lines { margin: 0; width: 100%; }
+  .pb-lines th { font-size: 9pt; }
+  .pb-lines td.pb-detail { color: #71717A; font-size: 9pt; }
+  .pb-lines tr { page-break-inside: avoid; }
+  .pb-lines tr.pb-total td { font-weight: 700; border-bottom: 0.6mm solid #014339; }
+  .pb-net { margin-top: 6mm; padding: 3mm 4mm; background: #014339; color: #FFFFFF; border-radius: 2mm; break-inside: avoid; page-break-inside: avoid; }
+  .pb-net table { margin: 0; width: 100%; }
+  .pb-net td { border: 0; padding: 0; color: #FFFFFF; vertical-align: middle; }
+  .pb-net td.pb-net-label { font-size: 11pt; font-weight: 600; letter-spacing: 0.3px; }
+  .pb-net td.pb-net-amount { font-size: 16pt; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+<div class="pb-body">
+  {{#each payslips}}
+  <section class="pb-slip">
+    <h1 class="pb-title">Payslip</h1>
+    <p class="pb-period">{{ period_label }} · {{ number }}</p>
+
+    <div class="pb-who">
+      <table>
+        <tr>
+          <td class="pb-key">Name</td><td class="pb-val">{{ employee_name }}</td>
+          <td class="pb-key">Bank</td><td class="pb-val">{{#if bank_name}}{{ bank_name }}{{else}}Not Set{{/if}}</td>
+        </tr>
+        <tr>
+          <td class="pb-key">Staff Number</td><td class="pb-val">{{ staff_number }}</td>
+          <td class="pb-key">Account</td><td class="pb-val">{{#if account_last4}}Ending {{ account_last4 }}{{else}}Not Set{{/if}}</td>
+        </tr>
+        <tr>
+          <td class="pb-key">Job Title</td><td class="pb-val">{{#if job_title}}{{ job_title }}{{/if}}</td>
+          <td class="pb-key">Pay Date</td><td class="pb-val">{{ pay_date_label }}</td>
+        </tr>
+        <tr>
+          <td class="pb-key">Department</td><td class="pb-val">{{#if department}}{{ department }}{{/if}}</td>
+          <td class="pb-key">Days Paid</td><td class="pb-val">{{#if working_days}}{{ working_days }}{{/if}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <h2 class="pb-h">Earnings</h2>
+    <table class="pb-lines">
+      <thead><tr><th>Item</th><th>Detail</th><th class="amount">Amount</th></tr></thead>
+      <tbody>
+        {{#each earnings}}<tr><td>{{ label }}</td><td class="pb-detail">{{#if detail}}{{ detail }}{{/if}}</td><td class="amount">{{ amount }}</td></tr>{{/each}}
+        <tr class="pb-total"><td>Total Earnings</td><td></td><td class="amount">{{ gross_pay }}</td></tr>
+      </tbody>
+    </table>
+
+    <h2 class="pb-h">Deductions</h2>
+    <table class="pb-lines">
+      <thead><tr><th>Item</th><th>Detail</th><th class="amount">Amount</th></tr></thead>
+      <tbody>
+        {{#each deductions}}<tr><td>{{ label }}</td><td class="pb-detail">{{#if detail}}{{ detail }}{{/if}}</td><td class="amount">{{ amount }}</td></tr>{{/each}}
+        <tr class="pb-total"><td>Total Deductions</td><td></td><td class="amount">{{ total_deductions }}</td></tr>
+      </tbody>
+    </table>
+
+    <div class="pb-net"><table><tr><td class="pb-net-label">Net Pay</td><td class="pb-net-amount">{{ net_pay }}</td></tr></table></div>
+  </section>
+  {{/each}}
+</div>

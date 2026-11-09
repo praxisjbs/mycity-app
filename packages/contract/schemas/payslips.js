@@ -150,6 +150,35 @@ const PayslipLineItem = z
   .strict();
 const PayslipLineItemPage = Paged(PayslipLineItem);
 
+/** The two path parameters of GET /payslips/:id/lines/:line_id/items. */
+const PayslipLineParams = z.object({ id: uuid, line_id: uuid }).strict();
+
+/* ------------------------------------------------------------------ *
+ * Mail
+ * ------------------------------------------------------------------ */
+
+/**
+ * POST /payroll/runs/:id/email-payslips answers 202 with how many mails were queued for the first
+ * send: the published payslips not yet emailed, or every one when `resend` is set. The worker sends
+ * them (the outbox handler `payroll.email_payslips`), so this is the count to expect, not a delivery.
+ */
+const PayslipEmailQueued = z.object({ queued: z.number().int().min(0) }).strict();
+
+/** POST /ess/payslips/:id/email: a copy is on its way to the person's work email. */
+const PayslipCopySent = z.object({ sent: z.boolean() }).strict();
+
+/**
+ * The variables of templates/email/payslip-ready.html: the month and where to read the payslip. The
+ * mail never carries an amount (guide §6.10 rule 5).
+ */
+const PayslipReadyEmailVars = z
+  .object({
+    period_label: z.string(),
+    number: z.string(),
+    read_url: z.string(),
+  })
+  .strict();
+
 /* ------------------------------------------------------------------ *
  * The document
  * ------------------------------------------------------------------ */
@@ -278,6 +307,10 @@ const TABLES = {
   PayslipPage: { table: null, reason: "a page of payslips" },
   PayslipLineItem: { table: null, reason: "a pay item, adjustment or instalment behind a grouped line, read as its owner reads it" },
   PayslipLineItemPage: { table: null, reason: "a page of the items behind a payslip line" },
+  PayslipLineParams: { table: null, reason: "the :id and :line_id path parameters" },
+  PayslipEmailQueued: { table: null, reason: "how many payslip mails Email All queued" },
+  PayslipCopySent: { table: null, reason: "whether a copy of a payslip was sent to its owner" },
+  PayslipReadyEmailVars: { table: null, reason: "the variables of templates/email/payslip-ready.html" },
   PayslipPrintedLine: { table: null, reason: "a payslip line as the document prints it" },
   PayslipVars: { table: null, reason: "template variables of the payslip document" },
   PayslipBatchVars: { table: null, reason: "template variables of the Download All document" },
@@ -311,6 +344,10 @@ module.exports = {
   PayslipPage,
   PayslipLineItem,
   PayslipLineItemPage,
+  PayslipLineParams,
+  PayslipEmailQueued,
+  PayslipCopySent,
+  PayslipReadyEmailVars,
   PayslipPrintedLine,
   PayslipVars,
   PayslipBatchVars,

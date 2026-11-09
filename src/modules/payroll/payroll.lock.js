@@ -17,16 +17,19 @@
  *   editable   a Draft or a Computed run (Compute, Exclude, Include, Add Adjustment, Discard)
  *   computed   a Computed run (Submit)
  *   approved   an Approved run (Mark Paid)
+ *   published  an Approved or a Paid run: its payslips are out (Email All, a copy, Download All; payslips.service)
  *   submitted  a Submitted run (the approval's two ends)
  *   none       there is no run yet (New Run)
  *
- * Locked means locked: nothing but Mark Paid, Email All Payslips and the exports (PR 4) touches an approved
- * or paid run. A correction after the lock goes into the next run as an adjustment.
+ * Locked means locked: nothing but Mark Paid, Email All Payslips, a payslip's copy and the exports touches an
+ * approved or paid run (the last three are written in payslips.service with the `published` guard). A correction
+ * after the lock goes into the next run as an adjustment.
  */
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const attendancePay = require("../attendance/attendance.pay");
 const fines = require("../sanctions/sanctions.fines");
+const payslipPdf = require("../payslips/payslips.pdf");
 const repo = require("./payroll.repo");
 const { EVENTS } = require("./payroll.events");
 
@@ -55,6 +58,12 @@ const GUARDS = Object.freeze({
     if (run.status !== "approved") throw new AppError("NOT_APPROVED", "Only an approved run is marked paid", 409);
     return run;
   },
+  published(run) {
+    if (!run) throw notFound();
+    if (run.status !== "approved" && run.status !== "paid")
+      throw new AppError("NOT_APPROVED", "The payslips are out once the run is approved", 409);
+    return run;
+  },
   submitted(run) {
     if (!run) throw notFound();
     if (run.status !== "submitted") throw new AppError("RUN_NOT_SUBMITTED", "This run is not waiting for approval", 409);
@@ -69,7 +78,7 @@ const WRITES = new Map();
  * Make a write function on one run: lock it, guard it, do the work.
  * @template A
  * @param {string} name
- * @param {"editable"|"computed"|"approved"|"submitted"} guard
+ * @param {"editable"|"computed"|"approved"|"published"|"submitted"} guard
  * @param {(client: import("pg").PoolClient, run: object, ...args: A[]) => Promise<any>} fn
  * @returns {(client: import("pg").PoolClient, runId: string, ...args: A[]) => Promise<any>}
  */
@@ -100,8 +109,9 @@ function defineCreate(name, fn) {
  *
  *   the instalments it froze are applied; a deduction whose last instalment this was is settled, and a fine
  *   among them settled through its owner (`sanctions.fines.settle`); the run is `approved` with who approved
- *   it and when; every payslip that is not excluded is published (its number was given at Compute); and
- *   `payroll_run.approved` and one `payslip.published` per person are emitted. The pay items stay `in_run`.
+ *   it and when; every payslip that is not excluded is published (its number was given at Compute) and its PDF
+ *   requested through the document engine; and `payroll_run.approved` and one `payslip.published` per person are
+ *   emitted. The pay items stay `in_run`.
  *
  * @param {{approver_user_id: string|null}} how  the user who approved it, from the approval's decision
  */
@@ -127,6 +137,8 @@ const applyApproval = defineWrite("applyApproval", "submitted", async (client, r
   }
   await repo.setRun(client, runId, { status: "approved", approved_at: "now", approved_by: approver });
   const published = await repo.publishPayslips(client, runId);
+  // Every payslip's PDF is requested here, in the lock's transaction, and rendered by the worker (§6.10 rule 4).
+  await payslipPdf.requestForRun(client, runId);
   await emit(client, {
     key: EVENTS.PAYROLL_RUN_APPROVED,
     entity: { type: "payroll_run", id: runId },
