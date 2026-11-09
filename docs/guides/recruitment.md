@@ -5,12 +5,12 @@
 | Owner | GE |
 | Milestone | M4 |
 | Backend modules | `vacancies`, `candidates`, `assessments`, `interviews`, `talent_pool` |
-| Frontend paths | `app/src/features/recruitment/`, `public-app/src/pages/Home.tsx`, `public-app/src/pages/Careers.tsx`, `public-app/src/pages/Vacancy.tsx`, `public-app/src/pages/Apply.tsx`, `public-app/src/pages/Assessment.tsx`, `public-app/src/pages/shared.tsx`, `public-app/src/pages/Guidance.tsx` |
+| Frontend paths | `app/src/features/recruitment/`, `public-app/src/pages/Home.tsx`, `public-app/src/pages/Careers.tsx`, `public-app/src/pages/Vacancy.tsx`, `public-app/src/pages/Apply.tsx`, `public-app/src/pages/Assessment.tsx`, `public-app/src/pages/shared.tsx`, `public-app/src/pages/Guidance.tsx`, `public-app/src/lib/router.tsx`, `public-app/src/shell/Page.tsx` |
 | Permission key(s) | `recruitment` |
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #38 Vacancies, #39 Candidates, #40 Assessments, #41 Interviews, #44 Talent Pool; public #107 Home, #80 Careers, #81 Vacancy, #82 Apply, #83 Assessment |
 | Status | Built |
-| Last changed | 06/11/2026 |
+| Last changed | 09/11/2026 |
 
 Sources: MILESTONES §9 (scope, A9, A10, definition of done) and §1 (A23 as amended 01/11/2026);
 REUSE_MAP §5; MILESTONE_QUESTIONS Q4, Q9, Q10; DATABASE_SCHEMA M4; the discovery call of
@@ -723,7 +723,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 | Recruitment · Assessments (`assessments`) | Assessments and Sittings as a segmented control; cards | The average-by-assessment chart | New Assessment in the floating button; Mark Answers in a sitting's sheet | Bottom bar; the Recruitment tabs |
 | Recruitment · Interviews (`interviews`) | Upcoming and Recent as cards (candidate, date, panel, round state), upcoming first; nothing open until a card is tapped | Role, end time and how on the card; the wide dialog (it opens in a sheet instead, its cards one under another) | A tapped interview opens its sheet, its actions at the top full width; My Card full width, opening as its own full sheet, one trait a row with ten 44 px stars, in two rows of five (ten do not fit 390 px) | Bottom bar; the Recruitment tabs |
 | Recruitment · Talent Pool (`talent-pool`) | Two KPI cards a row, then pool cards (name, applied for, score, kept until) | Added and Reason columns (in the sheet) | A tapped card opens its sheet with Invite to Apply full width | Bottom bar; the Recruitment tabs |
-| Home, Careers, Vacancy, Apply, Assessment | One column, full width buttons, 44 px targets; Home's hero still the first screen, its search button under the box; on Careers the teams as a row of pills above the roles; on Vacancy The Role card above the text; on Apply and Assessment the aside as a band above the Panel | The hero's line and The Role card's Apply (the bar carries it), Share Role and Know Someone for This?; the aside's steps, skyline and credit | Search Roles; Apply in a bar fixed at the foot of a vacancy; Next, Submit Application, Submit Assessment | The public site's header, its six links in the menu (Help last) |
+| Home, Careers, Vacancy, Apply, Assessment | One column, full width buttons, 44 px targets; Home's hero still the first screen, its search button under the box; on Careers the teams as a row of pills above the roles; on Vacancy The Role card above the text; on Apply and Assessment the aside as a band above the Panel | The hero's line and The Role card's Apply (the bar carries it), Share Role and Know Someone for This?; the aside's steps, skyline and credit | Search Roles; Apply in a bar fixed at the foot of a vacancy; Next, Submit Application, Submit Assessment | The public site's three navigation links in the menu |
 
 ## 11 · Edge cases
 
@@ -785,6 +785,8 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 09/11/2026 · AI · Hide Apply, Assessment and Sign Offer from the public header because they are
+  private-link pages. Their token routes and functionality remain unchanged; left: nothing.
 - 08/11/2026 · GE · (Ose) The Interviews dialog has Close at its foot (ListDetail `closeButton`, desktop only).
 - 08/11/2026 · GE · (Ose) Interviews on desktop: the list takes the page's width (with when it ends and how it is held)
   and a row opens the interview in a wide dialog, the interview, Blind Panel, Weighted Scorecard and Candidate Details

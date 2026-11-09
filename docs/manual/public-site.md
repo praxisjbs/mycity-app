@@ -11,9 +11,10 @@ This is how MyCityApp's careers site, [go.mycityapp.io](https://go.mycityapp.io)
 need an account: the pages you fill in open from a link of your own.
 
 Every page has the same bar at the top: the MyCityApp mark, which opens the front page, and the
-links **Vacancy**, **Apply**, **Assessment**, **Sign Offer**, **Verify Document** and **Help**. On a
-phone they are in the menu at the top right. The moon or sun beside them switches between light and
-dark, and the site keeps your choice on your device.
+links **Vacancy**, **Verify Document** and **Help**. On a phone they are in the menu at the top
+right. Your private Apply, Assessment and Sign Offer links arrive by email and are not in the
+navigation. The moon or sun beside them switches between light and dark, and the site keeps your
+choice on your device.
 
 ## The Front Page {#public-home icon=home}
 
@@ -153,7 +154,7 @@ The page says *This Link Does Not Open*, whatever the reason. The reason is one 
 | Your application was sent | Nothing: it arrived. Your email holds the reference |
 | The link is mistyped or was stopped | Open the role from [the open roles](https://go.mycityapp.io/jobs) |
 
-Pressing **Apply** in the bar at the top, with no link, says *Start From a Role*; **See Open Roles**
+If you open `/apply` without a private link, the page says *Start From a Role*; **See Open Roles**
 opens the open roles.
 
 > **Tip:** A role that is paused or closed gives no new Apply link. A link given before it closed
@@ -223,8 +224,8 @@ When the clock reaches zero, or the due day ends, the assessment ends by itself.
 3. Words still being typed, not yet saved, are lost.
 
 A test not started by its start day expires, and its link no longer opens it; ask MyCity for a new
-one by replying to the email. Pressing **Assessment** in the bar at the top, with no link, says
-*Use Your Email Link*.
+one by replying to the email. If you open `/assess` without the link, the page says *Use Your Email
+Link*.
 
 ## Sign Offer {#public-sign icon=signature}
 
@@ -266,8 +267,8 @@ declined after.
    instead.
 3. The page says *Offer Declined*. The hiring team is told, with your reason.
 
-An offer past its day says *This Offer Has Expired*, and one withdrawn says *Offer Withdrawn*. Pressing
-**Sign Offer** in the bar at the top, with no link, says *Use Your Offer Email*.
+An offer past its day says *This Offer Has Expired*, and one withdrawn says *Offer Withdrawn*. If you
+open `/sign` without the private link, the page says *Use Your Offer Email*.
 
 ## Verify a Document {#public-verify icon=shield}
 

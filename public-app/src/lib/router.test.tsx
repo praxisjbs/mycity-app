@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { parse, sectionOf } from "./router";
+import { NAV, parse, sectionOf } from "./router";
 
-/** The site's addresses (MILESTONES §6) and the header link each belongs to. */
+/** The site's addresses (MILESTONES §6) and the public links in its header. */
 describe("router", () => {
+  it("keeps personal-link pages out of the header navigation", () => {
+    expect(NAV.map(({ label }) => label)).toEqual(["Vacancy", "Verify Document", "Help"]);
+  });
+
   it.each([
     ["/", { page: "home" }, null],
     ["/jobs", { page: "careers" }, "Vacancy"],
