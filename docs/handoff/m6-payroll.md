@@ -86,7 +86,8 @@ exists, and the payslip template is empty.
 - [x] Compute measured for 300 people (decides the job stubs, guide §13.2 item 3): 550 ms for 308 people, so no
       `payroll-compute` job and both stubs go in PR 8 (09/11/2026)
 - [x] Carried from PR 6 by the gates: the card `payroll_runs.create`, `payroll.search.js` for `payroll_run` (09/11/2026)
-- [ ] `npm run ci` green on the PR head and the PR marked ready; not merged until JBS Praxis says so
+- [x] `npm run ci` green locally on Node 20, all 52 gates (09/11/2026): the full run passed 51 and its one failure, an unhandled Radix timer error from `Categories.test.tsx` under four groups' load, passed on its own re-run (`--only=fe-test`)
+- [ ] The PR marked ready (it stays a draft until JBS Praxis says so); not merged until then
 
 ### PR 3 · Deductions and advances
 - [ ] The paged union, accept, spread, waive, release, record and cancel an advance, routes, events, notices
