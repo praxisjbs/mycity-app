@@ -11,7 +11,7 @@ requirement and settles no decision. Tick a line when it is done, with the date,
 | Owner | TB (Tom-Blake Asaah) owns the milestone and its backend; LA (Love Adeola) builds the screens (guide §13.1 item 22, JBS Praxis, 09/11/2026) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 27 Nov 2026 (MILESTONES §4) |
-| Pull requests | PR 0 (this documentation) is on `claude/cool-goldberg-uszqmn`, not opened; no other PR yet |
+| Pull requests | PR 0 (this documentation) merged as praxisjbs/mycity-app#100 on 09/11/2026 (`1352338`); no other PR yet |
 
 ---
 
@@ -62,7 +62,7 @@ exists, and the payslip template is empty.
       people (08/11/2026)
 - [x] The payslip sample drafted (`docs/MyCity-ERP-Documents/payroll-samples/payslip-sample.html` and its README,
       listed in `docs/MyCity-ERP-Documents/INDEX.md`) (08/11/2026)
-- [ ] **After this pull request merges**, the first chat ticks Written for `payroll.md` in `docs/guides/README.md` (JBS Praxis, 09/11/2026; not before)
+- [x] Written ticked for `payroll.md` in `docs/guides/README.md` after praxisjbs/mycity-app#100 merged (JBS Praxis, 09/11/2026) (09/11/2026)
 - [ ] TB shows MyCity the payslip sample and records the answers (guide §13.3 item 1; the README lists what to confirm)
 - [x] The statutory rates, the accountant's conventions, the pay day and every person's salary and bank details are
       configuration MyCity enters in the app (guide §13.1 item 21); LA builds the screens (item 22) (09/11/2026)
@@ -118,6 +118,7 @@ exists, and the payslip template is empty.
 
 ## 3 · Log
 
+- 09/11/2026 · JP · PR 0 merged as praxisjbs/mycity-app#100 (`1352338`, squashed; the local CI run passed its 50 gates and the backend group after pgvector was installed, and GitHub's `ci` check was green on the head). Written ticked for `payroll.md` in `docs/guides/README.md` as JBS Praxis asked (once the pull request merged). Left for people: MyCity signs off the payslip sample. Next: PR 1, contract and data (guide Appendix A).
 - 09/11/2026 · JP · PR 0, pay day: confirmed with JBS Praxis that the pay day defaults to the 30th, configurable 1 to 31, a day past a month's end falling on its last day (guide §13.1 item 24, §6.11 rule 1); the statutory rates and conventions are data entered from a date and only the items and the formula's shape are code (§6.12 rule 7); a person's salary and bank are set on People · Employees' Pay and Bank step, already built (§2). The ESS guide's "27th" and the payslip sample's date moved to the 30th. Documentation only.
 - 09/11/2026 · JP · PR 0, third round: JBS Praxis answered the rest. The statutory rates, the accountant's conventions,
   the pay day and every person's salary and bank details are configuration MyCity enters in the app, so none is an
