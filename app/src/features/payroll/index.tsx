@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ApiError, api } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
-import type { PayrollRun } from "@mycity/contract/contract.gen.ts";
-import type { Grade, PayrollDeduction, PayslipRow } from "@/api/types/payroll";
+import type { PayrollRun, Payslip } from "@mycity/contract/contract.gen.ts";
+import type { Grade, PayrollDeduction } from "@/api/types/payroll";
 import type { PersonRef } from "@/api/types/common";
 
 import { SlipPaper } from "@/features/ess/Payslips";
@@ -130,11 +130,11 @@ function Payslips() {
   const modal = useModal();
   const s = useApi("GET /api/v1/payroll/runs/summary");
   const c = s.data?.current;
-  const list = usePaged("GET /api/v1/payslips", { filters: { scope: "all", ...(c ? { period: c.period.slice(0, 7) } : {}) }, enabled: !!c });
+  const list = usePaged("GET /api/v1/payslips", { filters: c ? { run_id: c.payroll_run_id } : {}, enabled: !!c });
   const phone = useIsPhone();
-  const [sel, setSel] = useState<PayslipRow | null>(null);
+  const [sel, setSel] = useState<Payslip | null>(null);
   // Under the list on desktop the first payslip with a deduction shows unasked; on a phone one opens when tapped (F31).
-  const shown = sel ?? (phone ? null : (list.rows.find((r) => r.has_query_deduction) ?? list.rows[0] ?? null));
+  const shown = sel ?? (phone ? null : (list.rows.find((r) => r.has_deduction) ?? list.rows[0] ?? null));
   const email = useMutation("POST /api/v1/payroll/runs/:id/email-payslips");
   const locked = c && (c.status === "approved" || c.status === "paid");
   return (
@@ -150,7 +150,7 @@ function Payslips() {
         }
       />
       {c && <StatStrip items={[{ label: "Payslips", value: c.headcount }, { label: "Gross", value: c.gross_pay === null ? "Restricted" : <Money value={c.gross_pay} /> }, { label: "Deductions", value: c.total_deductions === null ? "Restricted" : <Money value={c.total_deductions} />, tone: "warn" }, { label: "Net", value: c.net_pay === null ? "Restricted" : <Money value={c.net_pay} /> }, { label: "Visible to Staff", value: locked ? "Yes" : "On approval", desktop: true }]} />}
-      <PagedTable<PayslipRow>
+      <PagedTable<Payslip>
         title={locked ? "This Run" : "Preview"}
         list={list}
         search="Search people"
@@ -159,9 +159,9 @@ function Payslips() {
         onRowClick={setSel}
         columns={[
           { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department ?? undefined} /> },
-          { key: "g", label: "Gross", align: "n", render: (r) => <Money value={r.gross} /> },
-          { key: "d", label: "Deductions", align: "n", render: (r) => (r.has_query_deduction ? <Money value={r.deductions} /> : "None"), desktop: true },
-          { key: "n", label: "Net", align: "n", render: (r) => <b><Money value={r.net} /></b> },
+          { key: "g", label: "Gross", align: "n", render: (r) => <Money value={r.gross_pay} /> },
+          { key: "d", label: "Deductions", align: "n", render: (r) => (r.has_deduction ? <Money value={r.total_deductions} /> : "None"), desktop: true },
+          { key: "n", label: "Net", align: "n", render: (r) => <b><Money value={r.net_pay} /></b> },
           { key: "p", label: "", render: (r) => <Button size="sm" icon="doc" onClick={(e) => (e.stopPropagation(), modal.open({ title: `${r.employee.display_name} · ${formatMonth(r.period)}`, wide: true, body: <SlipPaper id={r.payslip_id} /> }))}>PDF</Button> },
         ]}
       />
@@ -169,7 +169,7 @@ function Payslips() {
         {shown && (
           <div className="mt-3 phone:mt-0">
             <SlipPaper id={shown.payslip_id} />
-            {shown.has_query_deduction && <p className="mt-3 text-2xs text-subtle-foreground">{shown.employee.display_name} carries a deduction accepted into this run from Queries and Sanctions. The line names its reason, not the sanction.</p>}
+            {shown.has_deduction && <p className="mt-3 text-2xs text-subtle-foreground">{shown.employee.display_name} carries a deduction accepted into this run from Queries and Sanctions. The line names its reason, not the sanction.</p>}
           </div>
         )}
       </DetailPane>

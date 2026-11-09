@@ -1,7 +1,7 @@
 import type { ApprovalInstance, PayrollRun, PayrollRunSummary } from "@mycity/contract/contract.gen.ts";
 import type { Grade, PayrollDeduction, Statutory } from "@/api/types/payroll";
 import type { Status } from "@/api/types/performance";
-import { accepted, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
+import { created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, refKey, SIGN_INS } from "../data/people";
 import { kobo, money, SLIPS } from "../data/payroll";
 import { deductionTiersOn } from "./attendance";
@@ -32,7 +32,9 @@ const RUN = {
 const WID = sid("wf:payroll_run");
 const first = (period: string) => `${period}-01`;
 const numberOf = (period: string) => `PAY-${period}`;
-const runId = (period: string) => sid(`run:${period}`);
+export const runId = (period: string) => sid(`run:${period}`);
+/** A month's run status: this month's is the open run's, every earlier month is paid. */
+export const runStatusOf = (period: string): Status6 => (period === RUN.period ? RUN.status : "paid");
 const periods = () => [...new Set(SLIPS.map((x) => x.period))].sort().reverse();
 
 function totals(period: string) {
@@ -144,7 +146,10 @@ route("POST /api/v1/payroll/runs/:id/mark-paid", (req) => {
   return ok(runOf(RUN.period, req.user!, true));
 });
 route("POST /api/v1/payroll/runs/:id/email-payslips", (req) =>
-  guard(req.params.id) ?? (RUN.status === "computed" || RUN.status === "submitted" ? fail(409, "NOT_APPROVED", "Payslips go to staff once the run is approved.") : accepted()),
+  guard(req.params.id) ??
+  (RUN.status === "computed" || RUN.status === "submitted"
+    ? fail(409, "NOT_APPROVED", "Payslips go to staff once the run is approved.")
+    : { status: 202, body: { queued: totals(RUN.period).headcount } }),
 );
 
 /** POST /workflow/instances/:id/approve|reject for the month's run: the CEO decides it; null for any other id. */

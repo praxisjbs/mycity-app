@@ -156,7 +156,7 @@ function listOwn(db, employeeId, year, query) {
     db,
     `SELECT ${LIST_COLUMNS}, ${TOTAL_COL}
        FROM payslip p ${PAYSLIP_JOINS}
-      WHERE p.employee_id = $1 AND p.status = 'published' AND extract(year FROM r.period)::int = $2
+      WHERE p.employee_id = $1 AND p.status = 'published' AND date_part('year', r.period)::int = $2
       ORDER BY r.period DESC, p.payslip_id`,
     [employeeId, year],
     query,
@@ -179,7 +179,7 @@ function summaryOwn(db, employeeId, year) {
     `SELECT count(*)::int AS payslips, COALESCE(sum(p.earnings_total), 0)::numeric(18,2)::text AS earnings_total,
             COALESCE(sum(p.deductions_total), 0)::numeric(18,2)::text AS deductions_total, COALESCE(sum(p.net_pay), 0)::numeric(18,2)::text AS net_pay
        FROM payslip p JOIN payroll_run r ON r.payroll_run_id = p.payroll_run_id
-      WHERE p.employee_id = $1 AND p.status = 'published' AND extract(year FROM r.period)::int = $2`,
+      WHERE p.employee_id = $1 AND p.status = 'published' AND date_part('year', r.period)::int = $2`,
     [employeeId, year],
   );
 }
@@ -248,7 +248,7 @@ async function printRowsOfYear(db, employeeId, year) {
   const { rows } = await completeQuery(
     db,
     `SELECT ${PRINT_COLUMNS} FROM payslip p ${PAYSLIP_JOINS}
-      WHERE p.employee_id = $1 AND p.status = 'published' AND extract(year FROM r.period)::int = $2
+      WHERE p.employee_id = $1 AND p.status = 'published' AND date_part('year', r.period)::int = $2
       ORDER BY r.period, p.payslip_id`,
     [employeeId, year],
     { label: "The payslips of a year", ceiling: 12 * 5 },
