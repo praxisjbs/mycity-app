@@ -1,10 +1,9 @@
-import type { ApprovalInstance, PayrollRun, PayrollRunSummary } from "@mycity/contract/contract.gen.ts";
-import type { Grade, PayrollDeduction, Statutory } from "@/api/types/payroll";
+import type { ApprovalInstance, DeductionRow, DeductionSummary, PayrollRun, PayrollRunSummary } from "@mycity/contract/contract.gen.ts";
+import type { Grade, Statutory } from "@/api/types/payroll";
 import type { Status } from "@/api/types/performance";
 import { accepted, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, refKey, SIGN_INS } from "../data/people";
 import { kobo, money, SLIPS } from "../data/payroll";
-import { deductionTiersOn } from "./attendance";
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const canRun = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
@@ -230,66 +229,176 @@ route("POST /api/v1/payroll/grades", (req) => {
   return created(g);
 });
 
-const DEDS: PayrollDeduction[] = [
-  ["bashir", "Lateness, 3 instances", "Queries & Sanctions", "12500.00", 0, S("warn", "Pending acceptance")],
-  ["seyi", "Studio monitor damage", "Fine, sanction", "45000.00", -3, S("ok", "Recovered")],
-  ["amara", "Salary advance repayment", "Advance", "50000.00", 0, S("ok", "Accepted")],
-].map((d, i) => {
-  const dt = new Date();
-  dt.setUTCDate(1);
-  dt.setUTCMonth(dt.getUTCMonth() + (d[4] as number));
-  return { deduction_id: sid(`ded:${i}`), employee: refKey(d[0] as string), reason: d[1] as string, source: d[2] as string, amount: d[3] as string, period: dt.toISOString().slice(0, 7), status: d[5] as Status };
-});
-/** An accepted deduction lands on that person's payslip in the open run, as one line with its reason. */
-function apply(d: PayrollDeduction) {
-  const slip = SLIPS.find((x) => x.person.employee_id === d.employee.employee_id && x.period === d.period);
-  if (!slip) return;
-  slip.ded += kobo(d.amount);
-  slip.ded_reason = d.reason;
-  slip.ded_query = d.source === "Queries & Sanctions" ? "QRY-0014" : null;
-}
-DEDS.filter((d) => d.status.text === "Accepted" && d.period === RUN.period).forEach(apply);
+/*
+ * Deductions in the contract's shapes (packages/contract/schemas/deductions.js): waiting attendance deductions,
+ * fines and advances as one list, and the moves the screen makes, down to the API's own refusals: the open
+ * month and later for a start, nothing accepted twice, never your own.
+ */
+type Ded = DeductionRow;
+const OPEN = `${thisPeriod()}-01`;
+const person = (key: string) => refKey(key);
+const flags = (): Pick<Ded, "can_accept" | "can_waive" | "can_release" | "can_cancel"> => ({ can_accept: false, can_waive: false, can_release: false, can_cancel: false });
 
-route("GET /api/v1/payroll/deductions/summary", () => {
-  const pending = DEDS.filter((d) => d.status.text === "Pending acceptance");
-  const applied = DEDS.filter((d) => d.period === RUN.period && d.status.text === "Accepted").reduce((a, d) => a + kobo(d.amount), 0);
-  const f = pending[0];
-  return ok({
-    pending: pending.length, applied_this_period: money(applied), recovered_this_year: "45000.00", sources: new Set(DEDS.map((d) => d.source)).size, tiers_on: deductionTiersOn(),
-    focus: f ? { deduction_id: f.deduction_id, title: `Pending: ${f.employee.display_name}`, chain: [{ label: "Query Closed", state: "done" }, { label: "Warning Served", state: "done" }, { label: "Deduction Raised", state: "done" }, { label: "Accepted", state: "now" }, { label: "In the Run", state: null }, { label: "Applied", state: null }], note: "Raised by a sanction. It waits for a person, which is correct: nothing deducts itself." } : null,
-  });
+const DEDS: Ded[] = [
+  { source: "attendance", id: "late:bashir", who: "bashir", reason: "Late arrival, 06/10/2026", amount: "1500.00", status: "pending" },
+  { source: "attendance", id: "absence:seyi", who: "seyi", reason: "Absence, 08/10/2026", amount: "17307.69", status: "pending" },
+  { source: "fine", id: "fine:seyi", who: "seyi", reason: "Studio monitor damage", amount: "45000.00", status: "pending", query: "QRY-0014" },
+  { source: "fine", id: "fine:amara", who: "amara", reason: "Lost a company badge", amount: "8000.00", status: "pending", query: "QRY-0019" },
+  { source: "fine", id: "fine:chidera", who: "chidera", reason: "Late return of a laptop", amount: "15000.00", status: "pending", query: "QRY-0021" },
+  { source: "fine", id: "fine:ngozi", who: "ngozi", reason: "Missed a handover", amount: "6000.00", status: "pending", query: "QRY-0023" },
+  { source: "fine", id: "fine:bashir2", who: "bashir", reason: "Unreturned petty cash", amount: "9500.00", status: "pending", query: "QRY-0025" },
+  { source: "fine", id: "fine:bashir", who: "bashir", reason: "Late with a delivery", amount: "5000.00", status: "waived", query: "QRY-0011" },
+  { source: "advance", id: "advance:amara", who: "amara", reason: "School fees", amount: "50000.00", status: "active", instalments: 2, applied: 0 },
+  { source: "fine", id: "fine:ada", who: "ifeoma", reason: "Broken headset", amount: "12000.00", status: "settled", query: "QRY-0007", instalments: 3, applied: 3 },
+].map((d, i) => {
+  const fine = d.source === "fine";
+  const id = sid(`ded:${d.id}`);
+  const accepted = d.status === "active" || d.status === "settled";
+  return {
+    source: d.source as Ded["source"],
+    source_id: id,
+    sanction_fine_id: fine ? id : null,
+    payroll_deduction_id: accepted ? sid(`deduction:${d.id}`) : null,
+    employee: person(d.who),
+    reason: d.reason,
+    pay_amount: d.amount,
+    salary_set: true,
+    period: d.source === "attendance" ? first(`${thisPeriod()}`) : OPEN,
+    instalments: "instalments" in d ? (d.instalments as number) : null,
+    instalments_applied: "applied" in d ? (d.applied as number) : null,
+    status: d.status as Ded["status"],
+    query_number: "query" in d ? (d.query as string) : null,
+    created_at: new Date(Date.now() - i * 3600_000 * 5).toISOString(),
+    ...flags(),
+  } as Ded;
 });
-route("GET /api/v1/payroll/deductions", (req) => paged(DEDS, req, { search: (d) => [d.employee.display_name, d.reason, d.source], filters: { status: (d, v) => (v === "pending" ? d.status.text === "Pending acceptance" : d.status.text !== "Pending acceptance") } }));
-route("POST /api/v1/payroll/deductions", (req) => {
-  if (!canRun(req.user!)) return fail(403, "FORBIDDEN", "Payroll is for Operations and the CEO.");
-  const b = req.body as Record<string, string>;
-  const p = byId(b.employee_id);
+
+/** What a reader may press on a row now: their grant, the row's state, and never their own (§6.6 rule 8). */
+function offered(d: Ded, user: string): Ded {
+  const mine = byKey(user)?.employee_id === d.employee.employee_id;
+  const may = canRun(user) && !mine;
+  const waiting = d.source === "fine" && d.status === "pending";
+  const running = d.status === "active" && !(d.instalments_applied && d.instalments_applied > 0);
+  return {
+    ...d,
+    can_accept: may && waiting,
+    can_waive: may && waiting,
+    can_release: may && d.source === "fine" && running,
+    can_cancel: may && d.source === "advance" && running,
+  };
+}
+
+const figure = (rows: Ded[]) => ({ count: rows.length, pay_amount: money(rows.reduce((a, r) => a + kobo(r.pay_amount ?? "0"), 0)) });
+const queue = (a: Ded, b: Ded) => Number(b.status === "pending") - Number(a.status === "pending") || b.created_at.localeCompare(a.created_at);
+
+route("GET /api/v1/deductions/summary", (req) => {
+  if (!canRun(req.user!)) return forbidden();
+  const live = DEDS.filter((d) => d.status !== "waived");
+  const body: DeductionSummary = {
+    open_period: OPEN,
+    pending_fines: figure(DEDS.filter((d) => d.source === "fine" && d.status === "pending")),
+    pending_attendance: figure(DEDS.filter((d) => d.source === "attendance" && d.status === "pending")),
+    active: figure(live.filter((d) => d.status === "active")),
+    recovered_this_year: figure(live.filter((d) => d.status === "settled")),
+  };
+  return ok(body);
+});
+route("GET /api/v1/deductions", (req) =>
+  canRun(req.user!)
+    ? paged(DEDS.map((d) => offered(d, req.user!)), req, {
+        search: (d) => [d.employee.display_name, d.reason, d.query_number],
+        filters: {
+          status: (d, v) => d.status === v,
+          source: (d, v) => d.source === v,
+          employee_id: (d, v) => d.employee.employee_id === v,
+          month: (d, v) => d.period.startsWith(v),
+        },
+        sort: {
+          queue,
+          created: (a, b) => a.created_at.localeCompare(b.created_at),
+          employee: (a, b) => a.employee.display_name.localeCompare(b.employee.display_name),
+          amount: (a, b) => kobo(a.pay_amount ?? "0") - kobo(b.pay_amount ?? "0"),
+        },
+      })
+    : forbidden(),
+);
+
+const byFine = (id: string) => DEDS.find((d) => d.source === "fine" && d.source_id === id);
+const byDeduction = (id: string) => DEDS.find((d) => d.payroll_deduction_id === id);
+const reasonFault = (reason: unknown) => (String(reason ?? "").trim().length >= 10 ? null : invalid({ reason: [String(reason ?? "").trim() ? "At least 10 characters" : "Give a reason"] }));
+const own = (user: string, d: Ded) => byKey(user)?.employee_id === d.employee.employee_id;
+const startFault = (start: unknown, months: unknown) => {
+  const n = Number(months);
+  if (!Number.isInteger(n) || n < 1 || n > 12) return invalid({ months: ["Pick 1 to 12"] });
+  if (typeof start !== "string" || !/^\d{4}-\d{2}-01$/.test(start)) return invalid({ start_period: ["Pick a start month"] });
+  if (start < OPEN) return fail(422, "START_NOT_ALLOWED", "Start this month or a later one", { start_period: ["Pick a later month"] });
+  return null;
+};
+
+route("POST /api/v1/deductions/fines/:sanction_fine_id/accept", (req) => {
+  if (!canRun(req.user!)) return forbidden();
+  const d = byFine(req.params.sanction_fine_id);
+  if (!d) return notFound();
+  const b = req.body as { months?: unknown; start_period?: unknown };
+  const bad = startFault(b.start_period, b.months);
+  if (bad) return bad;
+  if (own(req.user!, d)) return fail(403, "OWN_RECORD", "Someone else accepts your own fine");
+  if (d.status !== "pending") return fail(409, "FINE_NOT_MOVABLE", "This fine cannot be accepted now");
+  Object.assign(d, { status: "active", payroll_deduction_id: sid(`deduction:${d.source_id}`), instalments: Number(b.months), instalments_applied: 0, period: String(b.start_period) });
+  return ok(offered(d, req.user!));
+});
+route("POST /api/v1/deductions/fines/:sanction_fine_id/waive", (req) => {
+  if (!canRun(req.user!)) return forbidden();
+  const d = byFine(req.params.sanction_fine_id);
+  if (!d) return notFound();
+  const bad = reasonFault(req.body.reason);
+  if (bad) return bad;
+  if (own(req.user!, d)) return fail(403, "OWN_RECORD", "Someone else waives your own fine");
+  if (d.status !== "pending") return fail(409, "FINE_NOT_MOVABLE", "This fine cannot be waived now");
+  d.status = "waived";
+  return ok(offered(d, req.user!));
+});
+route("POST /api/v1/deductions/:id/release", (req) => {
+  if (!canRun(req.user!)) return forbidden();
+  const d = byDeduction(req.params.id);
+  if (!d || d.source !== "fine") return notFound();
+  const bad = reasonFault(req.body.reason);
+  if (bad) return bad;
+  if (own(req.user!, d)) return fail(403, "OWN_RECORD", "Someone else releases your own fine");
+  if (d.status !== "active") return fail(409, "FINE_NOT_MOVABLE", "This fine is no longer accepted");
+  if ((d.instalments_applied ?? 0) > 0) return fail(409, "INSTALMENTS_STARTED", "A month of this deduction is already in a run");
+  Object.assign(d, { status: "pending", payroll_deduction_id: null, instalments: null, instalments_applied: null });
+  return ok(offered(d, req.user!));
+});
+route("POST /api/v1/deductions/advances", (req) => {
+  if (!canRun(req.user!)) return forbidden();
+  const b = req.body as Record<string, unknown>;
+  const p = byId(String(b.employee_id ?? ""));
   const f: Record<string, string[]> = {};
-  if (!p) f.employee_id = ["Pick the employee"];
-  if (!b.reason?.trim()) f.reason = ["Give the reason; it is the payslip line"];
-  if (!(Number(b.amount) > 0)) f.amount = ["Enter the amount"];
+  if (!p) f.employee_id = ["Pick a person"];
+  if (!(Number(b.amount) > 0)) f.amount = ["Enter an amount"];
+  if (!b.granted_on) f.granted_on = ["Pick a date"];
+  else if (String(b.granted_on) > isoDaysAgo(0)) f.granted_on = ["Not in the future"];
+  if (String(b.reason ?? "").trim().length < 10) f.reason = [String(b.reason ?? "").trim() ? "At least 10 characters" : "Give a reason"];
   if (Object.keys(f).length) return invalid(f);
-  const d: PayrollDeduction = { deduction_id: sid(`ded:new:${DEDS.length}`), employee: refKey(p!.user_key), reason: b.reason.trim(), source: "Added by Operations", amount: b.amount, period: b.period || RUN.period, status: S("warn", "Pending acceptance") };
+  const bad = startFault(b.start_period, b.months);
+  if (bad) return bad;
+  if (byKey(req.user!)?.employee_id === p!.employee_id) return fail(403, "OWN_RECORD", "Someone else records your own advance");
+  const id = sid(`deduction:advance:${DEDS.length}`);
+  const d = offered({ ...flags(), source: "advance", source_id: id, sanction_fine_id: null, payroll_deduction_id: id, employee: refKey(p!.user_key), reason: String(b.reason).trim(), pay_amount: String(b.amount), salary_set: true, period: String(b.start_period), instalments: Number(b.months), instalments_applied: 0, status: "active", query_number: null, created_at: now() }, req.user!);
   DEDS.unshift(d);
   return created(d);
 });
-const findD = (id: string) => DEDS.find((d) => d.deduction_id === id);
-route("POST /api/v1/payroll/deductions/:id/accept", (req) => {
-  const d = findD(req.params.id);
-  if (!d) return notFound();
-  if (RUN.status === "approved" || RUN.status === "paid") return fail(409, "RUN_LOCKED", "This month's run is locked. It goes into next month as an adjustment.");
-  d.status = S("ok", Number(req.body.runs) === 2 ? "Accepted, over 2 runs" : "Accepted");
-  if (Number(req.body.runs) === 2) d.amount = money(Math.round(kobo(d.amount) / 2));
-  d.period = RUN.period;
-  apply(d);
-  return ok(d);
-});
-route("POST /api/v1/payroll/deductions/:id/waive", (req) => {
-  const d = findD(req.params.id);
-  if (!d) return notFound();
-  if (!String(req.body.reason ?? "").trim()) return invalid({ reason: ["Say why it is waived"] });
-  d.status = S("neutral", "Waived");
-  return ok(d);
+route("POST /api/v1/deductions/:id/cancel", (req) => {
+  if (!canRun(req.user!)) return forbidden();
+  const d = byDeduction(req.params.id);
+  if (!d || d.source !== "advance") return notFound();
+  const bad = reasonFault(req.body.reason);
+  if (bad) return bad;
+  if (own(req.user!, d)) return fail(403, "OWN_RECORD", "Someone else cancels your own advance");
+  if ((d.instalments_applied ?? 0) > 0) return fail(409, "INSTALMENTS_STARTED", "A month of this deduction is already in a run");
+  DEDS.splice(DEDS.indexOf(d), 1);
+  return ok({ ...d, can_cancel: false });
 });
 
 const STAT: Statutory = {

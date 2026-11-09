@@ -573,7 +573,7 @@ edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4
 | `payroll` | `.calc` (pure, no DB), `.inputs` (attendance, accepted deductions), `.run`, `.lock`, `.config.repo` (effective dated) |
 | `payslips` | `.pdf`, `.breakdown` |
 | `salary_structure` | |
-| `deductions` | `.acceptance` (nothing deducts itself) |
+| `deductions` | `.acceptance` (nothing deducts itself: accept, spread, waive, release, record and cancel an advance), `.repo` (the paged union of waiting attendance deductions, fines and advances), `.search` |
 | `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
 
 The build plan and the file map are `docs/guides/payroll.md` (Appendix A and D), M6's only source of
@@ -584,7 +584,7 @@ mode; `salary_structure.js` and `statutory.js` come with PR 5), migrations `6000
 `account_last4` in `shared/rbac/field-mask.js`, and the four tabs (Payroll Runs, Payslips, Deductions,
 Configurations: Salary Structure and Statutory are retired) in the route map, ⌘K, Coming Soon and the shell's
 catalogue, with `tests/integration/payroll-schema.test.js` and `tests/unit/payroll-contract.test.js`. No
-controller, route, service or repo of the five modules is filled yet: that is PR 2 onward.
+controller, route, service or repo of the five modules is filled yet: that is PR 2 onward. PR 3 (09/11/2026) filled `deductions`: the union the Payroll · Deductions tab lists, accept, spread, waive and release of a fine, record and cancel of an advance, the notices and the outbox handler that tells payroll of a fine waiting; `deductions.ai.js` (one route) and `deductions.search.js` came with it for gates 9 and 10; payroll's `.lock` gained the month locks a deduction takes (`openPeriod`, `lockRunsOf`, `lockMonths`); and `app/src/features/payroll/Deductions.tsx` (with `Deductions.test.tsx`) is the screen, on the contract, with its mock in the contract's shapes in `app/src/api/mock/modules/payroll.ts`. Tests: `tests/integration/deductions.test.js` and `src/modules/deductions/deductions.test.js`.
 
 Web push, each person's preferences, `notifications.reminders` and the `settings` Notifications
 screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2026

@@ -138,9 +138,7 @@ async function recordAdvance(actor, body) {
 async function cancelAdvance(actor, deductionId, body) {
   const before = await repo.rowOf(pool, "advance", deductionId);
   await tx((client) => acceptance.cancelAdvance(client, actor, deductionId, body));
-  const grants = await grantsOf(actor);
-  const row = { ...before, status: before.status, started: false };
-  return { ...present(row, { grants, reader: actor }), can_cancel: false };
+  return { ...present(before, { grants: await grantsOf(actor), reader: actor }), can_cancel: false };
 }
 
 /* ------------------------------------------------------------------ *
