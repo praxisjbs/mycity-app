@@ -1,6 +1,10 @@
-import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Tone, Uuid } from "./common";
+import type { IsoDate, Money, Paged, PersonRef, Tone, Uuid } from "./common";
 
-/** INTERIM payroll shapes (owner TB, M6). Statutory rates come from current Nigerian law at M6. */
+/**
+ * INTERIM payroll shapes (owner TB, M6) for what the contract does not declare yet. Payroll runs are on the
+ * contract since M6 PR 2 (packages/contract/schemas/payroll.js); payslips, deductions, grades and statutory
+ * follow with PR 3 to PR 5, and their entries go here as they land (npm run contract:status).
+ */
 type Pill = { tone: Tone; text: string };
 
 export interface PayslipRow {
@@ -41,41 +45,11 @@ export interface DeductionRow {
   outcome: Pill;
 }
 
-export interface PayrollRun {
-  run_id: Uuid;
-  number: string;
-  period: string;
-  headcount: number;
-  gross: Money;
-  deductions: Money;
-  net: Money;
-  status: "draft" | "computing" | "review" | "awaiting_approval" | "approved" | "paid";
-  submitted_by: string | null;
-  approved_by: string | null;
-  created_at: IsoDateTime;
-}
-
 type Q<T = object> = T & { page?: number; q?: string };
 
 /* ── Payroll module (owner TB, M6) ── */
 type Status = Pill;
 type Step = { label: string; state: "done" | "now" | null };
-export interface RunRow {
-  run_id: Uuid;
-  period: string;
-  headcount: number;
-  gross: Money;
-  deductions: Money;
-  net: Money;
-  approved_by: string | null;
-  status: Status;
-}
-export interface RunsSummary {
-  current: RunRow & { chain: Step[]; stage: PayrollRun["status"]; can_submit: boolean; can_approve: boolean; can_pay: boolean } | null;
-  next_period: string;
-  trend: { labels: string[]; values: Money[] };
-  trend_note: string;
-}
 export interface Grade {
   grade_id: Uuid;
   code: string;
@@ -118,12 +92,6 @@ export interface Statutory {
 
 declare module "@/api/endpoints" {
   interface Endpoints {
-    "GET /api/v1/payroll/runs/summary": { query: never; body: never; params: never; response: RunsSummary };
-    "GET /api/v1/payroll/runs": { query: Q; body: never; params: never; response: Paged<RunRow> };
-    "POST /api/v1/payroll/runs": { query: never; body: { period: string }; params: never; response: RunRow };
-    "POST /api/v1/payroll/runs/:id/submit": { query: never; body: Record<string, never>; params: { id: string }; response: RunRow };
-    "POST /api/v1/payroll/runs/:id/approve": { query: never; body: Record<string, never>; params: { id: string }; response: RunRow };
-    "POST /api/v1/payroll/runs/:id/paid": { query: never; body: { paid_on: IsoDate }; params: { id: string }; response: RunRow };
     "POST /api/v1/payroll/runs/:id/email-payslips": { query: never; body: Record<string, never>; params: { id: string }; response: { job_id: Uuid } };
     "GET /api/v1/payroll/grades/summary": { query: never; body: never; params: never; response: GradesSummary };
     "GET /api/v1/payroll/grades": { query: Q; body: never; params: never; response: Paged<Grade> };
@@ -142,5 +110,3 @@ declare module "@/api/endpoints" {
     "GET /api/v1/payslips/deductions": { query: Q<{ scope?: "own" }>; body: never; params: never; response: Paged<DeductionRow> };
   }
 }
-
-export type { PayrollRun as _PayrollRun };

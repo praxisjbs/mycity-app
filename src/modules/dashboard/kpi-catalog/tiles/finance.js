@@ -1,10 +1,10 @@
 "use strict";
 /**
  * Finance cards: expenses awaiting approval, how much of the running budgets is used (committed
- * and spent, handoff decision 16), and payroll, which waits for M6.
+ * and spent, handoff decision 16), and the payroll runs not yet paid.
  *
  *   expenses, budgets   their source adapters (M8), in the reader's scope on `expenses`
- *   payroll             hidden: no payroll table exists until M6 builds one. The card keeps
+ *   payroll             its source adapter (M6), in the reader's scope on `payroll`. The card keeps
  *                       `employee.salary` as its sensitive field, so a reader who may not
  *                       see pay never sees a payroll card at all.
  *
@@ -12,10 +12,15 @@
  */
 const expenses = require("../../sources/expenses.source");
 const budgets = require("../../sources/budgets.source");
+const payroll = require("../../sources/payroll.source");
+const { formatMonth } = require("../../../../shared/time/day-first");
 const { cell, linkTo, plural, record, records } = require("../shared");
 
 /** The reader's scope on expenses, which also holds budgets. */
 const scopeOf = (ctx) => ctx.scope("expenses");
+
+/** A run's status as the card's list reads it. */
+const STATUS_WORDS = Object.freeze({ draft: "Draft", computed: "Computed", submitted: "Submitted", approved: "Approved" });
 
 const ENTRIES = [
   {
@@ -116,11 +121,36 @@ const ENTRIES = [
     module: "payroll",
     capability: null,
     sensitive_field: "employee.salary",
-    status: "hidden",
-    until: "M6",
+    status: "live",
     pickable: true,
     tone: null,
     source: "payroll",
+    value: (client, g, ctx) => g.count(() => payroll.inProgressCount(client, ctx.scope("payroll"))),
+    detail: {
+      title: "Payroll In Progress",
+      columns: [
+        { key: "run", label: "Run" },
+        { key: "month", label: "Month", phone: true },
+        { key: "status", label: "Status", phone: true },
+        { key: "staff", label: "Staff", numeric: true },
+        { key: "net", label: "Net", numeric: true },
+      ],
+      groups: [],
+      list: async (client, query, ctx) =>
+        records(await payroll.inProgressPage(client, ctx.scope("payroll"), query), (r) =>
+          record(
+            r.payroll_run_id,
+            {
+              run: cell.text(r.number),
+              month: cell.text(formatMonth(r.period)),
+              status: cell.text(STATUS_WORDS[r.status] || r.status),
+              staff: cell.number(r.headcount),
+              net: cell.money(r.net_total),
+            },
+            linkTo("payroll_run", r.payroll_run_id),
+          ),
+        ),
+    },
   },
 ];
 

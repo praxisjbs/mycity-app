@@ -314,7 +314,9 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 - A fine is never a rung: it attaches to any sanction (property damage, deducted from salary).
 - Amount `numeric(18,2)` in Naira, a string on the wire, above 0.00.
 - It is `pending` once the sanction is issued, and reaches the payroll run only when M6 accepts it
-  (`sanctions.fines.accept`) or is waived with a reason. It is never automatic.
+  (`sanctions.fines.accept`) or is waived with a reason. It is never automatic. Payroll may give an accepted
+  fine back (`sanctions.fines.release`, accepted to pending) while none of its instalments is in a run, and settles
+  it (`settle`) when the last instalment is applied by an approved run.
 - **Salary Deduction letter.** A sanction issued with a fine sends a second letter beside its rung's:
   `salary-deduction-letter`, the one shipped template of purpose `fine`, quoting the amount through
   `shared/money` (`{{ money fine_amount }}`). It is generated, numbered and filed in the same
@@ -595,6 +597,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 09/11/2026 · JP · M6 PR 2 (`payroll.md` §6.6 rule 5): `sanctions.fines.release(client, id, actor, reason)` returns a fine payroll had accepted to `pending`, so it can be accepted again or waived (§6.6); it writes `sanction_fine.released` and refuses a fine not accepted (409 `FINE_NOT_MOVABLE`). That no instalment is yet in a run is payroll's rule to hold, not the fine's. The run's lock settles a fine whose last instalment applied through the existing `settle`.
 - 06/11/2026 · JP · The `templates` module gains `templates.agreements`, the wording of Partnerships' agreement templates on the same `template_version` store (`docs/guides/partnerships.md` §6.8, M7 PR 2). Letter templates, their routes, variables and screen are unchanged.
 - 04/11/2026 · GE · (Ose) A letter template edited in Settings (Markdown) and its preview escape each name once
   (`renderMarkdown`): a name such as O'Brien prints as written, never "O&#39;Brien", and a value can never

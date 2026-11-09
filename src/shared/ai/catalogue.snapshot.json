@@ -929,6 +929,17 @@
       "screen": null
     },
     {
+      "key": "payroll_runs.create",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.create",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "payroll.PayrollRunCreate",
+      "schema_sha": "06af322723da8649",
+      "screen": null
+    },
+    {
       "key": "pips.edit",
       "kind": "action",
       "module_key": "performance",
@@ -2815,6 +2826,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "partnerships.proposals"
+    },
+    {
+      "key": "payroll.route.run_payroll",
+      "kind": "route",
+      "module_key": "payroll",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "payroll.payroll-runs"
     },
     {
       "key": "people.route.add_a_department",

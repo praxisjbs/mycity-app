@@ -808,7 +808,7 @@ describeDb("Home · Overview against the real migrations", () => {
       expect(o.picker_source).toBe("user");
     });
 
-    test("refused: a card they may not see, one never offered, a hidden one, more than four, one twice", async () => {
+    test("refused: a card they may not see, one never offered, more than four, one twice", async () => {
       for (const ids of [["headcount"], ["team_present"], ["payroll_run_state"], ["not_a_card"]]) {
         const res = await picks("staff", ids);
         expect([ids[0], res.status]).toEqual([ids[0], 422]);

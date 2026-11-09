@@ -355,7 +355,7 @@ const ENTITY_ROUTES = Object.freeze({
   talent_pool_entry: screen("recruitment", "talent-pool"),
 
   // Payroll
-  payroll_run: screen("payroll", "payroll-runs"), // search:none not built yet (src/modules/payroll)
+  payroll_run: screen("payroll", "payroll-runs"),
   // search:none not built yet (src/modules/payslips)
   payslip: {
     ...screen("payroll", "payslips"),

@@ -494,10 +494,10 @@ on each; `tests/integration/payroll-schema.test.js` checks that, the constraints
 already names), off by default and with no rate, band or grade in any seed. The earlier note that payroll was
 "deliberately not modelled" was not a decision and is withdrawn.
 
-**Read by Home** (home.md §4.1): nothing yet. Payroll In Progress is a hidden card with no query and
-`src/modules/dashboard/sources/payroll.source.js` declares no table. The PR that fills the run's service
-(PR 2) adds the query there (runs not finished, in the reader's scope), declares its columns and makes the
-card live in the same PR; `payroll_run` now exists for it to read.
+**Read by Home** (home.md §4.1): `payroll_run` (`payroll_run_id`, `number`, `period`, `status`, `headcount`,
+`net_total`, `submitted_at`). Payroll In Progress is live since M6 PR 2: `src/modules/dashboard/sources/payroll.source.js`
+counts the runs that are a Draft, Computed, Submitted or Approved and pages them, for a reader whose `payroll` view reaches
+everyone, and owes nothing.
 
 ### M7 Partnerships, CRM & Trackers · 7000 to 7999 · LA
 
