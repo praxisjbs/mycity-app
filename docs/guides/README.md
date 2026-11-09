@@ -47,6 +47,7 @@ section exists to stop.
 | `expenses.md` | Expenses & Budget Control: requests with line items and payees (ESS · My Requests), the line manager and Operations & People approval, requisitions for the CEO, disbursements with the bank reference, department and project budgets, categories | AJ | M8 | ☑ |
 | `offers.md` | Offers, Documentation & Onboarding: offers from the shortlist with approval, the signing service (email code, drawn signature, two hashes, QR verification) shared with M7, the employment contract, the hire's documents on the Employee 360, department onboarding plans | AJ | M5 | ☑ |
 | `partnerships.md` | Partnerships, M7's single source of truth: Pipeline, Categories, Partners and Leads with their 360s, deals, Proposals and the Claude Proposal Studio with its design kit, Contracts & MOUs with approval, signing and QR verification, Analytics; the tracker and returns importers; projects, tasks and events connected to partners; the build plan (Appendix A) | GE, LA | M7 | ☐ |
+| `payroll.md` | Payroll, M6's single source of truth: Payroll Runs, Payslips, Deductions and Configurations, the monthly run from compute to approval and lock, payslips as PDFs with Email All and Download All, fines and advances as instalments, the advanced option (PAYE, pension, NHF, ITF, NSITF, salary grades) built and shipped off, ESS · My Payslips; the build plan (Appendix A) | TB | M6 | ☐ |
 
 Tick **Written** when the guide exists and has been read by the owner of every screen in its §2.
 Later milestones add their rows as they start.

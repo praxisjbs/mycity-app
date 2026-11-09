@@ -83,7 +83,8 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    recorded (My Queries · Sanctions) and any deduction is accepted into the payroll run (M6) → the
    approved payslip shows it in My Payslips, and the Deductions figure opens the list of months with
    deductions, each with its query. If the query is waived nothing is deducted.
-4. **Payslips** become visible when Payroll approves and locks the run (normally the 27th). Until
+4. **Payslips** become visible when Payroll approves and locks the run (the pay day is the 30th unless
+   MyCity sets another, `docs/guides/payroll.md` §6.11). Until
    then the month shows "In the run".
 5. **Leave.** A request from My Leave goes to the line manager, then to Operations & People when it
    is over 5 days (the leave flow, `docs/guides/foundation.md` §6.5) → approved leave counts down the
@@ -186,7 +187,9 @@ check ownership, not the `settings` grant (README §5.2).
 - A payslip is visible only once its run is approved and locked. The preview is the PDF the
   document engine produces for that payslip, not a screen layout.
 - MyCity runs simple payroll: staff are treated as contractors and consultants, so no screen
-  mentions PAYE or pension, and Payroll sits behind an advanced option (12 October).
+  mentions PAYE or pension in simple mode (12 October). Payroll itself is visible; only its advanced option
+  (statutory deductions and salary grades) is switched on from a date on Payroll · Configurations (4
+  November; `docs/guides/payroll.md` §13.1 is the record, and the single source for M6).
 - A deduction reaches a payslip only from an upheld query. The Deductions figure opens every month
   that carried one, with its query reference.
 - My Queries is one tab with a switch, Queries and Sanctions (meeting 26/10/2026: ESS has twelve
@@ -379,7 +382,7 @@ Coming Soon from the module's delivery state.
 | ESS · My Devices (`my-devices`) | As the attendance guide §10.2: the device cards with their status | The subtitle; a device's detail in a bottom sheet | Register This Device, as the attendance guide | As My Profile |
 | ESS · Policy Updates (`policy-updates`) | As policies.md §10.2: To Acknowledge cards with Acknowledge full width, then policy cards | The subtitle | Acknowledge, as policies.md | As My Profile |
 | ESS · My Performance (`my-performance`) | The banner when something waits, the five figures two to a row, then icon cards: My Scorecard, This Month's Check-In, My Commitments (this month's count and how many on time), Rolls Up To, My Reviews, My PIP | The subtitle; the month columns of My Scorecard | Start Check-In, full width; the check-in is a full-screen sheet, one line per card, Submit Check-In in its footer | As My Profile |
-| ESS · My Payslips (`my-payslips`) | The year switcher (44 px targets), Email a Copy, Download All; the stats two to a row; then the months as a list with a status pill | The subtitle and the preview beside the list: a month opens its payslip as a full sheet (F31) | Download PDF, at the foot of the month's sheet | As My Profile |
+| ESS · My Payslips (`my-payslips`) | The year switcher (44 px targets), Email a Copy, Download All; the stats two to a row; then the months as a list with a status pill | The subtitle; a month opens its payslip in a modal on desktop at every width and as a full sheet on a phone (F31 as amended for payslips, `docs/guides/payroll.md` §10.3) | Download PDF, at the foot of the month's sheet or modal | As My Profile |
 | ESS · My Leave (`my-leave`) | Request Leave; the four KPI cards two to a row, each opening its list as a sheet; icon cards My Requests and Entitlement | The subtitle; the requests table (a list in the My Requests sheet); the entitlement card (its sheet) | Request Leave opens the form as a full sheet, Send Request full width | As My Profile |
 | ESS · My Queries (`my-queries`) | The switch as a segmented control at the top, then the chosen list as cards | The Number and Query columns | A tapped query opens in a sheet with Respond at its foot; a sanction opens its letter | As My Profile |
 | ESS · My Documents (`my-documents`) | Upload Document; the five stats; the documents as a list with a status pill | The Expires column, and the preview beside the list: a document opens its details as a sheet, with View File (the file viewer, full screen, swiped and pinched) and Download | Upload Document; on a missing document, Upload Document in its sheet | As My Profile |
@@ -427,10 +430,15 @@ Deductions figure and every form open the shared modal.
   sign off before the inventory, the route table and the permission catalogue are changed. TB.
 - **Device approval**: the 12 October meeting said a registered device is accepted without People
   approving it; My Devices (LA) currently says People review a new device. LA and TB to agree.
-- **My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?
+- ~~**My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?~~ Settled
+  08/11/2026: Payroll is not hidden behind the advanced option (that is only statutory and grades,
+  `docs/guides/payroll.md` §13.1). The tab shows to every employee; with no published payslip it says so,
+  and Coming Soon stays until M6's API is built.
 
 ## 14 · Change log
 
+- 09/11/2026 · JP · §3 step 4: the pay day is the 30th unless MyCity sets another (it read "normally the 27th"; `docs/guides/payroll.md` §13.1 item 24). No screen changed.
+- 08/11/2026 · JP · Payroll's lines brought into line with the 4 November review and `docs/guides/payroll.md` (M6's single source of truth): §6's simple-payroll bullet, §13's My Payslips visibility settled; §10.2's My Payslips row now says the payslip opens in a modal at every desktop width (JBS Praxis, 08/11/2026; built with M6's PR 7). No screen of ESS changed yet.
 - 05/11/2026 · AJ · My Requests (#56) moved from Expenses into ESS, after My Leave (M8 handoff decision 8). Its screen, rules and API are M8's, in `docs/guides/expenses.md`; `app/src/features/ess/index.tsx` renders `features/expenses/MyRequests.tsx`.
 
 - 03/11/2026 · JP · Record Leave, Add Type, Save Type and Send Response are Praxis AI cards (§9;
