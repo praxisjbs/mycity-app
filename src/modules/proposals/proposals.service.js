@@ -219,7 +219,11 @@ async function transcriptText(client, documentId) {
   return Buffer.from(await storage.get(doc.storage_key)).toString("utf8").replace(/^\uFEFF/, "");
 }
 
-async function start(actor, body, scope) {
+/**
+ * New Proposal. `byHand` (the staging seed's) starts it as AI Is Off does, so nothing is asked of
+ * Claude: the brief is kept and Write Draft fills the kit from the record (§13.2, In PR 7).
+ */
+async function start(actor, body, scope, { byHand = false } = {}) {
   const deal = await pipelineRepo.get(pool, body.deal_id, scope);
   if (!deal) throw new AppError("NOT_FOUND", "That deal does not exist, or you cannot see it", 404, { deal_id: ["Pick a deal"] });
   if (!["open", "live"].includes(deal.status)) throw new AppError("VALIDATION", "That deal is closed", 422, { deal_id: ["That deal is closed"] });
@@ -227,7 +231,7 @@ async function start(actor, body, scope) {
     const t = await repo.getTemplate(pool, body.design_template_id);
     if (!t || !t.active) throw new AppError("VALIDATION", "Pick a template", 422, { design_template_id: ["Pick a template"] });
   }
-  const ai = await aiState(pool);
+  const ai = byHand ? "off" : await aiState(pool);
   const id = await tx(async (client) => {
     const transcript = body.transcript_document_id ? await transcriptText(client, body.transcript_document_id) : null;
     const { number } = await numbering.allocate(client, "proposal");
@@ -382,13 +386,13 @@ async function reshuffle(actor, id, qid, scope) {
  * Write Draft
  * ------------------------------------------------------------------ */
 
-async function requestDraft(actor, id, scope) {
+async function requestDraft(actor, id, scope, { byHand = false } = {}) {
   const r = await seen(pool, id, scope);
   if (r.status !== "questions") throw refuse("A draft is already written");
   const cards = await repo.questionsOf(pool, id);
   const open = cards.filter((q) => q.required && q.state === "open");
   if (open.length) throw refuse("Answer the required cards", { questions: ["Answer the required cards"] });
-  const ai = await aiState(pool);
+  const ai = byHand ? "off" : await aiState(pool);
   await tx(async (client) => {
     await repo.lockProposal(client, id);
     if (ai === "on") {

@@ -671,6 +671,7 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · M7 PR 8 (`partnerships.md` §6.15): `PartnerLinkFields` takes `open`, showing Partner and Deal at once with no Disconnect, for a form whose whole purpose is the link: Mailbox's Link to Partner reuses Workspace's pickers rather than a copy. Nothing on My Workspace's screens changes.
 - 07/11/2026 · AJ · M7 PR 5 (`partnerships.md` §6.16, Appendix A): Connect to Partner on New Project, New Task and New Event and their edits (Partner, leads marked, and Deal; Disconnect), written by the three services after Partnerships checks the person sees the record and the deal (`partners.work.checkLink`); a task made in a connected project takes its link; `partner_link` on every task, project and event, named only for a reader who sees the record; the Partner filter on Tasks and Projects (`partner_id`, `lead_id`); `relinkIn` moves a lead's work to its partner on conversion (`project.relinked`, `task.relinked`, `calendar_event.relinked`); a signed deal's event days are an event its partner keeps (`entity_type` `partner`, with the deal's `deal_id`); the Workspace cards carry the optional partner and deal (§2 to §11).
 - 05/11/2026 · GE · The calendar's write path takes a transaction from another module: `createIn`,
   `editIn` and `cancelIn` beside create, edit and cancel, which now call them. Recruitment uses them so an

@@ -577,11 +577,14 @@ const TrackerImportRow = z
   })
   .strict();
 
-/** What an export of Partners, Leads or their deals is made from: the list's own filters, in the tracker's columns. */
+/**
+ * What an export of Partners, Leads or their deals is made from: the list's own filters, in the
+ * tracker's columns; or Analytics' period (`partnerships.analytics`, its AnalyticsQuery).
+ */
 const PartnershipExportRequest = z
   .object({
-    source: z.enum(["partnerships.partners", "partnerships.leads", "partnerships.deals"]),
-    /** The list's filters as its screen holds them (PartnerListQuery, LeadListQuery or DealListQuery, without the page). */
+    source: z.enum(["partnerships.partners", "partnerships.leads", "partnerships.deals", "partnerships.analytics"]),
+    /** The list's filters as its screen holds them (PartnerListQuery, LeadListQuery or DealListQuery, without the page; AnalyticsQuery for Analytics). */
     filters: z.record(z.unknown()).optional(),
   })
   .strict();

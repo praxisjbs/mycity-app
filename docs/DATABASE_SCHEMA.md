@@ -482,6 +482,9 @@ and pay components, deductions (pending, accepted, in a run, including M3 fines 
 statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, and the payroll approval
 workflow (reminder settings are `0480`). The `payroll_run` and `payslip` numbering schemes are already seeded.
 The earlier note that payroll was "deliberately not modelled" was not a decision and is withdrawn.
+The tables, their columns, the migration files (`6000`, `6010`, `6020`, `6030`) and the reference seed
+(`6099`) are designed in `docs/guides/payroll.md` §4 (08/11/2026); this block says what is built, and
+nothing is yet.
 
 **Read by Home** (home.md §4.1): nothing yet. Payroll In Progress is a hidden card with no query and
 `src/modules/dashboard/sources/payroll.source.js` declares no table. The PR that creates
@@ -533,32 +536,37 @@ spell it followed up (a partner or a lead, the day of its last contact, the task
 unique `dedup_key` `partner-inactivity:<record>:<day>`, so one follow-up a spell) · `7100` (M7 PR 6)
 `signature.signer_email` nullable for a signature recorded from paper only (`method = 'paper'`, a CHECK),
 the shared signatures service's Record Signed Copy · `7101` (M7 PR 6) `partnership_agreement`
-`returned_reason` and `returned_at`: why an agreement came back to Draft from its approval. The Workspace link
+`returned_reason` and `returned_at`: why an agreement came back to Draft from its approval · `7110` (M7 PR 7)
+the Proposal Studio's progress, encrypted link and sent message · `7120` (M7 PR 8) `partner_interaction`
+`mail_from`, `mail_to` and `mail_thread_id` (a linked mail's sender, recipients and conversation, kept with
+the interaction), and `mail_message_id` set null when its message goes, so emptying Trash keeps the
+record's history. The Workspace link
 columns of `7040` are written by the Workspace services since PR 5. `docs/guides/partnerships.md` §4 is
 the field-by-field account.
 
 **Owes:**
 - MyCity's own stages (with their meanings), impact, sources, document kinds and categories: entered
   on Partnerships · Categories or by Start From Tracker (M7 PR 2), never seeded (A26).
-- The writers: every table above is written only through M7's services, PR 2 to PR 8 (the guide's
-  Appendix A); the Workspace link columns through the Workspace services (done in PR 5).
+- Nothing: every table above is written only through M7's services (PR 2 to PR 8, done) and the
+  Workspace link columns through the Workspace services (PR 5).
 - **Read by Home** (home.md §4.1): `partner` (`partner_id`, `name`, `partner_category_id`, `status`,
   `owner_id`, `created_at`) with `partner_category` (`partner_category_id`, `name`), `lead` (`lead_id`,
   `name`, `owner_id`), `partner_interaction` (`partner_id`, `occurred_at`), `partnership_opportunity`
   (`partnership_opportunity_id`, `number`, `partner_id`, `lead_id`, `title`, `stage`, `status`,
   `owner_id`, `estimated_value`, `currency`, `expected_close_on`, `signed_at`), `deal_member`
   (`deal_id`, `employee_id`), `partnership_proposal` (`partnership_proposal_id`,
-  `partnership_opportunity_id`, `number`, `status`, `value`, `currency`, `sent_at`) and
+  `partnership_opportunity_id`, `number`, `status`, `value`, `currency`, `sent_at`, `view_count`,
+  `last_viewed_at`) and
   `partnership_agreement` (`partnership_opportunity_id`, `status`, `value`, `signed_at`) through
   `src/modules/dashboard/sources/partners.source.js`. Since M7 PR 3 every query there is the owning
   module's own read (`partner_pipeline.repo`, `partners.repo`, `proposals.repo`: open deals, deals
   signed in the year at their signed agreement's value else their projected value, proposals `sent`
   or `viewed`), and the adapter owes nothing (partnerships.md §6.17).
-  **Staging holds Home's demonstration rows** in `partner`, `partner_interaction`,
-  `partnership_opportunity`, `partnership_proposal` and `partnership_agreement`
-  (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`
-  (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
-  (M7 PR 8) takes them away once, in the three steps that file starts with: that seed calls
+  **Home's demonstration rows are taken away** (M7 PR 8, done): they were in `partner`,
+  `partner_interaction`, `partnership_opportunity`, `partnership_proposal` and `partnership_agreement`
+  (`seeds/staging/60_home.js`, decision O11), their ids in `HOME_STAGING_ROWS`
+  (`seeds/staging/lib/home-staging-rows.js`). M7's own synthetic seed, `seeds/staging/70_partnerships.js`,
+  took them away in the three steps that file starts with: that seed calls
   `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes
   the alerts Home raised about those rows and then the rows, children first; the PR takes the rows
   out of `seeds/staging/lib/forward-rows.js` and leaves their ids in the manifest, so the call finds

@@ -248,6 +248,33 @@ route(
   controller.summary,
 );
 
+// Link to Partner (docs/guides/partnerships.md §6.15): the caller's own thread, a record they may see in
+// Partnerships; the service checks `partnerships` view (mailbox/binding/mail-context.service.js).
+route(
+  router,
+  "get",
+  "/threads/:id/partner",
+  { params: c.common.IdParams, response: c.interactions.ThreadContext, summary: "The lead or partner a conversation is linked to" },
+  view(),
+  controller.partnerContext,
+);
+route(
+  router,
+  "post",
+  "/threads/:id/partner",
+  { params: c.common.IdParams, body: c.interactions.ThreadPartnerBind, response: c.interactions.ThreadContext, summary: "Link a conversation to a lead or partner" },
+  view(),
+  controller.linkPartner,
+);
+route(
+  router,
+  "delete",
+  "/threads/:id/partner",
+  { params: c.common.IdParams, response: c.interactions.ThreadContext, summary: "Unlink a conversation from its lead or partner" },
+  view(),
+  controller.unlinkPartner,
+);
+
 route(
   router,
   "get",

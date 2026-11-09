@@ -674,7 +674,31 @@ async function unreportedByFunction(db, month) {
 const unreportedOf = async (db, departmentId, month) =>
   (await unreportedByFunction(db, month)).find((r) => r.department_id === departmentId) || null;
 
+/**
+ * Each person's latest closed monthly rating with its round's month between two days, for the
+ * reviews the reader may list (readable): one row a person, none for a person the reader may not see
+ * in Performance. Partnership Analytics reads it (docs/guides/partnerships.md §6.18).
+ * @param {{from: string, to: string, employee_ids: string[]}} q
+ */
+async function latestRatings(db, q, scope, reader, roleCodes) {
+  const params = [q.from, q.to, q.employee_ids];
+  const who = readable(scope, reader, roleCodes, params);
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (pr.employee_id) pr.employee_id, pr.rating
+       FROM performance_review pr
+       JOIN performance_cycle c ON c.performance_cycle_id = pr.performance_cycle_id
+       LEFT JOIN scorecard s ON s.scorecard_id = pr.scorecard_id
+      WHERE pr.review_kind = 'monthly' AND pr.status = 'closed' AND pr.rating IS NOT NULL
+        AND c.month BETWEEN date_trunc('month', $1::date)::date AND $2::date
+        AND pr.employee_id = ANY($3::uuid[]) ${who}
+      ORDER BY pr.employee_id, c.month DESC, pr.closed_at DESC NULLS LAST`,
+    params,
+  );
+  return rows;
+}
+
 module.exports = {
+  latestRatings,
   ROW,
   FROM,
   list,

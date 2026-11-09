@@ -8,6 +8,10 @@
  * The workbook's sheet is Master Tracker with MyCity's eighteen columns, then a column for each
  * custom field, so it reads back through the Partnership Tracker import (partners.import.js) as it
  * came. Money never leaves this way: no commission, no returns.
+ *
+ * Analytics (`partnerships.analytics`, §6.18) exports its period as a workbook of its own: a sheet a
+ * table of the screen, made in the asker's scope; Returns per Month only for a holder of
+ * `partnerships.money`, decided again in the worker.
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
@@ -26,6 +30,7 @@ const SOURCES = {
   "partnerships.partners": { kind: "partner", title: "Partners", base: "partners", query: () => c.partners.PartnerListQuery, list: (q, s) => require("./partners.service").list(q, s), idOf: (r) => r.partner_id },
   "partnerships.leads": { kind: "lead", title: "Leads", base: "leads", query: () => c.leads.LeadListQuery, list: (q, s) => require("../leads/leads.service").list(q, s), idOf: (r) => r.lead_id },
   "partnerships.deals": { kind: "deal", title: "Deals", base: "partnership-deals", query: () => c.partner_pipeline.DealListQuery, list: (q, s) => require("../partner_pipeline/partner_pipeline.service").list(q, s), idOf: (r) => r.deal_id },
+  "partnerships.analytics": { kind: "analytics", title: "Partnership Analytics", base: "partnership-analytics", query: () => c.partnership_analytics.AnalyticsQuery },
 };
 
 const HEALTH = { on_track: "On Track", follow_up_required: "Follow-Up Required", stalled: "Stalled" };
@@ -55,7 +60,8 @@ const COLUMNS = [
 
 /** A row's filters, checked by its list's own query without the page (the screen's filters as it holds them). */
 function filtersOf(source, filters) {
-  const shape = SOURCES[source].query().omit({ page: true, sort: true });
+  const query = SOURCES[source].query();
+  const shape = source === "partnerships.analytics" ? query : query.omit({ page: true, sort: true });
   const parsed = shape.safeParse(filters || {});
   if (!parsed.success) throw new AppError("VALIDATION_FAILED", "Those filters cannot be exported", 422, { filters: parsed.error.issues.map((i) => i.message) });
   return parsed.data;
@@ -138,6 +144,29 @@ async function gather(source, filters, scope) {
   return { rows, fields, total: page.page.total, capped: page.page.total > EXPORT_CEILING };
 }
 
+/** Analytics' period as sheets, one a table of the screen (§6.18), in the asker's scope. */
+async function analyticsSheets(filters, scope, reader) {
+  const a = await require("../partnership_analytics/partnership_analytics.service").get(filters, scope, reader);
+  const text = (k, header, width = 14) => ({ key: k, header, width });
+  const num = (k, header) => ({ key: k, header, format: "int", width: 14 });
+  const amount = (k, header) => ({ key: k, header, format: "money", width: 18 });
+  const sheets = [
+    {
+      name: "By Lead Owner",
+      columns: [text("owner", "Lead Owner", 26), num("new_prospects", "New Prospects Added"), num("meetings_held", "Meetings Held"), num("proposals_sent", "Proposals Sent"), num("partnerships_signed", "Partnerships Signed"), num("active_partnerships", "Active Partnerships Managed"), num("downloads", "Downloads Generated"), num("vendor_leads", "Vendor Leads Generated"), text("performance_rating", "Performance Rating")],
+      rows: a.by_owner.map((o) => ({ ...o, owner: o.owner ? o.owner.display_name : "No Owner" })),
+    },
+    { name: "Signed per Month", columns: [text("month", "Month"), num("signed", "Signed"), amount("value", "Signed Value")], rows: a.signed_per_month },
+  ];
+  if (a.returns_per_month) sheets.push({ name: "Returns per Month", columns: [text("month", "Month"), amount("gross_sales", "Gross Sales"), amount("mycity_commission", "MyCity Commission"), num("downloads", "Downloads")], rows: a.returns_per_month });
+  sheets.push(
+    { name: "By Category", columns: [text("name", "Category", 22), num("open", "Open Deals"), num("signed", "Signed"), amount("value", "Signed Value")], rows: a.by_category },
+    { name: "By Region", columns: [text("region", "Region", 22), num("open", "Open Deals"), num("signed", "Signed")], rows: a.by_region },
+    { name: "Stage Conversion", columns: [text("from_label", "From", 26), text("to_label", "To", 26), num("moved", "Reached"), num("rate", "Rate %")], rows: a.stage_conversion },
+  );
+  return { sheets, period: a.period };
+}
+
 /** The outbox handler: the workbook made into the file the request reserved, in the asker's scope. */
 async function buildExport(event, ctx) {
   const { buildWorkbook } = require("../../shared/spreadsheet/build");
@@ -152,6 +181,16 @@ async function buildExport(event, ctx) {
   if (!scope) return exportFiles.fail(p.document_id, "The person who asked can no longer export Partnerships.");
   const src = SOURCES[p.source];
   if (!src) return exportFiles.fail(p.document_id, "That list cannot be exported.");
+  if (src.kind === "analytics") {
+    return exportFiles.make(p.document_id, ctx, async () => {
+      const { sheets, period } = await analyticsSheets(p.filters || {}, { scope: scope.scope, scope_ids: scope.scope_ids || null }, reader);
+      return buildWorkbook({
+        sheets: sheets.map((sh) => ({ ...sh, freeze: { y: 1 } })),
+        context: workbookContext({ actor: { name: reader.display_name }, title: src.title, lines: [["Period", `${period.from} to ${period.to}`]] }),
+        cover: true,
+      });
+    });
+  }
   await exportFiles.make(p.document_id, ctx, async () => {
     const { rows, fields, total, capped } = await gather(p.source, p.filters || {}, { scope: scope.scope, scope_ids: scope.scope_ids || null });
     return buildWorkbook({
@@ -166,4 +205,4 @@ async function buildExport(event, ctx) {
   });
 }
 
-module.exports = { SOURCES, COLUMNS, requestExport, gather, buildExport, rowOf };
+module.exports = { SOURCES, COLUMNS, requestExport, gather, analyticsSheets, buildExport, rowOf };

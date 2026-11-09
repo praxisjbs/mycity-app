@@ -9,8 +9,8 @@
 | Permission key(s) | `partnerships` |
 | Capabilities | `partnerships.configure` (the Categories tab: categories, their agreement templates, delivery checklists and custom fields; pipeline stages and lists; proof points; saved proposal templates); `partnerships.money` (see and enter commission, the merchant's take and returns; import returns) |
 | Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026; PR 1 registers them in the next two free PROGRESS rows, #104 and #105 while free, and corrects this guide if another milestone took one first); changes to My Workspace (#4 Today, #5 Tasks, #6 Calendar, #101 Projects), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
-| Status | Agreed |
-| Last changed | 06/11/2026 |
+| Status | Built |
+| Last changed | 08/11/2026 |
 
 ---
 
@@ -311,7 +311,10 @@ month)`.
 health codes. Append only (no update path in the repo).
 
 **`partner_interaction`** (7000): `partner_id` becomes nullable; adds `lead_id` (one of the two);
-`interaction_type` gains `note`.
+`interaction_type` gains `note`. Migration `7120` (PR 8): a message logged from a linked thread keeps
+`mail_from`, `mail_to text[]` and `mail_thread_id` (`ON DELETE SET NULL`) on the interaction, and
+`mail_message_id` lets its message go (`ON DELETE SET NULL`), so emptying Trash never takes the
+record's history (§6.15).
 
 **`partner_mail_thread`**: `mail_thread_id uuid UNIQUE REFERENCES mail_thread`; `partner_id` or
 `lead_id` (one); `deal_id`; `bound_by`; `bound_at`; `unbound_at`.
@@ -447,14 +450,16 @@ The schemas and their fields are catalogued in Appendix C.
 | `POST /agreements/:id/signed-copy` | `SignedCopyRecord` → `AgreementDetail` | edit · §6.1 | | Record Signed Copy |
 | `POST /agreements/:id/renew`, `/close`, `/resend` | `AgreementRenew`, `AgreementClose`, `EmptyBody` → `AgreementDetail` | edit · §6.1 | | |
 | `GET /analytics` | `AnalyticsQuery` → `PartnershipAnalytics` | view · §6.1; money with `partnerships.money` | no | §6.18 |
-| `POST /mailbox/threads/:id/partner`, `DELETE` | `ThreadPartnerBind` → `ThreadContext` | `mailbox` view and `partnerships` view | | On the mailbox's routes, schemas in `interactions.js` (§6.15) |
+| `GET /mailbox/threads/:id/partner`, `POST`, `DELETE` | → `ThreadContext`; `ThreadPartnerBind` → `ThreadContext`; → `ThreadContext` | `mailbox` view on the route; `partnerships` view checked by the service (403 without it) | | The caller's own thread only (404 otherwise); on the mailbox's routes, schemas in `interactions.js` (§6.15) |
 | Public `GET /public/proposals/:token`, `GET /public/proposals/:token/pdf` | → `PublicProposal`; → PDF | none, the token | no | Records a view (§6.10); the PDF is the one sent; public routes never import auth |
 | Public `GET /public/sign/:token`, `POST .../code`, `POST .../code/verify`, `POST .../sign`, `GET .../signed` | M5's signing contract, extended (§6.9) | none, the token | | |
 | Public `GET /public/verify/:ref`, `GET /public/verify/t/:token` | → `VerifyResult` | none | | By reference: no content; by QR token: the document (§6.9) |
 
 Approvals go through the shared `/workflow` routes and My Approvals. Imports go through `/imports` with
-the keys `partnership_tracker` and `partnership_returns`. Exports are `ExportAction` sources
-`partnerships.partners`, `partnerships.leads`, `partnerships.deals`, `partnerships.analytics`.
+the keys `partnership_tracker` and `partnership_returns`. Exports are `POST /partnerships/exports` sources
+`partnerships.partners`, `partnerships.leads`, `partnerships.deals` (the tracker's columns, PR 4) and
+`partnerships.analytics` (the period's workbook, a sheet a table, Returns per Month only with
+`partnerships.money`; PR 8).
 
 ## 6 · Rules and calculations
 
@@ -904,6 +909,19 @@ Performance** (headers on row 3, four staff names, no figures).
   stops new interactions and keeps those logged.
 - `mailbox/binding/` (`intake.service`, `mail-context.service`, `context-tabs`, `convert.service`) is
   filled with `docs/guides/mailbox.md` and `docs/manual/mailbox.md` changed in the same PR.
+- **As built (PR 8):** Link to Partner is the conversation's menu in Mailbox, for its owner who sees
+  Partnerships; Partner offers the partners and leads they may see (leads marked) and Deal that record's
+  open and live deals (Workspace's own pickers, §6.16). Linked, a line under the conversation's header
+  names the record (and deal), opening its 360, with Unlink; the menu then offers Change Partner. Linking
+  logs what the thread holds; each message stored after it (synced or sent) is logged in the transaction
+  that stores it (`intake.afterStoredIn`); Spam is never logged; a message is logged once
+  (`partner_interaction_mail_message_uq`). An email interaction is owned by the mailbox's owner, its
+  subject the message's, its summary the first 300 characters of its text cut on a word
+  (`context-tabs.js`), with `mail_from` and `mail_to`. The 360's Activity opens an interaction in a
+  sheet: When, Kind, By, From, To, Contact and its text, and **Open in Mailbox** for the thread's owner
+  alone (`Interaction.mail.mail_thread_id` is null for anyone else). Unlink keeps what was logged;
+  emptying Trash keeps it too (migration `7120`). Conversion moves the link with the lead
+  (`convert.service.moveToPartnerIn`, from `interactions.service.moveToPartner`).
 
 ### 6.16 Projects, tasks and events
 
@@ -954,6 +972,21 @@ Performance** (headers on row 3, four staff names, no figures).
 
 - Also: signed deals and returns per month (returns with `partnerships.money`), stage-to-stage
   conversion, by category and by region; Export.
+- **As built (PR 8):** This Month, This Quarter and This Year are whole Lagos periods; Custom is at most
+  five years (60 months). Every measure is within the reader's scope by §6.1's one rule (a lead by
+  `recordSeen`, a deal by `dealSeen`, an interaction or calendar meeting by its record). **Meetings
+  Held** are interactions of type meeting and connected calendar meetings that started by now and were
+  not called off, each by its own owner. **Partnerships Signed** leaves out a deal the tracker import
+  signed (its import line into a signed meaning). **Active Partnerships Managed** counts partners whose
+  owner is the person with a deal signed by the period's end and neither completed, lost nor closed
+  before it. **Downloads** sum the returns of months that start in the period. **Performance Rating**
+  is the person's latest closed monthly review in the period, read through Performance's own service
+  (`reviews.service.ratingsFor`, its `readable` rule): a reader who may not list that person's reviews
+  sees none. By Category and By Region count **open deals today** and deals signed in the period (a
+  record in two cities counts in each); Stage Conversion takes the deals made or moved in the period,
+  the furthest of MyCity's forward stages each reached (On Hold and Closed Lost are not forward), and
+  gives each step the share of those at one stage that reached the next. Owners with nothing in the
+  period are not listed; the table holds at most 200 owners, the groupings 100.
 
 ### 6.19 Money, dates and places
 
@@ -994,7 +1027,15 @@ holds a `PlaceInput` key to its owner's name, and the contract's region key is `
 
 Notification types sit in a **Partnerships** category in Settings · Notifications. Each module with inner
 views declares them in its `<module>.views.js` (notifications.md §6), so the tabs carry their unread
-counts and rows their marks. Every scheduler is named in `SCHEDULERS`. The M7 `partner-inactivity` stub,
+counts and rows their marks. **As built (PR 8):** Deal Moved (a deal's owner, when someone else moved it
+by hand: never an import, the system or a signing), Deal Stalled (the Head of Department of the deal
+owner's department, high, with the blockers), Lead Signed (the lead's owner and Operations & People),
+Questions Ready, Draft Ready (not after Build by Hand), Proposal Viewed (the first opening only),
+Proposal Accepted, Declined, Withdrawn (not when a revision withdrew it) and Expired (each the owner of
+the proposal's deal), beside PR 6's agreement notices; the person who acted is never told.
+`leads.views.js` places a lead under its status's chip on Leads (a contacted lead under Open) and
+`agreements.views.js` an agreement under its status's on Contracts & MOUs; Pipeline and Proposals have no
+chips their notices could follow. Every scheduler is named in `SCHEDULERS`. The M7 `partner-inactivity` stub,
 superseded for alerting by Home's sweep (README §5.15), is filled as the follow-up job.
 
 ## 8 · Permissions and visibility by role
@@ -1054,6 +1095,14 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   `PartnerAdd` signed before the hub, `DealAdd`, `DealReturnChange` and the rest) with the form's own
   request named by its `via` reason; the category, template, checklist, field and list writes are
   `design`.
+- **Built in PR 8:** the summaries `partnerships.summary` (open, live and stalled deals, projected value,
+  and value signed in a period, grouped by stage, category, region, partner or owner: "what is our
+  partnership value", "who is our highest contributing partner") and `partnership_returns.summary`
+  (returns by partner or month: downloads and units to every reader, gross, MyCity's commission and
+  payouts only with `partnerships.money`), both in `partnership_analytics.ai.js`; the read
+  `proposals.list`; the card `proposals.start` (`ProposalBriefAdd`: the deal and the notes; a transcript
+  and images are files, added on the studio's Brief), run by `proposals.service.start`. Proposals' other
+  forms are `design`. Analytics itself has no form.
 - **AI routes:** "add a lead" opens Leads with New Lead; "move a deal" opens its 360; "write a proposal for
   X" opens the studio; "renewals due" opens Contracts & MOUs; "set up a category" opens Categories.
 - **Search** (`partners.search.js`, `leads.search.js`, `partner_pipeline.search.js` for deals and
@@ -1065,7 +1114,10 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   Partner, New Deal, New Proposal and New Partner Category are ⌘K actions. The last is Categories' New
   Category, named in full in ⌘K and the phone's floating button because Expenses has a New Category too
   (§13.2). PR 3 built partners, leads and deals (`partner`, `partner_deal`, `lead` off `search:none`) and
-  the New Lead and New Partner actions; New Deal needs its record, so it is the 360's own action.
+  the New Lead and New Partner actions; New Deal needs its record, so it is the 360's own action. PR 6
+  built agreements, MOUs and contracts with Generate Agreement; PR 7 New Proposal; PR 8 proposals
+  (`proposals.search.js`: number, title, partner and deal, the newest version of each), `proposal` off
+  `search:none`, and `partnership_proposal`, the type its events and notices name, opening Proposals.
 
 ## 10 · On screen and mobile
 
@@ -1497,6 +1549,33 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
     Sign); its consent box keeps the label it shipped with, Agree to Sign Electronically, as the public site's
     User Guide chapter and its pictures name it.
 
+- **In PR 8 (08/11/2026, JP), analytics, mail, Praxis AI, search and finish:**
+  - Analytics' rating goes through Performance's service (`reviews.service.ratingsFor` on
+    `reviews.repo.latestRatings`, Performance's own `readable` rule), never a query of Analytics' own
+    on its tables (§6.18).
+  - Analytics' Export is a source of the partnerships export, `partnerships.analytics`, the period's
+    workbook a sheet a table, money decided again in the worker (§5).
+  - The record's history keeps a linked mail's sender, recipients and thread on the interaction
+    (`7120`), and the message's link is set null when the message goes, so the owner emptying Trash
+    never fails on, or takes, the record's history (§4.2, §6.15).
+  - Link to Partner sits in the conversation's menu and the linked record in a line under its header,
+    so a conversation not linked shows nothing new; it reuses Workspace's Partner and Deal pickers
+    (`PartnerLinkFields` `open`) rather than a second copy (§6.15, workspace.md).
+  - A linked message is logged in the transaction that stores it, not by an outbox handler: Mailbox
+    emits `mail_message.received` only for fresh unread inbox mail, and a thread's sent and older
+    messages must be logged too (§6.15).
+  - The Partner Agreement flow's context reads the deal's rate, else its category's default, else 0:
+    Submit for Approval failed (`context is missing "commission_pct"`) on a deal of a category with no
+    default rate, which the staging seed found (§6.9).
+  - The staging seed writes through the services as Operations & People (the real post's login), and
+    its proposals are Build by Hand (`proposals.service.start` and `requestDraft` `byHand`), so a deploy
+    never asks Claude. Home's demonstration rows in the five M7 tables leave `lib/forward-rows.js`, which
+    now writes no row anywhere, and Home's seed tests no longer count Partnerships' figures (§6.17).
+  - Home's Proposals Out records show Last Viewed (or Not Yet) and Views, the views PR 7 recorded.
+  - `templates/documents/mou.html` and `templates/email/agreement-renewal.html` stayed empty and are
+    deleted: MOUs are templates built in the hub (§6.8) and the renewal reminder is `defineReminder`'s
+    (§7). `templates/documents/signature-certificate.html` is M5's, left as it is.
+
 ### 13.3 Still open
 
 - **AI jobs:** settled. `template-tidy` is Default (JP, 06/11/2026) and `proposal-message` is Default (TB,
@@ -1758,7 +1837,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   search · test` in each, beyond them):
   - `partners/`: `.360`, `.dedup`, `.import` (the tracker), `.convert` (the conversion transaction),
     `.documents`, `.work`, `.views`
-  - `leads/`: `.360`, `.views`; a lead's status from its stage is `partner_pipeline.lists`'
+  - `leads/`: `.360`, `.views` (PR 8); a lead's status from its stage is `partner_pipeline.lists`'
     `leadStatusOf`, kept in step by `leads.service` `syncStatus` (PR 3)
   - `partner_pipeline/`: `.categories`, `.lists`, `.fields`, `.checklists`, deals in the template
     `.service` and `.repo` (PR 3), `.options`,
@@ -1773,7 +1852,8 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
     `.renewals`, `.views`
   - `templates/` (M3's, shared): `.agreements` (the wording of a category's templates: its fields, chips and
     checks; PR 2)
-  - `partnership_analytics/`: `.queries`
+  - `partnership_analytics/`: `.queries`, `.ai` (the summaries), no repo and no `.search` (figures, not
+    records; PR 8)
   - `signatures/` (shared with M5): `.service`, `.code` (the email code), `.stamp`, `.certificate`,
     `.signed-pdf`, `.verify`, `.public.routes`
   - `mailbox/binding/`: `intake.service`, `mail-context.service`, `context-tabs`, `convert.service`
@@ -1782,11 +1862,11 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
   `agreement-renewals` takes it (PR 7), each in `SCHEDULERS`.
 - **Shared:** `shared/import` (Map Values), `shared/documents/render.js` (table loop if missing),
   `shared/workflow/definitions.js` (`partnership.agreement`), `shared/numbering/schemes.js`.
-- **Templates:** `templates/documents/` (`deal-merchant-agreement.html`, `mou.html`,
-  `service-agreement.html`, `contract.html`, `proposal.html` as the kit's entry,
-  `signature-certificate.html`); `templates/proposals/` (layouts, `kit.css` from tokens, assets);
-  `templates/email/` (`proposal-sent.html`, `agreement-sign.html`, `agreement-signed.html`,
-  `agreement-renewal.html`, `sign-code.html`).
+- **Templates:** `templates/documents/` (`proposal.html` as the kit's entry; an agreement's wording is its
+  category template's, built in the hub, §6.8; `signature-certificate.html` is M5's);
+  `templates/proposals/` (layouts, `kit.css` from tokens, assets); `templates/email/`
+  (`proposal-sent.html`, `agreement-sign.html`; the sealed copy and the code are the signatures
+  service's `signature-completed.html` and `signature-code.html`).
 - **Prompts** (`src/services/ai/prompts/`): `proposal-questions.md`, `proposal-draft.md`,
   `proposal-rewrite.md`, `proposal-message.md`, `template-tidy.md`; `mou-draft.md` is deleted (MOUs are
   templates, not drafts).
@@ -1801,13 +1881,25 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 - **packages/ui:** `StageSwitcher`, `QuestionCard`, `DocumentFrame`, `DocumentEditor` (PR 2).
 - **Seeds:** `seeds/reference/7190_seed_partnerships.sql` (code lists, capabilities, the flow, numbering,
   `7099`'s choices switched off); `seeds/staging/70_partnerships.js` (synthetic).
-- **Tests:** `tests/integration/partnerships-*.test.js` per module; `tests/unit/` for the importer's
+- **Migrations:** `7010` to `7060`, `7080`, `7100`, `7101`, `7110`, `7120` (a linked mail's sender,
+  recipients and thread on its interaction, PR 8).
+- **Mailbox** (`app/src/features/mailbox/PartnerContext.tsx`, PR 8): Link to Partner and the linked line.
+- **Tests:** `tests/integration/partnerships-*.test.js` per module (PR 8: `-analytics`, `-mail`,
+  `-notices`, `-staging-records`); `tests/unit/` for the importer's
   parsers, the content schema and the figure check; `tests/fixtures/partnership-tracker.synthetic.xlsx`.
 
 ---
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · PR 8, analytics, mail, Praxis AI, search and finish (`m7/analytics-finish`): Analytics
+  (#55) on the contract, desktop and phone, with Export (§6.18); Link to Partner and a linked thread's
+  mail on the record's Activity with the excerpt rule, migration `7120` (§6.15); the summaries
+  `partnerships.summary` and `partnership_returns.summary`, the read `proposals.list` and the card
+  `proposals.start` (§9); proposals in ⌘K (§9); who is told and where it waits (§7); Home's Proposals Out
+  with its views; the synthetic staging seed `70_partnerships.js`, Home's M7 rows handed over (§6.17);
+  the approval context's rate (§6.9); the INTERIM types and the empty stubs gone; Status Built. What it
+  decided is in §13.2, In PR 8.
 - 08/11/2026 · TB · PR 6, agreements, approval, signing and verification (`m7/agreements-signing`): the agreements
   module (generate, Draft, Submit through `partnership.agreement`, Send for Signature, Send Again, Record Signed
   Copy, Renew, Close), signing converting a lead, the seal filed with the partner's documents, the

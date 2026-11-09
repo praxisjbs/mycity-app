@@ -756,8 +756,9 @@ and Move Down rather than bare arrows.
     punch only once its time has come. A seeded punch is source `import` with the idempotency key
     `staging-home:<date>:<type>`; a day holding the person's own punch, or one the day-close already
     closed, is left alone. `attendance_event` is append-only, so these stay;
-  - **rows in the forward modules' tables** (tasks, the calendar, goals and targets, a review cycle and
-    its reviews, partners and their pipeline, expenses and budgets) by SQL with fixed UUIDv5 ids, the in-browser mock's records on the real staff
+  - **rows in the forward modules' tables** (once tasks, the calendar, goals and targets, a review cycle
+    and its reviews, partners and their pipeline, expenses and budgets; now none, each owner seeding its
+    own, M7's in `seeds/staging/70_partnerships.js`) by SQL with fixed UUIDv5 ids, the in-browser mock's records on the real staff
     (`seeds/staging/lib/forward-rows.js`). Their numbers carry STG (`PAR-STG-01`), so none collides
     with a number the owning module gives. Every id is written out in one manifest,
     `HOME_STAGING_ROWS` (`seeds/staging/lib/home-staging-rows.js`, `{ table, id_column, ids }`,
@@ -854,6 +855,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · M7 PR 8 (`partnerships.md` §6.10, §6.17): Proposals Out's records show Last Viewed (Not Yet until the link is opened) and Views, the views the public link recorded. §11: Home's staging seed writes no partners, deals, proposals, agreements or interactions any more (`seeds/staging/lib/forward-rows.js` writes no row at all now); M7's `70_partnerships.js` removes them with `removeHomeStagingRows` and writes its own synthetic tracker through the services, so the partnership cards, the pipeline chart and the Quiet Partners alert read M7's rows on staging. Home's seed tests no longer count Partnerships' figures.
 - 06/11/2026 · TB · M7's audit after PR 3 (`partnerships.md` §6.1, §13.2): a deal is also seen through its lead's or partner's owner, so Home's partnership cards (Open Opportunities, Signed Value and the pipeline chart) count a deal on a record the reader's scope owns; `partners.source.js` names `lead.owner_id` in `TABLES` (§4.1).
 - 06/11/2026 · JP · M7 PR 3 (`partnerships.md` Appendix A, §6.17): `partners.source.js` reads through the Partnerships modules' own reads (`partner_pipeline.repo`, `partners.repo`, `proposals.repo`), so a card's scope is the screens' scope (a deal by its owner or its team, a partner by its owner or a deal on it the reader may see), and it owes nothing (§4.1). Signed Value and Monthly Signed Value read deals by the Lagos day they were signed, each at its signed agreement's value, else its projected value; the card's caption counts deals and its records are one row a deal (§6 Overview), on the in-browser mock too. `partner_type` is dropped. Home's seed tests updated.
 - 05/11/2026 · GE · Home's staging vacancies are gone from `lib/forward-rows.js` (and the open seats it read for them): Recruitment's own seed, `seeds/staging/55_recruitment.js`, removes them with `removeHomeStagingRows` and makes its roles through its services. Their ids stay in `HOME_STAGING_ROWS`.

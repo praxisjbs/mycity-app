@@ -1231,8 +1231,9 @@ Owner decisions of 20/10/2026 (T4, T6). The items are settled in the same transa
   - With no gross set, the item keeps its minutes and its amount is empty (No Salary Set).
 - **Pending until** People waive it (`people` approve, scope all, with a reason of 10 to 500
   characters; one, or up to 25 at once; never their own) or payroll takes it into a run (M6,
-  `in_run`), after which it cannot be waived. The person sees each on My Attendance as it is added,
-  and is told when one is added or waived.
+  `in_run`), after which it cannot be waived. Payroll takes an item at the run's Submit, not at its
+  lock, so the approver sees what they approve; a Send Back releases it (`docs/guides/payroll.md` §6.9).
+  The person sees each on My Attendance as it is added, and is told when one is added or waived.
 - **When the day changes** (a decision, a clock-out People add, the day-close, leave granted for a
   closed day): an item still pending, or one the system decided, follows the day: its minutes and
   amount change with it, and when the day stops qualifying the system waives a deduction (or cuts
@@ -1663,6 +1664,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · §6.17: payroll takes a pending item `in_run` at the run's Submit (it read "until the run is locked" in T4), and the new functions payroll will call (`takeIntoRun`, `releaseFromRun`, `monthRates`) are named in `docs/guides/payroll.md` §4.4. No behaviour of attendance changed yet.
 - 03/11/2026 · JP · Approve Overtime and Add Work Site are Praxis AI cards (`attendance.ai.js`, §9;
   `praxis-ai.md` decisions 33 to 39): Approve Overtime after Confirm It's You, for someone in the
   reader's reach, through `approveOvertime`; Add Work Site with one address picked as every address

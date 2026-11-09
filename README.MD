@@ -89,6 +89,9 @@ mycity-app/
 │                             65_partnership_setup.js: Partnerships · Categories as MyCity sets it up (stages,
 │                             impacts, types, the Events checklist and Deal Merchant Agreement, proof points),
 │                             through the services, tested by tests/integration/partnerships-staging-seed.test.js;
+│                             70_partnerships.js: a synthetic tracker (partners with returns, leads at their
+│                             stages, proposals, agreements to Active) through the services, after taking
+│                             Home's M7 rows away, tested by tests/integration/partnerships-staging-records.test.js;
 │                             80_expenses.js: M8's categories, budgets, projects and requests at
 │                             every stage on the Implementation Team's accounts, through the
 │                             services, after taking Home's expense rows and 8099's categories away,
@@ -642,10 +645,13 @@ shapes, invented organisations and contacts; the real one is never committed).
 Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);
 `shared/documents/render.js` its table loop if missing (PR 6). Prompts (`services/ai/prompts/`):
 `proposal-questions`, `proposal-draft`, `proposal-rewrite`, `proposal-message`, `template-tidy`;
-`mou-draft` is not built (an MOU is a template). Templates: `templates/documents/` (the agreements,
-`proposal.html`, `signature-certificate.html`), `templates/proposals/` (the design kit),
-`templates/email/` (`proposal-sent`, `agreement-sign`, `agreement-signed`, `agreement-renewal`,
-`sign-code`).
+`mou-draft` is not built (an MOU is a template). Templates: `templates/documents/proposal.html` (an
+agreement's wording is its category template's, built in the hub), `templates/proposals/` (the design
+kit), `templates/email/` (`proposal-sent`, `agreement-sign`; the sealed copy and the code are the
+signatures service's). PR 8: `partnership_analytics` (`.queries`, `.service`, `.ai` with the
+summaries), `leads.views.js` and `agreements.views.js`, `proposals.ai.js` and `.search.js`,
+`mailbox/binding/` (Link to Partner, `app/src/features/mailbox/PartnerContext.tsx`), migration `7120`,
+the synthetic staging seed `seeds/staging/70_partnerships.js`.
 
 ### 5.11 M8 · Expenses & Budget Control · AJ · 7 to 11 Dec
 

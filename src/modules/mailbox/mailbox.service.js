@@ -42,6 +42,7 @@ const usage = require("../../shared/integrations/usage");
 const { cleanHtml, textToHtml } = require("./visible");
 const realtime = require("../../services/realtime/emitter");
 const { outgoingHtml, textOf } = require("./compose");
+const binding = require("./binding/intake.service");
 const signatures = require("./signature/signature.service");
 const { place } = require("./signature/signature.place");
 
@@ -306,6 +307,8 @@ async function ingest(client, a, folder, m) {
     }
   }
   await repo.refreshThread(client, t.mail_thread_id);
+  // A thread linked to a lead or partner logs each new message there (partnerships.md §6.15).
+  await binding.afterStoredIn(client, { mail_thread_id: t.mail_thread_id, mail_message_id: row.mail_message_id });
   const fresh = Date.now() - at.getTime() < FRESH_MS;
   if (!outbound && folder.kind === "inbox" && !m.seen && fresh) {
     await emit(client, {
@@ -977,6 +980,7 @@ async function deliver(q) {
           });
       }
       await repo.refreshThread(client, t.mail_thread_id);
+      if (row) await binding.afterStoredIn(client, { mail_thread_id: t.mail_thread_id, mail_message_id: row.mail_message_id });
       await repo.markSent(
         client,
         q.mail_send_queue_id,

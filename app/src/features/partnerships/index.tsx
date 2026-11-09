@@ -8,9 +8,9 @@ import { Proposals } from "./Proposals";
 import { Categories } from "./Categories";
 
 /**
- * Partnerships (docs/guides/partnerships.md §2, §10): routing only, one file a screen. Pipeline,
- * Partners and Leads with both 360s (M7 PR 3), Categories (PR 2) and Contracts & MOUs (PR 6) run on the
- * generated contract; Proposals and Analytics stay on the mock until their pull requests (Appendix A).
+ * Partnerships (docs/guides/partnerships.md §2, §10): routing only, one file a screen. Every tab runs on
+ * the generated contract: Categories (M7 PR 2), Pipeline, Partners and Leads with both 360s (PR 3),
+ * Contracts & MOUs (PR 6), Proposals (PR 7) and Analytics (PR 8).
  */
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   switch (tab) {
