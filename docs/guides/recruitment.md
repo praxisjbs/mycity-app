@@ -785,8 +785,8 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
-- 09/11/2026 · The public header no longer lists Apply, Assessment or Sign Offer. Candidates still
-  open those pages from their private links; their token routes and functionality are unchanged.
+- 09/11/2026 · AI · Hide Apply, Assessment and Sign Offer from the public header because they are
+  private-link pages. Their token routes and functionality remain unchanged; left: nothing.
 - 08/11/2026 · GE · (Ose) The Interviews dialog has Close at its foot (ListDetail `closeButton`, desktop only).
 - 08/11/2026 · GE · (Ose) Interviews on desktop: the list takes the page's width (with when it ends and how it is held)
   and a row opens the interview in a wide dialog, the interview, Blind Panel, Weighted Scorecard and Candidate Details
