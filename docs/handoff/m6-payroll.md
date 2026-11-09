@@ -73,7 +73,7 @@ exists, and the payslip template is empty.
 - [ ] `payroll.run` in `DEFAULTS`, `payroll.configure` in the capability catalogue, `employer_cost` in the field mask
 - [ ] The four tabs in the route map, ⌘K screens, Coming Soon, catalogue and their tests; PROGRESS #47 and #49 Dropped,
       Configurations added in the next free row (#109 while free), the Payroll screens' Owner set to LA, `SCREENS` and the counts; MILESTONES §18's Payroll row
-- [ ] `payroll_setting` carries the option columns (Pay Day, Bank Details Required, the three conventions)
+- [ ] `payroll_setting` carries the option columns (Pay Day, default 30 and 1 to 31 with the month-end rule; Bank Details Required; the three conventions)
 - [ ] DATABASE_SCHEMA M6 as built; README §5.9; gates 3 to 6 green
 
 ### PR 2 · Calculation and the run
@@ -118,6 +118,7 @@ exists, and the payslip template is empty.
 
 ## 3 · Log
 
+- 09/11/2026 · JP · PR 0, pay day: confirmed with JBS Praxis that the pay day defaults to the 30th, configurable 1 to 31, a day past a month's end falling on its last day (guide §13.1 item 24, §6.11 rule 1); the statutory rates and conventions are data entered from a date and only the items and the formula's shape are code (§6.12 rule 7); a person's salary and bank are set on People · Employees' Pay and Bank step, already built (§2). The ESS guide's "27th" and the payslip sample's date moved to the 30th. Documentation only.
 - 09/11/2026 · JP · PR 0, third round: JBS Praxis answered the rest. The statutory rates, the accountant's conventions,
   the pay day and every person's salary and bank details are configuration MyCity enters in the app, so none is an
   open question (Configurations gains Bank Details Required and, in advanced mode, three conventions: PAYE basis,

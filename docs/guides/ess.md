@@ -83,7 +83,8 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    recorded (My Queries · Sanctions) and any deduction is accepted into the payroll run (M6) → the
    approved payslip shows it in My Payslips, and the Deductions figure opens the list of months with
    deductions, each with its query. If the query is waived nothing is deducted.
-4. **Payslips** become visible when Payroll approves and locks the run (normally the 27th). Until
+4. **Payslips** become visible when Payroll approves and locks the run (the pay day is the 30th unless
+   MyCity sets another, `docs/guides/payroll.md` §6.11). Until
    then the month shows "In the run".
 5. **Leave.** A request from My Leave goes to the line manager, then to Operations & People when it
    is over 5 days (the leave flow, `docs/guides/foundation.md` §6.5) → approved leave counts down the
@@ -436,6 +437,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 09/11/2026 · JP · §3 step 4: the pay day is the 30th unless MyCity sets another (it read "normally the 27th"; `docs/guides/payroll.md` §13.1 item 24). No screen changed.
 - 08/11/2026 · JP · Payroll's lines brought into line with the 4 November review and `docs/guides/payroll.md` (M6's single source of truth): §6's simple-payroll bullet, §13's My Payslips visibility settled; §10.2's My Payslips row now says the payslip opens in a modal at every desktop width (JBS Praxis, 08/11/2026; built with M6's PR 7). No screen of ESS changed yet.
 - 05/11/2026 · AJ · My Requests (#56) moved from Expenses into ESS, after My Leave (M8 handoff decision 8). Its screen, rules and API are M8's, in `docs/guides/expenses.md`; `app/src/features/ess/index.tsx` renders `features/expenses/MyRequests.tsx`.
 

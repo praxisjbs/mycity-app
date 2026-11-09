@@ -1041,7 +1041,8 @@ record and M6's only source of truth.
   Payslips and ESS · My Payslips) open in a modal. Staging demos use test people, because staging sends
   real mail (A4).
 - **Configuration, entered by MyCity in the app (09/11/2026):** the statutory rates and bands, the accountant's
-  conventions (PAYE basis, whether pension and NHF reduce taxable pay), the pay day and a Bank Details Required
+  conventions (PAYE basis, whether pension and NHF reduce taxable pay), the pay day (the 30th unless changed, 1 to 31, a
+  day past a month's end falling on its last day) and a Bank Details Required
   switch live on Configurations, and every person's salary and bank details on People · Employees or the staff
   import. None is seeded (A26) and none blocks the build.
 - **LA builds the screens** (Payroll Runs, Payslips, Deductions, Configurations and ESS · My Payslips); TB owns the
