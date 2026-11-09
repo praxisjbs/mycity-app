@@ -152,7 +152,7 @@ next run as an adjustment).
 | Payroll · Payroll Runs (`payroll-runs`, #45) | Staff app, People group | `payroll` view | The current run's figures and chain, its problems, the run history, the approval | New Run, Compute, Add Adjustment, Exclude, Submit for Approval, Approve, Send Back, Reject (the approver), Mark Paid, Email All Payslips, Download All, Statutory Report (advanced), Discard |
 | Payroll · Payslips (`payslips`, #46) | Staff app | `payroll` view; amounts need the salary grant | The month's payslips (Preview until approved, Published after), one opening in a modal with its lines | Open a payslip, Download PDF (`payroll` edit, a restricted file), search by person |
 | Payroll · Deductions (`deductions`, #48) | Staff app | `payroll` view | Every deduction waiting or running: attendance items, fines, advances; the month's figures | Accept This Month, Spread Over Months, Waive (a fine); Record Advance, Cancel Advance; a link to People · Attendance to waive an attendance item |
-| Payroll · Configurations (`configurations`, new, #109 while free) | Staff app | `payroll` view; changes need `payroll.configure` | Pay Day, the Advanced Payroll switch; when on: Statutory Items, PAYE Bands, Salary Structure, Pay Components | Set Pay Day, Switch On or Off from a date, Save Rate, Save Grade, Place People, Set Pay Components |
+| Payroll · Configurations (`configurations`, new, #109 while free) | Staff app | `payroll` view; changes need `payroll.configure` | Pay Day, Bank Details Required, the Advanced Payroll switch, Statutory Items and PAYE Bands; when on or once it has been: the conventions, Salary Structure, Pay Components | Set Pay Day, Switch On or Off from a date, Save Rate, Save Grade, Place People, Set Pay Components |
 | ESS · My Payslips (`my-payslips`, #11) | Staff app | Every employee, own record | Gross, Net Received, Payslips, Deductions, Next Payday; the year's months; the month's payslip | Change year, open a month, Download PDF, Email a Copy, open Deductions, Download All |
 | Home · Overview, the Payroll In Progress card | Staff app | Readers with the salary field and `payroll` view | Runs not yet paid, in their scope | Open the run |
 | Settings · Approvals (#72) | Staff app | `settings` view | The `payroll.run` flow, its stage and version | Edit Stages (saves a new version) |
@@ -224,8 +224,9 @@ Repayment" in its month's run → the person is told when it is recorded, and se
 **3.5 Switching the advanced option on.** Someone with `payroll.configure` presses Switch On on Configurations,
 picks a date (today or later, never earlier) → refused (409 `NO_RATES`) unless at least one statutory rate is in
 force on that date, and (409 `NO_CONVENTIONS`) unless the three conventions are set → saved as a new version of the
-setting. MyCity enters the rates and the conventions on the same screen, when its accountant has confirmed them; no
-build step waits for them. Runs for months before the date stay simple and
+setting. MyCity enters the rates first, on the same screen, while the option is still off (Statutory Items and PAYE
+Bands are always there, §13.1 item 25), and sets the three conventions in the Switch On request itself, when its
+accountant has confirmed them; no build step waits for them. Runs for months before the date stay simple and
 locked runs never change; a run for a month from the date computes statutory lines, shows Employer Cost and
 offers the Statutory Report.
 
@@ -262,7 +263,7 @@ Paid ends it. A run stuck from an older month still counts, so an unpaid October
 | `statutory_rate` | A rate, band or relief in force from a date (advanced) | `6020` | `statutory` |
 
 Changes to tables other people own, each reviewed by that table's owner (MIGRATIONS §1.3, README §12):
-`attendance_pay_item.payroll_run_id` gains its foreign key (owed since `1435`; LA); `leave_type` gains
+`attendance_pay_item.payroll_run_id` gains its foreign key (owed since `1435`; `ON DELETE SET NULL`, a nullable link; LA); `leave_type` gains
 `unpaid` (M1 leave; AJ); in advanced mode `employee` gains the tax and pension numbers the statutory mask
 already names (`tax_id`, `pension_pin`, `pension_administrator`, `nhf_number`; written through the
 organisation service; TB). `sanctions.fines` gains `release` (§6.6; GE). Nothing else outside M6 changes.
@@ -302,7 +303,7 @@ item 21).
 | `number` | `citext NOT NULL UNIQUE`, from `numbering.allocate(client, "payroll_run", { date: period })`, `PAY-2026-10` |
 | `period` | `date NOT NULL UNIQUE`, `CHECK (period = date_trunc('month', period)::date)` |
 | `status` | `draft`, `computed`, `submitted`, `approved`, `paid` |
-| `advanced` | `boolean NOT NULL`, the mode this run was computed in |
+| `advanced` | `boolean NOT NULL DEFAULT false`, the mode this run was computed in (a Draft not yet computed holds the default) |
 | `headcount` | `integer NOT NULL DEFAULT 0`, payslips not excluded |
 | `earnings_total`, `deductions_total`, `net_total`, `employer_total` | `numeric(18,2) NOT NULL DEFAULT 0` |
 | `computed_at`, `submitted_at`, `approved_at` | `timestamptz` |
@@ -352,17 +353,17 @@ item 21).
 |---|---|
 | `employee_id` | `uuid NOT NULL REFERENCES employee ON DELETE RESTRICT` |
 | `source` | `sanction_fine`, `salary_advance` |
-| `sanction_fine_id` | `uuid UNIQUE REFERENCES sanction_fine ON DELETE RESTRICT`; set iff `source = 'sanction_fine'` |
+| `sanction_fine_id` | `uuid REFERENCES sanction_fine ON DELETE RESTRICT`; set iff `source = 'sanction_fine'`. One live deduction a fine: a unique index leaving out the cancelled ones (`payroll_deduction_live_fine_uq`), so a fine released back to pending (§6.6 rule 5) can be accepted again as a new deduction |
 | `reason` | `text NOT NULL` (a fine: the sanction's reason; an advance: what it was for) |
 | `total_amount` | `numeric(18,2) NOT NULL CHECK (total_amount > 0)` |
 | `instalments` | `smallint NOT NULL CHECK (instalments BETWEEN 1 AND 12)` |
-| `start_period` | `date NOT NULL`, the first month's first day |
+| `start_period` | `date NOT NULL`, the first month's first day (a `CHECK` holds it to a month's first day) |
 | `granted_on` | `date`, the day an advance was paid; null for a fine |
 | `status` | `active`, `settled`, `cancelled` |
 | `settled_at`, `cancelled_at`, `cancel_reason` | as named |
 | `created_by` | `uuid REFERENCES app_user ON DELETE RESTRICT` |
 
-**`payroll_deduction_instalment`**: `payroll_deduction_id` (CASCADE), `period date` (first of month),
+**`payroll_deduction_instalment`**: `payroll_deduction_id` (CASCADE), `period date` (first of month, held by a `CHECK`),
 `amount numeric(18,2) NOT NULL CHECK (amount > 0)`, `status` (`scheduled`, `in_run`, `applied`,
 `cancelled`), `payroll_run_id uuid REFERENCES payroll_run ON DELETE SET NULL`; `UNIQUE
 (payroll_deduction_id, period)`; indexes on `(period, status)` and `payroll_run_id`.
@@ -432,7 +433,7 @@ owning module's service, in a transaction, with `emit()`.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /payroll/runs` | `PayrollRunListQuery` (`status`, `year`; sort `-period`, `period`, `status`) → `PayrollRunPage` | `payroll` view · all | yes, 25 | Totals are null for a reader without the salary grant |
+| `GET /payroll/runs` | `PayrollRunListQuery` (`status`, `year`; sort `-period`, `period`, `status`) → `PayrollRunPage` | `payroll` view · all | yes, 25 | Totals are null for a reader without the salary grant. A row is a `PayrollRun` with an empty `chain`: the approval's route is read for the run a person opens |
 | `GET /payroll/runs/summary` | → `PayrollRunSummary` | `payroll` view · all | no | The current run (the open one, else the latest), counts by status, the last 12 months' net for the Net Payroll by Month chart |
 | `POST /payroll/runs` | `PayrollRunCreate` (`period`) → `PayrollRun` | `payroll` create · all | no | 409 `RUN_EXISTS` if the month has a run; 422 `PERIOD_NOT_ALLOWED` for a month after the current Lagos month or before anyone started |
 | `GET /payroll/runs/:id` | → `PayrollRun` | `payroll` view · all | no | Totals, status, the approval's route (`chain`), problem counts, and `can_compute`, `can_submit`, `can_decide`, `can_pay`, `can_discard` for this reader |
@@ -487,10 +488,10 @@ The ESS routes live in `src/modules/ess/` and call `payslips.service` with the c
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /payroll/settings` | → `PayrollSettings` (`advanced_enabled`, `pay_day` (30 when none is set), `pay_day_is_default`, the version in force and the next) | `payroll` view · all | no | |
+| `GET /payroll/settings` | → `PayrollSettings` (`advanced_enabled`, `advanced_has_been_on`, `pay_day` (30 when none is set), `pay_day_is_default`, `require_bank_details`, the three conventions, and `current` and `next`, the version in force and the one that starts later) | `payroll` view · all | no | |
 | `PATCH /payroll/settings` | `PayrollSettingsChange` (`advanced_enabled`, `effective_from`, `pay_day`, `require_bank_details`, `paye_basis`, `pension_reduces_taxable`, `nhf_reduces_taxable`, `reason`) → `PayrollSettings` | `payroll` edit · all, capability `payroll.configure` | no | `effective_from` today or later; the convention fields are accepted only once the option has been on or is being switched on (409 `ADVANCED_OFF` otherwise); 409 `NO_RATES` to switch on with no rate in force on that date; 409 `NO_CONVENTIONS` with any convention unset |
-| `GET /statutory/rates` | `StatutoryRateListQuery` (`item`, `as_of`) → `StatutoryRatePage` | `payroll` view · all | yes, 25 | 409 `ADVANCED_OFF` while the option is off and never was on |
-| `POST /statutory/rates` | `StatutoryRatesSave` (`item`, `effective_from`, its rows or bands) → `StatutoryRatePage` | `payroll` edit · all, `payroll.configure` | no | A new version from a date; never backdated; the previous version ends the day before |
+| `GET /statutory/rates` | `StatutoryRateListQuery` (`item`, `as_of`) → `StatutoryRatePage` | `payroll` view · all | yes, 25 | Readable whatever the option's state: the rates are entered before the first switch-on (§13.1 item 25) |
+| `POST /statutory/rates` | `StatutoryRatesSave` (`item`, `effective_from`, its rows or bands) → `StatutoryRatePage` | `payroll` edit · all, `payroll.configure` | no | A new version from a date; never backdated; the previous version ends the day before; accepted while the option is off, so a rate can be in force when it is first switched on |
 | `GET /salary-structure/grades`, `POST /salary-structure/grades` | `SalaryGradeListQuery`, `SalaryGradeSave` → `SalaryGradePage`, `SalaryGrade` | view; edit with `payroll.configure` | yes, 25 | Advanced only |
 | `GET /salary-structure/placements`, `PUT /salary-structure/placements/:employee_id` | `GradePlacementListQuery`, `GradePlacementSave` → `GradePlacementPage`, `GradePlacement` | view; edit with `payroll.configure` | yes, 25 | Each person against their band: Below Minimum, Within, Above Maximum |
 | `GET /salary-structure/employees/:employee_id/components`, `PUT …` | `PayComponentsSave` → the person's components | view; edit with `payroll.configure` | no | A save is a new version from a date |
@@ -728,9 +729,12 @@ suspension into absent days), so payroll does, from the owners' records:
    by MyCity when its accountant confirms it; no build step waits for one. Every person's salary and bank details
    are entered on People · Employees or through the staff import (nothing in payroll creates them), and the run
    reports each one missing (§6.15).
-4. **Gated pieces.** Statutory Items, PAYE Bands, Salary Structure and Pay Components are visible on
-   Configurations only when the option is on or has been; their routes answer 409 `ADVANCED_OFF` otherwise. In
-   simple mode Configurations holds Pay Day and the switch alone.
+4. **Gated pieces.** Statutory Items and PAYE Bands are on Configurations whatever the option's state, so the
+   rates can be entered before the first switch-on (§13.1 item 25, decided 09/11/2026). The conventions, Salary
+   Structure and Pay Components are visible only when the option is on or has been (`advanced_has_been_on`); their
+   routes answer 409 `ADVANCED_OFF` otherwise, except that the conventions are accepted in the request that
+   switches the option on. In simple mode Configurations holds Pay Day, Bank Details Required, the switch, Statutory
+   Items and PAYE Bands.
 5. **Salary structure.** Grades are bands (minimum, maximum) from a date; people are placed in a grade from a
    date; a person above the maximum or below the minimum is flagged (Above Maximum, Below Minimum), never blocked,
    and an offer outside its band is not a payroll matter. Salaries stay negotiated: a grade sets no one's pay.
@@ -791,7 +795,7 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    added to that list in PR 1. These fields are nullable in the contract. A reader without the grant gets
    null, and the screens show Restricted.
 2. **Bank fields** follow `employee.bank`: another person's bank name and last four digits on a payslip are masked
-   for a reader without it. A person always sees their own.
+   for a reader without it (`account_last4` joined that list in `field-mask.js` in PR 1). A person always sees their own.
 3. **Masks apply at the boundary** (`maskForUser` in controllers), in exports and in the assistant's reads; a
    service uses the real figure.
 4. **Dates** are ISO on the wire and day-first for people (`formatDate`, `formatMonth`); a period is a first-of-month
@@ -996,7 +1000,7 @@ Both tables are read by `scripts/check/guides.js`.
 | Payroll · Payroll Runs | The month (desktop subtitle); Staff in Run, Gross, Deductions, Net; the chain Draft, Computed, Submitted, Approved, Paid with who has it now; the problem line "2 blocking, 3 warnings" with Open; Run History (Month, Staff, Gross, Net, Approved By, Status); New Run, Compute Run, Add Adjustment, Submit for Approval, Approve, Send Back, Reject (the approver), Mark Paid, Email All Payslips, Download All, Statutory Report (advanced), Discard | Help term on **Status**: what each status lets people do. On **Blocking**: what stops Submit. On **Adjustment**: a correction to a locked month goes into the next run. On **Send Back**: it releases everything frozen. Each at most 35 words | The freeze at Submit, the recompute and `RUN_CHANGED`, rounding, the working-days divisor, one run a month: §6.8, §6.9, the chapter |
 | Payroll · Payslips | Payslips, Gross, Deductions, Net, Visible to Staff (On approval, then Published); the month's payslips (Employee, Gross, Deductions, Net, Status); a payslip opens in the modal: its lines, Net Pay, Download PDF (`payroll` edit) | Help term on **Preview**: a payslip is a preview until the run is approved. On **Restricted**: the amount needs the salary grant | PDF generation, the restricted file rule, the breakdown's source: §6.10 |
 | Payroll · Deductions | Pending Fines, Pending Attendance, Active, Recovered This Year (each opens its list in a pop-up, the ESS rule); the status chips (Pending, Active, Settled, Waived) and the source switch (All, Attendance, Fines, Advances); the list (Employee, Reason, Source, Amount, Month, Status); a row's sheet with Accept This Month, Spread Over Months, Waive, Release; Record Advance | Help term on **Spread Over Months**: how many months, the first month, equal shares. On **Pending Attendance**: waive these on People · Attendance. On **Release**: only before any share is in a run | Instalment rounding, never your own, the fine and attendance lifecycles: §6.6, queries.md §6.6 |
-| Payroll · Configurations | Pay Day; the Bank Details Required switch; the Advanced Payroll row with its switch and its state; when on: Statutory Items (Item, Type, Rate, Base, Status), PAYE Bands, Conventions (PAYE Basis, Pension Reduces Taxable Pay, NHF Reduces Taxable Pay), Salary Structure (Bands by Grade, Grades, who is Above Maximum or Below Minimum), Pay Components; Save Rate, Save Grade | Help term on **Advanced Payroll**: from its date, later runs compute PAYE, pension, NHF, ITF and NSITF; locked runs never change. On **Effective From**: today or later. On **Bank Details Required**: a person with none blocks Submit. On **Pay Day**: 30 unless changed; a day past a month's end is its last day. On **PAYE Basis**: annualised or monthly bands | Why statutory is off by default, how a run picks its mode, the rates' sources: §6.11, §6.12 |
+| Payroll · Configurations | Pay Day; the Bank Details Required switch; the Advanced Payroll row with its switch and its state; Statutory Items (Item, Type, Rate, Base, Status) and PAYE Bands, always; when on or once it has been: Conventions (PAYE Basis, Pension Reduces Taxable Pay, NHF Reduces Taxable Pay), Salary Structure (Bands by Grade, Grades, who is Above Maximum or Below Minimum), Pay Components; Save Rate, Save Grade | Help term on **Advanced Payroll**: from its date, later runs compute PAYE, pension, NHF, ITF and NSITF; locked runs never change. On **Effective From**: today or later. On **Bank Details Required**: a person with none blocks Submit. On **Pay Day**: 30 unless changed; a day past a month's end is its last day. On **PAYE Basis**: annualised or monthly bands | Why statutory is off by default, how a run picks its mode, the rates' sources: §6.11, §6.12 |
 | ESS · My Payslips | The year with its ‹ › switch; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; the year's months (Month, Net, Status: Paid, Paid with a deduction, In the run); the picked month's payslip, Download PDF, Email a Copy; Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries) | Help term on **In the run**: the month is waiting for approval | PDF rendering, that no statutory word appears in simple mode: §6.10, ess.md §6 |
 | Home · Payroll In Progress | A count of runs not paid, opening the run | Help term on the card's title (as every Home card) | The card's source and mask: home.md §4.1, §3.8 |
 
@@ -1007,7 +1011,7 @@ Both tables are read by `scripts/check/guides.js`.
 | Payroll · Payroll Runs | Staff in Run and Net two to a row, the chain as a vertical list, the problem line, then run cards (month, net, status pill) | The subtitle, Gross and Deductions cards, the trend chart | Submit for Approval, full width at the foot of the open run's sheet | Bottom bar More, then People; the four tabs scroll sideways |
 | Payroll · Payslips | Four figures two to a row, then payslip cards (person, net, status pill) | The Gross and Deductions columns | Download PDF, full width at the foot of a payslip's full sheet; Email All Payslips and Download All in the run's overflow | As above |
 | Payroll · Deductions | Four figures two to a row, then deduction cards (person, reason, amount, status pill) | The Source column, the subtitle | Accept This Month at the foot of a pending fine's sheet, Spread Over Months and Waive beside it | As above |
-| Payroll · Configurations | Pay Day, the Advanced Payroll row; when on, cards for each section | The band chart | Switch On or Off, opening its date sheet | As above |
+| Payroll · Configurations | Pay Day, the Advanced Payroll row, Statutory Items and PAYE Bands as cards; when on, cards for the rest | The band chart | Switch On or Off, opening its date sheet | As above |
 | ESS · My Payslips | The year switch (44 px targets), Email a Copy, Download All; the figures two to a row; the months as a list with a status pill | The subtitle; the payslip opens in a modal on desktop and as a full sheet on a phone (F31 as amended, §10.3) | Download PDF at the foot of the month's sheet | ESS tabs |
 | Home · Payroll In Progress | The card as every Home card | Nothing | Open the run | Bottom bar Home |
 
@@ -1195,6 +1199,16 @@ Binding; never re-opened. Timestamps are the meeting's transcript.
     09/11/2026): a pay day past a month's last day falls on that last day (§6.11 rule 1). The default is a constant in
     code, shown on Configurations as "30 (default)", not a seeded row (A26). The ESS guide's "normally the 27th" is
     superseded.
+25. **The first statutory rates are entered before the option is switched on** (JBS Praxis, 09/11/2026): Configurations
+    shows Statutory Items and PAYE Bands while the option is off, `GET /statutory/rates` and `POST /statutory/rates` work
+    whatever its state, and Switch On then passes `NO_RATES`. The gate is on computing statutory lines, not on entering
+    the rates. The conventions are set in the Switch On request; Salary Structure and Pay Components stay behind "on or
+    has been" (§6.11 rule 4).
+26. **`leave_type.unpaid` is seed-only for now** (JBS Praxis, 09/11/2026): payroll reads the flag from the seeded Unpaid
+    type; a switch on People · Leave's type form is a separate small change to M1 leave, taken when MyCity asks for a
+    second unpaid type.
+27. **My Payslips (#11) keeps its Owner, AJ** (JBS Praxis, 09/11/2026): LA builds the screen in PR 7 under AJ's review
+    (item 22); the Owner column of the other Payroll rows is LA's.
 
 ### 13.2 Decided in writing this guide (change here if wrong)
 
@@ -1248,8 +1262,8 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
 
 Answered and moved to §13.1: the approver (item 7), a leaver's instalments and a negative net (16), recurring
 allowances (17), the ESS modal (18), staging mail (19), the statutory rates, the accountant's conventions, the pay day
-and every person's salary and bank details as configuration (21), who builds the screens (22) and when Written is
-ticked (23).
+and every person's salary and bank details as configuration (21), who builds the screens (22), when Written is
+ticked (23), where the first statutory rates are entered (25), the unpaid flag on leave types (26) and #11's Owner (27).
 
 ---
 
@@ -1297,12 +1311,12 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   `payroll.run` definition, `payroll.configure`, the Unpaid flag); each with `-- UP` and `-- DOWN`, idempotent,
   its `updated_at` triggers and FK indexes.
 - **Shared wiring:** the definition in `DEFAULTS` of `src/shared/workflow/definitions.js` (validated); the capability
-  in `src/shared/access/access.catalog.js`; `employer_cost` in `src/shared/rbac/field-mask.js`; the labels in
-  `src/modules/settings/settings.service.js`; the route map, ⌘K screens, Coming Soon and catalogue for the four tabs
+  in `src/shared/access/access.catalog.js`; `employer_cost` in `src/shared/rbac/field-mask.js`; the labels
+  (`src/modules/settings/settings.service.js` already names `payroll_run` and `payslip` in `DOC_LABELS`, so it needs no change); the route map, ⌘K screens, Coming Soon and catalogue for the four tabs
   (`src/shared/route-map.js`, `src/shared/search/screens.js`, `app/src/shell/coming-soon.ts`,
   `app/src/shell/catalogue.ts`, `app/src/api/mock/modules/identity.ts`, `app/src/lib/trail.test.tsx`,
   `tests/unit/foundation/delivery-plan.test.js`); PROGRESS rows #47 and #49 Dropped and Configurations added in the next free row (#109 while free),
-  the Payroll screens' Owner set to LA (#45, #46, #48, Configurations, and #11's build), `SCREENS` in
+  the Payroll screens' Owner set to LA (#45, #46, #48 and Configurations; #11 keeps AJ, §13.1 item 27), `SCREENS` in
   `scripts/check/progress.js` and the summary counts; MILESTONES §18's Payroll row. `payroll_setting` is created in
   `6000` with its option columns (Pay Day, Bank Details Required, the three conventions); the conventions are
   accepted by the route only in PR 5.
@@ -1427,17 +1441,23 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 - `payroll.js`: `PayrollRun`, `PayrollRunListQuery`, `PayrollRunPage`, `PayrollRunSummary`, `PayrollRunCreate`,
   `PayrollRunSubmit`, `PayrollRunPaid`, `PayrollRunExclude`, `PayrollProblem`, `PayrollProblemPage`,
   `PayrollAdjustment`, `PayrollAdjustmentPage`, `PayrollAdjustmentAdd`, `PayrollSettings`, `PayrollSettingsChange`,
-  `PayslipEmailAll`.
+  `PayslipEmailAll`; and the pieces they are made of: `RunStatus`, `AdjustmentKind`, `PayeBasis`,
+  `ProblemSeverity`, `ProblemCode`, `PayrollRunCounts`, `PayrollTrendMonth`, `PayrollSettingsVersion`.
 - `payslips.js`: `Payslip`, `PayslipLine`, `PayslipDetail`, `PayslipListQuery`, `PayslipPage`, `PayslipVars`,
-  `PayslipBatchVars`, `EssPayslipQuery`, `EssPayslipSummary`, `EssDeductionRow`, `EssDeductionPage`.
+  `PayslipBatchVars`, `EssPayslipQuery`, `EssPayslipSummary`, `EssDeductionRow`, `EssDeductionPage`; and
+  `PayslipLineItem` and `PayslipLineItemPage` (the pay items behind a grouped line, §5), `PayslipPrintedLine`,
+  `PayslipStatus`, `PayslipLineKind`, `PayslipLineCode`, `EssDeductionSource`.
 - `deductions.js`: `DeductionRow`, `DeductionListQuery`, `DeductionPage`, `DeductionSummary`, `DeductionAccept`,
-  `DeductionWaive`, `AdvanceRecord`, `AdvanceCancel`.
+  `DeductionWaive`, `AdvanceRecord`, `AdvanceCancel`; and `DeductionFigure`, `DeductionSource`, `DeductionStatus`
+  (a row's status on the tab), `DeductionState` (a `payroll_deduction`'s own) and `InstalmentStatus`.
 - `salary_structure.js` (PR 5): `SalaryGrade`, `SalaryGradeListQuery`, `SalaryGradePage`, `SalaryGradeSave`,
   `GradePlacement`, `GradePlacementListQuery`, `GradePlacementPage`, `GradePlacementSave`, `PayComponent`,
   `PayComponentsSave`.
 - `statutory.js` (PR 5): `StatutoryRate`, `StatutoryRateListQuery`, `StatutoryRatePage`, `StatutoryRatesSave`,
   `StatutoryReportVars`.
-- Shared from `common.js`: `EmptyBody`, `PageQuery`, `ExportFile`, `money`, `isoDate`, `uuid`, `text`.
+- Shared from `common.js`: `EmptyBody`, `PageQuery`, `money`, `isoDate`, `uuid`, `text`, and, added in PR 1,
+  `positiveMoney` (an amount above zero, the field error "Enter an amount") and `monthStart` (a month's first day).
+  `ExportFile` is `documents.js`'s.
 
 ## Appendix D · File map
 
@@ -1464,6 +1484,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 09/11/2026 · JP · JBS Praxis's answers on PR 1's open points recorded (§13.1 items 25 to 27): the first statutory rates are entered before the option is switched on, so Statutory Items and PAYE Bands are always on Configurations and the rates routes work whatever the option's state, while the conventions go in the Switch On request and Salary Structure and Pay Components stay behind "on or has been" (§2, §3.5, §5, §6.11 rule 4, §10.1, §10.2); `leave_type.unpaid` is seed-only for now; #11 My Payslips keeps its Owner, AJ (Appendix A). §13.3's question 2 is answered and removed.
+- 09/11/2026 · JP · PR 1 (contract, data and scaffolding) built the simple-mode contract, migrations `6000`, `6010` and `6030` and seed `6099`; the guide meets what was built: `payroll_run.advanced` defaults to false and the foreign key from `attendance_pay_item` is `ON DELETE SET NULL` (§4.1, §4.2); `payroll_deduction.sanction_fine_id` is no longer plainly `UNIQUE` but unique among the live (not cancelled) deductions, because a released fine (§6.6 rule 5) could otherwise never be accepted again (§4.2); `PayrollSettings` carries `advanced_has_been_on`, which the version in force and the next cannot tell (an option switched off has been on), and the conventions (§5); a run list row has an empty `chain` (§5); `account_last4` joins `employee.bank` in the mask so a payslip's last four digits are masked as §6.13 rule 2 says; the settings labels already existed (Appendix A); Appendix C lists the pieces the schemas are made of, the pay items behind a grouped line (`PayslipLineItem`, which §5 and §6.10 rule 7 name without a contract) and the two helpers added to `common.js`; §13.3 gains question 2, a circle between `NO_RATES` and the Statutory Items being hidden before the option has been on, for PR 5.
 - 09/11/2026 · JP · Pay day and the statutory rates confirmed with JBS Praxis: the pay day defaults to the 30th, configurable 1 to 31, a day past a month's end falls on its last day (§13.1 item 24, §6.11 rule 1, §4.2, §5, §11); the statutory rates, bands, relief, employer percentages, bases and conventions are all data entered from a date, and only the set of items and the formula's shape are code (§6.12 rule 7); People · Employees already has the Pay and Bank step that sets a person's salary and bank (§2).
 - 09/11/2026 · JP · After rebasing onto main: Configurations' PROGRESS row is the next free one, #109 while free (#107 and #108 are the public site's); §0.3 and the build plan otherwise unchanged.
 - 09/11/2026 · JP · JBS Praxis's third round recorded: the statutory rates, the accountant's conventions, the pay day and every person's salary and bank details are configuration MyCity enters in the app (§13.1 item 21; the options in §4.2 `payroll_setting`, §5, §6.11 rule 3a, §6.12 rule 1, §6.15, §10.1; `NO_CONVENTIONS`); LA builds the screens (item 22; the header, Appendix A's lanes and PR 7); Written is ticked once the pull request merges (item 23, Appendix A PR 0); §13.3 holds one question.

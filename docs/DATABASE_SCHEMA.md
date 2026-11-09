@@ -473,23 +473,31 @@ left it. Every CHECK equals the contract's enums (`docs/guides/offers.md` §4).
 
 ### M6 Payroll & Notifications · 6000 to 6999 · TB
 
-**Built:** nothing in the block. Notifications are M0 (`0060`), web push and each person's
+**Built (PR 1, 09/11/2026), simple mode.** Notifications are M0 (`0060`), web push and each person's
 preferences too (`0460`), and Settings · Notifications with the reminder settings (`0480`), all
-brought forward by TB on 19/10/2026.
+brought forward by TB on 19/10/2026. The payroll tables are designed in `docs/guides/payroll.md` §4 and built
+as that section says (08/11/2026, amended by its Change log):
 
-**Owes, all of payroll** (MILESTONES §11, in scope): payroll runs, payslips, salary structures
-and pay components, deductions (pending, accepted, in a run, including M3 fines and lateness),
-statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, and the payroll approval
-workflow (reminder settings are `0480`). The `payroll_run` and `payslip` numbering schemes are already seeded.
-The earlier note that payroll was "deliberately not modelled" was not a decision and is withdrawn.
-The tables, their columns, the migration files (`6000`, `6010`, `6020`, `6030`) and the reference seed
-(`6099`) are designed in `docs/guides/payroll.md` §4 (08/11/2026); this block says what is built, and
-nothing is yet.
+| File | Creates | Notes |
+|---|---|---|
+| `6000_payroll.sql` | `payroll_setting`, `payroll_run`, `payslip`, `payslip_line`, `payroll_adjustment` | `payroll_setting` is effective-dated (`scope` is always `organisation`; an exclusion constraint on `daterange(effective_from, effective_to)` keeps two versions from overlapping) and carries the pay day (1 to 31, null until set; the default 30 is a constant in code), Bank Details Required and the three conventions. A run is one per month (`period` unique, a month's first day). A payslip is one per person per run; an excluded one has its reason, and only an excluded one. A line's amount is never negative; its `kind` and `code` equal the contract's. Money is `numeric(18,2)` |
+| `6010_payroll_deductions.sql` | `payroll_deduction`, `payroll_deduction_instalment` | A fine accepted or an advance recorded, and one month's share of each. One live deduction a fine (a unique index leaving out the cancelled), so a released fine can be accepted again. Adds `attendance_pay_item_payroll_run_fk` (`ON DELETE SET NULL`) and its index: the key owed since `1435` |
+| `6030_leave_unpaid.sql` | `leave_type.unpaid` | `boolean NOT NULL DEFAULT false` |
+| `seeds/reference/6099_seed_payroll.sql` | Reference data only (A26) | The `payroll.run` approval (version 1, the CEO, 72 hours, context `{ net_total: "money" }`), the `payroll.configure` capability held by Operations & People and the Implementation Team, and the Unpaid leave type flagged unpaid. No setting row, rate, band, grade, run or pay day |
+
+Every table has its own `<table>_set_updated_at` trigger, an index on every foreign key and an `ON DELETE`
+on each; `tests/integration/payroll-schema.test.js` checks that, the constraints, the numbers (`PAY-2026-10`,
+`PAY-2026-10-0001`) and the files undone and applied again.
+
+**Owes** (PR 5): `6020_payroll_advanced.sql` (`salary_grade`, `employee_salary_grade`,
+`employee_pay_component`, `statutory_rate`, and the employee tax and pension numbers the statutory mask
+already names), off by default and with no rate, band or grade in any seed. The earlier note that payroll was
+"deliberately not modelled" was not a decision and is withdrawn.
 
 **Read by Home** (home.md §4.1): nothing yet. Payroll In Progress is a hidden card with no query and
-`src/modules/dashboard/sources/payroll.source.js` declares no table. The PR that creates
-`payroll_run` adds the query there (runs not finished, in the reader's scope), declares its columns
-and makes the card live in the same PR.
+`src/modules/dashboard/sources/payroll.source.js` declares no table. The PR that fills the run's service
+(PR 2) adds the query there (runs not finished, in the reader's scope), declares its columns and makes the
+card live in the same PR; `payroll_run` now exists for it to read.
 
 ### M7 Partnerships, CRM & Trackers · 7000 to 7999 · LA
 

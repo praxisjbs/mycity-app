@@ -433,6 +433,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `partnerships.configure` | `partnerships` | Configure Partnerships: the categories with their agreement templates, delivery checklists and custom fields, the pipeline's stages and lists, the proof points and the saved proposal templates (`docs/guides/partnerships.md`) | Implementation, Operations & People | `7190` |
 | `partnerships.money` | `partnerships` | See Commission and Returns: see and enter commission, the merchant's take and returns, and import returns | Implementation, Operations & People, Management; General Management through their department (in code) | `7190` |
 | `expenses.finance` | `expenses` | Run Expenses: group approved requests into requisitions, record disbursements, set budgets and manage the expense categories (`docs/guides/expenses.md`) | Implementation, Operations & People | `8100` |
+| `payroll.configure` | `payroll` | Configure Payroll: switch the advanced option on or off, set the pay day and the bank rule, and enter the statutory rates, bands, salary grades and pay components (`docs/guides/payroll.md` §8) | Implementation, Operations & People | `6099` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -574,6 +575,16 @@ edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4
 | `salary_structure` | |
 | `deductions` | `.acceptance` (nothing deducts itself) |
 | `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
+
+The build plan and the file map are `docs/guides/payroll.md` (Appendix A and D), M6's only source of
+truth. PR 1 (09/11/2026) filled the contract files `payroll.js`, `payslips.js` and `deductions.js` (simple
+mode; `salary_structure.js` and `statutory.js` come with PR 5), migrations `6000`, `6010` and `6030`, seed
+`6099` (the `payroll.run` approval, `payroll.configure`, the Unpaid flag), the definition in
+`shared/workflow/definitions.js`, the capability in `shared/access/access.catalog.js`, `employer_cost` and
+`account_last4` in `shared/rbac/field-mask.js`, and the four tabs (Payroll Runs, Payslips, Deductions,
+Configurations: Salary Structure and Statutory are retired) in the route map, ⌘K, Coming Soon and the shell's
+catalogue, with `tests/integration/payroll-schema.test.js` and `tests/unit/payroll-contract.test.js`. No
+controller, route, service or repo of the five modules is filled yet: that is PR 2 onward.
 
 Web push, each person's preferences, `notifications.reminders` and the `settings` Notifications
 screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2026

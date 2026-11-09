@@ -18,6 +18,8 @@ afterEach(() => deliveryPlan.use());
 describe("the plan, read from the docs", () => {
   test("each screen is its PROGRESS section and slug, with its milestone and ticks; each milestone its demo day", () => {
     expect(docs.screens["Payroll|payroll-runs"]).toEqual({ m: "M6", api: false, delivered: false });
+    // Configurations took Salary Structure's and Statutory's place (M6 PR 1); their rows stay, Dropped.
+    expect(docs.screens["Payroll|configurations"]).toEqual({ m: "M6", api: false, delivered: false });
     expect(docs.screens["Employee Self-Service|my-leave"]).toMatchObject({ m: "M1", api: true, delivered: true });
     expect(docs.milestones.find((m) => m.key === "M8")).toMatchObject({ n: 8, demo: "2026-12-11" });
     // "with M1": the foundation takes the next milestone's demo day.
@@ -67,6 +69,7 @@ describe("the API's answers", () => {
   test("on staging, Payroll is held back until its API is ticked, and what has shipped opens", () => {
     deliveryPlan.use({ plan: docs, rule: "staging" });
     expect(deliveryPlan.screenOpen("payroll", "payroll-runs")).toBe(false);
+    expect(deliveryPlan.screenOpen("payroll", "configurations")).toBe(false);
     expect(deliveryPlan.screenOpen("ess", "my-leave")).toBe(true);
     expect(deliveryPlan.moduleOpen("payroll")).toBe(false);
     expect(deliveryPlan.linkOpens("/payroll?tab=payroll-runs&id=1")).toBe(false);

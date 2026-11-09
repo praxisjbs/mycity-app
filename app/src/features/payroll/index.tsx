@@ -14,9 +14,17 @@ import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
   if (tab === "payslips") return <Payslips />;
-  if (tab === "salary-structure") return <Structure />;
   if (tab === "deductions") return <Deductions />;
-  if (tab === "statutory") return <StatutoryTab />;
+  // Salary Structure and Statutory fold into Configurations (docs/guides/payroll.md §2); the prototype
+  // shows both until PR 7 rebuilds this screen on the real API.
+  if (tab === "configurations") {
+    return (
+      <>
+        <Structure />
+        <StatutoryTab />
+      </>
+    );
+  }
   return <Runs />;
 }
 

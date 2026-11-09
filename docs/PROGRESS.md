@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 106 screens (97 in the staff app, 9 on the public site) plus
+**The single record of what is built.** 105 screens (96 in the staff app, 9 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -48,12 +48,12 @@ saying who agreed and when.
 | M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
 | M4 Recruitment End to End | 11 | 0 | 0 | 11 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 4 | 1 | 0 | 3 | 0 | 0 |
-| M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
+| M6 Payroll & Notifications | 5 | 5 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 8 | 0 | 0 | 8 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **106** | **10** | **0** | **96** | **0** | **0** |
+| **Total** | **105** | **9** | **0** | **96** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
@@ -1260,14 +1260,16 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 45 | Payroll Runs | `payroll-runs` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
-| 46 | Payslips | `payslips` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
-| 47 | Salary Structure | `salary-structure` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
-| 48 | Deductions | `deductions` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
-| 49 | Statutory | `statutory` | M6 | TB | ☐ | ☐ | ☐ | Not started | |
+| 45 | Payroll Runs | `payroll-runs` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| 46 | Payslips | `payslips` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| 47 | Salary Structure | `salary-structure` | M6 | TB | ☐ | ☐ | ☐ | Dropped | 09/11/2026 |
+| 48 | Deductions | `deductions` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| 49 | Statutory | `statutory` | M6 | TB | ☐ | ☐ | ☐ | Dropped | 09/11/2026 |
+| 109 | Configurations | `configurations` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 09/11/2026 · JP · M6 PR 1, contract, data and scaffolding (`docs/guides/payroll.md` Appendix A): Salary Structure (#47) and Statutory (#49) are Dropped (the 4 November Modules Review, `docs/guides/payroll.md` §13.1 item 1): they fold into Configurations, added as #109 in the next free row (#107 and #108 are the public site's), M6. Their slugs are retired, not renamed, and were Coming Soon, so no link breaks. The Owner of #45, #46, #48 and #109 is LA (JBS Praxis, 09/11/2026; the guide's §13.1 item 22); #11 My Payslips keeps its Owner, AJ (JBS Praxis, 09/11/2026, `docs/guides/payroll.md` §13.1 item 27): LA builds the screen in PR 7 under AJ's review. `SCREENS` is 109 and the summary 5 screens in M6, 105 in all, 96 in the staff app. The simple-mode contract (`payroll.js`, `payslips.js`, `deductions.js`; the advanced contracts are PR 5), migrations `6000`, `6010` (with the foreign key from `attendance_pay_item.payroll_run_id`) and `6030`, and the reference seed `6099` (the `payroll.run` approval, the `payroll.configure` capability, the Unpaid leave type's flag; no rate, band, grade, run or pay day), the four tabs in the route map, ⌘K, Coming Soon and the shell. No controller, route, service or repo is filled and no screen built, so no API, UI or Mobile tick and no status moves. Left: PR 2 (the run), PR 3 (deductions), PR 4 (payslips), PR 5 (the advanced option), PR 6 (AI and search), PR 7 (screens), PR 8 (staging seed and User Guide).
 - 09/11/2026 · JP · M6 pay day confirmed with JBS Praxis: it defaults to the 30th, configurable 1 to 31, a day past a month's end falling on its last day (`docs/guides/payroll.md` §13.1 item 24); the guide also states which statutory settings are data and which are code (§6.12 rule 7). The ESS guide's "27th" is now the 30th. No row moved and no status changed; no code.
 - 09/11/2026 · JP · M6's remaining questions answered by JBS Praxis and recorded in `docs/guides/payroll.md` §13.1: the statutory rates, the accountant's conventions, the pay day and every person's salary and bank details are configuration MyCity enters in the app (Configurations, People · Employees); LA builds the screens (Payroll Runs, Payslips, Deductions, Configurations, My Payslips); Written is ticked once the pull request merges. MILESTONES §4 and §11 name LA. No row moved and no status changed; the Owner column of the Payroll rows changes with PR 1. No code.
 - 08/11/2026 · JP · M6 open questions answered by JBS Praxis and recorded in `docs/guides/payroll.md` §13.1 (the CEO alone approves a run; a leaver's final run takes every outstanding instalment and a negative net blocks Submit; no recurring allowances in simple mode; Payroll · Payslips and ESS · My Payslips open in a modal at every desktop width, so My Payslips (#11) changes with PR 7; staging demos use test people), and a payslip sample drafted under `docs/MyCity-ERP-Documents/payroll-samples/` for MyCity's sign-off. No row moved and no status changed; no code.
