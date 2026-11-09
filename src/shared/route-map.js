@@ -361,7 +361,8 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("payroll", "payslips"),
     self: screen("ess", "my-payslips"),
   },
-  deduction: screen("payroll", "deductions"), // search:none not built yet (src/modules/deductions)
+  // A person told that a fine is scheduled or waived, or an advance recorded, reads it on their own payslips.
+  deduction: { ...screen("payroll", "deductions"), self: screen("ess", "my-payslips") },
   // Grades and statutory rates are settings, not records: the retired entries open Configurations.
   salary_structure: screen("payroll", "configurations"), // search:none not built yet (src/modules/salary_structure)
   statutory_return: screen("payroll", "configurations"), // search:none not built yet (src/modules/statutory)

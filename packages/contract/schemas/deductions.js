@@ -68,7 +68,9 @@ const months = z.number().int().min(1, "Pick 1 to 12").max(12, "Pick 1 to 12");
  * (a `payroll_deduction`) behind it; a fine that has been accepted also carries its `payroll_deduction_id`,
  * which Release needs. `period` is the month the row belongs to (the day's month, the fine's first month
  * or the deduction's first month). `instalments` and `instalments_applied` are null for a row with none
- * yet. `query_number` is the fine's query (QRY-0019). The `can_*` flags say what the reader may press now;
+ * yet. `query_number` is the fine's query (QRY-0019). `salary_set` is false for an attendance row priced
+ * for a person with no monthly gross yet, whose `pay_amount` is then null for a reason other than the mask
+ * (the screen says No Salary Set, not Restricted). The `can_*` flags say what the reader may press now;
  * they are all false for an attendance row, which is waived on People · Attendance.
  */
 const DeductionRow = z
@@ -80,6 +82,7 @@ const DeductionRow = z
     employee: PersonRef,
     reason: z.string(),
     pay_amount: money.nullable(),
+    salary_set: z.boolean(),
     period: isoDate,
     instalments: z.number().int().min(1).max(12).nullable(),
     instalments_applied: z.number().int().min(0).max(12).nullable(),
@@ -113,10 +116,14 @@ const DeductionFigure = z.object({ count: z.number().int().min(0), pay_amount: m
 
 /**
  * GET /deductions/summary: Pending Fines, Pending Attendance, Active (what is left to recover) and
- * Recovered This Year (instalments applied this calendar year, Lagos).
+ * Recovered This Year (instalments applied this calendar year, Lagos). `open_period` is the month a fine
+ * is accepted into unless the person picks a later one (guide §6.6 rule 2): the month of the newest run
+ * still a Draft or Computed one, else the current Lagos month if it has no run, else the next. The screen
+ * offers the months from it and works out none itself.
  */
 const DeductionSummary = z
   .object({
+    open_period: isoDate,
     pending_fines: DeductionFigure,
     pending_attendance: DeductionFigure,
     active: DeductionFigure,
@@ -127,6 +134,9 @@ const DeductionSummary = z
 /* ------------------------------------------------------------------ *
  * Writing
  * ------------------------------------------------------------------ */
+
+/** The path of a fine's Accept and Waive. */
+const FineParams = z.object({ sanction_fine_id: uuid }).strict();
 
 /**
  * POST /deductions/fines/:sanction_fine_id/accept. One month is Accept This Month; two to twelve is
@@ -174,6 +184,7 @@ const TABLES = {
   DeductionPage: { table: null, reason: "a page of deductions" },
   DeductionFigure: { table: null, reason: "a count and an amount over deductions" },
   DeductionSummary: { table: null, reason: "figures over the deductions" },
+  FineParams: { table: null, reason: "the :sanction_fine_id path parameter" },
   DeductionAccept: {
     table: "payroll_deduction",
     virtual: { months: "written as payroll_deduction.instalments, and one payroll_deduction_instalment each" },
@@ -203,6 +214,7 @@ module.exports = {
   DeductionPage,
   DeductionFigure,
   DeductionSummary,
+  FineParams,
   DeductionAccept,
   DeductionWaive,
   AdvanceRecord,

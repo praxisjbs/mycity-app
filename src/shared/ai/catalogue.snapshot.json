@@ -2828,6 +2828,17 @@
       "screen": "partnerships.proposals"
     },
     {
+      "key": "payroll.route.record_a_salary_advance",
+      "kind": "route",
+      "module_key": "payroll",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "payroll.deductions"
+    },
+    {
       "key": "payroll.route.run_payroll",
       "kind": "route",
       "module_key": "payroll",
