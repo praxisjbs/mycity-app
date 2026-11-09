@@ -15,9 +15,9 @@ import { createContext, useCallback, useContext, useEffect, useState, type Ancho
  *   /proposal/<token>      opaque, one proposal, not indexable (M7)
  *   /help                  how the site works, indexable (the User Guide's public chapter)
  *
- * The header's links reach every page, so the three a person is sent to by a link of their own
- * have a guidance screen when opened without one: /apply, /assess, /sign. Vacancy needs none: its
- * link opens the open roles, and a role opened from them stays under Vacancy.
+ * Apply, assessment and signing are reached from personal links, not the header. Their tokenless
+ * paths retain guidance screens when opened directly: /apply, /assess, /sign. Vacancy's link opens
+ * the open roles, and a role opened from them stays under Vacancy.
  */
 export type Route =
   | { page: "home" }
@@ -55,18 +55,17 @@ export function parse(path: string): Route {
   }
 }
 
-/** The header's six links, left to right, and the one each page marks as current. */
+/** The header's public entry points, left to right. */
 export const NAV = [
   { label: "Vacancy", href: "/jobs" },
-  { label: "Apply", href: "/apply" },
-  { label: "Assessment", href: "/assess" },
-  { label: "Sign Offer", href: "/sign" },
   { label: "Verify Document", href: "/verify" },
   { label: "Help", href: "/help" },
 ] as const;
 
-/** Which header link a route belongs to; the index belongs to none. */
-export function sectionOf(r: Route): (typeof NAV)[number]["label"] | null {
+type Section = "Vacancy" | "Apply" | "Assessment" | "Sign Offer" | "Verify Document" | "Help";
+
+/** Which header section a route belongs to; token pages may have no visible header link. */
+export function sectionOf(r: Route): Section | null {
   switch (r.page) {
     case "careers":
     case "vacancy": return "Vacancy";
