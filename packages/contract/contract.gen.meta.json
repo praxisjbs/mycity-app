@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "65cc987bb3ef124eff020a24c7578cb6c83549f445ae14fa7c64d68fd6c0e07b",
-  "schemas": 2029,
-  "endpoints": 918,
+  "source_hash": "6ed2d55520e31a331df08b2a8d62581cf35e4a76e665089fcc7b644db4a39639",
+  "schemas": 2030,
+  "endpoints": 925,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "81b25e3cc13df3d3a8f4ddc020d168316fcc6dcb2f9e291d84048c5c7460d69a",
@@ -21,7 +21,7 @@
     "packages/contract/schemas/common.js": "6c44be89759306339cfc9d28a69c60fbbd05964a71c8ff123b4c1a7fe33e647e",
     "packages/contract/schemas/community.js": "1c13986f3dea794ab8e83b461c18e863f8a285a81fa0aad029a0d94b733648fb",
     "packages/contract/schemas/dashboard.js": "30a17b3c0dd8b6fd460b332444be2c2e31047154a16787ddda1346f63a5b4870",
-    "packages/contract/schemas/deductions.js": "af4c288ff0e7df7a710d19c56629ffd3b59f90cde7ccb1d1473bf473a8df789f",
+    "packages/contract/schemas/deductions.js": "bd24280943d9cf7db6bd72535edb1112453fc298e56efd3d8410591b89e51382",
     "packages/contract/schemas/devices.js": "b91698248b9bbba88812399e504aee8069de9f5292975627fc20994ca10ec4dd",
     "packages/contract/schemas/disbursements.js": "64c22b030f48e19cc5a39ad06b7cc6fad65d98347306c73f0ef7e8804bf4b692",
     "packages/contract/schemas/documents.js": "848b7bc4577530e54b9caec56d542ece74b5a1b02d047eb26f12b124c7a895e3",
@@ -93,6 +93,7 @@
     "src/modules/candidates/candidates.routes.js": "fa1d2e88ae2b89f2222147f1da12deceb9d0c7061f940a3f2c3315081984d559",
     "src/modules/community/community.routes.js": "9cf0819793b0a258f598710fec6f48c2e1d406b37aaebc014579479d104d9553",
     "src/modules/dashboard/dashboard.routes.js": "bc400ef66277933e51505bf611f4904857860368c1fa7c46e8d8f63dff687ac4",
+    "src/modules/deductions/deductions.routes.js": "b5d20ee05b6c73cf4af8eca22f319706af14b5431642da48c47ea6b303e887f4",
     "src/modules/devices/devices.routes.js": "66275823baca42614b175e59a41f62ff7bf7c2816e65a6a795f2cbbb0d01459f",
     "src/modules/disbursements/disbursements.routes.js": "ff73e93681dafee344380902315e5d01a85e0039644d52e3e42f6df147fc8a35",
     "src/modules/documents/documents.routes.js": "a3a4c005466e2693981dd795e91484498748f8d17731193c93b9c44f85f451ad",

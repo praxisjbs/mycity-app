@@ -3,15 +3,14 @@ import { ApiError, api } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
 import type { PayrollRun, Payslip } from "@mycity/contract/contract.gen.ts";
-import type { Grade, PayrollDeduction } from "@/api/types/payroll";
-import type { PersonRef } from "@/api/types/common";
+import type { Grade } from "@/api/types/payroll";
 
 import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { ChainCard, ExportAction, KvCard, PagedTable } from "@/features/shared/sections";
+import { ChainCard, ExportAction, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AreaChart, BandChart, Banner, Button, Card, CardHeader, Chain, DataView, DateField, DetailPane, Field, formatMoneyShort, formatMonth, FormFooter, Grid, Icon, LoadingRows, Money, MoneyField, PageHeader, rules, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useIsPhone, useModal, Who } from "@mycity/ui";
-import { EmployeePicker } from "@/features/shared/pickers";
+import Deductions from "./Deductions";
+import { AreaChart, BandChart, Banner, Button, Card, DataView, DateField, DetailPane, Field, formatMoneyShort, formatMonth, FormFooter, Grid, Icon, LoadingRows, Money, MoneyField, PageHeader, StatStrip, StatusPill, TextField, toast, todayIso, useContractForm, useIsPhone, useModal, Who } from "@mycity/ui";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
   if (tab === "payslips") return <Payslips />;
@@ -248,126 +247,6 @@ function GradeForm({ close }: { close: () => void }) {
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Add Grade</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-/* ───────────── Deductions ───────────── */
-
-function Deductions() {
-  const modal = useModal();
-  const s = useApi("GET /api/v1/payroll/deductions/summary");
-  const list = usePaged("GET /api/v1/payroll/deductions");
-  const accept = useMutation("POST /api/v1/payroll/deductions/:id/accept");
-  const f = s.data?.focus;
-  const doAccept = async (runs: 1 | 2) => {
-    if (!f) return;
-    try {
-      await accept.run({ params: { id: f.deduction_id }, body: { runs } });
-      invalidate("/api/v1/payroll");
-      toast(runs === 2 ? "Accepted, spread over two runs" : "Accepted into this month's run");
-    } catch (e) {
-      fail(e);
-    }
-  };
-  return (
-    <>
-      <PageHeader
-        title="Deductions"
-        sub={`Pending and applied · attendance tiers ${s.data?.tiers_on ? "on" : "off"}`}
-        actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Deduction", body: (close) => <DeductionForm close={close} /> })}>Add Deduction</Button>}
-      />
-      {s.data && <KpiTiles items={[{ label: "Pending Acceptance", value: String(s.data.pending), tone: s.data.pending ? "warn" : "ok" }, { label: "Applied, This Month", value: <Money value={s.data.applied_this_period} /> }, { label: "Recovered This Year", value: <Money value={s.data.recovered_this_year} />, tone: "ok" }, { label: "Sources", value: String(s.data.sources) }]} />}
-      <PagedTable<PayrollDeduction>
-        title="All Deductions"
-        list={list}
-        search="Search people or reasons"
-        rowKey={(d) => d.deduction_id}
-        noun="deduction"
-        wide
-        columns={[
-          { key: "e", label: "Employee", render: (d) => <Who name={d.employee.display_name} sub={d.employee.department ?? undefined} /> },
-          { key: "r", label: "Reason", render: (d) => d.reason },
-          { key: "s", label: "Source", render: (d) => d.source, desktop: true },
-          { key: "a", label: "Amount", align: "n", render: (d) => <Money value={d.amount} /> },
-          { key: "m", label: "Month", render: (d) => formatMonth(d.period).split(" ")[0] },
-          { key: "st", label: "Status", render: (d) => <StatusPill s={d.status} /> },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        {f ? (
-          <Card>
-            <CardHeader title={f.title} right={<StatusPill s={{ tone: "warn", text: "Needs acceptance" }} />} />
-            <Chain steps={f.chain.map((x) => ({ label: x.label, state: x.state ?? undefined }))} />
-            <p className="mt-2.5 text-2xs text-subtle-foreground">{f.note}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button variant="primary" icon="ok" busy={accept.pending} onClick={() => doAccept(1)}>Accept This Month</Button>
-              <Button busy={accept.pending} onClick={() => doAccept(2)}>Split Across Runs</Button>
-              <Button onClick={() => modal.open({ title: "Waive Deduction", body: (close) => <Waive id={f.deduction_id} close={close} /> })}>Waive</Button>
-            </div>
-          </Card>
-        ) : (
-          <Card><CardHeader title="Nothing Pending" /><p className="text-xs text-subtle-foreground">Every deduction raised has been accepted or waived.</p></Card>
-        )}
-        <KvCard
-          title="Deduction Tiers, From Attendance"
-          items={[
-            ["Current policy", <StatusPill key="p" s={s.data?.tiers_on ? { tone: "ok", text: "On · applies to future reviewed outcomes" } : { tone: "neutral", text: "Off · configuration preserved" }} />],
-            ["Up to 1 hour late", "10% of the day"],
-            ["Up to 2 hours", "20% of the day"],
-            ["Up to 3 hours", "30% of the day"],
-            ["Beyond 3 hours", "Treated as absence, by decision"],
-            ["Who sets these", "Operations, in Settings, Attendance Policy"],
-            ["Automatic?", "No. The figure is computed. A person accepts it"],
-          ]}
-        />
-      </Grid>
-    </>
-  );
-}
-
-function Waive({ id, close }: { id: string; close: () => void }) {
-  const f = useContractForm({ reason: "" }, { reason: rules.min(6, "At least 6 characters") });
-  const reason = f.values.reason;
-  const waive = useMutation("POST /api/v1/payroll/deductions/:id/waive");
-  return (
-    <>
-      <Field label="Why It Is Waived" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Damaged laptop" /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={waive.pending} onClick={async () => { if (!f.check()) return; try { await waive.run({ params: { id }, body: { reason } }); invalidate("/api/v1/payroll"); close(); toast("Deduction waived"); } catch (e) { fail(e); } }}>Waive</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-function DeductionForm({ close }: { close: () => void }) {
-  const [who, setWho] = useState<PersonRef[]>([]);
-  const [tried, setTried] = useState(false);
-  const f = useContractForm({ reason: "", amount: "" }, { reason: (v) => (!v.trim() ? "Give a reason" : null), amount: (v) => (!(Number(v) > 0) ? "Enter the amount" : null) });
-  const save = useMutation("POST /api/v1/payroll/deductions");
-  const submit = async () => {
-    setTried(true);
-    if (!f.check() || !who.length) return;
-    try {
-      await save.run({ body: { employee_id: who[0].employee_id, reason: f.values.reason.trim(), amount: f.values.amount, period: new Date().toISOString().slice(0, 7) } });
-      invalidate("/api/v1/payroll/deductions");
-      close();
-      toast("Deduction added. It waits for acceptance");
-    } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
-    }
-  };
-  return (
-    <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="Reason" {...f.field("reason")}><TextField {...f.field("reason")} placeholder="Salary advance repayment" /></Field>
-      <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Add Deduction</Button>
       </FormFooter>
     </>
   );

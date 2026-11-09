@@ -573,7 +573,7 @@ edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4
 | `payroll` | `.calc` (pure, no DB), `.inputs` (attendance, accepted deductions), `.run`, `.lock`, `.config.repo` (effective dated) |
 | `payslips` | `.pdf` (the `payslip` and `payroll_payslips_export` document types, their variables and the calls that request the PDFs), `.breakdown` (the pay items behind a grouped line) |
 | `salary_structure` | |
-| `deductions` | `.acceptance` (nothing deducts itself) |
+| `deductions` | `.acceptance` (nothing deducts itself: accept, spread, waive, release, record and cancel an advance), `.repo` (the paged union of waiting attendance deductions, fines and advances), `.search` |
 | `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
 
 The build plan and the file map are `docs/guides/payroll.md` (Appendix A and D), M6's only source of
@@ -583,14 +583,7 @@ mode; `salary_structure.js` and `statutory.js` come with PR 5), migrations `6000
 `shared/workflow/definitions.js`, the capability in `shared/access/access.catalog.js`, `employer_cost` and
 `account_last4` in `shared/rbac/field-mask.js`, and the four tabs (Payroll Runs, Payslips, Deductions,
 Configurations: Salary Structure and Statutory are retired) in the route map, ⌘K, Coming Soon and the shell's
-catalogue, with `tests/integration/payroll-schema.test.js` and `tests/unit/payroll-contract.test.js`. PR 2 filled
-`payroll` (the run) and PR 4 (`m6/payslips`, 09/11/2026) `payslips`: Payroll · Payslips under `/api/v1/payslips`,
-Email All Payslips and Download All on the run (`/payroll/runs/:id/email-payslips`, `/payslips-export`), and My
-Payslips' routes in `ess` (`ess.earnings.js`, under `/api/v1/ess/payslips` and `/ess/deductions`); the PDFs are
-requested in the run's lock. Its templates are `templates/documents/payslip.html`, `payslip-batch.html` (Download
-All, a page each) and `templates/email/payslip-ready.html`, tested by `tests/integration/payslips.test.js` and
-`src/modules/payslips/payslips.test.js`. `deductions`, `salary_structure` and `statutory` are not filled yet: PR 3
-and PR 5.
+catalogue, with `tests/integration/payroll-schema.test.js` and `tests/unit/payroll-contract.test.js`. PR 2 filled `payroll` (the run). PR 3 (09/11/2026) filled `deductions`: the union the Payroll · Deductions tab lists, accept, spread, waive and release of a fine, record and cancel of an advance, the notices and the outbox handler that tells payroll of a fine waiting; `deductions.ai.js` (one route) and `deductions.search.js` came with it for gates 9 and 10; payroll's `.lock` gained the month locks a deduction takes (`openPeriod`, `lockRunsOf`, `lockMonths`); and `app/src/features/payroll/Deductions.tsx` (with `Deductions.test.tsx`) is the screen, on the contract, with its mock in the contract's shapes in `app/src/api/mock/modules/payroll.ts`. Tests: `tests/integration/deductions.test.js` and `src/modules/deductions/deductions.test.js`. PR 4 (`m6/payslips`, 09/11/2026) filled `payslips`: Payroll · Payslips under `/api/v1/payslips`, Email All Payslips and Download All on the run (`/payroll/runs/:id/email-payslips`, `/payslips-export`), and My Payslips' routes in `ess` (`ess.earnings.js`, under `/api/v1/ess/payslips` and `/ess/deductions`); the PDFs are requested in the run's lock. Its templates are `templates/documents/payslip.html`, `payslip-batch.html` (Download All, a page each) and `templates/email/payslip-ready.html`, tested by `tests/integration/payslips.test.js` and `src/modules/payslips/payslips.test.js`. `salary_structure` and `statutory` are not filled yet: PR 5.
 
 Web push, each person's preferences, `notifications.reminders` and the `settings` Notifications
 screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2026

@@ -220,6 +220,12 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["task", "add task", "create task", "to do", "todo", "set a task", "assign work"],
   }),
+  a("record_advance", "Record Advance", {
+    screen: "payroll.deductions",
+    params: { action: "new" },
+    need: ["payroll", "create"],
+    words: ["salary advance", "advance", "record an advance", "pay ahead", "loan"],
+  }),
   // A commitment is a task marked as one (docs/guides/performance.md §6.11): New Task with it ticked.
   a("new_commitment", "New Commitment", {
     screen: "workspace.tasks",
