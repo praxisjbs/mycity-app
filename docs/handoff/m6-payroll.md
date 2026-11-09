@@ -11,7 +11,7 @@ requirement and settles no decision. Tick a line when it is done, with the date,
 | Owner | TB (Tom-Blake Asaah) owns the milestone and its backend; LA (Love Adeola) builds the screens (guide §13.1 item 22, JBS Praxis, 09/11/2026) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 27 Nov 2026 (MILESTONES §4) |
-| Pull requests | PR 0 (this documentation) merged as praxisjbs/mycity-app#100 on 09/11/2026 (`1352338`); PR 1 (contract, data and scaffolding) merged as praxisjbs/mycity-app#102 on 09/11/2026 (`3b4c382`); PR 2 (calculation and the run) merged as praxisjbs/mycity-app#104 on 09/11/2026 (`a0b19fd`); PR 4 (payslips, the PDF, email and ESS) on branch `m6/payslips`, a draft |
+| Pull requests | PR 0 (this documentation) merged as praxisjbs/mycity-app#100 on 09/11/2026 (`1352338`); PR 1 (contract, data and scaffolding) merged as praxisjbs/mycity-app#102 on 09/11/2026 (`3b4c382`); PR 2 (calculation and the run) merged as praxisjbs/mycity-app#104 on 09/11/2026 (`a0b19fd`); PR 4 (payslips, the PDF, email and ESS) on branch `m6/payslips`, a draft (praxisjbs/mycity-app#106) |
 
 ---
 
@@ -99,7 +99,7 @@ exists, and the payslip template is empty.
 - [x] Email All (once per person, `resend`), Download All, Email a Copy; masks and the restricted file (09/11/2026)
 - [x] The lock requests every payslip's PDF in its own transaction (306 in 957 ms, no job); the `published` guard and the enumerating test hold the five new writes (09/11/2026)
 - [x] Carried by the gates: `payslips.search.js` for Payroll readers, `ai:none` on the controller until PR 6 (09/11/2026)
-- [ ] `npm run ci` green locally on Node 20 (see the log)
+- [x] `npm run ci` green locally on Node 20, all 52 gates (09/11/2026)
 - [ ] The PR marked ready (it stays a draft until JBS Praxis says so); not merged until then
 
 ### PR 5 · Configurations and the advanced option
