@@ -124,6 +124,8 @@ const CASES = Object.freeze([
   { id: "card.budget-edit", as: "operations_people", question: "Change the {budgets.edit#budget_id} budget to 2,500,000 naira for {expense_categories.edit#expense_category_id}.", shows: ["cards"], action: "budgets.edit" },
   { id: "card.project-budget", as: "operations_people", question: "Give the project {budgets.set_project#project_id} a budget of 1,500,000 naira.", shows: ["cards"], action: "budgets.set_project" },
   { id: "card.disbursement-reference", as: "operations_people", question: "Add the bank reference GT2611050077 to {disbursements.add_reference#disbursement_id}.", shows: ["cards"], action: "disbursements.add_reference" },
+  // M6 Payroll (docs/guides/payroll.md §9): New Run, the one card the PR that builds the run needs; the rest come with PR 6.
+  { id: "card.payroll-run", as: "operations_people", question: "Open the payroll run for October 2026.", shows: ["cards"], action: "payroll_runs.create" },
   // A request is raised by its requester and paid by a holder of expenses.finance: a member of staff is never drawn those cards.
   // Expenses' reads, as each role of docs/guides/expenses.md §8 holds them (M8 release check).
   { id: "expenses.mine", as: "employee", question: "Where are my expense requests?", reads: ["expenses.mine"] },

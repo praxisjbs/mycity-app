@@ -1,4 +1,5 @@
-import type { Grade, PayrollDeduction, RunRow, Statutory } from "@/api/types/payroll";
+import type { ApprovalInstance, PayrollRun, PayrollRunSummary } from "@mycity/contract/contract.gen.ts";
+import type { Grade, PayrollDeduction, Statutory } from "@/api/types/payroll";
 import type { Status } from "@/api/types/performance";
 import { accepted, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, refKey, SIGN_INS } from "../data/people";
@@ -8,12 +9,31 @@ import { deductionTiersOn } from "./attendance";
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const canRun = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
 const isCeo = (u: string) => SIGN_INS[u]?.view === "ceo";
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const monthOf = (p: string) => `${MONTHS[Number(p.slice(5)) - 1]} ${p.slice(0, 4)}`;
 const thisPeriod = () => new Date().toISOString().slice(0, 7);
+const now = () => new Date().toISOString();
+const operator = () => Object.keys(SIGN_INS).find((k) => SIGN_INS[k].view === "operations") ?? "";
 
-type Stage = "computed" | "submitted" | "approved" | "paid";
-const RUN = { period: thisPeriod(), stage: "submitted" as Stage, approved_by: null as string | null, paid_on: null as string | null };
+/*
+ * Payroll runs in the contract's shapes (packages/contract/schemas/payroll.js): the months before this one are
+ * paid, this month's run is waiting on the CEO, and every move the screen makes is the API's own, down to its
+ * refusals. The CEO decides it through the approval's routes (POST /workflow/instances/:id/approve), which reach
+ * here through organisation.ts's decide chain.
+ */
+type Status6 = PayrollRun["status"];
+const RUN = {
+  period: thisPeriod(),
+  status: "submitted" as Status6,
+  submitted_at: now(),
+  submitted_by: operator(),
+  approved_at: null as string | null,
+  approved_by: null as string | null,
+  paid_on: null as string | null,
+};
+const WID = sid("wf:payroll_run");
+const first = (period: string) => `${period}-01`;
+const numberOf = (period: string) => `PAY-${period}`;
+const runId = (period: string) => sid(`run:${period}`);
+const periods = () => [...new Set(SLIPS.map((x) => x.period))].sort().reverse();
 
 function totals(period: string) {
   const list = SLIPS.filter((x) => x.period === period);
@@ -21,52 +41,157 @@ function totals(period: string) {
   const ded = list.reduce((a, x) => a + x.ded, 0);
   return { headcount: list.length, gross, ded };
 }
-function runRow(period: string): RunRow {
+
+/** The approval's route as the screen reads it: one stage, the CEO. */
+function route1(): NonNullable<PayrollRun["chain"]> {
+  const pending = RUN.status === "submitted";
+  return [{ key: "ceo", name: "CEO", state: pending ? "now" : "done", approvers: [{ type: "ceo", value: null, label: "CEO" }] }] as PayrollRun["chain"];
+}
+
+function runOf(period: string, user: string, withChain = false): PayrollRun {
   const t = totals(period);
   const current = period === RUN.period;
-  const status = !current ? S("ok", `Paid 27/${period.slice(5)}`) : RUN.stage === "paid" ? S("ok", `Paid ${RUN.paid_on?.split("-").reverse().join("/")}`) : RUN.stage === "approved" ? S("info", "Approved, locked") : RUN.stage === "submitted" ? S("warn", "Awaiting Approval") : S("neutral", "Computed");
-  return { run_id: sid(`run:${period}`), period, headcount: t.headcount, gross: money(t.gross), deductions: money(t.ded), net: money(t.gross - t.ded), approved_by: current ? RUN.approved_by : "Ifeoma Chukwu", status };
+  const status: Status6 = current ? RUN.status : "paid";
+  const edit = canRun(user);
+  const open = status === "draft" || status === "computed";
+  return {
+    payroll_run_id: runId(period),
+    number: numberOf(period),
+    period: first(period),
+    status,
+    advanced: false,
+    headcount: t.headcount,
+    gross_pay: money(t.gross),
+    total_deductions: money(t.ded),
+    net_pay: money(t.gross - t.ded),
+    employer_cost: "0.00",
+    computed_at: now(),
+    submitted_at: current && status !== "computed" ? RUN.submitted_at : null,
+    submitted_by_name: current && status !== "computed" ? (byKey(RUN.submitted_by)?.display_name ?? null) : null,
+    approved_at: current ? RUN.approved_at : null,
+    approved_by_name: current ? (RUN.approved_by ? (byKey(RUN.approved_by)?.display_name ?? null) : null) : "Ifeoma Chukwu",
+    paid_on: current ? RUN.paid_on : `${period}-27`,
+    payment_reference: null,
+    paid_by_name: null,
+    returned_reason: null,
+    workflow_instance_id: current && status !== "computed" && status !== "draft" ? WID : null,
+    chain: withChain && current && status !== "computed" && status !== "draft" ? route1() : [],
+    blocking_problems: 0,
+    warnings: 0,
+    can_compute: open && edit,
+    can_submit: status === "computed" && edit,
+    can_decide: current && status === "submitted" && isCeo(user),
+    can_pay: current && status === "approved" && edit,
+    can_discard: open && edit,
+    created_at: now(),
+  } as PayrollRun;
 }
-const periods = () => [...new Set(SLIPS.map((x) => x.period))].sort().reverse();
+
+const forbidden = () => fail(403, "FORBIDDEN", "Payroll is for Operations and the CEO.");
+const guard = (id: string) => (runId(RUN.period) === id ? null : notFound());
 
 route("GET /api/v1/payroll/runs/summary", (req) => {
-  const labels = ["Computed", "Previewed", "Submitted", "Approved", "Locked", "Paid"];
-  const doneUpTo = { computed: 1, submitted: 2, approved: 5, paid: 6 }[RUN.stage];
-  const chain = labels.map((label, i) => ({ label, state: (i < doneUpTo ? "done" : i === doneUpTo ? "now" : null) as "done" | "now" | null }));
-  const last = periods().slice(0, 6).reverse();
-  return ok({
-    current: { ...runRow(RUN.period), stage: RUN.stage === "submitted" ? "awaiting_approval" : RUN.stage === "computed" ? "review" : RUN.stage, chain, can_submit: RUN.stage === "computed" && canRun(req.user!), can_approve: RUN.stage === "submitted" && isCeo(req.user!), can_pay: RUN.stage === "approved" && canRun(req.user!) },
-    next_period: (() => { const d = new Date(`${RUN.period}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + 1); return d.toISOString().slice(0, 7); })(),
-    trend: { labels: last.map((p) => MONTHS[Number(p.slice(5)) - 1].slice(0, 3)), values: last.map((p) => runRow(p).net) },
-    trend_note: "A step between months is new hires joining, not a pay rise.",
-  });
+  if (!canRun(req.user!)) return forbidden();
+  const counts = { draft: 0, computed: 0, submitted: 0, approved: 0, paid: 0 };
+  for (const p of periods()) counts[runOf(p, req.user!).status] += 1;
+  const last = periods().slice(0, 12).reverse();
+  const body: PayrollRunSummary = {
+    current: runOf(RUN.period, req.user!, true),
+    counts,
+    trend: last.map((p) => ({ period: first(p), net_pay: runOf(p, req.user!).net_pay })),
+  };
+  return ok(body);
 });
-route("GET /api/v1/payroll/runs", (req) => (canRun(req.user!) ? paged(periods().map(runRow), req, { search: (r) => [monthOf(r.period)] }) : fail(403, "FORBIDDEN", "Payroll is for Operations and the CEO.")));
+route("GET /api/v1/payroll/runs", (req) =>
+  canRun(req.user!)
+    ? paged(periods().map((p) => runOf(p, req.user!)), req, {
+        filters: { status: (r, v) => r.status === v, year: (r, v) => r.period.startsWith(v) },
+      })
+    : forbidden(),
+);
 route("POST /api/v1/payroll/runs", (req) => {
-  if (!canRun(req.user!)) return fail(403, "FORBIDDEN", "Payroll is for Operations and the CEO.");
-  if (RUN.stage !== "paid") return fail(409, "RUN_OPEN", `${monthOf(RUN.period)} is still open. Finish it before starting the next.`);
-  return fail(409, "TOO_EARLY", "The next run opens on the 1st of the month.");
+  if (!canRun(req.user!)) return forbidden();
+  const period = String((req.body as { period?: string }).period ?? "").slice(0, 7);
+  if (periods().includes(period)) return fail(409, "RUN_EXISTS", "This month already has a run", { period: ["Already has a run"] });
+  return fail(422, "PERIOD_NOT_ALLOWED", "Pick a month from the first start to this month", { period: ["Pick another month"] });
 });
-const runGuard = (id: string) => (sid(`run:${RUN.period}`) === id ? null : notFound());
-route("POST /api/v1/payroll/runs/:id/submit", (req) => runGuard(req.params.id) ?? (RUN.stage !== "computed" ? fail(409, "WRONG_STAGE", "Only a computed run can be submitted.") : ((RUN.stage = "submitted"), ok(runRow(RUN.period)))));
-route("POST /api/v1/payroll/runs/:id/approve", (req) => {
-  const g = runGuard(req.params.id);
+route("GET /api/v1/payroll/runs/:id", (req) => guard(req.params.id) ?? (canRun(req.user!) ? ok(runOf(RUN.period, req.user!, true)) : forbidden()));
+route("POST /api/v1/payroll/runs/:id/compute", (req) => {
+  const g = guard(req.params.id);
   if (g) return g;
-  if (!isCeo(req.user!)) return fail(403, "FORBIDDEN", "Only the CEO approves a payroll run.");
-  if (RUN.stage !== "submitted") return fail(409, "WRONG_STAGE", "Only a submitted run can be approved.");
-  RUN.stage = "approved";
-  RUN.approved_by = byKey(req.user)!.display_name;
-  return ok(runRow(RUN.period));
+  if (!canRun(req.user!)) return forbidden();
+  if (RUN.status !== "draft" && RUN.status !== "computed") return fail(409, "RUN_NOT_EDITABLE", "This run can no longer be changed");
+  RUN.status = "computed";
+  return ok(runOf(RUN.period, req.user!, true));
 });
-route("POST /api/v1/payroll/runs/:id/paid", (req) => {
-  const g = runGuard(req.params.id);
+route("POST /api/v1/payroll/runs/:id/submit", (req) => {
+  const g = guard(req.params.id);
   if (g) return g;
-  if (RUN.stage !== "approved") return fail(409, "WRONG_STAGE", "Only an approved, locked run can be marked paid.");
-  RUN.stage = "paid";
-  RUN.paid_on = String(req.body.paid_on ?? isoDaysAgo(0));
-  return ok(runRow(RUN.period));
+  if (!canRun(req.user!)) return forbidden();
+  if (RUN.status !== "computed") return fail(409, RUN.status === "draft" ? "RUN_NOT_COMPUTED" : "RUN_NOT_EDITABLE", RUN.status === "draft" ? "Compute the run first" : "This run can no longer be changed");
+  RUN.status = "submitted";
+  RUN.submitted_at = now();
+  RUN.submitted_by = req.user!;
+  return ok(runOf(RUN.period, req.user!, true));
 });
-route("POST /api/v1/payroll/runs/:id/email-payslips", (req) => runGuard(req.params.id) ?? (RUN.stage === "computed" || RUN.stage === "submitted" ? fail(409, "NOT_APPROVED", "Payslips go to staff once the run is approved.") : accepted()));
+route("POST /api/v1/payroll/runs/:id/mark-paid", (req) => {
+  const g = guard(req.params.id);
+  if (g) return g;
+  if (!canRun(req.user!)) return forbidden();
+  if (RUN.status !== "approved") return fail(409, "NOT_APPROVED", "Only an approved run is marked paid");
+  RUN.status = "paid";
+  RUN.paid_on = String((req.body as { paid_on?: string }).paid_on ?? isoDaysAgo(0));
+  return ok(runOf(RUN.period, req.user!, true));
+});
+route("POST /api/v1/payroll/runs/:id/email-payslips", (req) =>
+  guard(req.params.id) ?? (RUN.status === "computed" || RUN.status === "submitted" ? fail(409, "NOT_APPROVED", "Payslips go to staff once the run is approved.") : accepted()),
+);
+
+/** POST /workflow/instances/:id/approve|reject for the month's run: the CEO decides it; null for any other id. */
+export function decidePayrollRun(user: string, wid: string, approve: boolean, reason?: string | null) {
+  if (wid !== WID) return null;
+  if (RUN.status !== "submitted" || !isCeo(user)) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  if (!approve && !String(reason ?? "").trim()) return invalid({ reason: ["is required"] });
+  if (approve) {
+    RUN.status = "approved";
+    RUN.approved_at = now();
+    RUN.approved_by = user;
+  } else RUN.status = "draft";
+  return ok({ workflow_instance_id: WID, state: approve ? "approved" : "rejected", stage_name: null });
+}
+
+/** GET /workflow/instances/:id for the month's run; null for any other id. */
+export function payrollRunInstance(user: string, wid: string): ApprovalInstance | null {
+  if (wid !== WID || !canRun(user)) return null;
+  const pending = RUN.status === "submitted";
+  return {
+    workflow_instance_id: WID,
+    definition_key: "payroll.run",
+    definition_name: "Payroll Run",
+    version: 1,
+    module_key: "payroll",
+    entity_type: "payroll_run",
+    entity_id: runId(RUN.period),
+    subject_employee_id: null,
+    subject_name: null,
+    state: pending ? "pending" : "approved",
+    current_stage: pending ? "ceo" : null,
+    stage_name: pending ? "CEO" : null,
+    context: {},
+    stage_entered_at: RUN.submitted_at,
+    stage_due_at: pending ? new Date(Date.parse(RUN.submitted_at) + 72 * 3600000).toISOString() : null,
+    opened_by: null,
+    opened_by_name: byKey(RUN.submitted_by)?.display_name ?? null,
+    opened_at: RUN.submitted_at,
+    completed_at: pending ? null : (RUN.approved_at ?? now()),
+    route: route1(),
+    decisions: [],
+    can_decide: pending && isCeo(user),
+    can_withdraw: false,
+    can_reassign: false,
+    link: "/payroll?tab=payroll-runs",
+  } as ApprovalInstance;
+}
 
 const GRADES: Grade[] = [
   ["G1", "Associate", 150000, 180000, 220000], ["G2", "Officer", 200000, 250000, 300000], ["G3", "Senior", 360000, 440000, 520000],
@@ -152,7 +277,7 @@ const findD = (id: string) => DEDS.find((d) => d.deduction_id === id);
 route("POST /api/v1/payroll/deductions/:id/accept", (req) => {
   const d = findD(req.params.id);
   if (!d) return notFound();
-  if (RUN.stage === "approved" || RUN.stage === "paid") return fail(409, "RUN_LOCKED", "This month's run is locked. It goes into next month as an adjustment.");
+  if (RUN.status === "approved" || RUN.status === "paid") return fail(409, "RUN_LOCKED", "This month's run is locked. It goes into next month as an adjustment.");
   d.status = S("ok", Number(req.body.runs) === 2 ? "Accepted, over 2 runs" : "Accepted");
   if (Number(req.body.runs) === 2) d.amount = money(Math.round(kobo(d.amount) / 2));
   d.period = RUN.period;

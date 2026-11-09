@@ -172,6 +172,9 @@ const PayrollRunPaid = z
 /** Exclude: leave one person out of this run, with the reason. */
 const PayrollRunExclude = z.object({ employee_id: uuid, reason: reasonText }).strict();
 
+/** Include: put an excluded person back into this run; the next Compute builds their lines. */
+const PayrollRunInclude = z.object({ employee_id: uuid }).strict();
+
 /* ------------------------------------------------------------------ *
  * Problems
  * ------------------------------------------------------------------ */
@@ -212,6 +215,9 @@ const PayrollAdjustment = z
   })
   .strict();
 const PayrollAdjustmentPage = Paged(PayrollAdjustment);
+
+/** The path of one adjustment of a run: DELETE /payroll/runs/:id/adjustments/:adjustment_id. */
+const PayrollAdjustmentParams = z.object({ id: uuid, adjustment_id: uuid }).strict();
 
 /** Add Adjustment: only on a Draft or Computed run, whose person is paid in it. The label is up to 60 characters. */
 const PayrollAdjustmentAdd = z
@@ -332,7 +338,9 @@ const TABLES = {
     table: "payslip",
     virtual: { reason: "written as payslip.excluded_reason" },
   },
+  PayrollRunInclude: { table: "payslip" },
   PayrollProblem: { table: null, reason: "a problem a run reports, worked out on read and never stored" },
+  PayrollAdjustmentParams: { table: null, reason: "the :id and :adjustment_id path parameters" },
   PayrollProblemPage: { table: null, reason: "a page of a run's problems" },
   PayrollAdjustment: {
     table: "payroll_adjustment",
@@ -378,10 +386,12 @@ module.exports = {
   PayrollRunSubmit,
   PayrollRunPaid,
   PayrollRunExclude,
+  PayrollRunInclude,
   PayrollProblem,
   PayrollProblemPage,
   PayrollAdjustment,
   PayrollAdjustmentPage,
+  PayrollAdjustmentParams,
   PayrollAdjustmentAdd,
   PayrollSettingsVersion,
   PayrollSettings,

@@ -8,6 +8,7 @@ import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
 import { decideExpense, expenseInstance } from "./expenses";
 import { decideOffer, offerInstance, offersWaitingOn } from "./offers";
+import { decidePayrollRun, payrollRunInstance } from "./payroll";
 import { decidePlan, decideTargetChange, decideUnbind, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
@@ -999,6 +1000,7 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
       decideTargetChange(req.user!, req.params.id, approve, reason) ??
       decideExpense(req.user!, req.params.id, approve, reason) ??
       decideOffer(req.user!, req.params.id, approve, reason) ??
+      decidePayrollRun(req.user!, req.params.id, approve, reason) ??
       notFound()
     );
   }
@@ -1047,7 +1049,7 @@ function leaveInstance(user: string, wid: string): ApprovalInstance | null {
   };
 }
 route("GET /api/v1/workflow/instances/:id", (req) => {
-  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? expenseInstance(req.user!, req.params.id) ?? offerInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
+  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? expenseInstance(req.user!, req.params.id) ?? offerInstance(req.user!, req.params.id) ?? payrollRunInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
   return found ? ok(found) : notFound();
 });
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));

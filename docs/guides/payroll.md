@@ -411,7 +411,7 @@ transaction, and the owner writes (CLAUDE.md, "one write path").
 
 | Module | Payroll reads | Payroll asks it to write |
 |---|---|---|
-| `attendance` | The pay items of a person for the run (`pending` deductions, `confirmed` overtime, with `work_date` up to the period's last day and no run) and the person's working days and daily rate for the month | `attendance.pay.takeIntoRun(client, { run_id, items })` (status `in_run`, `payroll_run_id`; prices an item with no amount, "it gains its amount when payroll prices it", attendance guide §11) and `releaseFromRun(client, run_id)` (back to `pending` or `confirmed`). Both are new, written in PR 2 with LA's review; `monthRates(db, person, date)` exposes the rate loop `ratesFor` already has |
+| `attendance` | The pay items of a person for the run (`pending` deductions, `confirmed` overtime, with `work_date` up to the period's last day and no run) and the person's working days and daily rate for the month | `attendance.pay.takeIntoRun(client, { run_id, items, actor })` (status `in_run`, `payroll_run_id`; prices an item with no amount, "it gains its amount when payroll prices it", attendance guide §11; 409 `RUN_CHANGED` and nothing frozen when an item named is no longer a pending deduction or confirmed overtime with no run) and `releaseFromRun(client, run_id, actor)` (back to `pending` or `confirmed`; safe twice). Both are new, written in PR 2 with LA's review, each emitting one event for the run with a count. `monthRates(db, person, date, shared)` exposes the rate loop `ratesFor` already has (the person's working dates, minutes and daily rate; `monthContext(db, date)` loads the calendar and company hours once for a whole run) and `pricesOf(db, items)` prices items that have none |
 | `sanctions` | Pending fines (`sanctions.fines.pending`, 25 a page), a sanction's reason, step and query number, and the sanctions with `financial_effect = 'unpaid_days'` that overlap a month | `sanctions.fines.accept`, `settle`, `waive`, and the new `release` (accepted back to pending, only while no instalment is in a run; GE's review) |
 | `leave` | Approved leave of a type flagged `unpaid` that overlaps the month | Nothing |
 | `employee` (organisation) | Status, `start_date`, `left_on`, `gross_monthly`, `bank_name`, `account_number`, `work_email`, in advanced mode the pay split and the tax numbers | Nothing |
@@ -437,11 +437,12 @@ owning module's service, in a transaction, with `emit()`.
 | `GET /payroll/runs/summary` | → `PayrollRunSummary` | `payroll` view · all | no | The current run (the open one, else the latest), counts by status, the last 12 months' net for the Net Payroll by Month chart |
 | `POST /payroll/runs` | `PayrollRunCreate` (`period`) → `PayrollRun` | `payroll` create · all | no | 409 `RUN_EXISTS` if the month has a run; 422 `PERIOD_NOT_ALLOWED` for a month after the current Lagos month or before anyone started |
 | `GET /payroll/runs/:id` | → `PayrollRun` | `payroll` view · all | no | Totals, status, the approval's route (`chain`), problem counts, and `can_compute`, `can_submit`, `can_decide`, `can_pay`, `can_discard` for this reader |
-| `POST /payroll/runs/:id/compute` | `EmptyBody` → `PayrollRun` | `payroll` edit · all | no | Draft or Computed only (409 `RUN_NOT_EDITABLE`). Idempotent; inline in the request (§7 on the job) |
+| `POST /payroll/runs/:id/compute` | `EmptyBody` → `PayrollRun` | `payroll` edit · all | no | Draft or Computed only (409 `RUN_NOT_EDITABLE`). Idempotent; inline in the request: 308 people took 550 ms (§7 on the job) |
 | `GET /payroll/runs/:id/problems` | `PageQuery` → `PayrollProblemPage` | `payroll` view · all | yes, 25 | Blocking first, then warnings, each naming the person and what to do |
-| `POST /payroll/runs/:id/submit` | `PayrollRunSubmit` (`expected_net_total`, optional) → `PayrollRun` | `payroll` edit · all | no | Computes again; 422 `RUN_HAS_PROBLEMS` while a blocking problem stands; 409 `RUN_CHANGED` (with the new totals) when `expected_net_total` differs from the recomputed one |
-| `POST /payroll/runs/:id/mark-paid` | `PayrollRunPaid` (`paid_on`, `payment_reference` optional) → `PayrollRun` | `payroll` edit · all | no | Approved runs only; `paid_on` not in the future (Lagos) |
-| `POST /payroll/runs/:id/exclude` | `PayrollRunExclude` (`employee_id`, `reason`, 10 to 500) → `PayrollRun` | `payroll` edit · all | no | Draft or Computed; `…/include` undoes it |
+| `POST /payroll/runs/:id/submit` | `PayrollRunSubmit` (`expected_net_total`, optional) → `PayrollRun` | `payroll` edit · all | no | A Computed run only (409 `RUN_NOT_COMPUTED` for a Draft); computes again; 422 `NO_ONE_TO_PAY` with nobody paid; 422 `RUN_HAS_PROBLEMS` while a blocking problem stands; 409 `RUN_CHANGED` when `expected_net_total` differs from the recomputed one, its `fields` carrying the totals that now stand (`gross_pay`, `total_deductions`, `net_pay`) for a reader who may see pay. A refusal is answered after the recompute commits, so the screen reads what now stands; nothing is frozen |
+| `POST /payroll/runs/:id/mark-paid` | `PayrollRunPaid` (`paid_on`, `payment_reference` optional) → `PayrollRun` | `payroll` edit · all | no | Approved runs only (409 `NOT_APPROVED`, a repeat too); `paid_on` not in the future (422 `PAID_IN_THE_FUTURE`, Lagos) |
+| `POST /payroll/runs/:id/exclude` | `PayrollRunExclude` (`employee_id`, `reason`, 10 to 500) → `PayrollRun` | `payroll` edit · all | no | Draft or Computed; the person must be paid in the month (422 `NOT_IN_RUN`); the run goes back to Draft |
+| `POST /payroll/runs/:id/include` | `PayrollRunInclude` (`employee_id`) → `PayrollRun` | `payroll` edit · all | no | Undoes an exclusion (404 `NOT_EXCLUDED` for a person who is not left out); the run goes back to Draft |
 | `GET /payroll/runs/:id/adjustments` | `PageQuery` → `PayrollAdjustmentPage` | `payroll` view · all | yes, 25 | |
 | `POST /payroll/runs/:id/adjustments` | `PayrollAdjustmentAdd` → `PayrollAdjustment` | `payroll` edit · all | no | Draft or Computed; the run goes back to Draft (it must be computed again) |
 | `DELETE /payroll/runs/:id/adjustments/:adjustment_id` | → 204 | `payroll` edit · all | no | Same rule |
@@ -497,7 +498,8 @@ The ESS routes live in `src/modules/ess/` and call `payslips.service` with the c
 | `GET /salary-structure/employees/:employee_id/components`, `PUT …` | `PayComponentsSave` → the person's components | view; edit with `payroll.configure` | no | A save is a new version from a date |
 
 **Errors** (`shared/errors.js`, every one a code the screen can name): `RUN_EXISTS`, `PERIOD_NOT_ALLOWED`,
-`RUN_NOT_EDITABLE`, `RUN_HAS_PROBLEMS`, `RUN_CHANGED`, `NOT_APPROVED`, `NOT_READY`, `NO_RATES`,
+`RUN_NOT_EDITABLE`, `RUN_NOT_COMPUTED`, `RUN_NOT_SUBMITTED` (the approval's two ends, which the handlers answer with a quiet no-op),
+`NO_ONE_TO_PAY`, `RUN_HAS_PROBLEMS`, `RUN_CHANGED`, `NOT_IN_RUN`, `NOT_EXCLUDED`, `PAID_IN_THE_FUTURE`, `NOT_APPROVED`, `NOT_READY`, `NO_RATES`,
 `NO_CONVENTIONS`, `ADVANCED_OFF`, `FINE_NOT_MOVABLE`, `OWN_RECORD`, `INSTALMENTS_STARTED` (cancel or release after one is in a run).
 Messages are four words or fewer on a field, one short sentence elsewhere.
 
@@ -614,7 +616,9 @@ suspension into absent days), so payroll does, from the owners' records:
 8. **Never their own.** A person cannot accept, waive, release or record a deduction or advance for themselves
    (403 `OWN_RECORD`); someone else with `payroll` edit does it.
 9. **A person who leaves.** The run for their last month takes every outstanding instalment of theirs
-   (`left_on` in or before that month), so what is owed is recovered from final pay; if that would make the net
+   (`left_on` in or before that month's last day, whatever month each instalment was for), so what is owed is recovered
+   from final pay; a person whose `left_on` is in a later month keeps their schedule. Fines come before advances on the
+   slip, then by month; if that would make the net
    negative, §6.7 rule 3 stands and Operations & People decide (settled 08/11/2026, §13.1 item 16).
 
 ### 6.7 Adjustments and the net
@@ -839,7 +843,11 @@ Earnings 458,000.00; deductions 95,423.07 (3,500.00 + 17,307.69 + 34,615.38 + 15
 | `NO_PAY_SPLIT` | Warning | Advanced mode and no pay components for a person | Set the split on Configurations |
 | `FINE_WAITING` | Warning | A pending fine exists (any month) | Accept, spread or waive it on Deductions |
 
-Submit refuses while any Blocking problem stands (422 `RUN_HAS_PROBLEMS`); warnings never block.
+Submit refuses while any Blocking problem stands (422 `RUN_HAS_PROBLEMS`); warnings never block. A problem is about one person, and
+Overtime Waiting and Fine Waiting say how many; a run reports problems while it is a Draft or Computed one, and none once it is
+Submitted. Until PR 5 builds the statutory tables, a run computed in advanced mode reports No Rates Set for the run, blocking:
+no rate can exist yet, and the engine never defaults one (§6.12 rule 3), so Submit refuses it rather than approve a run with
+statutory lines missing.
 
 ---
 
@@ -859,7 +867,8 @@ the period, counts and statuses, never an amount (§6.13).
 | `payslip.published` | Per person, in the lock | Notification "Your payslip is ready" to the person; the PDF is requested |
 | `payslip.emailed` | A copy is mailed | Audit |
 | `payroll_adjustment.added`, `.removed` | An adjustment is saved or removed | Audit |
-| `payroll_deduction.accepted`, `.released`, `.waived`, `.settled`, `.cancelled` | A fine or advance moves | Audit; notifies the employee for accepted, waived and a recorded advance; the fine events also reach `sanctions.fines`'s own (`sanction_fine.accepted` and so on) |
+| `payslip.excluded`, `.included` | A person is left out of a run, or put back | Audit |
+| `payroll_deduction.accepted`, `.released`, `.waived`, `.settled`, `.cancelled` | A fine or advance moves | Audit; notifies the employee for accepted, waived and a recorded advance; the fine events also reach `sanctions.fines`'s own (`sanction_fine.accepted` and so on). `.settled` is emitted by the lock (PR 2, entity `deduction`); the others come with PR 3 |
 | `payroll_deduction.fine_pending` | After commit, from an outbox handler on `sanction.issued` whose payload has a `fine_amount` | Notifies `payroll` edit holders "Fine Waiting for Payroll" |
 | `payroll_setting.changed`, `statutory_rate.saved`, `salary_grade.saved`, `pay_components.saved` | Configurations change | Audit; `payroll_setting.changed` is `security: true` so the access watchers are told |
 | `document.generated` (doc type `payslip`) | A payslip PDF finishes rendering | Marks it ready for the screen; nothing else |
@@ -877,8 +886,9 @@ run is about no one person), and the actor the submitter.
 
 **Jobs.** `pdf-render` (existing) renders every payslip and the batch; `email-send` (existing) delivers the
 mails. Compute runs inline in the request. `src/jobs/handlers/payroll-compute.js` and `payslip-render.js`
-exist as empty stubs: PR 2 measures Compute for 300 people and moves it to `payroll-compute` only if it takes
-more than three seconds; otherwise both stubs are deleted at the end (README §11.5). There is no scheduler:
+exist as empty stubs. PR 2 measured Compute for 308 people at 550 ms on the real migrations
+(`tests/integration/payroll-run.test.js`; `PAYROLL_MEASURE=1` prints it), far under the three seconds that would move it to
+`payroll-compute`, so there is no compute job and both stubs are deleted at the end (PR 8, README §11.5). There is no scheduler:
 no reminder on pay day was agreed (the approver's waiting approval is already reminded by the engine's
 reminder rules).
 
@@ -969,6 +979,9 @@ ever wanted, the question CLAUDE.md requires ("which job does it use?", the owne
   `not_offered` with a reason the gate accepts (praxis-ai.md §6.15); PR 6 decides each and nothing is added to
   `scripts/check/ai-forms-gaps.json`. Each action key has an integration test and an evaluation case
   (`scripts/ai/eval-assistant.js`); `npm run gen:ai-catalogue` is run and its diff reviewed.
+- **What PR 2 carries.** Gates 9, 10, 19 and 23 hold a module to its AI manifest and its search provider from the day its controller is
+  filled, which is PR 2, so PR 2 carries `payroll_runs.create` (New Run, with its integration test and evaluation case) and
+  `payroll.search.js` for `payroll_run`; PR 6 adds the five other cards, the reads, the summary and the other providers.
 - **AI routes** (intent to screen): "run payroll" to Payroll · Payroll Runs with `action=new`; "my payslip" to
   ESS · My Payslips; "record a salary advance" to Payroll · Deductions with `action=advance`; "turn on advanced
   payroll" to Payroll · Configurations.
@@ -1218,7 +1231,7 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
 2. **Five statuses:** `draft`, `computed`, `submitted`, `approved`, `paid`. The demo's Previewed is Computed and its
    Locked is Approved.
 3. **Compute is inline** in the request; the `payroll-compute` and `payslip-render` job stubs are deleted at the end
-   unless PR 2 measures Compute over three seconds for 300 people.
+   (PR 2 measured 550 ms for 308 people, 09/11/2026, so there is no job).
 4. **Submit recomputes and freezes** pay items and instalments (narrowing attendance's T4 from "until locked");
    Send Back and Reject release them; `RUN_CHANGED` guards the totals the submitter saw.
 5. **Attendance deductions flow into the run automatically** unless People waive them; only fines are accepted,
@@ -1333,15 +1346,18 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   `payroll.config.repo.js` (the setting, as of a date), the repo, service, controller, routes (`/payroll/runs…`),
   `payroll.events.js` (events, the `payroll.apply_decision` completion handler, the notifications), the Home
   source (`payroll.source.js`: runs not paid, in the reader's scope; its `OWES` cleared; the card made live).
-- **In other modules, with the owner's review:** `attendance.pay.takeIntoRun`, `releaseFromRun`, `monthRates`
-  (LA); `sanctions.fines.release` (GE).
+- **In other modules, with the owner's review:** `attendance.pay.takeIntoRun`, `releaseFromRun`, `monthRates` with
+  `monthContext` and `pricesOf` (LA); `sanctions.fines.release` (GE).
+- **What the gates add to PR 2** (§9): `payroll.ai.js` with the one card `payroll_runs.create`, `payroll.search.js` for
+  `payroll_run`, the route map's note on `payroll_run` removed, `npm run gen:ai-catalogue`. The `payroll-compute` job is not built:
+  Compute was measured at 550 ms for 308 people (§13.2 item 3).
 - **Tests:** the worked example of §6.14 to the kobo; compute twice is identical; the totals equal the sums of
   the lines for generated runs; every write function hits `assertEditable`; Submit freezes and Send Back releases;
   `RUN_CHANGED`; concurrency (two computes, two submits); eligibility, proration, unpaid leave and suspension
   (with a double-counting case); a measurement of Compute for 300 people (decision 3 of §13.2); an end-to-end
   integration test on the real migrations: attendance items and a fine in, an approved run out.
 - Done when: a run computes from attendance, deductions and approved consequences, locks on approval and
-  publishes payslips (without their PDFs yet).
+  publishes payslips (without their PDFs yet). Built 09/11/2026 (`m6/run`).
 
 ### PR 3 · Deductions and advances (`m6/deductions`)
 
@@ -1376,9 +1392,10 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
 
 ### PR 6 · AI, search, Home and notices (`m6/ai-search`)
 
-- `payroll.ai.js`, `payslips.ai.js`, `deductions.ai.js` (the reads, summary, cards and routes of §9);
-  `payroll.search.js`, `payslips.search.js`, `deductions.search.js`; the route-map notes removed; the screens'
-  ⌘K entries; `npm run gen:ai-catalogue`; the integration test and evaluation case per action key.
+- `payroll.ai.js` (its reads, summary and the cards after `payroll_runs.create`, which PR 2 carried), `payslips.ai.js`,
+  `deductions.ai.js` (the reads, summary, cards and routes of §9); `payslips.search.js`, `deductions.search.js`
+  (`payroll.search.js` came with PR 2); the remaining route-map notes removed; the screens' ⌘K entries;
+  `npm run gen:ai-catalogue`; the integration test and evaluation case per action key.
 - Verify the definition of done's notices: a submitted run produces in-app, push and email for the approver, and
   each link opens the same screen, with a test.
 - Done when: gates 9, 10, 19 and 23 pass with payroll's controller filled; no M6 form on `ai-forms-gaps.json`.
@@ -1439,8 +1456,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 `snake_case`; a name ending Create, Edit, Update, Patch or Save is an AI action or accounted for (§9).
 
 - `payroll.js`: `PayrollRun`, `PayrollRunListQuery`, `PayrollRunPage`, `PayrollRunSummary`, `PayrollRunCreate`,
-  `PayrollRunSubmit`, `PayrollRunPaid`, `PayrollRunExclude`, `PayrollProblem`, `PayrollProblemPage`,
-  `PayrollAdjustment`, `PayrollAdjustmentPage`, `PayrollAdjustmentAdd`, `PayrollSettings`, `PayrollSettingsChange`,
+  `PayrollRunSubmit`, `PayrollRunPaid`, `PayrollRunExclude`, `PayrollRunInclude`, `PayrollProblem`, `PayrollProblemPage`,
+  `PayrollAdjustment`, `PayrollAdjustmentPage`, `PayrollAdjustmentParams`, `PayrollAdjustmentAdd`, `PayrollSettings`, `PayrollSettingsChange`,
   `PayslipEmailAll`; and the pieces they are made of: `RunStatus`, `AdjustmentKind`, `PayeBasis`,
   `ProblemSeverity`, `ProblemCode`, `PayrollRunCounts`, `PayrollTrendMonth`, `PayrollSettingsVersion`.
 - `payslips.js`: `Payslip`, `PayslipLine`, `PayslipDetail`, `PayslipListQuery`, `PayslipPage`, `PayslipVars`,
@@ -1484,6 +1501,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 09/11/2026 · JP · PR 2 (calculation and the run, `m6/run`) built `payroll.calc/.config.repo/.inputs/.lock/.run/.repo/.service/.controller/.routes/.events`, the Home source, `attendance.pay`'s hand-off functions and `sanctions.fines.release`; the guide meets what was built. Contract: `PayrollRunInclude` (the body of `POST …/include`, which §5 named without one) and `PayrollAdjustmentParams` (the two path parameters of a removal), added to §5 and Appendix C. Errors added to §5: `RUN_NOT_COMPUTED` (Submit on a Draft), `RUN_NOT_SUBMITTED`, `NO_ONE_TO_PAY` (§11 said Submit refuses an empty month), `NOT_IN_RUN`, `NOT_EXCLUDED`, `PAID_IN_THE_FUTURE`; `RUN_CHANGED` carries the new totals in `fields` to a reader who may see pay, and a refused Submit is answered after its recompute commits. The write guard is `payroll.lock.defineWrite`, which locks the run row and runs the guard a write names (`editable`, `computed`, `approved`, `submitted`), so every write registers in `WRITES` and a unit test holds the files to it (§6.9 rule 4). A leaver is one whose `left_on` falls on or before the month's last day (§6.6 rule 9); fines come before advances on a slip; a run reports problems only while Draft or Computed, and an advanced run reports No Rates Set until PR 5 (§6.15). New events `payslip.excluded`, `payslip.included` and `payroll_deduction.settled` (§7); the instalments' moves and the settlement of a finished deduction are written by the run (§4.1, which already named `payroll` a writer of the instalments). Compute for 308 people measured at 550 ms, so §13.2 item 3 is decided: no `payroll-compute` job, and both job stubs go in PR 8. Gates 9, 10, 19 and 23 hold a module to its AI manifest and search provider from the day its controller is filled, which is PR 2, so PR 2 carries the card `payroll_runs.create` and `payroll.search.js` for `payroll_run` (§9, Appendix A). Home's Payroll In Progress card is live.
 - 09/11/2026 · JP · JBS Praxis's answers on PR 1's open points recorded (§13.1 items 25 to 27): the first statutory rates are entered before the option is switched on, so Statutory Items and PAYE Bands are always on Configurations and the rates routes work whatever the option's state, while the conventions go in the Switch On request and Salary Structure and Pay Components stay behind "on or has been" (§2, §3.5, §5, §6.11 rule 4, §10.1, §10.2); `leave_type.unpaid` is seed-only for now; #11 My Payslips keeps its Owner, AJ (Appendix A). §13.3's question 2 is answered and removed.
 - 09/11/2026 · JP · PR 1 (contract, data and scaffolding) built the simple-mode contract, migrations `6000`, `6010` and `6030` and seed `6099`; the guide meets what was built: `payroll_run.advanced` defaults to false and the foreign key from `attendance_pay_item` is `ON DELETE SET NULL` (§4.1, §4.2); `payroll_deduction.sanction_fine_id` is no longer plainly `UNIQUE` but unique among the live (not cancelled) deductions, because a released fine (§6.6 rule 5) could otherwise never be accepted again (§4.2); `PayrollSettings` carries `advanced_has_been_on`, which the version in force and the next cannot tell (an option switched off has been on), and the conventions (§5); a run list row has an empty `chain` (§5); `account_last4` joins `employee.bank` in the mask so a payslip's last four digits are masked as §6.13 rule 2 says; the settings labels already existed (Appendix A); Appendix C lists the pieces the schemas are made of, the pay items behind a grouped line (`PayslipLineItem`, which §5 and §6.10 rule 7 name without a contract) and the two helpers added to `common.js`; §13.3 gains question 2, a circle between `NO_RATES` and the Statutory Items being hidden before the option has been on, for PR 5.
 - 09/11/2026 · JP · Pay day and the statutory rates confirmed with JBS Praxis: the pay day defaults to the 30th, configurable 1 to 31, a day past a month's end falls on its last day (§13.1 item 24, §6.11 rule 1, §4.2, §5, §11); the statutory rates, bands, relief, employer percentages, bases and conventions are all data entered from a date, and only the set of items and the formula's shape are code (§6.12 rule 7); People · Employees already has the Pay and Bank step that sets a person's salary and bank (§2).

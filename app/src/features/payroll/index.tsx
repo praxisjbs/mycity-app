@@ -2,7 +2,8 @@ import { useState } from "react";
 import { ApiError, api } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
-import type { Grade, PayrollDeduction, PayslipRow, RunRow } from "@/api/types/payroll";
+import type { PayrollRun } from "@mycity/contract/contract.gen.ts";
+import type { Grade, PayrollDeduction, PayslipRow } from "@/api/types/payroll";
 import type { PersonRef } from "@/api/types/common";
 
 import { SlipPaper } from "@/features/ess/Payslips";
@@ -32,17 +33,34 @@ const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : "Somethin
 
 /* ───────────── Runs ───────────── */
 
+/** The chain a run walks, with where it stands: Draft, Computed, Submitted, Approved, Paid. */
+const STAGES: Array<{ status: PayrollRun["status"]; label: string }> = [
+  { status: "draft", label: "Draft" },
+  { status: "computed", label: "Computed" },
+  { status: "submitted", label: "Submitted" },
+  { status: "approved", label: "Approved" },
+  { status: "paid", label: "Paid" },
+];
+const chainOf = (status: PayrollRun["status"]) => {
+  const at = STAGES.findIndex((x) => x.status === status);
+  return STAGES.map((x, i) => ({ label: x.label, state: i < at || status === "paid" ? ("done" as const) : i === at ? ("now" as const) : null }));
+};
+const TONE: Record<PayrollRun["status"], "neutral" | "info" | "warn" | "ok"> = { draft: "neutral", computed: "neutral", submitted: "warn", approved: "info", paid: "ok" };
+const WORDS: Record<PayrollRun["status"], string> = { draft: "Draft", computed: "Computed", submitted: "Submitted", approved: "Approved", paid: "Paid" };
+const pill = (status: PayrollRun["status"]) => ({ tone: TONE[status], text: WORDS[status] });
+
 function Runs() {
   const s = useApi("GET /api/v1/payroll/runs/summary");
   const list = usePaged("GET /api/v1/payroll/runs");
+  const compute = useMutation("POST /api/v1/payroll/runs/:id/compute");
   const submit = useMutation("POST /api/v1/payroll/runs/:id/submit");
-  const approve = useMutation("POST /api/v1/payroll/runs/:id/approve");
-  const paid = useMutation("POST /api/v1/payroll/runs/:id/paid");
+  const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
+  const paid = useMutation("POST /api/v1/payroll/runs/:id/mark-paid");
   const c = s.data?.current;
   const act = async (fn: () => Promise<unknown>, msg: string) => {
     try {
       await fn();
-      invalidate("/api/v1/payroll", "/api/v1/payslips");
+      invalidate("/api/v1/payroll", "/api/v1/payslips", "/api/v1/workflow");
       toast(msg);
     } catch (e) {
       fail(e);
@@ -56,36 +74,51 @@ function Runs() {
         actions={
           c && (
             <>
-              {c.can_submit && <Button variant="primary" onClick={() => act(() => submit.run({ params: { id: c.run_id }, body: {} }), "Submitted to the CEO for approval")}>Submit for Approval</Button>}
-              {c.can_approve && <Button variant="primary" icon="ok" onClick={() => act(() => approve.run({ params: { id: c.run_id }, body: {} }), `${formatMonth(c.period)} approved and locked. Payslips are now visible to staff`)}>Approve and Lock</Button>}
-              {c.can_pay && <Button variant="primary" onClick={() => act(() => paid.run({ params: { id: c.run_id }, body: { paid_on: todayIso() } }), "Marked paid")}>Mark Paid</Button>}
-              {!c.can_submit && !c.can_approve && !c.can_pay && <Button disabled>{c.status.text}</Button>}
+              {c.can_compute && <Button onClick={() => act(() => compute.run({ params: { id: c.payroll_run_id }, body: {} }), "Run computed")}>Compute Run</Button>}
+              {c.can_submit && <Button variant="primary" onClick={() => act(() => submit.run({ params: { id: c.payroll_run_id }, body: c.net_pay ? { expected_net_total: c.net_pay } : {} }), "Sent for approval")}>Submit for Approval</Button>}
+              {c.can_decide && c.workflow_instance_id && <Button variant="primary" icon="ok" onClick={() => act(() => approve.run({ params: { id: c.workflow_instance_id! }, body: {} }), `${formatMonth(c.period)} approved and locked`)}>Approve</Button>}
+              {c.can_pay && <Button variant="primary" onClick={() => act(() => paid.run({ params: { id: c.payroll_run_id }, body: { paid_on: todayIso() } }), "Marked paid")}>Mark Paid</Button>}
             </>
           )
         }
       />
       {c && (
         <>
-          <KpiTiles items={[{ label: "Staff in Run", value: String(c.headcount) }, { label: "Gross", value: formatMoneyShort(c.gross) }, { label: "Deductions", value: <Money value={c.deductions} />, tone: "warn" }, { label: "Net", value: formatMoneyShort(c.net), tone: "ok" }]} />
-          <ChainCard steps={c.chain} note="A run is submitted to the CEO for approval. Approval locks it; payslips become visible to staff." />
+          <KpiTiles
+            items={[
+              { label: "Staff in Run", value: String(c.headcount) },
+              { label: "Gross", value: c.gross_pay === null ? "Restricted" : formatMoneyShort(c.gross_pay) },
+              { label: "Deductions", value: c.total_deductions === null ? "Restricted" : <Money value={c.total_deductions} />, tone: "warn" },
+              { label: "Net", value: c.net_pay === null ? "Restricted" : formatMoneyShort(c.net_pay), tone: "ok" },
+            ]}
+          />
+          <ChainCard steps={chainOf(c.status)} />
         </>
       )}
-      <PagedTable<RunRow>
+      <PagedTable<PayrollRun>
         title="Run History"
         list={list}
-        rowKey={(r) => r.run_id}
+        rowKey={(r) => r.payroll_run_id}
         noun="run"
         columns={[
           { key: "m", label: "Month", render: (r) => <span className="font-semibold">{formatMonth(r.period)}</span> },
           { key: "s", label: "Staff", align: "n", render: (r) => r.headcount },
-          { key: "g", label: "Gross", align: "n", render: (r) => <Money value={r.gross} />, desktop: true },
-          { key: "n", label: "Net", align: "n", render: (r) => <Money value={r.net} /> },
-          { key: "a", label: "Approved By", render: (r) => r.approved_by ?? "Not yet", desktop: true },
-          { key: "st", label: "Status", render: (r) => <StatusPill s={r.status} /> },
+          { key: "g", label: "Gross", align: "n", render: (r) => (r.gross_pay === null ? "Restricted" : <Money value={r.gross_pay} />), desktop: true },
+          { key: "n", label: "Net", align: "n", render: (r) => (r.net_pay === null ? "Restricted" : <Money value={r.net_pay} />) },
+          { key: "a", label: "Approved By", render: (r) => r.approved_by_name ?? "Not yet", desktop: true },
+          { key: "st", label: "Status", render: (r) => <StatusPill s={pill(r.status)} /> },
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <AreaChart title="Net Payroll by Month" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} /> : <Card><LoadingRows /></Card>}
+        {s.data ? (
+          <AreaChart
+            title="Net Payroll by Month"
+            values={s.data.trend.map((t) => Number(t.net_pay ?? 0))}
+            labels={s.data.trend.map((t) => formatMonth(t.period).slice(0, 3))}
+          />
+        ) : (
+          <Card><LoadingRows /></Card>
+        )}
       </Grid>
     </>
   );
@@ -97,13 +130,13 @@ function Payslips() {
   const modal = useModal();
   const s = useApi("GET /api/v1/payroll/runs/summary");
   const c = s.data?.current;
-  const list = usePaged("GET /api/v1/payslips", { filters: { scope: "all", ...(c ? { period: c.period } : {}) }, enabled: !!c });
+  const list = usePaged("GET /api/v1/payslips", { filters: { scope: "all", ...(c ? { period: c.period.slice(0, 7) } : {}) }, enabled: !!c });
   const phone = useIsPhone();
   const [sel, setSel] = useState<PayslipRow | null>(null);
   // Under the list on desktop the first payslip with a deduction shows unasked; on a phone one opens when tapped (F31).
   const shown = sel ?? (phone ? null : (list.rows.find((r) => r.has_query_deduction) ?? list.rows[0] ?? null));
   const email = useMutation("POST /api/v1/payroll/runs/:id/email-payslips");
-  const locked = c && c.stage !== "awaiting_approval" && c.stage !== "review";
+  const locked = c && (c.status === "approved" || c.status === "paid");
   return (
     <>
       <PageHeader
@@ -111,12 +144,12 @@ function Payslips() {
         sub={c ? `${formatMonth(c.period)} ${locked ? "run" : "preview"}` : " "}
         actions={
           <>
-            <Button icon="mail" disabled={!c} onClick={async () => { try { await email.run({ params: { id: c!.run_id }, body: {} }); toast(`Payslips are being emailed to ${c!.headcount} staff`); } catch (e) { fail(e); } }}>Email All</Button>
-            {c && <ExportAction source="payroll.payslips" filters={{ period: c.period }} label="Download All" />}
+            <Button icon="mail" disabled={!c} onClick={async () => { try { await email.run({ params: { id: c!.payroll_run_id }, body: {} }); toast(`Payslips are being emailed to ${c!.headcount} staff`); } catch (e) { fail(e); } }}>Email All</Button>
+            {c && <ExportAction source="payroll.payslips" filters={{ period: c.period.slice(0, 7) }} label="Download All" />}
           </>
         }
       />
-      {c && <StatStrip items={[{ label: "Payslips", value: c.headcount }, { label: "Gross", value: <Money value={c.gross} /> }, { label: "Deductions", value: <Money value={c.deductions} />, tone: "warn" }, { label: "Net", value: <Money value={c.net} /> }, { label: "Visible to Staff", value: locked ? "Yes" : "On approval", desktop: true }]} />}
+      {c && <StatStrip items={[{ label: "Payslips", value: c.headcount }, { label: "Gross", value: c.gross_pay === null ? "Restricted" : <Money value={c.gross_pay} /> }, { label: "Deductions", value: c.total_deductions === null ? "Restricted" : <Money value={c.total_deductions} />, tone: "warn" }, { label: "Net", value: c.net_pay === null ? "Restricted" : <Money value={c.net_pay} /> }, { label: "Visible to Staff", value: locked ? "Yes" : "On approval", desktop: true }]} />}
       <PagedTable<PayslipRow>
         title={locked ? "This Run" : "Preview"}
         list={list}
