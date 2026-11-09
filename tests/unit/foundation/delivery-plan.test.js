@@ -20,6 +20,8 @@ describe("the plan, read from the docs", () => {
     expect(docs.screens["Payroll|payroll-runs"]).toEqual({ m: "M6", api: false, delivered: false });
     // Configurations took Salary Structure's and Statutory's place (M6 PR 1); their rows stay, Dropped.
     expect(docs.screens["Payroll|configurations"]).toEqual({ m: "M6", api: false, delivered: false });
+    // Deductions has its API (M6 PR 3), and no UI or Mobile tick until it is checked on staging.
+    expect(docs.screens["Payroll|deductions"]).toEqual({ m: "M6", api: true, delivered: false });
     expect(docs.screens["Employee Self-Service|my-leave"]).toMatchObject({ m: "M1", api: true, delivered: true });
     expect(docs.milestones.find((m) => m.key === "M8")).toMatchObject({ n: 8, demo: "2026-12-11" });
     // "with M1": the foundation takes the next milestone's demo day.
@@ -66,17 +68,21 @@ describe("the API's answers", () => {
     expect(["production", "staging", "development", "test"].map((env) => deliveryPlan.ruleFor(env))).toEqual(["production", "staging", "staging", "all"]);
   });
 
-  test("on staging, Payroll is held back until its API is ticked, and what has shipped opens", () => {
+  test("on staging, each Payroll screen is held back until its API is ticked (Deductions has), and what has shipped opens", () => {
     deliveryPlan.use({ plan: docs, rule: "staging" });
     expect(deliveryPlan.screenOpen("payroll", "payroll-runs")).toBe(false);
     expect(deliveryPlan.screenOpen("payroll", "configurations")).toBe(false);
+    expect(deliveryPlan.screenOpen("payroll", "deductions")).toBe(true);
     expect(deliveryPlan.screenOpen("ess", "my-leave")).toBe(true);
-    expect(deliveryPlan.moduleOpen("payroll")).toBe(false);
+    expect(deliveryPlan.moduleOpen("payroll")).toBe(true);
     expect(deliveryPlan.linkOpens("/payroll?tab=payroll-runs&id=1")).toBe(false);
+    expect(deliveryPlan.linkOpens("/payroll?tab=deductions")).toBe(true);
     expect(deliveryPlan.typeOpens("payroll_run")).toBe(false);
+    expect(deliveryPlan.typeOpens("deduction")).toBe(true);
     expect(deliveryPlan.typeOpens("leave_request")).toBe(true);
     expect(deliveryPlan.typeOpens("not_a_route")).toBe(true);
-    expect(deliveryPlan.closedTypes()).toEqual(expect.arrayContaining(["payroll_run", "deduction"]));
+    expect(deliveryPlan.closedTypes()).toEqual(expect.arrayContaining(["payroll_run", "salary_structure"]));
+    expect(deliveryPlan.closedTypes()).not.toContain("deduction");
     expect(deliveryPlan.closedTypes()).not.toContain("leave_request");
   });
 
@@ -122,7 +128,8 @@ describe("⌘K by the plan", () => {
     expect(screensOf()).toEqual(expect.arrayContaining(["/payroll?tab=payroll-runs", "/ess?tab=my-leave"]));
     deliveryPlan.use({ plan: docs, rule: "staging" });
     expect(screensOf()).toContain("/ess?tab=my-leave");
-    expect(screensOf().filter((link) => link.startsWith("/payroll"))).toEqual([]);
+    // Only the Payroll screen with its API ticked is offered: Deductions, not Payroll Runs.
+    expect(screensOf().filter((link) => link.startsWith("/payroll"))).toEqual(["/payroll?tab=deductions"]);
     expect(actionEntries(reader).map((e) => e.hit.link).filter((link) => link && !deliveryPlan.linkOpens(link))).toEqual([]);
   });
 });
