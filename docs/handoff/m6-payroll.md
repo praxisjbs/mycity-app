@@ -72,7 +72,7 @@ exists, and the payslip template is empty.
 - [ ] Migrations `6000`, `6010` (with the `attendance_pay_item.payroll_run_id` foreign key), `6030`; seed `6099`
 - [ ] `payroll.run` in `DEFAULTS`, `payroll.configure` in the capability catalogue, `employer_cost` in the field mask
 - [ ] The four tabs in the route map, ⌘K screens, Coming Soon, catalogue and their tests; PROGRESS #47 and #49 Dropped,
-      #107 added, the Payroll screens' Owner set to LA, `SCREENS` and the counts; MILESTONES §18's Payroll row
+      Configurations added in the next free row (#109 while free), the Payroll screens' Owner set to LA, `SCREENS` and the counts; MILESTONES §18's Payroll row
 - [ ] `payroll_setting` carries the option columns (Pay Day, Bank Details Required, the three conventions)
 - [ ] DATABASE_SCHEMA M6 as built; README §5.9; gates 3 to 6 green
 
