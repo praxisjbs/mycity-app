@@ -507,6 +507,7 @@ The studio reads your notes and asks about what is missing. Each question is a c
 ### Wait for the draft {#partnerships-proposals-draft needs="partnerships edit"}
 
 1. The page shows its progress: **Reading**, **Writing**, **Checking Figures** and **Laying Out**.
+   ![The draft being written](shot:partnerships-proposal-writing)
 2. Stay on the page, or come back. It refreshes by itself.
 3. When it finishes, the status reads **Draft** and the proposal shows.
 
@@ -612,15 +613,36 @@ The draft fills in from the partner, its contact and the deal. A field it could 
 1. Open the draft and press **Submit for Approval**.
 2. **Approval** shows its **Stage** and who it is **Waiting On**.
 3. Who approves each stage is set on [Settings · Approvals](/settings?tab=approvals). It starts with the
-   owner's Head of Department, then the CEO.
+   owner's Head of Department, then the CEO. Each is told, and decides as in
+   [Approve or reject an agreement](#partnerships-contracts-approve).
 4. When every stage approves, **Approval** reads **Approved** and **Send for Signature** shows.
-5. If an approver returns it, a line such as *Returned: the date is wrong* says why. Change the draft
+5. If an approver rejects it, a line such as *Returned: the date is wrong* says why. Change the draft
    and submit it again.
+
+### Approve or reject an agreement {#partnerships-contracts-approve needs="partnerships approve"}
+
+An agreement waits on its approvers before it can be sent. When it waits on you, it is listed under
+**Need You** on Home.
+
+1. Open [Home · Overview](/home?tab=overview) and press the agreement under **Need You**. You can also
+   open it from [Partnerships · Contracts & MOUs](/partnerships?tab=contracts-and-mous) by pressing
+   **In Approval**, then the agreement.
+   ![An agreement waiting on you](shot:partnerships-agreement-approve)
+2. Read the wording, then **Approval**. It shows the **Stage** and who it is **Waiting On**.
+3. Press **Approve**. The message reads such as *AGR-2026-0007 approved*. The first approval passes it
+   to the CEO. The CEO's approval makes **Approval** read **Approved**.
+4. To refuse it, press **Reject**.
+   ![Reject Agreement](shot:partnerships-agreement-reject)
+5. Type the **Reason** and press **Reject Agreement**. The message reads such as
+   *AGR-2026-0007 rejected*. The agreement goes back to Draft, and its owner reads your reason.
+
+**Approve** and **Reject** show only when the waiting stage names you. The CEO sees them at every
+stage. Nobody decides an agreement they submitted themselves.
 
 ### Send it for signature {#partnerships-contracts-send needs="partnerships edit"}
 
-1. Press **Send for Signature**. The form is the one pictured in
-   [Send it again or correct a signer](#partnerships-contracts-again).
+1. Press **Send for Signature**.
+   ![Send for Signature](shot:partnerships-agreement-send)
 2. Check **Partner's Signer**: the **Full Name**, **Title** and **Email**. It starts as the contact who
    signs agreements.
 3. If MyCity countersigns, check **MyCity's Signer** the same way.
@@ -639,7 +661,7 @@ partner. The deal's checklist becomes tasks, and its event days go on the team's
 1. Open an agreement that reads **Sent** or **Viewed**.
 2. Press **Send Again** to send every signer a new link.
 3. To change a signer's name or address, press **More**, then **Correct Signers**.
-   ![Correct the signers](shot:partnerships-agreement-send)
+   ![Correct the signers](shot:partnerships-agreement-again)
 4. Press **Send Again**. The message reads *Sent again to every signer*.
 
 If a signer declines, a line says so with their reason. If the link expires, the line reads
@@ -1239,7 +1261,7 @@ marks:
   1: button "Save Draft" | Save your changes
 ```
 
-```shot partnerships-agreement-send
+```shot partnerships-agreement-again
 open: /partnerships?tab=contracts-and-mous
 as: operations
 do:
@@ -1306,4 +1328,56 @@ do:
 crop: modal
 marks:
   1: button "Show Period" | Show these dates
+```
+
+```shot partnerships-agreement-approve
+open: /partnerships?tab=contracts-and-mous
+as: ceo
+do:
+  - click: button "In Approval"
+  - click: row 1
+  - wait: button "Approve"
+marks:
+  1: button "Approve" | Approve it
+  2: button "Reject" | Send it back with a reason
+```
+
+```shot partnerships-agreement-reject
+open: /partnerships?tab=contracts-and-mous
+as: ceo
+do:
+  - click: button "In Approval"
+  - click: row 1
+  - click: button "Reject"
+  - wait: button "Reject Agreement"
+crop: modal
+marks:
+  1: button "Reject Agreement" | Send it back
+```
+
+```shot partnerships-agreement-send
+open: /partnerships?tab=contracts-and-mous
+as: ceo
+do:
+  - click: button "In Approval"
+  - click: row 1
+  - click: button "Approve"
+  - click: button "Send for Signature"
+  - wait: label "Full Name"
+crop: modal
+marks:
+  1: button "Send for Signature" | Send the link
+```
+
+```shot partnerships-proposal-writing
+open: /partnerships?tab=proposals
+as: operations
+do:
+  - click: row 4
+  - fill: label "Your Answer" = A sold out season
+  - click: button "Save Answer"
+  - desktop click: button "Audience and Reach"
+  - click: button "Use Suggestion"
+  - click: button "Write Draft"
+  - wait: text "Writing"
 ```

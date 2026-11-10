@@ -8,6 +8,7 @@ import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
 import { decideExpense, expenseInstance } from "./expenses";
 import { decideOffer, offerInstance, offersWaitingOn } from "./offers";
+import { decideAgreement } from "./partnerships_agreements";
 import { decidePayrollRun, payrollRunInstance } from "./payroll";
 import { decidePlan, decideTargetChange, decideUnbind, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
@@ -1005,6 +1006,7 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
       decideTargetChange(req.user!, req.params.id, approve, reason) ??
       decideExpense(req.user!, req.params.id, approve, reason) ??
       decideOffer(req.user!, req.params.id, approve, reason) ??
+      decideAgreement(req.user!, req.params.id, approve, reason) ??
       decidePayrollRun(req.user!, req.params.id, approve, reason) ??
       notFound()
     );

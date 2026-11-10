@@ -350,7 +350,7 @@ icon: spark
    **Generate Agreement**.
 2. Pick the **Deal** and the **Kind**, then press **Generate Agreement**.
 3. Fill in what the draft marks, then press **Submit for Approval**.
-4. When it reads **Approved**, press **Send for Signature** and check the signers.
+4. Your approvers are told. When it reads **Approved**, press **Send for Signature** and check the signers.
 5. Your partner signs from the email. The lead then becomes a partner.
 6. Read [Make an agreement](#partnerships-contracts-generate).
 

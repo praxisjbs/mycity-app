@@ -109,8 +109,11 @@ with the date, and add a line to §3.
   screens with a picture of every step on desktop and phone; four Quick Start cards under a new Lead Owners group; the public Help's
   Your Proposal, Sign an Agreement and Check an agreement. TB's calls of 10/11/2026: the partner's pages go in the public Help as well as
   the chapter; four cards, not one; a picture for every step. `packages/contract/guide.js` takes the Lead Owners role and a
-  `/proposal/<token>` public address. Left: the staging walk (§4), which may rename a button the chapter names; the pictures the demo
-  cannot show (the draft being written, an approved agreement's own Send for Signature); MyCity's two samples.
+  `/proposal/<token>` public address. Left: the staging walk (§4), which may rename a button the chapter names; MyCity's two samples.
+- 10/11/2026 · TB · Found writing PR 9: **an approver had no button.** §6.9 put Approve and Reject on the agreement's card, PR 6
+  built it read only, and Home's Need You opened an agreement nobody could decide. Built: `approval.can_decide`, **Approve** and
+  **Reject** on the card, tested against the real engine, and the demo's approval and Write Draft steps, so the chapter pictures
+  Approve, Reject, Send for Signature and the draft's progress. The guide's §6.9, §10.1 and §13.2 say so.
 
 - 08/11/2026 · JP · PR 8 (`m7/analytics-finish`): Analytics (#55) on the contract, desktop and phone, with Export
   (the period's workbook); Performance's rating through `reviews.service.ratingsFor`. Link to Partner in Mailbox

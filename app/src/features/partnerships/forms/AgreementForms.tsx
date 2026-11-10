@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import agreements from "@mycity/contract/schemas/agreements.js";
 import partner_pipeline from "@mycity/contract/schemas/partner_pipeline.js";
+import workflow from "@mycity/contract/schemas/workflow.js";
 import type { AgreementDetail, RecordField, SignerInput } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useInfinite, useMutation } from "@/api/hooks";
@@ -282,6 +283,36 @@ export function RenewAgreement({ a, close, onCreated }: { a: AgreementDetail; cl
 }
 
 /** Close Agreement, from any status, with its reason: an open approval or signing ends with it (§6.8). */
+/** Reject an agreement waiting on the reader: the approval's own route, with its reason (§6.9). */
+export function RejectAgreement({ a, close }: { a: AgreementDetail; close: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const f = useContractForm({ reason: "" }, workflow.ReasonBody);
+  const reject = useMutation("POST /api/v1/workflow/instances/:id/reject");
+  const submit = async () => {
+    setError(null);
+    if (!f.check() || !a.workflow_instance_id) return;
+    try {
+      await reject.run({ params: { id: a.workflow_instance_id }, body: { reason: f.values.reason.trim() } });
+      refresh();
+      invalidate("/api/v1/workflow");
+      close();
+      toast(`${a.number} rejected`);
+    } catch (e) {
+      landed(f, setError)(e);
+    }
+  };
+  return (
+    <Form onSubmit={submit}>
+      <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} rows={3} placeholder="The dates are wrong" /></Field>
+      <FormError>{error}</FormError>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="danger" type="submit">Reject Agreement</Button>
+      </FormFooter>
+    </Form>
+  );
+}
+
 export function CloseAgreement({ a, close }: { a: AgreementDetail; close: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const f = useContractForm({ reason: "" }, agreements.AgreementClose);

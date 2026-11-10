@@ -30,12 +30,13 @@ import {
   Pill,
   RichText,
   StatusPill,
+  toast,
   useIsPhone,
   useModal,
   useSideBySide,
   Who,
 } from "@mycity/ui";
-import { CloseAgreement, EditDraft, GenerateAgreement, RecordSignedCopy, RenewAgreement, SendForSignature } from "./forms/AgreementForms";
+import { CloseAgreement, EditDraft, GenerateAgreement, RecordSignedCopy, RejectAgreement, RenewAgreement, SendForSignature } from "./forms/AgreementForms";
 import { agreementPill, fail, KIND_LABEL, SIGNER_STATE, useMay } from "./lib";
 import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { RecordState } from "./record";
@@ -155,6 +156,7 @@ function AgreementPanel({ id, onOpen }: { id: string; onOpen: (id: string) => vo
   const mayEdit = useMay("edit");
   const r = useApi("GET /api/v1/partnerships/agreements/:id", { params: { id } });
   const submit = useMutation("POST /api/v1/partnerships/agreements/:id/submit");
+  const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
   useTrailTitle(r.data?.number);
   if (!r.data) return <RecordState loading={r.loading} error={r.error} onRetry={r.reload} />;
   const a = r.data;
@@ -170,6 +172,18 @@ function AgreementPanel({ id, onOpen }: { id: string; onOpen: (id: string) => vo
     try {
       await submit.run({ params: { id: a.partnership_agreement_id }, body: {} });
       invalidate("/api/v1/partnerships/agreements");
+    } catch (e) {
+      fail(e);
+    }
+  };
+  // Approve is one press on the approval's own route; Reject asks its reason in a sheet (§6.9).
+  const decide = async () => {
+    if (!a.workflow_instance_id) return;
+    try {
+      await approve.run({ params: { id: a.workflow_instance_id }, body: {} });
+      invalidate("/api/v1/partnerships/agreements");
+      invalidate("/api/v1/workflow");
+      toast(`${a.number} approved`);
     } catch (e) {
       fail(e);
     }
@@ -220,7 +234,17 @@ function AgreementPanel({ id, onOpen }: { id: string; onOpen: (id: string) => vo
 
       {a.approval && (
         <Card>
-          <CardHeader title="Approval" />
+          <CardHeader
+            title="Approval"
+            right={
+              a.approval.can_decide && a.workflow_instance_id ? (
+                <ActionGroup>
+                  <Button variant="primary" icon="ok" onClick={decide}>Approve</Button>
+                  <Button onClick={() => open("Reject Agreement", (close) => <RejectAgreement a={a} close={close} />)}>Reject</Button>
+                </ActionGroup>
+              ) : undefined
+            }
+          />
           <KeyValue items={a.approval.state === "approved" ? [["Status", "Approved"]] : [["Stage", a.approval.stage ?? "None"], ["Waiting On", a.approval.waiting_on ?? "Nobody named"]]} />
         </Card>
       )}
