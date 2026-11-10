@@ -149,8 +149,11 @@ describe("Recruitment · Offers", () => {
 
   it("Not Progressing a candidate withdraws their open offer", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
-    const sheet = await openRow("Kunle Afolabi");
-    await press(sheet, "Not Progressing");
+    // The candidate opens beside the board (F31); the reason is asked in a dialog.
+    fireEvent.click((await screen.findAllByText("Kunle Afolabi", undefined, { timeout: 8000 }))[0]!);
+    await settled();
+    fireEvent.click(await screen.findByRole("button", { name: "Not Progressing" }));
+    await settled();
     fireEvent.change(within(dialog()).getByLabelText("Reason"), { target: { value: "The role went to someone with more experience" } });
     await press(dialog(), "Not Progressing");
     cleanup();

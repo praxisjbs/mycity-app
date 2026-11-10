@@ -155,8 +155,10 @@ mycity-app/
 │   ├── video/                a milestone's training video (docs/runbooks/training-videos.md): make.js
 │   │                         (script, narrate, film, assemble), style.js (the look measured from the
 │   │                         M3 video), cards.js, film.js, assemble.js, people.js (filming's sign-ins),
+│   │                         mail.js (the mail the app sent, shown and its links opened),
 │   │                         narrate.py and requirements.txt (the voice, Kokoro); scenes/, one a video:
-│   │                         m4-recruitment-1.js (M4 part 1, Vacancies and Candidates)
+│   │                         m4-recruitment-1.js (M4 part 1, Vacancies and Candidates),
+│   │                         m4-recruitment-2.js (M4 part 2, Assessments and Interviews)
 │   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging;
 │   │                         attack-assistant.js: its attack suite, asked of the real model on staging
 │   │                         nightly through deploy-gate attack (docs/guides/praxis-ai.md §6.17)

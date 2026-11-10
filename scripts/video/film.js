@@ -1,4 +1,5 @@
 "use strict";
+/* global document */
 /**
  * Film a video's shots (docs/runbooks/training-videos.md §4): each desktop or phone shot is signed
  * in off camera, then recorded as full-resolution captures taken back to back, each with its time,
@@ -32,7 +33,9 @@ const CURSOR = `(() => {
     Object.assign(c.style, { position: "fixed", left: "0", top: "0", zIndex: "2147483647", pointerEvents: "none",
       transform: "translate(760px, 420px)", filter: "drop-shadow(0 1px 1.5px rgba(0,0,0,.35))" });
     document.documentElement.appendChild(c);
-    addEventListener("mousemove", (e) => { c.style.transform = "translate(" + (e.clientX - 2) + "px," + (e.clientY - 2) + "px)"; }, true);
+    const follow = (e) => { if (e.clientX || e.clientY) c.style.transform = "translate(" + (e.clientX - 2) + "px," + (e.clientY - 2) + "px)"; };
+    // A card dragged between columns sends drag events, not mouse moves: the pointer follows both.
+    for (const type of ["mousemove", "dragover", "drag"]) addEventListener(type, follow, true);
   };
   if (document.readyState === "loading") addEventListener("DOMContentLoaded", draw); else draw();
 })();`;
@@ -49,12 +52,17 @@ function hands(page, { phone, origin }) {
   const glide = async (loc) => {
     await loc.waitFor({ state: "visible", timeout: 15000 });
     await loc.scrollIntoViewIfNeeded();
-    const box = await loc.boundingBox();
-    const to = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-    const steps = Math.max(12, Math.round(Math.hypot(to.x - at.x, to.y - at.y) / 18));
-    await page.mouse.move(to.x, to.y, { steps });
-    at = to;
-    await sleep(0.18);
+    // Measured again after each glide: a list that closes or opens as the pointer travels moves
+    // what it aims at, and a press where it was can land outside a dialog and close it.
+    for (let tries = 0; tries < 4; tries++) {
+      const box = await loc.boundingBox();
+      const to = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      if (tries && Math.hypot(to.x - at.x, to.y - at.y) < 3) break;
+      const steps = tries ? 6 : Math.max(12, Math.round(Math.hypot(to.x - at.x, to.y - at.y) / 18));
+      await page.mouse.move(to.x, to.y, { steps });
+      at = to;
+      await sleep(0.18);
+    }
   };
   const s = {
     page,
@@ -70,6 +78,18 @@ function hands(page, { phone, origin }) {
       await appSettle(page);
     },
     hover: async (target) => { if (!phone) await glide(find(target)); },
+    /** Drag `from` (a Locator) onto `to` (a Locator), at a person's pace: a card between columns. */
+    drag: async (from, to) => {
+      await glide(from);
+      await page.mouse.down();
+      const box = await to.boundingBox();
+      const end = { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 120) };
+      await page.mouse.move(end.x, end.y, { steps: Math.max(20, Math.round(Math.hypot(end.x - at.x, end.y - at.y) / 14)) });
+      at = end;
+      await sleep(0.3);
+      await page.mouse.up();
+      await appSettle(page);
+    },
     /** Type into a field by its label (or a Locator), at a person's pace. */
     type: async (field, text, { delay = 38, clear = true } = {}) => {
       const loc = typeof field === "string" ? page.getByLabel(field, { exact: true }).first() : field;
@@ -77,10 +97,11 @@ function hands(page, { phone, origin }) {
       if (clear) await loc.fill("");
       await loc.pressSequentially(text, { delay });
     },
-    /** Choose `option` in the select labelled `label` (SelectField, FilterSelect). */
+    /** Choose `option` in the select labelled `label`, or the select Locator `label` (SelectField, FilterSelect): its name, or its name then " · " and a number ("Head, Sales & Revenue · VAC-0001"). */
     pick: async (label, option) => {
-      await s.click(page.getByLabel(label, { exact: true }).first());
-      await s.click(page.getByRole("option", { name: option, exact: true }).first());
+      await s.click(typeof label === "string" ? page.getByLabel(label, { exact: true }).first() : label);
+      const name = new RegExp(`^${option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( · .+)?$`);
+      await s.click(page.getByRole("option", { name }).first());
     },
     /** Scroll the page (or the element under `within`) by `dy` pixels, smoothly. */
     scroll: async (dy, within) => {
@@ -139,11 +160,26 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf }) {
     acceptDownloads: true,
   });
   if (!phone) await context.addInitScript(CURSOR);
+  // No red underline under words the dictionary lacks ("MyCityApp's") as a person types: the
+  // fields inherit spellcheck from the page.
+  await context.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.setAttribute("spellcheck", "false")));
   const page = await context.newPage();
   page.setDefaultTimeout(20000);
   if (shot.as) await signIn(page, origins.hub, emailOf(shot.as), password);
   if (site !== "hub" || shot.start) await page.goto(origin + (shot.start || "/"));
   await appSettle(page);
+  // A policy waiting to be acknowledged opens its sheet over the screen: Later, as a person would
+  // before a demonstration (acknowledging is theirs to do, never filming's).
+  if (shot.as) {
+    const later = page.getByRole("dialog", { name: "Policy Update" }).getByRole("button", { name: "Later", exact: true });
+    // One sheet a policy, each after the last: Later to each.
+    for (let i = 0; i < 12 && (await later.waitFor({ timeout: i ? 1500 : 4000 }).then(() => true, () => false)); i++) {
+      await sleep(0.4);
+      await later.click({ timeout: 3000 }).catch(() => null);
+      await sleep(0.6);
+      await appSettle(page);
+    }
+  }
   const s = hands(page, { phone, origin });
   if (shot.setup) await shot.setup(s);
   await sleep(0.6);
@@ -161,9 +197,12 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf }) {
   const camera = (async () => {
     while (rolling) {
       const t0 = now();
+      // The clip is read in the document's coordinates, so it starts where the page is scrolled to:
+      // the careers site scrolls the document, the staff app a panel inside it.
+      const view = await cdp.send("Page.getLayoutMetrics").then((m) => m.cssVisualViewport, () => ({ pageX: 0, pageY: 0 }));
       const img = await cdp.send("Page.captureScreenshot", {
         format: "jpeg", quality: 92, optimizeForSpeed: true,
-        clip: { x: 0, y: 0, width: vp.width, height: vp.height, scale },
+        clip: { x: view.pageX, y: view.pageY, width: vp.width, height: vp.height, scale },
       }).catch(() => null);
       if (!img) { await sleep(0.03); continue; }
       const file = String(++n).padStart(5, "0") + ".jpg";

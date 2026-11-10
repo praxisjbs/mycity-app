@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { POOL } from "@/api/mock/data/recruitment";
 import { sid } from "@/api/mock/core";
-import { copyProblems, dialog, openAs, openRow, press } from "./testKit";
+import { copyProblems, dialog, openAs, openRow, press, settled } from "./testKit";
 
 /**
  * Recruitment · Talent Pool on the in-browser mock (docs/guides/recruitment.md §6.9, §10): the four
- * figures and the people kept with their kept-until date; Invite to Apply asks for an open role and
- * marks the person invited.
+ * figures and the people kept with their kept-until date; a person beside the list on a wide desktop
+ * (F31), in a sheet on a phone; Invite to Apply asks for an open role and marks the person invited.
  */
 
 vi.mock("@/api/mock/core", async (importOriginal) => {
@@ -37,6 +37,17 @@ afterEach(() => {
   setViewport(1440);
 });
 
+/** On a wide desktop a person opens beside the list, never in a dialog (F31): the card their name heads. */
+async function openBeside(name: string) {
+  fireEvent.click((await screen.findAllByText(name, undefined, { timeout: 8000 }))[0]!);
+  await settled();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  const heading = await screen.findByRole("heading", { name, level: 2 });
+  let pane: HTMLElement = heading;
+  while (pane.parentElement && !within(pane).queryByText("Kept Until")) pane = pane.parentElement;
+  return pane;
+}
+
 describe("Recruitment · Talent Pool", () => {
   it("lists the people kept, and Invite to Apply marks one invited", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=talent-pool");
@@ -44,11 +55,12 @@ describe("Recruitment · Talent Pool", () => {
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
 
-    let sheet = await openRow("Femi Lawal");
-    // Cancel goes back to the person's sheet, never past it.
+    let sheet = await openBeside("Femi Lawal");
+    // Cancel goes back to the person, still beside the list.
     await press(sheet, "Invite to Apply");
     await press(dialog(), "Cancel");
-    sheet = dialog();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    sheet = await openBeside("Femi Lawal");
     expect(within(sheet).getByRole("button", { name: "Invite to Apply" })).toBeTruthy();
     await press(sheet, "Invite to Apply");
     const form = dialog();
@@ -63,6 +75,16 @@ describe("Recruitment · Talent Pool", () => {
 
   it("a link to one person (?id=) opens them, read by their id", async () => {
     await openAs("cynthia@mycityapp.io", `/recruitment?tab=talent-pool&id=${sid("pool:dayo")}`);
-    expect(within(dialog()).getByText("dayo.martins@example.test")).toBeTruthy();
+    await settled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(await screen.findByText("dayo.martins@example.test")).toBeTruthy();
+  }, 60000);
+
+  it("on a phone, nothing opens until a person is tapped, then in a sheet", async () => {
+    setViewport(390);
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=talent-pool");
+    expect(screen.queryByText("femi.lawal@example.test")).toBeNull();
+    const sheet = await openRow("Femi Lawal");
+    expect(within(sheet).getByRole("button", { name: "Invite to Apply" })).toBeTruthy();
   }, 60000);
 });

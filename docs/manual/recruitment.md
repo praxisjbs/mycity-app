@@ -68,8 +68,8 @@ what a useful answer gives.
    `2 days in office, 3 from home`, and the **Working Days**. Press **Next**.
 7. Start typing the area under **Location** and pick it from the list. A remote role skips this
    question.
-8. Type the salary band, **Salary From** and **Salary To**. Tick **Show Salary on Careers** to show
-   it there.
+8. Type the salary band, **Salary From** and **Salary To**, as you would write it, such as
+   `350,000`. Tick **Show Salary on Careers** to show it there.
 9. Under **Your Answer**, say what the role must have and what it will do, in your own words. Add the
    **Years of Experience** needed.
 10. Add who the role **Reports To**, and anything else candidates should know: what would set
@@ -267,7 +267,8 @@ The best weighted total comes first. A score never moves, rejects or hides anyon
 ### Open a candidate {#recruitment-candidates-sheet}
 
 1. Press a card on [Recruitment · Candidates](/recruitment?tab=candidates). On a computer it opens
-   beside the board; on a phone it opens in a sheet.
+   beside the board, which makes room for it; on a phone it opens in a sheet. **Close** at its foot
+   gives the board its width back.
    ![A candidate's sheet](shot:recruitment-candidate-sheet)
 2. The sheet shows their details, their CV, their answers and their assessments and interviews.
 3. **Screening** shows the score, **Provisional** while it is the estimate, and the AI's summary.
@@ -409,7 +410,8 @@ Assessments holds MyCity's tests and take-home briefs, and every sitting a candi
 3. Press **Assessments** at the top for the library, or **Sittings** for who took what.
 4. Each assessment shows its name, type, minutes, questions, how many were sent, the average and its
    status.
-5. Press an assessment to see its questions, and the **Points** each option scores.
+5. Press an assessment to see its questions, and the **Points** each option scores. On a computer it
+   opens beside the list, the first one until you press another; on a phone it opens in a sheet.
 
 An assessment is timed, with minutes and a clock, or untimed: a take-home brief due by a day.
 
@@ -503,7 +505,8 @@ an earlier stage move to **Assessment**.
    ![Sittings awaiting marking](shot:recruitment-sittings)
 2. Each sitting shows the candidate, the assessment, where it stands and the score.
 3. Press **To Mark** to see only those waiting for marks. **Awaiting Marking**, at the top, counts them.
-4. Press a sitting to read each answer. Open a file, or the link they gave.
+4. Press a sitting to read each answer. Open a file, or the link they gave. On a computer it opens
+   beside the list; on a phone it opens in a sheet.
 
 | Where it stands | What it means |
 |---|---|
@@ -839,7 +842,8 @@ The Talent Pool keeps good candidates who were not hired this time, for 24 month
 3. Each person shows the role they applied for, their score, when they were added and why.
 4. **Kept Until** is the day they leave the pool by themselves.
 5. **Invited** shows when someone has been invited to a later role.
-6. Press a person to open them. On a phone, when they were added and why are in the sheet.
+6. Press a person to open them. On a computer they open beside the list, the first one until you
+   press another; on a phone they open in a sheet, with when they were added and why.
 
 The score is the one from the role they came from, with **Provisional** when it is the estimate.
 
@@ -980,7 +984,6 @@ as: operations
 do:
   - click: row 1
   - wait: button "Mark Answers"
-crop: modal
 marks:
   1: button "Mark Answers" | Save the marks
 ```

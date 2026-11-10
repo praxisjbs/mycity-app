@@ -33,6 +33,7 @@ import {
   Grid,
   HelpTerm,
   Kanban,
+  ListDetail,
   LoadingRows,
   PageHeader,
   Pill,
@@ -42,6 +43,7 @@ import {
   Toolbar,
   useContractForm,
   useModal,
+  useSideBySide,
 } from "@mycity/ui";
 import { CandidateSheet } from "./CandidateSheet";
 import { say, sayRefusal, ScoreText, STAGE_LABEL, useVacancyOptions } from "./shared";
@@ -98,7 +100,15 @@ export function Candidates() {
   const columns = offers ? BOARD : BOARD.filter(([s]) => s !== "offer");
   const board = role.data && vacancy ? columns.filter(([s]) => role.data!.board_stages.includes(s)) : columns;
 
-  const open = (id: string, title = "Candidate") => modal.open({ title, wide: true, body: (close) => <CandidateSheet id={id} close={close} /> });
+  // On a wide desktop a pressed card opens beside the board (F31), the board keeping the full width
+  // until then; on a phone, and where two columns do not fit, it opens in the sheet or dialog.
+  const beside = useSideBySide();
+  const [picked, setPicked] = useState<string | null>(null);
+  const open = (id: string, title = "Candidate") => {
+    if (!beside) return modal.open({ title, wide: true, body: (close) => <CandidateSheet id={id} close={close} /> });
+    modal.close();
+    setPicked(id);
+  };
   const invite = () => modal.open({ title: "Invite to Apply", body: (close) => <InviteForm close={close} vacancyId={vacancy} /> });
   const screen = () => modal.open({ title: "Screen With AI", body: (close) => <ScreenForm close={close} vacancyId={vacancy} /> });
   useScreenAction(mayCreate ? { label: "Invite to Apply", onSelect: invite } : null);
@@ -163,39 +173,54 @@ export function Candidates() {
         <FilterSelect label="Vacancy" value={vacancy} onChange={setVacancy} options={[["", "All Vacancies"], ...vacancies.options]} more={vacancies.more} onMore={vacancies.onMore} />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
       </Toolbar>
-      {failed ? (
-        <ErrorState error={failed} onRetry={() => Promise.all(lists.map((c) => c.reload()))} />
-      ) : (
-        <Kanban
-          loading={lists.some((c) => !c.page && !c.error)}
-          onMove={mayEdit && status === "active" ? (card, _from, to) => onMove(card, to) : undefined}
-          onOpen={(card) => {
-            const c = all.find((x) => x.application_id === card);
-            if (c) open(c.application_id, c.name);
-          }}
-          empty={<EmptyState title={status === "active" ? "No Candidates Yet" : "No One Here"} />}
-          columns={board.map(([stage, series]) => ({
-            key: stage,
-            label: STAGE_LABEL[stage],
-            series,
-            count: cols[stage as keyof typeof cols].page?.total,
-            onMore: cols[stage as keyof typeof cols].page?.has_next ? cols[stage as keyof typeof cols].more : undefined,
-            cards: cols[stage as keyof typeof cols].rows.map((c: CandidatesCandidate) => ({
-              key: c.application_id,
-              // Only the moves the server allows: ahead, or one back, on the role's own board.
-              moves: c.next_stages,
-              title: c.name,
-              meta: (
-                <>
-                  {!vacancy && <Pill dot={false}>{c.vacancy.title}</Pill>}
-                  <ScoreText score={c.score} provisional={c.score_provisional} />
-                  <span className="text-xs text-subtle-foreground">{daysAt(c.days_at_stage)}</span>
-                </>
-              ),
-            })),
-          }))}
-        />
-      )}
+      <ListDetail
+        fillUntilPicked
+        open={false}
+        onClose={() => setPicked(null)}
+        title="Candidate"
+        list={
+          failed ? (
+            <ErrorState error={failed} onRetry={() => Promise.all(lists.map((c) => c.reload()))} />
+          ) : (
+            <Kanban
+              loading={lists.some((c) => !c.page && !c.error)}
+              onMove={mayEdit && status === "active" ? (card, _from, to) => onMove(card, to) : undefined}
+              onOpen={(card) => {
+                const c = all.find((x) => x.application_id === card);
+                if (c) open(c.application_id, c.name);
+              }}
+              empty={<EmptyState title={status === "active" ? "No Candidates Yet" : "No One Here"} />}
+              columns={board.map(([stage, series]) => ({
+                key: stage,
+                label: STAGE_LABEL[stage],
+                series,
+                count: cols[stage as keyof typeof cols].page?.total,
+                onMore: cols[stage as keyof typeof cols].page?.has_next ? cols[stage as keyof typeof cols].more : undefined,
+                cards: cols[stage as keyof typeof cols].rows.map((c: CandidatesCandidate) => ({
+                  key: c.application_id,
+                  // Only the moves the server allows: ahead, or one back, on the role's own board.
+                  moves: c.next_stages,
+                  title: c.name,
+                  meta: (
+                    <>
+                      {!vacancy && <Pill dot={false}>{c.vacancy.title}</Pill>}
+                      <ScoreText score={c.score} provisional={c.score_provisional} />
+                      <span className="text-xs text-subtle-foreground">{daysAt(c.days_at_stage)}</span>
+                    </>
+                  ),
+                })),
+              }))}
+            />
+          )
+        }
+        detail={
+          beside && picked ? (
+            <Card>
+              <CandidateSheet key={picked} id={picked} close={() => setPicked(null)} inline />
+            </Card>
+          ) : null
+        }
+      />
       <DesktopOnly unmount>
         <Grid cols={2} className="mt-3">
           <Card>

@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { APPLICATIONS } from "@/api/mock/data/recruitment";
-import { copyProblems, dialog, openAs, openRow, press, type } from "./testKit";
+import { copyProblems, dialog, openAs, openRow, press, settled, type } from "./testKit";
 
 /**
  * Recruitment · Candidates on the in-browser mock (docs/guides/recruitment.md §6.3 to §6.5, §10): the
- * board's five stages; a candidate's sheet with the screening read, the weighted total over the parts
+ * board's five stages; a candidate beside the board on a wide desktop (F31), in a dialog where two
+ * columns do not fit and in a sheet on a phone; the candidate's sheet with the screening read, the weighted total over the parts
  * scored, and Move To; Not Progressing asks for a reason and Reopen puts the candidate back; a score
  * still Provisional says so.
  */
@@ -40,6 +41,17 @@ afterEach(() => {
 
 const app = (first: string) => APPLICATIONS.find((a) => a.first_name === first)!;
 
+/** On a wide desktop a card opens beside the board, never in a dialog (F31): the card its name heads. */
+async function openBeside(name: string) {
+  fireEvent.click((await screen.findAllByText(name, undefined, { timeout: 8000 }))[0]!);
+  await settled();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  const heading = await screen.findByRole("heading", { name, level: 2 });
+  let pane: HTMLElement = heading;
+  while (pane.parentElement && !within(pane).queryByText("Stage History")) pane = pane.parentElement;
+  return pane;
+}
+
 describe("Recruitment · Candidates", () => {
   it("shows the board's five stages, and a candidate's sheet with the weighted total", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
@@ -47,38 +59,55 @@ describe("Recruitment · Candidates", () => {
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
 
-    const sheet = await openRow("Emeka Obi");
+    // Nothing is open until a card is pressed, and the board has the full width.
+    expect(screen.queryByText("Stage History")).toBeNull();
+    const sheet = await openBeside("Emeka Obi");
     expect(within(sheet).getByText("Weighted Total")).toBeTruthy();
     expect(within(sheet).getByText(/of 5 parts|of 4 parts/)).toBeTruthy();
     expect(within(sheet).getByText("Sales Scenario Case Study")).toBeTruthy();
     expect(copyProblems()).toEqual([]);
+    expect(await axe(document.body)).toHaveNoViolations();
+
+    // Another card swaps it in place; Close puts the board back to the full width.
+    const next = await openBeside("Chinedu Okafor");
+    await press(next, "Close");
+    expect(screen.queryByText("Stage History")).toBeNull();
   }, 60000);
 
   it("a score from the form only reads Provisional", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
-    const sheet = await openRow("Chinedu Okafor");
+    const sheet = await openBeside("Chinedu Okafor");
     expect(within(sheet).getAllByText("Provisional").length).toBeGreaterThan(0);
   }, 60000);
 
   it("Move To, then Not Progressing with its reason, then Reopen", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
-    let sheet = await openRow("Funke Bakare");
+    let sheet = await openBeside("Funke Bakare");
     await press(sheet, "Move to Assessment");
     expect(app("Funke").stage).toBe("assessment");
 
-    await press(dialog(), "Not Progressing");
-    let form = dialog();
+    // The form opens in a dialog and, once done, the candidate is still beside the board.
+    await press(await openBeside("Funke Bakare"), "Not Progressing");
+    const form = dialog();
     await press(form, "Not Progressing");
     expect(app("Funke").status).toBe("active");
     type(dialog(), "Reason", "Four years in sales, none leading a team of five");
     await press(dialog(), "Not Progressing");
     expect(app("Funke").status).toBe("not_progressed");
+    expect(screen.queryByRole("dialog")).toBeNull();
 
-    sheet = dialog();
+    sheet = await openBeside("Funke Bakare");
     await press(sheet, "Reopen");
     expect(app("Funke").status).toBe("active");
-    form = dialog();
-    expect(within(form).getAllByRole("button", { name: /^Move to/ }).length).toBeGreaterThan(0);
+    sheet = await openBeside("Funke Bakare");
+    expect(within(sheet).getAllByRole("button", { name: /^Move to/ }).length).toBeGreaterThan(0);
+  }, 60000);
+
+  it("between 761 and 1180 px, where two columns do not fit, a card opens in the dialog", async () => {
+    setViewport(1024);
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
+    const sheet = await openRow("Chinedu Okafor");
+    expect(within(sheet).getByText("Stage History")).toBeTruthy();
   }, 60000);
 
   it("on a phone, the board shows one stage at a time and a card opens in a sheet", async () => {
