@@ -229,6 +229,13 @@ How CI differs from your laptop:
   id); `--group=backend|frontend|screens|checks` runs a CI job's. Never run two screen-gate runs at
   once: they share one demo build (the Stop hook already stands aside while `npm run ci` runs).
 
+## Training and handover videos
+
+Asked for a milestone's training or handover video ("make the Milestone 6 video")? Read
+`docs/runbooks/training-videos.md` in full first. It holds the pattern every video follows (measured
+from the M3 video), the tooling in `scripts/video/`, how to film, the pitfalls met and where the work
+stands. Bugs found while filming are fixed in the same branch and logged there (§7).
+
 ## Working conventions
 
 - Branch `m<N>/<short-name>`. PR titles in Conventional Commits form. No approving review is
