@@ -171,7 +171,7 @@ stays off the table until MyCity is near that size.
   (`syncHeadRoles`). Each line moves through the reporting write, so it is audited and team scope
   follows. Only a vacant seat is filled (`SEAT_NOT_VACANT`, 409, otherwise).
 - The viewer shows the **whole company**. The builder shows the whole company with edit affordances.
-- Restricted fields (`bank_name`, `account_number`, `gross_monthly`, per BACKEND_STRUCTURE §9.4)
+- Restricted fields (`bank_name`, `account_number`, `gross_monthly`, the tax and pension numbers, per BACKEND_STRUCTURE §9.4)
   and phone are never rendered on any organogram card, in either page, in a person's sheet or in
   the PDF.
 - **Team size.** A card with reports says how many report to it directly and in all, every place
@@ -504,6 +504,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 10/11/2026 · JP · The employee record gains the tax and pension numbers payroll's statutory report reads (`tax_id`, `pension_pin`, `pension_administrator`, `nhf_number`; migration `6020`, `docs/guides/payroll.md` §4.1): `PATCH /employees/:id` takes them and the 360 returns them, masked as `employee.statutory`. Like the other restricted fields they are never rendered on an organogram card, a person's sheet or the PDF (§6). No screen asks for them yet.
 - 06/11/2026 · GE · A hire fills its vacant seat: `organisation.fillSeat` (§6) for Recruitment's
   `vacancies.hiredIn`, with `org_seat.filled` (§7). The person takes the seat's department and line,
   and the seat's reports and open roles report to them.
