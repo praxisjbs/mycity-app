@@ -171,6 +171,15 @@ const AdvanceRecord = z
 /** Cancel an advance recorded in error, while none of its instalments is in a run or applied. */
 const AdvanceCancel = z.object({ reason: reasonText }).strict();
 
+/**
+ * Accept This Month and Spread Over Months as a card names them: the fine, then the form's own fields
+ * (`DeductionAccept`). The fine is the screen's own path parameter (`FineParams`), which a card carries as a field.
+ */
+const FineAccept = DeductionAccept.extend({ sanction_fine_id: uuid }).strict();
+
+/** Waive as a card names it: the fine, then the reason (`DeductionWaive`). */
+const FineWaive = DeductionWaive.extend({ sanction_fine_id: uuid }).strict();
+
 /* ------------------------------------------------------------------ *
  * Gate 6 (check/contract-columns.js): which table each schema is a row of
  * ------------------------------------------------------------------ */
@@ -201,6 +210,11 @@ const TABLES = {
     table: "payroll_deduction",
     virtual: { reason: "written as payroll_deduction.cancel_reason" },
   },
+  FineAccept: {
+    table: "payroll_deduction",
+    virtual: { months: "written as payroll_deduction.instalments, and one payroll_deduction_instalment each" },
+  },
+  FineWaive: { table: null, reason: "a reason kept on the audit trail, not a column" },
 };
 
 module.exports = {
@@ -219,4 +233,6 @@ module.exports = {
   DeductionWaive,
   AdvanceRecord,
   AdvanceCancel,
+  FineAccept,
+  FineWaive,
 };

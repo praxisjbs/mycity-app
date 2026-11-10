@@ -1,7 +1,7 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "ea2e7e959d97ca727ab8c16127c945b03a045bdb4419d5d30252ab9c6836afb1",
-  "schemas": 2059,
+  "source_hash": "d0d3b13991728cc3fbccd112a55f53c19103c67e89a53d405e17e84a332c623c",
+  "schemas": 2064,
   "endpoints": 937,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
@@ -21,7 +21,7 @@
     "packages/contract/schemas/common.js": "6c44be89759306339cfc9d28a69c60fbbd05964a71c8ff123b4c1a7fe33e647e",
     "packages/contract/schemas/community.js": "1c13986f3dea794ab8e83b461c18e863f8a285a81fa0aad029a0d94b733648fb",
     "packages/contract/schemas/dashboard.js": "30a17b3c0dd8b6fd460b332444be2c2e31047154a16787ddda1346f63a5b4870",
-    "packages/contract/schemas/deductions.js": "bd24280943d9cf7db6bd72535edb1112453fc298e56efd3d8410591b89e51382",
+    "packages/contract/schemas/deductions.js": "8352682601423797fd44b9341f74120683a0dc0cf4f76c80e220f1545c1c604f",
     "packages/contract/schemas/devices.js": "b91698248b9bbba88812399e504aee8069de9f5292975627fc20994ca10ec4dd",
     "packages/contract/schemas/disbursements.js": "64c22b030f48e19cc5a39ad06b7cc6fad65d98347306c73f0ef7e8804bf4b692",
     "packages/contract/schemas/documents.js": "848b7bc4577530e54b9caec56d542ece74b5a1b02d047eb26f12b124c7a895e3",
@@ -48,7 +48,7 @@
     "packages/contract/schemas/partner_pipeline.js": "d05fdb4d19154d256b7328a0e58d0ffbea57ac83cd38dc74bf14e12aad55da96",
     "packages/contract/schemas/partners.js": "e5f3dd361b32b256600236d6c62baf0d85ff3d48f4a9c9882610d71376976d3d",
     "packages/contract/schemas/partnership_analytics.js": "eb19230f5db9c5e8ab71e858635906a56c69ad25de87474ee033aa605382972a",
-    "packages/contract/schemas/payroll.js": "457315ebb0b173d64bd5baccf07a35ab6fbf350d1648db2be39f8de5e01fdbdc",
+    "packages/contract/schemas/payroll.js": "d8a049dede9019ce89533a7bc638a8becff92cf0273ec92016a3870afe180123",
     "packages/contract/schemas/payslips.js": "7b8ad408d334ad01283800422ce40371d07dfb604623d116d1f2fb46452d1ea5",
     "packages/contract/schemas/policies.js": "069c09178e09da0d7dad8ffd0d6551d4108a4c0ab78a0c0c0dee4b0fa4ba4a3e",
     "packages/contract/schemas/projects.js": "1fe44c73b97a8f644737c144d909fc8cfdfe154428671b199e0bef6f025f7745",

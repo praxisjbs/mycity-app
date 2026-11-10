@@ -362,6 +362,10 @@ const ENTITY_ROUTES = Object.freeze({
   },
   // A person told that a fine is scheduled or waived, or an advance recorded, reads it on their own payslips.
   deduction: { ...screen("payroll", "deductions"), self: screen("ess", "my-payslips") },
+  // The asking person's own payslip and instalment, as the assistant cites them and ⌘K finds the payslip (payslips.search.js,
+  // payslips.ai.js, deductions.ai.js): they open My Payslips, which a Payroll · Payslips link would not for someone without `payroll`.
+  payroll_own_payslip: screen("ess", "my-payslips"),
+  payroll_own_deduction: screen("ess", "my-payslips"), // search:none an instalment is found with its payslip on My Payslips, and as the deduction Payroll readers search
   // Grades, pay splits, statutory rates and the payroll setting are configuration, not records: each opens
   // Configurations, which ⌘K finds as a screen (docs/guides/payroll.md §9).
   salary_structure: screen("payroll", "configurations"), // search:none configuration, found as the Configurations screen
