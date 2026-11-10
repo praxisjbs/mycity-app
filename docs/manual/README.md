@@ -109,7 +109,7 @@ under it). Its spec is a fenced `shot <id>` block anywhere in the same file:
 | `marks` | Numbered marks drawn on the picture: `1: button "Add Employee" \| Add a person`. The legend under the picture lists them |
 | `crop` | `page` (the default), `modal` (only the open dialog or sheet), `viewport`, or a CSS selector |
 | `prompt` | `keep`: the picture is of a prompt that opens by itself once per sign-in (a policy to acknowledge), so it is taken in a sign-in of its own, before the prompt is closed |
-| `site` | `public`: a page of the public site (go.mycityapp.io), taken signed out on its demo build. `open` is then its address, `/` (the front page), `/jobs`, `/jobs/<slug>`, `/apply/<token>` or `/assess/<token>`, a demo link from `public-app/src/api/mock/demo-links.ts`; leave out `as` |
+| `site` | `public`: a page of the public site (go.mycityapp.io), taken signed out on its demo build. `open` is then its address, `/` (the front page), `/jobs`, `/jobs/<slug>`, `/apply/<token>`, `/assess/<token>`, `/sign/<token>`, `/verify/<reference>` or `/proposal/<token>`, a demo link from `public-app/src/api/mock/demo-links.ts`; leave out `as` |
 | `sources` | More files the picture depends on, beside the screen's feature folder (for a public page, its page file and the public shell) |
 
 A target is `button "Name"`, `link "Name"`, `tab "Name"`, `label "Field"`, `text "Words"`,

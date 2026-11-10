@@ -267,8 +267,10 @@ mock filters as the API does.
 
 `docs/manual/quick-start.md` holds cards: `## Title {#qs-slug role="Everyone" needs="..."}` with
 one picture and three to six steps, each step linking to the screen and to the Full Guide section
-that explains it. The roles are Everyone, Line Managers, People & HR and Administrators; a card's
-role only groups it, its `needs` decide who receives it.
+that explains it. The roles are Everyone, Line Managers, People & HR, Administrators and Lead Owners
+(`ROLES` in `packages/contract/guide.js`, which the gate and the mock share); a card's role only groups
+it, its `needs` decide who receives it. The screen shows the four first groups in their order, then any
+other.
 
 ### 6.5 Pictures
 
@@ -417,7 +419,7 @@ microphone shows only while a model is Ready on the chain (`GuideContents.voice`
 ### 6.11 The public site's Help
 
 One chapter is written for people outside MyCity: `docs/manual/public-site.md`, `kind: public-help`
-(decided by GE, 08/11/2026). It speaks to the candidate ("you") and names no hub screen and no grant.
+(decided by GE, 08/11/2026). It speaks to a candidate or a partner ("you") and names no hub screen and no grant.
 `load()` keeps it apart from the chapters: it is never in the hub's contents, chapters, Quick Start or
 search, and `/chapters/public-site` is 404. The public route reads it whole for a reader nobody signed
 in (`screen` always true, no need held), so a step that names a need is not sent; the gate still
@@ -523,6 +525,7 @@ word limits do not count it, as they do not count an article.
 
 ## 14 · Change log
 
+- 10/11/2026 · TB · The Partnerships chapter (M7 PR 9, `docs/manual/partnerships.md`, `milestones: M7`) and its pictures; four Quick Start cards under a new Lead Owners role (§6.4; `ROLES` in `packages/contract/guide.js`); the public Help gains Your Proposal, Sign an Agreement and Check an agreement, written to a partner (§6.11), and a public picture may open `/proposal/<token>` (`PUBLIC_OPEN`). 335 pictures.
 - 08/11/2026 · GE · (Ose) The public site's Help (§6.11, #108): `public-site.md` becomes `kind: public-help`, written to the candidate, kept out of the hub's guide and served at `GET /api/public/v1/help` with its pictures; `GuideContents.public_help_url` and **Public Site Help** on the User Guide; `go.mycityapp.io/help` with `SectionNav` and SkylineHero size `page`; GuideBody's `home`.
 - 05/11/2026 · GE · (Ose) Pictures of the public site: a spec with `site: public` is taken signed out on the public app's demo build (`node_modules/.cache/mycity/demo-public`, `ensurePublicBuild`), its address a public one; it goes stale when its page file or the public shell changes. `public-site.md` has its eight.
 - 05/11/2026 · GE · (Ose) A bold name is also found in `public-app/src`, so the public site's chapter (`public-site.md`) is held to its own pages' words.

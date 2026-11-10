@@ -251,15 +251,22 @@ describeDb("partnerships: agreements, approval, signing and verification", () =>
     // The Partner Agreement flow: the Head of Department of the owner's department, then the CEO.
     const review = ok(await as("staff").post(`/partnerships/agreements/${id}/submit`));
     expect(review).toMatchObject({ status: "review", approval: { state: "waiting", stage: "Head of Department", waiting_on: "Kemi Alade" }, body_html: null });
+    // Who may decide it shows on its card (§6.9): the stage's person and the CEO, never who submitted it.
+    expect(review.approval.can_decide).toBe(false);
+    expect(ok(await as("staff").get(`/partnerships/agreements/${id}`)).approval.can_decide).toBe(false);
+    expect(ok(await as("hod").get(`/partnerships/agreements/${id}`)).approval.can_decide).toBe(true);
+    expect(ok(await as("ceo").get(`/partnerships/agreements/${id}`)).approval.can_decide).toBe(true);
     expect((await as("staff").post(`/partnerships/agreements/${id}/send`, { signers: review.suggested_signers, confirm: true })).body.error.code).toBe("NOT_APPROVED");
     expect((await as("staff").patch(`/partnerships/agreements/${id}`, { starts_on: "2026-12-02" })).body.error.code).toBe("NOT_DRAFT");
     ok(await as("hod").post(`/workflow/instances/${review.workflow_instance_id}/approve`));
     await drain();
     expect(ok(await as("staff").get(`/partnerships/agreements/${id}`))).toMatchObject({ status: "approval", approval: { state: "waiting", stage: "CEO" } });
+    expect(ok(await as("hod").get(`/partnerships/agreements/${id}`)).approval.can_decide).toBe(false);
+    expect(ok(await as("ceo").get(`/partnerships/agreements/${id}`)).approval.can_decide).toBe(true);
     ok(await as("ceo").post(`/workflow/instances/${review.workflow_instance_id}/approve`));
     await drain();
     const approvedOne = ok(await as("staff").get(`/partnerships/agreements/${id}`));
-    expect(approvedOne).toMatchObject({ status: "approval", approval: { state: "approved", stage: null, waiting_on: null }, countersigned: false });
+    expect(approvedOne).toMatchObject({ status: "approval", approval: { state: "approved", stage: null, waiting_on: null, can_decide: false }, countersigned: false });
     expect(approvedOne.suggested_signers).toEqual([{ contact_id: expect.any(String), name: "Ngozi Adebayo", title: "Founder", email: "harbour.lights@example.test", side: "partner" }]);
 
     // Send for Signature: the PDF rendered, the request opened, the link mailed after commit.

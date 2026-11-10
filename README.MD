@@ -710,7 +710,7 @@ a declared action a person confirms (A23 as amended 01/11/2026; `docs/guides/pra
 No new modules. The User Guide (`docs/manual/`, the Knowledge Hub's User Guide tab) is written
 milestone by milestone from M0 as each is approved (JBS Praxis, 25/10/2026,
 `docs/guides/user-guide.md` §1.1); the public site's chapter (`docs/manual/public-site.md`) was begun
-with M4's pages (careers, a vacancy, applying, an assessment) and M5 adds signing and verifying. M11
+with M4's pages (careers, a vacancy, applying, an assessment), M5 added signing and verifying and M7 a partner's proposal and agreement. M11
 completes the guide with the training sessions, and brings `docs/runbooks/*.md` up to date. The nightly backup, the weekly restore drill and the uptime probe
 were built in M0 and run from then on; M11 shows them working for the handover: a restore drill
 timed in front of MyCity (`scripts/db/restore-drill.js`, its history in

@@ -11,6 +11,7 @@
  */
 const money = require("../../shared/money/money");
 const workflow = require("../../shared/workflow/engine");
+const approvers = require("../../shared/workflow/approvers");
 const definitions = require("../../shared/workflow/definitions");
 const cond = require("../../shared/workflow/conditions");
 const organisation = require("../organisation/organisation.service");
@@ -85,18 +86,21 @@ async function namesOf(db, snapshot) {
 
 /**
  * AgreementDetail.approval: the stage waiting and who, while its approval is pending; approved once it
- * was, until it is sent; null before Submit and after Send.
+ * was, until it is sent; null before Submit and after Send. `can_decide` is the engine's own rule for
+ * `actor` (approvers.canAct): the CEO, or a person the waiting stage names, never whoever submitted it.
+ * Whoever reads without an actor (a search, the assistant) is told false.
  */
-async function viewOf(db, a) {
+async function viewOf(db, a, actor = null) {
   if (!a.workflow_instance_id || !["review", "approval"].includes(a.status)) return null;
   const instance = await workflow.getInstance(db, a.workflow_instance_id);
   if (!instance) return null;
-  if (instance.state === "approved" || instance.state === "timeout_approved") return { state: "approved", stage: null, waiting_on: null };
+  if (instance.state === "approved" || instance.state === "timeout_approved") return { state: "approved", stage: null, waiting_on: null, can_decide: false };
   if (instance.state !== "pending") return null;
   const def = (await definitions.findActive(db, instance.definition_key)) || definitions.getDefault(instance.definition_key);
   const stage = def ? cond.stageByKey(def, instance.current_stage) : null;
   const names = await namesOf(db, instance.stage_approvers || []);
-  return { state: "waiting", stage: stage ? stage.name : instance.current_stage, waiting_on: names.length ? names.join(", ") : null };
+  const can = Boolean(actor) && (await approvers.canAct(db, instance.stage_approvers || [], actor, instance));
+  return { state: "waiting", stage: stage ? stage.name : instance.current_stage, waiting_on: names.length ? names.join(", ") : null, can_decide: can };
 }
 
 /** Whether its approval has finished approved: the one state Send for Signature accepts. */

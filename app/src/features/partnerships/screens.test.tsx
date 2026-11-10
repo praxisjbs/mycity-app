@@ -46,15 +46,15 @@ const app = (show: boolean) => (
   </RouterProvider>
 );
 
-/** Signs in on the mock as Operations and opens a Partnerships address. */
-async function open(at: string) {
+/** Signs in on the mock (as Operations unless `email` says otherwise) and opens a Partnerships address. */
+async function open(at: string, email = "cynthia@mycityapp.io") {
   window.history.replaceState(null, "", at);
   mockSession.set(null);
   invalidate("/api/v1");
   const { rerender } = render(app(false));
   await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 15000 });
   await act(async () => {
-    const next = await auth!.signIn("cynthia@mycityapp.io", "demo1234");
+    const next = await auth!.signIn(email, "demo1234");
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
   });
   rerender(app(true));
@@ -249,4 +249,24 @@ describe("Partnerships on the contract", () => {
     expect(screen.queryByRole("heading", { name: "Stage Conversion" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
   }, 30000);
+
+  it("Contracts & MOUs: Approve and Reject are offered to whoever may decide the approval, and Approve opens Send for Signature", async () => {
+    // Operations is not named on the CEO's stage, so the Approval card only reads.
+    await open("/partnerships?tab=contracts-and-mous");
+    let chips = await screen.findByRole("group", { name: "Agreements" }, { timeout: 8000 });
+    fireEvent.click(within(chips).getByRole("button", { name: "In Approval" }));
+    expect(await screen.findByRole("heading", { name: "Approval" }, { timeout: 8000 })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
+    cleanup();
+
+    // The CEO may decide any stage: both buttons show, and Approve moves the agreement to its next step.
+    await open("/partnerships?tab=contracts-and-mous", "ifeoma@mycityapp.io");
+    chips = await screen.findByRole("group", { name: "Agreements" }, { timeout: 8000 });
+    fireEvent.click(within(chips).getByRole("button", { name: "In Approval" }));
+    expect(await screen.findByRole("button", { name: "Reject" }, { timeout: 8000 })).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    expect((await screen.findAllByRole("button", { name: "Send for Signature" }, { timeout: 8000 })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  }, 40000);
 });
