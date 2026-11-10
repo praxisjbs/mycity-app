@@ -884,11 +884,10 @@ marks:
 open: /recruitment?tab=vacancies
 as: operations
 do:
-  - click: row 1
-  - wait: button "Questions"
+  - click: text "Head, Sales & Revenue"
+  - wait: button "Copy Link"
 marks:
-  1: button "Questions" | Apply questions and interview traits
-  2: button "Scorecard" | The parts and their weights
+  1: button "Copy Link" | Copy the role's public link
 ```
 
 ```shot recruitment-vacancy-new

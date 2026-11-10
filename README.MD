@@ -152,6 +152,11 @@ mycity-app/
 │   ├── guide/                the User Guide's pictures: shoot.js (npm run guide:shots) takes each chapter's
 │   │                         pictures on the demo build, desktop and phone, with numbered marks; lib.js,
 │   │                         shared with check/user-guide.js: the chapters on disk and each picture's hashes
+│   ├── video/                a milestone's training video (docs/runbooks/training-videos.md): make.js
+│   │                         (script, narrate, film, assemble), style.js (the look measured from the
+│   │                         M3 video), cards.js, film.js, assemble.js, people.js (filming's sign-ins),
+│   │                         narrate.py and requirements.txt (the voice, Kokoro); scenes/, one a video:
+│   │                         m4-recruitment-1.js (M4 part 1, Vacancies and Candidates)
 │   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging;
 │   │                         attack-assistant.js: its attack suite, asked of the real model on staging
 │   │                         nightly through deploy-gate attack (docs/guides/praxis-ai.md §6.17)
@@ -191,7 +196,8 @@ mycity-app/
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
 │   │                         first-accounts (the first two logins on a server),
 │   │                         staff-roster (MyCity's staff onto a server that has none),
-│   │                         push-notifications (web push keys, live mail, a device's health)
+│   │                         push-notifications (web push keys, live mail, a device's health),
+│   │                         training-videos (a milestone's handover video, start to finish)
 │   ├── handoff/              a build carried across sessions: its decisions, plan and log
 │   │                         (push-notifications, m3-queries-sanctions)
 │   └── manual/               the User Guide (Knowledge Hub · User Guide, docs/guides/user-guide.md): one

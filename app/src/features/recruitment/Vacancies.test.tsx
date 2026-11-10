@@ -38,14 +38,25 @@ afterEach(() => {
 
 const byTitle = (title: string) => VACANCIES.find((v) => v.title === title)!;
 
+/** On a wide desktop a role opens beside the list, never in a dialog (F31): the card its heading heads. */
+async function openBeside(title: string) {
+  fireEvent.click((await screen.findAllByText(title, undefined, { timeout: 8000 }))[0]!);
+  await settled();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  const heading = await screen.findByRole("heading", { name: title, level: 2 });
+  let pane: HTMLElement = heading;
+  while (pane.parentElement && !within(pane).queryByRole("button", { name: "See Candidates" })) pane = pane.parentElement;
+  return pane;
+}
+
 describe("Recruitment · Vacancies", () => {
-  it("shows the four figures and the roles, and a role opens with its traits and public link", async () => {
+  it("shows the four figures and the roles, and a role opens beside the list with its traits and public link", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
     for (const label of ["Open Vacancies", "Applicants", "In Interview", "Past Closing Date"]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
 
-    const sheet = await openRow("Head, Sales & Revenue");
+    const sheet = await openBeside("Head, Sales & Revenue");
     expect(within(sheet).getByText("Appearance and Grooming")).toBeTruthy();
     expect(within(sheet).getByText("Future Growth Potential in Career")).toBeTruthy();
     expect(within(sheet).getByText(/go\.mycityapp\.io\/jobs\//)).toBeTruthy();
@@ -71,10 +82,10 @@ describe("Recruitment · Vacancies", () => {
 
   it("Pause and Resume a role", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
-    const sheet = await openRow("Graphics and Motion Designer");
+    const sheet = await openBeside("Graphics and Motion Designer");
     await press(sheet, "Pause");
     expect(byTitle("Graphics and Motion Designer").status).toBe("paused");
-    await press(dialog(), "Resume");
+    await press(await openBeside("Graphics and Motion Designer"), "Resume");
     expect(byTitle("Graphics and Motion Designer").status).toBe("open");
   }, 60000);
 
