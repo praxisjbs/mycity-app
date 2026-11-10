@@ -69,6 +69,20 @@ async function inForce(db, date) {
   return rows;
 }
 
+/** The rows of each item's next version: the one with the earliest first day after `date`. */
+async function nextVersions(db, date) {
+  // pagination:complete the next version of each of seven items: at most seven items and twelve PAYE bands
+  const { rows } = await completeQuery(
+    db,
+    `SELECT ${ROW} FROM statutory_rate r ${JOINS}
+      WHERE r.effective_from = (SELECT min(n.effective_from) FROM statutory_rate n WHERE n.item = r.item AND n.effective_from > $1::date)
+      ORDER BY ${ITEM_ORDER}, r.position NULLS FIRST`,
+    [date],
+    { label: "The next statutory versions", ceiling: 100 },
+  );
+  return rows;
+}
+
 /** The most statutory lines one run carries: six items for each person a run can pay. */
 const MAX_REPORT_LINES = 30000;
 
@@ -97,4 +111,4 @@ async function reportLines(db, runId) {
   return rows;
 }
 
-module.exports = { list, versionRows, inForce, reportLines };
+module.exports = { list, versionRows, inForce, nextVersions, reportLines };

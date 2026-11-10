@@ -273,6 +273,7 @@ describe("the routes", () => {
     expect(mod.basePath).toBe("/statutory");
     expect(routesOf(mod.router).map((r) => [r.method, r.path, r.permission, r.capability || null])).toEqual([
       ["GET", "/rates", { key: "payroll", action: "view" }, null],
+      ["GET", "/items", { key: "payroll", action: "view" }, null],
       ["POST", "/rates", { key: "payroll", action: "edit" }, "payroll.configure"],
     ]);
   });

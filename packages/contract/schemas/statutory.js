@@ -104,6 +104,34 @@ const StatutoryRate = z
 const StatutoryRateListQuery = listQuery({ item: StatutoryItem.optional(), as_of: isoDate.optional() }, ["item", "effective_from"]);
 const StatutoryRatePage = Paged(StatutoryRate);
 
+/** One version of an item in brief: its rate (the relief its flat amount too), its base, how many PAYE bands, its first day. */
+const StatutoryVersionBrief = z
+  .object({
+    rate: z.string().nullable(),
+    flat_amount: money.nullable(),
+    base: StatutoryBase,
+    bands: z.number().int().min(1).nullable(),
+    effective_from: isoDate,
+  })
+  .strict();
+
+/** One of the seven items: its side, the bases it may use, the version in force today and the next, each null when none. */
+const StatutoryItemState = z
+  .object({
+    item: StatutoryItem,
+    kind: StatutoryKind,
+    bases: z.array(StatutoryBase).min(1),
+    current: StatutoryVersionBrief.nullable(),
+    next: StatutoryVersionBrief.nullable(),
+  })
+  .strict();
+
+/**
+ * GET /statutory/items: the seven items, always all seven in §6.12's order, so Configurations shows Not Set for an
+ * item with no rate. A fixed set of the items the code knows, not a list of records: it is never paged.
+ */
+const StatutoryItems = z.object({ items: z.array(StatutoryItemState).length(7) }).strict();
+
 /* ------------------------------------------------------------------ *
  * Saving a version
  * ------------------------------------------------------------------ */
@@ -233,6 +261,19 @@ const TABLES = {
   },
   StatutoryRateListQuery: { table: null, reason: "list controls for the rates" },
   StatutoryRatePage: { table: null, reason: "a page of rates" },
+  StatutoryVersionBrief: {
+    table: "statutory_rate",
+    virtual: { bands: "how many PAYE bands the version has, counted from its rows" },
+  },
+  StatutoryItemState: {
+    table: "statutory_rate",
+    virtual: {
+      bases: "the bases the item's formula may use (ITEM_BASES)",
+      current: "the version in force today",
+      next: "the version that starts later",
+    },
+  },
+  StatutoryItems: { table: null, reason: "the seven statutory items the code knows, each with its versions" },
   StatutoryBand: { table: "statutory_rate" },
   StatutoryRatesSave: {
     table: "statutory_rate",
@@ -253,6 +294,9 @@ module.exports = {
   StatutoryRate,
   StatutoryRateListQuery,
   StatutoryRatePage,
+  StatutoryVersionBrief,
+  StatutoryItemState,
+  StatutoryItems,
   StatutoryBand,
   StatutoryRatesSave,
   StatutoryReportRow,

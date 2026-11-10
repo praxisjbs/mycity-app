@@ -7,13 +7,15 @@
  * Rates and bands are configuration, not a person's pay, so nothing here is masked. A run's statutory report is asked
  * for on the run (payroll.routes.js).
  */
-const { created } = require("../../shared/http/respond");
+const { ok, created } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { withActor } = require("../../shared/events/emit");
 const service = require("./statutory.service");
 
 module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.validated.query)),
+
+  items: async (req, res) => ok(res, await service.items()),
 
   save: async (req, res) => created(res, await service.save(withActor(req), req.validated.body)),
 };

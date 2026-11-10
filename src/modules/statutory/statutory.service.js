@@ -6,11 +6,13 @@
  * computes them.
  *
  *   list(query)                 GET /statutory/rates, 25 a page
+ *   items()                     GET /statutory/items: the seven items, each with today's version and the next
  *   save(actor, body)           POST /statutory/rates (`payroll.configure`): a version from today or later, never
  *                               backdated (422 EFFECTIVE_IN_THE_PAST, payroll.config.repo); one starting that day is replaced
  *   requestReport(actor, id)    POST /payroll/runs/:id/statutory-report: an approved or paid advanced run's report
  *   assertMayReadReport(user)   a reader whose role hides pay or tax numbers is not handed the report (403)
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
@@ -39,6 +41,36 @@ async function list(query) {
   return { ...page, data: page.data.map(rates.present) };
 }
 
+/** One item's rows of one version in brief, or null with none. */
+function brief(item, rows) {
+  const mine = rows.filter((r) => r.item === item);
+  if (!mine.length) return null;
+  const r = mine[0];
+  return {
+    rate: item === "paye" ? null : r.rate,
+    flat_amount: item === "relief" ? r.flat_amount : null,
+    base: r.base,
+    bands: item === "paye" ? mine.length : null,
+    effective_from: r.effective_from,
+  };
+}
+
+/** GET /statutory/items: the seven items, each with the version in force today and the next one. */
+async function items() {
+  const today = lagos.today();
+  const [now, next] = await Promise.all([repo.inForce(pool, today), repo.nextVersions(pool, today)]);
+  const [current, later] = [now.map(rates.present), next.map(rates.present)];
+  return {
+    items: c.statutory.StatutoryItem.options.map((item) => ({
+      item,
+      kind: c.statutory.ITEM_KIND[item],
+      bases: [...c.statutory.ITEM_BASES[item]],
+      current: brief(item, current),
+      next: brief(item, later),
+    })),
+  };
+}
+
 /** POST /statutory/rates: the version's rows, as a page. */
 async function save(actor, body) {
   assertNotPast(body.effective_from);
@@ -65,4 +97,4 @@ async function assertMayReadReport(user) {
 /** POST /payroll/runs/:id/statutory-report: 202 with the file the screen waits on. */
 const requestReport = (actor, runId) => tx((client) => report.requestReport(client, runId, { actor }));
 
-module.exports = { list, save, assertMayReadReport, requestReport };
+module.exports = { list, items, save, assertMayReadReport, requestReport };

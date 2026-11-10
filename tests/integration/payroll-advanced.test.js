@@ -238,6 +238,7 @@ describeDb("the advanced option against the real migrations", () => {
       next: null,
     });
     expect((await as("ops").get("/statutory/rates")).body.data).toEqual([]);
+    expect((await as("ops").get("/statutory/items")).body.items.every((i) => i.current === null && i.next === null)).toBe(true);
     expect((await as("ops").get("/salary-structure/grades")).body.error.code).toBe("ADVANCED_OFF");
     expect((await as("ops").get("/salary-structure/placements")).body.error.code).toBe("ADVANCED_OFF");
     expect((await as("ops").get(`/salary-structure/employees/${employeeId("ada")}/components`)).body.error.code).toBe("ADVANCED_OFF");
@@ -353,6 +354,14 @@ describeDb("the advanced option against the real migrations", () => {
       expect(listed.map((r) => r.item)).toEqual(["paye", "paye", "pension_employee", "pension_employer", "nhf", "relief", "itf", "nsitf"]);
       const september = (await as("ops").get(`/statutory/rates?as_of=${SEP}`)).body.data;
       expect(september.map((r) => r.item)).toEqual(["pension_employee"]);
+      // The seven items in brief: the pension in force since September, the rest starting in October.
+      const items = (await as("ops").get("/statutory/items")).body.items;
+      expect(items.map((i) => i.item)).toEqual(["paye", "pension_employee", "pension_employer", "nhf", "itf", "nsitf", "relief"]);
+      const of = (item) => items.find((i) => i.item === item);
+      expect(of("pension_employee")).toMatchObject({ kind: "employee", current: { rate: "5", base: "pensionable", effective_from: SEP }, next: null });
+      expect(of("paye")).toMatchObject({ current: null, next: { bands: 2, rate: null, base: "taxable", effective_from: OCT } });
+      expect(of("relief").next).toMatchObject({ rate: "10", flat_amount: "100000.00" });
+      expect(of("itf")).toMatchObject({ kind: "employer", bases: ["annual_payroll"] });
     });
     expect((await q("SELECT count(*)::int AS n FROM statutory_rate WHERE item = 'paye'")).rows[0].n).toBe(2);
   });
