@@ -1,30 +1,20 @@
 import { useState } from "react";
-import { ApiError, api } from "@/api/client";
+import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import "@/api/types/payroll";
 import type { PayrollRun, Payslip } from "@mycity/contract/contract.gen.ts";
-import type { Grade } from "@/api/types/payroll";
 
 import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { ChainCard, ExportAction, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import Configurations from "./Configurations";
 import Deductions from "./Deductions";
-import { AreaChart, BandChart, Banner, Button, Card, DataView, DateField, DetailPane, Field, formatMoneyShort, formatMonth, FormFooter, Grid, Icon, LoadingRows, Money, MoneyField, PageHeader, StatStrip, StatusPill, TextField, toast, todayIso, useContractForm, useIsPhone, useModal, Who } from "@mycity/ui";
+import { AreaChart, Button, Card, DetailPane, formatMoneyShort, formatMonth, Grid, LoadingRows, Money, PageHeader, StatStrip, StatusPill, toast, todayIso, useIsPhone, useModal, Who } from "@mycity/ui";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
   if (tab === "payslips") return <Payslips />;
   if (tab === "deductions") return <Deductions />;
-  // Salary Structure and Statutory fold into Configurations (docs/guides/payroll.md §2); the prototype
-  // shows both until PR 7 rebuilds this screen on the real API.
-  if (tab === "configurations") {
-    return (
-      <>
-        <Structure />
-        <StatutoryTab />
-      </>
-    );
-  }
+  if (tab === "configurations") return <Configurations />;
   return <Runs />;
 }
 
@@ -175,162 +165,3 @@ function Payslips() {
     </>
   );
 }
-
-/* ───────────── Salary structure ───────────── */
-
-function Structure() {
-  const modal = useModal();
-  const s = useApi("GET /api/v1/payroll/grades/summary");
-  const list = usePaged("GET /api/v1/payroll/grades");
-  const scale = Number(s.data?.scale_max ?? 1) * 1.05;
-  const pct = (m: string) => (Number(m) / scale) * 100;
-  return (
-    <>
-      <PageHeader title="Salary Structure" sub="Grades and bands" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Grade", body: (close) => <GradeForm close={close} /> })}>Add Grade</Button>} />
-      {s.data && <KpiTiles items={[{ label: "Grades", value: String(s.data.grades) }, { label: "Staff Placed", value: String(s.data.placed) }, { label: "Below Band Minimum", value: String(s.data.below_minimum), tone: s.data.below_minimum ? "warn" : "ok" }, { label: "Above Maximum", value: String(s.data.above_maximum), tone: s.data.above_maximum ? "warn" : "ok" }]} />}
-      {list.rows.length > 0 && (
-        <BandChart
-          title="BandChart by Grade"
-          scale={`₦0 to ${formatMoneyShort(String(Math.round(scale)))}`}
-          rows={list.rows.map((g) => ({ label: `${g.code} · ${g.band}`, sub: `${g.staff} staff`, from: pct(g.minimum), middle: pct(g.midpoint), to: pct(g.maximum), value: `${formatMoneyShort(g.minimum)} to ${formatMoneyShort(g.maximum)}` }))}
-        />
-      )}
-      <Grid cols={2} className="mt-3">
-        <PagedTable<Grade>
-          title="Grades"
-          list={list}
-          rowKey={(g) => g.grade_id}
-          noun="grade"
-          columns={[
-            { key: "c", label: "Grade", render: (g) => <span className="font-semibold">{g.code}</span> },
-            { key: "b", label: "Band", render: (g) => g.band },
-            { key: "mn", label: "Minimum", align: "n", render: (g) => <Money value={g.minimum} />, desktop: true },
-            { key: "md", label: "Midpoint", align: "n", render: (g) => <Money value={g.midpoint} /> },
-            { key: "mx", label: "Maximum", align: "n", render: (g) => <Money value={g.maximum} />, desktop: true },
-            { key: "s", label: "Staff", align: "n", render: (g) => g.staff },
-          ]}
-        />
-      </Grid>
-    </>
-  );
-}
-
-function GradeForm({ close }: { close: () => void }) {
-  const f = useContractForm({ code: "", band: "", minimum: "", midpoint: "", maximum: "", effective_from: "" }, {
-    code: (v) => (!/^G\d{1,2}$/.test(v) ? "Like G7" : null),
-    band: (v) => (!v.trim() ? "Name the band" : null),
-    minimum: (v) => (!(Number(v) > 0) ? "Enter the minimum" : null),
-    midpoint: (v, a) => (!(Number(v) > Number(a.minimum)) ? "Above the minimum" : null),
-    maximum: (v, a) => (!(Number(v) > Number(a.midpoint)) ? "Above the midpoint" : null),
-    effective_from: (v) => (!v ? "Pick the start date" : null),
-  });
-  const save = useMutation("POST /api/v1/payroll/grades");
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      const g = await save.run({ body: f.values });
-      invalidate("/api/v1/payroll/grades");
-      close();
-      toast(`${g.code} added`);
-    } catch {
-      f.setServerErrors(save.fields);
-    }
-  };
-  return (
-    <>
-      <Field label="Grade" {...f.field("code")}><TextField {...f.field("code")} placeholder="G7" onChange={(v) => f.set("code", v.toUpperCase())} /></Field>
-      <Field label="Band" {...f.field("band")}><TextField {...f.field("band")} placeholder="Principal" /></Field>
-      <Field label="Minimum" {...f.field("minimum")}><MoneyField {...f.field("minimum")} /></Field>
-      <Field label="Midpoint" {...f.field("midpoint")}><MoneyField {...f.field("midpoint")} /></Field>
-      <Field label="Maximum" {...f.field("maximum")}><MoneyField {...f.field("maximum")} /></Field>
-      <Field label="Applies From" {...f.field("effective_from")}><DateField {...f.field("effective_from")} min={todayIso()} /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Add Grade</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-/* ───────────── Statutory ───────────── */
-
-function StatutoryTab() {
-  const modal = useModal();
-  const s = useApi("GET /api/v1/payroll/statutory");
-  const d = s.data;
-  return (
-    <>
-      <PageHeader
-        title="Statutory"
-        sub={`Advanced payroll · ${d?.enabled ? "on" : "off by default"}`}
-        actions={!d?.enabled && <Button variant="primary" onClick={() => modal.open({ title: "Switch On Advanced Payroll", body: (close) => <Enable close={close} /> })}>Switch On</Button>}
-      />
-      {d && !d.enabled && (
-        <div className="mb-3 flex items-start gap-2.5 rounded-card bg-warning-soft p-3.5 text-warning">
-          <Icon name="alert" className="mt-0.5 flex-none" />
-          <div>
-            <h2 data-ui="title" className="text-sm font-semibold">Advanced Payroll Off</h2>
-            <p className="mt-1 text-2xs">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p>
-          </div>
-        </div>
-      )}
-      {d?.enabled && <Banner tone="ok" icon="ok">Advanced payroll is on from {d.effective_from?.split("-").reverse().join("/")}. Runs before that date are unchanged.</Banner>}
-      <DataView
-        title="Nigerian Statutory Items"
-        rows={d?.items ?? []}
-        rowKey={(r) => r.item}
-        loading={s.loading}
-        columns={[
-          { key: "i", label: "Item", render: (r) => <span className="font-semibold">{r.item}</span> },
-          { key: "k", label: "Type", render: (r) => r.kind },
-          { key: "r", label: "Rate", render: (r) => r.rate },
-          { key: "b", label: "Base", render: (r) => r.base, desktop: true },
-          { key: "s", label: "Status", render: (r) => <StatusPill s={r.status} /> },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        <DataView
-          title="Progressive BandChart"
-          right={<span className="text-2xs text-subtle-foreground">Effective dated</span>}
-          rows={d?.paye_bands ?? []}
-          rowKey={(r) => `${r.label}-${r.annual}-${r.rate}`}
-          loading={s.loading}
-          columns={[
-            { key: "l", label: "PAYE Band", render: (r) => r.label },
-            { key: "a", label: "Annual", align: "n", render: (r) => <Money value={r.annual} /> },
-            { key: "r", label: "Rate", align: "n", render: (r) => r.rate },
-          ]}
-        />
-      </Grid>
-    </>
-  );
-}
-
-function Enable({ close }: { close: () => void }) {
-  const [from, setFrom] = useState("");
-  const [tried, setTried] = useState(false);
-  const go = async () => {
-    setTried(true);
-    if (!from) return;
-    try {
-      await api.call("POST /api/v1/payroll/statutory/enable", { body: { effective_from: from } });
-      invalidate("/api/v1/payroll");
-      close();
-      toast("Advanced payroll switched on for future runs");
-    } catch (e) {
-      fail(e);
-    }
-  };
-  return (
-    <>
-      <Banner tone="warn">PAYE, pension, NHF, ITF and NSITF will apply to every run from this date. Locked runs never change.</Banner>
-      <Field label="From" state={tried && !from ? "bad" : undefined} message={tried && !from ? "Pick the first day it applies" : undefined}><DateField value={from} onChange={setFrom} min={todayIso()} /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={go}>Switch On</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-
