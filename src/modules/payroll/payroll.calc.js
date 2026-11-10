@@ -17,6 +17,9 @@
  *   totalsOf()         the payslip's totals from its lines
  *   sumTotals()        a run's totals from its payslips'
  *   payDate()          the day a month is paid: the pay day, or the month's last day when it is past
+ *   componentPay()     advanced mode: a person's pay split, each component prorated, rounded once (§6.11 rule 6)
+ *   computeStatutory() advanced mode: PAYE, pension, NHF, ITF and NSITF from the rates in force and the accountant's
+ *                      three conventions, none of them a default (§6.12)
  */
 const m = require("../../shared/money/money");
 
@@ -108,9 +111,134 @@ function instalmentShares(total, months) {
   return m.allocate(total, Array.from({ length: months }, () => 1));
 }
 
+/* ------------------------------------------------------------------ *
+ * Advanced mode (§6.11 rule 6, §6.12): the pay split and the statutory items
+ * ------------------------------------------------------------------ */
+
+/** The statutory items that become lines, in the order a payslip prints them, with their words. Relief is no line. */
+const STATUTORY_LINES = Object.freeze([
+  { item: "pension_employee", kind: "deduction", label: "Pension" },
+  { item: "nhf", kind: "deduction", label: "NHF" },
+  { item: "paye", kind: "deduction", label: "PAYE" },
+  { item: "pension_employer", kind: "employer", label: "Employer Pension" },
+  { item: "itf", kind: "employer", label: "ITF" },
+  { item: "nsitf", kind: "employer", label: "NSITF" },
+]);
+
+/** "7.5%" from a stored rate ("7.500000"). */
+function rateLabel(rate) {
+  return `${m.money(String(rate)).toFixed()}%`;
+}
+
+/**
+ * A person's pay split for the part of the month they are paid (§6.11 rule 6): each component prorated as Monthly
+ * Pay is (§6.3 rule 1) and rounded once, so a person paid the whole month is paid each component whole. Pure.
+ * @param {Array<{id: string, code: string, label: string, amount: string, pensionable: boolean}>} components
+ * @param {{workingDays: number, daysPaid: number, calendarDays: number, calendarPaid: number}} part
+ * @returns {{lines: Array<{id: string, code: string, label: string, amount: string, pensionable: boolean}>, basic: string, pensionable: string}}
+ */
+function componentPay(components, part) {
+  const lines = components.map((c) => ({ ...c, amount: proratedPay(c.amount, part) }));
+  return {
+    lines,
+    basic: m.toWire(m.sum(lines.filter((c) => c.code === "basic").map((c) => c.amount))),
+    pensionable: m.toWire(m.sum(lines.filter((c) => c.pensionable).map((c) => c.amount))),
+  };
+}
+
+/**
+ * Tax over ordered bands (§6.12): each band taxes the part of `amount` between its `band_from` and its `band_to` (no
+ * end on the last) at its rate. Unrounded.
+ * @param {string|object} amount
+ * @param {Array<{band_from: string, band_to: string|null, rate: string, position: number}>} bands
+ */
+function progressiveTax(amount, bands) {
+  const taxable = m.money(amount);
+  let tax = m.ZERO;
+  for (const b of [...bands].sort((x, y) => x.position - y.position)) {
+    const from = m.money(b.band_from);
+    if (taxable.lessThanOrEqualTo(from)) break;
+    const to = b.band_to === null || b.band_to === undefined ? taxable : m.Decimal.min(taxable, m.money(b.band_to));
+    if (to.greaterThan(from)) tax = tax.plus(m.percentOf(to.minus(from), b.rate));
+  }
+  return tax;
+}
+
+const CONVENTIONS = ["paye_basis", "pension_reduces_taxable", "nhf_reduces_taxable"];
+
+/**
+ * The statutory lines of one payslip (§6.12), pure and deterministic, with no rate in the code: every figure comes
+ * from `rates`, the rows in force on the run's last day, and the accountant's three conventions, none of which has a
+ * default (an unset one is a defect here, refused at switch-on as NO_CONVENTIONS).
+ *
+ *   pension_employee, pension_employer, nhf   rate × the base the row names, rounded once
+ *   itf, nsitf                                 rate × the month's gross, its share of the annual payroll
+ *   relief (no line)                           flat amount + rate × gross, taken off the taxable pay
+ *   paye                                       progressive over the bands, on the taxable pay: gross less the relief,
+ *                                              less employee pension and NHF when the conventions say so.
+ *                                              `annualised`: the month's figures × 12 against annual bands (and an
+ *                                              annual flat relief), the tax ÷ 12; `monthly`: against monthly bands
+ *
+ * An item with no row is not computed (§6.12 rule 3). Each line carries `base_amount`, what its rate was applied to
+ * (the month's taxable pay for PAYE), for the statutory report.
+ *
+ * @param {object} p
+ * @param {string} p.gross        the month's earnings: Monthly Pay or the split, overtime, earning adjustments
+ * @param {string} p.basic        the basic component as paid this month (the whole Monthly Pay with no split)
+ * @param {string} p.pensionable  the pensionable components as paid (the whole Monthly Pay with no split)
+ * @param {Record<string, any>} p.rates  item → `{ base, rate }`, relief `{ base, rate, flat_amount }`, paye `{ base, bands }`
+ * @param {{paye_basis: "annualised"|"monthly", pension_reduces_taxable: boolean, nhf_reduces_taxable: boolean}} p.conventions
+ * @returns {Array<{kind: string, code: string, label: string, detail: string|null, amount: string, base_amount: string}>}
+ */
+function computeStatutory({ gross, basic, pensionable, rates, conventions }) {
+  for (const c of CONVENTIONS)
+    if (!conventions || conventions[c] === null || conventions[c] === undefined)
+      throw new Error(`computeStatutory: the convention ${c} is not set`);
+  const g = m.money(gross);
+  const bases = { gross: g, annual_payroll: g, basic: m.money(basic), pensionable: m.money(pensionable) };
+  const amounts = {};
+  const out = [];
+  const line = (spec, amount, base, detail) => {
+    amounts[spec.item] = m.round(amount);
+    if (m.isZero(amounts[spec.item])) return;
+    out.push({ kind: spec.kind, code: spec.item, label: spec.label, detail, amount: m.toWire(amount), base_amount: m.toWire(base) });
+  };
+
+  // The flat-rate items first: PAYE's taxable pay reads employee pension and NHF as deducted.
+  for (const spec of STATUTORY_LINES) {
+    if (spec.item === "paye") continue;
+    const r = rates[spec.item];
+    if (!r) continue;
+    const base = bases[r.base] ?? m.ZERO;
+    line(spec, m.percentOf(base, r.rate), base, rateLabel(r.rate));
+  }
+
+  const paye = rates.paye;
+  if (paye && paye.bands && paye.bands.length) {
+    const relief = rates.relief || null;
+    const pension = conventions.pension_reduces_taxable ? amounts.pension_employee || m.ZERO : m.ZERO;
+    const nhf = conventions.nhf_reduces_taxable ? amounts.nhf || m.ZERO : m.ZERO;
+    const annual = conventions.paye_basis === "annualised";
+    const k = annual ? 12 : 1;
+    const grossK = g.times(k);
+    const reliefK = relief ? m.percentOf(grossK, relief.rate || "0").plus(m.money(relief.flat_amount || "0")) : m.ZERO;
+    const taxableK = m.Decimal.max(m.ZERO, grossK.minus(reliefK).minus(pension.times(k)).minus(nhf.times(k)));
+    const tax = progressiveTax(taxableK, paye.bands).dividedBy(k);
+    const spec = STATUTORY_LINES.find((s) => s.item === "paye");
+    line(spec, tax, taxableK.dividedBy(k), null);
+  }
+
+  const order = STATUTORY_LINES.map((s) => s.item);
+  return out.sort((a, b) => order.indexOf(a.code) - order.indexOf(b.code));
+}
+
 /**
  * The lines of one payslip, in the order the slip prints them: earnings, then deductions, then employer
  * charges, `position` counting from 1 (§4.2). A line of nothing is left off. Pure.
+ *
+ * In advanced mode (`p.statutory` given) the earnings are the person's pay split when they have one (each
+ * component a Monthly Pay line under its own label), and the statutory lines follow the earnings: employee items
+ * as deductions before the rest, employer items last, never in the net (§6.12 rule 2).
  *
  * @param {object} p
  * @param {string|null} p.gross  the monthly gross; null is No Salary Set and a payslip with no lines
@@ -122,8 +250,11 @@ function instalmentShares(total, months) {
  * @param {Array<{id: string, days: number, from: string, to: string, amount: string}>} p.unpaidSuspension
  * @param {Array<{id: string, code: "fine"|"advance", amount: string, detail: string|null}>} p.instalments
  * @param {Array<{id: string, kind: "earning"|"deduction", label: string, amount: string}>} p.adjustments
+ * @param {Array<{id: string, code: string, label: string, amount: string, pensionable: boolean}>|null} [p.components]
+ *   advanced mode: the person's pay split in force, when they have one
+ * @param {{rates: object, conventions: object}|null} [p.statutory]  advanced mode: what computeStatutory needs
  * @returns {Array<{position: number, kind: string, code: string, label: string, detail: string|null,
- *   amount: string, source_type: string|null, source_id: string|null}>}
+ *   amount: string, source_type: string|null, source_id: string|null, base_amount: string|null}>}
  */
 function buildLines(p) {
   if (p.gross === null || p.gross === undefined) return [];
@@ -139,15 +270,36 @@ function buildLines(p) {
       amount: m.toWire(amount),
       source_type: extra.source_type || null,
       source_id: extra.source_id || null,
+      base_amount: extra.base_amount || null,
     });
   };
 
-  add("monthly_pay", proratedPay(p.gross, p.part));
+  // Monthly Pay, or in advanced mode the pay split, each component under its own label.
+  const split = p.statutory && p.components && p.components.length ? componentPay(p.components, p.part) : null;
+  const monthly = proratedPay(p.gross, p.part);
+  if (split) for (const c of split.lines) add("monthly_pay", c.amount, { label: c.label, source_type: "employee_pay_component", source_id: c.id });
+  else add("monthly_pay", monthly);
   const overtime = m.sum((p.overtime || []).map((i) => i.amount));
   if (!overtime.isZero()) add("overtime", overtime, { detail: plural((p.overtime || []).length, "day", "days") });
   for (const a of p.adjustments || []) {
     if (a.kind === "earning")
       add("adjustment_earning", a.amount, { kind: "earning", label: a.label, source_type: "payroll_adjustment", source_id: a.id });
+  }
+
+  // Advanced mode: the statutory items on the month's earnings, employee items first among the deductions.
+  const employer = [];
+  if (p.statutory) {
+    const statutory = computeStatutory({
+      gross: m.toWire(m.sum(out.map((l) => l.amount))),
+      basic: split ? split.basic : monthly,
+      pensionable: split ? split.pensionable : monthly,
+      rates: p.statutory.rates,
+      conventions: p.statutory.conventions,
+    });
+    for (const s of statutory) {
+      if (s.kind === "employer") employer.push(s);
+      else add(s.code, s.amount, { kind: s.kind, label: s.label, detail: s.detail, base_amount: s.base_amount });
+    }
   }
 
   for (const k of ATTENDANCE_DEDUCTIONS) {
@@ -165,6 +317,7 @@ function buildLines(p) {
     if (a.kind === "deduction")
       add("adjustment_deduction", a.amount, { kind: "deduction", label: a.label, source_type: "payroll_adjustment", source_id: a.id });
   }
+  for (const s of employer) add(s.code, s.amount, { kind: "employer", label: s.label, detail: s.detail, base_amount: s.base_amount });
 
   const rank = { earning: 0, deduction: 1, employer: 2 };
   return out
@@ -245,6 +398,10 @@ function paidPart(workingDates, { first, last, from, to }) {
 module.exports = {
   LINES,
   ATTENDANCE_DEDUCTIONS,
+  STATUTORY_LINES,
+  componentPay,
+  progressiveTax,
+  computeStatutory,
   proratedPay,
   daysAmount,
   instalmentShares,

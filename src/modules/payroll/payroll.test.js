@@ -10,6 +10,7 @@ const lock = require("./payroll.lock");
 const run = require("./payroll.run");
 const repo = require("./payroll.repo");
 const payslips = require("../payslips/payslips.service");
+const statutoryReport = require("../statutory/statutory.report");
 const settings = require("./payroll.config.repo");
 const m = require("../../shared/money/money");
 const { applyMask } = require("../../shared/rbac/field-mask");
@@ -285,7 +286,17 @@ describe("the salary mask reaches a run (§6.13)", () => {
 describe("every write function of a run hits the guard (§6.9 rule 4)", () => {
   /** The writes the run, the lock and the payslips' mail and downloads make, by name. */
   const { emailAll, markEmailed, unmarkEmailed, emailCopy, exportAll } = payslips;
-  const functions = { ...run, applyApproval: lock.applyApproval, returnToDraft: lock.returnToDraft, emailAll, markEmailed, unmarkEmailed, emailCopy, exportAll };
+  const functions = {
+    ...run,
+    applyApproval: lock.applyApproval,
+    returnToDraft: lock.returnToDraft,
+    emailAll,
+    markEmailed,
+    unmarkEmailed,
+    emailCopy,
+    exportAll,
+    statutoryReport: statutoryReport.requestReport,
+  };
   const runWith = (status) => ({ payroll_run_id: "00000000-0000-4000-8000-000000000001", status });
   const REFUSED = {
     editable: [
@@ -319,7 +330,7 @@ describe("every write function of a run hits the guard (§6.9 rule 4)", () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  test("every function the run, the lock and the payslips' mail and downloads export is a registered write, and every registered write is exported", () => {
+  test("every function the run, the lock, the payslips' mail and downloads and the statutory report export is a registered write, and every registered write is exported", () => {
     expect(Object.keys(functions).sort()).toEqual([...lock.WRITES.keys()].sort());
   });
 

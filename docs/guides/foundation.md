@@ -1186,6 +1186,7 @@ screen.
 
 ## 14 · Change log
 
+- 10/11/2026 · JP · `shared/db/effective-dated` gains `replace` (a change for a day that already has a version joins it, updated in place, rather than being refused) and `addVersionSet` (a version made of several rows that start and end together: a PAYE table, a person's pay split), for M6 PR 5's Configurations (`docs/guides/payroll.md` §4.2, §13.2 item 26). The employee record gains the four tax and pension numbers the `employee.statutory` mask already named, written through the organisation service. Nothing else changes for an existing caller.
 - 07/11/2026 · LA · Map Values on the import engine (§5, §10.1; M7 PR 4, `partnerships.md` §6.13): the step,
   `GET` and `PUT /imports/:id/values`, the choices kept on the batch's mapping and its profile, a
   reference's `missing: "leave"`, a write's `notes`, and `ImportStats.notes` (what an importer reading a

@@ -362,9 +362,11 @@ const ENTITY_ROUTES = Object.freeze({
   },
   // A person told that a fine is scheduled or waived, or an advance recorded, reads it on their own payslips.
   deduction: { ...screen("payroll", "deductions"), self: screen("ess", "my-payslips") },
-  // Grades and statutory rates are settings, not records: the retired entries open Configurations.
-  salary_structure: screen("payroll", "configurations"), // search:none not built yet (src/modules/salary_structure)
-  statutory_return: screen("payroll", "configurations"), // search:none not built yet (src/modules/statutory)
+  // Grades, pay splits, statutory rates and the payroll setting are configuration, not records: each opens
+  // Configurations, which ⌘K finds as a screen (docs/guides/payroll.md §9).
+  salary_structure: screen("payroll", "configurations"), // search:none configuration, found as the Configurations screen
+  statutory_return: screen("payroll", "configurations"), // search:none configuration, found as the Configurations screen
+  payroll_setting: screen("payroll", "configurations"), // search:none configuration, found as the Configurations screen
 
   // Partnerships
   // A partner and a lead open their 360 beside their list; a deal opens on Pipeline, which opens

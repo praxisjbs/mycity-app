@@ -1,7 +1,7 @@
 "use strict";
 /**
- * /api/v1/payroll: payroll runs (docs/guides/payroll.md §5). Simple mode; the settings and the statutory
- * routes come with PR 5, the payslips' and the deductions' own routers with PR 3 and PR 4.
+ * /api/v1/payroll: payroll runs and the payroll setting (docs/guides/payroll.md §5). The payslips', the deductions',
+ * the statutory rates' and the salary structure's own routers are in their modules.
  *
  *   GET    /runs, /runs/summary         `payroll` view: Run History, and the run to show first with the
  *                                       runs by status and the last twelve months' net
@@ -19,6 +19,10 @@
  *   POST   /runs/:id/email-payslips     `payroll` edit: Email All Payslips, an approved or paid run (202, the worker mails)
  *   POST   /runs/:id/payslips-export    `payroll` export: Download All, one PDF of the run's payslips (202, the file the
  *                                       screen waits on)
+ *   POST   /runs/:id/statutory-report   `payroll` export: Statutory Report of an approved or paid advanced run (202)
+ *   GET    /settings                    `payroll` view: the setting today, the version in force and the next one
+ *   PATCH  /settings                    `payroll` edit and `payroll.configure`: a new version from today or later (the
+ *                                       pay day, Bank Details Required, Switch On or Off, the conventions)
  *
  * Email All and Download All are written in payslips.service (the `published` guard); their routes sit here because they
  * are the run's buttons. A run is approved, sent back or rejected in its approval (/workflow/instances/:id/approve, request-changes,
@@ -28,7 +32,7 @@
 const express = require("express");
 const c = require("@mycity/contract");
 const { route } = require("../../http/route");
-const { requirePermission } = require("../../middleware/rbac");
+const { requirePermission, requireCapability } = require("../../middleware/rbac");
 const controller = require("./payroll.controller");
 
 const router = express.Router();
@@ -82,5 +86,14 @@ route(router, "post", "/runs/:id/email-payslips", { ...byId, body: p.PayslipEmai
 
 route(router, "post", "/runs/:id/payslips-export", { ...byId, body: c.common.EmptyBody, response: c.documents.ExportFile, summary: "Download every payslip of an approved run as one PDF" },
   requirePermission("payroll", "export"), controller.payslipsExport);
+
+route(router, "post", "/runs/:id/statutory-report", { ...byId, body: c.common.EmptyBody, response: c.documents.ExportFile, summary: "The statutory report of an approved advanced run" },
+  requirePermission("payroll", "export"), controller.statutoryReport);
+
+route(router, "get", "/settings", { response: p.PayrollSettings, summary: "The payroll setting: pay day, bank rule, the advanced option" },
+  requirePermission("payroll", "view"), controller.settings);
+
+route(router, "patch", "/settings", { body: p.PayrollSettingsChange, response: p.PayrollSettings, summary: "Change the payroll setting from a date" },
+  requirePermission("payroll", "edit"), requireCapability("payroll.configure"), controller.changeSettings);
 
 module.exports = { basePath: "/payroll", surface: "staff", router };

@@ -1,11 +1,27 @@
-import type { ApprovalInstance, DeductionRow, DeductionSummary, PayrollRun, PayrollRunSummary } from "@mycity/contract/contract.gen.ts";
-import type { Grade, Statutory } from "@/api/types/payroll";
-import type { Status } from "@/api/types/performance";
+import type {
+  ApprovalInstance,
+  DeductionRow,
+  DeductionSummary,
+  GradePlacement,
+  PayComponentSet,
+  PayrollRun,
+  PayrollRunSummary,
+  PayrollSettings,
+  PayrollSettingsChange,
+  PayrollSettingsVersion,
+  SalaryGrade,
+  StatutoryItemState,
+  StatutoryRate,
+} from "@mycity/contract/contract.gen.ts";
+import payrollSchemas from "@mycity/contract/schemas/payroll.js";
+import salarySchemas from "@mycity/contract/schemas/salary_structure.js";
+import statutorySchemas from "@mycity/contract/schemas/statutory.js";
+import { todayIso } from "@mycity/ui";
+import type { RawResponse } from "../../client";
 import { created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
-import { byId, byKey, PEOPLE, refKey, SIGN_INS } from "../data/people";
+import { byId, byKey, PEOPLE, ref, refKey, SIGN_INS } from "../data/people";
 import { kobo, money, SLIPS } from "../data/payroll";
 
-const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const canRun = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
 const isCeo = (u: string) => SIGN_INS[u]?.view === "ceo";
 const thisPeriod = () => new Date().toISOString().slice(0, 7);
@@ -197,43 +213,6 @@ export function payrollRunInstance(user: string, wid: string): ApprovalInstance 
   } as ApprovalInstance;
 }
 
-const GRADES: Grade[] = [
-  ["G1", "Associate", 150000, 180000, 220000], ["G2", "Officer", 200000, 250000, 300000], ["G3", "Senior", 360000, 440000, 520000],
-  ["G4", "Lead", 460000, 540000, 640000], ["G5", "Head", 520000, 640000, 760000], ["G6", "Executive", 1200000, 1500000, 1800000],
-].map((g) => {
-  const code = g[0] as string;
-  return { grade_id: sid(`grade:${code}`), code, band: g[1] as string, minimum: money(kobo(String(g[2]))), midpoint: money(kobo(String(g[3]))), maximum: money(kobo(String(g[4]))), staff: PEOPLE.filter((p) => p.grade.startsWith(code)).length };
-});
-route("GET /api/v1/payroll/grades/summary", () => {
-  let below = 0, above = 0;
-  PEOPLE.forEach((p) => {
-    const g = GRADES.find((x) => p.grade.startsWith(x.code));
-    if (!g) return;
-    const pay = Number(p.gross_monthly);
-    if (pay < Number(g.minimum)) below++;
-    if (pay > Number(g.maximum)) above++;
-  });
-  return ok({ grades: GRADES.length, placed: PEOPLE.length, below_minimum: below, above_maximum: above, scale_max: GRADES.reduce((m, g) => (Number(g.maximum) > Number(m) ? g.maximum : m), "0.00") });
-});
-route("GET /api/v1/payroll/grades", (req) => paged(GRADES, req, { search: (g) => [g.code, g.band] }));
-route("POST /api/v1/payroll/grades", (req) => {
-  const b = req.body as Record<string, string>;
-  const f: Record<string, string[]> = {};
-  if (!/^G\d{1,2}$/.test(b.code ?? "")) f.code = ["Like G7"];
-  else if (GRADES.some((g) => g.code === b.code)) f.code = ["That grade exists"];
-  if (!b.band?.trim()) f.band = ["Name the band"];
-  const [mn, md, mx] = [Number(b.minimum), Number(b.midpoint), Number(b.maximum)];
-  if (!(mn > 0)) f.minimum = ["Enter the minimum"];
-  if (!(md > mn)) f.midpoint = ["Above the minimum"];
-  if (!(mx > md)) f.maximum = ["Above the midpoint"];
-  if (!b.effective_from) f.effective_from = ["Pick the date it applies from"];
-  else if (b.effective_from < isoDaysAgo(0)) f.effective_from = ["A band applies from a date, never backwards"];
-  if (Object.keys(f).length) return invalid(f);
-  const g: Grade = { grade_id: sid(`grade:${b.code}`), code: b.code, band: b.band.trim(), minimum: b.minimum, midpoint: b.midpoint, maximum: b.maximum, staff: 0 };
-  GRADES.push(g);
-  return created(g);
-});
-
 /*
  * Deductions in the contract's shapes (packages/contract/schemas/deductions.js): waiting attendance deductions,
  * fines and advances as one list, and the moves the screen makes, down to the API's own refusals: the open
@@ -406,18 +385,322 @@ route("POST /api/v1/deductions/:id/cancel", (req) => {
   return ok({ ...d, can_cancel: false });
 });
 
-const STAT: Statutory = {
-  enabled: false, effective_from: null,
-  items: [["PAYE", "Employee", "Progressive bands", "Gross less relief, pension and NHF"], ["Pension, employee", "Employee", "8%", "Basic, housing, transport"], ["Pension, employer", "Employer", "10%", "Basic, housing, transport"], ["NHF", "Employee", "2.5%", "Basic"], ["ITF", "Employer", "1%", "Annual payroll"], ["NSITF", "Employer", "1%", "Annual payroll"]].map(([item, kind, rate, base]) => ({ item, kind: kind as "Employee", rate, base, status: S("neutral", "Configured, off") })),
-  paye_bands: [["First", "300000.00", "7%"], ["Next", "300000.00", "11%"], ["Next", "500000.00", "15%"], ["Next", "500000.00", "19%"], ["Next", "1600000.00", "21%"], ["Above", "3200000.00", "24%"]].map(([label, annual, rate]) => ({ label, annual, rate })),
-};
-route("GET /api/v1/payroll/statutory", () => ok(STAT));
-route("POST /api/v1/payroll/statutory/enable", (req) => {
-  if (!isCeo(req.user!)) return fail(403, "FORBIDDEN", "Switching statutory payroll on is the CEO's decision.");
-  const from = String(req.body.effective_from ?? "");
-  if (!from || from < isoDaysAgo(0)) return invalid({ effective_from: ["From a future date. A locked run never changes"] });
-  STAT.enabled = true;
-  STAT.effective_from = from;
-  STAT.items = STAT.items.map((i) => ({ ...i, status: S("ok", "On") }));
-  return ok(STAT);
+/*
+ * Configurations in the contract's shapes (packages/contract/schemas/payroll.js, statutory.js, salary_structure.js):
+ * the setting, the statutory rates, grades, placements and pay splits. It starts as production does, with nothing
+ * entered: simple mode, the pay day the default 30, no rate, no band and no grade (A26; docs/guides/payroll.md §6.11).
+ * Each change is a version from today or later, checked by the contract's own schema and refused as the API refuses it.
+ */
+type Version = { effective_from: string; effective_to: string | null };
+type GradeRow = Version & { salary_grade_id: string; code: string; name: string; minimum: string; maximum: string; created_at: string };
+type PlaceRow = Version & { employee_id: string; salary_grade_id: string };
+type SplitRow = Version & { employee_id: string; code: string; label: string; amount: string; pensionable: boolean };
+interface Issue {
+  path: PropertyKey[];
+  message: string;
+}
+interface Checker<T> {
+  safeParse(v: unknown): { success: true; data: T } | { success: false; error: { issues: Issue[] } };
+}
+
+const SETTINGS: PayrollSettingsVersion[] = [];
+const RATES: StatutoryRate[] = [];
+const GRADE_ROWS: GradeRow[] = [];
+const PLACES: PlaceRow[] = [];
+const SPLITS: SplitRow[] = [];
+
+const inForce = (r: Version, day: string) => r.effective_from <= day && (r.effective_to === null || r.effective_to > day);
+const fromToday = (r: Version, day: string) => r.effective_to === null || r.effective_to > day;
+const configures = (u: string) => canRun(u);
+const notConfigurer = () => fail(403, "CAPABILITY_REQUIRED", "You do not have permission to do that.");
+const forbiddenRead = () => fail(403, "FORBIDDEN", "You do not have permission to see this.");
+const tooEarly = () => fail(422, "EFFECTIVE_IN_THE_PAST", "A change starts today or later", { effective_from: ["Date too early"] });
+const advancedOff = () => fail(409, "ADVANCED_OFF", "Switch on Advanced Payroll first");
+const hasBeenOn = () => SETTINGS.some((v) => v.advanced_enabled);
+const operatorName = (u: string) => byKey(u)?.display_name ?? null;
+
+/** The body through the contract's schema: the parsed value, or the 422 the API sends. */
+function checked<T>(schema: unknown, body: unknown, then: (data: T) => RawResponse): RawResponse {
+  const r = (schema as Checker<T>).safeParse(body);
+  if (r.success) return then(r.data);
+  const fields: Record<string, string[]> = {};
+  for (const i of r.error.issues) fields[i.path.map(String).join(".") || "body"] ??= [i.message];
+  return invalid(fields);
+}
+
+/**
+ * A new version of a key from `from`: refused when one starts later, the same day's replaced, the open one ended the
+ * day before (shared/db/effective-dated, with `replace`).
+ */
+function addVersion<T extends Version>(list: T[], mine: (r: T) => boolean, from: string, rows: T[]): RawResponse | null {
+  if (list.some((r) => mine(r) && r.effective_from > from))
+    return fail(409, "VERSION_EXISTS", "A version already starts on or after this date. Change that version instead.", {
+      effective_from: ["a version already starts on or after this date"],
+    });
+  for (let i = list.length - 1; i >= 0; i -= 1) if (mine(list[i]) && list[i].effective_from === from) list.splice(i, 1);
+  for (const r of list) if (mine(r) && r.effective_to === null && r.effective_from < from) r.effective_to = from;
+  list.push(...rows);
+  return null;
+}
+
+/* The setting */
+
+function settingsView(): PayrollSettings {
+  const day = todayIso();
+  const current = SETTINGS.find((v) => inForce(v, day)) ?? null;
+  const next = [...SETTINGS].filter((v) => v.effective_from > day).sort((a, b) => a.effective_from.localeCompare(b.effective_from))[0] ?? null;
+  return {
+    advanced_enabled: current?.advanced_enabled ?? false,
+    advanced_has_been_on: hasBeenOn(),
+    pay_day: current?.pay_day ?? 30,
+    pay_day_is_default: !current?.pay_day,
+    require_bank_details: current?.require_bank_details ?? false,
+    paye_basis: current?.paye_basis ?? null,
+    pension_reduces_taxable: current?.pension_reduces_taxable ?? null,
+    nhf_reduces_taxable: current?.nhf_reduces_taxable ?? null,
+    current,
+    next,
+  };
+}
+
+route("GET /api/v1/payroll/settings", (req) => (canRun(req.user!) ? ok(settingsView()) : forbiddenRead()));
+
+const CONVENTION_KEYS = ["paye_basis", "pension_reduces_taxable", "nhf_reduces_taxable"] as const;
+
+route("PATCH /api/v1/payroll/settings", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  return checked<PayrollSettingsChange>(payrollSchemas.PayrollSettingsChange, req.body, (b) => {
+    if (b.effective_from < todayIso()) return tooEarly();
+    const latest = [...SETTINGS].sort((a, c) => c.effective_from.localeCompare(a.effective_from))[0] ?? null;
+    const merged = {
+      advanced_enabled: b.advanced_enabled ?? latest?.advanced_enabled ?? false,
+      pay_day: b.pay_day ?? latest?.pay_day ?? null,
+      require_bank_details: b.require_bank_details ?? latest?.require_bank_details ?? false,
+      paye_basis: b.paye_basis ?? latest?.paye_basis ?? null,
+      pension_reduces_taxable: b.pension_reduces_taxable ?? latest?.pension_reduces_taxable ?? null,
+      nhf_reduces_taxable: b.nhf_reduces_taxable ?? latest?.nhf_reduces_taxable ?? null,
+    };
+    const conventionsSent = CONVENTION_KEYS.some((k) => b[k] !== undefined);
+    if (conventionsSent && b.advanced_enabled !== true && !hasBeenOn()) return fail(409, "ADVANCED_OFF", "Conventions are set when Advanced Payroll is switched on");
+    if (b.advanced_enabled === true && latest?.advanced_enabled !== true) {
+      if (!RATES.some((r) => inForce(r, b.effective_from))) return fail(409, "NO_RATES", "Enter a statutory rate in force from this date first", { effective_from: ["No rate that day"] });
+      const unset = CONVENTION_KEYS.filter((k) => merged[k] === null);
+      if (unset.length) return fail(409, "NO_CONVENTIONS", "Set the three conventions to switch on", Object.fromEntries(unset.map((k) => [k, ["Pick one"]])));
+    }
+    const row: PayrollSettingsVersion = {
+      payroll_setting_id: sid(`setting:${b.effective_from}`),
+      ...merged,
+      effective_from: b.effective_from,
+      effective_to: null,
+      reason: b.reason ?? null,
+      changed_by_name: operatorName(req.user!),
+    };
+    return addVersion(SETTINGS, () => true, b.effective_from, [row]) ?? ok(settingsView());
+  });
+});
+
+/* Statutory rates */
+
+const ITEMS: StatutoryRate["item"][] = ["paye", "pension_employee", "pension_employer", "nhf", "itf", "nsitf", "relief"];
+const ORDER: StatutoryRate["item"][] = ["paye", "pension_employee", "pension_employer", "nhf", "relief", "itf", "nsitf"];
+const byItem = (a: StatutoryRate, b: StatutoryRate) =>
+  ORDER.indexOf(a.item) - ORDER.indexOf(b.item) || a.effective_from.localeCompare(b.effective_from) || (a.position ?? 0) - (b.position ?? 0);
+
+function brief(item: StatutoryRate["item"], rows: StatutoryRate[]): StatutoryItemState["current"] {
+  const mine = rows.filter((r) => r.item === item);
+  if (!mine.length) return null;
+  const r = mine[0];
+  return { rate: item === "paye" ? null : r.rate, flat_amount: item === "relief" ? r.flat_amount : null, base: r.base, bands: item === "paye" ? mine.length : null, effective_from: r.effective_from };
+}
+
+route("GET /api/v1/statutory/items", (req) => {
+  if (!canRun(req.user!)) return forbiddenRead();
+  const day = todayIso();
+  const items: StatutoryItemState[] = ITEMS.map((item) => {
+    const later = RATES.filter((r) => r.item === item && r.effective_from > day).sort(byItem);
+    const first = later[0]?.effective_from;
+    return {
+      item,
+      kind: statutorySchemas.ITEM_KIND[item] as StatutoryItemState["kind"],
+      bases: [...statutorySchemas.ITEM_BASES[item]] as StatutoryItemState["bases"],
+      current: brief(item, RATES.filter((r) => inForce(r, day)).sort(byItem)),
+      next: brief(item, later.filter((r) => r.effective_from === first)),
+    };
+  });
+  return ok({ items });
+});
+
+route("GET /api/v1/statutory/rates", (req) => {
+  if (!canRun(req.user!)) return forbiddenRead();
+  const day = todayIso();
+  return paged(
+    RATES.filter((r) => (req.query.as_of ? inForce(r, req.query.as_of) : fromToday(r, day))),
+    { ...req, query: Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "as_of")) },
+    { filters: { item: (r, v) => r.item === v }, sort: { item: byItem, effective_from: (a, b) => a.effective_from.localeCompare(b.effective_from) } },
+  );
+});
+
+type RatesSave = { item: StatutoryRate["item"]; effective_from: string; base?: StatutoryRate["base"]; rate?: string; flat_amount?: string; bands?: Array<{ band_from: string; band_to: string | null; rate: string }> };
+
+route("POST /api/v1/statutory/rates", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  return checked<RatesSave>(statutorySchemas.StatutoryRatesSave, req.body, (b) => {
+    if (b.effective_from < todayIso()) return tooEarly();
+    const kind = statutorySchemas.ITEM_KIND[b.item] as StatutoryRate["kind"];
+    const base = (b.base ?? statutorySchemas.ITEM_BASES[b.item][0]) as StatutoryRate["base"];
+    const common = { item: b.item, kind, base, effective_from: b.effective_from, effective_to: null, created_by_name: operatorName(req.user!), created_at: now() };
+    const rows: StatutoryRate[] =
+      b.item === "paye"
+        ? (b.bands ?? []).map((band, i) => ({ ...common, statutory_rate_id: sid(`rate:paye:${b.effective_from}:${i}`), rate: band.rate, band_from: band.band_from, band_to: band.band_to, flat_amount: null, position: i + 1 }))
+        : [{ ...common, statutory_rate_id: sid(`rate:${b.item}:${b.effective_from}`), rate: b.rate ?? "0", band_from: null, band_to: null, flat_amount: b.item === "relief" ? (b.flat_amount ?? "0.00") : null, position: null }];
+    const refused = addVersion(RATES, (r) => r.item === b.item, b.effective_from, rows);
+    if (refused) return refused;
+    return created({ data: rows, page: { number: 1, size: __CONTRACT_PAGE_SIZE__, total: rows.length, pages: 1, has_next: false } });
+  });
+});
+
+/* Salary structure */
+
+const gradeOf = (id: string) => GRADE_ROWS.find((g) => g.salary_grade_id === id);
+const bandOn = (code: string, day: string) => GRADE_ROWS.find((g) => g.code === code && inForce(g, day)) ?? null;
+
+function placementOf(p: (typeof PEOPLE)[number], day: string): GradePlacement {
+  const placed = PLACES.find((x) => x.employee_id === p.employee_id && inForce(x, day)) ?? null;
+  const band = placed ? bandOn(gradeOf(placed.salary_grade_id)?.code ?? "", day) : null;
+  const gross = Number(p.gross_monthly);
+  const position: GradePlacement["band_position"] = !band ? null : gross < Number(band.minimum) ? "below" : gross > Number(band.maximum) ? "above" : "within";
+  return {
+    employee: ref(p)!,
+    gross_pay: p.gross_monthly,
+    salary_grade_id: band?.salary_grade_id ?? null,
+    grade_code: band?.code ?? null,
+    grade_name: band?.name ?? null,
+    band_position: position,
+    effective_from: placed?.effective_from ?? null,
+    has_pay_split: SPLITS.some((s) => s.employee_id === p.employee_id && inForce(s, day)),
+  };
+}
+
+function gradeView(g: GradeRow, day: string): SalaryGrade {
+  const placed = PEOPLE.map((p) => placementOf(p, day)).filter((x) => x.grade_code === g.code);
+  return {
+    salary_grade_id: g.salary_grade_id,
+    code: g.code,
+    name: g.name,
+    band_minimum: g.minimum,
+    band_maximum: g.maximum,
+    effective_from: g.effective_from,
+    effective_to: g.effective_to,
+    staff: placed.length,
+    below_minimum: placed.filter((x) => x.band_position === "below").length,
+    above_maximum: placed.filter((x) => x.band_position === "above").length,
+    created_at: g.created_at,
+  };
+}
+
+const structureGuard = (u: string) => (!canRun(u) ? forbiddenRead() : !hasBeenOn() ? advancedOff() : null);
+
+route("GET /api/v1/salary-structure/grades", (req) => {
+  const refused = structureGuard(req.user!);
+  if (refused) return refused;
+  const day = todayIso();
+  return paged(
+    GRADE_ROWS.filter((g) => (req.query.as_of ? inForce(g, req.query.as_of) : fromToday(g, day))).map((g) => gradeView(g, day)),
+    { ...req, query: Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "as_of")) },
+    {
+      sort: {
+        minimum: (a, b) => kobo(a.band_minimum ?? "0") - kobo(b.band_minimum ?? "0"),
+        code: (a, b) => a.code.localeCompare(b.code),
+        name: (a, b) => a.name.localeCompare(b.name),
+      },
+    },
+  );
+});
+
+type GradeSave = { code: string; name: string; minimum: string; maximum: string; effective_from: string };
+
+route("POST /api/v1/salary-structure/grades", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  if (!hasBeenOn()) return advancedOff();
+  return checked<GradeSave>(salarySchemas.SalaryGradeSave, req.body, (b) => {
+    if (b.effective_from < todayIso()) return tooEarly();
+    const row: GradeRow = { salary_grade_id: sid(`grade:${b.code}:${b.effective_from}`), code: b.code, name: b.name, minimum: b.minimum, maximum: b.maximum, effective_from: b.effective_from, effective_to: null, created_at: now() };
+    return addVersion(GRADE_ROWS, (g) => g.code === b.code, b.effective_from, [row]) ?? created(gradeView(row, todayIso()));
+  });
+});
+
+route("GET /api/v1/salary-structure/placements", (req) => {
+  const refused = structureGuard(req.user!);
+  if (refused) return refused;
+  const day = todayIso();
+  return paged(
+    PEOPLE.map((p) => placementOf(p, day)),
+    req,
+    {
+      search: (x) => [x.employee.display_name],
+      filters: {
+        salary_grade_id: (x, v) => x.grade_code !== null && x.grade_code === (gradeOf(v)?.code ?? ""),
+        band_position: (x, v) => (v === "unplaced" ? x.grade_code === null : x.band_position === v),
+      },
+      sort: {
+        employee: (a, b) => a.employee.display_name.localeCompare(b.employee.display_name),
+        grade: (a, b) => (a.grade_code ?? "~").localeCompare(b.grade_code ?? "~"),
+      },
+    },
+  );
+});
+
+route("PUT /api/v1/salary-structure/placements/:employee_id", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  if (!hasBeenOn()) return advancedOff();
+  const p = byId(req.params.employee_id);
+  if (!p) return notFound();
+  return checked<{ salary_grade_id: string; effective_from: string }>(salarySchemas.GradePlacementSave, req.body, (b) => {
+    if (b.effective_from < todayIso()) return tooEarly();
+    const grade = gradeOf(b.salary_grade_id);
+    if (!grade) return invalid({ salary_grade_id: ["No such grade"] });
+    const band = bandOn(grade.code, b.effective_from);
+    if (!band) return fail(422, "GRADE_NOT_IN_FORCE", "That grade has no band on this date", { salary_grade_id: ["No band that day"] });
+    const row: PlaceRow = { employee_id: p.employee_id, salary_grade_id: band.salary_grade_id, effective_from: b.effective_from, effective_to: null };
+    return addVersion(PLACES, (x) => x.employee_id === p.employee_id, b.effective_from, [row]) ?? ok(placementOf(p, todayIso()));
+  });
+});
+
+function splitView(p: (typeof PEOPLE)[number]): PayComponentSet {
+  const day = todayIso();
+  const of = (rows: SplitRow[]) =>
+    rows.length
+      ? { effective_from: rows[0].effective_from, effective_to: rows[0].effective_to, components: rows.map((r) => ({ code: r.code, label: r.label, pay_amount: r.amount, pensionable: r.pensionable, effective_from: r.effective_from, effective_to: r.effective_to })) }
+      : null;
+  const mine = SPLITS.filter((s) => s.employee_id === p.employee_id);
+  const later = mine.filter((s) => s.effective_from > day).sort((a, b) => a.effective_from.localeCompare(b.effective_from));
+  return {
+    employee: ref(p)!,
+    gross_pay: p.gross_monthly,
+    current: of(mine.filter((s) => inForce(s, day))),
+    next: of(later.filter((s) => s.effective_from === later[0]?.effective_from)),
+  };
+}
+
+route("GET /api/v1/salary-structure/employees/:employee_id/components", (req) => {
+  const refused = structureGuard(req.user!);
+  if (refused) return refused;
+  const p = byId(req.params.employee_id);
+  return p ? ok(splitView(p)) : notFound();
+});
+
+type SplitSave = { effective_from: string; components: Array<{ code: string; label: string; amount: string; pensionable: boolean }> };
+
+route("PUT /api/v1/salary-structure/employees/:employee_id/components", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  if (!hasBeenOn()) return advancedOff();
+  const p = byId(req.params.employee_id);
+  if (!p) return notFound();
+  return checked<SplitSave>(salarySchemas.PayComponentsSave, req.body, (b) => {
+    if (b.effective_from < todayIso()) return tooEarly();
+    if (b.components.reduce((a, c) => a + kobo(c.amount), 0) !== kobo(p.gross_monthly))
+      return fail(422, "SPLIT_NOT_GROSS", "The components must add up to the monthly gross", { components: ["Must equal the gross"] });
+    const rows: SplitRow[] = b.components.map((c) => ({ employee_id: p.employee_id, ...c, effective_from: b.effective_from, effective_to: null }));
+    return addVersion(SPLITS, (s) => s.employee_id === p.employee_id, b.effective_from, rows) ?? ok(splitView(p));
+  });
 });

@@ -387,7 +387,9 @@ describeDb("payslips from an approved run to the person", () => {
     expect((await as("staff").get(`/documents/${stranger}/content`)).status).toBe(200);
 
     expect(s.PayslipDetail.parse((await as("staff").get(`/ess/payslips/${ids.musaPayslip}`)).body).pdf_ready).toBe(true);
-  });
+    // The first test to start Chromium, rendering five real PDFs: on a busy CI shard its cold launch alone has taken
+    // half a minute, so it is allowed what the file's other heavy tests are; on a laptop it takes seconds.
+  }, 180_000);
 
   test("a payslip's lines equal the run's, and the person reads only their own", async () => {
     const slips = (await q("SELECT payslip_id, employee_id, earnings_total::text AS e, deductions_total::text AS d, net_pay::text AS n FROM payslip WHERE payroll_run_id = $1 AND status = 'published'", [run])).rows;

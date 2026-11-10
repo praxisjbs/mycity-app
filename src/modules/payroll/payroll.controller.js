@@ -12,6 +12,7 @@ const { sendPaged } = require("../../shared/http/paged");
 const { maskForUser } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
 const payslips = require("../payslips/payslips.service");
+const statutory = require("../statutory/statutory.service");
 const service = require("./payroll.service");
 
 const id = (req) => req.validated.params.id;
@@ -54,6 +55,15 @@ module.exports = {
     await payslips.assertMayPrint(req.user, null);
     return accepted(res, await payslips.requestRunExport(withActor(req), id(req)));
   },
+
+  statutoryReport: async (req, res) => {
+    await statutory.assertMayReadReport(req.user);
+    return accepted(res, await statutory.requestReport(withActor(req), id(req)));
+  },
+
+  settings: async (req, res) => ok(res, await service.getSettings()),
+
+  changeSettings: async (req, res) => ok(res, await service.changeSettings(withActor(req), body(req))),
 
   discard: async (req, res) => {
     await service.discardRun(withActor(req), id(req));

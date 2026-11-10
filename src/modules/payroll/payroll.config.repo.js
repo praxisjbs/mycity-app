@@ -15,6 +15,7 @@
  * that month, whenever it is computed (§6.11 rule 2).
  */
 const effective = require("../../shared/db/effective-dated");
+const { AppError } = require("../../shared/errors");
 const lagos = require("../../shared/time/lagos");
 
 /** The pay day when MyCity has set none (§13.1 item 24): shown on Configurations as "30 (default)". */
@@ -91,4 +92,88 @@ async function nextPayDate(db, today, isPaid) {
   return null;
 }
 
-module.exports = { DEFAULT_PAY_DAY, DEFAULTS, settingOn, payDayOf, payDateOf, payDateFor, nextPayDate };
+/* ------------------------------------------------------------------ *
+ * Configurations (PR 5): the setting's versions, and the rule every configuration change keeps
+ * ------------------------------------------------------------------ */
+
+/** The three conventions of §6.12 rule 1: the accountant's choices, none with a default. */
+const CONVENTIONS = Object.freeze(["paye_basis", "pension_reduces_taxable", "nhf_reduces_taxable"]);
+
+/**
+ * A configuration change starts today or later in Lagos, never earlier (§6.11 rule 3): the setting, a statutory rate,
+ * a grade, a placement, a pay split. A locked run never changes, and a month already computed keeps its snapshot.
+ * @param {string} date  the change's first day
+ */
+function assertNotPast(date) {
+  if (date < lagos.today())
+    throw new AppError("EFFECTIVE_IN_THE_PAST", "A change starts today or later", 422, { effective_from: ["Date too early"] });
+}
+
+/** A version with who made it and why, as Configurations shows it. */
+const VERSION = `s.payroll_setting_id, s.advanced_enabled, s.pay_day, s.require_bank_details, s.paye_basis,
+  s.pension_reduces_taxable, s.nhf_reduces_taxable, s.effective_from::text AS effective_from,
+  s.effective_to::text AS effective_to, s.reason,
+  CASE WHEN e.employee_id IS NULL THEN NULL ELSE btrim(e.first_name || ' ' || e.last_name) END AS changed_by_name`;
+const VERSION_JOINS = `LEFT JOIN app_user u ON u.user_id = s.changed_by LEFT JOIN employee e ON e.employee_id = u.employee_id`;
+
+const one = async (db, sql, params) => {
+  const { rows } = await db.query(sql, params);
+  return rows[0] ? { ...rows[0], pay_day: rows[0].pay_day === null ? null : Number(rows[0].pay_day) } : null;
+};
+
+/** The version in force on a day with its names, or null. */
+function versionAt(db, date) {
+  return one(db, `SELECT ${VERSION} FROM payroll_setting s ${VERSION_JOINS} WHERE ${effective.asOf("s", 1)}`, [date]);
+}
+
+/** The first version that starts after a day, or null: Configurations' `next`. */
+function versionAfter(db, date) {
+  return one(
+    db,
+    `SELECT ${VERSION} FROM payroll_setting s ${VERSION_JOINS} WHERE s.effective_from > $1::date ORDER BY s.effective_from LIMIT 1`,
+    [date],
+  );
+}
+
+/** The latest version, every version locked for the rest of the transaction: a change merges onto it. */
+async function lockLatest(client) {
+  await client.query(`SELECT 1 FROM payroll_setting WHERE scope = 'organisation' FOR UPDATE`);
+  return one(client, `SELECT ${VERSION} FROM payroll_setting s ${VERSION_JOINS} ORDER BY s.effective_from DESC LIMIT 1`, []);
+}
+
+/** Whether the advanced option is on in any version, now, before or from a later day (§6.11 rule 4). */
+async function hasBeenOn(db) {
+  const { rows } = await db.query(`SELECT EXISTS (SELECT 1 FROM payroll_setting WHERE advanced_enabled) AS has_been`);
+  return rows[0].has_been === true;
+}
+
+/** The columns a version of the setting may write. */
+const WRITABLE = [...CONVENTIONS, "advanced_enabled", "pay_day", "require_bank_details", "changed_by", "reason"];
+
+/**
+ * A new version of the setting from a day, or the change joined onto that day's version (shared/db/effective-dated
+ * `replace`). The service has merged the values and kept the rules.
+ * @param {import("pg").PoolClient} client
+ * @param {string} from
+ * @param {object} data  every column of WRITABLE
+ */
+function writeVersion(client, from, data) {
+  return effective.addVersion(client, { table: "payroll_setting", key: { scope: "organisation" }, from, data, writable: WRITABLE, replace: true });
+}
+
+module.exports = {
+  DEFAULT_PAY_DAY,
+  DEFAULTS,
+  CONVENTIONS,
+  settingOn,
+  payDayOf,
+  payDateOf,
+  payDateFor,
+  nextPayDate,
+  assertNotPast,
+  versionAt,
+  versionAfter,
+  lockLatest,
+  hasBeenOn,
+  writeVersion,
+};

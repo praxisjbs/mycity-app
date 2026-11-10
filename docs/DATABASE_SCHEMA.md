@@ -473,7 +473,7 @@ left it. Every CHECK equals the contract's enums (`docs/guides/offers.md` §4).
 
 ### M6 Payroll & Notifications · 6000 to 6999 · TB
 
-**Built (PR 1, 09/11/2026), simple mode.** Notifications are M0 (`0060`), web push and each person's
+**Built (PR 1, 09/11/2026), simple mode; the advanced tables in PR 5 (10/11/2026).** Notifications are M0 (`0060`), web push and each person's
 preferences too (`0460`), and Settings · Notifications with the reminder settings (`0480`), all
 brought forward by TB on 19/10/2026. The payroll tables are designed in `docs/guides/payroll.md` §4 and built
 as that section says (08/11/2026, amended by its Change log):
@@ -482,6 +482,7 @@ as that section says (08/11/2026, amended by its Change log):
 |---|---|---|
 | `6000_payroll.sql` | `payroll_setting`, `payroll_run`, `payslip`, `payslip_line`, `payroll_adjustment` | `payroll_setting` is effective-dated (`scope` is always `organisation`; an exclusion constraint on `daterange(effective_from, effective_to)` keeps two versions from overlapping) and carries the pay day (1 to 31, null until set; the default 30 is a constant in code), Bank Details Required and the three conventions. A run is one per month (`period` unique, a month's first day). A payslip is one per person per run; an excluded one has its reason, and only an excluded one. A line's amount is never negative; its `kind` and `code` equal the contract's. Money is `numeric(18,2)` |
 | `6010_payroll_deductions.sql` | `payroll_deduction`, `payroll_deduction_instalment` | A fine accepted or an advance recorded, and one month's share of each. One live deduction a fine (a unique index leaving out the cancelled), so a released fine can be accepted again. Adds `attendance_pay_item_payroll_run_fk` (`ON DELETE SET NULL`) and its index: the key owed since `1435` |
+| `6020_payroll_advanced.sql` | `salary_grade`, `employee_salary_grade`, `employee_pay_component`, `statutory_rate`; `payslip_line.base_amount`; `employee.tax_id`, `pension_pin`, `pension_administrator`, `nhf_number` | Built in PR 5 (10/11/2026) and off by default. Each table is effective-dated: one version of a key starting on a given day and at most one open version (two unique indexes; no `btree_gist` exclusion, the extension is not provisioned), written through `shared/db/effective-dated`, which ends the open version the day before the next. A statutory row's kind is held to its item and only a PAYE row is a band (`position`, `band_from`); `rate numeric(9,6)` is a percent, 0 to 100. A placement names any version of its grade and is read against the grade's band in force that day. `base_amount` is what a statutory line's rate was applied to, for the report. The four employee columns are masked as `employee.statutory`, written by the organisation service. No rate, band, relief or grade in any seed |
 | `6030_leave_unpaid.sql` | `leave_type.unpaid` | `boolean NOT NULL DEFAULT false` |
 | `seeds/reference/6099_seed_payroll.sql` | Reference data only (A26) | The `payroll.run` approval (version 1, the CEO, 72 hours, context `{ net_total: "money" }`), the `payroll.configure` capability held by Operations & People and the Implementation Team, and the Unpaid leave type flagged unpaid. No setting row, rate, band, grade, run or pay day |
 
@@ -489,10 +490,9 @@ Every table has its own `<table>_set_updated_at` trigger, an index on every fore
 on each; `tests/integration/payroll-schema.test.js` checks that, the constraints, the numbers (`PAY-2026-10`,
 `PAY-2026-10-0001`) and the files undone and applied again.
 
-**Owes** (PR 5): `6020_payroll_advanced.sql` (`salary_grade`, `employee_salary_grade`,
-`employee_pay_component`, `statutory_rate`, and the employee tax and pension numbers the statutory mask
-already names), off by default and with no rate, band or grade in any seed. The earlier note that payroll was
-"deliberately not modelled" was not a decision and is withdrawn.
+**Owes:** nothing in the schema; the staging seed is PR 8 (`seeds/staging/`, through the services). The earlier note
+that payroll was "deliberately not modelled" was not a decision and is withdrawn. `tests/integration/payroll-advanced.test.js`
+runs the advanced tables on the real migrations with labelled test rates.
 
 **Read by Home** (home.md §4.1): `payroll_run` (`payroll_run_id`, `number`, `period`, `status`, `headcount`,
 `net_total`, `submitted_at`). Payroll In Progress is live since M6 PR 2: `src/modules/dashboard/sources/payroll.source.js`
@@ -719,8 +719,8 @@ Security's two-step and PIN, which M1 owed until then.
 
 ## 5 · Open decisions
 
-1. **The M6 payroll design** (pay components, statutory rates and their effective dating) waits on
-   the payroll contract and the tax-reform rules. The block is reserved and the scope stands.
+1. **The M6 payroll design** (pay components, statutory rates and their effective dating) is built (M6 PR 5,
+   10/11/2026, `6020`); the rates themselves are MyCity's to enter from current law, never seeded.
 2. **The role-to-module permission matrix.** Decided with TB on 16/10/2026: the seven roles MyCity
    runs on (from the staff list) and their grants, seeded by `0290_seed_roles_and_grants.sql`.
    Changes after go-live are made in Settings · Roles & Permissions (built in M0, 17/10/2026), not in

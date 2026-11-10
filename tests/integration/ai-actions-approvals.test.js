@@ -30,10 +30,17 @@ const { q, one, drain, fresh, script, callRead, say, harness } = require("./help
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
+/** The public holidays the reference seeds hold (0448), loaded once: a leave day is never one of them. */
+let holidays = new Set();
+
+/**
+ * Monday to Friday of the week `weeksAhead` from now, less any public holiday: a date picked from the clock can land on
+ * one (Boxing Day observed on Monday 28 December 2026), and a request for it is refused as no working day.
+ */
 function week(weeksAhead) {
   const d = new Date(Date.now() + weeksAhead * 7 * 86_400_000);
   while (d.getUTCDay() !== 1) d.setUTCDate(d.getUTCDate() + 1);
-  return Array.from({ length: 5 }, (_, i) => new Date(d.getTime() + i * 86_400_000).toISOString().slice(0, 10));
+  return Array.from({ length: 5 }, (_, i) => new Date(d.getTime() + i * 86_400_000).toISOString().slice(0, 10)).filter((day) => !holidays.has(day));
 }
 
 describeDb("Praxis AI's My Approvals card against the real migrations", () => {
@@ -64,6 +71,7 @@ describeDb("Praxis AI's My Approvals card against the real migrations", () => {
     await grantsCache.bumpTeamVersion();
     await drain();
     annual = (await h.as("one").get("/leave/types?active=true")).body.data.find((t) => t.code === "annual").leave_type_id;
+    holidays = new Set((await q("SELECT holiday_date::text AS day FROM public_holiday")).rows.map((r) => r.day));
     registry.load();
     fresh();
   }, 120_000);

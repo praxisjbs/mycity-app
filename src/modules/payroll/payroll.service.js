@@ -8,6 +8,8 @@
  *   createRun, computeRun, submitRun, discardRun,
  *   excludePerson, includePerson, addAdjustment,
  *   removeAdjustment, markPaid                         what its buttons do
+ *   getSettings, changeSettings                        Configurations' setting: the pay day, Bank Details Required,
+ *                                                      the advanced option and the accountant's three conventions
  *   settle, sentBack                                   the approval's end, copied onto the run after commit
  *
  * The salary-derived amounts leave under the names the salary mask governs (`gross_pay`, `total_deductions`,
@@ -22,11 +24,14 @@ const { scopeFor } = require("../../middleware/rbac");
 const { canSee } = require("../../shared/rbac/field-mask");
 const engine = require("../../shared/workflow/engine");
 const lagos = require("../../shared/time/lagos");
+const { emit } = require("../../shared/events/emit");
 const workflowService = require("../workflow/workflow.service");
+const statutoryRates = require("../statutory/statutory.rates");
+const settings = require("./payroll.config.repo");
 const repo = require("./payroll.repo");
 const lock = require("./payroll.lock");
 const run = require("./payroll.run");
-const { DEFINITION_KEY } = require("./payroll.events");
+const { DEFINITION_KEY, EVENTS } = require("./payroll.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -129,7 +134,7 @@ async function summary(user) {
 const PROBLEM_WORDS = Object.freeze({
   NO_SALARY: { message: (n) => `No Salary Set for ${n.name}`, action: "Set the pay, or exclude them" },
   NEGATIVE_NET: { message: (n) => `${n.name} would be paid less than nothing`, action: "Spread a deduction, add an adjustment or exclude them" },
-  NO_RATES: { message: () => "No rates are set for the statutory items", action: "Enter the rates on Configurations" },
+  NO_RATES: { message: () => "No PAYE bands or conventions in force", action: "Enter them on Configurations" },
   OVERTIME_WAITING: {
     message: (n) => `${n.n} overtime ${n.n === 1 ? "item waits" : "items wait"} for a decision for ${n.name}`,
     action: "Ask the line manager to decide",
@@ -247,6 +252,92 @@ async function markPaid(actor, id, body) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Configurations: the setting (§5, §6.11)
+ * ------------------------------------------------------------------ */
+
+/** A version as the contract's PayrollSettingsVersion, or null. */
+const presentVersion = (v) =>
+  v
+    ? {
+        payroll_setting_id: v.payroll_setting_id,
+        advanced_enabled: v.advanced_enabled === true,
+        pay_day: v.pay_day ?? null,
+        require_bank_details: v.require_bank_details === true,
+        paye_basis: v.paye_basis ?? null,
+        pension_reduces_taxable: v.pension_reduces_taxable ?? null,
+        nhf_reduces_taxable: v.nhf_reduces_taxable ?? null,
+        effective_from: v.effective_from,
+        effective_to: v.effective_to ?? null,
+        reason: v.reason ?? null,
+        changed_by_name: v.changed_by_name ?? null,
+      }
+    : null;
+
+/**
+ * GET /payroll/settings: the setting as it stands today in Lagos, the version in force and the one that starts
+ * later. With no version, the run is simple, the pay day the default 30 and bank details a warning.
+ */
+async function getSettings(db = pool) {
+  const today = lagos.today();
+  const [current, next, beenOn] = await Promise.all([settings.versionAt(db, today), settings.versionAfter(db, today), settings.hasBeenOn(db)]);
+  const now = current || settings.DEFAULTS;
+  return {
+    advanced_enabled: now.advanced_enabled === true,
+    advanced_has_been_on: beenOn,
+    pay_day: settings.payDayOf(now),
+    pay_day_is_default: !now.pay_day,
+    require_bank_details: now.require_bank_details === true,
+    paye_basis: now.paye_basis ?? null,
+    pension_reduces_taxable: now.pension_reduces_taxable ?? null,
+    nhf_reduces_taxable: now.nhf_reduces_taxable ?? null,
+    current: presentVersion(current),
+    next: presentVersion(next),
+  };
+}
+
+/** The setting's own columns, from a version or the defaults. */
+const COLUMNS = ["advanced_enabled", "pay_day", "require_bank_details", ...settings.CONVENTIONS];
+
+/**
+ * PATCH /payroll/settings (`payroll.configure`): a new version from `effective_from`, today or later (422
+ * EFFECTIVE_IN_THE_PAST). What is sent changes; the rest carries over from the latest version, and a change for the
+ * day a version already starts joins it. The conventions are taken only once the option has been on or is being
+ * switched on (409 ADVANCED_OFF). Switching on needs a statutory rate in force that day (409 NO_RATES) and all three
+ * conventions set, in this change or before (409 NO_CONVENTIONS) (§6.11 rules 3 and 4, §3.5).
+ */
+async function changeSettings(actor, body) {
+  settings.assertNotPast(body.effective_from);
+  await tx(async (client) => {
+    const latest = await settings.lockLatest(client);
+    const base = latest || settings.DEFAULTS;
+    const merged = {};
+    for (const c of COLUMNS) merged[c] = body[c] !== undefined ? body[c] : (base[c] ?? (c === "advanced_enabled" || c === "require_bank_details" ? false : null));
+    const conventionsSent = settings.CONVENTIONS.some((c) => body[c] !== undefined);
+    const switchingOn = body.advanced_enabled === true && base.advanced_enabled !== true;
+    if (conventionsSent && body.advanced_enabled !== true && !(await settings.hasBeenOn(client)))
+      throw new AppError("ADVANCED_OFF", "Conventions are set when Advanced Payroll is switched on", 409);
+    if (switchingOn) {
+      if (!(await statutoryRates.anyInForce(client, body.effective_from)))
+        throw new AppError("NO_RATES", "Enter a statutory rate in force from this date first", 409, { effective_from: ["No rate that day"] });
+      const unset = settings.CONVENTIONS.filter((c) => merged[c] === null || merged[c] === undefined);
+      if (unset.length)
+        throw new AppError("NO_CONVENTIONS", "Set the three conventions to switch on", 409, Object.fromEntries(unset.map((c) => [c, ["Pick one"]])));
+    }
+    const row = await settings.writeVersion(client, body.effective_from, { ...merged, changed_by: actor.user_id || null, reason: body.reason || null });
+    const changed = COLUMNS.filter((c) => body[c] !== undefined && body[c] !== (base[c] ?? null));
+    await emit(client, {
+      key: EVENTS.PAYROLL_SETTING_CHANGED,
+      entity: { type: "payroll_setting", id: row.payroll_setting_id },
+      actor,
+      before: latest ? Object.fromEntries(COLUMNS.map((c) => [c, latest[c] ?? null])) : undefined,
+      after: { ...merged, effective_from: body.effective_from },
+      payload: { payroll_setting_id: row.payroll_setting_id, effective_from: body.effective_from, changed, advanced_enabled: merged.advanced_enabled },
+    });
+  });
+  return getSettings();
+}
+
+/* ------------------------------------------------------------------ *
  * After an approval moves (payroll.events.js)
  * ------------------------------------------------------------------ */
 
@@ -314,6 +405,8 @@ module.exports = {
   addAdjustment,
   removeAdjustment,
   markPaid,
+  getSettings,
+  changeSettings,
   settle,
   sentBack,
 };
