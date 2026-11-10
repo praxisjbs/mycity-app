@@ -65,7 +65,7 @@ const percent = z
   .string()
   .trim()
   .regex(/^\d{1,3}(\.\d{1,6})?$/, "Enter a rate")
-  .refine((v) => Number(v) <= 100, "At most 100");
+  .refine((v) => !/^\d{1,3}(\.\d{1,6})?$/.test(v) || Number(v) <= 100, "At most 100");
 
 /** An amount that is zero or more: a band's limits, the relief's flat amount. */
 const amountOrNothing = z.string().regex(/^\d{1,16}\.\d{2}$/, "Enter an amount");
