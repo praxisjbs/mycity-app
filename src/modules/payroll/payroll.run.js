@@ -20,6 +20,8 @@ const lagos = require("../../shared/time/lagos");
 const m = require("../../shared/money/money");
 const engine = require("../../shared/workflow/engine");
 const attendancePay = require("../attendance/attendance.pay");
+const statutoryRates = require("../statutory/statutory.rates");
+const structure = require("../salary_structure/salary_structure.repo");
 const calc = require("./payroll.calc");
 const settings = require("./payroll.config.repo");
 const inputs = require("./payroll.inputs");
@@ -127,7 +129,27 @@ async function buildPayslip(client, person, number, month) {
     amount: a.amount,
   }));
 
-  const lines = calc.buildLines({ gross: person.gross_monthly, part, overtime, deductions, unpaidLeave, unpaidSuspension, instalments, adjustments });
+  // Advanced mode (§6.11 rule 6): the person's pay split, used only while it adds up to their gross as it stands; with
+  // none, their Monthly Pay is the whole base and the run warns No Pay Split.
+  let components = null;
+  if (month.statutory) {
+    const split = month.splits.get(person.employee_id) || [];
+    if (split.length && m.compare(m.sum(split.map((c) => c.amount)), person.gross_monthly) === 0)
+      components = split.map((c) => ({ id: c.employee_pay_component_id, code: c.code, label: c.label, amount: c.amount, pensionable: c.pensionable === true }));
+  }
+
+  const lines = calc.buildLines({
+    gross: person.gross_monthly,
+    part,
+    overtime,
+    deductions,
+    unpaidLeave,
+    unpaidSuspension,
+    instalments,
+    adjustments,
+    components,
+    statutory: month.statutory,
+  });
   const row = emptyRow(person, number, {
     working_days: part.workingDays,
     working_days_paid: part.daysPaid,
@@ -152,6 +174,15 @@ async function computeInto(client, run) {
   const ids = people.map((p) => p.employee_id);
   const prior = new Map((await repo.payslipsOf(client, runId)).map((p) => [p.employee_id, p]));
 
+  // The mode is the setting's on the month's first day; the rates and the splits are those in force on its last day
+  // (§6.11 rule 2, §6.12). With no PAYE table, or the conventions unset, the run says what is missing (No Rates Set):
+  // the items that have rates are computed, PAYE is not, and Submit refuses it.
+  const advanced = setting.advanced_enabled === true;
+  const conventions = Object.fromEntries(settings.CONVENTIONS.map((c) => [c, setting[c] ?? null]));
+  const conventionsSet = settings.CONVENTIONS.every((c) => conventions[c] !== null);
+  const rated = advanced ? await statutoryRates.ratesOn(client, last) : { rates: {}, rows: [] };
+  const missing = advanced ? [...(rated.rates.paye ? [] : ["paye"]), ...(conventionsSet ? [] : ["conventions"])] : [];
+
   const items = await inputs.payItemsFor(client, ids, last);
   const unpriced = items.filter((i) => i.amount === null);
   const month = {
@@ -164,6 +195,8 @@ async function computeInto(client, run) {
     suspensions: groupBy(await inputs.unpaidSuspensionsFor(client, ids, first, last), "employee_id"),
     instalments: groupBy(await inputs.instalmentsFor(client, ids, run.period, last), "employee_id"),
     adjustments: groupBy(await repo.adjustmentsOf(client, runId), "employee_id"),
+    statutory: advanced && conventionsSet ? { rates: rated.rates, conventions } : null,
+    splits: advanced ? groupBy(await structure.splitsFor(client, ids, last), "employee_id") : new Map(),
   };
 
   const rows = [];
@@ -196,7 +229,7 @@ async function computeInto(client, run) {
   const totals = calc.sumTotals(rows);
   await repo.setRun(client, runId, {
     status: "computed",
-    advanced: setting.advanced_enabled === true,
+    advanced,
     headcount: totals.headcount,
     earnings_total: totals.earnings_total,
     deductions_total: totals.deductions_total,
@@ -205,10 +238,25 @@ async function computeInto(client, run) {
     computed_at: "now",
     config_snapshot: {
       payroll_setting_id: setting.payroll_setting_id,
-      advanced: setting.advanced_enabled === true,
+      advanced,
       require_bank_details: setting.require_bank_details === true,
       pay_day: settings.payDayOf(setting),
       pay_day_is_default: !setting.pay_day,
+      // The rates and conventions an advanced run was computed with, so a locked run is explained after they change.
+      ...(advanced && {
+        conventions,
+        statutory_missing: missing,
+        statutory_rates: rated.rows.map((r) => ({
+          item: r.item,
+          base: r.base,
+          rate: r.rate,
+          band_from: r.band_from,
+          band_to: r.band_to,
+          flat_amount: r.flat_amount,
+          position: r.position,
+          effective_from: r.effective_from,
+        })),
+      }),
     },
   });
   return { totals, itemIds, instalmentIds, setting };

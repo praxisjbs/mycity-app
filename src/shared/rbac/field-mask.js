@@ -60,6 +60,10 @@ const FIELDS = Object.freeze({
       "pay_amount",
       // A payroll run's employer total: what MyCity pays on top of the net (docs/guides/payroll.md §6.13).
       "employer_cost",
+      // A salary grade's band, and where a person's pay stands against it (docs/guides/payroll.md §6.11 rule 5).
+      "band_minimum",
+      "band_maximum",
+      "band_position",
     ],
   },
   "employee.bank": {

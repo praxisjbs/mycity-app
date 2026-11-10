@@ -7,7 +7,7 @@
  *
  *   list(query)                 GET /statutory/rates, 25 a page
  *   save(actor, body)           POST /statutory/rates (`payroll.configure`): a version from today or later, never
- *                               backdated (422 EFFECTIVE_IN_THE_PAST); one already starting that day is replaced
+ *                               backdated (422 EFFECTIVE_IN_THE_PAST, payroll.config.repo); one starting that day is replaced
  *   requestReport(actor, id)    POST /payroll/runs/:id/statutory-report: an approved or paid advanced run's report
  *   assertMayReadReport(user)   a reader whose role hides pay or tax numbers is not handed the report (403)
  */
@@ -17,6 +17,7 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { canSee } = require("../../shared/rbac/field-mask");
 const lagos = require("../../shared/time/lagos");
+const { assertNotPast } = require("../payroll/payroll.config.repo");
 const rates = require("./statutory.rates");
 const report = require("./statutory.report");
 const repo = require("./statutory.repo");
@@ -31,11 +32,6 @@ async function tx(fn) {
   }
 }
 
-/** A version starts today or later in Lagos: the past is never rewritten (§6.11 rule 3). */
-function assertNotPast(date) {
-  if (date < lagos.today())
-    throw new AppError("EFFECTIVE_IN_THE_PAST", "A change starts today or later", 422, { effective_from: ["Date too early"] });
-}
 
 /** GET /statutory/rates. */
 async function list(query) {
@@ -69,4 +65,4 @@ async function assertMayReadReport(user) {
 /** POST /payroll/runs/:id/statutory-report: 202 with the file the screen waits on. */
 const requestReport = (actor, runId) => tx((client) => report.requestReport(client, runId, { actor }));
 
-module.exports = { assertNotPast, list, save, assertMayReadReport, requestReport };
+module.exports = { list, save, assertMayReadReport, requestReport };

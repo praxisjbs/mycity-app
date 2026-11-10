@@ -14,6 +14,8 @@
  *   payslip.excluded, .included   a person was left out of a run, or put back
  *   payroll_adjustment.added, .removed   a one-off earning or deduction was added to a run, or taken off
  *   payroll_deduction.settled   a fine or an advance was deducted in full (its last instalment applied)
+ *   payroll_setting.changed  the advanced option, the pay day, Bank Details Required or a convention, from a date
+ *                            (security: the access watchers are told)
  *
  * Events carry ids, the period, counts and statuses, never an amount (§6.13 rule 5): amounts live in the
  * tables and are masked on the way out, so an audit line never carries one either.
@@ -46,6 +48,9 @@ const EVENTS = defineEvents("payroll", {
   "payroll_adjustment.added": { summary: "A one-off earning or deduction was added to a payroll run" },
   "payroll_adjustment.removed": { summary: "A one-off earning or deduction was taken off a payroll run" },
   "payroll_deduction.settled": { summary: "A fine or an advance was deducted in full" },
+  // Configurations: the advanced option, the pay day, Bank Details Required or a convention changed from a date.
+  // Security: who may change how everyone is paid is watched as access changes are (§7).
+  "payroll_setting.changed": { summary: "The payroll setting was changed from a date", security: true },
 });
 
 /** The approval flow every run opens (seeded in 6099; DEFAULTS in shared/workflow/definitions.js). */

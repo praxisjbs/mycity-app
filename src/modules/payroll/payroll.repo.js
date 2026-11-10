@@ -9,7 +9,9 @@
  * compute them) is `completeQuery` with its reason and a ceiling.
  *
  * A run's problems are worked out on read, never stored (§6.15): from its payslips as Compute left them,
- * from the live items that are still waiting (overtime, fines) and from the person's contract. A run that
+ * from the live items that are still waiting (overtime, fines) and from the person's contract. An advanced run's No
+ * Rates Set reads what its Compute found missing (its snapshot), and No Pay Split a Monthly Pay line that is not a
+ * component of the person's split. A run that
  * has left Draft and Computed reports none: the people reading it have moved on to the approval.
  */
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
@@ -274,9 +276,20 @@ async function replaceLines(client, runId, lines) {
   if (!lines.length) return;
   const col = (name) => lines.map((l) => l[name] ?? null);
   await client.query(
-    `INSERT INTO payslip_line (payslip_id, position, kind, code, label, detail, amount, source_type, source_id)
-     SELECT * FROM unnest($1::uuid[], $2::int[], $3::text[], $4::text[], $5::text[], $6::text[], $7::numeric[], $8::text[], $9::uuid[])`,
-    [col("payslip_id"), col("position"), col("kind"), col("code"), col("label"), col("detail"), col("amount"), col("source_type"), col("source_id")],
+    `INSERT INTO payslip_line (payslip_id, position, kind, code, label, detail, amount, source_type, source_id, base_amount)
+     SELECT * FROM unnest($1::uuid[], $2::int[], $3::text[], $4::text[], $5::text[], $6::text[], $7::numeric[], $8::text[], $9::uuid[], $10::numeric[])`,
+    [
+      col("payslip_id"),
+      col("position"),
+      col("kind"),
+      col("code"),
+      col("label"),
+      col("detail"),
+      col("amount"),
+      col("source_type"),
+      col("source_id"),
+      col("base_amount"),
+    ],
   );
 }
 
@@ -465,7 +478,7 @@ const FOUND = "found";
 const PROBLEMS = `
   WITH base AS (
     SELECT p.payslip_id, p.payroll_run_id, p.employee_id, p.gross_monthly, p.net_pay, p.bank_name, p.account_last4,
-           r.period, COALESCE((r.config_snapshot->>'require_bank_details')::boolean, false) AS require_bank,
+           r.period, r.advanced, COALESCE((r.config_snapshot->>'require_bank_details')::boolean, false) AS require_bank,
            (date_trunc('month', r.period) + interval '1 month - 1 day')::date AS last_day
       FROM payslip p JOIN payroll_run r ON r.payroll_run_id = p.payroll_run_id
      WHERE p.payroll_run_id = ANY($1::uuid[]) AND r.status IN ('draft', 'computed') AND p.status <> 'excluded'
@@ -495,8 +508,15 @@ const PROBLEMS = `
       JOIN LATERAL (SELECT count(*) AS n FROM sanction_fine f JOIN sanction x ON x.sanction_id = f.sanction_id
                      WHERE x.employee_id = b.employee_id AND x.status = 'issued' AND f.settlement_status = 'pending') w ON w.n > 0
     UNION ALL
+    SELECT 'NO_PAY_SPLIT', 'warning', 7, b.payroll_run_id, b.employee_id, b.payslip_id, 1
+      FROM base b
+     WHERE b.advanced AND EXISTS (SELECT 1 FROM payslip_line l
+                                   WHERE l.payslip_id = b.payslip_id AND l.code = 'monthly_pay' AND l.source_type IS NULL)
+    UNION ALL
     SELECT 'NO_RATES', 'blocking', 0, r.payroll_run_id, NULL::uuid, NULL::uuid, 1
-      FROM payroll_run r WHERE r.payroll_run_id = ANY($1::uuid[]) AND r.advanced AND r.status IN ('draft', 'computed')
+      FROM payroll_run r
+     WHERE r.payroll_run_id = ANY($1::uuid[]) AND r.advanced AND r.status IN ('draft', 'computed')
+       AND jsonb_array_length(COALESCE(r.config_snapshot->'statutory_missing', '[]'::jsonb)) > 0
   )`;
 
 /** GET /payroll/runs/:id/problems: blocking first, then the warnings, each naming the person. */
