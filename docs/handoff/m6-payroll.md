@@ -115,7 +115,7 @@ exists, and the payslip template is empty.
 - [x] The Configurations screen on desktop and phone, on the contract, its mock in the contract's shapes (JBS Praxis
       asked for it in this pull request, 10/11/2026; guide Appendix A, PR 5) (10/11/2026)
 - [x] The guide, PROGRESS (#109, API ticked), README §5.9, DATABASE_SCHEMA M6 and this tracker match what was built (10/11/2026)
-- [ ] `npm run ci` green locally on Node 20
+- [x] `npm run ci` green locally on Node 20, all 52 gates (10/11/2026): the first full run passed 50 and failed two (the mock's capability test lacked `payroll.configure`; in the backend suite, identity's list of a build account's empty columns lacked the four tax and pension numbers, and the approvals test picked Monday 28 December 2026, Boxing Day observed, for a leave day, which fails on any branch from today), all fixed, and the second full run passed all 52
 - [ ] The PR marked ready (it stays a draft until JBS Praxis says so); not merged until then
 
 ### PR 6 · AI, search, Home and notices
