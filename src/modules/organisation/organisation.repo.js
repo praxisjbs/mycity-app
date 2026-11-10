@@ -91,6 +91,11 @@ const UPDATE_COLUMNS = [
   "bank_name",
   "account_number",
   "gross_monthly",
+  // The tax and pension numbers payroll's statutory report reads (migration 6020, docs/guides/payroll.md §4.1).
+  "tax_id",
+  "pension_pin",
+  "pension_administrator",
+  "nhf_number",
 ];
 
 /** The login a person has, as the register and the 360 name it. */

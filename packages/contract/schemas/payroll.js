@@ -1,8 +1,8 @@
 "use strict";
 /**
  * Payroll runs, their problems and adjustments, and the payroll settings (docs/guides/payroll.md §4.2,
- * §5, §6.9, §6.11, Appendix C). Simple mode only: the advanced tables (salary grades, pay components,
- * statutory rates) and their contracts come with PR 5.
+ * §5, §6.9, §6.11, Appendix C). The advanced tables have their own contracts: salary grades and pay components in
+ * salary_structure.js, statutory rates and the statutory report in statutory.js.
  *
  * A run is one month's payroll for everyone paid that month, one run per month ever. Its statuses (the
  * table's CHECK, migration 6000):
@@ -278,9 +278,11 @@ const PayrollSettings = z
   .strict();
 
 /**
- * PATCH /payroll/settings: a new version from `effective_from` (today or later, Lagos). Only what is sent
- * changes; the rest carries over from the version in force. The conventions are taken by the route in PR 5,
- * once the option has been on or is being switched on.
+ * PATCH /payroll/settings (`payroll.configure`): a new version from `effective_from` (today or later, Lagos). Only
+ * what is sent changes; the rest carries over from the latest version. A second change from the same day joins that
+ * day's version. The conventions are taken once the option has been on or is being switched on (409 ADVANCED_OFF
+ * otherwise); switching on needs a statutory rate in force on the day (409 NO_RATES) and all three conventions
+ * set, here or before (409 NO_CONVENTIONS) (guide §6.11 rules 3 and 4).
  */
 const PayrollSettingsChange = z
   .object({
