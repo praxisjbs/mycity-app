@@ -256,6 +256,11 @@ function base(p: MockPerson, viewer: string, canSee: boolean, first: string, res
     bank_name: canSee ? p.bank_name : null,
     account_number: canSee ? `00000${p.account_last4}` : null,
     gross_monthly: canSee ? p.gross_monthly : null,
+    // Tax and pension numbers (employee.statutory): none recorded in the mock.
+    tax_id: null,
+    pension_pin: null,
+    pension_administrator: null,
+    nhf_number: null,
     created_at: at(200, "09:00"),
     photo_url: null,
   };

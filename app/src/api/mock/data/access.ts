@@ -19,6 +19,7 @@ export const CAPABILITIES = [
   { code: "mailbox.signature", name: "Configure Signature", description: "Set the company's signature links and what shows on everyone's email signature." },
   { code: "partnerships.configure", name: "Configure Partnerships", description: "Set up the partnership categories with their agreement templates, delivery checklists and custom fields, the pipeline's stages and lists, the proof points and the saved proposal templates." },
   { code: "partnerships.money", name: "See Commission and Returns", description: "See and enter commission, the merchant's take and returns, and import returns." },
+  { code: "payroll.configure", name: "Configure Payroll", description: "Switch the advanced option on or off, set the pay day and the bank rule, and enter the statutory rates, bands, salary grades and pay components." },
   { code: "performance.manage", name: "Run Performance", description: "Run the cycle: quarters and their rules, rounds, reviewer changes, conduct, improvement plans, probation outcomes and imports." },
   { code: "policies.manage", name: "Manage Policies", description: "Write, publish, withdraw and archive company policies, and see who has acknowledged them." },
   { code: "queries.configure", name: "Configure Queries", description: "Write the query rules, the consequence chain and the letter templates." },
@@ -32,7 +33,7 @@ const MANAGES = ["alerts.clear", "home.reports", "home.team"];
 /** Role code → the capabilities it holds by default. */
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
   implementation: EVERY,
-  operations_people: [...HOME, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "partnerships.configure", "partnerships.money", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
+  operations_people: [...HOME, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "partnerships.configure", "partnerships.money", "payroll.configure", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
   management: [...HOME, "goals.company", "goals.function", "goals.view_all", "partnerships.money", "workspace.late_reasons"],
   head_of_department: [...MANAGES, "goals.function"],
   manager: MANAGES,
