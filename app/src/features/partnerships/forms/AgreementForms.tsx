@@ -303,7 +303,7 @@ export function RejectAgreement({ a, close }: { a: AgreementDetail; close: () =>
   };
   return (
     <Form onSubmit={submit}>
-      <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} rows={3} placeholder="The dates are wrong" /></Field>
+      <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} rows={3} placeholder="Dates are wrong" /></Field>
       <FormError>{error}</FormError>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

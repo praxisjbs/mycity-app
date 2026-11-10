@@ -290,7 +290,7 @@ need no account.
 1. Press **Download PDF**, at the top of the page or under **Your Contact**.
 2. The PDF saves to your device with the same pages.
 
-### When the link does not work {#public-proposal-link}
+### When a proposal link does not work {#public-proposal-link}
 
 ![A proposal that is no longer open](shot:public-proposal-closed)
 
@@ -302,7 +302,7 @@ says *This Link Does Not Open*. Reply to the email the link came with and MyCity
 If MyCity asks you to sign a partnership agreement, you sign it on this page, from the link in the
 email we sent. Signing it is agreeing to it. You need no account.
 
-### Read it and confirm it is you {#public-agreement-read}
+### Read the agreement and confirm it is you {#public-agreement-read}
 
 1. Open the link in your email.
 2. The agreement's number and the day the link expires are at the left, with the three steps.
@@ -317,7 +317,7 @@ email we sent. Signing it is agreeing to it. You need no account.
 The code works for ten minutes. **Send Again** sends another after a minute. After five wrong codes,
 you must ask for another.
 
-### Sign it {#public-agreement-sign}
+### Sign the agreement {#public-agreement-sign}
 
 1. Under **Sign Below**, check your **Full Name** and add your **Title**.
 2. Under **Signature**, pick **Draw** and sign in the box with a finger or a mouse, or **Type** and
@@ -338,7 +338,7 @@ says *You sign after* and their name.
 
 Open the link again once they have signed.
 
-### Decline it {#public-agreement-decline}
+### Decline the agreement {#public-agreement-decline}
 
 1. Press **Decline to Sign**, at either step.
 2. Type the **Reason for Declining** and press **Confirm Decline**. **Back to the Agreement** goes back
