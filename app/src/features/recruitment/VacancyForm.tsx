@@ -37,6 +37,7 @@ import {
   TextField,
   toast,
   todayIso,
+  toMoneyString,
   useConfirm,
   useContractForm,
   useUnsavedChanges,
@@ -88,6 +89,9 @@ function bodyOf(v: Values, edit: Before | null, seatId: string | null) {
   const { hiring_manager, location, publish, closes_on, ...rest } = v;
   return {
     ...rest,
+    // The band as typed ("350,000") to the wire's two places ("350000.00"); left empty, it stays empty.
+    salary_min: toMoneyString(v.salary_min),
+    salary_max: toMoneyString(v.salary_max),
     hiring_manager_id: hiring_manager[0]?.employee_id ?? "",
     ...(!remote && location && moved ? { location } : {}),
     ...(!edit || closes_on !== edit.closes_on ? { closes_on } : {}),

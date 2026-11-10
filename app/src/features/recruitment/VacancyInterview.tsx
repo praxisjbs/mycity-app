@@ -37,6 +37,7 @@ import {
   TextAreaField,
   TextField,
   toast,
+  toMoneyString,
   useContractForm,
   useUnsavedChanges,
 } from "@mycity/ui";
@@ -74,11 +75,14 @@ const CHECKED: Key[] = [
   "salary_max",
 ];
 
+/** The salary band, typed as a person types it ("350,000") and sent with two places ("350000.00"). */
+const MONEY: Key[] = ["salary_min", "salary_max"];
+
 /** The answers as the contract checks them: VacancyEdit, every field optional, only what was given (the title always). */
 function checkedBody(v: Answers) {
   return {
     title: v.title,
-    ...Object.fromEntries(CHECKED.filter((k) => given(v[k])).map((k) => [k, v[k]])),
+    ...Object.fromEntries(CHECKED.filter((k) => given(v[k])).map((k) => [k, MONEY.includes(k) ? toMoneyString(String(v[k])) : v[k]])),
     salary_visible: v.salary_visible,
     ...(v.hiring_manager[0] ? { hiring_manager_id: v.hiring_manager[0].employee_id } : {}),
     ...(v.work_pattern !== "remote" && v.location ? { location: v.location } : {}),
@@ -101,8 +105,8 @@ const interviewOf = (v: Answers, asked: FollowUpQuestion[]) => ({
   working_days: v.working_days,
   area: v.work_pattern === "remote" ? "" : (lineOf(v.location) ?? ""),
   reports_to: v.reports_to,
-  salary_min: v.salary_min,
-  salary_max: v.salary_max,
+  salary_min: toMoneyString(v.salary_min),
+  salary_max: toMoneyString(v.salary_max),
   must_haves: v.must_haves,
   extras: v.extras,
   follow_ups: asked.map((q, i) => ({

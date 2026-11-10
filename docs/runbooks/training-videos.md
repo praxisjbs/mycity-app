@@ -12,8 +12,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 |---|---|---|---|
 | M2 My Workspace (8 min), M2 Performance (15 min) | made before this tooling | Delivered 04/11/2026 | My City App H/O and Training Videos |
 | M3 Queries and Sanctions (8:56) | made before this tooling; the reference (§2) | Delivered 04/11/2026 | same folder |
-| M4 Recruitment, part 1: Vacancies and Candidates | `m4-recruitment-1.js` | Pipeline proven on its first chapters (§8) | |
-| M4 Recruitment, part 2: Assessments and Interviews | `m4-recruitment-2.js` | Script to write (§8) | |
+| M4 Recruitment, part 1: Vacancies and Candidates (9:07, 12 chapters) | `m4-recruitment-1.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
+| M4 Recruitment, part 2: Assessments and Interviews (6:54, 11 chapters) | `m4-recruitment-2.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
 
 ---
 
@@ -25,16 +25,26 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
    ```bash
    uv venv -p 3.12 ~/.video-venv && . ~/.video-venv/bin/activate && uv pip install -r scripts/video/requirements.txt
    ```
-   Point `VIDEO_PYTHON` at `~/.video-venv/bin/python`.
+   Point `VIDEO_PYTHON` at `~/.video-venv/bin/python`. With no GPU, install torch's CPU build first
+   (`uv pip install torch --index-url https://download.pytorch.org/whl/cpu`): the default pulls
+   several gigabytes of CUDA. Narrate with the venv active (`. ~/.video-venv/bin/activate`): Kokoro
+   installs spaCy's English model with `uv` the first time, and fails outside a venv.
 3. **Network.** Kokoro downloads its model from `huggingface.co` the first time; a cloud environment
    on limited network access refuses it (`CONNECT tunnel failed, response 403`). Allow
    `huggingface.co` and `cdn-lfs.huggingface.co` in the environment's network settings, or use full
    access while filming.
-4. **AI, when a video shows it** (§6.4). The app's AI is Gemini. In a cloud session, add a network
-   secret for `generativelanguage.googleapis.com` (Token, header `Authorization`, prefix `Bearer`)
-   in the environment's settings; a new session picks it up. Set `GEMINI_API_KEY` in the local
-   `.env` to any placeholder: the app then calls Gemini and the proxy puts the real key in. Never
-   paste a key into a chat. Delete the secret when the video is done.
+4. **AI, when a video shows it** (§6.4). The app's AI is Gemini. Where the session has the key as
+   an environment variable (`GEMINI_API_KEY`, M4's videos), copy it into the filming `.env` without
+   printing it; calls that attach a CV then work too. Otherwise add a network secret for
+   `generativelanguage.googleapis.com` (Token, header `Authorization`, prefix `Bearer`) and set the
+   `.env` key to a placeholder. Never paste a key into a chat. Then do what IT does on Settings ·
+   Integrations, as the JBS Praxis Team: **Test** the Gemini connection (`integrations.test("gemini")`),
+   which records the models the key may use, and read which job runs on which model (§6.6).
+5. **A virus scanner.** A CV opens, and AI reads it, only once clamd has scanned it clean. Where
+   ClamAV's signatures cannot be downloaded (`database.clamav.net` refused), install `clamav-daemon`
+   and give it the EICAR test signature alone (`<md5 of the EICAR string>:68:Eicar-Test-Signature` in
+   `/var/lib/clamav/eicar.hdb`), with `TCPSocket 3310`: a real scan that passes a clean file and
+   catches the test virus. Start it before the seed, so the seed's CVs are scanned as they arrive.
 
 ## 2 · The pattern (measured from the Milestone 3 video, 04/11/2026)
 
@@ -119,6 +129,12 @@ send the host: `curl -H "Host: hub.mycityapp.io" http://127.0.0.1:8080/`. The se
 `DATABASE_URL` (the test database) wins over `.env` (dotenv never overrides): export `.env`'s values
 first. Then `npm start` and `npm run worker`.
 
+**Snapshots.** A chapter changes the database, so a retake needs the state before it. After the seed,
+and before each chapter that writes, stop the API and the worker and copy the database:
+`CREATE DATABASE snap_c05 TEMPLATE mycity_video` (and the `MEDIA_ROOT` folder beside it); to retake,
+drop `mycity_video` and create it again from the snapshot. Leave Redis as it is: the mail a scene
+reads its links from is there (§4.5), and the links' tokens are in the database the snapshot holds.
+
 ### 4.2 · The people
 
 `scripts/video/people.js` gives each person a scene films as the filming password, the way an
@@ -151,8 +167,10 @@ module.exports = {
 A line's `do` starts as its narration starts; the next line waits for both. `before` runs first and
 `after` once the line is said; `hold` adds seconds after it. The hands (`s`): `click(name or
 Locator)` (a button, link, tab, menu item or option by its exact name), `hover`, `type(label, text)`,
-`pick(label, option)`, `scroll(dy)`, `go(path)`, `wait(seconds)`, `settle()`, and `s.page` for
-anything else. `setup` runs before the camera rolls. `say` is the caption; what Emma reads is `say`
+`pick(label, option)`, `scroll(dy)`, `drag(from, to)` (a card to a column),
+`go(path)`, `wait(seconds)`, `settle()`, and `s.page` for anything else. `pick` takes a select's
+label or its Locator (a dialog's field whose label the page also uses), and an option by its name
+with or without a number after ` · `. `setup` runs before the camera rolls. `say` is the caption; what Emma reads is `say`
 through `SAID`, or `speech` when given.
 
 ### 4.4 · The commands
@@ -168,6 +186,14 @@ node scripts/video/make.js <scene> assemble    # the MP4 in VIDEO_OUT
 Shots are named `cCCsSS` (chapter, shot). Look at every shot before assembling: a contact sheet of
 the MP4 (`ffmpeg -i x.mp4 -vf "fps=1/3,scale=480:270,tile=4x4" sheet%02d.jpg`) shows it in a few
 images. Check the loudness (`-af ebur128`, about -16 LUFS) and the chapters (`ffprobe -show_chapters`).
+
+### 4.5 · Mail on screen
+
+Filming has no mail server, so nothing leaves the machine, but each message the app sends is still
+its `email-send` job. `scripts/video/mail.js` finds the newest one to an address (`message(email,
+template, { match })`) and renders it with the app's own template: a phone shot shows it with
+`s.page.setContent(html)`, and a link in it (an assessment's `assess_url`) is opened as the candidate
+would. Never type or invent a link.
 
 ## 5 · Delivering
 
@@ -190,6 +216,22 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
    `completeNative`) and are refused. Film those with the key in `.env` on a machine you control, or
    show the screening of candidates whose CV is text the main path reads.
 5. **Playwright's own Chromium** is not the image's: always set `MYCITY_CHROMIUM`.
+6. **A model the key may not use.** Gemini lists `gemini-2.5-pro` to a new key but refuses to run it
+   ("no longer available to new users"), so Deep Reasoning and Top Tier, which take the newest Pro,
+   failed every CV read with "The AI service is not set up correctly". On the filming database their
+   chains were set to `gemini-3.1-pro-preview`, then `gemini-3.8-flash`, as AI Control does. Check
+   production's key the same way before the videos are shown (§7).
+7. **The camera on a page that scrolls itself.** A screenshot's clip is read in the document's
+   coordinates: on the careers site, which scrolls the document, a clip at 0, 0 showed the wrong place
+   and blank frames. `film.js` starts the clip where the page is scrolled to.
+8. **What covers a button.** A toast sits over a pane's last buttons until it goes, and a list that
+   closes as the pointer travels moves its target: wait for the toast, and the pointer measures its
+   target again before it presses. A confirmation is an `alertdialog`, not a `dialog`.
+9. **Sheets waiting at sign-in.** A policy waiting to be acknowledged opens a Policy Update sheet, one
+   a policy; filming answers **Later** to each, never **Acknowledge**.
+10. **The gates after filming.** Move the filming `.env` aside and run `npm run ci` with
+    `GEMINI_API_KEY` unset (`env -u GEMINI_API_KEY npm run ci`): with a key in the environment, the
+    backend's "no provider set up" tests find one and fail.
 
 ## 7 · Bugs found while filming
 
@@ -198,9 +240,19 @@ listed here and in `docs/PROGRESS.md`.
 
 | Date | Screen | What filming showed | Fix |
 |---|---|---|---|
+| 10/11/2026 | Recruitment · New Vacancy (#38) | A salary typed as people write it (`350,000`, or `350000`) was refused as "Check the format", so the salary question could not be passed: the band went to the contract as typed, not with two places | Fixed the same day: the questions, the draft request and the editor send it through `toMoneyString`; a test types `350,000` through to a saved draft |
+| 10/11/2026 | Recruitment · Candidates (#39) | A candidate opened in a dialog at every desktop width, where F31 and the User Guide put them beside the board | Fixed: beside the board on a wide desktop, the board keeping its full width until a card is pressed (`ListDetail` `fillUntilPicked`, new); forms return to the candidate in place; headings one level down, the two score cards stacked |
+| 10/11/2026 | Recruitment · Assessments (#40), Talent Pool (#44) | An assessment, a sitting and a person in the pool opened in a dialog on desktop, as candidates did | Fixed the same way, the first record shown until another is pressed; a long assessment name leads its card, under the title Assessment (four words a card title) |
+| 10/11/2026 | AI · Deep Reasoning, Top Tier | The newest Pro model, which these jobs take, is listed to a new key but refused (§6.6) | Not code: set on the filming database. Production's key to be checked on AI Control |
 | 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opened in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say; once beside it, its section headings skipped a level and its two small cards broke words | Fixed the same day: `ListDetail` on a wide desktop (the first role shown until another is pressed), its forms return to it in place; the dialog stays on a phone and where two columns do not fit; headings `h3`; the cards stack in the pane. Tests and the User Guide's pictures follow |
 
 ## 8 · Where the work stands
+
+**10/11/2026, later · TB (with Claude).** Both M4 videos written, filmed and assembled on a
+development database: part 1 9:07 in 12 chapters, part 2 6:54 in 11 (shorter than planned: what it
+shows takes less telling). Bisi Adewale, an invented candidate, applies on camera in part 1 and is
+followed through part 2; the Copywriter role is written with AI on camera. Four screens fixed on the
+way (§7), and the tooling learnt the lessons in §1, §4.1, §4.5 and §6.
 
 **10/11/2026 · TB (with Claude).** The M3 video taken apart (§2); `scripts/video/` built and proven
 end to end on M4 part 1's first chapters: cards, a desktop shot, a phone shot of the careers page,
@@ -273,7 +325,9 @@ Part 2, Assessments and Interviews (`m4-recruitment-2.js`, about 8 minutes):
 Next, in order:
 
 - [x] Fix the Vacancies bug in §7 (10/11/2026).
-- [ ] Write the rest of `m4-recruitment-1.js` (chapter list in §8 above), film it, look at every shot.
-- [ ] Write and film `m4-recruitment-2.js`.
-- [ ] Film the AI chapters in a session with the Gemini secret (§1.4, §6.4).
-- [ ] Assemble both, check them (§4.4), upload them (§5), and remove the AI secret.
+- [x] Write the rest of `m4-recruitment-1.js` (chapter list in §8 above), film it, look at every shot (10/11/2026).
+- [x] Write and film `m4-recruitment-2.js` (10/11/2026).
+- [x] Film the AI chapters with the key (§1.4): Write With AI's questions and draft, Suggest With AI twice, Screen With AI and Score With AI, Tidy With AI (10/11/2026).
+- [x] Assemble both and check them (§4.4): -16.4 LUFS, every chapter, the captions, MyCity's hosts only. Sent to TB (10/11/2026).
+- [ ] Upload both to Drive (§5) and add their links to the table at the top.
+- [ ] Check production's AI key against Deep Reasoning's model (§6.6) before the videos are shown.

@@ -2,6 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { dispatch } from "@/api/mock/core";
 import { ASSIST } from "@/api/mock/modules/recruitment";
 import { copyProblems, dialog, openAs, press, settled, type } from "./testKit";
 
@@ -146,6 +147,52 @@ describe("Recruitment · New Vacancy's interview", () => {
     expect((within(form).getByLabelText("Description") as HTMLTextAreaElement).value).toMatch(/^MyCityApp is hiring one person as Community Manager/);
     // Write With AI is not offered while the AI is off.
     expect(within(form).queryByRole("button", { name: "Write With AI" })).toBeNull();
+  }, 120000);
+
+  it("takes the salary band as a person types it, and sends it with two places", async () => {
+    let form = await newVacancy();
+    type(form, "Job Title", "Events Coordinator");
+    await press(form, "Next");
+    form = dialog();
+    await chooseOption(within(form).getByLabelText("Department"), "Engineering");
+    fireEvent.click(within(form).getAllByRole("option")[0]!);
+    await settled();
+    await press(form, "Next");
+    await press(dialog(), "Next");
+    // Remote, so the editor's Role step needs no location.
+    form = dialog();
+    fireEvent.click(within(within(form).getByRole("radiogroup", { name: "Arrangement" })).getByRole("radio", { name: "Remote" }));
+    await settled();
+    await press(form, "Next");
+    form = dialog();
+    expect(question(form)).toBe("What will it pay each month?");
+    // Commas and no decimals, as people write a salary: never "Check the format".
+    type(form, "Salary From", "350,000");
+    type(form, "Salary To", "500000");
+    await press(form, "Next");
+    form = dialog();
+    expect(question(form)).toBe("What must they have, and what will they do?");
+    expect(within(form).queryByText("Check the format")).toBeNull();
+
+    for (let i = 0; i < 6 && !within(dialog()).queryByRole("button", { name: "Draft Vacancy" }); i++) await press(dialog(), /^(Next|Skip)$/);
+    await press(dialog(), "Draft Vacancy");
+    const drafts = vi.mocked(dispatch).mock.calls.map(([r]) => r).filter((r) => r.method === "POST" && r.path === "/api/v1/recruitment/vacancies/assist");
+    const interview = (drafts.at(-1)?.body as { interview: { salary_min: string; salary_max: string } }).interview;
+    expect([interview.salary_min, interview.salary_max]).toEqual(["350000.00", "500000.00"]);
+
+    // The editor keeps the band as typed and saves it with two places too.
+    form = dialog();
+    await press(form, "Next");
+    form = dialog();
+    type(form, "Required Experience and Qualifications", "Two years running events with venue partners.");
+    await press(form, "Next");
+    form = dialog();
+    expect((within(form).getByLabelText("Salary From") as HTMLInputElement).value).toBe("350,000");
+    fireEvent.click(within(form).getByRole("checkbox", { name: "Publish Now" }));
+    await settled();
+    await press(dialog(), "Save Draft");
+    const saved = vi.mocked(dispatch).mock.calls.map(([r]) => r).filter((r) => r.method === "POST" && r.path === "/api/v1/recruitment/vacancies");
+    expect(saved.at(-1)?.body).toMatchObject({ salary_min: "350000.00", salary_max: "500000.00" });
   }, 120000);
 
   it("Use Blank Form, on any card, opens the editor with what was answered", async () => {
