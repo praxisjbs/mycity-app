@@ -273,7 +273,8 @@ the screen said. Use a phone for the lines that name one.
       address; open the link on a phone; the proposal reads Viewed and the owner gets Proposal Viewed;
       Home's Proposals Out shows its Last Viewed and Views
 - [ ] 6. **Generate Agreement** from the Events template; **Submit for Approval**; approve as the Head of
-      Department, then the CEO (My Approvals); **Send for Signature**; sign on a phone with the emailed code
+      Department, then the CEO (each from Home's Need You: **Approve** on the agreement's card; try **Reject** on a
+      second one: the owner reads its reason); **Send for Signature**; sign on a phone with the emailed code
       and a drawn signature (and MyCity's countersignature); scan the QR: the document and both verdicts;
       by reference: status and verdicts, no content
 - [ ] 7. The lead is now a partner (Lead Signed to its owner and Operations & People); its five deliverables
