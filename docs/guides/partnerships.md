@@ -1892,6 +1892,10 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 10/11/2026 · TB · PR 9, the Partnerships User Guide chapter (`m7/user-guide`): `docs/manual/partnerships.md` with a
+  section for each of the seven screens, four Quick Start cards for lead owners and the partner's pages on the public Help
+  (Your Proposal, Sign an Agreement, Check an agreement). Appendix A's PR 9 is done; nothing in this guide changed.
+
 - 08/11/2026 · JP · PR 8, analytics, mail, Praxis AI, search and finish (`m7/analytics-finish`): Analytics
   (#55) on the contract, desktop and phone, with Export (§6.18); Link to Partner and a linked thread's
   mail on the record's Activity with the excerpt rule, migration `7120` (§6.15); the summaries

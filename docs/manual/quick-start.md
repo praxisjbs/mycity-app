@@ -310,6 +310,50 @@ icon: spark
 4. Press **Close Review**, or **Request Changes** with a reason. Read
    [Approve or close a review](#performance-review-approve).
 
+## Add a Lead {#qs-add-lead role="Lead Owners" icon=plus screen=partnerships/leads needs="partnerships create"}
+
+![The New Lead form](shot:qs-add-lead)
+
+1. Open [Partnerships · Leads](/partnerships?tab=leads) and press **New Lead**.
+2. On **Organisation**, type the **Name**, then pick the **Category** and the **Region**.
+3. Press **Next**. Type the contact's **First Name** and **Last Name**, then press **Next**.
+4. Type the deal's **Title**, pick its **Stage**, then press **Add Lead**.
+5. Read [Add a lead](#partnerships-leads-add).
+
+## Log an Interaction {#qs-log-interaction role="Lead Owners" icon=msg screen=partnerships/leads needs="partnerships edit"}
+
+![The Log Interaction form](shot:qs-log-interaction)
+
+1. Open [Partnerships · Leads](/partnerships?tab=leads) and press the lead. For a partner, open
+   [Partnerships · Partners](/partnerships?tab=partners).
+2. Press **More**, then **Log Interaction**.
+3. Pick the **Kind**, the **Day** and the **Time**.
+4. Type the **Subject** and the **Summary**, then press **Log Interaction**.
+5. Read [Log an interaction](#partnerships-partners-log).
+
+## Send a Proposal {#qs-send-proposal role="Lead Owners" icon=send screen=partnerships/proposals needs="partnerships create"}
+
+![The New Proposal form](shot:qs-send-proposal)
+
+1. Open [Partnerships · Proposals](/partnerships?tab=proposals) and press **New Proposal**.
+2. Pick the **Deal**, paste your **Notes**, then press **Start Proposal**.
+3. Answer the cards, then press **Write Draft**.
+4. Check the draft, then press **Send Proposal**.
+5. Check the **To** address, then press **Confirm and Send**.
+6. Read [Start a proposal](#partnerships-proposals-start).
+
+## Get an Agreement Signed {#qs-agreement role="Lead Owners" icon=signature screen=partnerships/contracts-and-mous needs="partnerships create"}
+
+![The Generate Agreement form](shot:qs-agreement)
+
+1. Open [Partnerships · Contracts & MOUs](/partnerships?tab=contracts-and-mous) and press
+   **Generate Agreement**.
+2. Pick the **Deal** and the **Kind**, then press **Generate Agreement**.
+3. Fill in what the draft marks, then press **Submit for Approval**.
+4. When it reads **Approved**, press **Send for Signature** and check the signers.
+5. Your partner signs from the email. The lead then becomes a partner.
+6. Read [Make an agreement](#partnerships-contracts-generate).
+
 ```shot qs-sign-in
 open: /
 as: guest
@@ -631,4 +675,53 @@ marks:
   1: button "Send Reset Link" | A forgotten password
   2: button "Sign Out Everywhere" | A lost device
   3: button "Reset Two-Step" | A lost phone
+```
+
+```shot qs-add-lead
+open: /partnerships?tab=leads
+as: operations
+do:
+  - click: button "New Lead"
+  - wait: label "Name"
+crop: modal
+marks:
+  1: label "Name" | The organisation
+  2: button "Next" | On to the contact
+```
+
+```shot qs-log-interaction
+open: /partnerships?tab=leads
+as: operations
+do:
+  - click: row 1
+  - click: button "More"
+  - click: text "Log Interaction"
+  - wait: label "Subject"
+crop: modal
+marks:
+  1: label "Kind" | Call, meeting, email, visit or note
+  2: button "Log Interaction" | Save it
+```
+
+```shot qs-send-proposal
+open: /partnerships?tab=proposals
+as: operations
+do:
+  - click: button "New Proposal"
+  - wait: button "Start Proposal"
+crop: modal
+marks:
+  1: label "Deal" | What the proposal is for
+```
+
+```shot qs-agreement
+open: /partnerships?tab=contracts-and-mous
+as: operations
+do:
+  - click: button "Generate Agreement"
+  - wait: label "Kind"
+crop: modal
+marks:
+  1: label "Kind" | Deal Merchant, MOU, Service Agreement or Contract
+  2: button "Generate Agreement" | Make the draft
 ```

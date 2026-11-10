@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | LA (Love Adeola), M7's owner as CLAUDE.md, the guide and PROGRESS name it; GE (Godwin-Okoh Elisha) builds most PRs, LA the importers, AJ the Workspace links (the guide's Appendix A) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 4 (#90, merged); PR 5 (#91, merged); PR 6 (#92, merged); PR 7 (#94, merged); PR 8 (`m7/analytics-finish`, ready for review) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 4 (#90, merged); PR 5 (#91, merged); PR 6 (#92, merged); PR 7 (#94, merged); PR 8 (#99, merged); PR 9 (`m7/user-guide`, the chapter) |
 
 ---
 
@@ -101,9 +101,16 @@ with the date, and add a line to §3.
 - [ ] The staging walk of Appendix B after merge (§4 below), by a person
 
 ### PR 9 · User Guide chapter (after acceptance)
-- [ ] `docs/manual/partnerships.md` with pictures; the Quick Start card
+- [x] `docs/manual/partnerships.md` with pictures; the Quick Start cards (four, Lead Owners); the partner's pages on the public Help (10/11/2026)
 
 ## 3 · Log
+
+- 10/11/2026 · TB · PR 9 (`m7/user-guide`): the Partnerships chapter, `docs/manual/partnerships.md`, a section for each of the seven
+  screens with a picture of every step on desktop and phone; four Quick Start cards under a new Lead Owners group; the public Help's
+  Your Proposal, Sign an Agreement and Check an agreement. TB's calls of 10/11/2026: the partner's pages go in the public Help as well as
+  the chapter; four cards, not one; a picture for every step. `packages/contract/guide.js` takes the Lead Owners role and a
+  `/proposal/<token>` public address. Left: the staging walk (§4), which may rename a button the chapter names; the pictures the demo
+  cannot show (the draft being written, an approved agreement's own Send for Signature); MyCity's two samples.
 
 - 08/11/2026 · JP · PR 8 (`m7/analytics-finish`): Analytics (#55) on the contract, desktop and phone, with Export
   (the period's workbook); Performance's rating through `reviews.service.ratingsFor`. Link to Partner in Mailbox
