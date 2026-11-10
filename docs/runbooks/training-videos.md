@@ -198,7 +198,7 @@ listed here and in `docs/PROGRESS.md`.
 
 | Date | Screen | What filming showed | Fix |
 |---|---|---|---|
-| 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opens in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say | Open (§8) |
+| 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opened in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say; once beside it, its section headings skipped a level and its two small cards broke words | Fixed the same day: `ListDetail` on a wide desktop (the first role shown until another is pressed), its forms return to it in place; the dialog stays on a phone and where two columns do not fit; headings `h3`; the cards stack in the pane. Tests and the User Guide's pictures follow |
 
 ## 8 · Where the work stands
 
@@ -213,9 +213,66 @@ and form), the shortlist, and a short hand-off to Make Offer, which the M5 video
 working (Write With AI, Screen With AI, Score With AI, Suggest With AI, Tidy With AI), with a key for
 the filming session only (§1.4).
 
+**The chapters (TB's split; each line is what the chapter must show, the User Guide's words).**
+Cast: Cynthia Osakunih (Operations & People) is the recruiter; the JBS Praxis Team account is every
+role's hiring manager and a panelist; candidates are the seed's invented people (Head, Sales &
+Revenue has one at every stage: Chinedu Okafor applied, Funke Bakare screening, Emeka Obi
+assessment, Tobi Adeyemi and Halima Yusuf interview, Kunle Afolabi shortlist, Femi Lawal not
+progressing). AI chapters are marked AI (§1.4).
+
+Part 1, Vacancies and Candidates (`m4-recruitment-1.js`, about 8 minutes):
+
+1. Welcome (written, filmed): the card, the menu, the tabs, who sees what, invented candidates.
+2. Reading Vacancies (written, filmed): tiles, the list, the funnel, a role beside the list, Copy
+   Link, See Candidates, Careers Page. Refilm: the role now sits beside the list.
+3. Writing a Vacancy (AI): New Vacancy's questions one card at a time (Question n of 10), Skip, the
+   two follow-ups the hub asks, Draft Vacancy, the three steps, Closes On, Publish Now, Publish
+   Vacancy. Create Vacancy from Suggested From Organogram in one line.
+4. Questions, Scorecard and Emails: Apply questions and interview traits (Suggest With AI, AI),
+   the scorecard's parts and weights adding to 100, Candidate Emails and Restore Default, Careers
+   Settings and its default traits.
+5. Pause, Resume and Close: Pause keeps the link, Resume, Close Vacancy with Not Progress All.
+6. The Careers Page (phone, written, filmed): open roles, a role's page, How We Hire.
+7. Applying on a Phone (phone): Apply for This Role, About You, Choose Your CV (an invented CV made
+   as a PDF), the role's questions, Why This Role, the privacy tick, Submit Application, the
+   reference; the email a candidate gets.
+8. The Candidates Board: tiles, the vacancy filter, the five columns, a card's score and
+   Provisional, days at stage; a candidate beside the board: details, View CV, Weighted Total,
+   Stage History.
+9. Screening With AI (AI): Screen With AI, a Must Meet condition, Screen Applications, scores
+   replacing Provisional, the summary; Score With AI on one; a condition about age refused.
+10. Moving and Stopping: drag to a column, Move to, Not Progressing with its reason, Reopen.
+11. Talent Pool: Add to Pool with Why Keep Them, the pool's tiles, Invite to Apply from the pool and
+    from the board, Remove, Export.
+12. Wrapping Up: "That's Recruitment's first half, from a new vacancy to the Talent Pool."
+
+Part 2, Assessments and Interviews (`m4-recruitment-2.js`, about 8 minutes):
+
+1. Welcome: the second of two; who it follows.
+2. The Assessment Library: tiles, Assessments and Sittings, an assessment's questions and Points.
+3. Making an Assessment: New Assessment (Name, Type, Minutes or a take-home brief, Pass Mark,
+   Instructions), Questions (choice with Points, written, file or link), Suggest With AI (AI),
+   Activate; Export and Import in one line.
+4. Sending It: Send Assessment from a candidate (Start Within Days, Days to Finish), Send to
+   Candidates for a whole stage.
+5. Taking It on a Phone (phone): the email's link, Start the Assessment, the clock, Saved, a file
+   or a link answer, Submit Assessment. The link is the one the worker mailed: read it from the
+   outbox on the filming database, never invent it.
+6. Marking: Sittings, To Mark, Mark Answers, the score reaching the candidate.
+7. Scheduling an Interview: Schedule Interview, the candidate, How, Day, Starts, Ends, Panel; the
+   calendar invite; Candidate Details.
+8. The Blind Panel: Blind Panel's Submitted and Waiting, Hidden; My Card on a phone as the JBS
+   Praxis Team (ten stars a trait, Your score, Decision, Comments, Tidy With AI (AI), Private Notes,
+   Submit Card); nobody reads another card until the round closes.
+9. Closing the Round: Close Round, the results (each rating, the averages, the total out of 100),
+   Write Report, Download Form (the Interview Assessment Form).
+10. Shortlist and Offer: the selected candidate to Shortlist; Make Offer opens Offers, covered in
+    the Milestone 5 video. About 20 seconds.
+11. Wrapping Up: "That's Recruitment, from a new vacancy to the shortlist."
+
 Next, in order:
 
-- [ ] Fix the Vacancies bug in §7.
+- [x] Fix the Vacancies bug in §7 (10/11/2026).
 - [ ] Write the rest of `m4-recruitment-1.js` (chapter list in §8 above), film it, look at every shot.
 - [ ] Write and film `m4-recruitment-2.js`.
 - [ ] Film the AI chapters in a session with the Gemini secret (§1.4, §6.4).
