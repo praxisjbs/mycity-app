@@ -220,6 +220,13 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["task", "add task", "create task", "to do", "todo", "set a task", "assign work"],
   }),
+  // Payroll Runs opens its New Run on `action=new` (docs/guides/payroll.md §9; the rebuilt screen, PR 7).
+  a("new_run", "New Run", {
+    screen: "payroll.payroll-runs",
+    params: { action: "new" },
+    need: ["payroll", "create"],
+    words: ["payroll run", "run payroll", "open a month", "pay run", "new payroll", "monthly payroll"],
+  }),
   a("record_advance", "Record Advance", {
     screen: "payroll.deductions",
     params: { action: "new" },

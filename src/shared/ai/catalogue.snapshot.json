@@ -2,6 +2,17 @@
   "about": "The AI manifests as the build declares them (docs/guides/praxis-ai.md §6.15). Rewrite with npm run gen:ai-catalogue; never by hand.",
   "entries": [
     {
+      "key": "advances.record",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.create",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "deductions.AdvanceRecord",
+      "schema_sha": "3275ba48fdfff9e7",
+      "screen": null
+    },
+    {
       "key": "alert_rules.create",
       "kind": "action",
       "module_key": "home",
@@ -306,6 +317,28 @@
       "bulk": 1,
       "schema": "partner_pipeline.DealChange",
       "schema_sha": "78acbdb5fdb43fd8",
+      "screen": null
+    },
+    {
+      "key": "deductions.accept",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.edit",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "deductions.FineAccept",
+      "schema_sha": "58e20a47f8a7e360",
+      "screen": null
+    },
+    {
+      "key": "deductions.waive",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.edit",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "deductions.FineWaive",
+      "schema_sha": "0f8bc8276bb3871e",
       "screen": null
     },
     {
@@ -929,6 +962,17 @@
       "screen": null
     },
     {
+      "key": "payroll_adjustments.add",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.edit",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "payroll.PayrollRunAdjust",
+      "schema_sha": "db1b534542c4cfd3",
+      "screen": null
+    },
+    {
       "key": "payroll_runs.create",
       "kind": "action",
       "module_key": "payroll",
@@ -937,6 +981,17 @@
       "bulk": 1,
       "schema": "payroll.PayrollRunCreate",
       "schema_sha": "06af322723da8649",
+      "screen": null
+    },
+    {
+      "key": "payroll_runs.submit",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.edit",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "payroll.PayrollRunSubmission",
+      "schema_sha": "f43fe3842cfc4c4a",
       "screen": null
     },
     {
@@ -1706,6 +1761,28 @@
       "screen": null
     },
     {
+      "key": "deductions.list",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "deductions.DeductionListQuery",
+      "schema_sha": "a94c4bedb9c46c38",
+      "screen": null
+    },
+    {
+      "key": "deductions.mine",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.PageQuery",
+      "schema_sha": "463693b1b2726c8c",
+      "screen": null
+    },
+    {
       "key": "departments.list",
       "kind": "read",
       "module_key": "people",
@@ -2033,6 +2110,39 @@
       "bulk": null,
       "schema": "partners.PartnerListQuery",
       "schema_sha": "ffe2bf894a6f1134",
+      "screen": null
+    },
+    {
+      "key": "payroll.runs",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payroll.PayrollRunListQuery",
+      "schema_sha": "e0a1e3678758cbce",
+      "screen": null
+    },
+    {
+      "key": "payslips.list",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payslips.PayslipListQuery",
+      "schema_sha": "fea82298cf644b4f",
+      "screen": null
+    },
+    {
+      "key": "payslips.mine",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payslips.EssPayslipQuery",
+      "schema_sha": "7574dc91de985edc",
       "screen": null
     },
     {
@@ -2916,6 +3026,17 @@
       "screen": "partnerships.proposals"
     },
     {
+      "key": "payroll.route.my_payslip",
+      "kind": "route",
+      "module_key": "payroll",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "ess.my-payslips"
+    },
+    {
       "key": "payroll.route.record_a_salary_advance",
       "kind": "route",
       "module_key": "payroll",
@@ -2936,6 +3057,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "payroll.payroll-runs"
+    },
+    {
+      "key": "payroll.route.turn_on_advanced_payroll",
+      "kind": "route",
+      "module_key": "payroll",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "payroll.configurations"
     },
     {
       "key": "people.route.add_a_department",
@@ -3793,6 +3925,17 @@
       "bulk": null,
       "schema": "partnership_analytics.PartnershipSummaryQuery",
       "schema_sha": "a8a9d28b3fbc7b38",
+      "screen": null
+    },
+    {
+      "key": "payroll.month",
+      "kind": "summary",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payroll.PayrollMonthQuery",
+      "schema_sha": "de1924c7adf48630",
       "screen": null
     },
     {

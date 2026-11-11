@@ -19,7 +19,8 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { scopeFor } = require("../../middleware/rbac");
 const lagos = require("../../shared/time/lagos");
-const { formatDate } = require("../../shared/time/day-first");
+const { formatDate, formatMonth } = require("../../shared/time/day-first");
+const { oneNamed } = require("../../shared/ai/named");
 const lock = require("../payroll/payroll.lock");
 const repo = require("./deductions.repo");
 const acceptance = require("./deductions.acceptance");
@@ -170,4 +171,76 @@ async function fineWaiting(payload) {
   });
 }
 
-module.exports = { present, list, summary, acceptFine, waiveFine, releaseFine, recordAdvance, cancelAdvance, fineWaiting };
+/* ------------------------------------------------------------------ *
+ * What the assistant reads and checks (deductions.ai.js, guide §9)
+ * ------------------------------------------------------------------ */
+
+/** A fine as a card and its answers name it: the person and the query ("Ada Obi, QRY-0019"), never an amount. */
+const fineLabel = (row) => `${row.employee.display_name}, ${row.query_number || row.reason_text}`;
+
+/** The fine a card names, for its chip. Nothing for one that does not exist. */
+async function cardFine(db, id) {
+  const row = id ? await repo.rowOf(db, "fine", id) : null;
+  return row ? [{ type: "deduction", id: row.sanction_fine_id || row.source_id, label: fineLabel(row) }] : [];
+}
+
+/**
+ * Before the press: the fine still waits (409 FINE_NOT_MOVABLE otherwise, as accepting or waiving says) and is not the
+ * asker's own (403 OWN_RECORD, §6.6 rule 8), so a card that cannot go through is refused when it is drawn.
+ */
+async function assertCardFine(db, id, actor) {
+  const row = await repo.rowOf(db, "fine", id);
+  if (!row) throw new AppError("NOT_FOUND", "That fine does not exist", 404);
+  if (row.employee_id === actor.employee_id) throw new AppError("OWN_RECORD", "Someone else settles your own fine", 403);
+  if (row.status !== "pending") throw new AppError("FINE_NOT_MOVABLE", "This fine is no longer waiting", 409);
+}
+
+/** Before the press: the person an advance is for exists and is not the asker (403 OWN_RECORD). */
+async function assertCardAdvance(db, values, actor) {
+  const person = await repo.employeeOf(db, values.employee_id);
+  if (!person) throw new AppError("NOT_FOUND", "That person does not exist", 404, { employee_id: ["Pick a person"] });
+  if (person.employee_id === actor.employee_id) throw new AppError("OWN_RECORD", "Someone else records your own advance", 403);
+}
+
+/** The twelve months a fine or an advance may start in, from the open month (§6.6 rule 2): each month's first day and how a person says it. */
+async function startMonths(db) {
+  const open = await lock.openPeriod(db);
+  return Array.from({ length: 12 }, (_, i) => {
+    const period = lagos.addMonths(open, i);
+    return { period, name: formatMonth(period) };
+  });
+}
+
+/** The months to tap under "Which month does it start?": the open month first, as a person names a month ("October 2026"). */
+async function startMonthChoices(db) {
+  return (await startMonths(db)).map((m) => m.name);
+}
+
+/**
+ * A start month as a person writes it ("October 2026", "2026-10") or as the form sends it ("2026-10-01"), as its first day;
+ * left as written when it is none of the twelve, so the field marks it. A month before the open one is the service's refusal.
+ */
+async function startMonthOf(db, words) {
+  const said = String(words || "").trim();
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(said)) return `${said}-01`;
+  const found = oneNamed(await startMonths(db), said, (m) => [m.name, m.period.slice(0, 7)]);
+  return found ? found.period : null;
+}
+
+module.exports = {
+  present,
+  list,
+  summary,
+  acceptFine,
+  waiveFine,
+  releaseFine,
+  recordAdvance,
+  cancelAdvance,
+  fineWaiting,
+  fineLabel,
+  cardFine,
+  assertCardFine,
+  assertCardAdvance,
+  startMonthChoices,
+  startMonthOf,
+};
