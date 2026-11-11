@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #74 Settings · Notifications (brought forward from M6); the bell, its pane, the banner, the urgent bar, Notification Settings, the counts on the menu and on each module's tabs, and the unread dot on a list's rows are shell parts on every screen |
 | Status | Built |
-| Last changed | 26/10/2026 |
+| Last changed | 11/11/2026 |
 
 TB's decisions of 19/10/2026 and their build logs are in `docs/handoff/push-notifications.md` (web
 push, the banner, the pane) and `docs/handoff/notifications-everywhere.md` (urgency, every device,
@@ -63,7 +63,11 @@ left alone.
    temporary site on ESS · Work Location Requests), mails `email`, and queues one
    `notification-push` job per row carrying `push` (job id `push-<notification_id>`, so a retried
    delivery never queues it twice), at once: nothing waits while the person is in the app (TB,
-   19/10/2026).
+   19/10/2026). **The email follows the reader** (M6 PR 12, 11/11/2026): its Open in MyCity App
+   link is the bell's own for the same person, and so is the push's path, all three from one
+   function (`notifications.service.readerLink`, through `screenTo` with the recipient's own grants
+   read in the worker), so an employee's "Your payslip is ready" email opens ESS · My Payslips as
+   their bell does. A notice whose person may open neither screen has no link on any channel.
 3. The app that receives `notification` updates the dot and the pane and, when the window is on
    screen, shows the banner (3 s) and plays the chime or vibrates (§6). The banner is not shown for
    the record already on screen.
@@ -232,7 +236,8 @@ Reference-data file(s): none.
   `shared/route-map.js` names its screen. The reader who may open the module its route names
   (`permission`, else the screen's module) opens it there; one who cannot opens the screen the route
   names for the people the record concerns (`self`, in another module) when they may open that one;
-  otherwise it opens nowhere and has no link. The bell's link, the badges per module and per tab,
+  otherwise it opens nowhere and has no link. The bell's link, the push's, the email's
+  (`readerLink`, one per person, on every channel), the badges per module and per tab,
   a list's unread rows and the read mark on opening a record all follow this rule, so a module's
   tabs add up to its count and the count matches what the bell links to (a leave request a member
   of staff is told about counts on Self-Service · My Leave; System Health's notices count on
@@ -537,6 +542,7 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
 
 ## 14 · Change log
 
+- 11/11/2026 · JP · M6 PR 12 (`m6/notification-links`): the email follows the reader. `notifications.service.readerLink(row)` is the one link a notice gives its person, through `screenTo` with that person's own grants (`grantsCache.getAuthUser` and `opener`, as the bell's socket copy already read them in the worker), and the bell's socket copy (`asNotice`), the push (`notifications.push.js`) and the email (`notification-deliver.js`, no longer `routeMap.linkFor` with no `self`) all call it (§3 step 2, §6). An employee's "Your payslip is ready", "Deduction Scheduled" and "Fine Waived" emails now open ESS · My Payslips, a temporary site's ESS · Work Location Requests; a notice whose person may open neither screen emails no link, as the bell shows none. The email's variables and the contract are unchanged. Tests: `tests/integration/notifications.test.js` (bell, socket, email and push agree for a temporary site and for a record with no screen for the reader), `tests/integration/ai-actions-payroll.test.js` (the payslip and deduction emails). No screen changed.
 - 11/11/2026 · JP · Found in the M6 audit (`docs/guides/payroll.md` §7, Appendix A PR 12): the 20/10/2026 fallback below holds for the bell and push (`notifications.service.screenTo`, `notifications.push.js`) but not for the email, whose link is `routeMap.linkFor(entity_type, id)` with no `self` (`src/jobs/handlers/notification-deliver.js`, `linkOf`). So an employee's "Your payslip is ready", "Deduction Scheduled" and "Fine Waived" emails link to Payroll screens they cannot open, and the M6 definition of done ("the link in each opens the same screen") is not met for a `self` route. To fix in M6 PR 12 (GE): the email's link resolved for its recipient as the bell's is, with a test. Documentation only.
 
 - 03/11/2026 · JP · Notifications' forms in the chat (`praxis-ai.md` decision 33): a person's own notice setting, quiet hours and digest, and the company's notice rules and reminders, as Praxis AI cards (`notifications.ai.js`; `rules.one`, `keyOf`, `names`); the controller's `ai:none` gives way to the manifest, which still reads nothing; the push subscription is `device` (§9). No screen changed.

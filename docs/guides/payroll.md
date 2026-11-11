@@ -1022,12 +1022,13 @@ the link `shared/route-map.js` gives `payroll_run`, Payroll · Payroll Runs on t
 approval's end tells each person "Your payslip is ready" (category `payroll`: bell and email, no push), opening My Payslips for
 someone who cannot open Payroll · Payslips.
 
-**Not yet true for a person without `payroll` (found 11/11/2026, PR 12):** the bell and push pick the reader's own screen
-through the route map's `self`, but the email's link does not (`src/jobs/handlers/notification-deliver.js`, `linkOf`), so an
-employee's "Your payslip is ready", "Deduction Scheduled" and "Fine Waived" emails link to Payroll · Payslips or
-Deductions, which they cannot open. Once PR 12 merges, the bell's link opens the same screen as the email's: `shared/route-map.js` maps `payroll_run` to Payroll ·
-Payroll Runs, `payslip` to Payroll · Payslips (`self: true` to ESS · My Payslips), `deduction` to Payroll ·
-Deductions, and the retired `salary_structure` and `statutory_return` entries to Configurations.
+The bell's link opens the same screen as the email's, and the push's, for each person: all three take the link the reader may
+open (`notifications.service.readerLink`, the route map's `self` included; `docs/guides/notifications.md` §3 step 2, PR 12).
+`shared/route-map.js` maps `payroll_run` to Payroll · Payroll Runs, `payslip` to Payroll · Payslips (`self: true` to ESS · My
+Payslips), `deduction` to Payroll · Deductions (`self: true` to ESS · My Payslips), and the retired `salary_structure` and
+`statutory_return` entries to Configurations. So an employee without `payroll` is emailed "Your payslip is ready", "Deduction
+Scheduled" and "Fine Waived" with a link to My Payslips, and a Payroll reader's own payslip opens Payroll · Payslips
+(`tests/integration/ai-actions-payroll.test.js`).
 
 ---
 
@@ -1773,6 +1774,9 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
 - `docs/guides/notifications.md` §3 and this guide's §7 say so.
 - Done when: the definition of done's "the link in each opens the same screen" holds for every payroll notice and every
   `self` route.
+- Built 11/11/2026: `notifications.service.readerLink` is the one link for the bell, push and email; tests in
+  `tests/integration/notifications.test.js` (a temporary site, and a record with no screen for the reader) and
+  `tests/integration/ai-actions-payroll.test.js` (the payslip and deduction emails).
 
 ## Appendix B · Done, demo and handover
 
@@ -1872,6 +1876,10 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 11/11/2026 · JP · PR 12 (`m6/notification-links`): a notice's email link follows the reader as the bell and push do
+  (`notifications.service.readerLink`), so "Your payslip is ready", "Deduction Scheduled" and "Fine Waived" open ESS · My
+  Payslips for a person without `payroll`. §7's "Not yet true" paragraph is replaced by what now holds; Appendix A PR 12
+  marked built. No screen changed.
 - 11/11/2026 · JP · Milestone 6 audit against the Milestones Review of 11 November 2026 (TB's corrections). §0.1 Pay day (one day every month, Last Day of Month) and Legal source; §0.2 the meeting as a source; §4.2 the owed source columns (`6040`); §5 Remove Change and `SOURCE_REQUIRED`, `VERSION_IN_FORCE` owed; §6.11 rule 1 (one day for every month, Operations & People, Last Day of Month); §6.12 rules 11 to 15 (every item monthly and PAYE Basis off the screen; every rate with its source; people enter every change; the conventions are law; the relief to be checked against the Nigeria Tax Act 2025); §6.16 the statutory register, unverified; §10.1 and §10.4 Configurations' Source, Remove Change, Last Day of Month; §13.1 items 29 to 37; §13.2 item 22 amended; §13.3 items 2 to 4; Appendix A "How the rest is planned" with PR 8 to PR 12, their lanes, models, efforts and merge order; Appendix B demo items 8 and 9. Found and recorded: the email link of a notice ignores the route map's `self` (PR 12); mail is paused on staging and failed outbox rows keep the Events check amber (Appendix B item 9). Documentation only; no code changed.
 
 - 11/11/2026 · JP · PR 7 (the screens, `m6/screens`) rebuilt Payroll Runs and Payslips and ESS · My Payslips on the contract and the real API, with `MonthField` in `packages/ui`; the guide meets what was built. §13.3's question 2 answered by JBS Praxis and moved to §13.1 item 28 (In the run is approved, not yet paid; no API change), §5's pointer with it. §2: Payroll Runs lists Include, Payslips its Month select and the run's mail and download. §10.1 to §10.4: what each screen now shows (the open run's card by its month, Waiting On, Adjustments, Left Out, Run Problems; the Payslips list titled Preview or Published; My Payslips' year from the start year, Email a Copy with Download PDF in the payslip's modal), the components as built (`MonthField`, `Chain stack`, the slip drawn from its lines until its PDF loads) and the words added. F31's amendment for both payslips recorded in FRONTEND_FOUNDATION, FRONTEND_GUIDE §7 and CLAUDE.md (§10.3). §11: Preparing has no Download PDF; a decision lands after it commits and the screen waits for it. §9: New Run's `action=new` is answered. Every money field of the four tabs sends a two-place amount (`toMoneyString`), as the contract asks. Appendix A PR 7 says what was built.
