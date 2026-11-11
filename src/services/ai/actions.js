@@ -42,6 +42,17 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-10-20",
     built: true,
   }),
+  // Draft With AI on an SOP (docs/guides/knowledge.md §6.4): a department's procedure shaped into
+  // Purpose, Roles and Steps; a procedure names people, so DeepSeek never answers it.
+  "sop-draft": Object.freeze({
+    label: "Draft SOP",
+    module: "knowledge",
+    job: "default",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-11-11",
+    built: true,
+  }),
   "data-answers": Object.freeze({
     label: "Data Answers",
     module: "praxis_ai",

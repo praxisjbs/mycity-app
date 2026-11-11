@@ -2223,6 +2223,28 @@
       "screen": null
     },
     {
+      "key": "sops.list",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "knowledge.SopListQuery",
+      "schema_sha": "6eee225e9fc20931",
+      "screen": null
+    },
+    {
+      "key": "sops.read",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
       "key": "talent_pool.list",
       "kind": "read",
       "module_key": "recruitment",
@@ -2663,6 +2685,17 @@
       "screen": "knowledge.policies"
     },
     {
+      "key": "knowledge.route.read_a_department_s_procedure_sop_",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.sops"
+    },
+    {
       "key": "knowledge.route.read_how_to_use_a_screen_in_the_user_guide",
       "kind": "route",
       "module_key": "knowledge",
@@ -2683,6 +2716,28 @@
       "schema": null,
       "schema_sha": null,
       "screen": "ess.policy-updates"
+    },
+    {
+      "key": "knowledge.route.start_a_new_sop",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.sops"
+    },
+    {
+      "key": "knowledge.route.write_change_or_publish_an_sop",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.sops"
     },
     {
       "key": "knowledge.route.write_or_publish_a_policy",
