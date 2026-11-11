@@ -42,8 +42,8 @@ const TrainingItem = z
     document_id: uuid.nullable(),
     document_name: z.string().nullable(),
     document_type: z.string().nullable(),
-    /** A lesson's Markdown, for the editor. */
-    lesson_markdown: z.string().nullable(),
+    /** A lesson as the editor loads it: its Markdown drawn as HTML by the one converter. */
+    lesson_html: z.string().nullable(),
     /** The same, as the reader draws it. */
     lesson: z.array(RichTextBlock).nullable(),
     minutes: z.number().int().min(1).max(600).nullable(),
@@ -51,6 +51,16 @@ const TrainingItem = z
   .strict();
 
 const itemTitle = text(120).refine(longEnough(2), "Name the item");
+/** The words of the editor's HTML, for the length a person sees. */
+const wordsOf = (html) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+/**
+ * A lesson as the editor sends it (HTML). The server keeps it as Markdown through the one
+ * converter (shared/documents/markdown.js) and refuses one longer than 20,000 characters there.
+ */
+const lessonHtml = z
+  .string()
+  .max(100_000, "Too long")
+  .refine((v) => wordsOf(v).length >= 20, "At least 20 characters");
 const minutes = z.number().int().min(1, "At least 1").max(600, "At most 600").optional();
 
 /** Add Item, and the whole item again when it changes (PATCH sends the same): one shape per kind. */
@@ -58,7 +68,7 @@ const ItemCreate = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("file"), title: itemTitle, document_id: uuid, minutes }).strict(),
   z.object({ kind: z.literal("video"), title: itemTitle, url: httpsUrl, minutes }).strict(),
   z.object({ kind: z.literal("link"), title: itemTitle, url: httpsUrl, minutes }).strict(),
-  z.object({ kind: z.literal("lesson"), title: itemTitle, lesson_markdown: text(20_000).refine(longEnough(20), "At least 20 characters"), minutes }).strict(),
+  z.object({ kind: z.literal("lesson"), title: itemTitle, lesson_html: lessonHtml, minutes }).strict(),
 ]);
 
 /** The items in their new order: every item of the course, once. */
@@ -154,8 +164,8 @@ const LessonWithAi = z
   .strict()
   .refine((v) => (v.text ? 1 : 0) + (v.document_id ? 1 : 0) === 1, { message: "Paste the text or pick a PDF", path: ["text"] });
 
-/** What Draft Lesson suggests; nothing is saved until the builder takes it. */
-const LessonSuggestion = z.object({ lesson_markdown: z.string() }).strict();
+/** What Draft Lesson suggests, as the editor loads it; nothing is saved until the builder takes it. */
+const LessonSuggestion = z.object({ lesson_html: z.string() }).strict();
 
 /* ------------------------------------------------------------------ *
  * Assignments
@@ -297,6 +307,7 @@ const TABLES = {
       youtube_id: "read from url",
       document_name: "the document's file name",
       document_type: "the document's media type",
+      lesson_html: "lesson_markdown, as the editor loads it",
       lesson: "lesson_markdown, as the reader draws it",
     },
   },
@@ -329,7 +340,7 @@ const TABLES = {
   CoursePublish: { table: null, reason: "the signature, stored in the vault as training_course.signature_document_id" },
   CourseReason: { table: null, reason: "the archive reason, written to training_course.archive_reason" },
   LessonWithAi: { table: null, reason: "what Draft Lesson reads; nothing is saved" },
-  LessonSuggestion: { table: "training_item" },
+  LessonSuggestion: { table: "training_item", virtual: { lesson_html: "the model's Markdown as the editor loads it; kept as lesson_markdown once added" } },
   AssignmentCreate: {
     table: "training_assignment",
     virtual: {
@@ -385,6 +396,7 @@ const TABLES = {
       youtube_id: "read from url",
       document_name: "the document's file name",
       document_type: "the document's media type",
+      lesson_html: "lesson_markdown, as the editor loads it",
       lesson: "lesson_markdown, as the reader draws it",
       done_at: "the person's training_item_progress",
     },

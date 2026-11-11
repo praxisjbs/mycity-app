@@ -166,11 +166,11 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `POST /api/v1/training/courses` | `CourseCreate` (`title`, `summary`) → `Course` | `knowledge` create, `training.manage` | no | Numbered, `draft` |
 | `GET /api/v1/training/courses/:id` | → `Course` | `knowledge` view, `training.manage` | no | Items, settings, counts |
 | `PATCH /api/v1/training/courses/:id` | `CourseUpdate` (`title`, `summary`, `library`, `proof_required`, `proof_prompt`, `issue_certificate`) → `Course` | `knowledge` edit, `training.manage` | no | |
-| `POST /api/v1/training/courses/:id/items` | `ItemCreate` → `Course` | `knowledge` edit, `training.manage` | no | At most 40 |
+| `POST /api/v1/training/courses/:id/items` | `ItemCreate` (a lesson's text as the editor's `lesson_html`) → `Course` | `knowledge` edit, `training.manage` | no | At most 40 |
 | `PATCH /api/v1/training/items/:id` | `ItemCreate` (the whole item) → `Course` | `knowledge` edit, `training.manage` | no | |
 | `DELETE /api/v1/training/items/:id` | → `Course` | `knowledge` edit, `training.manage` | no | §6.6 on a published course; an archived course's items are fixed (409 `COURSE_ARCHIVED`), as are its title and settings |
 | `PUT /api/v1/training/courses/:id/order` | `ItemOrder` (`item_ids`) → `Course` | `knowledge` edit, `training.manage` | no | |
-| `POST /api/v1/training/lesson-with-ai` | `LessonWithAi` (`text` or `document_id`, `title`) → `LessonSuggestion` | `knowledge` edit, `training.manage` | no | A suggestion only. 503 `AI_UNAVAILABLE` |
+| `POST /api/v1/training/lesson-with-ai` | `LessonWithAi` (`text` or `document_id`, `title`) → `LessonSuggestion` (`lesson_html`) | `knowledge` edit, `training.manage` | no | A suggestion only. 503 `AI_UNAVAILABLE` |
 | `POST /api/v1/training/courses/:id/publish` | `CoursePublish` (`signature`) → `Course` | `knowledge` edit, `training.manage` | no | §6.6 |
 | `POST /api/v1/training/courses/:id/archive` | `CourseReason` → `Course` | `knowledge` delete, `training.manage` | no | |
 | `POST /api/v1/training/courses/:id/assignments` | `AssignmentCreate` (`everyone`, `department_ids`, `role_ids`, `employee_ids`, `due_within_days`, `keep_assigning`) → `Assignment` | `knowledge` edit, `training.manage` | no | Published courses only (409 `COURSE_NOT_PUBLISHED`) |
@@ -243,11 +243,14 @@ not use them; a later release drops them (MIGRATIONS §8), together with
   plays in the course through `youtube-nocookie.com` (the staff app's CSP gains that `frame-src`);
   any other video link opens in a new tab.
 - **Course link**: an `https` URL to an outside course; it opens in a new tab.
-- **Lesson**: Markdown from the rich text editor (`RichTextField`, 20 to 20,000 characters).
-  **Draft Lesson** (`training-lesson-draft`, prompt `services/ai/prompts/training-lesson-draft.md`,
+- **Lesson**: Markdown from the rich text editor (`RichTextField`, 20 to 20,000 characters). The
+  editor sends HTML (`lesson_html`), which the server keeps as Markdown through the one converter
+  (`shared/documents/markdown.js`: headings, paragraphs, lists, bold, italic and links), and gives
+  back as `lesson_html` for the editor and as blocks for the reader, as Policies do; no screen
+  converts text itself. **Draft Lesson** (`training-lesson-draft`, prompt `services/ai/prompts/training-lesson-draft.md`,
   the **Default** job, personal data: yes, never DeepSeek, TB 11/11/2026): from a pasted text or a
   PDF's text, a lesson of headings, short paragraphs and a Key Points list, at most 1,200 words,
-  keeping the source's facts; shown beside the editor, Use Lesson replaces its text.
+  keeping the source's facts; shown beside the editor (`lesson_html`), Use Lesson replaces its text.
 - **Minutes** per item (1 to 600) are optional; the course's length is their sum.
 - A course's settings: **Library** (off by default), **Proof Required** with **Proof Prompt** (up to
   120 characters, "Paste your certificate link"), **Issue Certificate** (on by default).

@@ -28,7 +28,9 @@
  * The Content-Security-Policy is written for the two builds this process serves:
  * scripts, styles, fonts and API calls from the same origin only; images and
  * media also from blob: and data: (upload previews, voice notes). Nothing is
- * loaded from a third-party CDN.
+ * loaded from a third-party CDN. One frame comes from outside, on the staff host
+ * only: a training course's YouTube video, played through YouTube's privacy-enhanced
+ * domain (docs/guides/knowledge.md §6.5).
  */
 require("./middleware/async-safe");
 
@@ -45,7 +47,10 @@ const { JSON_LIMIT } = require("./shared/http/body-limits");
 const { buildRoutes } = require("./http/routes");
 // Every address a body carries is checked against its signature at the edge (F27).
 require("./shared/places/token");
-const { hostGuard, staticSites } = require("./http/static");
+const { hostGuard, staticSites, surfaceOfHost } = require("./http/static");
+
+/** Where a course's YouTube video plays from (docs/guides/knowledge.md §6.5). */
+const YOUTUBE_FRAMES = "https://www.youtube-nocookie.com";
 
 const CSP = {
   useDefaults: true,
@@ -59,6 +64,8 @@ const CSP = {
     "connect-src": ["'self'"],
     "worker-src": ["'self'"],
     "manifest-src": ["'self'"],
+    // The staff app may frame a course's YouTube video; the public site frames nothing outside.
+    "frame-src": ["'self'", (req) => (surfaceOfHost(req) === "staff" ? YOUTUBE_FRAMES : "")],
     "frame-ancestors": ["'none'"],
     // Over plain http on a laptop, upgrading would point every request at https.
     "upgrade-insecure-requests": isServer ? [] : null,

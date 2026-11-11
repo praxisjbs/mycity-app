@@ -50,9 +50,11 @@ describe("an item as the screens read it", () => {
     expect(toItem({ ...base, kind: "link", url }).youtube_id).toBeNull();
   });
 
-  test("a lesson is drawn from its Markdown, and the item matches the contract", () => {
+  test("a lesson is drawn from its Markdown for the reader and the editor, and the item matches the contract", () => {
     const item = toItem({ ...base, kind: "lesson", lesson_markdown: "## Rules\n\n- Lock your screen", minutes: "10" });
     expect(item.lesson.map((b) => b.kind)).toEqual(["heading", "bullets"]);
+    expect(item.lesson_html).toBe("<h2>Rules</h2>\n<ul><li>Lock your screen</li></ul>");
+    expect(toItem({ ...base, kind: "video", url: "https://youtu.be/dQw4w9WgXcQ" }).lesson_html).toBeNull();
     expect(item.minutes).toBe(10);
     expect(() => c.training.TrainingItem.parse(item)).not.toThrow();
   });
@@ -95,13 +97,13 @@ describe("Draft Lesson (§6.5)", () => {
     expect(actions.of("training-lesson-draft")).toMatchObject({ job: "default", personal_data: true, chosen_by: "TB", module: "knowledge" });
   });
 
-  test("the model's Markdown is given back without a fence; contact details never leave", async () => {
+  test("the model's Markdown is given back without a fence, as the editor loads it; contact details never leave", async () => {
     ai.complete.mockImplementation(async ({ input }) => {
       expect(JSON.stringify(input)).not.toContain("help@mycity.test");
       return { text: "```markdown\n## Your Data\n\nWrite to KEPT001 with questions.\n\n## Key Points\n\n- Ask\n```" };
     });
     const out = await lesson.suggest({ user_id: "u" }, { title: "Data", text: "Write to help@mycity.test with any question about personal data." });
-    expect(out.lesson_markdown).toBe("## Your Data\n\nWrite to help@mycity.test with questions.\n\n## Key Points\n\n- Ask");
+    expect(out.lesson_html).toBe("<h2>Your Data</h2>\n<p>Write to help@mycity.test with questions.</p>\n<h2>Key Points</h2>\n<ul><li>Ask</li></ul>");
     expect(ai.complete).toHaveBeenCalledWith(expect.objectContaining({ purpose: "training-lesson-draft", module: "knowledge" }));
   });
 
