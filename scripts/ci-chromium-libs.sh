@@ -31,7 +31,7 @@
 # retries a stalled fetch and waits for its lock (ci.yml's "apt retries a stalled mirror").
 #
 # Needs: SHARED (the artifact's name), GH_TOKEN (actions: read), GITHUB_RUN_ID, GITHUB_REPOSITORY,
-# GITHUB_OUTPUT. Writes `source` (cache, mirror, shared, shared-lite, fallback) and `share`.
+# GITHUB_OUTPUT. Writes `source` (cache, mirror, shared, shared-lite, image, fallback) and `share`.
 set -u
 
 DEBS="$HOME/chromium-debs"
@@ -152,6 +152,14 @@ fi
 
 # 4. The last resort: everything but the optional fonts, from a fresh index; shared as the lite set.
 packages="$(playwright_packages | grep -vxF -f <(tr ' ' '\n' <<<"$OPTIONAL_FONTS"))"
+# The runner image usually holds every one of them already, and then the mirror is not needed at all
+# (11/11/2026: its name stopped resolving, so even a fresh index failed while nothing was missing).
+missing="$(for p in $packages; do dpkg-query -W -f='${Status}\n' "$p" 2>/dev/null | grep -q 'install ok installed' || echo "$p"; done)"
+if [ -n "$packages" ] && [ -z "$missing" ]; then
+  echo "::warning::Chromium's system libraries were already on the runner image; the optional fonts ($OPTIONAL_FONTS) were not installed: the runner's apt mirror could not serve them"
+  out source image
+  exit 0
+fi
 if [ -n "$packages" ]; then
   # shellcheck disable=SC2086 # one word a package
   if timeout 120 sudo apt-get update -q && timeout 240 sudo apt-get install -y -q --no-install-recommends --fix-missing $packages; then
