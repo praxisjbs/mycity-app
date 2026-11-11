@@ -16,10 +16,17 @@
  *    font cache before it answers: 10 s with 335 fonts, past puppeteer's 30 s default on a
  *    CI runner with thousands (08/11/2026). So a launch waits LAUNCH_TIMEOUT_MS, tries once
  *    more if that runs out, and never waits on a D-Bus session a server does not have.
+ *  - A home it may write. Chromium keeps its crash database and desktop settings under
+ *    HOME. The services set HOME=/tmp (ops/systemd); a script run by hand as the
+ *    environment's user (`sudo -u mycity-stg node scripts/db/seed.js --staging`) keeps that
+ *    user's home, which it may not write, and Chromium then fails to start. So a home it
+ *    cannot write is swapped for the system's temp folder, as the services do.
  *
  * puppeteer-core is used, not puppeteer: it never downloads a browser of its own.
  */
 const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { config } = require("../../config/env");
 const { logger } = require("../../config/logger");
 
@@ -43,6 +50,23 @@ const exists = (p) => {
     return false;
   }
 };
+
+/**
+ * HOME and the XDG folders Chromium writes under: the caller's when it may write its HOME,
+ * else the system's temp folder (the services' own HOME=/tmp).
+ * @param {NodeJS.ProcessEnv} env
+ */
+function homeFor(env) {
+  let home = env.HOME;
+  try {
+    if (!home) throw new Error("no HOME");
+    fs.accessSync(home, fs.constants.W_OK);
+  } catch {
+    home = os.tmpdir();
+  }
+  if (home === env.HOME) return {};
+  return { HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), XDG_CACHE_HOME: path.join(home, ".cache") };
+}
 
 /** Playwright-style installs keep the binary a few folders down. */
 function findUnder(dir) {
@@ -104,7 +128,7 @@ async function start(executablePath) {
     headless: true,
     timeout: LAUNCH_TIMEOUT_MS,
     // No session bus on a server or a runner: Chromium fails fast instead of waiting on one.
-    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: "disabled:" },
+    env: { ...process.env, ...homeFor(process.env), DBUS_SESSION_BUS_ADDRESS: "disabled:" },
     // The background-networking flags stop Chromium itself calling out (Google sign-in,
     // component updates, sync): a PDF renderer on our server talks to nobody.
     args: [
@@ -189,4 +213,4 @@ function health() {
   }
 }
 
-module.exports = { KNOWN_PATHS, LAUNCH_TIMEOUT_MS, resolvePath, browser, withPage, close, health };
+module.exports = { KNOWN_PATHS, LAUNCH_TIMEOUT_MS, resolvePath, homeFor, browser, withPage, close, health };

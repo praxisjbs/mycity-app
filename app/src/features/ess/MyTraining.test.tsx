@@ -95,7 +95,7 @@ describe("ESS · My Training", () => {
     expect(await screen.findByRole("button", { name: "Mark Not Done" }, { timeout: 5000 })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Mark Not Done" }));
     expect(await screen.findByRole("button", { name: "Mark Done" }, { timeout: 5000 })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "All Items" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "All Items" })[0]!);
     expect(await screen.findByRole("list", { name: "Course Items" })).toBeTruthy();
   }, 30000);
 
@@ -121,7 +121,7 @@ describe("ESS · My Training", () => {
       await item(title);
       fireEvent.click(await screen.findByRole("button", { name: "Mark Done" }, { timeout: 5000 }));
       await screen.findByRole("button", { name: "Mark Not Done" }, { timeout: 5000 });
-      fireEvent.click(screen.getByRole("button", { name: "All Items" }));
+      fireEvent.click(screen.getAllByRole("button", { name: "All Items" })[0]!);
     }
     fireEvent.click(await screen.findByRole("button", { name: "Add Proof" }, { timeout: 5000 }));
     const sheet = await screen.findByRole("dialog", { name: "Add Proof" }, { timeout: 5000 });

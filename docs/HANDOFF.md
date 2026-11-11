@@ -268,7 +268,7 @@ only), real SMTP delivery, web push (M6).
   proxying, env files against `config/env.js`). He runs it: `docs/runbooks/server-setup.md`. DNS A
   records for the four hosts are his to add. The proxy is nginx from `ops/nginx/` now, not a
   hosting panel. GitHub settings by TB.
-- `assets/brand` and `assets/fonts` are empty, so PDFs show the text wordmark.
+- `assets/brand` and `assets/fonts` are empty, so PDFs show the text wordmark. (11/11/2026: `assets/brand/logo.png`, the pin and "MyCityApp", now prints on every PDF until Settings · Organisation holds a Logo.)
 - M3 and later letter templates are empty (each milestone writes its own). Web push waits for M6.
 - systemd it is (decided 15 October); the units are in `ops/systemd/`.
 
@@ -283,7 +283,8 @@ only), real SMTP delivery, web push (M6).
 4. Numbering prefixes in BACKEND_STRUCTURE §7 are proposals for MyCity to confirm.
 5. REUSE_MAP §1.3 public-site wording contradicts A9; he said leave it.
 6. Client pack: maintenance price contradiction (₦500,000 vs ₦300,000 a year); M11 "training on
-   live data on staging" vs A5; current PAYE bands before M6; who approves payroll; the lateness
+   live data on staging" vs A5; ~~current PAYE bands before M6; who approves payroll~~ (answered: the CEO approves; MyCity enters each
+   rate with its legal source, `docs/guides/payroll.md` §6.16); the lateness
    threshold for the auto-query.
 7. Restricted documents (payslips, bank letters, ID) need the module's `edit` grant to open, not just
    `view`. He has not objected; confirm if it comes up.

@@ -84,9 +84,10 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    recorded (My Queries · Sanctions) and any deduction is accepted into the payroll run (M6) → the
    approved payslip shows it in My Payslips, and the Deductions figure opens the list of months with
    deductions, each with its query. If the query is waived nothing is deducted.
-4. **Payslips** become visible when Payroll approves and locks the run (the pay day is the 30th unless
-   MyCity sets another, `docs/guides/payroll.md` §6.11). Until
-   then the month shows "In the run".
+4. **Payslips** become visible when the CEO approves the run, which locks it (the pay day is one day for
+   every month, the 30th unless MyCity sets another, a short month paying on its last day,
+   `docs/guides/payroll.md` §6.11). From approval until the pay is transferred the month shows "In the run";
+   before approval it has no row.
 5. **Leave.** A request from My Leave goes to the line manager, then to Operations & People when it
    is over 5 days (the leave flow, `docs/guides/foundation.md` §6.5) → approved leave counts down the
    entitlement and is never counted as absence by attendance.
@@ -196,8 +197,9 @@ check ownership, not the `settings` grant (README §5.2).
   mentions PAYE or pension in simple mode (12 October). Payroll itself is visible; only its advanced option
   (statutory deductions and salary grades) is switched on from a date on Payroll · Configurations (4
   November; `docs/guides/payroll.md` §13.1 is the record, and the single source for M6).
-- A deduction reaches a payslip only from an upheld query. The Deductions figure opens every month
-  that carried one, with its query reference.
+- A deduction reaches a payslip from an upheld query's fine, from attendance (lateness, early departure,
+  absence) or as an advance's repayment. The Deductions figure opens every month that carried a fine or an
+  advance, with its query reference for a fine.
 - My Queries is one tab with a switch, Queries and Sanctions (meeting 26/10/2026: ESS has twelve
   tabs, TB); the response is written in rich text. The build flowchart is not shown
   to staff (TB, 12 October). The employee's response stays on the record beside the decision, and
@@ -304,8 +306,8 @@ People's or a manager's. The workbook opens for the person it is about and the C
   requests by status, days approved, taken, booked ahead and waiting, people, on leave today; by
   status and type always, then by person or department (20) or by month as series. One SQL over the
   requests (`leave.repo.aiSummary`), figures never rows.
-  Still to come: the caller's own profile summary, latest payslip
-  summary, open queries count. Never another person's record. Paged at 25.
+  Still to come: the caller's own profile summary and open queries count (the
+  caller's own payslips and deductions are `payslips.mine` and `deductions.mine`, M6 PR 6). Never another person's record. Paged at 25.
 - **AI actions** (`docs/guides/praxis-ai.md` §6.11): `my_leave.request` (`ess.ai.js`; `ess` create,
   standard risk; input `LeaveRequestCreate`, Request Leave's own form: the type, the first and last
   day, a note; run `leave.service.request` for the person's own employee, so the type, the days,
@@ -357,7 +359,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | ESS · My Devices (`my-devices`) | Owned by LA: the attendance guide §1 | The attendance guide | The attendance guide §1, §7 (device rules) |
 | ESS · Policy Updates (`policy-updates`) | Owned by TB: policies.md §10.1 | policies.md | policies.md §6 |
 | ESS · My Performance (`my-performance`) | As `docs/guides/performance.md` §10.1 lists: the quarter and reviewer (desktop subtitle); Score to Date, Rating, This Month, Commitments On Time, Agreement; a banner when something waits (Agree Scorecard, or Start Check-In with its due date); My Scorecard, This Month's Check-In, My Commitments (this month's, each with its state and original date, Send Commitments while some are not sent), Rolls Up To, My Reviews, My PIP when open | Help terms on Score to Date, Change Score and Evidence (performance §10.1) | How scoring and the review chain work: performance §6.9, §6.12 |
-| ESS · My Payslips (`my-payslips`) | The year (‹ year ›, from the start year to this one), Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; 2026 Payslips (Month, Net, Status: Paid, Paid with a deduction, In the run); a month opens its payslip in the modal (its PDF, Preparing while it renders) with Download PDF and Email a Copy. Deductions opens Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries). A link to a payslip opens it; a link to a deduction opens Salary Deductions | Help term on **In the run**: approved, and the pay is not yet transferred | "This is the document the engine produces": §6. A deduction only from an upheld query, waived means nothing deducted: §3 step 3, §6. No PAYE or pension line: §6. Visible once Payroll approves, normally the 27th: §3 step 4. The Salary Deductions subtitle and "Click a month to preview it" are removed |
+| ESS · My Payslips (`my-payslips`) | The year (‹ year ›, from the start year to this one), Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; 2026 Payslips (Month, Net, Status: Paid, Paid with a deduction, In the run); a month opens its payslip in the modal (its PDF, Preparing while it renders) with Download PDF and Email a Copy. Deductions opens Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries). A link to a payslip opens it; a link to a deduction opens Salary Deductions | Help term on **In the run**: approved, and the pay is not yet transferred | "This is the document the engine produces": §6. A deduction only from an upheld query, waived means nothing deducted: §3 step 3, §6. No PAYE or pension line: §6. Visible once the CEO approves, the pay day the 30th unless set: §3 step 4. The Salary Deductions subtitle and "Click a month to preview it" are removed |
 | ESS · My Leave (`my-leave`) | "2026 entitlement" (desktop subtitle); Leave Calendar (a month of approved and waiting leave, the reader's own marked You and in yellow, waiting ones marked Waiting; this year and next) and Request Leave; Entitlement, Taken, Approved Upcoming, Remaining, each opening its list or request (Taken: Leave Taken, the year's approved leave that has begun; Approved Upcoming: the next booked leave, read on its own, and nothing when none is booked); My Requests (Type, From, To, Days, Approver: the person it waits on by name, else the stage, as §6 says; Status), a row opens the request with Cancel Request while it waits or before it starts, which asks first (Keep It, Cancel Request); Entitlement by type (allowance, bar, taken, booked, pending, left; No set allowance for a type without one). Request Leave: Leave Type (the types People offer, each with what is left of the year the First Day falls in: "Annual · 12 days left"; a type with no allowance by its name alone), First Day and Last Day (DD/MM/YYYY; a typed day the calendar greys out reads "Pick 21/10/2026 or later" at once, a Last Day in another year "Ends in another year", one past the allowance "32 working days, 19 left" after Send), Note (Optional); Cancel, Send Request, whose message names who it went to ("Sent to Kemi Alade") | None | "Leave is approved by your line manager in one step" and "The calendar shows clashes before you submit": §3 step 5, §6 |
 | ESS · My Queries (`my-queries`) | The Queries and Sanctions switch, each with its count; Queries (Number, Subject, Raised, Status), open ones first, the picked query beside the list with View Letter and Respond; Sanctions (Sanction, Query, Reason, Date, Fine), each opening its letter. Owned by the queries guide §10 | Help on Respond By | The 24 hours to respond: §3 step 3 (an open query shows its own due time). "Most queries close with no action", the response kept beside the decision, disagreement read before the decision: §6. Who can see a query: §8. A deduction only after an upheld sanction: §3 step 3. The flowchart and the page subtitle are removed |
 | ESS · My Documents (`my-documents`) | Upload Document (What Is It, then the drop box "PDF, Word, Excel or a photo, up to 15 MB", the vault's document limit and types; the upload starts as soon as the file is chosen; a larger file is refused before it is sent, "Larger than 15 MB"); Documents, Signed, Verified, Expiring, Missing; Vault (Document, Uploaded, Status, Expires); a row opens the document (Uploaded, Status, Expires, Reference; View File on a PDF or a photo, which opens it full screen in the file viewer with Download and, on a phone, Share; Download, or Upload Document on a missing one); the chosen document's preview, a PDF's pages drawn in the app | None | "Signed documents carry two hashes and a public verification link": §6. What each status means: `docs/guides/foundation.md` §6.9. A missing document blocks onboarding only for a new hire: §3 step 6, §11. The "Your vault" subtitle and "Click any row to preview it" are removed |
@@ -441,10 +443,11 @@ Deductions figure and every form open the shared modal.
 - ~~**My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?~~ Settled
   08/11/2026: Payroll is not hidden behind the advanced option (that is only statutory and grades,
   `docs/guides/payroll.md` §13.1). The tab shows to every employee; with no published payslip it says so,
-  and Coming Soon stays until M6's API is built.
+  and M6's API is built (PR 7, 11/11/2026), so Coming Soon is gone.
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · ESS · My Training (#110): a PDF grows to its pages, so the course scrolls through it to the item's actions and back; All Items at the item's foot too; an item, or the way back, starts at the course's top (`knowledge.md` §10, §14).
 - 11/11/2026 · TB · ESS · My Training (#110) built on the contract (M10 PR 5, `knowledge.md` §10): To Do,
   In Progress, Completed and Library, a course beside the list (a sheet on a phone) with its items
   opened in place, Mark Done, Start Course and Add Proof. `?id=` opens a course by its id or the

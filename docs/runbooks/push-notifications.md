@@ -80,7 +80,7 @@ sudo -u postgres psql mycity_<env> -c "SELECT status, http_status, left(error, 8
 | Status | Means | Action |
 |---|---|---|
 | `sent` | The push service took it | None |
-| `skipped_read` | Read before its held minute was up (the person was in front of the app) | None |
+| `skipped_read` | Already read when its push was due (an urgent repeat after it was opened, or a read notice; security notices are always sent) | None |
 | `gone` | The push service refused the subscription for good: 404 or 410 (the browser dropped it), 401 or 403 (made under another key, §4). The device is turned off with `revoked_reason` `refused` | None: the app subscribes again on its next start |
 | `failed` | 429, a 5xx or no answer. The `notification-push` job tries again with backoff for about 20 minutes | Many in a row for one service: is the server's outbound HTTPS working (§1)? |
 
@@ -136,4 +136,4 @@ Both units cache the pair for as long as they run, so a change is always followe
 | This Device reads Install First | Nothing on the server | An iPhone or iPad in Safari: iOS pushes only to an installed app (Share, Add to Home Screen) |
 | Send Test says sent, nothing arrives | §3 for that device | `gone`: it subscribes again on its next start. `failed`: the push service or the network |
 | Mail arrives in the app minutes late | §2 step 1, then `journalctl -u mycity-worker-<env> -g "mail idle"` | Live Connections 0 on Settings · Integrations (or `MAILBOX_IDLE_MAX=0` in `.env` with nothing saved there), or more connected mailboxes than it allows (the rest are synced every Sync Every minutes) |
-| A notification appears twice | Nothing on the server | Should not happen: the app on screen shows the banner and the device's own notification is held back. Report it with the phone's make and browser |
+| A notification appears twice | Nothing on the server | Expected on the device in hand: every registered device shows the notification, the one in use included, beside the in-app banner (`docs/handoff/notifications-everywhere.md` §2 decision 9). Twice on one device is a fault: report it with the phone's make and browser |

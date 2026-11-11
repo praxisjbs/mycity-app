@@ -525,8 +525,8 @@ Payslips are computed **estimates** until validated.
 | `salary_advance` (Praxis, 229) | 229 | Advances |
 
 **The D5 decision maps onto this cleanly.** The engine is already config-driven, so "simple by
-default, statutory behind an advanced toggle" is *a config row set*, not a second engine. ITF (1%)
-and NSITF (1%) are **employer** charges and are the only two not already modelled — Pixie has PAYE,
+default, statutory behind an advanced toggle" is *a config row set*, not a second engine. ITF and NSITF
+(each reported as 1%, unverified: every rate needs its legal source, TB 11/11/2026, `docs/guides/payroll.md` §6.16) are **employer** charges and are the only two not already modelled — Pixie has PAYE,
 pension (employee and employer) and NHF. Two rate rows and two GL postings.
 
 `posting-map.js` already has `NHF_PAYABLE: "2230"` and `NHF_EMPLOYER_EXPENSE: "5140"`.

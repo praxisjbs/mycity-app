@@ -132,8 +132,8 @@ silently.
   `ListDetail` from `@mycity/ui` (`DetailPane` where desktop puts the record elsewhere). The gate
   taps each phone screen's rows and has no exemption. Expenses records open in the modal on desktop
   too (F31 amended 04/11/2026, AJ; `docs/guides/expenses.md` §10), and so do Recruitment's Interviews
-  and Offers, in the widest dialog (F31 amended 08/11/2026, GE); its Vacancies, Candidates,
-  Assessments and Onboarding, in the wide dialog (F31 amended 11/11/2026, GE); and both payslips,
+  and Offers, in the widest dialog (F31 amended 08/11/2026, GE); its Candidates, Assessments
+  and Onboarding, in the wide dialog (F31 amended 11/11/2026, GE; a vacancy is a page of its own); and both payslips,
   Payroll · Payslips and ESS · My Payslips (F31 amended 11/11/2026, JBS Praxis; `docs/guides/payroll.md` §10.3).
 - **Components only from `@mycity/ui`** (`packages/ui`, listed in `docs/COMPONENTS.md`). A missing
   one is added in `packages/ui` with `npm run new:component` (header, test and gallery page), never
@@ -258,6 +258,22 @@ stands. Bugs found while filming are fixed in the same branch and logged there (
   here and in an agent. A background agent or a Workflow is for work long enough that waiting would
   block the person; say so when you start one. Slower in the foreground is fine; work lost with a
   session that ends is not.
+- **Plan first, then one chat a PR** (TB, 11/11/2026). A milestone, or any change cut into more
+  than one PR, is planned in its own planning chat on the most capable model available, at high
+  effort: never on a lighter model. The plan lives in the module's guide (its build plan appendix)
+  and names, for each PR, its scope and size, the model and effort to build it on, which PRs can
+  run in parallel and the order they merge in (for example "merge PR 3 before PR 5"), so parallel
+  work never conflicts. Each PR is then built in a **fresh chat** from the start prompt the
+  planning chat gives for it, so it carries only what that PR needs; the planning chat is asked
+  for the next prompt when a PR merges. A chat whose context is filling up (past about three
+  quarters) is closed and its next step started fresh from the guide and the handoff.
+- **Research has sources** (TB, 11/11/2026). A figure taken from law or from outside the
+  repository (a tax band, a statutory rate, a legal threshold) is researched in a session whose
+  environment allows network access (switched off again afterwards), from the primary text, and
+  is written down with its source (the instrument, the section, a link or the document, the date
+  checked). Nothing comes from memory or a model's guess. A figure with no legal source says so
+  in plain words ("no legal source: a company rule"). A source that changes is entered again by a
+  person; nothing updates a legal figure by itself.
 
 Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M4, community and mailbox) · TB Tom-Blake
 Asaah (Home, M6, M9, M10, M11) · LA Love Adeola (migrations and data, attendance, M7) · AJ Adole
