@@ -124,8 +124,23 @@ const CASES = Object.freeze([
   { id: "card.budget-edit", as: "operations_people", question: "Change the {budgets.edit#budget_id} budget to 2,500,000 naira for {expense_categories.edit#expense_category_id}.", shows: ["cards"], action: "budgets.edit" },
   { id: "card.project-budget", as: "operations_people", question: "Give the project {budgets.set_project#project_id} a budget of 1,500,000 naira.", shows: ["cards"], action: "budgets.set_project" },
   { id: "card.disbursement-reference", as: "operations_people", question: "Add the bank reference GT2611050077 to {disbursements.add_reference#disbursement_id}.", shows: ["cards"], action: "disbursements.add_reference" },
-  // M6 Payroll (docs/guides/payroll.md §9): New Run, the one card the PR that builds the run needs; the rest come with PR 6.
+  // M6 Payroll (docs/guides/payroll.md §9): one case for each of the six cards, each asked as the holder of `payroll` edit.
   { id: "card.payroll-run", as: "operations_people", question: "Open the payroll run for October 2026.", shows: ["cards"], action: "payroll_runs.create" },
+  { id: "card.payroll-submit", as: "operations_people", question: "Send the {payroll_runs.submit#payroll_run_id} payroll run to the CEO for approval.", shows: ["cards"], action: "payroll_runs.submit" },
+  { id: "card.payroll-adjustment", as: "operations_people", question: "Add a 20,000 naira transport bonus for {person} to the {payroll_adjustments.add#payroll_run_id} payroll run, for the extra field days.", shows: ["cards"], action: "payroll_adjustments.add" },
+  { id: "card.deduction-accept", as: "operations_people", question: "Accept the fine {deductions.accept#sanction_fine_id} over 3 months from {deductions.accept#start_period}.", shows: ["cards"], action: "deductions.accept" },
+  { id: "card.deduction-waive", as: "operations_people", question: "Waive the fine {deductions.waive#sanction_fine_id}: it was raised in error and the query was withdrawn.", shows: ["cards"], action: "deductions.waive" },
+  { id: "card.advance", as: "operations_people", question: "Record a salary advance of 50,000 naira for {person}, paid today, to be recovered over 2 months from {advances.record#start_period}, for school fees.", shows: ["cards"], action: "advances.record" },
+  // Payroll's reads and its summary, as each role of docs/guides/payroll.md §8 holds them (M6 PR 6).
+  { id: "payroll.runs", as: "operations_people", question: "Which payroll runs have not been paid yet?", reads: ["payroll.runs"] },
+  { id: "summary.payroll-month", as: "operations_people", question: "How many people are in the latest payroll run and what is the net pay?", reads: ["payroll.month"], shows: ["pane"] },
+  { id: "payroll.payslips", as: "operations_people", question: "Which payslips are in the latest payroll run?", reads: ["payslips.list"] },
+  { id: "payroll.deductions", as: "operations_people", question: "Which fines are waiting for payroll to accept or waive?", reads: ["deductions.list"] },
+  { id: "payroll.my-payslip", as: "employee", question: "What was my net pay on my latest payslip?", reads: ["payslips.mine"] },
+  { id: "payroll.my-deductions", as: "employee", question: "Is anything being deducted from my pay in the coming months?", reads: ["deductions.mine"] },
+  { id: "privacy.payroll", as: "employee", question: "How much is the payroll this month, and what is {person} paid?", never: ["payroll.runs", "payroll.month", "payslips.list", "deductions.list"] },
+  { id: "route.advanced-payroll", as: "operations_people", question: "Turn on advanced payroll from next month.", route: "payroll.configurations" },
+  { id: "route.my-payslip", as: "employee", question: "Take me to my payslip.", route: "ess.my-payslips" },
   // A request is raised by its requester and paid by a holder of expenses.finance: a member of staff is never drawn those cards.
   // Expenses' reads, as each role of docs/guides/expenses.md §8 holds them (M8 release check).
   { id: "expenses.mine", as: "employee", question: "Where are my expense requests?", reads: ["expenses.mine"] },

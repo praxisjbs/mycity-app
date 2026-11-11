@@ -1,5 +1,4 @@
 "use strict";
-// ai:none the assistant's payslip reads (payslips.mine, payslips.list) are written with M6 PR 6 (docs/guides/payroll.md §9); this pull request adds no read, summary or card, and a payslip has no create or edit form
 /**
  * Payslips: the HTTP edge for Payroll · Payslips (docs/guides/payroll.md §5). Every route is behind the `payroll`
  * grant, and a payslip is read within the reader's scope. The salary-derived amounts (`gross_pay`,

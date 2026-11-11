@@ -24,6 +24,9 @@ const { scopeFor } = require("../../middleware/rbac");
 const { canSee } = require("../../shared/rbac/field-mask");
 const engine = require("../../shared/workflow/engine");
 const lagos = require("../../shared/time/lagos");
+const { formatMonth } = require("../../shared/time/day-first");
+const { oneNamed } = require("../../shared/ai/named");
+const { figure } = require("../../shared/ai/summary");
 const { emit } = require("../../shared/events/emit");
 const workflowService = require("../workflow/workflow.service");
 const statutoryRates = require("../statutory/statutory.rates");
@@ -251,6 +254,75 @@ async function markPaid(actor, id, body) {
   return getRun(actor, id);
 }
 
+
+/* ------------------------------------------------------------------ *
+ * What the assistant reads and checks (payroll.ai.js, guide §9)
+ * ------------------------------------------------------------------ */
+
+/** A run as a card names it: its number and its month, never an amount. */
+const runLabel = (row) => `${row.number}, ${formatMonth(row.period)}`;
+
+/** What each card may act on: the run's statuses, and the refusal a run in any other state earns (the move's own). */
+const CARD_STATES = Object.freeze({
+  submit: { statuses: ["computed"], code: "RUN_NOT_COMPUTED", message: "Compute the run first" },
+  adjust: { statuses: ["draft", "computed"], code: "RUN_NOT_EDITABLE", message: "This run can no longer be changed" },
+});
+
+/** The runs a card of this kind may act on, newest month first: the first page of each status it takes. */
+async function cardRuns(db, kind) {
+  const pages = await Promise.all(CARD_STATES[kind].statuses.map((status) => repo.listRuns(db, { status, page: 1 })));
+  return pages.flatMap((p) => p.data).sort((a, b) => (a.period < b.period ? 1 : -1));
+}
+
+/** The months to tap under "Which run?": those the card may act on, as a person names them ("October 2026"). */
+async function cardRunChoices(db, kind) {
+  return (await cardRuns(db, kind)).map((r) => formatMonth(r.period));
+}
+
+/** The run a person names by its month or its number ("October 2026", "PAY-2026-10"), among those the card may act on; null when none or several. */
+async function cardRunIdOf(db, words, kind) {
+  const found = oneNamed(await cardRuns(db, kind), words, (r) => [formatMonth(r.period), r.number, r.period.slice(0, 7)]);
+  return found ? found.payroll_run_id : null;
+}
+
+/** The run a card names, for the card's chip: its number and month. Nothing for a run that does not exist. */
+async function cardRun(db, id) {
+  const row = id ? await repo.getRun(db, id) : null;
+  return row ? [{ type: "payroll_run", id: row.payroll_run_id, label: runLabel(row) }] : [];
+}
+
+/** Before the press: the run is still the state the card saw (404 for none), so a card for a run sent meanwhile is refused with the move's own words. */
+async function assertCardRun(db, id, kind) {
+  const row = await repo.getRun(db, id);
+  if (!row) throw new AppError("NOT_FOUND", "That payroll run does not exist", 404);
+  const want = CARD_STATES[kind];
+  if (!want.statuses.includes(row.status)) throw new AppError(want.code, want.message, 409);
+}
+
+/**
+ * The assistant's month summary (`payroll.month`, guide §9): headcount and, to a reader who may see pay,
+ * the gross, deductions and net of one month's run (the run Payroll Runs shows first when none is asked). Figures,
+ * never a row. A summary is not masked on the way out as a read's rows are, so the amounts are left out here
+ * for a reader whose role hides pay (`employee.salary`), as the screen shows them Restricted.
+ * @param {{query: Function}} db
+ * @param {{period?: string}} params  PayrollMonthQuery
+ * @param {object} actor              the asker, with their grants
+ */
+async function monthSummary(db, params, actor) {
+  const [found, salary] = await Promise.all([params.period ? repo.runOfPeriod(db, params.period) : repo.currentRun(db), canSee(db, actor, "employee.salary")]);
+  const month = found ? await repo.getRun(db, found.payroll_run_id) : null;
+  if (!month) return { figures: [], groups: [], series: [], total: 0 };
+  const figures = [figure("headcount", "People paid", month.headcount)];
+  if (salary) {
+    figures.push(
+      figure("gross", "Gross pay", month.earnings_total, "NGN"),
+      figure("deductions", "Deductions", month.deductions_total, "NGN"),
+      figure("net", "Net pay", month.net_total, "NGN"),
+    );
+  }
+  return { figures, groups: [], series: [], total: month.headcount };
+}
+
 /* ------------------------------------------------------------------ *
  * Configurations: the setting (§5, §6.11)
  * ------------------------------------------------------------------ */
@@ -409,4 +481,10 @@ module.exports = {
   changeSettings,
   settle,
   sentBack,
+  runLabel,
+  cardRunChoices,
+  cardRunIdOf,
+  cardRun,
+  assertCardRun,
+  monthSummary,
 };
