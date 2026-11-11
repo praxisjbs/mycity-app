@@ -2,7 +2,7 @@
 title: Employee Self-Service
 module: ess
 milestones: M1
-summary: Your own record: profile, attendance and clocking in, leave, documents, policies, devices and how you sign in.
+summary: Your own record: profile, attendance and clocking in, leave, documents, policies, devices, training and how you sign in.
 icon: user
 ---
 
@@ -903,6 +903,75 @@ Press **Download PDF** to save the whole chart as a file. The button spins while
 a message says **PDF downloaded**. If it says **That file could not be made. Try again.**, press
 **Download PDF** again.
 
+## My Training {#ess-training screen=ess/my-training icon=book}
+
+The courses set for you, the ones you have started and finished, and the Library of courses anyone
+may take. Each finished course gives you a MyCity certificate.
+
+![My Training](shot:ess-training)
+
+### Find your courses {#ess-training-find}
+
+1. Open [My Training](/ess?tab=my-training). A notice or a task about a course opens it here too.
+2. **To Do** lists the courses set for you that you have not started, the soonest due first.
+3. **In Progress** lists the ones you have started, with your **Progress**.
+4. **Completed** lists the ones you finished, with the date and the **Certificate** number.
+5. **Library** lists the courses anyone may take, with their **Length**.
+
+### Take a course {#ess-training-take}
+
+1. Press a course. On a computer it opens beside the list. On a phone it opens in a sheet: drag it
+   down to close it.
+   ![A course, open](shot:ess-training-course)
+2. Read its **Due** date, **Length** and **Progress**, then its items in order.
+3. Press an item to open it:
+   - a lesson reads in the course;
+   - a PDF or a picture shows in the course: scroll through its pages, and use **Zoom In** and
+     **Zoom Out** at its foot;
+   - a video plays when you press **Play Video**;
+   - a link to an outside course opens in a new tab with **Open Link**;
+   - any other file downloads with **Download File**.
+   ![An item, open](shot:ess-training-item)
+4. When you have finished it, press **Mark Done** at the item's foot. Pressed by mistake? Press
+   **Mark Not Done**.
+5. Press **Next Item** for the next one, or **All Items** to go back to the list. **All Items** is at
+   the item's top and its foot.
+
+> **Tip:** Take a course a little at a time. Your done marks stay, and **In Progress** keeps it for
+> you.
+
+### Start a Library course {#ess-training-library}
+
+1. Press **Library** and press a course.
+2. Press **Start Course**. The message **Course started** confirms it, and it moves to
+   **In Progress**.
+
+### Add proof {#ess-training-proof}
+
+Some courses ask for proof at the end, such as the certificate of an outside course. Their **Proof**
+card shows once every item is done, with what to send.
+
+1. Press **Add Proof**.
+2. Under **Proof**, choose **Link** and paste it into **Certificate Link**, or choose **File** and add
+   it under **Certificate File**: a PDF or a picture.
+3. Press **Add Proof**. The message **Course completed** confirms it.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **Use an https link** | The link does not start with `https://` | Copy the full link from the address bar |
+| **Pick a file** | No file was added | Add the file, or choose **Link** |
+
+### Download your certificate {#ess-training-certificate}
+
+1. Press **Completed**.
+   ![Completed courses](shot:ess-training-completed)
+2. Press **Download Certificate** beside the course, or open the course and press it under
+   **Completed**. The message **Certificate downloaded** confirms it.
+
+The certificate carries your name, the course, the date you finished, the publisher's signature, its
+number and a QR code. Anyone can check it by scanning the code, or on
+[Verify a Document](#public-verify-certificate) with its number.
+
 ```shot ess-profile
 open: /ess?tab=my-profile
 as: staff
@@ -1113,4 +1182,53 @@ crop: modal
 marks:
   1: label "Code From App" | The six digits
   2: button "Turn On" | Turn it on
+```
+
+```shot ess-training
+open: /ess?tab=my-training
+as: staff
+sources:
+  - app/src/features/ess/MyTraining.tsx
+marks:
+  1: role group "List" | Your lists
+```
+
+```shot ess-training-course
+open: /ess?tab=my-training
+as: staff
+sources:
+  - app/src/features/ess/MyTraining.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("Fire Safety at the Office"), [data-ui=page] ul[data-copy=content] > li:has-text("Fire Safety at the Office")
+  - wait: text "When the Alarm Sounds"
+crop: viewport
+marks:
+  1: role list "Course Items" | Take them in order
+```
+
+```shot ess-training-item
+open: /ess?tab=my-training
+as: staff
+sources:
+  - app/src/features/ess/MyTraining.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("Fire Safety at the Office"), [data-ui=page] ul[data-copy=content] > li:has-text("Fire Safety at the Office")
+  - wait: text "When the Alarm Sounds"
+  - click: text "When the Alarm Sounds"
+  - wait: button "Mark Done"
+crop: viewport
+marks:
+  1: button "Mark Done" | When you finish
+```
+
+```shot ess-training-completed
+open: /ess?tab=my-training
+as: staff
+sources:
+  - app/src/features/ess/MyTraining.tsx
+do:
+  - click: button "Completed"
+  - wait: text "Platform Walkthrough"
+marks:
+  1: button "Download Certificate" | Save the certificate
 ```

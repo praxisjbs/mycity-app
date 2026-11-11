@@ -12,7 +12,7 @@ line to §3.
 | Owner | TB (Tom-Blake Asaah) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 18 Dec 2026 (MILESTONES §15) |
-| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 praxisjbs/mycity-app#113; PR 2 praxisjbs/mycity-app#120; PR 3 praxisjbs/mycity-app#115; PR 4 praxisjbs/mycity-app#117; PR 5 praxisjbs/mycity-app#118 |
+| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 praxisjbs/mycity-app#113; PR 2 praxisjbs/mycity-app#120; PR 3 praxisjbs/mycity-app#115; PR 4 praxisjbs/mycity-app#117; PR 5 praxisjbs/mycity-app#118; the training fixes praxisjbs/mycity-app#124; PR 6 praxisjbs/mycity-app#127 |
 
 Praxis AI and AI Control, M10's other half, were brought forward and are built (`praxis-ai.md`,
 `ai-control.md`); this tracker is the Knowledge Hub's only.
@@ -56,7 +56,7 @@ SOPs tab in `app/src/features/knowledge/index.tsx` runs on INTERIM shapes and th
       catalogue description); My Training added with `npm run new:screen` as an empty screen (11/11/2026)
 - [x] Guides index row, the guide's CODEOWNERS line, DATABASE_SCHEMA M10 pointer (11/11/2026)
 - [x] TB shows MyCity the certificate sample and records the answers (guide §13 item 4): Cynthia approved it as drawn (11/11/2026)
-- [ ] Written ticked for `knowledge.md` in `docs/guides/README.md` once PR 0 merges
+- [x] Written ticked for `knowledge.md` in `docs/guides/README.md` once PR 0 merges (in PR 6, 11/11/2026)
 
 ### PR 1 · Contract, data and scaffolding
 - [x] `knowledge.js` and `training.js` contracts, `gen:contract` (11/11/2026)
@@ -90,15 +90,17 @@ SOPs tab in `app/src/features/knowledge/index.tsx` runs on INTERIM shapes and th
 - [x] YouTube player (CSP `frame-src`), viewer, proof; INTERIM types and the old mock deleted (11/11/2026)
 - [x] The Training tab's `training.manage` rule in both mirrors; ⌘K's New Course (11/11/2026)
 - [x] Download Certificate on My Training and Training · People, on PR 4's two routes (11/11/2026)
-- [ ] Screen gates at 390 and 1440 px; PROGRESS #65, #110; the PR body's Native app feel section
+- [x] Screen gates at 390 and 1440 px; PROGRESS #65, #110; the PR body's Native app feel section (#118, 11/11/2026)
 
 ### PR 6 · Staging seed, User Guide, release
-- [ ] `seeds/staging/` through the services
-- [ ] User Guide: SOPs and Training sections, My Training in the ESS chapter, pictures
-- [ ] Empty stubs deleted and off `README.MD`; PROGRESS Status; Appendix B ticked on staging
+- [x] `seeds/staging/` through the services: `90_knowledge.js`, ten SOPs and two real courses (11/11/2026)
+- [x] User Guide: SOPs and Training sections, My Training in the ESS chapter, pictures (11/11/2026)
+- [x] Empty stubs deleted and off `README.MD` (`knowledge-embed`); PROGRESS Status (Built) (11/11/2026)
+- [ ] Appendix B ticked on staging, once the staging seed has been run on the server (`docs/runbooks/deploy.md`)
 
 ## 3 · Log
 
+- 11/11/2026 · TB · PR 6 built on `m10/knowledge-release` from main after the training fixes: `seeds/staging/90_knowledge.js` through the services (ten SOPs, two for each of MyCity's five departments, published quietly; NDPA Data Protection Essentials and Partner Outreach, real courses of checked YouTube videos, lessons in our own words, two PDFs printed with the logo, free outside courses; NDPA assigned to Implementation, due in 14 days), `tests/integration/knowledge-staging-seed.test.js`; Publish SOP's `quiet` for the seed; the User Guide's Training and My Training sections with pictures; the Knowledge Hub chapter names M10; `knowledge-embed` deleted. Before it, the training fixes: the certificate and every PDF carry MyCity's logo (`assets/brand/logo.png`), and My Training scrolls through a PDF to its actions and back. Next: once merged and deployed, run `scripts/db/seed.js --staging` on the staging server (`docs/runbooks/deploy.md`: staging's demonstration data is loaded by hand; a second run adds only what is new), then walk Appendix B there.
 - 11/11/2026 · TB · PR 2 built on `m10/sops` from main after #113: the `knowledge` module (every `/knowledge/sops` route of guide §5, the writer rule of §6.2 checked in the service, so every route asks only `knowledge` view), `sop.published` telling the department, ⌘K with New SOP for heads too (`orHead` in `shared/search/actions.js`), Praxis AI's `sops.list` and `sops.read`, Draft With AI (`sop-draft`), the `SOP_VERSION` canonical hash; the SOPs tab (`app/src/features/knowledge/Sops.tsx`) and Procedures (`Procedures.tsx`) under a screen's guide section; the mock in the contract's shapes. Found on the way: most staff cannot read `/departments` (People's), so the chips and New SOP's Department come from a new `GET /knowledge/sops/departments` (guide §5 and change log); `pageQuery` refuses any `LIMIT`, even a subquery's, so the version in force is the newest published one by `NOT EXISTS`; a modal replaces another rather than stacking, so Draft With AI runs inside Edit SOP. Tests: integration 10, unit 15, screen 5. Next: PR 3 (another chat), then PR 4 to PR 6; PR 6 seeds SOPs for staging.
 - 11/11/2026 · TB · PR 5 built on PR 3: Knowledge Hub · Training (courses with state chips; a course beside the list, a full sheet on a phone, with Items in order, People, Assignments and Settings; Add Item for the four kinds with Draft Lesson; Publish Course signed; Assign Training; Withdraw; Remind Overdue; Archive Course) and ESS · My Training (To Do, In Progress, Completed, Library; an item opened in place with Mark Done, Mark Not Done and Next Item; Start Course; Add Proof), both on the contract and walked on the live API, desktop and phone. New in `packages/ui`: `OrderList` (drag on desktop, Move Up and Move Down in each row's menu) and `VideoPlayer` (YouTube through youtube-nocookie.com, or an uploaded MP4, nothing loaded until Play Video). The training mock rewritten in the contract's shapes (`app/src/api/mock/modules/training.ts`, every answer parsed by its schema in its test); the INTERIM training types and the old mock deleted. The Training tab follows `training.manage` in both mirrors; ⌘K's New Course; the staff host's CSP frames `youtube-nocookie.com`. Found on the way: `RichTextField` speaks HTML while the contract carried a lesson as Markdown, so a lesson now crosses as `lesson_html`, kept as Markdown by the server's converter as Policies' text is (guide §5, §6.5, §14). Tests: the two screens (16), the mock against the contract (4), `OrderList` (8), `VideoPlayer` (5), the mirrors, the CSP; `training.test.js` unit and integration updated. Download Certificate wired after PR 4 merged (main merged in), on My Training and Training · People, and walked on the live API to the PDF (CERT-2026-0002). Next: PR 6.
 - 11/11/2026 · TB · PR 4 built on PR 3, after Cynthia approved the certificate sample as drawn (guide §13 item 4): `templates/documents/training-certificate.html` and `training.certificate.js` (the page drawn from the sample, one A4 landscape page, Cormorant Garamond embedded from `templates/documents/fonts/` with its licence and the proposal kit's Geist; rosette, seal and QR drawn on the server), `training.issue_certificate` and "Certificate ready", Download Certificate's two routes (202, waiting on `GET /exports/:id`), and Verify a Document for `CERT-` numbers with both verdicts, on go.mycityapp.io too (Awarded To, Course, Completed, Published By; the public-site chapter's new section and pictures). Migration `10430` keeps the holder's name and course title as issued. Tests: the training integration file renders a real PDF with Chromium (one page, its words read back, both verdicts, a rename, the facts and the file each altered), the drawing's unit tests, the Verify page's. Next: PR 5 (screens; it can wire Download Certificate now), PR 6.

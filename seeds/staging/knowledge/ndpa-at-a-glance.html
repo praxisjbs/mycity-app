@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NDPA at a Glance</title>
+<style>
+  {{FONTS}}
+  @page { size: A4; margin: 12mm 13mm 14mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Geist", "Helvetica Neue", Arial, sans-serif; font-size: 8.2pt; line-height: 1.36; color: #01221D; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 3mm; border-bottom: 1.4pt solid #014339; }
+  header img { height: 9mm; }
+  header .kicker { font-size: 6.8pt; letter-spacing: .28em; text-transform: uppercase; color: #5B6662; text-align: right; }
+  h1 { margin: 4.5mm 0 1mm; font-size: 20pt; line-height: 1.1; letter-spacing: -0.4px; color: #014339; }
+  .lede { margin: 0 0 3.6mm; font-size: 9.2pt; color: #33413D; max-width: 160mm; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.8mm 4.5mm; }
+  section { break-inside: avoid; border: 0.8pt solid #D6DFDB; border-radius: 2.4mm; padding: 2.6mm 3.2mm 2.8mm; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { margin: 0 0 1.2mm; font-size: 9.6pt; color: #014339; display: flex; align-items: center; gap: 2mm; }
+  h2 .n { display: inline-flex; align-items: center; justify-content: center; width: 5.2mm; height: 5.2mm; border-radius: 50%; background: #FFDF55; color: #014339; font-size: 7.6pt; font-weight: 700; flex: none; }
+  p { margin: 0 0 1.4mm; }
+  ul, ol { margin: 0; padding-left: 4.4mm; }
+  li { margin: 0 0 0.4mm; }
+  .ref { color: #5B6662; font-size: 7.4pt; }
+  .timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin-top: 1.2mm; }
+  .timeline div { background: #F2F6F4; border-radius: 1.8mm; padding: 2mm 2.6mm; }
+  .timeline strong { display: block; color: #014339; font-size: 9.4pt; margin-bottom: 0.6mm; }
+  .note { margin-top: 3.2mm; padding-top: 2mm; border-top: 0.8pt solid #D6DFDB; font-size: 7.2pt; color: #5B6662; }
+  a { color: #014339; }
+</style>
+</head>
+<body>
+  <header>
+    <img src="{{LOGO}}" alt="MyCityApp">
+    <div class="kicker">Learning &amp; Development<br>Data Protection</div>
+  </header>
+
+  <h1>NDPA at a Glance</h1>
+  <p class="lede">The Nigeria Data Protection Act 2023 on one page: who it covers, the rules for using personal data, people's rights, and what to do when something goes wrong.</p>
+
+  <div class="grid">
+    <section>
+      <h2><span class="n">1</span>Who it covers</h2>
+      <p>Anyone who collects or uses personal data in Nigeria, or about people in Nigeria, on a computer or on paper. That includes MyCityApp and everyone who works here. <span class="ref">Section 2</span></p>
+      <p><strong>Personal data</strong> is anything that identifies a person: a name, a phone number, an ID number, a location, an online identifier.</p>
+    </section>
+
+    <section>
+      <h2><span class="n">2</span>The regulator</h2>
+      <p>The <strong>Nigeria Data Protection Commission (NDPC)</strong> registers organisations, hears complaints, investigates and can impose penalties. It replaced the Nigeria Data Protection Bureau. <span class="ref">Sections 4 to 7, 64</span></p>
+    </section>
+
+    <section>
+      <h2><span class="n">3</span>Six principles</h2>
+      <ol>
+        <li>Fair, lawful and open.</li>
+        <li>For a clear purpose, and only that purpose.</li>
+        <li>No more than the purpose needs.</li>
+        <li>Kept no longer than needed.</li>
+        <li>Accurate and up to date.</li>
+        <li>Kept secure.</li>
+      </ol>
+      <p class="ref">Section 24</p>
+    </section>
+
+    <section>
+      <h2><span class="n">4</span>A lawful reason for every use</h2>
+      <ul>
+        <li><strong>Consent</strong>, freely given and clear; never a pre-ticked box.</li>
+        <li><strong>Contract</strong> with the person.</li>
+        <li><strong>Legal obligation.</strong></li>
+        <li><strong>Vital interests</strong> of a person.</li>
+        <li><strong>Public interest</strong> or official authority.</li>
+        <li><strong>Legitimate interests</strong> that do not override the person's rights.</li>
+      </ul>
+      <p class="ref">Sections 25 and 26</p>
+    </section>
+
+    <section>
+      <h2><span class="n">5</span>People's rights</h2>
+      <p>To be told, to get a copy, to correct, to delete, to restrict, to withdraw consent, to object (absolutely, for marketing), to move their data, and not to be judged by a machine alone. They can complain to the NDPC.</p>
+      <p class="ref">Sections 34 to 38, 46</p>
+    </section>
+
+    <section>
+      <h2><span class="n">6</span>Sending data abroad</h2>
+      <p>Only to a country or recipient with adequate protection, or under a condition the Act allows, such as the person's informed consent or a contract with them. The reason is recorded each time.</p>
+      <p class="ref">Sections 41 to 43</p>
+    </section>
+
+    <section class="wide">
+      <h2><span class="n">7</span>When something goes wrong</h2>
+      <p>A breach is any loss, change or exposure of personal data: a lost phone, an email to the wrong person, a hacked account, a sheet shared with anyone who has the link.</p>
+      <div class="timeline">
+        <div><strong>Now</strong>Tell your line manager and the Technology team, even if you are not sure.</div>
+        <div><strong>Within 72 hours</strong>The company tells the NDPC of a breach likely to put people at risk. <span class="ref">Section 40(2)</span></div>
+        <div><strong>Immediately, if the risk is high</strong>The company tells the people affected, in plain words. <span class="ref">Section 40(3)</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="n">8</span>Penalties</h2>
+      <p>Up to the greater of <strong>₦10 million or 2%</strong> of annual gross revenue for an organisation of major importance; up to the greater of ₦2 million or 2% for others. An employer answers for what its staff do at work.</p>
+      <p class="ref">Sections 48 and 53</p>
+    </section>
+
+    <section>
+      <h2><span class="n">9</span>Read more</h2>
+      <ul>
+        <li>The Act: <a href="https://ndpc.gov.ng/wp-content/uploads/2024/03/Nigeria_Data_Protection_Act_2023.pdf">ndpc.gov.ng</a> (official text)</li>
+        <li>NDPC resources: <a href="https://ndpc.gov.ng/resources/">ndpc.gov.ng/resources</a></li>
+        <li>NDPC breach portal: <a href="https://services.ndpc.gov.ng/breach/">services.ndpc.gov.ng/breach</a></li>
+      </ul>
+    </section>
+  </div>
+
+  <p class="note">A summary for training only, not legal advice. Source: Nigeria Data Protection Act 2023 (Act No. 37), Federal Republic of Nigeria Official Gazette No. 119, Vol. 110.</p>
+</body>
+</html>

@@ -95,7 +95,11 @@ mycity-app/
 │                             80_expenses.js: M8's categories, budgets, projects and requests at
 │                             every stage on the Implementation Team's accounts, through the
 │                             services, after taking Home's expense rows and 8099's categories away,
-│                             tested by tests/integration/expenses-staging-seed.test.js; lib/)
+│                             tested by tests/integration/expenses-staging-seed.test.js;
+│                             90_knowledge.js: ten SOPs across MyCity's five departments and two
+│                             real courses (knowledge/: sops.js, courses.js and the two PDFs' pages),
+│                             through the services, tested by
+│                             tests/integration/knowledge-staging-seed.test.js; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
@@ -103,7 +107,7 @@ mycity-app/
 ├── templates/documents/      PDF templates (HTML); fonts/ the faces a document embeds itself (the training certificate's Cormorant Garamond, OFL)
 ├── templates/email/          mail templates (HTML)
 ├── templates/import/         import template definitions
-├── assets/brand/             logo vector masters, pin mark, app icons
+├── assets/brand/             logo.png (the lockup on every PDF until Settings · Organisation holds a Logo); vector masters, pin mark, app icons
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
@@ -735,7 +739,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M7 | `partner-inactivity` (the morning's follow-ups, re-run by hand), `agreement-renewal`, `proposal-questions` (a brief's question cards, after New Proposal and Try Again), `proposal-draft` (the writing job: the draft, its figure check and its pages) | `partner-inactivity` (each newly quiet partner's and lead's follow-up: its deals Follow-Up Required and one task for its owner, 06:30 Lagos, after `home-alert-sweeps`; `docs/guides/partnerships.md` §6.12), `agreement-renewals`, `proposal-expiry` (sent proposals past `valid_until` expired and their links stopped, daily, until `agreement-renewals` takes it; `docs/guides/partnerships.md` §13.2) |
 | M8 | `budget-threshold` (the morning's sweep, re-run by hand for a day), `approval-ageing` | `budget-threshold` (each budget line 90% used, committed and spent, told to its department's head and Operations & People once, 07:00 Lagos; `docs/guides/expenses.md` §6.6), `approval-ageing` |
 | M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |
-| M10 | `knowledge-embed`, `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | `training-joiners` (open training assignments enrol those who joined or moved into a department or role they name, then every assigned place still without its task gets it, 06:00 Lagos; the backstop to `training.enrol_joiners`, `docs/guides/knowledge.md` §6.7) |
+| M10 | `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | `training-joiners` (open training assignments enrol those who joined or moved into a department or role they name, then every assigned place still without its task gets it, 06:00 Lagos; the backstop to `training.enrol_joiners`, `docs/guides/knowledge.md` §6.7) |
 
 Home's `home-alert-sweeps` raises the Partner Inactivity alert (`src/modules/alerts/alerts.metrics.js`,
 through Home's source adapters); M7's `partner-inactivity` is the follow-up after it, never a second

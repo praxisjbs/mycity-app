@@ -151,8 +151,9 @@ describe("the certificate's page (§6.9)", () => {
     expect(html).toContain("data:font/woff2;base64,");
   });
 
-  test("the organisation's logo when Settings has one, else its name as the wordmark", () => {
-    expect(cert.draw(data, { org })).toContain('<div class="brand-mark"><i></i>MyCity App</div>');
+  test("the organisation's logo when Settings has one, else the pin and its name as the wordmark", () => {
+    const plain = cert.draw(data, { org });
+    expect(plain).toMatch(/<div class="brand-mark"><svg viewBox="0 0 24 24"[^>]*><path fill="#014339" fill-rule="evenodd" d="M12 1\.6c[^"]+"\/><\/svg>MyCity App<\/div>/);
     const withLogo = cert.draw(data, { org: { ...org, logo: png } });
     expect(withLogo).toContain(`<img class="brand-logo" src="${png}"`);
   });

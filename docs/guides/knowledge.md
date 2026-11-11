@@ -341,7 +341,8 @@ not use them; a later release drops them (MIGRATIONS §8), together with
   repository). The rosette, the seal's petals and the QR are drawn on the server: the renderer runs
   no script and refuses every request but a `data:` URL. Download Certificate issues it then if the
   worker has not yet.
-- It prints the organisation's logo (Settings · Organisation; the wordmark when none), "Certificate
+- It prints the organisation's logo (Settings · Organisation, else `assets/brand/logo.png`, the pin
+  and "MyCityApp"; the drawn pin and the name when neither exists), "Certificate
   of Completion", the person's full name as on their employee record, the course title, the number
   of items and the course's length (when minutes are set), the completion date (long, day first),
   the publisher's signature, name and job title, the seal (its ring the organisation's name), the
@@ -378,12 +379,44 @@ not use them; a later release drops them (MIGRATIONS §8), together with
   overdue", with the course and the due date.
 - Remind Overdue on a course reminds everyone overdue on it now, skipping anyone reminded that day.
 
+### 6.12 The staging seed
+
+`seeds/staging/90_knowledge.js` fills staging through the services (F13; never production), so the
+hub opens with real content (TB, 11/11/2026):
+
+- **SOPs**: two for each of MyCity's five departments (`seeds/staging/knowledge/sops.js`): Monthly
+  Management Review and Company-Wide Announcement (General Management), New Listing Publication and
+  App Incident Response (Technology & Back-office Ops), Social Media Post Approval and Campaign Launch
+  (Branding & Marketing), Lead Outreach and Partner Onboarding (Partnership & Growth), New Employee
+  Onboarding and Leave Request Handling (People & Culture, published twice so Versions has history).
+  Each is written by the department's head when they have a login, else by Operations & People, else
+  the CEO. Their steps link the screens they happen on, so they list under Procedures. They are
+  published quietly (`publish(..., { quiet: true })`, which no route passes): staging sends real mail,
+  and MyCity's staff are never the audience of demonstration data (TB, 27/10/2026).
+- **Training**: two real courses (`seeds/staging/knowledge/courses.js`), built and signed by
+  Operations & People. *NDPA Data Protection Essentials*: the NDPC's own video, two Nigerian news
+  explainers (HumAngle, Channels Television), CISA's phishing short, two lessons on the Act in our
+  own words with its section numbers, our one-page PDF *NDPA at a Glance*, and the Act's official
+  text on ndpc.gov.ng. *Partner Outreach*: four videos (GoDaddy, HubSpot, Y Combinator, Splash), two
+  lessons, our *Partner Outreach Checklist* PDF and HubSpot Academy's free Inbound Sales
+  certification, whose certificate is the proof. Both are in the Library; NDPA is assigned to the
+  Implementation department only, due in 14 days, so its tasks and notices reach our own team.
+  Videos play through YouTube's own player and outside courses are links: nothing is re-hosted. Each
+  video was checked on 11/11/2026 (YouTube's oEmbed answered, so its owner allows embedding); a video
+  later removed by its owner shows YouTube's own message, and the course is changed on Training.
+- The two PDFs are printed by the PDF service from `seeds/staging/knowledge/*.html` with the logo
+  every PDF carries, and uploaded through the upload engine as a builder's would be. A PDF that
+  cannot be printed leaves its item out, and the seed carries on.
+- Idempotent: an SOP is found by its department and title, a course by its title. Staging's
+  demonstration data is loaded by hand on the server (`docs/runbooks/deploy.md`); running the
+  staging seeds again after a release adds only this file's records.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
 |---|---|---|
 | `sop.created`, `sop.draft_saved`, `sop.draft_discarded`, `sop.archived` | As named | Audit with before and after; nobody is told |
-| `sop.published` | Publish SOP | Audit; outbox `knowledge.notify_sop` tells the department's members ("New SOP" or "SOP updated", its title and version; push as their Knowledge Hub preference allows); search index |
+| `sop.published` | Publish SOP | Audit; outbox `knowledge.notify_sop` tells the department's members ("New SOP" or "SOP updated", its title and version; push as their Knowledge Hub preference allows), nobody when the staging seed published it quietly (§6.12); search index |
 | `training_course.created`, `.updated`, `.item_changed`, `.archived` | As named | Audit |
 | `training_course.published` | Publish Course | Audit; search index |
 | `training.assigned` | Assign Training | Audit; outbox `training.notify_assigned`: each new place's task, then `training.enrolled` |
@@ -445,7 +478,7 @@ else's training in M10 (§13).
 |---|---|---|---|
 | Knowledge Hub · SOPs | Department chips, Search SOPs, the list (SOP, Department, Version, Updated); an SOP: title, number, department, version, updated, Purpose, Scope, Roles Involved, numbered Steps (text, Who, Open Screen, the file); Versions; a writer: New SOP (Department, Title, Start SOP), Edit SOP (Title, Purpose, Scope, Roles Involved, each step's Step, Who, Screen and File; Add Step; Move Up, Move Down, Remove Step), Save Draft, the draft's bar (Draft saved, not published; Discard Changes, Publish SOP), Draft With AI (From: Pasted Text or PDF File; Yours beside Drafted, Keep Mine, Use This Draft), Publish SOP (Note), Archive SOP (Reason), the State chips (Published, Draft, Archived) | Screen: the screen this step happens on, where the SOP is listed under Procedures; Draft With AI's Procedure: wording kept, steps found; Roles Involved: one role a line; Note: what changed | Why SOPs are not the User Guide, the writer rule, versions: §1.1, §6 here |
 | Knowledge Hub · Training | State chips (All, Draft, Published, Archived), the list (Course, State, Items, Library, Assigned, Completed, Overdue); a course beside it: its facts (Number, Items, Length, Published, Completed), Items (each: kind, title, minutes; Add Item with Upload File, Video Link, Course Link, Lesson; Draft Lesson beside the editor, Yours beside Drafted, Keep Mine, Use Lesson; each item's menu: Edit Item, Remove Item, Move Up, Move Down; drag to order), People (Status chips: Everyone, Not Started, In Progress, Completed, Overdue; Employee, Status, Department, Due, Progress, Completed, Certificate; Remind Overdue), Assignments (Audience, State, Due Within, New Joiners, Assigned, Assigned On, Withdraw), Settings (Library, Proof Required, Issue Certificate as switches; Course Details: Title, Summary, Proof Prompt, Save Course); Publish Course (Your Signature), Assign Training (Who Takes It: Everyone or Pick Who with Departments, Roles, People; Due Within (Days); Keep Assigning New Joiners), Archive Course (Reason) | Library: anyone may take it; New Joiners: enrols those who join later; Proof Required: asked at the end; Your Signature: printed on every certificate; Due: the date it was set for; Link: a YouTube link plays in the course | How enrolment, tasks and reminders work: §6.7, §6.11 |
-| ESS · My Training | List chips (To Do, In Progress, Completed, Library); To Do and In Progress (course, status, Due, Progress), Completed (date, certificate number, Download Certificate), Library (course, Length); a course beside the list: its facts (Due, Length, Progress), Start Course for a Library course, its items with Done marks; an item opens in place (All Items): the lesson as text, a PDF or a picture in the viewer, an MP4 or a YouTube video behind Play Video, Open Link for any other link, Download File for anything else; Mark Done, Mark Not Done (until completion), Next Item; Proof with the course's prompt and Add Proof (Link or File); Completed with the certificate number, the proof and Download Certificate | Due: the date it was set for | How certificates are signed and verified: §6.9, the manual |
+| ESS · My Training | List chips (To Do, In Progress, Completed, Library); To Do and In Progress (course, status, Due, Progress), Completed (date, certificate number, Download Certificate), Library (course, Length); a course beside the list: its facts (Due, Length, Progress), Start Course for a Library course, its items with Done marks; an item opens in place (All Items, at its top and its foot): the lesson as text, a PDF (grown to its pages) or a picture in the viewer, an MP4 or a YouTube video behind Play Video, Open Link for any other link, Download File for anything else; Mark Done, Mark Not Done (until completion), Next Item; Proof with the course's prompt and Add Proof (Link or File); Completed with the certificate number, the proof and Download Certificate | Due: the date it was set for | How certificates are signed and verified: §6.9, the manual |
 | User Guide's help for a screen | Procedures: SOP titles with their department | Nothing | How the link is made: §3 step 3 |
 
 ### 10.2 Phone layout
@@ -454,7 +487,7 @@ else's training in M10 (§13).
 |---|---|---|---|---|
 | Knowledge Hub · SOPs | Department chips scrolling sideways, then SOP cards (title, department, version); an SOP opens in a bottom sheet (F31) with its steps as a numbered list | Updated column; Versions behind a row in the sheet | New SOP in the floating button (writers); Edit SOP a full-screen sheet; Publish SOP in the draft's bar | More, then Knowledge Hub |
 | Knowledge Hub · Training | Course cards (title, state pill, completed of assigned, overdue pill); a course opens in a full bottom sheet with Items, People, Assignments and Settings as a segmented control | Items, Library, Assigned and Department columns; Assignments' table (a list of cards instead); the drag handle (Move Up and Move Down in each item's menu) | New Course in the floating button; Assign Training or Publish Course, and Archive Course, full width at the sheet's foot | More, then Knowledge Hub |
-| ESS · My Training | To Do cards first (title, status pill, due, a progress bar), then In Progress, Completed, Library as chips; a course opens in a full bottom sheet | Library's summaries (title and length only); the subtitle | Mark Done full width at the foot of the open item in the course's sheet, Next Item under it; Start Course and Add Proof full width | ESS tabs |
+| ESS · My Training | To Do cards first (title, status pill, due, a progress bar), then In Progress, Completed, Library as chips; a course opens in a full bottom sheet | Library's summaries (title and length only); the subtitle | Mark Done full width at the foot of the open item in the course's sheet, Next Item and All Items under it; Start Course and Add Proof full width | ESS tabs |
 
 ## 11 · Edge cases
 
@@ -514,7 +547,7 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 | 3 | `m10/training` | The training backend (courses, items, publish with signature, assignments, enrolments, tasks, progress, proof, completion, reminders, `training-lesson-draft`, search, AI reads); tests including 300 people assigned at once | 1 |
 | 4 | `m10/certificates` | `training-certificate.html` from the signed-off sample, the embedded fonts, `training.issue_certificate`, verification on `go.mycityapp.io`; tests that render real PDFs | 3 |
 | 5 | `m10/training-screens` | Knowledge Hub · Training and ESS · My Training on the contract, desktop and phone (YouTube player, viewer, proof), the CSP's `frame-src`, the mock in the contract's shapes, the INTERIM types deleted | 3, 4 for Download Certificate |
-| 6 | `m10/knowledge-release` | Staging seed through the services (SOPs for two departments, two courses, assignments), the User Guide chapter's SOPs and Training sections and the ESS chapter's My Training with pictures, empty stubs deleted, PROGRESS Status, Appendix B ticked on staging | 2, 5 |
+| 6 | `m10/knowledge-release` | Staging seed through the services (two SOPs for each of MyCity's five departments, two real courses, NDPA assigned to Implementation; §6.12), the User Guide chapter's SOPs and Training sections and the ESS chapter's My Training with pictures, empty stubs deleted, PROGRESS Status, Appendix B ticked on staging | 2, 5 |
 
 ## Appendix B · Demo checklist (18 December 2026)
 
@@ -534,6 +567,8 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · PR 6 built: the staging seed (§6.12: ten SOPs across MyCity's five departments, published quietly; NDPA Data Protection Essentials and Partner Outreach, real courses of checked YouTube videos, our lessons and PDFs and free outside courses; NDPA assigned to Implementation), the User Guide's Training section (Knowledge Hub chapter, which now names M10) and My Training (Employee Self-Service chapter), with pictures. Decided on the way: Publish SOP takes `quiet` from the seed only, so MyCity's staff are not told of demonstration SOPs (§7); the empty `knowledge-embed` job stub is deleted, since the hub's AI reads are queries, not vectors (`praxis-ai.md` §1 item 6).
+- 11/11/2026 · TB · Two fixes after PR 5, from TB's walk of staging. The certificate (and every PDF made before Settings · Organisation holds a Logo) prints MyCity's lockup, the pin and "MyCityApp" in City Green, from `assets/brand/logo.png`; the certificate's last resort is the drawn pin and the name, not a square (§6.9). On My Training a PDF grows to its pages instead of scrolling inside a frame, so the pane beside the list, or the sheet on a phone, scrolls through it to the item's actions and back; All Items sits at the foot as well as the top, and opening an item or going back starts at the course's top (§10). A certificate already issued keeps its PDF.
 - 11/11/2026 · TB · PR 2 built: the `knowledge` module (§5 to §9), Knowledge Hub · SOPs on the contract, desktop and phone, and Procedures under a screen's section of the User Guide. Decided on the way: `GET /knowledge/sops/departments` added (§5), because most staff hold no `people` view and so cannot read `/departments` for the chips, and a head's New SOP needs the departments they write for; a draft's Purpose, when given, is 10 characters or more at Save Draft too (the contract), and Publish asks for a purpose and a step (§6.3); a step's file is claimed for the SOP as `sop_file` and read by every `knowledge` viewer; the content hash is a new canonical payload, `SOP_VERSION` (`shared/documents/canonical.js`, pinned in its test); ⌘K's New SOP shows for heads too (`orHead`, `shared/search/actions.js`), and a writer finds their departments' drafts in ⌘K (§9). `knowledge.embeddings.js`, empty and unused, is deleted.
 - 11/11/2026 · TB · PR 5 built: Knowledge Hub · Training and ESS · My Training on the contract,
   desktop and phone (§10), walked on the live API (a course built with a lesson, a YouTube link and

@@ -268,7 +268,7 @@ only), real SMTP delivery, web push (M6).
   proxying, env files against `config/env.js`). He runs it: `docs/runbooks/server-setup.md`. DNS A
   records for the four hosts are his to add. The proxy is nginx from `ops/nginx/` now, not a
   hosting panel. GitHub settings by TB.
-- `assets/brand` and `assets/fonts` are empty, so PDFs show the text wordmark.
+- `assets/brand` and `assets/fonts` are empty, so PDFs show the text wordmark. (11/11/2026: `assets/brand/logo.png`, the pin and "MyCityApp", now prints on every PDF until Settings · Organisation holds a Logo.)
 - M3 and later letter templates are empty (each milestone writes its own). Web push waits for M6.
 - systemd it is (decided 15 October); the units are in `ops/systemd/`.
 
