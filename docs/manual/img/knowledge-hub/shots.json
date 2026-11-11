@@ -1,7 +1,7 @@
 {
   "knowledge-attendance": {
     "spec": "9e6b83868d0c44bb",
-    "source": "0a2aa423c66b8b42",
+    "source": "d69a1daab1ffcc79",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "knowledge-new-policy": {
     "spec": "b8f89fbf72f3a9d9",
-    "source": "78b50d526b03a8d2",
+    "source": "cdc8598200e3d774",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "knowledge-new-sop": {
     "spec": "8fb4cda0b82fe7ae",
-    "source": "0a8da5ce5d63d983",
+    "source": "e9b47879534a1b0b",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "knowledge-policies": {
     "spec": "e3ce218b49bca9ae",
-    "source": "78b50d526b03a8d2",
+    "source": "cdc8598200e3d774",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "knowledge-policy": {
     "spec": "b4c482e6a048841c",
-    "source": "0a2aa423c66b8b42",
+    "source": "d69a1daab1ffcc79",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "knowledge-publish": {
     "spec": "505268b0b6c88bb3",
-    "source": "6141734b5c2daea5",
+    "source": "18ee39ea6f89bf4c",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "knowledge-sop": {
     "spec": "6aa3576680374ae9",
-    "source": "0a8da5ce5d63d983",
+    "source": "e9b47879534a1b0b",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "knowledge-sop-ai": {
     "spec": "51f2539eba69bf86",
-    "source": "0a8da5ce5d63d983",
+    "source": "e9b47879534a1b0b",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "knowledge-sop-edit": {
     "spec": "c67603d6bc0215f6",
-    "source": "0a8da5ce5d63d983",
+    "source": "e9b47879534a1b0b",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "knowledge-sop-publish": {
     "spec": "abab5bea8b4a3b6c",
-    "source": "0a8da5ce5d63d983",
+    "source": "e9b47879534a1b0b",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "knowledge-sops": {
     "spec": "50e701365c2105b0",
-    "source": "0a8da5ce5d63d983",
+    "source": "e9b47879534a1b0b",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,7 @@
   },
   "knowledge-version": {
     "spec": "bc65fb7a518ea746",
-    "source": "78b50d526b03a8d2",
+    "source": "cdc8598200e3d774",
     "devices": [
       "desktop",
       "phone"
