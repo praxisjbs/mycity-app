@@ -758,6 +758,32 @@ async function setBirthday(client, employeeId, { day, month }, actor) {
 }
 
 /**
+ * Record a hire's BVN (M5's upload page; docs/guides/offers.md §3 step 6). The audit says that the
+ * field changed and whether it was set before, never the number: it is restricted under
+ * employee.bank (field-mask) and never sent to an AI model.
+ *
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {string} bvn  eleven digits (the contract's BvnEnter, and the column's CHECK)
+ */
+async function setBvnIn(client, employeeId, bvn, actor) {
+  const change = await repo.setBvn(client, employeeId, bvn);
+  if (!change) throw new AppError("NOT_FOUND", "Not found", 404);
+  await emit(client, {
+    key: EVENTS.EMPLOYEE_UPDATED,
+    entity: { type: "employee", id: employeeId },
+    actor,
+    before: { bvn_entered: change.had },
+    after: { bvn_entered: true },
+    payload: { employee_id: employeeId, fields: ["bvn"] },
+  });
+}
+
+/** Whether the person's BVN is on record, for the onboarding checklist (never the number). */
+async function hasBvn(db, employeeId) {
+  return repo.hasBvn(db, employeeId);
+}
+
+/**
  * Give a person the next free staff number, so the roster can take back a number its
  * sheet says belongs to somebody else. The counter is moved past every number already
  * in use first, so the new one is above them all; a number taken in the meantime is
@@ -1586,6 +1612,8 @@ async function aiSummary(client, params, scope, now = new Date()) {
 module.exports = {
   aiSummary,
   setBirthday,
+  setBvnIn,
+  hasBvn,
   findDepartmentByName,
   findDepartmentByCode,
   findOrCreateDepartment,

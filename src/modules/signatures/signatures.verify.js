@@ -11,6 +11,9 @@
  * Typed by reference it shows the status and the signers, never the content (a reference is not a
  * secret); from the QR's key it shows the document too. Only a sealed copy is verifiable; anything
  * else is the same 404 as an unknown reference.
+ *
+ * A training certificate's number (CERT-2026-0001) is answered by the training module, from the
+ * facts the certificate states (docs/guides/knowledge.md §6.10); an unknown one is the same 404.
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
@@ -51,10 +54,11 @@ async function resultOf(r, { withDocument = false, key = null } = {}) {
     issued_at: new Date(r.created_at).toISOString(),
     status: r.status,
     record_status: adapter.recordStatus ? await adapter.recordStatus(pool, r.subject_id) : null,
-    signers: signatures.map(service().signerView),
+    signers: signatures.map((s) => service().signerView(s, r)),
     signed_outside: signatures.some((s) => s.method === "paper"),
     content,
     artifact,
+    certificate: null,
   };
   if (!withDocument) return out;
   return {
@@ -62,6 +66,7 @@ async function resultOf(r, { withDocument = false, key = null } = {}) {
     document: {
       title: r.title,
       letter: await adapter.letter(pool, r.subject_id),
+      blocks: await service().blocksOf(pool, adapter, r.subject_id),
       file_name: doc ? doc.original_name : `${r.reference}.pdf`,
       url: `${String(config.PUBLIC_ORIGIN).replace(/\/+$/, "")}/api/public/v1/verify/t/${key}/document`,
     },
@@ -70,6 +75,7 @@ async function resultOf(r, { withDocument = false, key = null } = {}) {
 
 /** GET /verify/:ref. */
 async function byReference(reference) {
+  if (/^CERT-/i.test(String(reference))) return require("../training/training.certificate").verify(reference);
   const r = await repo.requestByReference(pool, reference);
   if (!r || !r.sealed_at) throw notFound();
   return resultOf(r);

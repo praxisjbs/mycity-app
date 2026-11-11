@@ -1,7 +1,8 @@
 /**
  * Recruitment · Offers (docs/guides/offers.md §2, §3, §10; M5, owner AJ): every offer in the
- * reader's scope with the figures above it, beside the offer picked (ListDetail; on a phone it
- * opens in a sheet). The offer shows its summary and status, the monthly pay lines and total with
+ * reader's scope with the figures above it, across the page; a row opens its offer in a wide dialog
+ * on desktop, its cards side by side over the letter, and in a sheet on a phone (ListDetail `modal`,
+ * F31 as amended 08/11/2026). The offer shows its summary and status, the monthly pay lines and total with
  * the vacancy's range, its approval, signers and history, the letter as the candidate reads it and
  * the PDF. What a person may do comes from the record's `can_*`: Edit and Submit for Approval on a
  * draft, Approve and Reject for the approver the flow waits on, Sign for the Company for the Offer
@@ -15,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import offerSchemas from "@mycity/contract/schemas/offers.js";
 import type { OfferDetail, OfferRow, OfferStatus } from "@mycity/contract/contract.gen.ts";
 import { api } from "@/api/client";
-import { saveFile } from "@/api/download";
+import { saveBlob, useFileBlob } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -29,6 +30,8 @@ import {
   Card,
   CardHeader,
   Chain,
+  DocumentPreview,
+  EmptyState,
   cn,
   ErrorState,
   FilterSelect,
@@ -37,12 +40,14 @@ import {
   formatMoney,
   FormError,
   FormFooter,
+  Grid,
   HelpTerm,
   KeyValue,
   ListDetail,
   LoadingRows,
   Money,
   PageHeader,
+  PdfViewer,
   Paper,
   PaperLogo,
   PaperTitle,
@@ -55,8 +60,8 @@ import {
   toast,
   Toolbar,
   useContractForm,
+  useIsPhone,
   useModal,
-  useSideBySide,
   type StatusTone,
   type TimelineItem,
 } from "@mycity/ui";
@@ -89,10 +94,10 @@ export function Offers() {
   const [status, setStatus] = useState(params.get("status") ?? "");
   const summary = useApi("GET /api/v1/recruitment/offers/summary");
   const list = usePaged("GET /api/v1/recruitment/offers", { filters: status ? { status: status as OfferStatus } : {} });
-  const beside = useSideBySide();
+  const phone = useIsPhone();
+  // Nothing opens unasked: a row opens its offer in the dialog, or the sheet on a phone (F31).
   const [picked, setPicked] = useState<string | null>(null);
-  // Beside the list the first offer shows unasked; on a phone one opens only when tapped (F31).
-  const shown = picked ?? (beside ? (list.rows[0]?.offer_id ?? null) : null);
+  const shown = picked;
 
   const newOffer = (applicationId?: string) =>
     modal.open({ title: "New Offer", wide: true, full: true, body: (close) => <OfferForm applicationId={applicationId} close={close} onSaved={(o) => setPicked(o.offer_id)} /> });
@@ -161,6 +166,9 @@ export function Offers() {
         />
       </Toolbar>
       <ListDetail
+        layout="modal"
+        closeButton
+        size="xl"
         full
         open={picked !== null}
         onClose={() => setPicked(null)}
@@ -175,22 +183,40 @@ export function Offers() {
             onRowClick={(o) => setPicked(o.offer_id)}
             empty={list.q || status ? undefined : { title: "No Offers Yet" }}
             columns={[
+              { key: "number", label: "Offer", render: (o) => o.number, desktop: true },
               { key: "who", label: "Candidate", render: (o) => <span className={cn(o.offer_id === shown ? "font-semibold" : "font-medium")}>{o.candidate_name}</span> },
               { key: "role", label: "Role", render: (o) => o.job_title, desktop: true },
-              { key: "pay", label: "Annual", align: "n", desktop: true, render: (o) => <Money value={o.annual_compensation} /> },
+              { key: "start", label: "Start Date", desktop: true, render: (o) => (o.start_date ? formatDate(o.start_date) : "–") },
+              {
+                key: "pay",
+                label: "Annual",
+                align: "n",
+                desktop: true,
+                render: (o) => (
+                  <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                    <Money value={o.annual_compensation} />
+                    {o.outside_range && <Pill tone="warn">Outside Range</Pill>}
+                  </span>
+                ),
+              },
               { key: "status", label: "Status", render: (o) => pill(OFFER_STATUS[o.status]) },
+              { key: "sent", label: "Sent", desktop: true, render: (o) => (o.sent_at ? formatDate(o.sent_at) : "–") },
               { key: "ends", label: "Expires", desktop: true, render: (o) => (o.expires_at ? formatDate(o.expires_at) : "–") },
             ]}
           />
         }
-        detail={shown ? <OfferRecord key={shown} id={shown} onPicked={setPicked} /> : null}
+        // The dialog sets the cards side by side over the letter; a phone's sheet stacks them.
+        detail={shown ? <OfferRecord key={shown} id={shown} onPicked={setPicked} wide={!phone} /> : null}
       />
     </>
   );
 }
 
-/** One offer: its summary and actions, pay, approval, signers, history, and the letter. */
-export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: string) => void }) {
+/**
+ * One offer: its summary and actions, pay, approval and signers, then its history and the letter.
+ * `wide` (the desktop dialog): the first four two by two, History and the letter across the dialog.
+ */
+export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPicked?: (id: string) => void; wide?: boolean }) {
   const modal = useModal();
   const read = useApi("GET /api/v1/recruitment/offers/:id", { params: { id } });
   const submit = useMutation("POST /api/v1/recruitment/offers/:id/submit");
@@ -216,8 +242,21 @@ export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: stri
   const edit = () => modal.open({ title: "Edit Offer", wide: true, full: true, body: (close) => <OfferForm offer={o} close={close} onSaved={(x) => (reload(), onPicked?.(x.offer_id))} /> });
   const withdraw = () => modal.open({ title: "Withdraw Offer", body: (close) => <WithdrawForm offer={o} close={close} onSaved={reload} /> });
   const sign = () => modal.open({ title: "Sign for the Company", wide: true, body: (close) => <SignForm offer={o} close={close} onSaved={reload} /> });
+  const viewLetter = () => modal.open({ title: `${o.number} · Offer Letter`, wide: true, body: <OfferLetter offer={o} /> });
   const changeEmail = () => modal.open({ title: "Change Email", body: (close) => <EmailForm offer={o} close={close} onSaved={reload} /> });
   const primary = "max-md:w-full";
+  const signers =
+    o.signers.length > 0 ? (
+      <KeyValue
+        items={o.signers.map((s) => [
+          s.role === "mycity" ? `For the Company${s.title ? `, ${s.title}` : ""}` : "Candidate",
+          <span key={s.name} className="inline-flex flex-wrap items-center justify-end gap-1.5">
+            {s.name}
+            {s.status === "signed" ? pill(["ok", s.signed_at ? `Signed ${formatDate(s.signed_at)}` : "Signed"]) : s.status === "pending" ? pill(["warn", "Waiting"]) : pill(["neutral", s.status === "declined" ? "Declined" : "Not Signed"])}
+          </span>,
+        ])}
+      />
+    ) : null;
 
   return (
     <Stack>
@@ -226,7 +265,8 @@ export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: stri
           The offer email to {o.candidate_email} was refused on {formatDateTime(o.send_refused_at)}.
         </Banner>
       )}
-      <Card as="article">
+      <Pair wide={wide}>
+        <Card as="article">
         <CardHeader record title={o.candidate_name} right={pill(OFFER_STATUS[o.status])} />
         <KeyValue
           items={[
@@ -240,9 +280,17 @@ export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: stri
             ...(o.end_reason ? [["Reason", <span key="r" data-copy="content">{o.end_reason}</span>] as [string, React.ReactNode]] : []),
           ]}
         />
+        {wide && signers && (
+          <section aria-labelledby={`signers-${id}`} className="mt-4 border-t border-border pt-4">
+            <h3 id={`signers-${id}`} data-ui="title" className="mb-3 text-base font-strong text-foreground">
+              Signers
+            </h3>
+            {signers}
+          </section>
+        )}
         <ActionGroup>
           <div className="mt-3 flex flex-wrap justify-end gap-2">
-            {o.document && <Button icon="download" onClick={() => saveFile(`/api/v1/recruitment/offers/${id}/document`, o.document!.file_name)}>Download PDF</Button>}
+            <Button icon="doc" onClick={viewLetter}>View Letter</Button>
             {o.can_withdraw && <Button variant="danger" onClick={withdraw}>Withdraw Offer</Button>}
             {o.can_edit && <Button icon="edit" onClick={edit}>Edit Offer</Button>}
             {o.can_change_email && <Button icon="mail" onClick={changeEmail}>Change Email</Button>}
@@ -253,41 +301,74 @@ export function OfferRecord({ id, onPicked }: { id: string; onPicked?: (id: stri
           </div>
         </ActionGroup>
       </Card>
-      <PayCard o={o} />
-      {o.workflow_instance_id && <OfferApproval instanceId={o.workflow_instance_id} onDecided={reload} />}
-      {o.signers.length > 0 && (
+      {/* In the dialog the approval sits under Monthly Pay, in the same card; a phone's sheet keeps its own card. */}
+      {wide ? (
+        <PayCard o={o}>{o.workflow_instance_id && <OfferApproval instanceId={o.workflow_instance_id} onDecided={reload} inCard />}</PayCard>
+      ) : (
+        <>
+          <PayCard o={o} />
+          {o.workflow_instance_id && <OfferApproval instanceId={o.workflow_instance_id} onDecided={reload} />}
+        </>
+      )}
+      {/* In the dialog the signers sit in the offer's own card; a phone's sheet keeps their card. */}
+      {!wide && signers && (
         <Card>
           <CardHeader title="Signers" />
-          <KeyValue
-            items={o.signers.map((s) => [
-              s.role === "mycity" ? `For the Company${s.title ? `, ${s.title}` : ""}` : "Candidate",
-              <span key={s.name} className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                {s.name}
-                {s.status === "signed" ? pill(["ok", s.signed_at ? `Signed ${formatDate(s.signed_at)}` : "Signed"]) : s.status === "pending" ? pill(["warn", "Waiting"]) : pill(["neutral", s.status === "declined" ? "Declined" : "Not Signed"])}
-              </span>,
-            ])}
-          />
+          {signers}
         </Card>
       )}
+      </Pair>
       <Card>
         <CardHeader title="History" />
         <Timeline label="History" items={historyOf(o)} />
       </Card>
-      <Paper>
-        <PaperLogo reference={o.number} />
-        <PaperTitle sub={`${o.candidate_name}, ${o.job_title}`}>Offer of Employment</PaperTitle>
-        <div data-copy="content">
-          {o.letter.slice(1).map((line, i) => (
-            <p key={i}>{line}</p>
-          ))}
-        </div>
-      </Paper>
     </Stack>
   );
 }
 
-/** The monthly pay, line by line, the total and the year, against the vacancy's range. */
-function PayCard({ o }: { o: OfferDetail }) {
+const MOCK = import.meta.env.VITE_API_MODE === "mock";
+
+/**
+ * View Letter: the offer's PDF as the candidate receives it, with Open in Tab and Download PDF, as a
+ * query's letter is shown (M3). Before the PDF is made (a draft), and on the mock, the letter's
+ * wording on paper.
+ */
+function OfferLetter({ offer: o }: { offer: OfferDetail }) {
+  const pdf = useFileBlob(o.document && !MOCK ? `/api/v1/recruitment/offers/${o.offer_id}/document` : null);
+  if (o.document && !MOCK) {
+    if (pdf.failed) return <EmptyState bare icon="doc" title="Letter Not Ready" text="It is still being made. Try again shortly." />;
+    if (!pdf.blob || !pdf.href) return <PdfViewer data={null} name={o.document.file_name} height="page" />;
+    return (
+      <DocumentPreview
+        name={o.document.file_name}
+        mime="application/pdf"
+        href={pdf.href}
+        file={pdf.blob}
+        height="page"
+        actions={<Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, o.document!.file_name)}>Download PDF</Button>}
+      />
+    );
+  }
+  return (
+    <Paper>
+      <PaperLogo reference={o.number} />
+      <PaperTitle sub={`${o.candidate_name}, ${o.job_title}`}>Offer of Employment</PaperTitle>
+      <div data-copy="content">
+        {o.letter.slice(1).map((line, i) => (
+          <p key={i}>{line}</p>
+        ))}
+      </div>
+    </Paper>
+  );
+}
+
+/** The record's first cards: two by two in the desktop dialog, each at its own height; one under another in a phone's sheet. */
+function Pair({ wide, children }: { wide: boolean; children: React.ReactNode }) {
+  return wide ? <Grid cols={2} scroll={false} flush>{children}</Grid> : <>{children}</>;
+}
+
+/** The monthly pay, line by line, the total and the year, against the vacancy's range; in the dialog, the approval under it. */
+function PayCard({ o, children }: { o: OfferDetail; children?: React.ReactNode }) {
   const range = o.salary_min || o.salary_max ? `${o.salary_min ? formatMoney(o.salary_min) : "Any"} to ${o.salary_max ? formatMoney(o.salary_max) : "Any"}` : null;
   return (
     <Card>
@@ -301,6 +382,7 @@ function PayCard({ o }: { o: OfferDetail }) {
           ...(o.outside_range && o.range_reason ? [["Why Outside", <span key="w" data-copy="content">{o.range_reason}</span>] as [string, React.ReactNode]] : []),
         ]}
       />
+      {children}
     </Card>
   );
 }
@@ -332,8 +414,11 @@ const MOVE: Record<string, (who: string) => string> = {
   reassign: (who) => `Passed on by ${who}`,
 };
 
-/** The offer's approval: its stages, each move with its reason, and Approve and Reject for whom it waits on. */
-function OfferApproval({ instanceId, onDecided }: { instanceId: string; onDecided: () => void }) {
+/**
+ * The offer's approval: its stages, each move with its reason, and Approve and Reject for whom it waits on.
+ * Its own card, or (`inCard`) a part of Monthly Pay's under a hairline.
+ */
+function OfferApproval({ instanceId, onDecided, inCard = false }: { instanceId: string; onDecided: () => void; inCard?: boolean }) {
   const modal = useModal();
   const flow = useApi("GET /api/v1/workflow/instances/:id", { params: { id: instanceId } });
   const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
@@ -353,9 +438,8 @@ function OfferApproval({ instanceId, onDecided }: { instanceId: string; onDecide
     }
   };
   const no = () => modal.open({ title: "Reject Offer", body: (close) => <RejectForm instanceId={instanceId} close={close} onSaved={done} /> });
-  return (
-    <Card>
-      <CardHeader title="Approval" />
+  const body = (
+    <>
       {f ? (
         <>
           <Chain steps={f.route.map((s) => ({ label: s.name, state: s.state === "done" || s.state === "now" ? s.state : undefined }))} />
@@ -384,6 +468,21 @@ function OfferApproval({ instanceId, onDecided }: { instanceId: string; onDecide
       ) : (
         <LoadingRows count={2} />
       )}
+    </>
+  );
+  if (inCard)
+    return (
+      <section aria-labelledby={`approval-${instanceId}`} className="mt-4 border-t border-border pt-4">
+        <h3 id={`approval-${instanceId}`} data-ui="title" className="mb-3 text-base font-strong text-foreground">
+          Approval
+        </h3>
+        {body}
+      </section>
+    );
+  return (
+    <Card>
+      <CardHeader title="Approval" />
+      {body}
     </Card>
   );
 }

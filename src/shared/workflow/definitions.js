@@ -37,6 +37,8 @@
  * M8 adds `expenses.request` (docs/guides/expenses.md §6.3, seeded in 8100): the line manager
  * (skipped when the requester manages people), then Operations & People; and `expenses.requisition`
  * (§6.4): the CEO decides a requisition of approved requests as a whole.
+ * M6 adds `payroll.run` (docs/guides/payroll.md §6.9, seeded in 6099): the CEO approves a month's
+ * payroll run, which locks it and publishes its payslips.
  *
  * A person may also make a flow on screen (Settings, Approvals, New Flow; keyFor, keyTaken). It is
  * stored like any other and opens only once a module's service calls openInstance with its key.
@@ -351,6 +353,17 @@ const DEFAULTS = Object.freeze({
     name: "Requisition",
     description: "The CEO approves or rejects the batch of approved requests.",
     context: { total: "money" },
+    stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
+  },
+  // M6, seeded in 6099 (docs/guides/payroll.md §6.9, §13.1 item 7): the CEO alone approves a month's
+  // run before its payslips are published. The context carries money, so the engine re-arms the stage
+  // and tells the CEO on a timeout and never approves it itself (conditions.js).
+  "payroll.run": {
+    key: "payroll.run",
+    module: "payroll",
+    name: "Payroll Run",
+    description: "The CEO approves the month's payroll before payslips are published.",
+    context: { net_total: "money" },
     stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
   },
 });

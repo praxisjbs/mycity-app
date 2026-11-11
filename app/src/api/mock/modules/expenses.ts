@@ -14,6 +14,7 @@ import { at, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid
 import { byKey, refKey, SIGN_INS, teamOf } from "../data/people";
 import { CATEGORY_NAMES, PROJECT_NAMES, SEED, type SeedRequest } from "../data/expenses";
 import { UPLOADS } from "../uploads";
+import { sendBackPayrollRun } from "./payroll";
 
 /*
  * Expenses on the contract's paths and shapes (docs/guides/expenses.md §5): requests and their
@@ -292,6 +293,24 @@ route("GET /api/v1/expenses/mine/summary", (req) => {
     rejected: own.filter((r) => r.status === "rejected").length,
   });
 });
+/* The Bank field's suggestions: the common banks (expenses.service COMMON_BANKS) and every bank a request names. */
+const COMMON_BANKS = [
+  "Access Bank", "Citibank", "Ecobank", "Fidelity Bank", "First Bank", "FCMB", "Globus Bank", "GTBank", "Jaiz Bank",
+  "Keystone Bank", "Kuda", "Moniepoint", "Opay", "PalmPay", "Polaris Bank", "Providus Bank", "Stanbic IBTC",
+  "Standard Chartered", "Sterling Bank", "Union Bank", "UBA", "Unity Bank", "Wema Bank", "Zenith Bank",
+];
+route("GET /api/v1/expenses/banks", (req) => {
+  const uses = new Map<string, { bank_name: string; uses: number }>();
+  for (const b of COMMON_BANKS) uses.set(b.toLowerCase(), { bank_name: b, uses: 0 });
+  for (const r of REQS) {
+    const b = r.bank_name?.trim();
+    if (!b) continue;
+    const had = uses.get(b.toLowerCase());
+    uses.set(b.toLowerCase(), { bank_name: had?.bank_name ?? b, uses: (had?.uses ?? 0) + 1 });
+  }
+  const rows = [...uses.values()].sort((a, b) => b.uses - a.uses || a.bank_name.localeCompare(b.bank_name));
+  return paged(rows, req, { search: (b) => [b.bank_name] });
+});
 route("GET /api/v1/expenses", (req) => list(REQS.filter((r) => r.status !== "draft" && sees(req.user!, r)), req));
 route("GET /api/v1/expenses/approvals", (req) => list(REQS.filter((r) => r.status === "submitted" && deciderOf(r) === req.user && r.requester !== req.user), req));
 route("GET /api/v1/expenses/approvals/summary", (req) => {
@@ -434,7 +453,8 @@ export function decideExpense(user: string, wid: string, approve: boolean, reaso
 }
 route("POST /api/v1/workflow/instances/:id/request-changes", (req) => {
   const r = byWid(req.params.id);
-  if (!r) return notFound();
+  // Another module's approval sent back: a payroll run returns to Draft with the reason.
+  if (!r) return sendBackPayrollRun(req.user!, req.params.id, (req.body as { reason?: string })?.reason) ?? notFound();
   if (r.status !== "submitted" || deciderOf(r) !== req.user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
   const reason = (req.body as { reason?: string })?.reason;
   if (!reason?.trim()) return invalid({ reason: ["is required"] });

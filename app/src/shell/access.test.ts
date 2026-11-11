@@ -58,6 +58,15 @@ describe("shell access", () => {
     expect(visibleTabs(itOnly, settings).map((t) => t.slug)).toEqual(["integrations"]);
   });
 
+  it("Knowledge Hub · Training follows training.manage, as every course route asks; staff take theirs on My Training", () => {
+    const knowledge = MODULES.find((m) => m.key === "knowledge")!;
+    const has = (me: Me) => visibleTabs(me, knowledge).some((t) => t.slug === "training");
+    expect(has(person([], { grants: { knowledge: ["view", "create", "edit"] } }))).toBe(false);
+    expect(has(person(["training.manage"], { grants: { knowledge: ["view"] } }))).toBe(true);
+    expect(has(person([], { grants: { knowledge: ["view"] }, is_ceo: true }))).toBe(true);
+    expect(visibleTabs(person([], { grants: { knowledge: ["view"] } }), knowledge).map((t) => t.slug)).toContain("user-guide");
+  });
+
   it("a capability never opens a module the person cannot view", () => {
     const me = person(["home.team"], { grants: { people: ["view"] } });
     expect(visibleModules(me).map((m) => m.key)).toEqual(["people"]);

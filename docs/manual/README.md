@@ -12,6 +12,7 @@ the reader's grants down to the step, and the tab shows it. The engineering guid
 | `getting-started.md` | Signing in, the hub's layout, search, notifications, your own settings. Everyone reads it |
 | `quick-start.md` | The Quick Start: short illustrated cards, grouped by role |
 | `<module>.md` | One chapter per module (`people.md`, `settings.md`), in the rail's order |
+| `public-site.md` | The public site's Help (`kind: public-help`): read by candidates at go.mycityapp.io/help, never in the hub's guide. Written to "you", naming no hub screen |
 | `img/<chapter>/` | The chapter's pictures, `<shot>.desktop.png` and `<shot>.phone.png`, and `shots.json` |
 | `performance-guide/` | The printed Performance training guide (A4). Not part of the tab |
 
@@ -108,7 +109,7 @@ under it). Its spec is a fenced `shot <id>` block anywhere in the same file:
 | `marks` | Numbered marks drawn on the picture: `1: button "Add Employee" \| Add a person`. The legend under the picture lists them |
 | `crop` | `page` (the default), `modal` (only the open dialog or sheet), `viewport`, or a CSS selector |
 | `prompt` | `keep`: the picture is of a prompt that opens by itself once per sign-in (a policy to acknowledge), so it is taken in a sign-in of its own, before the prompt is closed |
-| `site` | `public`: a page of the public site (go.mycityapp.io), taken signed out on its demo build. `open` is then its address, `/` (the front page), `/jobs`, `/jobs/<slug>`, `/apply/<token>` or `/assess/<token>`, a demo link from `public-app/src/api/mock/demo-links.ts`; leave out `as` |
+| `site` | `public`: a page of the public site (go.mycityapp.io), taken signed out on its demo build. `open` is then its address, `/` (the front page), `/jobs`, `/jobs/<slug>`, `/apply/<token>`, `/assess/<token>`, `/sign/<token>`, `/verify/<reference>` or `/proposal/<token>`, a demo link from `public-app/src/api/mock/demo-links.ts`; leave out `as` |
 | `sources` | More files the picture depends on, beside the screen's feature folder (for a public page, its page file and the public shell) |
 
 A target is `button "Name"`, `link "Name"`, `tab "Name"`, `label "Field"`, `text "Words"`,

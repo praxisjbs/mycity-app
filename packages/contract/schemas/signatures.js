@@ -17,16 +17,24 @@
  *   signature  pending, signed, declined, expired
  */
 const { z } = require("zod");
-const { text, optionalText, isoDateTime } = require("./common");
+const { text, optionalText, isoDate, isoDateTime } = require("./common");
+const { RichTextBlock } = require("./policies");
 
 const SignatureRequestStatus = z.enum(["pending", "completed", "declined", "expired", "revoked"]);
 const SignatureStatus = z.enum(["pending", "signed", "declined", "expired"]);
+/**
+ * A signer as the pages show them: the row's status, or `void` for a signature on a request that
+ * ended unsigned (another signer declined, it lapsed or it was withdrawn), which binds nobody.
+ */
+const SignerStatus = z.enum(["pending", "signed", "declined", "expired", "void"]);
 /** How a signature was made: drawn on the pad, typed in a signature face, or on paper and recorded. */
 const SignatureMethod = z.enum(["draw", "type", "paper"]);
 /** Whose signature it is, as the verification page names them. */
 const SignatoryRole = z.enum(["candidate", "employee", "partner", "mycity"]);
 /** What was signed, as the verification page names it. */
 const SignedDocumentType = z.enum(["offer_letter", "employment_contract", "agreement"]);
+/** What Verify a Document can check: a signed document, or a training certificate (docs/guides/knowledge.md §6.10). */
+const VerifiedDocumentType = z.enum([...SignedDocumentType.options, "training_certificate"]);
 /** A verdict of the two checks (A12). */
 const Verdict = z.enum(["matches", "differs"]);
 
@@ -62,8 +70,11 @@ const SignSubmit = z
 /** Decline the Offer (or the agreement): the reason the owner reads. */
 const SignDecline = z.object({ reason: text(500) }).strict();
 
-/** Where the person holding the link stands. */
-const SigningState = z.enum(["awaiting", "signed", "declined", "expired", "withdrawn"]);
+/**
+ * Where the person holding the link stands. `void`: they signed, but the document was declined by
+ * another signer, lapsed or was withdrawn before everyone signed, so their signature binds nobody.
+ */
+const SigningState = z.enum(["awaiting", "signed", "declined", "expired", "withdrawn", "void"]);
 
 /** The signing page (go.mycityapp.io/sign/<token>): the document as its PDF reads, and where signing stands. */
 const SigningView = z
@@ -80,6 +91,11 @@ const SigningView = z
     state: SigningState,
     /** The document's text, from the one renderer its PDF is made with. */
     letter: z.array(z.string()),
+    /**
+     * The same text as blocks, headings, numbered clauses and tables kept, where the document has
+     * them (an agreement); null where its paragraphs say it all (an offer letter).
+     */
+    blocks: z.array(RichTextBlock).nullable(),
     /** The emailed code was entered; Accept and Sign may be pressed. */
     code_verified: z.boolean(),
     signers: z.array(z.lazy(() => SignerView)),
@@ -104,8 +120,10 @@ const SignerView = z
     name: z.string(),
     title: z.string().nullable(),
     role: SignatoryRole,
-    status: SignatureStatus,
+    status: SignerStatus,
     signed_at: isoDateTime.nullable(),
+    /** Drawn, typed, or signed on paper and recorded. */
+    method: SignatureMethod.nullable(),
   })
   .strict();
 
@@ -116,10 +134,25 @@ const SignerView = z
 /** By reference: OFF-0018, CON-0004, AGR-2026-0001. A reference is not a secret, so it reveals no content. */
 const VerifyRefParams = z.object({ ref: z.string().trim().min(3).max(60) }).strict();
 
+/**
+ * A training certificate as it was issued (docs/guides/knowledge.md §6.10): the holder, the course,
+ * the completion date. Its number alone shows it; nothing else about the person is shown.
+ */
+const CertificateFacts = z
+  .object({
+    holder_name: z.string(),
+    course_number: z.string(),
+    course_title: z.string(),
+    completed_on: isoDate,
+    items: z.number().int().min(0),
+    minutes: z.number().int().min(1).nullable(),
+  })
+  .strict();
+
 const VerifyResult = z
   .object({
     reference: z.string(),
-    document_type: SignedDocumentType,
+    document_type: VerifiedDocumentType,
     title: z.string(),
     issued_by: z.string(),
     issued_at: isoDateTime,
@@ -132,6 +165,8 @@ const VerifyResult = z
     /** The two checks (A12): the content matches what was signed; the stored file is the one sealed. */
     content: Verdict,
     artifact: Verdict,
+    /** A training certificate's facts; null for a signed document. */
+    certificate: CertificateFacts.nullable(),
   })
   .strict();
 
@@ -142,6 +177,8 @@ const VerifyByToken = VerifyResult.extend({
       title: z.string(),
       /** The document's text, from the one renderer the PDF is made with. */
       letter: z.array(z.string()),
+      /** The same text as blocks, where the document has headings, clauses or tables (SigningView.blocks). */
+      blocks: z.array(RichTextBlock).nullable(),
       file_name: z.string(),
       url: z.string(),
     })
@@ -174,6 +211,7 @@ const TABLES = {
   SignatureCodeEmailVars: { table: null, reason: "the variables of templates/email/signature-code.html" },
   SignatureCompletedEmailVars: { table: null, reason: "the variables of templates/email/signature-completed.html" },
   VerifyRefParams: { table: null, reason: "a document's reference" },
+  CertificateFacts: { table: null, reason: "a training certificate as issued, kept on training_enrolment" },
   VerifyResult: { table: null, reason: "what verification shows: status, signers and the two verdicts" },
   VerifyByToken: { table: null, reason: "verification from the QR: the record and its document" },
 };
@@ -182,9 +220,11 @@ module.exports = {
   TABLES,
   SignatureRequestStatus,
   SignatureStatus,
+  SignerStatus,
   SignatureMethod,
   SignatoryRole,
   SignedDocumentType,
+  VerifiedDocumentType,
   Verdict,
   SignTokenParams,
   SignCodeVerify,
@@ -198,6 +238,7 @@ module.exports = {
   SignatureCompletedEmailVars,
   SignerView,
   VerifyRefParams,
+  CertificateFacts,
   VerifyResult,
   VerifyByToken,
 };

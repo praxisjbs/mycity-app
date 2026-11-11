@@ -498,12 +498,37 @@ async function projectName(db, id) {
   return rows[0] ? rows[0].name : null;
 }
 
+/**
+ * One page of the banks New Request suggests: `common` (the service's list) and every bank a request
+ * has named, one row a name whatever its case, most used first. `q` narrows by what the name
+ * contains. Only the bank's name is read, never an account, and no request is named.
+ * @param {object} query  ExpenseBankListQuery
+ * @param {string[]} common  the common banks, offered before any request names them
+ */
+function banks(db, query, common) {
+  return pageQuery(
+    db,
+    // A common bank keeps its own spelling ("GTBank", not a request's "gtbank"); any other name
+    // reads as its first spelling byte by byte, so the answer never turns on the database's collation.
+    `SELECT (array_agg(b.name ORDER BY b.common DESC, b.name COLLATE "C"))[1] AS bank_name, sum(b.used)::int AS uses, ${TOTAL_COL}
+       FROM (SELECT btrim(n) AS name, 0 AS used, true AS common FROM unnest($2::text[]) n
+             UNION ALL SELECT btrim(bank_name), 1, false FROM expense_request WHERE bank_name IS NOT NULL) b
+      WHERE b.name <> ''
+        AND ($1::text IS NULL OR strpos(search_fold(b.name), search_fold($1)) > 0)
+      GROUP BY lower(b.name)
+      ORDER BY sum(b.used) DESC, lower(b.name) COLLATE "C"`,
+    [query.q || null, common],
+    query,
+  );
+}
+
 async function departmentName(db, id) {
   const { rows } = await db.query("SELECT name FROM department WHERE department_id = $1", [id]);
   return rows[0] ? rows[0].name : null;
 }
 
 module.exports = {
+  banks,
   historyOf,
   duplicatesOf,
   refreshOverBudget,

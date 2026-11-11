@@ -200,6 +200,23 @@ jobs:
           fi
           ffmpeg -version | head -1
 
+      # Chromium's first launch on a fresh runner builds the font cache before it answers: 10 s
+      # with 335 fonts on a laptop, and on this image's thousands it ran past puppeteer's launch
+      # limit, failing whichever file rendered a PDF first (documents-import, worker; 08/11/2026).
+      # The cache is built here, once, so every launch in the suite takes a second or two.
+      - name: Chromium's font cache, built before the suite
+        run: |
+          start=$(date +%s)
+          fc-cache || true
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          if [ -n "$chrome" ]; then
+            DBUS_SESSION_BUS_ADDRESS=disabled: timeout 180 "$chrome" --headless=new --no-sandbox --disable-gpu \
+              --no-first-run --dump-dom about:blank >/dev/null 2>&1 || echo "::warning::Chromium did not finish its first launch"
+          else
+            echo "::warning::No Chromium on this runner: the PDF tests will fail"
+          fi
+          echo "Font cache and Chromium ready in $(( $(date +%s) - start )) s"
+
       # The job prints the service's log after its steps, and the transaction probe in
       # src/shared/db/tx.js has PostgreSQL log an ERROR on every call outside a transaction:
       # thousands of lines that buried the failing test at the end of each red backend log
@@ -417,26 +434,28 @@ jobs:
           echo "::error::Chromium could not be installed in two tries: its download or the runner's apt mirror stalled each time. Re-run the job."
           exit 1
       # The browser comes from the cache; the system libraries it needs from theirs when it holds
-      # them. Otherwise the screens jobs race the mirror and the first to finish shares its set with
-      # the rest of the run, so one slow mirror connection no longer holds a job for minutes
-      # (06/11/2026: four jobs nine minutes, four under 25 seconds). scripts/ci-chromium-libs.sh.
+      # them. Otherwise the screens jobs race the mirror: the first to have the set shares it, and
+      # the others stop their own install the moment it is there (they look every 3 seconds) and
+      # use it, so one slow or failing mirror connection no longer holds a job or fails it
+      # (06/11/2026, 07/11/2026). scripts/ci-chromium-libs.sh.
+      # The script starts its last resort by minute 7 and gives it up to six; 14 leaves room to tidy up.
       - name: Chromium's system libraries
         id: chromium-libs
         if: steps.chromium.outputs.cache-hit == 'true'
-        timeout-minutes: 12
+        timeout-minutes: 14
         env:
           GH_TOKEN: ${{ github.token }}
           SHARED: chromium-debs-${{ steps.image.outputs.id }}-${{ steps.playwright.outputs.version }}
         run: scripts/ci-chromium-libs.sh
-      # The job that fetched them first hands them to the others; a second job finishing at the same
-      # moment finds the name taken, which is fine.
+      # Every job that installed a set itself hands it to the others at once (none refuses): the
+      # whole set, or the last resort's lite one. Two jobs finishing together may both upload.
       - name: Share Chromium's system libraries with the run
-        if: steps.chromium-libs.outputs.source == 'mirror'
+        if: steps.chromium-libs.outputs.share != ''
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: chromium-debs-${{ steps.image.outputs.id }}-${{ steps.playwright.outputs.version }}
-          path: ~/chromium-debs/*.deb
+          name: ${{ steps.chromium-libs.outputs.share }}
+          path: ~/chromium-share/*.deb
           retention-days: 1
           if-no-files-found: ignore
 

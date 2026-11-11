@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 28/10/2026 |
+| Last changed | 11/11/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -144,7 +144,7 @@ Every list pages at 25 through `shared/http/paged.js`. Every route has a contrac
 
 | Route | Permission |
 |---|---|
-| `GET /employees` (search, department, status, work pattern, employment type; sort) | `people` view |
+| `GET /employees` (search, department, status, work pattern, employment type; sort; `exclude_self=true` leaves the caller out, for a form that may not name them, Raise a Query) | `people` view |
 | `GET /employees/summary` | `people` view |
 | `GET /employees/:id` (the 360: profile, job, reporting line, login, documents, history; masked per viewer) | `people` view |
 | `POST /employees`, `PATCH /employees/:id`, `POST /employees/:id/archive`, `POST /employees/:id/restore` | `people` create, edit, delete |
@@ -167,7 +167,8 @@ target_id, before }`. Track A builds both; the roster loader runs the same impor
 | Route | Permission |
 |---|---|
 | `GET /imports/importers`, `/importers/:key/template` | the importer's own (`people` create for staff), checked in the service |
-| `POST /imports`, `PUT /imports/:id/mapping`, `POST /imports/:id/preview`, `/commit`, `/revert` | the same |
+| `POST /imports`, `PUT /imports/:id/mapping`, `PUT /imports/:id/values`, `POST /imports/:id/preview`, `/commit`, `/revert` | the same |
+| `GET /imports/:id/values` (Map Values) | the importer's own |
 | `GET /imports/:id`, `/imports/:id/rows`, `/imports/:id/report` | the importer's own, or `settings` view |
 | `GET /imports` (history) | `settings` view |
 | `POST /documents` (a file before the record that will hold it) | a session; it belongs to the uploader |
@@ -183,6 +184,25 @@ reload; the two `/summary` routes carry the counts above a Vault list, which a p
 `POST /documents` is the upload field's own endpoint, for a voice note or a photograph that has no
 record yet. The import routes are `self` at the edge because the permission is the importer's and the
 importer arrives in the request: `engine.assertMay()` makes the real check and refuses with a 403.
+**Map Values** (M7 PR 4, 07/11/2026, LA; `docs/guides/partnerships.md` §6.13): a step every importer
+may use, between Map and Preview. A field declares `mapValues` (`shared/import/registry.js`): `list`
+(an enum's options, or the importer's `choices()` for a reference), `person` (a reference to an
+employee, picked with the people picker) or `place` (a text field the importer reads itself, a city
+picked from the address search, F27), with `split()` for a cell holding several values and `skip()`
+for one not listed ("National"). `GET /imports/:id/values` lists, for each such column the mapping
+feeds, every distinct value of the file once (compared as the engine compares, so "Mr. John" and
+"Mr.John" are one), with its row count, what was chosen and what the importer matches unchosen
+(`resolve()`, the enum option, or `suggest()`). `PUT /imports/:id/values` keeps the choices on
+`import_batch.mapping.values` (no migration: the mapping is jsonb), checked against the field's
+choices, a working employee, or a place token our search signed; `create` only where the field may
+create (it is then ticked, as on Commit); `save_profile` keeps them with the columns, so the next file
+of the same header maps its values too. The run applies them: an enum value reads as its option, a
+reference takes the id chosen (or is left empty), a text field asks `ctx.valueOf(field, value)`. Two
+small additions came with it: a reference may say `missing: "leave"` (an unmatched value leaves the
+field empty, as a note on the row, not an error: a lead owner nobody holds), and `write()` may answer
+`notes` the row shows as warnings. An importer without Map Values fields has no such step; the wizard
+shows it only when its importer declares one.
+
 The `documents` module mounts at the API root, because an employee's documents are read where the
 employee is (`/employees/:id/documents`) while `src/modules/organisation/` is track A's.
 
@@ -211,7 +231,7 @@ are drawn in the app by PDF.js (FRONTEND_FOUNDATION §5, PR 3 question 4).
 | `GET /settings/security/failed-logins` (days; sort), `/security/sessions` (search; sort), `POST /settings/security/sessions/:id/end` | `settings` view, edit |
 | `GET /audit` (module, action, actor, record, dates; search; sort), `/audit/summary` | `settings` view with scope all, or the CEO |
 | `POST /audit/exports` (the same filters; 202 with the workbook's file pending, downloaded where it was asked for, §6.12) | `settings` export with scope all, or the CEO |
-| `GET /exports/:id` (an export's file while its screen waits: pending, done or failed, §6.12) | the person who asked, nobody else (`self`) |
+| `GET /exports/:id` (an export's file while its screen waits: pending, done or failed, §6.12) | the person who asked, nobody else (`self`); or a generated document kept for good that the caller may read (a training certificate, `knowledge.md` §6.9) |
 | `POST /auth/two-step/setup`, `POST /auth/two-step/enrol` (anonymous, the set-up ticket) | none; `identity.md` §5 |
 
 `PUT /settings/roles/:id` replaces a role's grants, visible fields and capabilities together, so the
@@ -338,6 +358,11 @@ longer than 4.5 seconds.
   work email (the cell's own, or the one `roles.json` gives the post), never by staff number, which
   may have moved to somebody else, only when they have no date of birth and no birthday yet. The
   Staff Community celebrations read it (community guide §3 step 3). The log gives counts only.
+- **A hire's BVN is written once, by `organisation.setBvnIn`** (AJ, 11/11/2026; `offers.md` §3 step
+  6): the hire enters it on their Upload Documents page. It is not an edit field
+  (`UPDATE_COLUMNS`), so the audit row says only whether it was set before and that it is now
+  (`bvn_entered`), never the number; `hasBvn` answers the onboarding checklist. It stays masked under
+  `employee.bank` and is never sent to a model.
 - The loader asks the import engine for things no person asks for, as batch options: **keep what
   the app already has** (an existing person is left exactly as People hold them, and the reporting
   line is filled only where it is empty), **the work email `roles.json` gives a post** whose
@@ -1057,7 +1082,7 @@ screen.
 | People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; for `people` edit, a tick on each row and Move To Department on the rows picked (organogram.md §6.1); Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. That the people moved report to the department's head: organogram.md §6.1. Attendance Today, which returns to the list with the attendance API (LA, M1) |
 | Employee record | Profile, Job, Work Schedule (attendance.md §10, LA), Reporting Line, Login and History as tabs, then Queries and Sanctions for a viewer holding `queries` view (the person's queries and sanctions that viewer may see, `docs/guides/queries.md` §6.1; a row opens its query on Queries & Sanctions); the status, work pattern, manager and since chips; Edit Record, Archive Record (Reason and Last Day, today by default and never later, kept as `left_on`, which Attrition counts; not on the CEO's record, `is_ceo`) or Restore Record (which clears `left_on`), Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors (once previewed), Continue on an unfinished one (Uploaded, Mapped, Previewed: the wizard opens at Map, or Preview) and Revert, both for a reader who may run that importer | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
-| Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; the drop zone's "Excel or CSV, up to 10 MB" (a workbook's limit in `shared/spreadsheet/parse.js`); on Map, Required (the fields a mapping needs, each marked once a column fills it); a field picked for one column leaves the column that had it, which goes back to Leave Out with the toast "Moved from" and its name, so no field is mapped twice; after a refused Next, one error banner naming the fields still without a column or the server's refusal, until it is put right; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
+| Settings · Imports, the wizard | Steps Upload, Map, Map Values (only for an importer with list, person or place columns: each distinct value with its row count, as a select, the people picker or the address search, Leave Empty and Create where it may), Preview, Commit; Blank Sheet; the drop zone's "Excel or CSV, up to 10 MB" (a workbook's limit in `shared/spreadsheet/parse.js`); on Map, Required (the fields a mapping needs, each marked once a column fills it); a field picked for one column leaves the column that had it, which goes back to Leave Out with the toast "Moved from" and its name, so no field is mapped twice; after a refused Next, one error banner naming the fields still without a column or the server's refusal, until it is put right; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address (suggestions as it is typed, §6.13), phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
 | Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give, Period ticked once it starts again, each rule's mark as the scheme is filled; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
@@ -1165,6 +1190,16 @@ screen.
 - The sign-in screen's drawings or licensed photographs: TB (`identity.md` §13).
 
 ## 14 · Change log
+
+- 11/11/2026 · AJ · The organisation module gains `setBvnIn` and `hasBvn` (service and repo) for M5's Upload Documents page (§6.1, `offers.md` §3 step 6): the hire's BVN on `employee.bvn` (migration `5040`), its audit saying only that it was entered. Nothing else changes for an existing caller.
+- 11/11/2026 · TB · `GET /exports/:id` also answers for a generated document that is not an export when the vault lets the caller read it, so a Download button can wait on a PDF kept for good while the worker renders it (Download Certificate, `knowledge.md` §6.9). An export stays its asker's alone.
+- 11/11/2026 · TB · Settings · Documents & Numbering lists M10's three schemes, SOP (`SOP-0001`), Training Course (`TRN-0001`) and Training Certificate (`CERT-2026-0001`, by year), seeded in `10490`; the contract's `DOC_TYPES` and the screen's labels name them (`docs/guides/knowledge.md` §4).
+- 11/11/2026 · JP · `GET /employees` takes `exclude_self` (§5): `true` leaves the caller out of the page, in SQL, so Raise a Query never offers the raiser (`queries.md` §6.2, fault #9 of the 11/11 staging brief).
+- 10/11/2026 · JP · `shared/db/effective-dated` gains `replace` (a change for a day that already has a version joins it, updated in place, rather than being refused) and `addVersionSet` (a version made of several rows that start and end together: a PAYE table, a person's pay split), for M6 PR 5's Configurations (`docs/guides/payroll.md` §4.2, §13.2 item 26). The employee record gains the four tax and pension numbers the `employee.statutory` mask already named, written through the organisation service. Nothing else changes for an existing caller.
+- 07/11/2026 · LA · Map Values on the import engine (§5, §10.1; M7 PR 4, `partnerships.md` §6.13): the step,
+  `GET` and `PUT /imports/:id/values`, the choices kept on the batch's mapping and its profile, a
+  reference's `missing: "leave"`, a write's `notes`, and `ImportStats.notes` (what an importer reading a
+  whole workbook noted) in the contract. The Partnership Tracker and Partnership Returns importers use it.
 
 - 06/11/2026 · GE · The organisation service gains `fillSeat(client, seatId, employeeId, actor)` and the read
   `findSeatById`, for Recruitment's hire (`recruitment.md` §6.1, `organogram.md` §6): a vacant seat is marked

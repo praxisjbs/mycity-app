@@ -497,8 +497,8 @@ describeDb("approvals against the real migrations", () => {
 
   test("a request about a record whose screen has not shipped waits in nobody's Need You (QA DEF-01)", async () => {
     const { workflow_instance_id: id } = await openLeave("staff", 1);
-    // As a request about a payroll run would read, before Payroll has its API on staging.
-    await q("UPDATE workflow_instance SET entity_type = 'payroll_run' WHERE workflow_instance_id = $1", [id]);
+    // As a request about a new joiner's onboarding would read, before Recruitment · Onboarding has its API on staging (M5).
+    await q("UPDATE workflow_instance SET entity_type = 'onboarding' WHERE workflow_instance_id = $1", [id]);
     const listed = async () => (await as("manager").get("/workflow/mine")).body.data.map((r) => r.workflow_instance_id);
     const counted = async () => (await as("manager").get("/workflow/mine/count")).body.waiting;
     const waiting = await counted();

@@ -13,15 +13,22 @@
  *           → onboarding (the start date) → completed; or cancelled
  *   item    pending → uploaded → verified, or rejected (back to the hire with the reason)
  *
- * The requirements are MyCity's New Joiner list, entered on the Checklist settings, never seeded
- * (A26). A requirement of kind `number` or `both` takes a typed value on its item (the MyLagosApp
- * Wallet ID). The BVN is not a checklist item: it is asked once on the upload page and kept on
+ * The requirements are MyCity's New Joiner list, seeded once as reference data and kept on the
+ * Checklist settings (5399; A26 allows it because Send Offer refuses an empty checklist, AJ
+ * 11/11/2026). A requirement of kind `number` or `both` takes a typed value on its item (the
+ * MyLagosApp Wallet ID). The BVN is not a checklist item: it is asked once on the upload page and kept on
  * the employee record under employee.bank (masked).
  *
  * Two guarantors a hire, not related to them: one a previous employer, one who has known them
  * four years or more; serving police, military and other uniformed staff are not accepted.
  * Operations & People run a reference check on each (pending → passed or failed). Documentation
- * completes when every required item is verified, both guarantors passed, and the contract signed.
+ * completes when every required item is verified, both guarantors passed, the BVN is entered and the
+ * contract signed (`waiting_on` names what is still owed).
+ *
+ * Plans (the Plans settings): a department's onboarding steps, each with the role that owns it, a
+ * due day counted from the start date and an optional SOP. The plan with no department is the
+ * company's default (MyCity's Your First 30 Days), used for a department without its own. The
+ * steps are copied onto the case when it reaches onboarding, the role resolved then to a person.
  */
 const { z } = require("zod");
 const { uuid, text, optionalText, email, phone, blank, isoDate, isoDateTime, listQuery, Paged } = require("./common");
@@ -34,6 +41,10 @@ const ChecklistItemStatus = z.enum(["pending", "uploaded", "verified", "rejected
 const RequirementKind = z.enum(["file", "number", "both"]);
 const GuarantorKind = z.enum(["previous_employer", "personal"]);
 const ReferenceCheckStatus = z.enum(["pending", "passed", "failed"]);
+/** What documentation still waits on before the case may move to pre-onboarding. */
+const GateCondition = z.enum(["documents", "guarantors", "bvn", "contract"]);
+/** Who owns a plan step, named when the steps are copied onto a hire's case. */
+const StepOwnerRole = z.enum(["case_owner", "line_manager", "head_of_department", "hire"]);
 
 /** A Bank Verification Number: eleven digits. */
 const bvn = z.string().trim().regex(/^\d{11}$/, "Eleven digits");
@@ -71,7 +82,68 @@ const DocumentRequirementEdit = DocumentRequirementCreate.omit({ code: true })
   .extend({ active: z.boolean(), display_order: z.number().int().min(0) })
   .partial();
 
+const DocumentRequirementListQuery = listQuery({}, ["display_order", "name"]);
 const DocumentRequirementPage = Paged(DocumentRequirement);
+const DocumentRequirementParams = z.object({ id: uuid }).strict();
+
+/* ------------------------------------------------------------------ *
+ * The plans' settings
+ * ------------------------------------------------------------------ */
+
+/** The SOP a step points to (M10's knowledge base). */
+const StepSop = z.object({ sop_id: uuid, number: z.string(), title: z.string() }).strict();
+
+const OnboardingPlanStep = z
+  .object({
+    onboarding_plan_step_id: uuid,
+    position: z.number().int().min(1),
+    title: z.string(),
+    description: z.string().nullable(),
+    owner_role: StepOwnerRole,
+    due_offset_days: z.number().int().min(0),
+    sop: StepSop.nullable(),
+  })
+  .strict();
+
+/** A plan as the Plans settings list it. `department` null is the company's default plan. */
+const OnboardingPlanRow = z
+  .object({
+    onboarding_plan_id: uuid,
+    department_id: uuid.nullable(),
+    department: z.string().nullable(),
+    name: z.string(),
+    active: z.boolean(),
+    step_count: z.number().int().min(0),
+    updated_at: isoDateTime,
+  })
+  .strict();
+
+const OnboardingPlan = OnboardingPlanRow.omit({ step_count: true }).extend({ steps: z.array(OnboardingPlanStep) });
+
+/** One step as the Plans settings save it: the due day counts from the hire's start date. */
+const OnboardingPlanStepInput = z
+  .object({
+    title: text(160),
+    description: optionalText(500),
+    owner_role: StepOwnerRole,
+    due_offset_days: z.coerce.number().int().min(0).max(365),
+    sop_id: blank(uuid),
+  })
+  .strict();
+
+/** A plan saved whole: its steps replace the plan's earlier ones, in the order given. */
+const OnboardingPlanSave = z
+  .object({
+    department_id: uuid.nullable(),
+    name: text(120),
+    active: z.boolean().default(true),
+    steps: z.array(OnboardingPlanStepInput).min(1).max(40),
+  })
+  .strict();
+
+const OnboardingPlanListQuery = listQuery({}, ["name", "updated_at"]);
+const OnboardingPlanPage = Paged(OnboardingPlanRow);
+const OnboardingPlanParams = z.object({ id: uuid }).strict();
 
 /* ------------------------------------------------------------------ *
  * Cases
@@ -171,7 +243,13 @@ const OnboardingDetail = OnboardingRow.extend({
   guarantors: z.array(Guarantor).max(2),
   bvn_entered: z.boolean(),
   contract: EmploymentContractView.nullable(),
+  waiting_on: z.array(GateCondition),
 });
+
+/** A case's checklist item or guarantor, in the path. */
+const ChecklistItemParams = z.object({ id: uuid, item_id: uuid }).strict();
+const GuarantorParams = z.object({ id: uuid, guarantor_id: uuid }).strict();
+const OnboardingParams = z.object({ id: uuid }).strict();
 
 const OnboardingListQuery = listQuery(
   {
@@ -197,7 +275,10 @@ const UploadPack = z
   .object({
     first_name: z.string(),
     role: z.string(),
+    company: z.string(),
     starts_on: isoDate.nullable(),
+    status: OnboardingStatus,
+    privacy_notice: z.array(z.string()),
     privacy_acknowledged: z.boolean(),
     items: z.array(OnboardingItem),
     guarantors: z.array(Guarantor).max(2),
@@ -207,6 +288,15 @@ const UploadPack = z
 
 /** The privacy notice, accepted before anything is uploaded. */
 const PrivacyAcknowledge = z.object({ consent: z.literal(true) }).strict();
+
+/** The path of one item on the upload page. */
+const UploadItemParams = z.object({ token: z.string().min(1).max(100), item_id: uuid }).strict();
+
+/**
+ * A file sent on the upload page (multipart, field `file`): stored on the hire's employee record and
+ * scanned, then named on its item (`UploadItem.document_id`) or as a guarantor's form.
+ */
+const UploadFile = z.object({ purpose: z.literal("document").optional() }).strict();
 
 /** One item: the file the upload engine stored, the typed value, or both, as the requirement asks. */
 const UploadItem = z
@@ -232,6 +322,28 @@ const TABLES = {
   DocumentRequirementCreate: { table: "document_requirement" },
   DocumentRequirementEdit: { table: "document_requirement" },
   DocumentRequirementPage: { table: null, reason: "a page of document requirements" },
+  DocumentRequirementListQuery: { table: null, reason: "list controls for the Checklist settings" },
+  DocumentRequirementParams: { table: null, reason: "the requirement in the path" },
+  StepSop: { table: "sop" },
+  OnboardingPlanStep: { table: "onboarding_plan_step", virtual: { sop: "the sop behind sop_id" } },
+  OnboardingPlanRow: {
+    table: "onboarding_plan",
+    virtual: { department: "department.name", step_count: "the plan's onboarding_plan_step rows" },
+  },
+  OnboardingPlan: {
+    table: "onboarding_plan",
+    virtual: { department: "department.name", steps: "the plan's onboarding_plan_step rows" },
+  },
+  OnboardingPlanStepInput: { table: "onboarding_plan_step" },
+  OnboardingPlanSave: { table: "onboarding_plan", virtual: { steps: "saved as onboarding_plan_step rows" } },
+  OnboardingPlanListQuery: { table: null, reason: "list controls for the Plans settings" },
+  OnboardingPlanPage: { table: null, reason: "a page of plans" },
+  OnboardingPlanParams: { table: null, reason: "the plan in the path" },
+  ChecklistItemParams: { table: null, reason: "the case and its item in the path" },
+  GuarantorParams: { table: null, reason: "the case and its guarantor in the path" },
+  OnboardingParams: { table: null, reason: "the case in the path" },
+  UploadItemParams: { table: null, reason: "the link and the item in the path" },
+  UploadFile: { table: null, reason: "a multipart upload's fields; the file is stored as a document" },
   OnboardingItem: {
     table: "onboarding_checklist_item",
     virtual: {
@@ -249,6 +361,7 @@ const TABLES = {
       guarantors: "onboarding_guarantor rows",
       bvn_entered: "the hire's employee.bvn is set",
       contract: "its employment_contract",
+      waiting_on: "the documentation gate's conditions still unmet",
     },
   },
   OnboardingListQuery: { table: null, reason: "list controls and filters for the cases" },
@@ -266,6 +379,24 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  GateCondition,
+  StepOwnerRole,
+  StepSop,
+  OnboardingPlanStep,
+  OnboardingPlanRow,
+  OnboardingPlan,
+  OnboardingPlanStepInput,
+  OnboardingPlanSave,
+  OnboardingPlanListQuery,
+  OnboardingPlanPage,
+  OnboardingPlanParams,
+  DocumentRequirementListQuery,
+  DocumentRequirementParams,
+  ChecklistItemParams,
+  GuarantorParams,
+  OnboardingParams,
+  UploadItemParams,
+  UploadFile,
   OnboardingStatus,
   ChecklistItemStatus,
   RequirementKind,

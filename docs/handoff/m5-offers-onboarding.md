@@ -130,7 +130,8 @@ GE's (on #79, 06/11/2026):
 | 3 · Offers backend | create from the shortlist with the score snapshot, edit, approval, send (`advanceIn`), resend, withdraw, decline, expiry (`offer-expiry`), token revocation on Not Progressing, one renderer for page and PDF, the offer emails, search and AI manifest | PR 2; GE's M4 PR for the real `advanceIn` |
 | 4 · Offers screens | `Offers.tsx` rewritten on the contract (the old one breaks F31 and gate 8), Sign Offer and Verify wired, the User Guide sections and pictures | PR 3; #82 merged |
 | 5 · Acceptance to hire | in one transaction: seal, `createEmployee`, `hireIn`, the case at documentation, the contract generated and sent for signature, the emails | PR 3; GE's `hireIn` |
-| 6 · Onboarding backend | Checklist and Plans settings, the public upload with the privacy notice, BVN, verify and reject, the documentation gate, `onboarding-dispatch`, Complete Onboarding and the login invite; the Upload Documents PROGRESS row (`npm run new:screen`) | PR 5 |
+| 6a · Onboarding to the gate | Checklist and Plans settings (the New Joiner list and the default plan seeded), the Upload Documents link and the public page's API with the privacy notice, files, guarantors and their checks, BVN, verify and reject, the documentation gate, ⌘K and the AI read; the Upload Documents PROGRESS row (#112) | PR 5 |
+| 6b · Onboarding to hired | `onboarding-dispatch` (the start date, the plan's steps copied onto the case with owners resolved, overdue reminders), Mark Step Done, Withdraw on the case, Complete Onboarding with the company email (`work_email` changed before `users.invite`), the login invite and `candidates.hireIn` | PR 6a |
 | 7 · Onboarding screens | `Onboarding.tsx` rewritten, the public Upload Documents page, the Employee 360 Documents tab (with TB, `foundation.md`), User Guide and pictures | PR 6 |
 | 8 · Close-out | AI cards or reasons for every form, ⌘K, every picture retaken, the guide to Built, PROGRESS, `npm run ci` | all |
 
@@ -147,7 +148,8 @@ earlier: M5's forms use help terms.
 - [x] PR 3 · Offers backend (06/11/2026; the Head of Department grant and the board's Offer column confirmed by AJ 07/11/2026, for GE)
 - [x] PR 4 · Offers screens (07/11/2026)
 - [x] PR 5 · Acceptance to hire (11/11/2026)
-- [ ] PR 6 · Onboarding backend
+- [x] PR 6a · Onboarding to the documentation gate (11/11/2026)
+- [ ] PR 6b · Onboarding to hired
 - [ ] PR 7 · Onboarding screens
 - [ ] PR 8 · Close-out
 
@@ -169,7 +171,8 @@ earlier: M5's forms use help terms.
   sample offer letter (two pages: deductions for PAYE and pension, per-unit incentives such as
   ₦5,000 a business onboarded, annual leave after six months). The second letter is shorter than the
   standard wording of 06/11; the offer's Incentives and Benefits fields already carry its extra lines.
-- Still owed by MyCity: a sample employment contract (PR 5).
+- Still owed by MyCity: a sample employment contract (PR 5); a check of the upload page's privacy
+  notice (PR 6a, guide §13).
 - Filed 11/11/2026 (AJ): the documents of 07/11 redacted into
   `docs/MyCity-ERP-Documents/onboarding-samples/` (names to placeholders or roles; the bank's terms
   not copied). PR 5 ships a placeholder standard contract from the offer's terms until MyCity's
@@ -179,6 +182,41 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
+- 11/11/2026 · AJ · PR 6a, onboarding to the documentation gate (guide §3 steps 6 and 7, §4 to §7, §9,
+  §11, §13). Built in `src/modules/onboarding/`: `.checklist` (the gate's rules, `waitingOn`, and the
+  Checklist settings), `.plans` and `.sop` (the Plans settings; an SOP must be in force), `.upload`
+  (the hire's page and the link), `.service` (cases, verify and reject, reference checks, Send
+  Reminder, `checkGateIn`), `.repo`, `.events`, `.routes`, `.public.routes`, `.controller`, `.ai`,
+  `.search`; `organisation.setBvnIn` and `hasBvn` (the number kept out of the audit row: TB to
+  review, organisation's table). Migration 5050 (plans, their steps, and the case's steps for 6b);
+  seed 5399 (the New Joiner list, nine items, and Your First 30 Days, four steps). The gate is asked
+  after a verification, a reference check, the BVN and the hire's contract signature
+  (`employment_contracts.signedIn` calls `onboarding.contractSignedIn`), and moves the application to
+  Pre-Onboarding with the case.
+  - Decided here, with AJ: the New Joiner list and the default plan are seeded (A26 exception, as
+    the code cannot run without a checklist; MILESTONES §10 records it); a step's owner is a role
+    resolved when the steps reach a case; PR 6 split at the gate into 6a and 6b.
+  - Decided while building: every file the hire sends lands on their employee record at once
+    (`employee_document`, quarantined, scanned) and is verified only once clean; Request Document is
+    Reject plus Send Reminder; a guarantor who passed cannot be changed by the hire; the link lives a
+    month and at least a week past the start date; the privacy notice is six plain sentences from
+    what the system does, for Operations & People to confirm (guide §13).
+  - The upload, guarantor and BVN forms are not in `not_offered`: gate 23 accepts only create and
+    edit schemas there, so their reason lives in the manifest's header (decisions 4 and 9).
+  - Found and fixed from PR 5, first run of its suite: the contract read the company's name straight
+    from the profile and got null on a database without one (now `profile.displayName`, as the offer
+    letter does); the contract's signature request had no creator at acceptance (opened now as the
+    company's signatory); the offers test cleared `work_pattern` through Edit Offer, which cannot
+    clear it, and read the sealed copy's mails before the copy was rendered.
+  - Verified here, in a Linux workspace with PostgreSQL 16, pgvector and Redis (Node 20):
+    `tests/integration/onboarding.test.js` (4), offers (10), signatures (5), partnerships-agreements
+    and recruitment-hire (9), the module's unit tests (10); gates lint, the migration gates with the
+    UP, DOWN, UP round trip, schema drift, contract columns, route contracts, pagination, search
+    coverage, AI manifest coverage and awareness, public surface, module catalogue, schedulers,
+    dashes, upload, provenance; `gen:contract` and `gen:ai-catalogue` run; the backend group, the
+    whole jest suite included (4,107 tests), green after two stale counts were brought up to date
+    (Candidate Emails' nine keys since PR 5's `contract-sent`; `new:screen`'s next row, now #113).
+    Not run: the frontend and screen gates (no screen changed).
 - 11/11/2026 · AJ · PR 5, acceptance to hire (guide §3 steps 5 and 5a, §5 to §7, §11). The candidate's
   signature runs one transaction in `offers.acceptedIn`: the offer accepted, `organisation.createEmployee`
   (no seat, no login, the candidate's address as both emails), `candidates.advanceIn(..., "documentation")`
@@ -207,6 +245,10 @@ earlier: M5's forms use help terms.
     (`sharp`) and its `@mycity/*` links do not resolve from this session's Linux shell, so the suite
     and `npm run gen:contract` must be run on the machine itself. Every file changed passes
     `node --check`.
+- 08/11/2026 · GE · (Ose) Offers on desktop, at GE's ask (F31 amended 08/11/2026): the list takes the page's width
+  (number, start date, Outside Range and sent added) and a row opens the offer in a wide dialog (ListDetail `modal`,
+  size `xl`), the offer, Monthly Pay, Approval and Signers two by two, History and the letter across it. Phone
+  unchanged. `docs/guides/offers.md` §10 and the Recruitment chapter follow.
 - 07/11/2026 · AJ · The open reviews, taken by AJ (every M5 item falls to AJ): nothing in PR 1 to 3
   breaks an existing structure. 5020's CHECKs on `signature_request` and `signature` meet no other
   writer (M7's agreements do not write them yet) and no row older than 5020; 5090 drops tables no

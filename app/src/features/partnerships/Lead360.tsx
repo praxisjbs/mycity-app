@@ -5,13 +5,15 @@ import { useRouter } from "@/lib/router";
 import { useTrailTitle } from "@/lib/trail";
 import { Banner, Button, EmptyState, formatDate, formatMoneyShort, HelpTerm, Menu, Pill, ProfileHeader, StatusPill, Tabs, useModal } from "@mycity/ui";
 import { ContactForm } from "./forms/ContactForm";
+import { GenerateAgreement } from "./forms/AgreementForms";
 import { ConvertLead } from "./forms/ConvertLead";
 import { LogInteraction } from "./forms/LogInteraction";
 import { LoseLead } from "./forms/LoseLead";
 import { EditLead } from "./forms/RecordForm";
 import { UploadDocument } from "./forms/UploadDocument";
 import { daysWord, HEALTH, leadPill, useHoldsMoney, useMay } from "./lib";
-import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP, WorkTab } from "./record";
+import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP } from "./record";
+import { NextEvents, WorkTab } from "./WorkTab";
 
 const TABS = ["overview", "deal", "documents", "work", "activity", "contacts", "details"] as const;
 type Tab = (typeof TABS)[number];
@@ -41,7 +43,10 @@ export function Lead360({ id }: { id: string }) {
     { label: "Log Interaction", icon: "plus" as const, onSelect: () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={x.deal?.deal_id} close={close} />) },
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
-    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${lead.lead_id}`) },
+    { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${lead.lead_id}&record=lead`) },
+    ...(x.deal && x.deal.status === "open"
+      ? [{ label: "Generate Agreement", icon: "doc" as const, onSelect: () => open("Generate Agreement", (close) => <GenerateAgreement dealId={x.deal!.deal_id} close={close} onCreated={(aid) => navigate(`/partnerships?tab=contracts-and-mous&id=${aid}`)} />) }]
+      : []),
     { label: "Edit Lead", icon: "doc" as const, onSelect: () => open("Edit Lead", (close) => <EditLead lead={lead} close={close} />, true) },
     ...(done ? [] : [{ label: "Close as Lost", danger: true, onSelect: () => open("Close as Lost", (close) => <LoseLead id={lead.lead_id} close={close} />) }]),
   ];
@@ -89,12 +94,13 @@ export function Lead360({ id }: { id: string }) {
         {tab === "overview" && (
           <>
             {x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} categoryId={lead.partner_category_id} /> : <EmptyState title="No Deal Yet" text="A lead is captured with its deal." />}
+            <NextEvents events={x.overview.events} />
             <InteractionsCard items={x.overview.interactions} />
           </>
         )}
         {tab === "deal" && (x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} categoryId={lead.partner_category_id} /> : <EmptyState title="No Deal Yet" />)}
         {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} />}
-        {tab === "work" && <WorkTab />}
+        {tab === "work" && <WorkTab record={record} dealId={x.deal && (x.deal.status === "open" || x.deal.status === "live") ? x.deal.deal_id : null} readOnly={readOnly || done} />}
         {tab === "activity" && <ActivityTab record={record} history={x.deal?.history} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}
         {tab === "details" && (

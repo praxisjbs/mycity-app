@@ -15,6 +15,11 @@
  *   decideOvertime()  the line manager or People confirm all of a pending overtime item, confirm
  *                 fewer minutes, or cut it with a reason (Line Manager After; never their own)
  *   approveOvertime() Approve Overtime: minutes for a person's day beforehand (Pre-Approved)
+ *   monthRates()  a person's month for payroll: their working days and daily rate (docs/guides/payroll.md
+ *                 §6.2), from the one loop pricing a day already uses
+ *   takeIntoRun() payroll's Submit freezes the items it counted into its run (in_run), pricing one
+ *                 that had no amount; releaseFromRun() a Send Back gives them back (§6.9). Payroll
+ *                 never writes the table itself: it asks here, inside its own transaction
  *
  * The amounts, through shared/money, rounded to the kobo once:
  *   daily rate    the monthly gross over the person's working days that month (their schedule,
@@ -187,28 +192,64 @@ function qualifies(day, shift, r) {
  * ------------------------------------------------------------------ */
 
 /**
+ * What a month's rates are read from, loaded once: the working week with its public holidays, and the
+ * company hours of each day. Payroll loads it once for a whole run and hands it to `monthRates` for
+ * every person, so 300 people do not each load the calendar again.
+ */
+async function monthContext(db, date) {
+  const { first, last } = lagos.monthBounds(date);
+  return { cal: await workingWeek.loadCalendar(db), hours: await calendar.companyHoursBetween(db, first, last) };
+}
+
+/**
+ * A person's month (docs/guides/payroll.md §6.2): the days they work by their own schedule, less public
+ * holidays, with the scheduled minutes of those days, and the daily rate (their monthly gross over the
+ * working days, unrounded; null with no gross or no working day). This is the one loop `ratesFor` prices
+ * a day with, so payroll and attendance can never count the month differently.
+ * @param {{query: Function}} db
+ * @param {{employee_id: string, work_pattern: string, gross_monthly: string|null}} person
+ * @param {string} date  any date of the month
+ * @param {{cal: object, hours: object}|null} [shared]  `monthContext(db, date)`, when the caller holds it
+ * @returns {Promise<{first: string, last: string, working_dates: string[], working_days: number,
+ *   total_minutes: number, daily: object|null}>}
+ */
+async function monthRates(db, person, date, shared = null) {
+  const { first, last } = lagos.monthBounds(date);
+  const { cal, hours } = shared || (await monthContext(db, date));
+  const schedules = await repo.workSchedulesBetween(db, person.employee_id, first, last);
+  const workingDates = [];
+  let minutes = 0;
+  for (let d = first; d <= last; d = lagos.addDays(d, 1)) {
+    const schedule = schedules.filter((s) => String(s.effective_from).slice(0, 10) <= d).pop() || null;
+    const s = rules.shiftFor(d, cal, { hours: hours[d] }, { schedule, pattern: person.work_pattern });
+    if (!s.working_day) continue;
+    workingDates.push(d);
+    minutes += shiftMinutes(s);
+  }
+  return {
+    first,
+    last,
+    working_dates: workingDates,
+    working_days: workingDates.length,
+    total_minutes: minutes,
+    daily: dailyRate(person.gross_monthly, workingDates.length),
+  };
+}
+
+/**
  * The person's daily and hourly rates for a day: their gross over the month's working days by
  * their own schedule (less public holidays), and over the day's scheduled minutes (on a day not
  * worked, the month's average). Null rates with no gross set.
  */
 async function ratesFor(db, person, date, shift) {
   if (person.gross_monthly === null || person.gross_monthly === undefined) return { daily: null, hourly: null };
-  const { first, last } = lagos.monthBounds(date);
-  const cal = await workingWeek.loadCalendar(db);
-  const schedules = await repo.workSchedulesBetween(db, person.employee_id, first, last);
-  const hours = await calendar.companyHoursBetween(db, first, last);
-  let days = 0;
-  let minutes = 0;
-  for (let d = first; d <= last; d = lagos.addDays(d, 1)) {
-    const schedule = schedules.filter((s) => String(s.effective_from).slice(0, 10) <= d).pop() || null;
-    const s = rules.shiftFor(d, cal, { hours: hours[d] }, { schedule, pattern: person.work_pattern });
-    if (!s.working_day) continue;
-    days += 1;
-    minutes += shiftMinutes(s);
-  }
-  const daily = dailyRate(person.gross_monthly, days);
-  const dayMinutes = shift.working_day ? shiftMinutes(shift) : days ? Math.round(minutes / days) : 0;
-  return { daily, hourly: hourlyRate(daily, dayMinutes) };
+  const month = await monthRates(db, person, date);
+  const dayMinutes = shift.working_day
+    ? shiftMinutes(shift)
+    : month.working_days
+      ? Math.round(month.total_minutes / month.working_days)
+      : 0;
+  return { daily: month.daily, hourly: hourlyRate(month.daily, dayMinutes) };
 }
 
 /* ------------------------------------------------------------------ *
@@ -439,6 +480,106 @@ async function mine(user, query) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Payroll's hand-off (docs/guides/payroll.md §4.4, §6.4, §6.9)
+ * ------------------------------------------------------------------ */
+
+/**
+ * What an item with no price comes to now that the person has a salary: "it gains its amount when
+ * payroll prices it" (§6.17 above). The item's own figures through its judging version's rules, the
+ * way a day is priced when it is settled. Null for an item that still cannot be priced (no salary, no
+ * working day, or no version to read the rule from).
+ * @param {{query: Function}} db
+ * @param {object} row  a pay item with its person's `gross_monthly` and `work_pattern`
+ * @returns {Promise<string|null>}
+ */
+async function priceOf(db, row) {
+  if (row.amount !== null && row.amount !== undefined) return String(row.amount);
+  if (row.gross_monthly === null || row.gross_monthly === undefined || !row.policy_version_id) return null;
+  const person = { employee_id: row.employee_id, work_pattern: row.work_pattern, gross_monthly: row.gross_monthly };
+  const date = String(row.work_date).slice(0, 10);
+  const r = (await policies.rulesOfVersion(db, "attendance", row.policy_version_id)).rules;
+  const day = await repo.getDay(db, row.employee_id, date);
+  const shift = day && day.judged_at ? rules.recordedShift(day, r) : { working_day: !row.rest_day };
+  const rates = await ratesFor(db, person, date, shift);
+  if (row.kind === "overtime") {
+    const o = r.overtime;
+    return overtimeAmount(row.method, {
+      hourly: rates.hourly,
+      minutes: row.confirmed_minutes ?? row.minutes,
+      multiplier: row.rest_day ? o.rest_day_multiplier : o.multiplier,
+      amount: o.amount,
+    });
+  }
+  const rule = row.kind === "early_departure" ? r.early_deduction : r.late_deduction;
+  return deductionAmount(row.method, { daily: rates.daily, hourly: rates.hourly, minutes: row.minutes, amount: rule.amount });
+}
+
+/**
+ * Payroll's Compute asks what each pending deduction and confirmed overtime item comes to, so a total
+ * shown before Submit is the one Submit freezes: the item's own amount, or its price now when it had none.
+ * @param {{query: Function}} db
+ * @param {object[]} rows  pay items with their person's `gross_monthly` and `work_pattern`
+ * @returns {Promise<Map<string, string|null>>} attendance_pay_item_id → amount on the wire
+ */
+async function pricesOf(db, rows) {
+  const out = new Map();
+  for (const row of rows) out.set(row.attendance_pay_item_id, await priceOf(db, row));
+  return out;
+}
+
+/**
+ * Submit freezes the items a run counted (§6.9 rule 1): each becomes `in_run` with the run, so People
+ * can no longer waive it. An item that had no price gets it now. Every item named must still be a
+ * pending deduction or confirmed overtime with no run, or nothing is frozen and the caller's
+ * transaction ends in 409 `RUN_CHANGED`: someone waived, cut or took it since Compute counted it.
+ * Called inside payroll's transaction; one event for the run, with the count.
+ * @param {import("pg").PoolClient} client
+ * @param {{run_id: string, items: string[], actor?: object|null}} args
+ * @returns {Promise<{taken: number}>}
+ */
+async function takeIntoRun(client, { run_id: runId, items, actor = null }) {
+  const ids = [...new Set(items || [])];
+  if (!ids.length) return { taken: 0 };
+  const rows = await repo.lockPayItemsForRun(client, ids);
+  for (const row of rows) {
+    if (row.amount === null || row.amount === undefined) {
+      const price = await priceOf(client, row);
+      if (price !== null) await repo.setPayItemAmount(client, row.attendance_pay_item_id, price);
+    }
+  }
+  const taken = await repo.takePayItems(client, ids, runId);
+  if (rows.length !== ids.length || taken.length !== ids.length)
+    throw new AppError("RUN_CHANGED", "Attendance changed while the run was sent", 409);
+  await emit(client, {
+    key: EVENTS.ATTENDANCE_PAY_ITEMS_TAKEN,
+    entity: { type: "payroll_run", id: runId },
+    actor,
+    payload: { payroll_run_id: runId, items: taken.length },
+  });
+  return { taken: taken.length };
+}
+
+/**
+ * A Send Back, a Reject or a withdrawal gives the run's items back (§6.9 rule 2): a deduction to
+ * pending, confirmed overtime to confirmed, no run. Safe to call twice: the second finds none.
+ * @param {import("pg").PoolClient} client
+ * @param {string} runId
+ * @param {object|null} [actor]
+ * @returns {Promise<{released: number}>}
+ */
+async function releaseFromRun(client, runId, actor = null) {
+  const released = await repo.releasePayItems(client, runId);
+  if (released > 0)
+    await emit(client, {
+      key: EVENTS.ATTENDANCE_PAY_ITEMS_RELEASED,
+      entity: { type: "payroll_run", id: runId },
+      actor,
+      payload: { payroll_run_id: runId, items: released },
+    });
+  return { released };
+}
+
+/* ------------------------------------------------------------------ *
  * People's decisions
  * ------------------------------------------------------------------ */
 
@@ -641,6 +782,11 @@ module.exports = {
   capped,
   qualifies,
   ratesFor,
+  monthContext,
+  monthRates,
+  pricesOf,
+  takeIntoRun,
+  releaseFromRun,
   settleDay,
   present,
   list,

@@ -399,6 +399,7 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
+- 08/11/2026 · TB · `RichTextBlock` (`policies.js`) gains a `table` block (a header row and its rows), for an agreement's options table (M7 PR 6, `docs/guides/partnerships.md` §13.2); `markdownToBlocks` keeps tables. A policy's text never holds one, so its screens are unchanged.
 - 03/11/2026 · JP · Start Policy and Save Draft are Praxis AI cards for holders of `policies.manage`
   (§9; `praxis-ai.md` decision 33). New Policy's sheet validates with the contract's `PolicyStart` and
   sends `POLICY_START`, the same as the card; nothing a person sees changed.

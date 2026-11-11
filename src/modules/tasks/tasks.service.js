@@ -58,6 +58,8 @@ const reminders = require("../notifications/notifications.reminders");
 const { EVENTS, REMINDER_KEY } = require("./tasks.events");
 
 const iso = (v) => (v instanceof Date ? v.toISOString() : v || null);
+/** Connect to Partner: Partnerships decides what work may be linked to (workspace.md §6). */
+const links = () => require("../partners/partners.work");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -103,6 +105,7 @@ function toTask(row, now = new Date()) {
     late_reason_label: row.late_reason_label ?? null,
     counts_towards: countsTowardsOf(row),
     project: row.project_id ? { project_id: row.project_id, number: row.project_number || "", name: row.project_name || "" } : null,
+    partner_link: links().viewOf(row),
     assignee_left: Boolean(row.assignee_left),
     entity_type: row.entity_type,
     entity_id: row.entity_id,
@@ -557,13 +560,29 @@ async function watchersFor(db, { watcher_ids: named, watcher_department_id: depa
  * ------------------------------------------------------------------ */
 
 /**
+ * The partner a new task is for (Connect to Partner, workspace.md §6): the one the body names,
+ * checked against what the person sees in Partnerships; else, in a connected project, the project's.
+ * `trusted`: Partnerships sets the task itself (a deliverable, a follow-up) for a record it has read.
+ */
+async function partnerLinkOf(client, actor, body, { trusted = false } = {}) {
+  const named = { partner_id: body.partner_id || null, lead_id: body.lead_id || null, deal_id: body.deal_id || null };
+  if (named.partner_id || named.lead_id || named.deal_id) {
+    await links().checkLink(client, actor, named, { trusted });
+    return named;
+  }
+  if (body.project_id) return require("../projects/projects.service").linkOf(client, body.project_id);
+  return named;
+}
+
+/**
  * Set a task. With no assignee it is the caller's own.
  * @param {object} actor  withActor(req)
  * @param {object} scope  scopeOf(req) under `workspace` create
  * @param {object} body   TaskCreate
- * @param {{client?: object}} [opts]  the caller's transaction, when it has one
+ * @param {{client?: object, trusted?: boolean}} [opts]  the caller's transaction, when it has one;
+ *   `trusted` when Partnerships sets the task for a record it has read (partnerLinkOf)
  */
-async function create(actor, scope, body, { client: within = null } = {}) {
+async function create(actor, scope, body, { client: within = null, trusted = false } = {}) {
   if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee can hold tasks", 403);
   const shared = body.member_ids !== undefined || body.department_id !== undefined;
   // An importer sets tasks inside its own transaction (a key result's initiatives).
@@ -578,6 +597,7 @@ async function create(actor, scope, body, { client: within = null } = {}) {
     await checkTarget(client, body.employee_target_id, assigneeId);
     await checkRecord(client, body.entity_type, body.entity_id);
     await checkProject(client, body.project_id);
+    const link = await partnerLinkOf(client, actor, body, { trusted });
     const watching = await watchersFor(client, body, { leadId: assigneeId, setterId: actor.employee_id, members });
     const cal = await workingWeek.loadCalendar(client);
     const dueAt = recurrence.dueFor(body, lagos.today(), cal);
@@ -600,6 +620,7 @@ async function create(actor, scope, body, { client: within = null } = {}) {
       entity_type: body.entity_type || null,
       entity_id: body.entity_id || null,
       project_id: body.project_id || null,
+      ...link,
       recurrence: body.recurrence || null,
       sort_order: await repo.nextOrder(client, assigneeId, "todo"),
       is_commitment: commitment,
@@ -681,11 +702,17 @@ async function edit(actor, scope, id, body) {
     // A task may stay in a project completed since; joining one needs it open.
     if (body.project_id && body.project_id !== before.project_id) await checkProject(client, body.project_id);
     if (body.late_reason) await reasons.assertOn(client, body.late_reason);
+    // Connect to Partner: only what changes, checked; a task with none that joins a connected project takes the project's.
+    const relinked = links().merged(before, body);
+    if (relinked.changed && (relinked.link.partner_id || relinked.link.lead_id)) await links().checkLink(client, actor, relinked.link);
+    const joins = body.project_id && body.project_id !== before.project_id && !links().touches(body) && !before.partner_id && !before.lead_id;
+    const link = joins ? await require("../projects/projects.service").linkOf(client, body.project_id) : relinked.changed ? relinked.link : null;
 
     const changes = {};
     for (const k of ["title", "priority", "cadence", "employee_target_id", "entity_type", "entity_id", "project_id", "recurrence", "late_reason"])
       if (k in body) changes[k] = body[k];
     if ("description" in body) changes.description = body.description || null;
+    if (link) Object.assign(changes, link);
     if ("due_on" in body) {
       const cal = await workingWeek.loadCalendar(client);
       changes.due_at = body.due_on ? recurrence.dueInstant(body.due_on, cal) : null;
@@ -1106,6 +1133,35 @@ async function cancelForRecord(client, actor, { entity_type: entityType, entity_
       before: { status: t.status },
       after: { status: "cancelled" },
       payload: payloadOf(after, { cancel_reason: reason, from_status: t.status }),
+    });
+  }
+}
+
+/**
+ * A record that tasks carry out is done (a course its person completed, docs/guides/knowledge.md
+ * §6.7): its open tasks move to Done with it, in the caller's transaction, as the system's work.
+ * Nothing waits on such a task, so no one waiting is told.
+ */
+async function completeForRecord(client, actor, { entity_type: entityType, entity_id: entityId }) {
+  for (const t of await repo.openForRecord(client, entityType, entityId)) {
+    const now = new Date();
+    await repo.update(client, t.task_id, { status: "done", completed_at: now });
+    await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id: t.task_id } });
+    await repo.addActivity(client, {
+      task_id: t.task_id,
+      actor_user_id: actor ? actor.user_id : null,
+      kind: "status_changed",
+      from_status: t.status,
+      to_status: "done",
+    });
+    const after = await repo.get(client, t.task_id);
+    await emit(client, {
+      key: EVENTS.TASK_COMPLETED,
+      entity: { type: "task", id: t.task_id },
+      actor,
+      before: { status: t.status },
+      after: { status: "done" },
+      payload: payloadOf(after, { from_status: t.status, month: `${lagos.dateOf(now).slice(0, 7)}-01` }),
     });
   }
 }
@@ -1547,7 +1603,24 @@ async function settleRescope(client, actor, id, approved) {
   });
 }
 
+/**
+ * A lead's tasks now its partner's (workspace.md §6, partnerships.md §6.4): in the conversion's own
+ * transaction, one event for them all. Returns how many moved.
+ */
+async function relinkIn(client, actor, { lead_id: leadId, partner_id: partnerId }) {
+  const moved = await repo.relinkLead(client, leadId, partnerId);
+  if (!moved.length) return 0;
+  await emit(client, {
+    key: EVENTS.TASK_RELINKED,
+    entity: { type: "lead", id: leadId },
+    actor,
+    payload: { lead_id: leadId, partner_id: partnerId, count: moved.length },
+  });
+  return moved.length;
+}
+
 module.exports = {
+  relinkIn,
   aiCounts,
   people,
   linkCommitments,
@@ -1555,6 +1628,7 @@ module.exports = {
   askRescope,
   settleRescope,
   cancelForRecord,
+  completeForRecord,
   toTask,
   toRef,
   readable,

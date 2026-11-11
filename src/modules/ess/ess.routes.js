@@ -8,8 +8,8 @@
  * nothing a wrong employee id could slip past; the service reads the employee
  * from `req.user` and there is no parameter that names another.
  *
- * My Profile, My Documents (M0, track B), My Leave (M1), My Performance (M2) and My Queries
- * (M3) are on the real API. The other tabs are added here as their milestones land.
+ * My Profile, My Documents (M0, track B), My Leave (M1), My Performance (M2), My Queries
+ * (M3) and My Payslips (M6) are on the real API. The other tabs are added here as their milestones land.
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -149,5 +149,42 @@ route(router, "get", "/sanctions",
   { query: c.common.PageQuery, response: c.sanctions.MySanctionPage, self: true,
     summary: "My sanctions" },
   controller.listSanctions);
+
+/* My Payslips: the caller's published payslips, the year's cards, a copy by email, Download All and their deductions
+   (docs/guides/payroll.md §5). The person always reads their own; a payslip is theirs only once its run is approved. */
+
+route(router, "get", "/payslips",
+  { query: c.payslips.EssPayslipQuery, response: c.payslips.PayslipPage, self: true,
+    summary: "My payslips of a year" },
+  controller.listPayslips);
+
+route(router, "get", "/payslips/summary",
+  { query: c.payslips.EssPayslipQuery, response: c.payslips.EssPayslipSummary, self: true,
+    summary: "The cards above My Payslips" },
+  controller.payslipSummary);
+
+route(router, "post", "/payslips/export",
+  { body: c.payslips.EssPayslipQuery, response: c.documents.ExportFile, self: true,
+    summary: "Download all my payslips of a year as one PDF" },
+  controller.exportPayslips);
+
+route(router, "get", "/payslips/:id",
+  { params: c.common.IdParams, response: c.payslips.PayslipDetail, self: true,
+    summary: "One of my payslips" },
+  controller.getPayslip);
+
+route(router, "get", "/payslips/:id/pdf",
+  { params: c.common.IdParams, no_content: true, self: true, summary: "The PDF of one of my payslips" },
+  controller.payslipPdf);
+
+route(router, "post", "/payslips/:id/email",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: c.payslips.PayslipCopySent, self: true,
+    summary: "Email me a copy of one of my payslips" },
+  controller.emailPayslip);
+
+route(router, "get", "/deductions",
+  { query: c.common.PageQuery, response: c.payslips.EssDeductionPage, self: true,
+    summary: "The deductions on my payslips" },
+  controller.listDeductions);
 
 module.exports = { basePath: "/ess", surface: "staff", router };

@@ -1,0 +1,18 @@
+---
+subject: "Please sign: {{ title }}"
+title: Agreement to Sign
+format: markdown
+---
+{{#if recipient.first_name}}Dear {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+{{ company }} has sent **{{ title }}** ({{ reference }}) for {{ record_name }} for your signature.
+
+{{#if message}}{{ message }}
+
+{{/if}}{{#if after}}You sign after {{ after }}; the link opens your turn as soon as they have signed.
+
+{{/if}}Read it in full on the page below. We will email you a six-digit code to confirm it is you, then you draw or type your signature.
+
+[Read and Sign]({{ sign_url }})
+
+{{#if expires_at}}The link works until {{ datetime expires_at }}. {{/if}}Only you can use it: please do not forward this email.

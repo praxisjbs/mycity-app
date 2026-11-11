@@ -29,6 +29,32 @@ async function recordSeen(db, { kind, id }, scope) {
 }
 
 /**
+ * File a document another module keeps among a record's documents, in the caller's transaction: an
+ * agreement's sealed copy (origin `agreement`), which stays the agreement's in the vault (its entity, its
+ * read rule) and is listed here beside the uploads. Filed once: a second call changes nothing.
+ * @param {{record: {kind: string, id: string}, deal_id?: string|null, document_id: string, origin: "agreement"|"proposal"}} opts
+ * @returns {Promise<string|null>} the partner_document id, or null when it was filed already
+ */
+async function fileIn(client, actor, { record, deal_id = null, document_id, origin }) {
+  const { rows } = await client.query(
+    `INSERT INTO partner_document (document_id, partner_id, lead_id, deal_id, kind, origin, attached_by)
+     VALUES ($1, $2, $3, $4, NULL, $5, $6)
+     ON CONFLICT (document_id) DO NOTHING
+     RETURNING partner_document_id`,
+    [document_id, record.kind === "partner" ? record.id : null, record.kind === "lead" ? record.id : null, deal_id, origin, actor ? actor.user_id : null],
+  );
+  if (!rows[0]) return null;
+  const id = rows[0].partner_document_id;
+  await emit(client, {
+    key: EVENTS.PARTNER_DOCUMENT_ATTACHED,
+    entity: { type: "partner_document", id },
+    actor,
+    payload: { partner_document_id: id, document_id, [`${record.kind}_id`]: record.id, deal_id, origin },
+  });
+  return id;
+}
+
+/**
  * Tag a staged upload for a lead or a partner, in the caller's transaction.
  * @param {{record: {kind: string, id: string}, deal_id?: string|null, document_id: string, kind?: string|null,
  *          origin?: "upload"|"proposal"|"agreement"|"signed_copy", field?: string}} opts
@@ -113,4 +139,5 @@ async function mayRead(client, user, doc) {
   return recordSeen(client, record, scope);
 }
 
-module.exports = { attachIn, attach, page, moveToPartner, mayRead, recordSeen };
+module.exports = {
+  fileIn, attachIn, attach, page, moveToPartner, mayRead, recordSeen };

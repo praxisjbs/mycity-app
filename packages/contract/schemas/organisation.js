@@ -72,6 +72,14 @@ const accountNumber = z
   .trim()
   .regex(/^\d{10}$/, "Ten digits");
 
+/** A tax or pension number as it is issued: letters, digits and hyphens (a TIN, a pension PIN, an NHF number). */
+const statutoryNumber = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .max(30, "At most 30 characters")
+  .regex(/^[A-Z0-9]+(?:[-/][A-Z0-9]+)*$/, "Letters and digits");
+
 /** Gross pay: an amount, never below zero (employee_gross_monthly_check, migration 0110). */
 const pay = money.refine((v) => !v.startsWith("-"), "Not below zero");
 
@@ -201,6 +209,8 @@ const EmployeeListQuery = listQuery(
     line_manager_id: uuid.optional(),
     /** `ending`: active people whose contract ends within 30 days, as Contracts Ending counts them. */
     contract: z.enum(["ending"]).optional(),
+    /** `true`: the caller is left out, for a picker whose form may not name them (Raise Query). */
+    exclude_self: z.enum(["true", "false"]).optional(),
   },
   ["display_name", "staff_number", "job_title", "department", "start_date", "created_at"],
 );
@@ -339,6 +349,14 @@ const Employee360 = z
     bank_name: z.string().nullable(),
     account_number: z.string().nullable(),
     gross_monthly: money.nullable(),
+    /**
+     * Tax and pension numbers, masked as `employee.statutory` (field-mask.js): read by payroll's statutory report in
+     * advanced mode (docs/guides/payroll.md §6.12 rule 6), where a missing one prints Not Set.
+     */
+    tax_id: z.string().nullable(),
+    pension_pin: z.string().nullable(),
+    pension_administrator: z.string().nullable(),
+    nhf_number: z.string().nullable(),
     created_at: isoDateTime,
     /** Their photo at a profile's size (384 px, shared/db/person.js); null shows their initials. */
     photo_url: z.string().nullable(),
@@ -383,6 +401,11 @@ const EmployeeUpdateFields = z
     bank_name: clearable(z.string().trim().max(100)),
     account_number: clearable(accountNumber),
     gross_monthly: clearable(pay),
+    /** Tax and pension numbers (`employee.statutory`), read by payroll's statutory report (docs/guides/payroll.md §6.12). */
+    tax_id: clearable(statutoryNumber),
+    pension_pin: clearable(statutoryNumber),
+    pension_administrator: clearable(z.string().trim().max(100)),
+    nhf_number: clearable(statutoryNumber),
   })
   .partial()
   .strict();
@@ -505,6 +528,10 @@ const EMPLOYEE_FIELD_LABELS = Object.freeze({
   gross_monthly: "Gross Monthly",
   bank_name: "Bank",
   account_number: "Account Number",
+  tax_id: "Tax ID",
+  pension_pin: "Pension PIN",
+  pension_administrator: "Pension Administrator",
+  nhf_number: "NHF Number",
   next_of_kin_name: "Next of Kin",
   next_of_kin_phone: "Next of Kin Phone",
   next_of_kin_relationship: "Relationship",

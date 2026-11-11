@@ -89,18 +89,25 @@ mycity-app/
 │                             65_partnership_setup.js: Partnerships · Categories as MyCity sets it up (stages,
 │                             impacts, types, the Events checklist and Deal Merchant Agreement, proof points),
 │                             through the services, tested by tests/integration/partnerships-staging-seed.test.js;
+│                             70_partnerships.js: a synthetic tracker (partners with returns, leads at their
+│                             stages, proposals, agreements to Active) through the services, after taking
+│                             Home's M7 rows away, tested by tests/integration/partnerships-staging-records.test.js;
 │                             80_expenses.js: M8's categories, budgets, projects and requests at
 │                             every stage on the Implementation Team's accounts, through the
 │                             services, after taking Home's expense rows and 8099's categories away,
-│                             tested by tests/integration/expenses-staging-seed.test.js; lib/)
+│                             tested by tests/integration/expenses-staging-seed.test.js;
+│                             90_knowledge.js: ten SOPs across MyCity's five departments and two
+│                             real courses (knowledge/: sops.js, courses.js and the two PDFs' pages),
+│                             through the services, tested by
+│                             tests/integration/knowledge-staging-seed.test.js; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
 │                             16/10/2026; docs/guides/foundation.md §6.1). The repository is private
-├── templates/documents/      PDF templates (HTML)
+├── templates/documents/      PDF templates (HTML); fonts/ the faces a document embeds itself (the training certificate's Cormorant Garamond, OFL)
 ├── templates/email/          mail templates (HTML)
 ├── templates/import/         import template definitions
-├── assets/brand/             logo vector masters, pin mark, app icons
+├── assets/brand/             logo.png (the lockup on every PDF until Settings · Organisation holds a Logo); vector masters, pin mark, app icons
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
@@ -115,9 +122,13 @@ mycity-app/
 │   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30);
 │   │                         ai-catalogue.js writes src/shared/ai/catalogue.snapshot.json, the AI manifests as
 │   │                         the build declares them (npm run gen:ai-catalogue; gate 23 holds it current)
+│   │                         proposal-kit.js copies the proposal design kit's tokens, Geist, city photos and
+│   │                         icons into templates/proposals/ and draws the gallery's sample (npm run gen:proposal-kit)
 │   ├── new-component.js      npm run new:component: a shared component with header, test and gallery page
 │   ├── new-screen.js         npm run new:screen: a staff-app screen in its module, the route map, PROGRESS and the gates
 │   ├── check/                the CI gates (§8); frontend: components (palette, contrast and more in PR 1)
+│   │   ├── proposal-kit.js   the proposal design kit drawn at 16:9 in Chromium: page size, Geist, alt
+│   │   │                     text, one PDF page a page, one column on a phone (screens group)
 │   │   ├── lib/changes.js    what a change touched (git diff vs main) and its trailers,
 │   │   │                     shared by check/progress.js, check/guides.js, check/readme-map.js
 │   │   ├── lib/scope.js      how much of `npm run ci` a GitHub run needs: full, docs (documents
@@ -145,6 +156,13 @@ mycity-app/
 │   ├── guide/                the User Guide's pictures: shoot.js (npm run guide:shots) takes each chapter's
 │   │                         pictures on the demo build, desktop and phone, with numbered marks; lib.js,
 │   │                         shared with check/user-guide.js: the chapters on disk and each picture's hashes
+│   ├── video/                a milestone's training video (docs/runbooks/training-videos.md): make.js
+│   │                         (script, narrate, film, assemble), style.js (the look measured from the
+│   │                         M3 video), cards.js, film.js, assemble.js, people.js (filming's sign-ins),
+│   │                         mail.js (the mail the app sent, shown and its links opened),
+│   │                         narrate.py and requirements.txt (the voice, Kokoro); scenes/, one a video:
+│   │                         m4-recruitment-1.js (M4 part 1, Vacancies and Candidates),
+│   │                         m4-recruitment-2.js (M4 part 2, Assessments and Interviews)
 │   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging;
 │   │                         attack-assistant.js: its attack suite, asked of the real model on staging
 │   │                         nightly through deploy-gate attack (docs/guides/praxis-ai.md §6.17)
@@ -185,7 +203,8 @@ mycity-app/
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
 │   │                         first-accounts (the first two logins on a server),
 │   │                         staff-roster (MyCity's staff onto a server that has none),
-│   │                         push-notifications (web push keys, live mail, a device's health)
+│   │                         push-notifications (web push keys, live mail, a device's health),
+│   │                         training-videos (a milestone's handover video, start to finish)
 │   ├── handoff/              a build carried across sessions: its decisions, plan and log
 │   │                         (push-notifications, m3-queries-sanctions)
 │   └── manual/               the User Guide (Knowledge Hub · User Guide, docs/guides/user-guide.md): one
@@ -290,7 +309,7 @@ src/
 │   ├── media/         image-pipeline · av-pipeline · pdf-pipeline (a PDF's page count and first page) ·
 │   │                  pdf-page (the first page drawn by PDF.js in its own process) · pdf-text (a PDF's
 │   │                  text, for the CV reader, in its own process) · scan · reconcile
-│   ├── pdf/           chromium · pdf.service
+│   ├── pdf/           chromium (one browser; a slow first launch waited for and tried once more, tests/unit/pdf-chromium.test.js) · pdf.service
 │   ├── mail/          system-mail.service · pace (the hourly sending limit) · smtp-errors (what a mail
 │   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
 │   │                  deliverability/{check, route-check, dns-check, dmarc, ptr, rbl, evaluate}
@@ -375,7 +394,7 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `payroll` | `payroll`, `payslips`, `salary_structure`, `deductions`, `statutory` |
 | `partnerships` | `partners`, `partner_pipeline`, `leads`, `interactions`, `proposals`, `agreements`, `partnership_analytics` |
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
-| `knowledge` | `knowledge`, `policies` (with the `policies.manage` capability for writing them); announcements are read here too |
+| `knowledge` | `knowledge` (SOPs; a department's head, or the `sops.manage` capability, writes them), `policies` (with the `policies.manage` capability for writing them), `training` (with the `training.manage` capability for building and assigning courses; ESS · My Training is the person's own) |
 | `praxis_ai` | `assistant` |
 | `ai_control` | `ai_governance` (AI Control: chains, prices, caps; `docs/guides/ai-control.md`) |
 | `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `templates`, `signatures`, `search`, `maps` |
@@ -427,6 +446,9 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `partnerships.configure` | `partnerships` | Configure Partnerships: the categories with their agreement templates, delivery checklists and custom fields, the pipeline's stages and lists, the proof points and the saved proposal templates (`docs/guides/partnerships.md`) | Implementation, Operations & People | `7190` |
 | `partnerships.money` | `partnerships` | See Commission and Returns: see and enter commission, the merchant's take and returns, and import returns | Implementation, Operations & People, Management; General Management through their department (in code) | `7190` |
 | `expenses.finance` | `expenses` | Run Expenses: group approved requests into requisitions, record disbursements, set budgets and manage the expense categories (`docs/guides/expenses.md`) | Implementation, Operations & People | `8100` |
+| `payroll.configure` | `payroll` | Configure Payroll: switch the advanced option on or off, set the pay day and the bank rule, and enter the statutory rates, bands, salary grades and pay components (`docs/guides/payroll.md` §8) | Implementation, Operations & People | `6099` |
+| `sops.manage` | `knowledge` | Manage SOPs: write, publish and archive any department's SOPs; a department's head writes its own without it (`docs/guides/knowledge.md` §6.2) | Implementation, Operations & People | `10490` |
+| `training.manage` | `knowledge` | Manage Training: build, publish, assign and archive courses, and see everyone's progress and certificates (`docs/guides/knowledge.md` §8) | Implementation, Operations & People | `10490` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -444,7 +466,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `maps` | `maps.service.js` (the places-name job's naming), `maps.events.js` (`place.named`) | `GET /maps/search` (the address search behind every address field, signed places, from the second character), `/maps/pin` (a pinned point's nearest address, signed), `/maps/tiles` (the map's tiles, signed in); every address is kept by its owner through `shared/places` (`services/maps`; `docs/guides/addresses.md`, F27) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
-| `user_guide` | `.search` (⌘K's User Guide group, ranked by the guide's search), `.meaning` (the meaning index: `sync` for the `user-guide-index` schedule, a search's vector and nearness), `.repo` (`user_guide_passage`, migration 0510), `.events` (`user_guide.indexed`, the spoken search's document type), `.ai` (`guide.search` for Praxis AI); prompt `services/ai/prompts/guide-answer.md` | Knowledge Hub · User Guide: `docs/manual` read through `packages/contract/guide.js` and cut to each reader down to the step, its pictures behind the same check; its search by words and meaning (`packages/contract/guide-search.js`), an answer on the Fast job and a spoken search (`docs/guides/user-guide.md`; brought forward from M11, JBS Praxis, 25/10/2026); tested on the real chapters by `tests/integration/user-guide.test.js` |
+| `user_guide` | `.chapters` (the chapters read from `docs/manual`, and the public chapter with its pictures, kept apart from staff access for `.public.routes`), `.search` (⌘K's User Guide group, ranked by the guide's search), `.meaning` (the meaning index: `sync` for the `user-guide-index` schedule, a search's vector and nearness), `.repo` (`user_guide_passage`, migration 0510), `.events` (`user_guide.indexed`, the spoken search's document type), `.ai` (`guide.search` for Praxis AI); prompt `services/ai/prompts/guide-answer.md` | Knowledge Hub · User Guide: `docs/manual` read through `packages/contract/guide.js` and cut to each reader down to the step, its pictures behind the same check; its search by words and meaning (`packages/contract/guide-search.js`), an answer on the Fast job and a spoken search (`docs/guides/user-guide.md`; brought forward from M11, JBS Praxis, 25/10/2026); tested on the real chapters by `tests/integration/user-guide.test.js`. `.public.routes` serves the public chapter (`kind: public-help`) and its pictures at `/api/public/v1/help`, read by the public site's Help, `public-app/src/pages/Help.tsx` (§6.11) |
 
 ### 5.4 M1 · Core Operations & Employee Management · TB, LA, AJ, GE · to 19 Oct
 
@@ -533,7 +555,7 @@ Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
 
 | Module | Files beyond the template |
 |---|---|
-| `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED; the board's stages and How We Hire), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`; New Vacancy's interview: `vacancy-follow-ups`, prompt `services/ai/prompts/vacancy-follow-ups.md`, and its plain draft when the AI cannot write one), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards), `.matrix` (Recruitment's scope probes for the AI access matrix); the staff screens in `app/src/features/recruitment/`, one file per tab (`index.tsx` routes only): `Vacancies.tsx` with `VacancyInterview.tsx` (New Vacancy's ten questions, tested by `VacancyInterview.test.tsx`) and `VacancyForm.tsx` (the editor it opens, and Edit Vacancy), `VacancyQuestions.tsx` (Questions and Scorecard), `CareersSettings.tsx` and `CandidateEmails.tsx`; `Candidates.tsx` (the board, Invite to Apply, Screen With AI) and `CandidateSheet.tsx`; `Assessments.tsx` (library, sittings, Mark Answers) and `AssessmentQuestions.tsx`; `Interviews.tsx`, `MyCard.tsx` (the blind card) and `ScheduleInterview.tsx`; `TalentPool.tsx`; M5's `Offers.tsx` (on the contract, with `OfferForm.tsx`, New and Edit Offer; `OfferSign.tsx`, Sign for the Company; `OfferSettings.tsx`, the Offer Signatory and the standard letter; its mock `app/src/api/mock/modules/offers.ts`, which also answers the offer's approval through the workflow routes) and INTERIM `Onboarding.tsx`; `shared.tsx` (labels, pills, refusals); each tab's `*.test.tsx` on the mock, sharing `testKit.tsx`. The mock is `app/src/api/mock/modules/recruitment.ts` (bodies checked by the contract's schemas) with its fixtures in `app/src/api/mock/data/recruitment.ts` |
+| `vacancies` | `.public.routes` (careers list, vacancy by slug, Apply link), `.careers` (the careers page's allow-lists, no staff auth), `.lifecycle` (DRAFT, OPEN, PAUSED keeps the link, CLOSED; the board's stages and How We Hire), `.slug`, `.draft` (Write With AI: `jd-draft`, `screening-questions`; New Vacancy's interview: `vacancy-follow-ups`, prompt `services/ai/prompts/vacancy-follow-ups.md`, and its plain draft when the AI cannot write one), `.questions` (Apply questions and interview traits), `.ai` (reads; New Vacancy and Save Vacancy cards), `.matrix` (Recruitment's scope probes for the AI access matrix); the staff screens in `app/src/features/recruitment/`, one file per tab (`index.tsx` routes only): `Vacancies.tsx` with `VacancyInterview.tsx` (New Vacancy's ten questions, tested by `VacancyInterview.test.tsx`) and `VacancyForm.tsx` (the editor it opens, and Edit Vacancy), `VacancyQuestions.tsx` (Questions and Scorecard), `CareersSettings.tsx` and `CandidateEmails.tsx`; `Candidates.tsx` (the board, Invite to Apply, Screen With AI) and `CandidateSheet.tsx`; `Assessments.tsx` (library, sittings, Mark Answers) and `AssessmentQuestions.tsx`; `Interviews.tsx`, `MyCard.tsx` (the blind card) and `ScheduleInterview.tsx`; `TalentPool.tsx`; `Analytics.tsx` (the tab's charts: the funnel and screening scores); M5's `Offers.tsx` (on the contract, with `OfferForm.tsx`, New and Edit Offer; `OfferSign.tsx`, Sign for the Company; `OfferSettings.tsx`, the Offer Signatory and the standard letter; its mock `app/src/api/mock/modules/offers.ts`, which also answers the offer's approval through the workflow routes) and INTERIM `Onboarding.tsx`; `shared.tsx` (labels, pills, refusals); each tab's `*.test.tsx` on the mock, sharing `testKit.tsx`. The mock is `app/src/api/mock/modules/recruitment.ts` (bodies checked by the contract's schemas) with its fixtures in `app/src/api/mock/data/recruitment.ts` |
 | `candidates` | `.public.routes` (apply, write only) and `.apply` (its service, no staff auth), `.pipeline` (the moves, entity_state_history; Offer and after set only through the service's `advanceIn`, `offerEndedIn` and `hireIn`, which M5 calls), `.screening` (the estimate, provisional flag), `.score` (Score With AI and Screen With AI, `cv-screen`, from the outbox), `.scorecard` (A10 weights), `.sla` (days at stage), `.mail` (the candidate emails it sends), `.emails` (Candidate Emails, the editor, M5's three mails included), `.retention` (CVs left on Apply links that ended without an application, removed nightly by `jobs/schedulers/apply-cv-purge`), `.ai`, `.search` |
 | `assessments` | `.public.routes` (take, token) and `.delivery` (its service, no staff auth), `.authoring` (the library, export and import, Suggest With AI), `.service` (sittings: send, Send to Candidates, marks, cancel), `.timer` (the server's clock and how a sitting ends; `jobs/schedulers/assessment-expiry`), `.scoring` (points sealed in `answer_key_enc`), `.mail` (assessment-invite, the link made after commit), `.ai`, `.search` |
 | `interviews` | `.panel` (the card, blind until the round closes; the predicate is `.repo` BLIND), `.consolidate` (Close Round, the report and the Interview Assessment Form), `.schedule` (schedule, reschedule, cancel, the calendar entry and the candidate's ICS), `.notes` (Tidy With AI), `.reminders` (`jobs/schedulers/interview-reminders`), `.service` (the sheet), `.ai`, `.search` |
@@ -551,7 +573,7 @@ The design is `docs/guides/offers.md`; the build plan and its log `docs/handoff/
 |---|---|
 | `offers` | built in M5 PR 3: `.service` (New Offer with the score snapshot, a draft's edits, Submit for Approval on `recruitment.offer`, the approval settled from the outbox, the company's signature, Send and Resend, Withdraw, Not Progressing, the signatures hooks, the Offers settings), `.render` (one set of values and one Markdown renderer for the record, the signing page and the PDF), `.repo`, `.events` (the `offer_letter` doc type, `defineSignable("offer")`), `.routes`, `.controller`, `.ai` (New Offer as a card), `.search`; mail `offer-sent`. No public routes and no expiry job of its own: signing is `signatures`' page, and `signature-reminders` ends a lapsed offer's request, which expires the offer. The screens (M5 PR 4) are Recruitment · Offers in `app/src/features/recruitment/` (§5.7's row) and the public Sign Offer and Verify Document, `public-app/src/pages/SignOffer.tsx` and `Verify.tsx` |
 | `signatures` | built in M5 PR 2, shared with M7: `.service` (`defineSignable`, `requestIn`, `signAsStaffIn`, `endFor`, the signing page's steps), `.code` (the six-digit email code), `.public.routes` (`/sign/:token` and its code, sign, decline and document; `/verify/:ref`, `/verify/t/:token` and its document), `.certificate`, `.signed-pdf` (sealing from the outbox: the sealed copy, its artifact hash, the copies mailed), `.verify` (two verdicts), `.events`, `.repo`; `jobs/schedulers/signature-reminders` ends lapsed requests; mails `signature-code`, `signature-completed` |
-| `onboarding` | M5 PR 5 opened the hire's case: `.service` (`openCaseIn` in the acceptance transaction, the checklist from the active document requirements, `requiredCount` for Send Offer), `.repo`, `.events` (`onboarding.opened`). PR 6 fills the rest: `.public.routes` (candidate document upload), `.checklist` (documentation before onboarding), `.plans`, `.sop`, `.controller`, `.routes`, `.ai` |
+| `onboarding` | M5 PR 5 opened the hire's case (`openCaseIn` in the acceptance transaction); PR 6a built it to the documentation gate: `.service` (cases, verify and reject, reference checks, Send Reminder, `checkGateIn`), `.checklist` (the gate's rules and the Checklist settings), `.plans` and `.sop` (the Plans settings, an SOP in force), `.upload` (the hire's Upload Documents page and its link, mailed as `onboarding-documents`), `.public.routes` (`/onboard/:token`), `.routes`, `.controller`, `.repo`, `.events`, `.ai` (a read, the settings `not_offered`), `.search`, `.test`; `migrations/5050_onboarding_plans.sql`, `seeds/reference/5399_seed_new_joiner_list.sql`, `tests/integration/onboarding.test.js`. PR 6b adds the start date, the plan's steps and Complete Onboarding (`jobs/handlers/onboarding-dispatch`) |
 | `employment_contracts` | built in M5 PR 5: `.service` (`generateIn` at the offer's acceptance, Sign for Company and Resend, `cancelIn`, the signatures hooks, the Contract settings), `.render` (one set of values and one Markdown renderer for the signing page and the PDF), `.repo`, `.lifecycle` (the four statuses and their moves), `.events` (the `employment_contract` doc type, `defineSignable("employment_contract")`), `.routes`, `.controller`, `.ai` (nothing offered: no AI drafts a contract), `.search`; mail `contract-sent` |
 
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
@@ -560,15 +582,24 @@ Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Template
 M4's, built and edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4's,
 built).
 
-### 5.9 M6 · Payroll & Notifications · TB, AJ · 23 to 27 Nov
+### 5.9 M6 · Payroll & Notifications · TB, LA · 23 to 27 Nov
 
 | Module | Files beyond the template |
 |---|---|
 | `payroll` | `.calc` (pure, no DB), `.inputs` (attendance, accepted deductions), `.run`, `.lock`, `.config.repo` (effective dated) |
-| `payslips` | `.pdf`, `.breakdown` |
-| `salary_structure` | |
-| `deductions` | `.acceptance` (nothing deducts itself) |
-| `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
+| `payslips` | `.pdf` (the `payslip` and `payroll_payslips_export` document types, their variables and the calls that request the PDFs), `.breakdown` (the pay items behind a grouped line) |
+| `salary_structure` | grades, placements and pay splits, read as of a day (advanced mode only, `ADVANCED_OFF` until the option is on or has been) |
+| `deductions` | `.acceptance` (nothing deducts itself: accept, spread, waive, release, record and cancel an advance), `.repo` (the paged union of waiting attendance deductions, fines and advances), `.search` |
+| `statutory` | `.rates` (the rows in force on a day, shaped for `payroll.calc.computeStatutory`; a version saved from a day), `.report` (the `statutory_report` document type and its request on an approved run). Off by default; every rate, band and relief is entered on Configurations from confirmed law, none in a seed |
+
+The build plan and the file map are `docs/guides/payroll.md` (Appendix A and D), M6's only source of
+truth. PR 1 (09/11/2026) filled the contract files `payroll.js`, `payslips.js` and `deductions.js` (simple
+mode; `salary_structure.js` and `statutory.js` came with PR 5), migrations `6000`, `6010` and `6030`, seed
+`6099` (the `payroll.run` approval, `payroll.configure`, the Unpaid flag), the definition in
+`shared/workflow/definitions.js`, the capability in `shared/access/access.catalog.js`, `employer_cost` and
+`account_last4` in `shared/rbac/field-mask.js`, and the four tabs (Payroll Runs, Payslips, Deductions,
+Configurations: Salary Structure and Statutory are retired) in the route map, ⌘K, Coming Soon and the shell's
+catalogue, with `tests/integration/payroll-schema.test.js` and `tests/unit/payroll-contract.test.js`. PR 2 filled `payroll` (the run). PR 3 (09/11/2026) filled `deductions`: the union the Payroll · Deductions tab lists, accept, spread, waive and release of a fine, record and cancel of an advance, the notices and the outbox handler that tells payroll of a fine waiting; `deductions.ai.js` (one route) and `deductions.search.js` came with it for gates 9 and 10; payroll's `.lock` gained the month locks a deduction takes (`openPeriod`, `lockRunsOf`, `lockMonths`); and `app/src/features/payroll/Deductions.tsx` (with `Deductions.test.tsx`) is the screen, on the contract, with its mock in the contract's shapes in `app/src/api/mock/modules/payroll.ts`. Tests: `tests/integration/deductions.test.js` and `src/modules/deductions/deductions.test.js`. PR 4 (`m6/payslips`, 09/11/2026) filled `payslips`: Payroll · Payslips under `/api/v1/payslips`, Email All Payslips and Download All on the run (`/payroll/runs/:id/email-payslips`, `/payslips-export`), and My Payslips' routes in `ess` (`ess.earnings.js`, under `/api/v1/ess/payslips` and `/ess/deductions`); the PDFs are requested in the run's lock. Its templates are `templates/documents/payslip.html`, `payslip-batch.html` (Download All, a page each) and `templates/email/payslip-ready.html`, tested by `tests/integration/payslips.test.js` and `src/modules/payslips/payslips.test.js`. PR 5 (`m6/advanced`, 10/11/2026) filled `statutory` and `salary_structure`: `/api/v1/statutory` (the seven items in brief, the rates, a version from a day) and `/api/v1/salary-structure` (grades, placements, a person's pay split), `/payroll/settings` (the pay day, Bank Details Required, the advanced switch and the three conventions, `payroll.configure`) and the Statutory Report on a run (`/payroll/runs/:id/statutory-report`); `payroll.calc.computeStatutory` and the pay split in Compute; migration `6020_payroll_advanced.sql` (grades, placements, pay components, statutory rates, `payslip_line.base_amount` and the employee's tax and pension numbers, written through `organisation`); `shared/db/effective-dated` gained `replace` and `addVersionSet`; the template `templates/documents/statutory-report.html`; and the screen `app/src/features/payroll/Configurations.tsx` (with `Configurations.test.tsx`), its mock in `app/src/api/mock/modules/payroll.ts` (the INTERIM `app/src/api/types/payroll.ts` is retired). Tests: `tests/integration/payroll-advanced.test.js` (labelled test rates, never law), `src/modules/statutory/statutory.test.js` and `src/modules/salary_structure/salary_structure.test.js`. PR 6 (`m6/ai-search`, 10/11/2026) filled the assistant's and ⌘K's side of payroll, with no screen: `payroll.ai.js` (the read `payroll.runs`, the summary `payroll.month`, the cards New Run, Submit for Approval and Add Adjustment, the routes "run payroll" and "turn on advanced payroll"), `payslips.ai.js` (`payslips.mine`, `payslips.list`), `deductions.ai.js` (`deductions.list`, `deductions.mine`, the cards Accept Deduction, Waive Fine and Record Advance); `payslips.search.js` gained the owner-pinned provider (a person finds only their own published payslips, opening My Payslips), the route map the types `payroll_own_payslip` and `payroll_own_deduction`, and ⌘K the New Run action. Tested on the real migrations by `tests/integration/ai-actions-payroll.test.js` (the reads and the summary masked as the screen is, each card through Confirm It's You, ⌘K, and the Submit notice by the bell, by push and by email); the contract's card schemas are `PayrollRunSubmission`, `PayrollRunAdjust`, `FineAccept` and `FineWaive`. PR 7 (`m6/screens`, 11/11/2026) built the screens on that API: `app/src/features/payroll/index.tsx` (the four tabs' switch), `PayRuns.tsx` (Payroll Runs), `PaySlips.tsx` (Payroll · Payslips) and `parts.tsx` (what they and My Payslips share), with `Payroll.test.tsx`; `app/src/features/ess/Payslips.tsx` (ESS · My Payslips) with `Payslips.test.tsx`; the mock's runs and payslips in `app/src/api/mock/modules/payroll.ts` and `payslips.ts`; and in `packages/ui` the month field `src/form/MonthField.tsx` (with `MonthField.test.tsx` and `MonthField.gallery.tsx`, in `docs/COMPONENTS.md`).
 
 Web push, each person's preferences, `notifications.reminders` and the `settings` Notifications
 screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2026
@@ -595,11 +626,11 @@ files included (`.ai`, `.search`).
 
 | Module | Files beyond the template |
 |---|---|
-| `partners` | `.360` (the Partner 360, renders correctly with zero data), `.dedup` (on `shared/dedup`), `.convert` (the conversion transaction, a lead's records moved to its partner), `.documents` (the Documents tab: `partner_document` rows naming the vault's, migration `7060_partnership_documents.sql`, which also drops `partner.partner_type`) (PR 3); `.import` (the tracker, PR 4); `.work` (PR 5); `.views` (PR 8); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
-| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2), with the deals' rules added by PR 3: in `.lists` the stages as deals read them (the first stage, signed meanings, a lead's status from its stage, `leadStatusOf`) and in `.fields` a record's custom values checked by `checkValue` (`checkCustom`) and lists narrowed by them (`filterSql`); deals in the template `.service` and `.repo`, `.options` (a deal's priced lines), `.stages` (stage moves, their rules and history), `.health` (health and blockers), `.returns` (the `deal_return` service and its two money-gated routes) (PR 3); `.returns.import` (PR 4); `.deliverables`, `.inactivity` (PR 5); `.views` (PR 8); `.types` was deleted with PR 2 (categories replace it); `.events` registers `deal.venue` (PR 1) |
+| `partners` | `.360` (the Partner 360, renders correctly with zero data), `.dedup` (on `shared/dedup`), `.convert` (the conversion transaction, a lead's records moved to its partner), `.documents` (the Documents tab: `partner_document` rows naming the vault's, migration `7060_partnership_documents.sql`, which also drops `partner.partner_type`) (PR 3); `.import` (the tracker, PR 4); `.work` (Connect to Partner's check, names and pickers, the 360's Work tab and Next Events, the cards' partner fields; PR 5); `.views` (PR 8); `.events` registers the `partner.headquarters` and `partner.cities` place owners (PR 1) |
+| `partner_pipeline` | `.categories`, `.lists`, `.fields`, `.checklists`, `.setup` (Start From Tracker) (PR 2), with the deals' rules added by PR 3: in `.lists` the stages as deals read them (the first stage, signed meanings, a lead's status from its stage, `leadStatusOf`) and in `.fields` a record's custom values checked by `checkValue` (`checkCustom`) and lists narrowed by them (`filterSql`); deals in the template `.service` and `.repo`, `.options` (a deal's priced lines), `.stages` (stage moves, their rules and history), `.health` (health and blockers), `.returns` (the `deal_return` service and its two money-gated routes) (PR 3); `.returns.import` (PR 4); `.deliverables` (a signed deal's checklist raised as tasks), `.calendar` (a signed deal's event days on its team's calendar), `.inactivity` (the follow-up of a quiet partner or lead, `partner_follow_up`, migration `7080_partner_follow_ups.sql`) (PR 5); `.views` (PR 8); `.types` was deleted with PR 2 (categories replace it); `.events` registers `deal.venue` (PR 1) |
 | `leads` | `.360` (the Lead 360, renders correctly with zero data) (PR 3); a lead's status is `partner_pipeline.lists`' `leadStatusOf`, kept in step by `leads.service`; conversion is `partners.convert`; `.views` (PR 8); `.events` registers `lead.cities` (PR 1) |
 | `interactions` | `.mail` (with `mailbox/binding/`, PR 8) |
-| `proposals` | `.studio`, `.questions`, `.draft` (the jobs), `.content` (validation and the figure check), `.kit` (rendering), `.send`, `.public`, `.templates`, `.proof`, `.views` (PR 7; `.proof` with PR 2); `.questionnaire` and `.pdf` are not built and go with PR 7 |
+| `proposals` | `.studio` (the brief, its sources and the kit's context), `.questions` (the cards, answer, skip, reshuffle), `.draft` (the jobs' work: the draft, the figure check asked once more), `.content` (validation per layout, the figure check, Build by Hand's starter), `.kit` (the design kit's HTML for web and PDF), `.charts` (the seven charts as SVG), `.send` (Send with confirmation, the link, `proposal-sent`), `.public` with `.public.routes` (the private link and its views), `.proof` (proof points, PR 2); saved templates in `.service` (PR 7). `.ai` and `.search` are PR 8's |
 | `agreements` | `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`), `.renewals`, `.views` (PR 6; `.tidy` with PR 2) |
 | `partnership_analytics` | `.queries` (per lead owner, A21; PR 8) |
 | `signatures` (shared with M5) | built by M5 (§5.8): M7's agreements declare themselves with `defineSignable` and send with `requestIn`; the stamping is each signable's template, given the signatures by `.signed-pdf` |
@@ -619,14 +650,34 @@ conversion, stage rules, health, the 360s, Home's cards). The audit after PR 3 (
 Stage, Category, Region, Owner, Health and the filterable custom fields) and, for PR 4's importer, the
 in-transaction `leads.service` `createIn`, `partners.service` `createIn` and
 `partner_pipeline.returns` `saveIn`.
+PR 5 (07/11/2026): `app/src/features/partnerships/WorkTab.tsx` (the 360s' Work tab and Next Events);
+`app/src/features/workspace/PartnerLink.tsx` (Connect to Partner on New Task, New Project and New Event,
+the Partner filter and a panel's Partner row); the mock `app/src/api/mock/modules/partnerships_work.ts`
+(the link and its pickers; the Work tab's read sits with the work in `workspace.ts`); tested on the real
+migrations by `tests/integration/partnerships-work.test.js`.
+
+PR 4 (07/11/2026) added `partners.import.js` (the Partnership Tracker importer, `partnership_tracker`),
+`partners.export.js` (Export on Partners, Leads and their deals in the tracker's columns, `POST
+/partnerships/exports`, made by the outbox handler `partners.events` registers) and
+`partner_pipeline.returns.import.js` (Partnership Returns, `partnership_returns`); Map Values in
+`shared/import` (`engine.js` `valuesOf` and `setValues`, `registry.js` `mapValues`, routes `GET` and `PUT
+/imports/:id/values`); on screen `app/src/features/partnerships/Returns.tsx` (the Partner 360's Returns tab)
+and `forms/ReturnsForm.tsx` (Enter Returns), and `app/src/features/settings/ImportValues.tsx` (the wizard's
+Map Values step); tested by `tests/integration/partnerships-imports.test.js` and
+`tests/unit/partnerships-import.test.js` on the synthetic workbook
+`tests/fixtures/partnership-tracker.synthetic.xlsx` (the real tracker's headers, dropdowns and value
+shapes, invented organisations and contacts; the real one is never committed).
 
 Shared first filled: `shared/dedup` (PR 3); `shared/import` gains Map Values (PR 4);
 `shared/documents/render.js` its table loop if missing (PR 6). Prompts (`services/ai/prompts/`):
 `proposal-questions`, `proposal-draft`, `proposal-rewrite`, `proposal-message`, `template-tidy`;
-`mou-draft` is not built (an MOU is a template). Templates: `templates/documents/` (the agreements,
-`proposal.html`, `signature-certificate.html`), `templates/proposals/` (the design kit),
-`templates/email/` (`proposal-sent`, `agreement-sign`, `agreement-signed`, `agreement-renewal`,
-`sign-code`).
+`mou-draft` is not built (an MOU is a template). Templates: `templates/documents/proposal.html` (an
+agreement's wording is its category template's, built in the hub), `templates/proposals/` (the design
+kit), `templates/email/` (`proposal-sent`, `agreement-sign`; the sealed copy and the code are the
+signatures service's). PR 8: `partnership_analytics` (`.queries`, `.service`, `.ai` with the
+summaries), `leads.views.js` and `agreements.views.js`, `proposals.ai.js` and `.search.js`,
+`mailbox/binding/` (Link to Partner, `app/src/features/mailbox/PartnerContext.tsx`), migration `7120`,
+the synthetic staging seed `seeds/staging/70_partnerships.js`.
 
 ### 5.11 M8 · Expenses & Budget Control · AJ · 7 to 11 Dec
 
@@ -656,7 +707,8 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 
 | Module | Files beyond the template |
 |---|---|
-| `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
+| `knowledge` | SOPs (`docs/guides/knowledge.md`): `.versions` (an SOP's content, its hash and the shapes staff read: steps, screens, versions, the draft), `.draft` (Draft With AI, prompt `services/ai/prompts/sop-draft.md`); `GET /knowledge/sops/for-screen` feeds Procedures under a screen's section of the User Guide (`app/src/features/knowledge/Procedures.tsx`); the SOPs tab is `app/src/features/knowledge/Sops.tsx`; tested on the real migrations by `tests/integration/knowledge-sops.test.js` |
+| `training` | Training and ESS · My Training (`docs/guides/knowledge.md`), built in M10 PR 3: `.service` (courses and their items, publishing with the publisher's signature, assignments and enrolments in one transaction, each place's task through `tasks.service` from the outbox, progress, proof and completion with the certificate's number and hash, Remind Overdue and the `training_due` reminder, joiners and leavers), `.lesson` (Draft Lesson, `training-lesson-draft`, prompt `services/ai/prompts/training-lesson-draft.md`), `.repo`, `.events`, `.routes`, `.controller`, `.ai` (reads only), `.search`; `jobs/schedulers/training-joiners`; migration `10420_training_tasks.sql` (a task may name its enrolment); tested on the real migrations by `tests/integration/training.test.js` (300 people assigned at once among them); `.certificate` (M10 PR 4: the certificate of completion drawn from `templates/documents/training-certificate.html` with Cormorant Garamond in `templates/documents/fonts/` and the proposal kit's Geist, issued from the outbox, Download Certificate, and Verify a Document for `CERT-` numbers through `signatures.verify`); migration `10430_training_certificate_facts.sql` (the name and course title a certificate states) |
 | `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, the card events, and the `ai_voice_question`, `ai_history_export` and `ai_answer_export` document types), `.cards` (a card's life: read, edited, pressed with the five-minute confirm for a sensitive class, cancelled; `docs/guides/praxis-ai.md` §6.11), `.reads` (a read of an answer run again, 25 a page, §6.12; the replay the export walks), `.export` (History's Export, and Download Excel on an answer's read through the one export path with About This File, §6.16); the service pushes `ai:progress` to the asker's realtime room before each read (§6.1.8). The adapter in `services/ai/assistant/{orchestrator, answer}.js` over the engine `services/ai/engine/`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read; the screens' views are the Assistant group of `packages/ui`, with `app/src/features/assistant/Card.tsx` wiring an answer's card (Edit, the press through Confirm It's You, Cancel, Draw It Again; `docs/guides/praxis-ai.md` §6.11); tested on the real migrations by `tests/integration/{ai-cards, ai-matrix, ai-summaries, ai-actions-workspace, ai-actions-leave, ai-actions-approvals, ai-actions-community, ai-actions-mailbox, ai-actions-people, ai-actions-queries, ai-actions-policies, ai-actions-performance, ai-attacks}.test.js` (the matrix with each scoped module's probes, the attack suite with the model scripted; `docs/guides/praxis-ai.md` §6.17), the action suites sharing `tests/integration/helpers/ai-actions.js` (people, scripted Gemini, the three ways to confirm); `tests/unit/foundation/ai-attacks.test.js` checks the attack suite's grading without a key |
 | `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
@@ -669,7 +721,7 @@ a declared action a person confirms (A23 as amended 01/11/2026; `docs/guides/pra
 No new modules. The User Guide (`docs/manual/`, the Knowledge Hub's User Guide tab) is written
 milestone by milestone from M0 as each is approved (JBS Praxis, 25/10/2026,
 `docs/guides/user-guide.md` §1.1); the public site's chapter (`docs/manual/public-site.md`) was begun
-with M4's pages (careers, a vacancy, applying, an assessment) and M5 adds signing and verifying. M11
+with M4's pages (careers, a vacancy, applying, an assessment), M5 added signing and verifying and M7 a partner's proposal and agreement. M11
 completes the guide with the training sessions, and brings `docs/runbooks/*.md` up to date. The nightly backup, the weekly restore drill and the uptime probe
 were built in M0 and run from then on; M11 shows them working for the handover: a restore drill
 timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
@@ -686,14 +738,15 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M4 | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` (the Talent Pool moved from M5, TB 04/11/2026), `apply-cv-purge` (CVs on Apply links that ended without an application, nightly at 02:47 Lagos) |
 | M5 | `signature-reminder`, `onboarding-dispatch` | `signature-reminders` (lapsed signature requests ended, a sent offer's among them, 06:17 Lagos) |
 | M6 | `payroll-compute`, `payslip-render` | |
-| M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
+| M7 | `partner-inactivity` (the morning's follow-ups, re-run by hand), `agreement-renewal`, `proposal-questions` (a brief's question cards, after New Proposal and Try Again), `proposal-draft` (the writing job: the draft, its figure check and its pages) | `partner-inactivity` (each newly quiet partner's and lead's follow-up: its deals Follow-Up Required and one task for its owner, 06:30 Lagos, after `home-alert-sweeps`; `docs/guides/partnerships.md` §6.12), `agreement-renewals`, `proposal-expiry` (sent proposals past `valid_until` expired and their links stopped, daily, until `agreement-renewals` takes it; `docs/guides/partnerships.md` §13.2) |
 | M8 | `budget-threshold` (the morning's sweep, re-run by hand for a day), `approval-ageing` | `budget-threshold` (each budget line 90% used, committed and spent, told to its department's head and Operations & People once, 07:00 Lagos; `docs/guides/expenses.md` §6.6), `approval-ageing` |
 | M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |
-| M10 | `knowledge-embed`, `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | |
+| M10 | `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | `training-joiners` (open training assignments enrol those who joined or moved into a department or role they name, then every assigned place still without its task gets it, 06:00 Lagos; the backstop to `training.enrol_joiners`, `docs/guides/knowledge.md` §6.7) |
 
-`partner-inactivity` (M7) and `approval-ageing` (M8) are superseded by Home's
-`home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity reads through Home's
-source adapters, approval ageing reads the workflow tables in the metric's own SQL. Home's Budget
+Home's `home-alert-sweeps` raises the Partner Inactivity alert (`src/modules/alerts/alerts.metrics.js`,
+through Home's source adapters); M7's `partner-inactivity` is the follow-up after it, never a second
+alert. `approval-ageing` (M8) is superseded by Home's sweep, which reads the workflow tables in the
+metric's own SQL. Home's Budget
 Threshold rules read whole budgets the same way; M8's `budget-threshold` warns about each category
 line of a budget, once, as the handoff for M8 asked (`docs/handoff/m8-expenses.md` PR 5).
 Their stub files stay for their milestones to delete or fill.

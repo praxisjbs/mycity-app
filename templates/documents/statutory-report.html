@@ -1,0 +1,58 @@
+<style>
+  .sr-title { font-size: 14pt; font-weight: 700; color: #014339; margin: 0 0 1mm 0; }
+  .sr-period { font-size: 10.5pt; color: #71717A; margin: 0 0 4mm 0; }
+  .sr-conventions { margin: 0 0 5mm 0; padding: 3mm 4mm; border: 0.3mm solid #E4E4E7; border-radius: 2mm; }
+  .sr-conventions table { margin: 0; width: 100%; }
+  .sr-conventions td { border: 0; padding: 0.7mm 0; }
+  .sr-conventions td.sr-key { width: 52mm; color: #71717A; }
+  .sr-conventions td.sr-val { font-weight: 600; }
+  .sr-item { margin: 0 0 6mm 0; }
+  .sr-h { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; color: #014339; margin: 5mm 0 0.5mm 0; }
+  .sr-sub { font-size: 9pt; color: #71717A; margin: 0 0 1.5mm 0; }
+  .sr-lines { margin: 0; width: 100%; }
+  .sr-lines th { font-size: 9pt; }
+  .sr-lines tr { page-break-inside: avoid; }
+  .sr-lines tr.sr-total td { font-weight: 700; border-bottom: 0.6mm solid #014339; }
+  .sr-totals { margin-top: 6mm; padding: 3mm 4mm; background: #014339; color: #FFFFFF; border-radius: 2mm; break-inside: avoid; page-break-inside: avoid; }
+  .sr-totals table { margin: 0; width: 100%; }
+  .sr-totals td { border: 0; padding: 0.6mm 0; color: #FFFFFF; }
+  .sr-totals td.amount { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+<div class="sr-body">
+  <h1 class="sr-title">{{ title }}</h1>
+  <p class="sr-period">{{ period_label }} · {{ number }} · {{ status_label }}</p>
+
+  <div class="sr-conventions">
+    <table>
+      <tr><td class="sr-key">PAYE Basis</td><td class="sr-val">{{ paye_basis_label }}</td></tr>
+      <tr><td class="sr-key">Pension Reduces Taxable Pay</td><td class="sr-val">{{ pension_reduces_label }}</td></tr>
+      <tr><td class="sr-key">NHF Reduces Taxable Pay</td><td class="sr-val">{{ nhf_reduces_label }}</td></tr>
+    </table>
+  </div>
+
+  {{#each items}}
+  <section class="sr-item">
+    <h2 class="sr-h">{{ label }}</h2>
+    <p class="sr-sub">{{ kind_label }} · {{ rate_label }} of {{ base_label }}</p>
+    <table class="sr-lines">
+      <thead>
+        <tr>
+          <th>Name</th><th>Staff Number</th>{{#if number_label}}<th>{{ number_label }}</th>{{/if}}
+          <th class="amount">Base</th><th class="amount">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each rows}}<tr><td>{{ employee_name }}</td><td>{{ staff_number }}</td>{{#if number_label}}<td>{{#if statutory_number}}{{ statutory_number }}{{else}}Not Set{{/if}}</td>{{/if}}<td class="amount">{{ base }}</td><td class="amount">{{ amount }}</td></tr>{{/each}}
+        <tr class="sr-total"><td>Total</td><td></td>{{#if number_label}}<td></td>{{/if}}<td></td><td class="amount">{{ total }}</td></tr>
+      </tbody>
+    </table>
+  </section>
+  {{/each}}
+
+  <div class="sr-totals">
+    <table>
+      <tr><td>Employee Total</td><td class="amount">{{ employee_total }}</td></tr>
+      <tr><td>Employer Total</td><td class="amount">{{ employer_total }}</td></tr>
+    </table>
+  </div>
+</div>

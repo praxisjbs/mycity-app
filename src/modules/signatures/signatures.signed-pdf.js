@@ -7,10 +7,12 @@
  *
  *   seal(requestId)        outbox, on signature.completed: generate the sealed copy (pending render)
  *   sealed(documentId)     outbox, on document.generated: record the artifact hash, emit signature.sealed
- *   mailSealed(requestId)  outbox, on signature.sealed: the copy to each signer
+ *   mailSealed(requestId)  outbox, on signature.sealed: the copy to each signer, and to whoever the
+ *                          record names besides (its adapter's sealedTo: an agreement's owner)
  *
  * Each step is safe to run twice: a request already sealed is left alone.
  */
+const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
 const { config } = require("../../config/env");
 const { atomically } = require("../../shared/db/tx");
@@ -97,30 +99,47 @@ async function sealed(documentId) {
  * about that person and its own email says more than this one does (`sealedMailFor` on its
  * defineSignable: the candidate of an offer gets `offer-signed`). It answers null for the signers it
  * leaves to `signature-completed`. The sealed copy is attached either way, and the jobId stays the
- * signature's, so a handler that runs twice still mails once.
+ * signature's, so a handler that runs twice still mails once. A signer recorded from paper has no
+ * address and is skipped; then whoever the adapter's `sealedTo` names (an agreement's owner) gets
+ * `signature-completed`, once per address.
  */
 async function mailSealed(requestId) {
   const r = await repo.request(pool, requestId);
   if (!r || !r.sealed_at) return 0;
   const queues = require("../../jobs/queues");
   const adapter = service().adapterOf(r.subject_type);
+  const data = { title: r.title, reference: r.reference, verify_url: `${origin()}/verify/${encodeURIComponent(r.reference)}` };
+  const attachments = [{ document_id: r.sealed_document_id }];
+  const mailed = new Set();
   let sent = 0;
   for (const s of await repo.signaturesOf(pool, requestId)) {
-    if (s.status !== "signed") continue;
+    // A signature recorded from paper has no address: nobody was sent a link.
+    if (s.status !== "signed" || !s.signer_email) continue;
     const own = adapter.sealedMailFor ? await adapter.sealedMailFor(pool, { request: r, signer: s }) : null;
+    const template = own ? own.template : EMAILS.completed;
     await queues.enqueue(
       "email-send",
-      own ? own.template : EMAILS.completed,
+      template,
       {
         to: { name: s.signer_name, email: s.signer_email },
         ...(own && own.recipient ? { recipient: own.recipient } : {}),
-        template: own ? own.template : EMAILS.completed,
-        data: own
-          ? own.data
-          : { title: r.title, reference: r.reference, verify_url: `${origin()}/verify/${encodeURIComponent(r.reference)}` },
-        attachments: [{ document_id: r.sealed_document_id }],
+        template,
+        data: own ? own.data : data,
+        attachments,
       },
       { jobId: `signature-completed-${s.signature_id}` },
+    );
+    mailed.add(String(s.signer_email).toLowerCase());
+    sent += 1;
+  }
+  for (const to of adapter.sealedTo ? (await adapter.sealedTo(pool, r.subject_id)) || [] : []) {
+    if (!to || !to.email || mailed.has(String(to.email).toLowerCase())) continue;
+    mailed.add(String(to.email).toLowerCase());
+    await queues.enqueue(
+      "email-send",
+      EMAILS.completed,
+      { to: { name: to.name || to.email, email: to.email }, template: EMAILS.completed, data, attachments },
+      { jobId: `signature-completed-${requestId}-${crypto.createHash("sha256").update(String(to.email).toLowerCase()).digest("hex").slice(0, 16)}` },
     );
     sent += 1;
   }

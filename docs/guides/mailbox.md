@@ -24,10 +24,13 @@ answers of 22/10/2026 (§1.1).
 
 Each member of staff reads and sends their **own MyCity mail** (`name@mycityapp.io`) inside the
 app, without opening another mail client. It is a straightforward mail client: **receive and send,
-manage your mail. It is not linked to operations, partnerships or any other module** in M1 (TB,
-12 October). Linking a thread to a partner record is M7 (`mailbox/binding/`). The one bridge is a
-mail's attachment sent on to a Staff Community chat with Forward to Chat (TB, 19/10/2026;
-`docs/guides/community.md` §3 step 19): the file is copied into Community, the mail stays here.
+manage your mail. It is not linked to operations or any other module** in M1 (TB, 12 October).
+Two bridges: a mail's attachment sent on to a Staff Community chat with Forward to Chat (TB,
+19/10/2026; `docs/guides/community.md` §3 step 19), where the file is copied into Community and the
+mail stays here; and, since M7, **Link to Partner**, which ties one of the owner's conversations to a
+lead or partner in Partnerships (`mailbox/binding/`, `docs/guides/partnerships.md` §6.15): each
+message is logged on the record as an email, its readers seeing only an excerpt, and the
+conversation itself stays the owner's alone.
 
 Custom domain only: no Google, no Microsoft, no OAuth. A user connects with their address and
 password, as with any mail app.
@@ -91,7 +94,7 @@ dictation's recording is removed once it is transcribed.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Mailbox · Inbox (`inbox`) | Staff app | The mailbox owner only | Threads, newest first; the open message; the Summary card once asked for | Read, reply, reply all, forward, archive, move to spam or trash, download attachments; Summarise Thread |
+| Mailbox · Inbox (`inbox`) | Staff app | The mailbox owner only | Threads, newest first; the open message; the Summary card once asked for; the lead or partner a conversation is linked to (M7) | Read, reply, reply all, forward, archive, move to spam or trash, download attachments; Summarise Thread; Link to Partner, Change Partner and Unlink (with `partnerships` view; not in Spam) |
 | Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | Staff app | Owner | The canonical six folders | As above (Spam: no Summarise Thread); continue a draft; empty spam and trash |
 | Mailbox · Connect (sheet) | Staff app | Owner | Opens over Mailbox when the user has no connection, or when the server refused the saved password | Connect with address and password; reconnect |
 | Composer (modal; full screen on mobile) | Staff app | Owner | From, To, Cc, Bcc, Subject, rich text body, attachments; the signature that will be added, behind Show Signature | Write, format, attach, send now or schedule, discard; preview the signature; Write With AI |
@@ -213,6 +216,16 @@ dictation's recording is removed once it is transcribed.
    (`mail_thread.summarised`, audited, no mail text in the event). The card shows above the
    messages until Close; Copy Summary copies its text; pressing again while it shows asks again
    if new mail has arrived since.
+15. **Link to Partner** (M7, `docs/guides/partnerships.md` §6.15; the conversation's menu, for an owner
+   with `partnerships` view; not in Spam). Partner lists the partners and leads the owner sees in
+   Partnerships, leads marked, and Deal that record's open and live deals (Workspace's own pickers,
+   `docs/guides/workspace.md`). `POST /threads/:id/partner` links it and logs every message it holds as
+   an email interaction on the record; each message the mailbox stores after (synced or sent) is logged
+   too, once. A line under the header then names the record and deal, opening its 360, with Unlink
+   (`DELETE`), which stops new messages being logged and keeps the rest; the menu offers Change Partner.
+   The record's readers see each message's subject, from, to, date and first 300 characters; only the
+   owner opens the conversation (Open in Mailbox on the 360). When a lead becomes a partner, the link
+   moves with it.
 
 ## 4 · Data
 
@@ -230,6 +243,7 @@ The tables come from `1000_core_operations.sql`; `1120_mailbox.sql` adds what M1
 | `mail_send_queue` | `mail_send_queue_id`, `user_id`, `mail_draft_id`, `payload`, `status` (`queued` / `sending` / `sent` / `failed` / `cancelled`), `release_at`, `attempts`, `error_code`, `idempotency_key` (unique), `sent_message_id` | Scheduled send and retry; one `queued` row per draft at most (`1128`). `payload.signature` holds the baked signature: its HTML, its text and its inline parts (`content_id`, `document_id`) |
 | `mail_signature` (1127) | `mail_signature_id`, `user_id` (unique), `office_line`, `show_mobile`, `show_whatsapp` | A person's own choices; no row reads as both switches on and no office line. The mobile is `employee.phone`, never copied here |
 | `mail_signature_config` (1127) | `mail_signature_config_id`, one row at most; `app_store_url`, `google_play_url`, `instagram_url`, `tiktok_url`, `linkedin_url`, `x_url`, `facebook_url`, `youtube_url`, `confidentiality_note`, `show_whatsapp`, `show_app_links`, `show_social_links`, `show_legal`, `updated_by` | The company's links and switches (Configure). No row reads as no links and every switch on. Not seeded: the links are MyCity's to enter |
+| `partner_mail_thread` (7020, M7's) | `mail_thread_id` (unique, cascades with its conversation), `partner_id` or `lead_id`, `deal_id`, `bound_by`, `bound_at`, `unbound_at` | Link to Partner (§3 step 15): one record a conversation; Unlink sets `unbound_at` and keeps the row. Written only by `binding/mail-context.service.js`; the messages it logs are Partnerships' `partner_interaction` rows (`mail_message_id` set null when a message goes, migration 7120) |
 | `mail_thread_summary` (10300, M10's block: mail AI brought forward) | `mail_thread_summary_id`, `mail_thread_id` (unique, cascades with its conversation), `gist`, `key_points` and `asked_of_you` (`text[]`, at most 5 each), `message_count`, `last_message_id` (the newest message it covered; set null if that message goes), `ai_run_id`, `summarised_at` | Summarise Thread's answer, kept until the conversation's newest message changes (decision 7). One row per conversation, replaced in place. Read only through the owner's own conversation |
 
 Signature pictures are documents of type `mail_signature_image` (module `mailbox`), one per distinct
@@ -268,6 +282,7 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 | `POST /assist` | `MailAssistRequest` → `MailAssist` | create · own | | Write With AI and Tidy Up (§3 step 12, §6): `mode` (`write`, `tidy`), `in_reply_to`, the recipients, subject, the person's own words (`body_html`) and the quoted mail under them (`quoted_html`), `instruction`, `note`, `answers`, `write_anyway` in; `available`, `kind` (`draft`, `questions`), `subject`, `body_html`, `questions`, `ai_run_id` out. 422 `NOTHING_TO_WRITE` on `instruction` for a new message with nothing to go on, on `body_html` for Tidy Up with no words; 422 `SPAM_NOT_READ` for a reply in Spam |
 | `POST /dictation` | multipart `file` → `DocumentRef` | create · own | | The recording (purpose `voice_note`, at most 10 MB), held only until it is transcribed |
 | `POST /dictation/:id/transcript` | empty → `MailDictation` | create · own | | Transcribes the caller's own recording, then removes it; `text`, and `draft` when only the stub answered (no provider set up) |
+| `GET /threads/:id/partner`, `POST /threads/:id/partner`, `DELETE /threads/:id/partner` | → `ThreadContext`; `ThreadPartnerBind` → `ThreadContext`; → `ThreadContext` | view · own, and `partnerships` view (403 without it) | | Link to Partner (§3 step 15; M7, schemas in `interactions.js`): the owner's own conversation (404 otherwise), a record they may see in Partnerships, optionally one of its deals; the context names the record only when the reader may see it |
 | `POST /threads/:id/summary` | empty → `ThreadSummary` | view · own | | The kept summary, or a fresh one (§3 step 14): `available`, `gist`, `key_points`, `asked_of_you`, `message_count`, `summarised_at`, `ai_run_id`. 422 `SPAM_NOT_READ` in Spam |
 
 Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule on
@@ -396,6 +411,7 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
 | `mail_account.images_trusted` | Always Show Images or Stop Showing Images | Audit |
 | `mail_signature.changed` | A person saves their numbers or switches | Audit (the mobile's own change is the organisation service's `employee.updated`) |
 | `mail_signature.config_changed` | Configure saved | Audit, with the links before and after |
+| `mailbox.thread_bound`, `mailbox.thread_unbound` | Link to Partner, Change Partner, Unlink (§3 step 15) | Audit: the conversation, the record and deal before and after, how many messages were logged; never mail text. Each message logged is Partnerships' `interaction.logged` |
 | `mail_thread.summarised` | Summarise Thread kept a fresh summary (§3 step 14) | Audit: the conversation, its message count and the AI run; never the summary's text |
 | `document.stored`, `document.removed` (the vault's) | A dictation's recording stored, then removed once transcribed (§3 step 13) | Audit. A `transient` doc type gets no playable copy (`av-transcode` is not queued); `export-cleanup` (hourly, at twenty past) also removes any transient file older than an hour |
 
@@ -417,6 +433,9 @@ in the file only (off for a local test server).
 
 ## 9 · AI and search
 
+- **Linked mail** (M7): a message of a conversation linked to a lead or partner becomes an email
+  interaction there, which Partnerships' reads (`interactions.list`) answer as the record's readers see
+  it: subject, from, to, date and the first 300 characters. Praxis AI still reads no mailbox.
 - **AI reads**: none. Mail is private correspondence, and Praxis AI reads none of it: `mailbox.ai.js`
   declares no read and no summary, so no question to the assistant reaches anyone's mail (A23 as
   amended, `docs/guides/praxis-ai.md` decision 19).
@@ -471,7 +490,7 @@ interface copy; the copy rules apply to the chrome around them.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Mailbox · Inbox (`inbox`) | "N messages · N unread" (desktop subtitle); Refresh, Compose; Folder, Messages, Unread, Attachments, Mailbox (desktop: the user's address); the message list (unread dot, sender, subject, time); the open message: sender avatar, subject, sender and address, time, Reply, Forward, the body as the sender laid it out in its own sealed frame (`EmailFrame`: nothing in it runs or reaches the app; a `mailto:` link opens our composer; signature logos drawn in place), "Remote images are hidden." with Load Images and Always Show Images when anything was held back, Show Quoted Text and Hide Quoted Text when the message quotes earlier mail, the attachments with their sizes (a photo, a video or a PDF opens full screen in the file viewer, with Download and, on a phone, Share; any other file downloads), each with Forward to Chat beside it (and in the viewer), which opens Community's Forward To; the thread menu adds Stop Showing Images for a trusted sender; Summarise Thread beside Reply and Forward (not in Spam), which opens the Summary card above the messages: Summary as its title, the gist, Key Points and Asked of You (each only when it has something), Copy Summary and Close, loading lines while it is written; toasts "Summary copied", "AI summaries are off" | Help term on the Summary card's title: "Written by AI from this conversation. Check dates and amounts against the mail before acting." | Custom domain only, no Google or Microsoft, signing in with an address and a password, sending and receiving only with no link to other modules: §1, §3 step 1 (the page's ⓘ text is removed). What Refresh does: §3 step 2. What the summary reads, how it is kept and when it is made again: §3 step 14, §6 |
+| Mailbox · Inbox (`inbox`) | "N messages · N unread" (desktop subtitle); Refresh, Compose; Folder, Messages, Unread, Attachments, Mailbox (desktop: the user's address); the message list (unread dot, sender, subject, time); the open message: sender avatar, subject, sender and address, time, Reply, Forward, the body as the sender laid it out in its own sealed frame (`EmailFrame`: nothing in it runs or reaches the app; a `mailto:` link opens our composer; signature logos drawn in place), "Remote images are hidden." with Load Images and Always Show Images when anything was held back, Show Quoted Text and Hide Quoted Text when the message quotes earlier mail; for a conversation linked to a lead or partner, a line under the header naming it (and its deal), opening its 360, with Unlink; the menu's Link to Partner (Partner, leads marked, and Deal, Optional; Cancel, Link to Partner) and, once linked, Change Partner (an owner with Partnerships, not in Spam); toasts "Linked to <name>", "Conversation unlinked"; the attachments with their sizes (a photo, a video or a PDF opens full screen in the file viewer, with Download and, on a phone, Share; any other file downloads), each with Forward to Chat beside it (and in the viewer), which opens Community's Forward To; the thread menu adds Stop Showing Images for a trusted sender; Summarise Thread beside Reply and Forward (not in Spam), which opens the Summary card above the messages: Summary as its title, the gist, Key Points and Asked of You (each only when it has something), Copy Summary and Close, loading lines while it is written; toasts "Summary copied", "AI summaries are off" | Help term on the Summary card's title: "Written by AI from this conversation. Check dates and amounts against the mail before acting." | Custom domain only, no Google or Microsoft, signing in with an address and a password, sending and receiving only with no link to other modules: §1, §3 step 1 (the page's ⓘ text is removed). What Refresh does: §3 step 2. What the summary reads, how it is kept and when it is made again: §3 step 14, §6 |
 | Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | As Inbox, for that folder. Drafts lists scheduled mail as "Scheduled: subject" with its release time. Spam offers no Forward to Chat | None | Scheduled mail waiting in Drafts until release: §3 step 5. Spam bodies not rendered: §6 |
 | Composer (modal; full screen on mobile) | New Message, Reply or Forward as the title; From (the user's address), To (address chips, each removable; Cc Bcc), Cc, Bcc, Subject; the formatting bar (Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link with its address field and Add Link, Clear Formatting); Attach a File and Write With AI with "Draft saved" (or "Saving…") as quiet text at the end of their row, never in the footer; the body; Show Signature under it (Hide Signature once open), which opens the signature this message will carry, full or the slim line, in its own frame ("Signature not available" when it cannot be drawn); attachments as chips with their size and Remove, each with its upload bar while it travels and a Remove on one that failed; Schedule Send (Send Date, DD/MM/YYYY; Send Time, HH:MM; Cancel, Schedule Send). Footer: Discard, Schedule (Tomorrow at 08:00, Monday at 08:00, Pick Date and Time), Send; editing a scheduled mail (title Edit Scheduled Mail), the scheduled time in place of Schedule (the same menu, with Send Now) and Done in place of Send, the toast "Scheduled mail updated"; after Discard, Keep Editing and Discard Draft. Errors of at most 4 words where they happen: "Add a recipient" and "Not an email address" on the To row, "Not a real date", "Not a valid time", "Time already passed" | Help term on Send Time: "Lagos time, on the 24 hour clock: 08:30, 17:45." | How drafts save: §3 step 4. Scheduled mail and its release: §3 step 5. Which messages carry the full signature or the slim line, and where it lands: §3 steps 8 and 9. Link addresses limited to `https://` and `mailto:`: §6. The discard question ("Discard this draft and its attachments?") and the "That time has already passed" sentence are removed: the Discard Draft button and the field error say it (§6) |
 | Composer · Write With AI (a step inside the composer) | Write With AI as the step's title with Back; Write and Tidy Up as a choice when the composer holds the person's own words; What To Say (Optional on a reply or a forward) with Dictate; Add a Note (a checkbox) opening Note with Dictate; footer Write Draft, or Tidy Email in Tidy Up. The questions: each question with its answer box and Dictate; footer Write Anyway, Write Draft. The draft: the suggested subject (when the composer's is empty) and the draft in its own frame; footer Try Again, Use Draft. Dictate while recording: Stop Recording and the time; "Writing it down"; "Microphone not allowed", "Could not transcribe". Error "Say what to write" on What To Say. Toasts "Draft added", "Write With AI is off" | Help term on What To Say: "A line on what the mail should say: agree, decline or ask, and the facts it needs." | What the AI reads and never sees, the placeholder check, the questions and the closing line: §6. Which model answers: §9 and AI Control. Where the draft lands: §3 step 12 |
@@ -584,6 +603,12 @@ interface copy; the copy rules apply to the chrome around them.
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · M7 PR 8 (`docs/guides/partnerships.md` §6.15): Link to Partner. `mailbox/binding/`
+  filled (`mail-context.service`, `intake.service`, `context-tabs`, `convert.service`); `GET`, `POST` and
+  `DELETE /threads/:id/partner`; each message of a linked conversation logged once on its lead or partner
+  (synced, sent, or already there when linked; never Spam), its readers seeing only the excerpt;
+  `mailbox.thread_bound` and `mailbox.thread_unbound`; the line under the header, the menu's Link to
+  Partner and Change Partner, Unlink. §1, §2, §3 step 15, §4, §5, §7, §9, §10.1.
 - 03/11/2026 · JP · The signatures in the chat (`praxis-ai.md` decisions 33 and 40, §6.11): Save My
   Signature (`MySignatureSave`, the mobile included, as the owner chose) and Configure Signature
   (`SignatureConfigChange`, for `mailbox.signature`), each the Signature tab's own service function

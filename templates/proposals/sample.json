@@ -1,0 +1,93 @@
+{
+  "about": "The gallery's sample (packages/ui #/ProposalKit, scripts/gen/proposal-kit.js): an invented festival and invented figures, every layout once. Never seeded, never sent.",
+  "context": {
+    "reference": "PRO-0012",
+    "seed": "PRO-0012",
+    "org": { "display_name": "MyCity", "website": "mycityapp.io", "mark_white": null },
+    "event": { "starts_on": "2026-12-18", "ends_on": "2026-12-20" }
+  },
+  "content": {
+    "sections": [
+      { "key": "cover", "layout": "cover", "title": "Selling Out Harmattan Jazz Weekend, Together", "prepared_for": "Harmattan Jazz Weekend", "date": "2026-11-07", "reference": "PRO-0012", "image_asset_id": null, "partner_logo_asset_id": null },
+      { "key": "letter", "layout": "letter", "signer_name": "Ngozi Eze", "signer_title": "Partnerships Lead, MyCity", "signer_photo_asset_id": null,
+        "paragraphs": [
+          "Thank you for Tuesday's conversation. You want three sold-out nights at Jabi Lake in December and a crowd that comes back next year, and we would like to help you get there.",
+          "What follows is how MyCity would sell your tickets, check your guests in at the gate and keep Harmattan Jazz Weekend in front of Abuja for the six weeks before it opens.",
+          "Everything here can change to suit you. If a page does not read right, tell me and we will make it so."
+        ] },
+      { "key": "opportunity", "layout": "opportunity", "heading": "December Belongs to Abuja's Music Lovers",
+        "paragraphs": [
+          "The festive season brings the city out, and live jazz by the lake is the kind of night people plan around. Last year's edition sold 2,100 tickets with almost no online presence.",
+          "This year the goal is 4,500 guests over three nights. That needs ticketing people trust, a promotion calendar that starts early and a check-in that keeps queues short at the gate."
+        ],
+        "pull_quote": "Three sold-out nights, and a crowd that comes back next December.", "chart": null, "illustration": "stage" },
+      { "key": "why", "layout": "why_mycity", "heading": "Why MyCity",
+        "points": [
+          { "proof_point_id": null, "value": "120,000+", "label": "People who plan their week on MyCityApp" },
+          { "proof_point_id": null, "value": "340", "label": "Events ticketed in 2026" },
+          { "proof_point_id": null, "value": "6", "label": "Cities with a team on the ground" }
+        ], "chart": null },
+      { "key": "audience", "layout": "audience", "heading": "Who You Will Reach", "intro": "MyCity's Abuja audience is young, mobile and out most weekends.",
+        "stats": [
+          { "value": "38,000", "label": "Active users in Abuja" },
+          { "value": "68%", "label": "Aged 21 to 35" },
+          { "value": "2.4", "label": "Events booked a month" },
+          { "value": "41%", "label": "Book within a week" }
+        ],
+        "chart": { "kind": "bar", "title": "Abuja Downloads by Month", "unit": null, "series": [ { "name": null, "points": [ { "label": "Jul", "value": 3200 }, { "label": "Aug", "value": 3900 }, { "label": "Sep", "value": 4100 }, { "label": "Oct", "value": 5300 }, { "label": "Nov", "value": 6800 } ] } ] } },
+      { "key": "deliverables", "layout": "deliverables", "heading": "What We Will Do", "illustration": "megaphone",
+        "items": [
+          { "title": "Ticketing on MyCityApp", "detail": "Regular, VIP and VVIP on sale from 20 November, paid by card or transfer.", "icon": "ticket" },
+          { "title": "Check-in at the Gate", "detail": "QR scanning on our devices with two staff each night.", "icon": "scan-line" },
+          { "title": "Six Weeks of Promotion", "detail": "Home screen placement, push messages and our Abuja social channels.", "icon": "megaphone" },
+          { "title": "Ember to Remember Listing", "detail": "Featured in MyCity's December calendar of the city's best nights.", "icon": "calendar-days" },
+          { "title": "On-Ground Coverage", "detail": "Photographs and short films each night, yours to keep.", "icon": "camera" },
+          { "title": "Branded Presence", "detail": "A MyCity booth with souvenirs for early arrivals.", "icon": "gift" }
+        ] },
+      { "key": "packages", "layout": "packages", "heading": "Ticket Packages", "display": "cards", "chart": null,
+        "options": [
+          { "label": "Regular", "price": "15000.00", "price_note": "A night by the lake", "includes": [ "Entry for one night", "Open lawn seating", "Food court access" ], "terms": "8% MyCity commission per ticket" },
+          { "label": "VIP", "price": "45000.00", "price_note": "All three nights", "includes": [ "Entry for three nights", "Reserved seating near the stage", "Welcome drink" ], "terms": "8% MyCity commission per ticket" },
+          { "label": "VVIP", "price": "120000.00", "price_note": "Table for four", "includes": [ "Table for four, three nights", "Lounge with its own bar", "Meet the headline act" ], "terms": "8% MyCity commission per ticket" }
+        ] },
+      { "key": "timeline", "layout": "timeline", "heading": "From Launch to Encore", "illustration": "calendar",
+        "phases": [
+          { "name": "Build-up", "starts_on": "2026-11-20", "ends_on": "2026-12-17", "detail": "Tickets on sale, promotion every week, early bird pricing until 5 December." },
+          { "name": "The Weekend", "starts_on": "2026-12-18", "ends_on": "2026-12-20", "detail": "Three nights, check-in at the gate and coverage from the first act." },
+          { "name": "Follow-through", "starts_on": "2026-12-21", "ends_on": "2027-01-15", "detail": "Photographs to guests, your results report and next year's waiting list." }
+        ] },
+      { "key": "proof", "layout": "proof", "heading": "Partners Who Grew With Us",
+        "logos": [
+          { "proof_point_id": "11111111-1111-4111-8111-111111111111", "label": "Lagos Food Week" },
+          { "proof_point_id": "22222222-2222-4222-8222-222222222222", "label": "Afro Nation Fringe" },
+          { "proof_point_id": "33333333-3333-4333-8333-333333333333", "label": "Eko Arts Fair" },
+          { "proof_point_id": "44444444-4444-4444-8444-444444444444", "label": "Abuja Comedy Nights" }
+        ],
+        "results": [
+          { "value": "92%", "label": "Tickets sold on MyCityApp for Lagos Food Week" },
+          { "value": "11 min", "label": "Longest queue at an Eko Arts Fair gate" },
+          { "value": "3.1x", "label": "Repeat bookings after a season with us" }
+        ],
+        "chart": { "kind": "progress", "title": "Sell-through for Recent Partners", "unit": "%", "series": [ { "name": null, "points": [ { "label": "Food Week", "value": 92 }, { "label": "Arts Fair", "value": 87 } ] } ] } },
+      { "key": "insight", "layout": "insight", "heading": "When People Book", "takeaway": "Half of all December tickets sell in the final ten days, so promotion that starts early lifts the whole run.",
+        "chart": { "kind": "area", "title": "Tickets Sold in the Weeks Before an Event", "unit": null, "series": [ { "name": null, "points": [ { "label": "6 weeks", "value": 180 }, { "label": "5 weeks", "value": 260 }, { "label": "4 weeks", "value": 340 }, { "label": "3 weeks", "value": 520 }, { "label": "2 weeks", "value": 910 }, { "label": "Final week", "value": 1640 } ] } ] },
+        "note": "MyCity's December events in Abuja and Lagos, 2025." },
+      { "key": "terms", "layout": "terms", "heading": "The Terms, Plainly", "illustration": "handshake",
+        "items": [
+          { "label": "Validity", "detail": "This proposal holds for 30 days from 7 November 2026." },
+          { "label": "Commission", "detail": "8% of each ticket sold on MyCityApp, taken at the point of sale." },
+          { "label": "Payouts", "detail": "Ticket income, less commission, paid to you weekly and within three days of the last night." },
+          { "label": "Check-in", "detail": "Devices and two staff each night are included at no extra cost." }
+        ] },
+      { "key": "next_steps", "layout": "next_steps", "heading": "Next Steps", "show_qr": true, "illustration": "check_in",
+        "steps": [
+          "Tell us which packages to put on sale",
+          "Sign the Deal Merchant Agreement we send you",
+          "Share your artwork and line-up with our team",
+          "Tickets go live on 20 November"
+        ],
+        "contact": { "name": "Ngozi Eze", "title": "Partnerships Lead, MyCity", "email": "ngozi.eze@mycityapp.io", "phone": "+234 803 000 0000" } },
+      { "key": "closing", "layout": "closing", "message": "Here's to three full nights by the lake.", "image_asset_id": null, "illustration": null }
+    ]
+  }
+}

@@ -183,7 +183,7 @@ R("GET /api/v1/recruitment/vacancies/summary", "view", () => {
     applicants: VACANCIES.filter((v) => v.status === "open" || v.status === "paused").reduce((n, v) => n + appsOf(v).length, 0),
     in_interview: live.filter((a) => a.stage === "interview").length,
     past_closing: VACANCIES.filter((v) => v.status === "open" && v.closes_at && Date.parse(v.closes_at) < Date.now()).length,
-    careers_url: "https://go.mycityapp.io/jobs",
+    site_url: "https://go.mycityapp.io/",
     funnel: STAGES.map((stage) => ({ stage, count: D.APPLICATIONS.filter((a) => reached(a, stage)).length })),
   });
 });
@@ -193,6 +193,15 @@ R("GET /api/v1/recruitment/vacancies/suggested", "view", (req) =>
     D.SEATS.filter((s) => !VACANCIES.some((v) => v.org_seat_id === s.org_seat_id && v.status !== "closed")),
     req,
     { search: (s) => [s.title, s.department], filters: { org_seat_id: (s, id) => s.org_seat_id === id } },
+  ),
+);
+
+// Who may be a hiring manager: the panel's rule (holds Recruitment), as the save holds them to (guide §6.1).
+R("GET /api/v1/recruitment/vacancies/hiring-managers", "view", (req) =>
+  paged(
+    PEOPLE.filter(maySit).map((p) => ref(p)!),
+    req,
+    { search: (p) => [p.display_name] },
   ),
 );
 

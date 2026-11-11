@@ -230,7 +230,7 @@ table frozen · `1425` a day judged once: on `attendance_day` its `early_minutes
 policy's five consequence rules, unique on the person, the rule and its last counted day; the Home
 alert it raised; `employee_query_id`, keyed to the query by M3's `3040`) · `1435` `attendance_pay_item` (one pending
 deduction or overtime per person, day and kind, its amount `numeric(18,2)` masked as the salary is;
-`payroll_run_id` for M6, no key yet) and `attendance_overtime_approval` (overtime approved for a day
+`payroll_run_id` for M6, keyed by `6010`) and `attendance_overtime_approval` (overtime approved for a day
 beforehand, one per person and day) · `1440` reminders to clock out: `attendance_clock_reminder`'s
 `kind` widened to `clock_out_due`, a `slot` and `due_at`, unique per person, day, kind and slot ·
 `1445` Home's `late_arrivals` and `missing_clock_out` rules switched off and their open alerts
@@ -263,13 +263,12 @@ and schedules (`attendance_work_schedule`, `attendance_rule_breach`, `attendance
 locations and members, `attendance_check_in`, the `temporary_site` numbering scheme and the
 `attendance.temporary_site` workflow). `attendance_policy` and `attendance_policy_acknowledgement`
 are read by nothing after `1405` and are dropped by a later release (MIGRATIONS §8); policies do not
-use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
+use M10's `knowledge_article` tables, and nor do SOPs or training (M10 below).
 
 **Owes:**
 - Attendance (attendance.md §4, §13): the redesign's tables above are built (PR 2's in `1380` and
-  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign key of
-  `attendance_pay_item.payroll_run_id` (M6) once its table exists (the breach's query key is M3's
-  `3040`); dropping `attendance_location_request` and the field assignment tables once no
+  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`)(the breach's query key is M3's `3040`; the foreign key of `attendance_pay_item.payroll_run_id` was
+  added by M6's `6010`); dropping `attendance_location_request` and the field assignment tables once no
   request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
   (MIGRATIONS §8); dropping
   `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
@@ -463,30 +462,50 @@ order, the case's phases (`documentation`, `pre_onboarding`, `onboarding`, `comp
 `cancelled`) and privacy acknowledgement, each item's typed value and verification,
 `onboarding_guarantor` (two a hire, each with its reference check), the contract's statuses, FK
 indexes · `5040` `employee.bvn` (eleven digits, masked under `employee.bank`; organisation's table,
-TB reviews) · `5090` 5000's unused `talent_pool` and `talent_pool_member` dropped · `5199` the
+TB reviews) · `5050` `onboarding_plan` (one a department, and one default with no department),
+`onboarding_plan_step` (an owner role, a due day from the start date, an SOP by id with no foreign
+key, as `sop` is M10's and created after this block) and `onboarding_case_step` (the steps a case
+works through, copied from its plan with the owner and due date resolved) · `5090` 5000's unused
+`talent_pool` and `talent_pool_member` dropped · `5199` the
 statuses `5010` and `5030` add · `5299` the `recruitment.offer` flow, version 1 (Head of
 Department, then the CEO; the same definition as `shared/workflow/definitions.js`), and Head of
 Department's `approve` on recruitment in its team scope, each only while it is as an earlier seed
-left it. Every CHECK equals the contract's enums (`docs/guides/offers.md` §4).
+left it · `5399` MyCity's New Joiner list (nine `document_requirement` rows) and the default plan,
+Your First 30 Days (four steps), inserted only when absent: an exception to A26 recorded in
+MILESTONES §10, as Send Offer refuses an empty checklist; its DOWN takes back only a plan nobody has
+saved and requirements no checklist has used. Every CHECK equals the contract's enums
+(`docs/guides/offers.md` §4).
 
-**Owes:** onboarding plans and their steps (PR 6, linked to the department's SOPs).
+**Owes:** nothing; PR 6b writes `onboarding_case_step`, already made by `5050`.
 
 ### M6 Payroll & Notifications · 6000 to 6999 · TB
 
-**Built:** nothing in the block. Notifications are M0 (`0060`), web push and each person's
+**Built (PR 1, 09/11/2026), simple mode; the advanced tables in PR 5 (10/11/2026).** Notifications are M0 (`0060`), web push and each person's
 preferences too (`0460`), and Settings · Notifications with the reminder settings (`0480`), all
-brought forward by TB on 19/10/2026.
+brought forward by TB on 19/10/2026. The payroll tables are designed in `docs/guides/payroll.md` §4 and built
+as that section says (08/11/2026, amended by its Change log):
 
-**Owes, all of payroll** (MILESTONES §11, in scope): payroll runs, payslips, salary structures
-and pay components, deductions (pending, accepted, in a run, including M3 fines and lateness),
-statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, and the payroll approval
-workflow (reminder settings are `0480`). The `payroll_run` and `payslip` numbering schemes are already seeded.
-The earlier note that payroll was "deliberately not modelled" was not a decision and is withdrawn.
+| File | Creates | Notes |
+|---|---|---|
+| `6000_payroll.sql` | `payroll_setting`, `payroll_run`, `payslip`, `payslip_line`, `payroll_adjustment` | `payroll_setting` is effective-dated (`scope` is always `organisation`; an exclusion constraint on `daterange(effective_from, effective_to)` keeps two versions from overlapping) and carries the pay day (1 to 31, null until set; the default 30 is a constant in code), Bank Details Required and the three conventions. A run is one per month (`period` unique, a month's first day). A payslip is one per person per run; an excluded one has its reason, and only an excluded one. A line's amount is never negative; its `kind` and `code` equal the contract's. Money is `numeric(18,2)` |
+| `6010_payroll_deductions.sql` | `payroll_deduction`, `payroll_deduction_instalment` | A fine accepted or an advance recorded, and one month's share of each. One live deduction a fine (a unique index leaving out the cancelled), so a released fine can be accepted again. Adds `attendance_pay_item_payroll_run_fk` (`ON DELETE SET NULL`) and its index: the key owed since `1435` |
+| `6020_payroll_advanced.sql` | `salary_grade`, `employee_salary_grade`, `employee_pay_component`, `statutory_rate`; `payslip_line.base_amount`; `employee.tax_id`, `pension_pin`, `pension_administrator`, `nhf_number` | Built in PR 5 (10/11/2026) and off by default. Each table is effective-dated: one version of a key starting on a given day and at most one open version (two unique indexes; no `btree_gist` exclusion, the extension is not provisioned), written through `shared/db/effective-dated`, which ends the open version the day before the next. A statutory row's kind is held to its item and only a PAYE row is a band (`position`, `band_from`); `rate numeric(9,6)` is a percent, 0 to 100. A placement names any version of its grade and is read against the grade's band in force that day. `base_amount` is what a statutory line's rate was applied to, for the report. The four employee columns are masked as `employee.statutory`, written by the organisation service. No rate, band, relief or grade in any seed |
+| `6030_leave_unpaid.sql` | `leave_type.unpaid` | `boolean NOT NULL DEFAULT false` |
+| `6040_statutory_sources.sql` (owed, M6 PR 10) | `statutory_rate` source columns | Not built. Every statutory version carries its legal source (`source_title`, `source_section`, `source_url`, `source_document_id`, `source_checked_on`) or `no_legal_source` with a reason (TB, 11/11/2026; `docs/guides/payroll.md` §4.2, §6.16). `payroll_setting.paye_basis` leaves the screen (every deduction is monthly) and is fixed by PR 11 |
+| `seeds/reference/6099_seed_payroll.sql` | Reference data only (A26) | The `payroll.run` approval (version 1, the CEO, 72 hours, context `{ net_total: "money" }`), the `payroll.configure` capability held by Operations & People and the Implementation Team, and the Unpaid leave type flagged unpaid. No setting row, rate, band, grade, run or pay day |
 
-**Read by Home** (home.md §4.1): nothing yet. Payroll In Progress is a hidden card with no query and
-`src/modules/dashboard/sources/payroll.source.js` declares no table. The PR that creates
-`payroll_run` adds the query there (runs not finished, in the reader's scope), declares its columns
-and makes the card live in the same PR.
+Every table has its own `<table>_set_updated_at` trigger, an index on every foreign key and an `ON DELETE`
+on each; `tests/integration/payroll-schema.test.js` checks that, the constraints, the numbers (`PAY-2026-10`,
+`PAY-2026-10-0001`) and the files undone and applied again.
+
+**Owes:** nothing in the schema; the staging seed is PR 8 (`seeds/staging/`, through the services). The earlier note
+that payroll was "deliberately not modelled" was not a decision and is withdrawn. `tests/integration/payroll-advanced.test.js`
+runs the advanced tables on the real migrations with labelled test rates.
+
+**Read by Home** (home.md §4.1): `payroll_run` (`payroll_run_id`, `number`, `period`, `status`, `headcount`,
+`net_total`, `submitted_at`). Payroll In Progress is live since M6 PR 2: `src/modules/dashboard/sources/payroll.source.js`
+counts the runs that are a Draft, Computed, Submitted or Approved and pages them, for a reader whose `payroll` view reaches
+everyone, and owes nothing.
 
 ### M7 Partnerships, CRM & Trackers · 7000 to 7999 · LA
 
@@ -528,30 +547,42 @@ their department, in code), and 7099's partner types and stages switched off (A2
 and its origin (`upload`, `proposal`, `agreement`, `signed_copy`), the vault's row naming it as its
 entity so conversion re-points it and never rewrites the vault; and `partner.partner_type` dropped,
 one release after the code stopped reading it (MIGRATIONS §8; its DOWN copies it back from the
-category). `docs/guides/partnerships.md` §4 is the field-by-field account.
+category) · `7080` (M7 PR 5) `partner_follow_up`, the `partner-inactivity` job's record of each quiet
+spell it followed up (a partner or a lead, the day of its last contact, the task it gave the owner;
+unique `dedup_key` `partner-inactivity:<record>:<day>`, so one follow-up a spell) · `7100` (M7 PR 6)
+`signature.signer_email` nullable for a signature recorded from paper only (`method = 'paper'`, a CHECK),
+the shared signatures service's Record Signed Copy · `7101` (M7 PR 6) `partnership_agreement`
+`returned_reason` and `returned_at`: why an agreement came back to Draft from its approval · `7110` (M7 PR 7)
+the Proposal Studio's progress, encrypted link and sent message · `7120` (M7 PR 8) `partner_interaction`
+`mail_from`, `mail_to` and `mail_thread_id` (a linked mail's sender, recipients and conversation, kept with
+the interaction), and `mail_message_id` set null when its message goes, so emptying Trash keeps the
+record's history. The Workspace link
+columns of `7040` are written by the Workspace services since PR 5. `docs/guides/partnerships.md` §4 is
+the field-by-field account.
 
 **Owes:**
 - MyCity's own stages (with their meanings), impact, sources, document kinds and categories: entered
   on Partnerships · Categories or by Start From Tracker (M7 PR 2), never seeded (A26).
-- The writers: every table above is written only through M7's services, PR 2 to PR 8 (the guide's
-  Appendix A); the Workspace link columns through the Workspace services, PR 5.
+- Nothing: every table above is written only through M7's services (PR 2 to PR 8, done) and the
+  Workspace link columns through the Workspace services (PR 5).
 - **Read by Home** (home.md §4.1): `partner` (`partner_id`, `name`, `partner_category_id`, `status`,
   `owner_id`, `created_at`) with `partner_category` (`partner_category_id`, `name`), `lead` (`lead_id`,
   `name`, `owner_id`), `partner_interaction` (`partner_id`, `occurred_at`), `partnership_opportunity`
   (`partnership_opportunity_id`, `number`, `partner_id`, `lead_id`, `title`, `stage`, `status`,
   `owner_id`, `estimated_value`, `currency`, `expected_close_on`, `signed_at`), `deal_member`
   (`deal_id`, `employee_id`), `partnership_proposal` (`partnership_proposal_id`,
-  `partnership_opportunity_id`, `number`, `status`, `value`, `currency`, `sent_at`) and
+  `partnership_opportunity_id`, `number`, `status`, `value`, `currency`, `sent_at`, `view_count`,
+  `last_viewed_at`) and
   `partnership_agreement` (`partnership_opportunity_id`, `status`, `value`, `signed_at`) through
   `src/modules/dashboard/sources/partners.source.js`. Since M7 PR 3 every query there is the owning
   module's own read (`partner_pipeline.repo`, `partners.repo`, `proposals.repo`: open deals, deals
   signed in the year at their signed agreement's value else their projected value, proposals `sent`
   or `viewed`), and the adapter owes nothing (partnerships.md §6.17).
-  **Staging holds Home's demonstration rows** in `partner`, `partner_interaction`,
-  `partnership_opportunity`, `partnership_proposal` and `partnership_agreement`
-  (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`
-  (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
-  (M7 PR 8) takes them away once, in the three steps that file starts with: that seed calls
+  **Home's demonstration rows are taken away** (M7 PR 8, done): they were in `partner`,
+  `partner_interaction`, `partnership_opportunity`, `partnership_proposal` and `partnership_agreement`
+  (`seeds/staging/60_home.js`, decision O11), their ids in `HOME_STAGING_ROWS`
+  (`seeds/staging/lib/home-staging-rows.js`). M7's own synthetic seed, `seeds/staging/70_partnerships.js`,
+  took them away in the three steps that file starts with: that seed calls
   `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes
   the alerts Home raised about those rows and then the rows, children first; the PR takes the rows
   out of `seeds/staging/lib/forward-rows.js` and leaves their ids in the manifest, so the call finds
@@ -669,10 +700,27 @@ records a press acts on, so an id reads as a name and a card's verb never counts
 it. An answer's Excel file (§6.16) is a `document` of type `ai_answer_export`, no table of its own,
 and a question asked before a card keeps what it asked for in the answer's `metadata.ask`.
 
-**Owes:**
-- `updated_at` triggers for these seven tables (they came after `9095`).
-- Article audiences by role and department; MyCity's categories (SOPs, FAQs, Training).
-- The embedding dimension, fixed to the model `services/ai` uses, and its vector index.
+**Built 11/11/2026, M10 PR 1** (`docs/guides/knowledge.md` §4):
+- `10400` SOPs: `sop`, `sop_version`, `sop_step` (a department's structured, versioned procedures).
+- `10410` Training: `training_course`, `training_item`, `training_assignment`,
+  `training_assignment_audience`, `training_enrolment`, `training_item_progress` (courses, who must take
+  them, progress, proof and the certificate's number and PDF).
+- `10490` seed: the capabilities `sops.manage` and `training.manage`; the numbering schemes `sop`,
+  `training_course` and `training_certificate`. Nothing about a person, SOP or course (A26).
+- `10000`'s article tables (`knowledge_category`, `knowledge_article`, `knowledge_article_version`,
+  `knowledge_embedding`) are not used: SOPs need a department, drafts and steps, and FAQs are gone. A
+  later release drops them with `ai_message_citation.knowledge_article_version_id` (MIGRATIONS §8); until
+  then they keep the `updated_at` triggers and vector dimension they were owed only if something reads them.
+
+**Built 11/11/2026, M10 PR 3** (`docs/guides/knowledge.md` §6.7):
+- `10420` a task's record may be a `training_enrolment` (`task_entity_check` widened, as `2400` did for
+  `task`): each assigned person's "Complete <course>" task points at their place on the course.
+
+**Built 11/11/2026, M10 PR 4** (`docs/guides/knowledge.md` §6.9, §6.10):
+- `10430` `training_enrolment.certificate_holder_name` and `certificate_course_title`: the name and title a
+  certificate states, kept at completion beside its number and hash, so a rename leaves it as issued and
+  Verify a Document recomputes its hash from them. Filled for any completion before the file; a CHECK
+  keeps the two with the number.
 
 ### M11 Handover · 11000 to 11999 · TB
 
@@ -696,8 +744,8 @@ Security's two-step and PIN, which M1 owed until then.
 
 ## 5 · Open decisions
 
-1. **The M6 payroll design** (pay components, statutory rates and their effective dating) waits on
-   the payroll contract and the tax-reform rules. The block is reserved and the scope stands.
+1. **The M6 payroll design** (pay components, statutory rates and their effective dating) is built (M6 PR 5,
+   10/11/2026, `6020`); the rates themselves are MyCity's to enter from current law, never seeded.
 2. **The role-to-module permission matrix.** Decided with TB on 16/10/2026: the seven roles MyCity
    runs on (from the staff list) and their grants, seeded by `0290_seed_roles_and_grants.sql`.
    Changes after go-live are made in Settings · Roles & Permissions (built in M0, 17/10/2026), not in

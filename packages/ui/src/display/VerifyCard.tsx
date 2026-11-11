@@ -1,7 +1,7 @@
 /**
  * @component VerifyCard
  * @group Display
- * @summary What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself with its download.
+ * @summary What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself (an agreement's headings, clauses and tables included) with its download.
  * @use The right-hand card of Verify a Document (/verify, /verify/<number>, /verify/t/<token>).
  * @avoid A form's outcome (PageMessage); a notice about the system (Banner); the staff app.
  * @phone Full width; the band and the rows keep 20 px at their sides.
@@ -11,6 +11,7 @@
  * @example <VerifyCard empty={{ title: "Enter a Reference", text: "The document's record shows here." }} />
  * @example <VerifyCard tone="ok" title="Document Verified" text="This document is genuine and unchanged." items={rows} />
  */
+import { RichText, type RichTextBlock } from "../documents/RichText";
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { content } from "../lib/slots";
@@ -28,8 +29,11 @@ export interface VerifyCardProps {
   items?: ReadonlyArray<KeyValueItem>;
   /** A line under the rows (what to do when nothing was found). */
   note?: ReactNode;
-  /** A QR check's document: its heading, title, opening words and its download. */
-  document?: { heading: string; title: string; paragraphs: ReadonlyArray<string>; action?: ReactNode };
+  /**
+   * A QR check's document: its heading, title, opening words and its download; or, for a document with
+   * headings, clauses and tables (an agreement), the whole text as `blocks`, drawn in place of the words.
+   */
+  document?: { heading: string; title: string; paragraphs: ReadonlyArray<string>; blocks?: RichTextBlock[] | null; action?: ReactNode };
   /** Before a check: the title and line under the shield. */
   empty?: { title: string; text: string };
   /** Layout classes only (spacing). */
@@ -70,9 +74,11 @@ export function VerifyCard({ tone, title, text, items = [], note, document, empt
               <p>
                 <b>{document.title}</b>
               </p>
-              {document.paragraphs.map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
+              {document.blocks && document.blocks.length > 0 ? (
+                <RichText look="site" blocks={document.blocks} top={3} />
+              ) : (
+                document.paragraphs.map((p, i) => <p key={i}>{p}</p>)
+              )}
               {document.action != null && <div className="ps-qrdoc-act">{document.action}</div>}
             </div>
           )}

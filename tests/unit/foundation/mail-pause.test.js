@@ -156,6 +156,7 @@ describe("a notice due by email while mail is paused", () => {
       quietUntil: async () => new Map(),
       passesQuiet: () => false,
       asNotice: async (row) => row,
+      readerLink: async () => null,
     }));
     jest.doMock("../../../src/config/db", () => ({
       pool: {

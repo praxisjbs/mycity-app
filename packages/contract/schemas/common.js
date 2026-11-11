@@ -97,6 +97,22 @@ const money = z
   .regex(/^-?\d{1,16}\.\d{2}$/, "must be an amount like 1250000.00");
 
 /**
+ * An amount above zero, for a form that takes money in: a two-place string, never negative, never
+ * 0.00. The one message is the field's error on a screen (at most four words).
+ */
+const positiveMoney = z
+  .string()
+  .regex(/^\d{1,16}\.\d{2}$/, "Enter an amount")
+  .refine((v) => /[1-9]/.test(v), "Enter an amount");
+
+/**
+ * The first day of a month, as ISO: a period is stored and sent that way (`2026-10-01` is October
+ * 2026). `message` is the field's error, at most four words.
+ * @param {string} [message]
+ */
+const monthStart = (message = "Pick a month") => isoDate.refine((v) => v.endsWith("-01"), message);
+
+/**
  * An optional typed value a form may send as an empty cell.
  *
  * `optionalText()` already treats "" as "not given". A typed optional (a date, an
@@ -304,6 +320,8 @@ module.exports = {
   isoDate,
   isoDateTime,
   money,
+  positiveMoney,
+  monthStart,
   blank,
   recordId,
   changesBeside,

@@ -31,6 +31,7 @@ const grantsCache = require("../../src/shared/rbac/grants-cache");
 const lagos = require("../../src/shared/time/lagos");
 const token = require("../../src/shared/places/token");
 const { one, drain, harness } = require("./helpers/ai-actions");
+const documents = require("../../src/shared/documents/generate");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -85,8 +86,8 @@ describeDb("Recruitment · Offers against the real migrations", () => {
 
   /**
    * The document requirements a case's checklist is built from. Send Offer is refused while there is
-   * no required one (guide §11), so every send below needs these; the Checklist settings that enter
-   * them are PR 6.
+   * no required one (guide §11), so every send below makes sure of these beside the seeded New Joiner
+   * list (5399), which a test below switches off.
    */
   async function requirements() {
     await pool.query(
@@ -95,6 +96,20 @@ describeDb("Recruitment · Offers against the real migrations", () => {
               ('nysc', 'NYSC certificate', false, 3)
        ON CONFLICT (code) DO UPDATE SET active = true, required = EXCLUDED.required`,
     );
+  }
+
+  /**
+   * Render every pending document as the worker's pdf-render job does, then run the outbox: a sealed
+   * copy's hash is recorded and its mails queued only once it is rendered.
+   */
+  async function rendered() {
+    for (let round = 0; round < 3; round += 1) {
+      await drain();
+      const { rows } = await pool.query("SELECT document_id FROM document WHERE render_status = 'pending' ORDER BY created_at");
+      if (rows.length === 0) break;
+      for (const r of rows) await documents.renderPending(r.document_id, { db: pool });
+    }
+    await drain();
   }
 
   /** Submit, both approvals, the outbox: the offer approved with its letter and request. */
@@ -265,7 +280,9 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     const appId = await applicant("Zainab");
     await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
     const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
-    await h.as("ops").patch(`/recruitment/offers/${offer.offer_id}`).send({ work_pattern: null });
+    // Edit Offer cannot clear it (an empty field leaves it as it was); a draft the assistant's card made
+    // can lack it, as this one now does.
+    await pool.query("UPDATE offer SET work_pattern = NULL WHERE offer_id = $1", [offer.offer_id]);
     const refusedSubmit = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/submit`).send({});
     expect(refusedSubmit.status).toBe(422);
     expect(refusedSubmit.body.error.code).toBe("NO_WORK_PATTERN");
@@ -285,7 +302,7 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     expect((await pub().post(`/sign/${t}/code`).send({})).status).toBe(200);
     expect((await pub().post(`/sign/${t}/code/verify`).send({ code: codesSent().pop() })).status).toBe(200);
     expect((await pub().post(`/sign/${t}/sign`).send({ full_name: "Nkem Okafor", method: "draw", signature_png: PNG, consent: true })).status).toBe(200);
-    await drain();
+    await rendered();
 
     // The employee: no seat, no login, the candidate's address as both emails until onboarding completes.
     const hire = await one(
@@ -312,7 +329,8 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     expect(kase.status).toBe("documentation");
     expect(kase.employee_id).toBeTruthy();
     const items = await one("SELECT count(*)::int AS n FROM onboarding_checklist_item WHERE onboarding_case_id = $1", [kase.onboarding_case_id]);
-    expect(items).toEqual({ n: 3 });
+    // One item an active requirement: MyCity's New Joiner list (seed 5399) and the test's own.
+    expect(items).toEqual(await one("SELECT count(*)::int AS n FROM document_requirement WHERE active = true"));
 
     // The contract: generated, waiting for the company, the hire second.
     const row = await one("SELECT employment_contract_id, number::text AS number, status FROM employment_contract WHERE onboarding_case_id = $1", [kase.onboarding_case_id]);

@@ -12,7 +12,7 @@ with the date, and add a line to §3.
 | Owner | LA (Love Adeola), M7's owner as CLAUDE.md, the guide and PROGRESS name it; GE (Godwin-Okoh Elisha) builds most PRs, LA the importers, AJ the Workspace links (the guide's Appendix A) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 4 Dec 2026 (MILESTONES §4); built in parallel with M4 to M6 (TB, 05/11/2026) |
-| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`) |
+| Pull requests | PR 0 (#76, merged); PR 1 (#77, merged); PR 2 (#80, merged); PR 3 (#83, merged); the audit of PRs 1 to 3 (`ccr-511a90ef-tw2tud`); PR 4 (#90, merged); PR 5 (#91, merged); PR 6 (#92, merged); PR 7 (#94, merged); PR 8 (#99, merged); PR 9 (`m7/user-guide`, the chapter) |
 
 ---
 
@@ -64,40 +64,118 @@ with the date, and add a line to §3.
 - [x] Audit of PRs 1 to 3 against the guide, TB's four calls applied (the guide's §13.2, the audit) (06/11/2026)
 
 ### PR 4 · Importers and returns
-- [ ] Map Values in `shared/import`; foundation.md
-- [ ] Partnership Tracker and Partnership Returns importers, through `leads.createIn`, `partners.createIn`
+- [x] Map Values in `shared/import`; foundation.md (07/11/2026)
+- [x] Partnership Tracker and Partnership Returns importers, through `leads.createIn`, `partners.createIn`
       and `partner_pipeline.returns.saveIn` with source `import` (ready since the audit); synthetic fixture
-- [ ] Returns tab and Enter Returns on PR 3's service and routes; settings.md chapter pictures retaken
-- [ ] Export on Partners and Leads in the tracker's columns (`partnerships.partners`, `partnerships.leads`,
-      `partnerships.deals`)
+      (07/11/2026)
+- [x] Returns tab and Enter Returns on PR 3's service and routes; settings.md chapter pictures retaken
+      (07/11/2026)
+- [x] Export on Partners and Leads in the tracker's columns (`partnerships.partners`, `partnerships.leads`,
+      `partnerships.deals`) (07/11/2026)
 
 ### PR 5 · Workspace links and deliverables
-- [ ] workspace.md first; Connect to Partner on projects, tasks, events; Partner filter
-- [ ] Work tab with hidden counts; deliverables on signing; calendar event days; inactivity follow-up
-- [ ] Praxis AI cards; my-workspace.md chapter and pictures retaken
+- [x] workspace.md first; Connect to Partner on projects, tasks, events; Partner filter (07/11/2026)
+- [x] Work tab with hidden counts; deliverables on signing; calendar event days; inactivity follow-up
+      (07/11/2026)
+- [x] Praxis AI cards; my-workspace.md chapter and pictures retaken (07/11/2026)
 
 ### PR 6 · Agreements, approval, signing, verification
-- [ ] Generate, lifecycle, renewals; the approval flow on Settings · Approvals
-- [ ] The shared signatures service to §6.9 (agreed with LA); Sign and Verify pages
-- [ ] Contracts & MOUs (#54)
+- [x] Generate, lifecycle, renewals; the approval flow on Settings · Approvals (08/11/2026)
+- [x] The shared signatures service to §6.9 (agreed with LA); Sign and Verify pages (08/11/2026)
+- [x] Contracts & MOUs (#54) (08/11/2026)
 
 ### PR 7 · Proposal Studio and design kit
-- [ ] The person confirms the `proposal-message` job
+- [x] The person confirms the `proposal-message` job: Default, TB, 07/11/2026
 - [ ] MyCity's sample proposal uploaded in this PR's chat and stored redacted in `partnership-samples/`;
-      the kit checked against it (does not block the start)
-- [ ] Studio, AI actions (Top Tier, Sonnet then Gemini Pro), the figure check, the kit and its gallery
-- [ ] Proposals (#53) and the public Proposal page (#105)
+      the kit checked against it (does not block the start): not yet received; the kit is checked against
+      it when it arrives
+- [x] Studio, AI actions (Top Tier, Sonnet then Gemini Pro), the figure check, the kit and its gallery
+      (08/11/2026)
+- [x] Proposals (#53) and the public Proposal page (#105) (08/11/2026)
 
 ### PR 8 · Analytics, mail, Praxis AI, search, finish
-- [ ] Analytics (#55); mail binding; manifests, cards and search; views and notifications
-- [ ] Staging seed; INTERIM types deleted; empty stubs filled or deleted
-- [ ] PROGRESS rows and counts; the demo walked (Appendix B)
+- [x] Analytics (#55); mail binding; manifests, cards and search; views and notifications (08/11/2026)
+- [x] Staging seed; INTERIM types deleted; empty stubs filled or deleted (08/11/2026)
+- [x] PROGRESS rows and counts; the demo walked (Appendix B) on a database seeded as staging is, through the
+      real API (08/11/2026; steps 2 to 11, step 1 by the imports and Categories suites)
+- [ ] The staging walk of Appendix B after merge (§4 below), by a person
 
 ### PR 9 · User Guide chapter (after acceptance)
-- [ ] `docs/manual/partnerships.md` with pictures; the Quick Start card
+- [x] `docs/manual/partnerships.md` with pictures; the Quick Start cards (four, Lead Owners); the partner's pages on the public Help (10/11/2026)
 
 ## 3 · Log
 
+- 10/11/2026 · TB · PR 9 (`m7/user-guide`): the Partnerships chapter, `docs/manual/partnerships.md`, a section for each of the seven
+  screens with a picture of every step on desktop and phone; four Quick Start cards under a new Lead Owners group; the public Help's
+  Your Proposal, Sign an Agreement and Check an agreement. TB's calls of 10/11/2026: the partner's pages go in the public Help as well as
+  the chapter; four cards, not one; a picture for every step. `packages/contract/guide.js` takes the Lead Owners role and a
+  `/proposal/<token>` public address. Left: the staging walk (§4), which may rename a button the chapter names; MyCity's two samples.
+- 10/11/2026 · TB · Found writing PR 9: **an approver had no button.** §6.9 put Approve and Reject on the agreement's card, PR 6
+  built it read only, and Home's Need You opened an agreement nobody could decide. Built: `approval.can_decide`, **Approve** and
+  **Reject** on the card, tested against the real engine, and the demo's approval and Write Draft steps, so the chapter pictures
+  Approve, Reject, Send for Signature and the draft's progress. The guide's §6.9, §10.1 and §13.2 say so.
+
+- 08/11/2026 · JP · PR 8 (`m7/analytics-finish`): Analytics (#55) on the contract, desktop and phone, with Export
+  (the period's workbook); Performance's rating through `reviews.service.ratingsFor`. Link to Partner in Mailbox
+  (`mailbox/binding/` filled, `GET`, `POST`, `DELETE /mailbox/threads/:id/partner`), each email of a linked thread
+  logged once on the record with the excerpt rule, the 360's Activity opening it, migration `7120`. Praxis AI:
+  `partnerships.summary`, `partnership_returns.summary`, `proposals.list`, the `proposals.start` card; proposals in
+  ⌘K. Notices for deals, leads and proposals (`proposal.viewed` among them, PR 7's left item); `leads.views.js`
+  and `agreements.views.js`; Home's Proposals Out with Last Viewed and Views. The synthetic staging seed
+  `70_partnerships.js` through the services (Build by Hand proposals, an agreement approved and recorded signed
+  to Active), Home's M7 rows handed over (`forward-rows.js` writes nothing now). Fixed on the way: Submit for
+  Approval failed on a deal of a category with no default rate (the flow's context now reads the category's).
+  INTERIM `app/src/api/types/partnerships.ts`, `templates/documents/mou.html` and
+  `templates/email/agreement-renewal.html` deleted; `proposals.test.js` and `agreements.test.js` filled. The calls
+  are in the guide's §13.2, In PR 8; Status Built. Tests: `partnerships-analytics` (5), `-mail` (5), `-notices`
+  (3), `-staging-records` (4), the proposals suite's card and view notice, unit and screen tests. Demo walked
+  through the API on a seeded database: every step passed. Left: the staging walk (§4), PR 9, MyCity's samples.
+
+- 08/11/2026 · TB · PR 6 (`m7/agreements-signing`, #92) built: `main` merged after #85, #90, #91 and #95 (#85 had already landed
+  AJ's signatures service and `5020` unchanged, so no gate 3 exception was needed); the agreements module (generate
+  with empty fields kept as chips, Draft in the document editor, Submit through `partnership.agreement`, Send for
+  Signature and Send Again, Record Signed Copy, Renew, Close), signing converting a lead, the seal stamped and filed with
+  the partner's documents and mailed to the owner, the `agreement-renewals` job and the `agreement_renewal` reminder,
+  canonical `PARTNERSHIP_AGREEMENT` v1, migrations `7100` and `7101`; Contracts & MOUs (#54) on the real API, desktop and
+  phone, with Generate Agreement on both 360s; the public Sign and Verify pages for agreements; `RichText` and
+  `VerifyCard` draw tables. The calls are in the guide's §13.2, In PR 6. Tests: six integration, renderer, RichText,
+  VerifyCard, three screen and four public page tests. Next: PR 8 (the staging seed's agreements).
+- 08/11/2026 · JP · PR 7 (`m7/proposal-studio`, #94): the Proposal Studio and design kit. TB's calls of
+  07/11/2026: `proposal-message` on Default; the kit's pages 16:9 (338.7 × 190.5 mm); charts on
+  opportunity, why_mycity, audience, packages and proof, and a 13th layout `insight` (seven kinds); the
+  kit's own 24 drawings, no image AI; the design in `templates/proposals/`. Built: the contract, migration
+  `7110`, the kit with `npm run gen:proposal-kit` and its visual gate; `proposals` (brief, cards with
+  reshuffle, the writing job and the figure check, edits, rewrites, versions, Send with confirmation, the
+  public link and its views, accept, decline, withdraw, expiry, save as template), the jobs and
+  `proposal-expiry`, four prompts and four AI actions; `QuestionCard` and `DocumentFrame`; Proposals (#53)
+  and the public Proposal page (#105), desktop and phone. The calls the guide records (§13.2, In PR 7).
+  Left: MyCity's sample proposal (not received, so the kit is not yet checked against it); notifications,
+  views on Home and `proposals.start` (PR 8); the chapter (PR 9). Next: PR 6, then PR 8.
+- 07/11/2026 · AJ · PR 5 (`m7/workspace-links`): Connect to Partner on New Project, New Task and New Event and their
+  edits (Partner, leads marked, Deal, Disconnect), checked by `partners.work`; the Partner filter on Tasks and
+  Projects; `partner_link` named only for readers who see the record; `GET /work` with hidden counts, the 360s' Work
+  tab (`WorkTab.tsx`) and Next Events; deliverables and the deal's event days as outbox handlers on `deal.signed`,
+  moved with the deal's dates and called off when it is lost; the `partner-inactivity` follow-up once a quiet spell
+  (`partner_follow_up`, migration `7080`); Praxis AI's Workspace cards with Partner, Lead and Deal; conversion moving
+  Workspace links (`relinkIn`); workspace.md, my-workspace.md (pictures retaken) and praxis-ai.md. TB answered: New
+  Partner's Signed Before the Hub raises no deliverables, its event days still go on the calendar (the guide's §13.2,
+  In PR 5). Tests: eleven integration tests, two screen tests. Next: PR 6 and PR 7, then PR 8.
+- 07/11/2026 · LA · PR 4 (`m7/importers-returns`): Map Values on the import engine (`GET` and `PUT
+  /imports/:id/values`, kept on the mapping and its profile); `partnership_tracker` (`partners.import.js`) on
+  `tests/fixtures/partnership-tracker.synthetic.xlsx`, every column rule of §6.13, signed rows to partners and
+  the rest to leads through the services with source `import` (a signed row's `deal.signed` carries it, for PR
+  5 to skip), revert until referenced; `partnership_returns` (`partner_pipeline.returns.import.js`) with
+  `partnerships.money`; the Partner 360's Returns tab with Enter Returns; Export on Partners and Leads
+  (`POST /partnerships/exports`) in the tracker's columns, reading back through the importer. The calls are in
+  the guide's §13.2, In PR 4. Tests: ten integration, ten unit, two screen. Left: the real tracker is imported
+  on staging by a person (Appendix B); PRs 5 to 7 run beside this one.
+- 07/11/2026 · TB · PR 6 (`m7/agreements-signing`) started, draft, unfinished. TB's calls: the one
+  signatures service is AJ's from #85, brought in unchanged (credited) and improved here, landing on
+  `main` through PR 6; AJ's migration `5020` carried byte for byte (gate 3 needs a named exception);
+  our schema from `7100`; Sign and Verify wired here for every document. Done: the import (AJ's 73
+  tests pass on `main`), `RichTextBlock` tables, `render.js` block values (clauses, grid, stamped
+  signature) and `fillMarkdown`, `SigningView.blocks`, `SignerStatus` with `void`. Next: the PR's
+  handover prompt.
 - 06/11/2026 · TB · Audit of PRs 1 to 3 against the guide before PR 4, with TB's four calls (the guide's
   §13.2, the audit; §14). Who sees a deal: its owner's scope, its team, or its lead's or partner's
   owner's, one rule everywhere, so the 360s list and count only the deals the reader sees; New Deal and
@@ -172,3 +250,43 @@ with the date, and add a line to §3.
   truth. This file reduced to the checklist and the log; the decisions that were proposed here on
   04/11/2026 are superseded by the guide's §13.
 - 04/11/2026 · JP · PR 0 first written from the documents alone.
+
+## 4 · The staging walk (after PR 8 merges)
+
+Appendix B on staging, by a person, once the deploy has run the seeds (`10_staff`, `65_partnership_setup`,
+`70_partnerships`). Tick each line with the date and who walked it; a line that fails goes in §3 with what
+the screen said. Use a phone for the lines that name one.
+
+- [ ] 0. Staging holds the seed: Partnerships · Partners lists Lumen Arts Festival, Harbourline Hotels, Kora
+      Street Kitchens, Brightwave Radio and Tallow Tech Summit; Leads lists Gidi Food Carnival and six more; no
+      MTN Nigeria, ProvidusBank or other Home demonstration partner remains
+- [ ] 1. Categories · **Start From Tracker** on the synthetic tracker; Settings · Imports · Partnership Tracker:
+      column map, Map Values (stages, owners, types), duplicate report, preview, import; revert; import again
+- [ ] 2. **New Partner** (Signed Before the Hub), then open it: zeros and empty tabs, not a broken page
+- [ ] 3. **New Lead** with its first deal (Deal Options, event dates, a venue picked from the address
+      search); move it through stages on the 360; **Set Health** Stalled with blockers; **Log Interaction**
+      a call. The deal's owner, if someone else, gets Deal Moved; their Head of Department gets Deal Stalled
+- [ ] 4. From its 360's Work tab, **New Project** and **New Task**: both listed there, connected
+- [ ] 5. **New Proposal** with notes and a `.md` transcript; with MyCity's Anthropic key on Settings ·
+      Integrations, answer, **Use Suggestion**, **Skip** and **Reshuffle** cards, **Write Draft** (without it,
+      Write Draft builds it by hand); edit a section and **Change Layout**; **Send Proposal**, confirming the
+      address; open the link on a phone; the proposal reads Viewed and the owner gets Proposal Viewed;
+      Home's Proposals Out shows its Last Viewed and Views
+- [ ] 6. **Generate Agreement** from the Events template; **Submit for Approval**; approve as the Head of
+      Department, then the CEO (each from Home's Need You: **Approve** on the agreement's card; try **Reject** on a
+      second one: the owner reads its reason); **Send for Signature**; sign on a phone with the emailed code
+      and a drawn signature (and MyCity's countersignature); scan the QR: the document and both verdicts;
+      by reference: status and verdicts, no content
+- [ ] 7. The lead is now a partner (Lead Signed to its owner and Operations & People); its five deliverables
+      are tasks; the event days are on the team's calendar
+- [ ] 8. **Enter Returns** for this month; the 360's Returns This Year moves; ask Praxis AI "who is our
+      highest contributing partner" and "what is our partnership value this year"
+- [ ] 9. In Mailbox, a conversation's menu: **Link to Partner**; the line under its subject names the partner;
+      its emails on the partner's Activity, each opening with its first lines and **Open in Mailbox** (yours
+      only); **Unlink**
+- [ ] 10. Kora Street Kitchens (quiet 45 days in the seed): the next morning, Home's Partner Inactivity alert
+       and its follow-up task, the deal Follow-Up Required
+- [ ] 11. Analytics for This Quarter: a lead owner's row against the records behind it (their leads, meetings,
+       proposals sent, deals signed); Export the workbook; Returns per Month only for a holder of See
+       Commission and Returns
+

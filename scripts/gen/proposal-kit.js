@@ -1,0 +1,232 @@
+#!/usr/bin/env node
+"use strict";
+/**
+ * The proposal design kit's assets, copied from the hub into `templates/proposals/`, which every
+ * release ships (docs/guides/partnerships.md §6.11). The kit renders on the server, where neither
+ * packages/ui nor node_modules' front-end packages are present, so what it draws is copied here:
+ *
+ *   kit.tokens.css     the kit's colours, read from packages/ui/src/styles/tokens.css (F4, gate 13):
+ *                      the light theme's brand, paper and chart colours, and the dark theme's chart
+ *                      colours for charts on Deep Green. The kit's CSS names only these.
+ *   photos/<city>.webp the sign-in screen's city photographs (1280 wide), the kit's stand-ins until
+ *                      MyCity uploads its own.
+ *   fonts/             Geist (SIL Open Font License, its licence beside it), embedded in every page so
+ *                      the PDF, the studio and the public page set the same type.
+ *   icons.json         the Lucide icons (ISC licence) a deliverable may name, each as path data.
+ *   sample.html        the gallery's page of every layout (packages/ui, `#/ProposalKit`), drawn by the
+ *                      kit itself from templates/proposals/sample.json, and that content beside it
+ *                      (proposal-kit.sample.json), which the staff app's in-browser mock serves.
+ *
+ *   npm run gen:proposal-kit                     write them
+ *   node scripts/gen/proposal-kit.js --check     exit 1 when one is stale (tests/unit/proposals-kit.test.js)
+ */
+const fs = require("node:fs");
+const path = require("node:path");
+
+const ROOT = path.resolve(__dirname, "..", "..");
+const KIT = path.join(ROOT, "templates", "proposals");
+const UI = path.join(ROOT, "packages", "ui");
+const SAMPLE_OUT = path.join(UI, "src", "documents", "proposal-kit.sample.html");
+
+const CITIES = ["lagos", "accra", "nairobi", "abidjan", "douala", "johannesburg", "rabat", "london"];
+
+/** Kit name → the token it is read from, in the light theme. */
+const LIGHT = {
+  "--k-gold": "--primary",
+  "--k-gold-tint": "--primary-tint",
+  "--k-green": "--secondary",
+  "--k-deep": "--deep",
+  "--k-deep-2": "--sidebar-accent",
+  "--k-on-deep-muted": "--sidebar-muted",
+  "--k-paper": "--paper",
+  "--k-ink": "--paper-foreground",
+  "--k-heading": "--paper-heading",
+  "--k-muted": "--paper-muted",
+  "--k-faint": "--paper-faint",
+  "--k-mist": "--paper-head",
+  "--k-line": "--paper-line",
+  "--k-rule": "--paper-rule",
+  "--k-chart-1": "--chart-1",
+  "--k-chart-2": "--chart-2",
+  "--k-chart-3": "--chart-3",
+  "--k-chart-4": "--chart-4",
+  "--k-chart-5": "--chart-5",
+  "--k-chart-6": "--chart-6",
+};
+/** Charts on Deep Green take the dark theme's series, drawn for a dark ground. */
+const DARK = {
+  "--k-night-chart-1": "--chart-1",
+  "--k-night-chart-2": "--chart-2",
+  "--k-night-chart-3": "--chart-3",
+  "--k-night-chart-4": "--chart-4",
+  "--k-night-chart-5": "--chart-5",
+  "--k-night-chart-6": "--chart-6",
+};
+
+/** The icons a deliverable may name: what MyCity does for a partner, in Lucide's names. */
+const ICONS = [
+  "badge-check", "bike", "building-2", "bus", "calendar-check", "calendar-days", "camera", "car",
+  "chart-column", "circle-check", "clipboard-check", "clock", "coffee", "credit-card", "download",
+  "flag", "gift", "globe", "graduation-cap", "handshake", "headphones", "heart-handshake", "hotel",
+  "image", "landmark", "layout-grid", "list-checks", "mail", "map-pin", "megaphone", "message-circle",
+  "mic", "music", "newspaper", "palette", "party-popper", "percent", "plane", "presentation", "qr-code",
+  "radio", "receipt", "route", "scan-line", "share-2", "shield-check", "shirt", "smartphone", "sparkles",
+  "star", "store", "sun", "target", "tent", "ticket", "trending-up", "trophy", "user-check", "users",
+  "utensils", "video", "wallet",
+];
+
+/* ------------------------------------------------------------------ *
+ * Tokens
+ * ------------------------------------------------------------------ */
+
+/** The declarations of the first block whose selector list starts with `selector`. */
+function block(css, selector) {
+  const at = css.indexOf(selector);
+  if (at < 0) throw new Error(`tokens.css has no ${selector} block`);
+  const open = css.indexOf("{", at);
+  const close = css.indexOf("}", open);
+  const out = new Map();
+  for (const m of css.slice(open + 1, close).matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) out.set(m[1], m[2].trim());
+  return out;
+}
+
+function tokensCss() {
+  const css = fs.readFileSync(path.join(UI, "src", "styles", "tokens.css"), "utf8");
+  const light = block(css, ':root,\n[data-theme="light"]');
+  const dark = block(css, '[data-theme="dark"]');
+  const line = (map, [kit, token]) => {
+    const v = map.get(token);
+    if (!v || !/^#[0-9A-Fa-f]{6}$/.test(v)) throw new Error(`tokens.css: ${token} is not a colour (${v})`);
+    return `  ${kit}: ${v};`;
+  };
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(" ");
+  return [
+    "/* Generated by scripts/gen/proposal-kit.js from packages/ui/src/styles/tokens.css. Do not edit. */",
+    ":root {",
+    ...Object.entries(LIGHT).map((e) => line(light, e)),
+    ...Object.entries(DARK).map((e) => line(dark, e)),
+    `  --k-deep-rgb: ${rgb(light.get("--deep"))};`,
+    `  --k-paper-rgb: ${rgb(light.get("--paper"))};`,
+    "}",
+    "",
+  ].join("\n");
+}
+
+/* ------------------------------------------------------------------ *
+ * Icons: each Lucide shape written as path data, so the kit draws it with CSS strokes
+ * ------------------------------------------------------------------ */
+
+const num = (v) => Number(v || 0);
+const fmt = (n) => String(Math.round(n * 1000) / 1000);
+
+function toPath(tag, a) {
+  switch (tag) {
+    case "path":
+      return a.d;
+    case "line":
+      return `M${fmt(num(a.x1))} ${fmt(num(a.y1))}L${fmt(num(a.x2))} ${fmt(num(a.y2))}`;
+    case "polyline":
+    case "polygon": {
+      const pts = String(a.points).trim().split(/[\s,]+/).map(Number);
+      let d = "";
+      for (let i = 0; i < pts.length; i += 2) d += `${i ? "L" : "M"}${fmt(pts[i])} ${fmt(pts[i + 1])}`;
+      return tag === "polygon" ? `${d}Z` : d;
+    }
+    case "circle":
+    case "ellipse": {
+      const cx = num(a.cx);
+      const cy = num(a.cy);
+      const rx = tag === "circle" ? num(a.r) : num(a.rx);
+      const ry = tag === "circle" ? num(a.r) : num(a.ry);
+      return `M${fmt(cx - rx)} ${fmt(cy)}a${fmt(rx)} ${fmt(ry)} 0 1 0 ${fmt(2 * rx)} 0a${fmt(rx)} ${fmt(ry)} 0 1 0 ${fmt(-2 * rx)} 0`;
+    }
+    case "rect": {
+      const x = num(a.x);
+      const y = num(a.y);
+      const w = num(a.width);
+      const h = num(a.height);
+      const r = Math.min(num(a.rx || a.ry), w / 2, h / 2);
+      if (!r) return `M${fmt(x)} ${fmt(y)}h${fmt(w)}v${fmt(h)}h${fmt(-w)}Z`;
+      return (
+        `M${fmt(x + r)} ${fmt(y)}h${fmt(w - 2 * r)}a${fmt(r)} ${fmt(r)} 0 0 1 ${fmt(r)} ${fmt(r)}` +
+        `v${fmt(h - 2 * r)}a${fmt(r)} ${fmt(r)} 0 0 1 ${fmt(-r)} ${fmt(r)}h${fmt(-(w - 2 * r))}` +
+        `a${fmt(r)} ${fmt(r)} 0 0 1 ${fmt(-r)} ${fmt(-r)}v${fmt(-(h - 2 * r))}a${fmt(r)} ${fmt(r)} 0 0 1 ${fmt(r)} ${fmt(-r)}Z`
+      );
+    }
+    default:
+      throw new Error(`an icon shape the kit cannot draw: ${tag}`);
+  }
+}
+
+function iconsJson() {
+  const dir = path.join(ROOT, "node_modules", "lucide-react", "dist", "esm", "icons");
+  const out = { licence: "Lucide icons, ISC licence (lucide.dev/license)", icons: {} };
+  for (const name of ICONS) {
+    let src = fs.readFileSync(path.join(dir, `${name}.mjs`), "utf8");
+    // A renamed icon re-exports its new name's file.
+    const alias = /export \{ default \} from '\.\/([a-z0-9-]+)\.mjs'/.exec(src);
+    if (alias) src = fs.readFileSync(path.join(dir, `${alias[1]}.mjs`), "utf8");
+    const m = /const __iconData = (\{[\s\S]*?\n\});/.exec(src);
+    if (!m) throw new Error(`lucide-react: no icon data for ${name}`);
+    // The icon's data is a plain object literal: read it as JSON once its keys are quoted.
+    const data = JSON.parse(m[1].replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_-]*)\s*:/g, '$1"$2":'));
+    out.icons[name] = data.node.map(([tag, attrs]) => toPath(tag, attrs));
+  }
+  return `${JSON.stringify(out, null, 1)}\n`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Files
+ * ------------------------------------------------------------------ */
+
+function outputs() {
+  const fontDir = path.join(ROOT, "node_modules", "@fontsource-variable", "geist");
+  const files = [
+    { to: path.join(KIT, "kit.tokens.css"), text: tokensCss() },
+    { to: path.join(KIT, "icons.json"), text: iconsJson() },
+    { to: path.join(KIT, "fonts", "geist-latin.woff2"), from: path.join(fontDir, "files", "geist-latin-wght-normal.woff2") },
+    { to: path.join(KIT, "fonts", "geist-latin-ext.woff2"), from: path.join(fontDir, "files", "geist-latin-ext-wght-normal.woff2") },
+    { to: path.join(KIT, "fonts", "LICENSE"), from: path.join(fontDir, "LICENSE") },
+    ...CITIES.map((city) => ({
+      to: path.join(KIT, "photos", `${city}.webp`),
+      from: path.join(UI, "src", "illustrations", "photos", `${city}-1280.webp`),
+    })),
+  ];
+  return files.map((f) => ({ ...f, bytes: f.from ? fs.readFileSync(f.from) : Buffer.from(f.text) }));
+}
+
+/** The gallery's sample, drawn by the kit once its assets are written; and its content, which the staff app's in-browser mock serves. */
+function sampleOutput() {
+  const kit = require("../../src/modules/proposals/proposals.kit");
+  const sample = JSON.parse(fs.readFileSync(path.join(KIT, "sample.json"), "utf8"));
+  return { to: SAMPLE_OUT, bytes: Buffer.from(kit.renderSample(sample)) };
+}
+
+function sampleContentOutput() {
+  const sample = JSON.parse(fs.readFileSync(path.join(KIT, "sample.json"), "utf8"));
+  return { to: SAMPLE_OUT.replace(/\.html$/, ".json"), bytes: Buffer.from(`${JSON.stringify(sample.content, null, 1)}\n`) };
+}
+
+function main() {
+  const check = process.argv.includes("--check");
+  const stale = [];
+  const write = (f) => {
+    const now = fs.existsSync(f.to) ? fs.readFileSync(f.to) : null;
+    if (now && now.equals(f.bytes)) return;
+    if (check) return stale.push(path.relative(ROOT, f.to));
+    fs.mkdirSync(path.dirname(f.to), { recursive: true });
+    fs.writeFileSync(f.to, f.bytes);
+    console.log(`wrote ${path.relative(ROOT, f.to)}`);
+  };
+  outputs().forEach(write);
+  write(sampleOutput());
+  write(sampleContentOutput());
+  if (stale.length) {
+    console.error(`The proposal kit's assets are stale: ${stale.join(", ")}. Run npm run gen:proposal-kit.`);
+    process.exit(1);
+  }
+}
+
+if (require.main === module) main();
+
+module.exports = { outputs, sampleOutput, sampleContentOutput, tokensCss, CITIES, ICONS, SAMPLE_OUT };

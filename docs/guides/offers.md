@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/recruitment/Offers.tsx` (with `OfferForm.tsx`, `OfferSign.tsx`, `OfferSettings.tsx`), `app/src/features/recruitment/Onboarding.tsx`, `public-app/src/pages/SignOffer.tsx`, `public-app/src/pages/Verify.tsx` |
 | Permission key(s) | `recruitment` (offers and onboarding cases); `people` (the hire's documents on the Employee 360) |
 | Capabilities | none; who approves an offer is the `recruitment.offer` flow on Settings · Approvals, not a capability |
-| Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, and a new public Upload Documents row (PR 6 registers it with `npm run new:screen`); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
+| Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, #112 Upload Documents (added with PR 6a; `new:screen` makes staff-app tabs only); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
 | Status | Draft |
 | Last changed | 11/11/2026 |
 
@@ -31,7 +31,7 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Recruitment · Offers (`offers`) | staff app | `recruitment` view; a hiring manager their vacancies (team scope) | every offer: number, candidate, role, compensation, status, expiry; the offer's letter as the candidate will read it, its approval chain and signers | New Offer (from a shortlisted application), Edit, Submit for Approval, Approve and Reject (approvers), Send Offer, Resend, Withdraw, Download PDF |
+| Recruitment · Offers (`offers`) | staff app | `recruitment` view; a hiring manager their vacancies (team scope) | every offer: number, candidate, role, compensation, status, expiry; the offer's letter as the candidate will read it, its approval chain and signers | New Offer (from a shortlisted application), Edit, Submit for Approval, Approve and Reject (approvers), Send Offer, Resend, Withdraw, View Letter (the letter in a dialog of its own, with Open in Tab and Download PDF) |
 | Recruitment · Onboarding (`onboarding`) | staff app | `recruitment` view | every onboarding case: hire, role, start date, status, checklist progress; one case's checklist, contract and plan | Verify and Reject a document, Request Document, Send Reminder, Sign for Company and Resend Contract on the contract, Mark Step Done, Complete Onboarding; Checklist, Plans and Contract settings |
 | Recruitment · Candidates (`candidates`) | staff app | as M4 | the Offer column (GE) | Open Offer on the sheet of a card at Offer or after (Offers opened by `?application=`); Make Offer on a shortlisted one (`?new=1&application=`) |
 | Public · Sign Offer (`/sign/<token>`) | go.mycityapp.io | the candidate holding the link | the letter, the signing steps, the outcome | Send Code, sign (draw or type), Accept and Sign, Decline the Offer |
@@ -103,19 +103,29 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    `/sign/<token>` as for the offer. Their signature, the last, marks the contract `signed`, and the
    sealed copy is mailed to both. Declined or lapsed, the contract is `cancelled` and the case's
    owner told.
-6. **Documentation.** The hire uploads on `/onboard/<token>` after accepting the privacy notice.
+6. **Documentation.** The Upload Documents link is mailed as `onboarding-documents` (Candidate
+   Emails) when the case opens, from the outbox after the acceptance commits, and again on Send
+   Reminder, which stops every earlier link; a link lives a month, and at least a week past the start
+   date. The hire uploads on `/onboard/<token>` after accepting the privacy notice.
    The checklist is MyCity's New Joiner list, entered on the Checklist settings: proof of residential
    address, a valid ID, educational and professional certificates (with NYSC), evidence of separation
    from the last employer, birth certificate, the Employee Data Form, the MyLagosApp Wallet ID (a
    typed value), a passport photograph and the bank Account Opening Form; the signed offer and the
-   contract are added by the system. Each file lands on the employee (People 360 Documents tab) and
-   on its item; Operations & People verify or reject each. The hire enters their BVN once (a masked
+   contract are added by the system. Each file lands on the employee (People 360 Documents tab, the
+   `employee_document` type) the moment it is sent, quarantined and scanned as any stranger's upload,
+   and is then named on its item; Operations & People verify each once its scan is clean, or reject
+   it with a reason the hire reads beside the item and send it again. The hire enters their BVN once (a masked
    number on the employee record, no upload) and their **two guarantors**: not related to them, one
    a previous employer and one who has known them four years or more, no serving police, military
    or other uniformed staff, each with their guarantor form. Operations & People run a reference
-   check on each and record Passed or Failed.
-7. **Pre-onboarding.** When every required item is verified, both guarantors have passed and the
-   contract is signed, the case moves to `pre_onboarding`. Nothing before that opens onboarding.
+   check on each and record Passed or Failed. A failed guarantor is corrected by the hire, which
+   starts its check again; a guarantor who has passed stays as they are.
+7. **Pre-onboarding.** When every required item is verified, both guarantors have passed, the BVN
+   is entered and the contract is signed, the case moves to `pre_onboarding` and the application to
+   Pre-Onboarding (`candidates.advanceIn`) in the same transaction. The gate is asked after each of
+   those (a verification, a reference check, the BVN, the hire's signature on the contract), so
+   whichever comes last opens it. The case shows what it still waits on (`waiting_on`). Nothing
+   before that opens onboarding, and from then the upload page takes nothing more.
 8. **Onboarding.** On the start date the case moves to `onboarding` and the department's plan steps
    are added, each with an owner and a due date and linked to the department's SOPs. Complete
    Onboarding (every step done) asks for the hire's company email, closes the case, calls
@@ -132,19 +142,22 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
 | `offer_pay_line` | `offer_id`, `position`, `name`, `monthly_amount` | 5010. The monthly compensation, line by line |
 | `signature_request` | `document_id`, `subject_type`, `subject_id`, `status`, `expires_at` | 5000. Shared with M7 (`partnership_agreement.signature_request_id`); LA reviews any change |
 | `signature` | `signature_request_id`, `signer_name`, `signer_email`, `signed_at`, `evidence` | 5000. 5020 adds `content_hash`, `artifact_hash` (A12), `signer_title`, `method`, `signature_document_id`, `code_verified_at`, `viewed_at`; a signed row must carry its time, method and content hash. 5020 also adds the request's `sealed_document_id` and `end_reason` |
-| `document_requirement` | `code`, `name`, `required`, `expires`, `active` | 5000. Entered by MyCity on Onboarding's Checklist settings, never seeded (A26). 5030 adds `kind` (`file`, `number`, `both`; the Wallet ID is a number) and `display_order` |
+| `document_requirement` | `code`, `name`, `required`, `expires`, `active` | 5000. MyCity's New Joiner list, seeded once by 5399 (`ON CONFLICT DO NOTHING`) and kept on Onboarding's Checklist settings: an exception to A26 because Send Offer refuses an empty checklist (AJ, 11/11/2026; MILESTONES §10). 5030 adds `kind` (`file`, `number`, `both`; the Wallet ID is a number) and `display_order` |
 | `onboarding_case` | `application_id`, `offer_id`, `employee_id`, `status`, `starts_on` | 5000. Status `documentation → pre_onboarding → onboarding → completed`, or `cancelled` (5030, with `privacy_acknowledged_at`, `documentation_completed_at`, `cancelled_at`, `end_reason`) |
 | `onboarding_checklist_item` | `onboarding_case_id`, `document_requirement_id`, `status`, `document_id` | 5000. 5030 adds `entered_value`, `uploaded_at`, `verified_by`, `verified_at`, `rejected_reason` |
 | `onboarding_guarantor` | `onboarding_case_id`, `position` (1, 2), `kind` (`previous_employer`, `personal`), `full_name`, `relationship`, `phone`, `years_known`, `form_document_id`, `check_status` | 5030. The reference check: `pending`, `passed`, `failed`, with who and when |
 | `employment_contract` | `onboarding_case_id`, `employee_id`, `number` (CON), `document_id`, `signature_request_id` | 5000 |
-| onboarding plans | department, steps (title, owner role, due offset, SOP link) | PR 6, new tables; the plan's steps are copied onto the case |
+| `onboarding_plan` | `department_id` (null for the company's default), `name`, `active` | 5050. One plan a department and one default (partial unique indexes). The default, Your First 30 Days from the HR Induction deck, is seeded by 5399 with its four steps |
+| `onboarding_plan_step` | `onboarding_plan_id`, `position`, `title`, `owner_role`, `due_offset_days`, `sop_id` | 5050. The owner is a role (`case_owner`, `line_manager`, `head_of_department`, `hire`), named as a person when the steps are copied onto a case; the due day counts from the start date. `sop_id` has no foreign key: `sop` is M10's (10400, after this block), so the service takes only an SOP in force |
+| `onboarding_case_step` | `onboarding_case_id`, `position`, `title`, `owner_role`, `owner_id`, `due_on`, `sop_id`, `status` (`pending`, `done`), `done_by`, `done_at` | 5050. The plan's steps copied onto the case when it reaches onboarding (PR 6b), so a plan changed later never changes a hire's steps |
 | `employee.bvn` | eleven digits | 5040, masked under `employee.bank` (organisation's table, TB reviews) |
 | `talent_pool`, `talent_pool_member` | | 5000, never used (M4's pool is `talent_pool_entry`, 4060). Dropped in 5010 |
 
 Schema migration files: `migrations/5000_offers_onboarding.sql` (merged, never edited),
 `5010_offer_terms.sql`, `5020_signature_evidence.sql`, `5030_onboarding_documentation.sql`,
-`5040_employee_bvn.sql`, `5090_drop_unused_talent_pool.sql`. Reference data:
+`5040_employee_bvn.sql`, `5050_onboarding_plans.sql`, `5090_drop_unused_talent_pool.sql`. Reference data:
 `seeds/reference/5099_seed_offers_onboarding.sql` and `5199_seed_m5_statuses.sql` (statuses);
+`5399_seed_new_joiner_list.sql`, the New Joiner list and the default plan;
 `5299_seed_offer_flow.sql`, the `recruitment.offer` flow's version 1 and Head of Department's
 `approve` on recruitment (team), set only while its grant is as 0290 left it. 5010 also gives the
 offer `approved`, `outside_range`, `range_reason`, `additional_terms`, `terms_version` and
@@ -167,25 +180,34 @@ employee record (masked, never sent to an AI model).
 | `GET /api/v1/recruitment/offers/:id/document` | PDF | `recruitment` view | | the sealed copy once there is one |
 | `GET /api/v1/recruitment/offers/settings`, `PUT .../settings/signatory` | `OfferSettings`, `OfferSignatorySave` | `recruitment` edit | | the Offer Signatory (setting `recruitment.offer_signatory`) |
 | `GET/PUT /api/v1/recruitment/offers/settings/letter`, `POST .../letter/restore` | `OfferLetterTemplate`, `OfferLetterTemplateSave` | `recruitment` edit | | the standard wording, a `template_version` of `offer-letter` |
-| `GET /api/v1/recruitment/onboarding` | `OnboardingListQuery` → `OnboardingPage` | `recruitment` view | yes, 25 | filters: status, department |
-| `GET /api/v1/recruitment/onboarding/:id` | `OnboardingDetail` | `recruitment` view | | |
-| `POST /api/v1/recruitment/onboarding/:id/items/:itemId/verify`, `/reject`, `/request` | `ChecklistItemAction` | `recruitment` edit | | |
-| `POST /api/v1/recruitment/onboarding/:id/steps/:stepId/done`, `/complete` | | `recruitment` edit | | |
-| `GET/POST /api/v1/recruitment/onboarding/requirements`, plans | | `recruitment` edit | yes, 25 | Checklist and Plans settings |
+| `GET /api/v1/recruitment/onboarding` | `OnboardingListQuery` → `OnboardingPage` | `recruitment` view · all/team (the case's owner) | yes, 25 | filters: status, department, q (the hire or the role) |
+| `GET /api/v1/recruitment/onboarding/:id` | → `OnboardingDetail` | `recruitment` view | | the checklist, guarantors, `bvn_entered` (never the number), the contract, `waiting_on` |
+| `POST /api/v1/recruitment/onboarding/:id/items/:item_id/verify` | `EmptyBody` → `OnboardingDetail` | `recruitment` edit | | an item sent and, for a file, scanned clean (409 `SCAN_PENDING`, `FILE_INFECTED`); then the gate |
+| `POST /api/v1/recruitment/onboarding/:id/items/:item_id/reject` | `ChecklistItemReject` → `OnboardingDetail` | `recruitment` edit | | back to the hire with the reason |
+| `POST /api/v1/recruitment/onboarding/:id/guarantors/:guarantor_id/check` | `ReferenceCheckRecord` → `OnboardingDetail` | `recruitment` edit | | Passed or Failed with a note; then the gate |
+| `POST /api/v1/recruitment/onboarding/:id/remind` | `EmptyBody` → `OnboardingDetail` | `recruitment` edit | | Send Reminder: a fresh link mailed, every earlier one stopped |
+| `POST /api/v1/recruitment/onboarding/:id/steps/:stepId/done`, `/complete` | | `recruitment` edit | | PR 6b |
+| `GET/POST /api/v1/recruitment/onboarding/requirements`, `PATCH .../requirements/:id` | `DocumentRequirementListQuery` → `DocumentRequirementPage`; `DocumentRequirementCreate`, `DocumentRequirementEdit` → `DocumentRequirement` | `recruitment` edit | yes, 25 | the Checklist settings; a code is kept once made (409 `CODE_TAKEN`) |
+| `GET/POST /api/v1/recruitment/onboarding/plans`, `GET/PUT .../plans/:id` | `OnboardingPlanListQuery` → `OnboardingPlanPage`; `OnboardingPlanSave` → `OnboardingPlan` | `recruitment` edit | yes, 25 | the Plans settings; a plan saved whole (409 `PLAN_EXISTS`, 422 `SOP_NOT_FOUND`) |
 | `GET /api/public/v1/sign/:token` | → `SigningView` | public token `signature.sign` (one a signer) | | the first opening is recorded; 404 for any bad or ended link (signatures) |
 | `POST /api/public/v1/sign/:token/code` | `EmptyBody` → `SignCodeSent` | public token | | a six-digit code to the address the link was sent to; 10 minutes; another after 60 seconds (429) |
 | `POST /api/public/v1/sign/:token/code/verify` | `SignCodeVerify` → `SigningView` | public token | | five wrong tries and a new code must be asked for |
 | `POST /api/public/v1/sign/:token/sign` | `SignSubmit` → `SigningView` | public token | | the code entered within 30 minutes; signers in order; a second press returns the signed state |
 | `POST /api/public/v1/sign/:token/decline` | `SignDecline` → `SigningView` | public token | | ends the request for every signer |
 | `GET /api/public/v1/sign/:token/document` | PDF | public token | | the sealed copy once there is one |
-| `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | | status, signers, the two verdicts; no content; only a sealed copy |
+| `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | | status, signers, the two verdicts; no content; only a sealed copy. A `CERT-` number is a training certificate, answered by the training module (`knowledge.md` §6.10); a signed document's `certificate` is null |
 | `GET /api/public/v1/verify/t/:token` | → `VerifyByToken` | the sealed copy's QR key | | the record and the document |
 | `GET /api/public/v1/verify/t/:token/document` | PDF | the QR key | | the sealed copy |
 | `POST /api/v1/recruitment/contracts/:id/sign` | `SignSubmit` → `EmploymentContractView` | `recruitment` view, and the signer named on its request | | the company's signature, in the hub; the hire's link is then made and mailed (`contract-sent`) |
 | `POST /api/v1/recruitment/contracts/:id/resend` | `EmptyBody` → `EmploymentContractView` | `recruitment` edit | | a fresh link to the hire, every earlier one revoked; once the company has signed |
 | `GET /api/v1/recruitment/contracts/:id/document` | PDF | `recruitment` view | | the sealed copy once there is one, else the copy generated at acceptance |
 | `GET/PUT /api/v1/recruitment/contracts/settings/template`, `POST .../template/restore` | `ContractTemplate`, `ContractTemplateSave` | `recruitment` edit | | the standard contract wording, a `template_version` of `employment-contract` |
-| `GET/POST /api/public/v1/onboard/:token` | `UploadPack`, `UploadItem` | public token `onboarding.upload` | | privacy notice first |
+| `GET /api/public/v1/onboard/:token` | → `UploadPack` | public token `onboarding.upload` (the case its subject) | | the checklist as the hire sees it, the privacy notice's sentences; a guarantor's check note is left out |
+| `POST /api/public/v1/onboard/:token/privacy` | `PrivacyAcknowledge` → `UploadPack` | public token | | first; every write below is 409 `PRIVACY_FIRST` before it |
+| `POST /api/public/v1/onboard/:token/files` | multipart `file` (`UploadFile`) → `DocumentRef` | public token | | at most 15 MB (purpose `document`); stored on the hire's employee record, quarantined and scanned |
+| `POST /api/public/v1/onboard/:token/items/:item_id` | `UploadItem` → `UploadPack` | public token | | the file sent on this link, the typed value, or both, as the requirement's kind asks |
+| `POST /api/public/v1/onboard/:token/guarantors` | `GuarantorInput` → `UploadPack` | public token | | by position (1, 2); two of different kinds (422 `SAME_KIND`); a passed one stays (409 `ALREADY_CHECKED`) |
+| `POST /api/public/v1/onboard/:token/bvn` | `BvnEnter` → `UploadPack` | public token | | eleven digits, kept on `employee.bvn`; then the gate. After documentation every write is 409 `DOCUMENTATION_DONE` |
 
 ## 6 · Rules and calculations
 
@@ -208,7 +230,13 @@ employee record (masked, never sent to an AI model).
   company's signature. Its wording is the version in force at acceptance, kept on its document, so a
   later edit never changes a contract already generated.
 - Until Complete Onboarding, the hire's work email is their candidate email.
+- A signer reads `void` on the signing and verification pages (and on a record's signers) once their signature sits on a request that ended unsigned: another signer declined, it lapsed or it was withdrawn (M7 PR 6, partnerships.md §13.2). Signing views also carry the document's `blocks` where its type gives them (an agreement's headings, clauses and tables) and each signer's `method`.
+- A sealed copy prints its QR in the letterhead's header, so on every page (partnerships.md §6.9 step 7).
 - Documentation completes when every required item is verified, both guarantors have passed their reference checks, the BVN is entered and the contract is signed. Onboarding never opens before that.
+- The hire accepts the privacy notice before sending anything. A file they send is theirs to name only on their own link (on their employee record, sent from no signed-in user); a file is verified only once its virus scan is clean.
+- An optional item never holds the gate; whether an item is required is read from its requirement as it stands. A requirement switched off stays on the cases already open.
+- The BVN is never returned by any route (only `bvn_entered`), never written into an audit row, and never sent to a model.
+- The Upload Documents link is never kept or put in the outbox: only its hash is stored, and the mail is queued with it straight after its own transaction. Not Progressing stops it.
 - A personal guarantor has known the hire four years or more; the two are not the same kind.
 - Onboarding plan steps come from the hire's department plan; Complete Onboarding needs every step done, then the login is invited (`users.invite`).
 - No AI drafts an offer or a contract: both are the template plus the offer's fields. M5 registers no AI job.
@@ -230,8 +258,16 @@ employee record (masked, never sent to an AI model).
 | `document.generated` (a sealed copy) | the worker rendered it | its stored bytes' hash on every signature row (`artifact_hash`); `signature.sealed` |
 | `signature.sealed` | | every signer mailed the sealed copy (`signature-completed`), except where the signed record's module words its own: the candidate of an offer gets `offer-signed` with the copy |
 | `offer.declined`, `offer.expired`, `offer.withdrawn` | the candidate declines; the request lapses; Withdraw or Not Progressing | declined and expired tell the owner; the links stop working |
-| `onboarding.opened` | at acceptance, in the signing transaction | audit; `onboarding-documents` with the upload link from PR 6 |
-| `onboarding.item_uploaded`, `.item_verified`, `.item_rejected` | | notify Operations & People / the hire |
+| `onboarding.opened` | at acceptance, in the signing transaction | tells the owner; the outbox makes the Upload Documents link and mails `onboarding-documents` |
+| `onboarding.link_sent` | Send Reminder | audit (the link is made and mailed by the same step) |
+| `onboarding.privacy_acknowledged`, `.bvn_entered` | the hire on their page | audit (never the number) |
+| `onboarding.item_uploaded` | the hire sent an item | tells the owner |
+| `onboarding.item_verified`, `.item_rejected` | Operations & People | audit; the hire reads a rejection's reason on their page |
+| `onboarding.guarantor_saved` | the hire entered or corrected a guarantor | tells the owner |
+| `onboarding.guarantor_checked` | a reference check recorded | audit |
+| `onboarding.documentation_completed` | the gate, in the transaction of whatever came last | tells the owner; the application at Pre-Onboarding |
+| `onboarding.requirement_saved`, `.plan_saved` | the Checklist and Plans settings | audit |
+| `application.not_progressed` (M4) | Not Progressing | the case's Upload Documents links stop (`onboarding.stop_links`) |
 | `onboarding.completed` | Complete Onboarding | invite the hire's login |
 | `signature-reminders` job | daily, 06:17 Lagos | ends requests past their end; their links stop working |
 | `onboarding-dispatch` job | daily | move cases to `onboarding` on their start date; remind owners of overdue steps |
@@ -254,7 +290,8 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 - **AI reads** (`offers.ai.js`, `onboarding.ai.js`): offers by status and expiring soon; cases by status with outstanding items. Paged at 25. No personal data to DeepSeek.
 - **AI routes**: "make an offer to <candidate>" opens New Offer with the application; "who still owes documents" opens Onboarding filtered.
 - **AI cards**: New Offer is a card (`offers.create`, `OfferCard`: the candidate picked from the shortlist through `candidates.list`, the start date, the monthly basic salary; the rest starts from the vacancy and the draft is finished on Offers); the document upload and BVN forms are `not_offered: personal`. Approving, signing, sending and withdrawing stay on the screen.
-- **Search** (`offers.search.js`, `onboarding.search.js`): offers by number (OFF-), candidate and role; onboarding cases by hire; employment contracts by number (CON-).
+- **Search** (`offers.search.js`, `onboarding.search.js`): offers by number (OFF-), candidate and role; onboarding cases by the hire's name or the role (built in PR 6a, opening the case by `?case=` as a contract does); employment contracts by number (CON-).
+- `onboarding.ai.js` (PR 6a): the read `onboarding.list` and three routes; the Checklist and Plans settings' forms are `not_offered` (`design:`). The hire's upload, guarantor and BVN forms are not staff-app create or edit forms, so gate 23 asks no reason of them; they never reach the chat.
 
 ## 10 · On screen and mobile
 
@@ -262,7 +299,7 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list (candidate, role, annual compensation, status, expiry); the offer's summary, Monthly Pay with Outside Range and its reason, Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates), the letter on paper and Download PDF; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
+| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list across the page (number, candidate, role, start date, annual compensation with Outside Range, status, sent, expiry); a pressed row opens the offer in a wide dialog (F31 as amended 08/11/2026): the offer's summary with Signers under its details in the same card, beside Monthly Pay with Approval under the pay in the same card, then History across it, and Close at its foot; the offer's summary, Monthly Pay with Outside Range and its reason, Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates); View Letter beside Withdraw Offer, which opens the letter in a dialog of its own: the PDF with Open in Tab and Download PDF once it is made (as a query's letter, M3), the wording on paper before; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
 | Recruitment · Onboarding | the cases list (hire, role, start date, status, items outstanding); a case's checklist with each item's state, the contract, the plan steps | help on Pre-Onboarding: every required document verified and the contract signed | why documentation comes first: §3 here |
 | Public · Sign Offer | the letter, Signers, the three steps (Read the Letter, Confirm Your Email, Sign Below), Send Code, the code, full name, title, Draw or Type, Agree to Sign Electronically, Accept and Sign, Decline the Offer, the outcome | help on Email Code | "this document is locked and verifiable" reassurance: never shown |
 | Public · Upload Documents | the privacy notice to accept, each item with its state, upload | help on BVN | how the files are stored: the manual |
@@ -287,6 +324,9 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
   the address on the candidate and their signature and sends a fresh link; an address another
   candidate holds is refused. A bounce that comes back later as a mail of its own is not seen.
 - A file over the upload engine's limit: refused, with the limit named.
+- A file still being scanned cannot be verified (Wait for the virus scan to finish); one that failed it is rejected, and the hire sends another.
+- The hire's link has lapsed or was lost: Send Reminder makes a fresh one and stops the rest.
+- A department with no active plan of its own: its hires follow the company's default plan.
 - No document requirements set: Send Offer is refused until the checklist has at least one required item.
 - The hire leaves before the start date: Withdraw on the case ends it; the employee is archived.
 - No Offer Signatory named when the offer is accepted: the contract's company signer is whoever
@@ -330,8 +370,27 @@ Decided 11/11/2026 (AJ), for PR 5:
 - The application stays at Documentation until Complete Onboarding calls `hireIn` (GE's pipeline,
   #88), which supersedes the 06/11 plan of `hireIn` at acceptance.
 
+Decided 11/11/2026 (AJ), for PR 6:
+
+- **The New Joiner list and the default plan are seeded** (5399), an exception to A26 recorded in
+  MILESTONES §10: Send Offer refuses an empty checklist, so the code cannot run without one. Seeded
+  once, never written over; MyCity edits both on the settings.
+- **A plan step's owner is a role**, named as a person when the steps reach a case (the case's owner
+  when nobody holds the role).
+- **PR 6 is built in two**, split at the documentation gate: 6a up to "documentation completes", 6b
+  the start date, the plan's steps, Complete Onboarding with the company email, the login invite and
+  `hireIn`.
+- Request Document is Reject (with the reason the hire reads) and Send Reminder (a fresh link); no
+  third action.
+
+Open, for MyCity: the privacy notice's wording (`onboarding.upload.privacyNotice`) is written from
+what the system does; Operations & People to confirm it before go-live.
+
 ## 14 · Change log
 
+- 11/11/2026 · AJ · PR 6a, onboarding to the documentation gate (§3 steps 6 and 7, §4 to §7, §9, §11, §13): the Checklist and Plans settings, the New Joiner list and Your First 30 Days seeded (5399), plans and the case's steps (5050), the Upload Documents link and page API with the privacy notice, files on the employee and scanned, two guarantors with their checks, the BVN, verify and reject, the gate (asked after each of its conditions, the contract's signature included), `waiting_on`, ⌘K and the assistant's read. Fixed from PR 5: the contract's company name on a database without a company profile, and its signature request's creator at acceptance.
+- 11/11/2026 · GE · The letter left the offer's dialog, which it made long: View Letter, beside Withdraw Offer, opens it in a dialog of its own, the PDF with Open in Tab and Download PDF once made (`DocumentPreview`, as a query's letter in M3), the wording on paper before (§10). Download PDF moved there from the offer's buttons.
+- 11/11/2026 · TB · M10 PR 4 (`knowledge.md` §6.10): Verify a Document also checks a training certificate by its number. `VerifyResult.document_type` is `VerifiedDocumentType` (the signed types and `training_certificate`; the signing page keeps `SignedDocumentType`), and the result gains `certificate` (holder, course, completion date), null for every signed document. The page shows a certificate's Awarded To, Course, Completed and Published By; offers and agreements read as before.
 - 06/11/2026 · AJ · First draft from the Modules Review of 04/11/2026, AJ's decisions on #79 (offer approval, the contract's own signature, the employee at acceptance, BVN, department plans, the seat on hire) and GE's answers (`advanceIn`, `hireIn`, the public pages on #82).
 - 06/11/2026 · AJ · The offer emails go in M4's Candidate Emails; New Offer is a chat card.
 - 06/11/2026 · AJ · From MyCity's sample offer letter and New Joiner list: monthly pay lines and the Offer Summary's fields on the offer, the company signing when the offer is approved, the New Joiner checklist, two guarantors with reference checks, BVN a number only (§3, §4, §6). PR 1's migrations named.
@@ -341,3 +400,6 @@ Decided 11/11/2026 (AJ), for PR 5:
 - 07/11/2026 · AJ · PR 4, the screens (§2, §5, §10): Recruitment · Offers on the contract (the figures, the list beside the offer, Monthly Pay against the vacancy's range, the approval with Approve and Reject through the workflow routes for whom it waits on, Signers, History from the offer's dates, the letter on paper, the actions per `can_*`; New and Edit Offer as a four-step wizard; Sign for the Company; Offer Settings), opened by `?id=`, `?new=1`, `?application=`, `?status=` and `?panel=settings`; `OfferListQuery.application_id` for the board's Open Offer (Make Offer on a shortlisted card); Sign Offer and Verify Document on the signatures routes (the email code, name, title, draw or type, the consent, the signers; every signer and the status on Verify). The code's field messages are four words (Ask for another code).
 - 07/11/2026 · AJ · PR 4: the failed send (§5, §11): `OfferDetail.candidate_email`, `send_refused_at` and `can_change_email`; Change Email (`POST /:id/recipient`, `OfferRecipient`) through `candidates.correctEmailIn` and `signatures.setSignerEmailIn`.
 - 11/11/2026 · AJ · PR 5, acceptance to hire (§3 steps 5, 5a and 8, §5, §6, §7, §11, §13): the acceptance transaction (employee, Documentation, case, contract), the contract signed company then hire with its routes and wording settings, `offer-signed` with the sealed copy for the candidate, `contract-sent`, Submit needing employment type and work pattern, Send refused without a required checklist item. `hireIn` moves to Complete Onboarding, as GE's pipeline (#88) has it.
+- 08/11/2026 · TB · M7 PR 6 on the shared signatures service (`docs/guides/partnerships.md` §13.2, In PR 6): `void` signers and `SignerView.method`; a signable's optional `blocks` and `sealedTo` (the owner's sealed copy); `recordPaperIn` for a copy signed on paper (migration `7100`: no email only then), verified by reference only; `stopLinksFor` when a record is sent again; `progressOf` for a record's signers; the sealed copy's QR on every page. Offers' behaviour is unchanged (§6).
+- 08/11/2026 · GE · (Ose) Offers on desktop (GE's ask, F31 as amended 08/11/2026): the list takes the page's width (number, candidate, role, start date, annual with Outside Range, status, sent, expires) and a row opens the offer in a wide dialog (ListDetail `modal` size `xl`): the offer, Monthly Pay, Approval and Signers two by two, then History and the letter across it. Nothing opens unasked; the phone is unchanged (§10).
+- 08/11/2026 · GE · (Ose) In the dialog, Approval sits under Monthly Pay in the same card and Signers under the offer's details in its card (each its own card in a phone's sheet), and the dialog has Close at its foot (ListDetail `closeButton`, desktop only).

@@ -42,6 +42,7 @@ describe("the routes", () => {
     expect(routes.map((r) => [r.method, r.path, r.permission || "self", r.capability || null])).toEqual([
       ["GET", "/mine", "self", null],
       ["GET", "/mine/summary", "self", null],
+      ["GET", "/banks", { key: "expenses", action: "create" }, null],
       ["POST", "/mine", { key: "expenses", action: "create" }, null],
       ["POST", "/mine/invoice-reading", { key: "expenses", action: "create" }, null],
       ["POST", "/mine/category-suggestion", { key: "expenses", action: "create" }, null],

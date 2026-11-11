@@ -1,0 +1,5 @@
+<header class="page-head"><h2 class="h1">{{ heading }}</h2></header>
+{{#if visual}}<div class="tl-illus">{{> body}}</div>{{/if}}
+<ol class="tl n-{{ count }}">
+  {{#each phases}}<li class="phase{{#if key}} phase--key{{/if}}"><div class="phase-dates">{{#if starts_on}}{{ longdate starts_on }}{{/if}}{{#if both}} to {{/if}}{{#if ends_on}}{{ longdate ends_on }}{{/if}}</div><div class="phase-name">{{ name }}</div><p class="phase-detail">{{ detail }}</p></li>{{/each}}
+</ol>

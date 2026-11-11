@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { axe } from "../testing/axe";
@@ -63,6 +63,29 @@ describe("ListDetail side by side", () => {
     setViewport(1180);
     rerender(<Probe />);
     expect(screen.getByText("Alone")).toBeInTheDocument();
+  });
+
+  it("with fillUntilPicked, gives a board the full width until a record is picked, then puts it beside", async () => {
+    function Board() {
+      const [picked, setPicked] = useState<string | null>(null);
+      const shown = REQUESTS.find((r) => r.id === picked);
+      return (
+        <ListDetail
+          fillUntilPicked
+          open={picked !== null}
+          onClose={() => setPicked(null)}
+          title="Candidate"
+          list={<button type="button" onClick={() => setPicked("b")}>Chidi Eze</button>}
+          detail={shown && <p>{`${shown.type} leave for ${shown.name}`}</p>}
+        />
+      );
+    }
+    const { container } = render(<Board />);
+    expect(container.querySelector("[data-grid]")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
+    expect(screen.getByText("Sick leave for Chidi Eze")).toBeInTheDocument();
+    expect(container.querySelector("[data-grid]")).not.toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("has no accessibility violations", async () => {
@@ -159,12 +182,14 @@ describe("DetailPane", () => {
 });
 
 /** Expenses' layout (F31 as amended): the picked record only, in the dialog, at every width. */
-function ModalRequests() {
+function ModalRequests({ size, closeButton }: { size?: "md" | "wide" | "xl"; closeButton?: boolean }) {
   const [picked, setPicked] = useState<string | null>(null);
   const shown = REQUESTS.find((r) => r.id === picked) ?? null;
   return (
     <ListDetail
       layout="modal"
+      size={size}
+      closeButton={closeButton}
       open={picked !== null}
       onClose={() => setPicked(null)}
       title="Expense Request"
@@ -192,6 +217,23 @@ describe("ListDetail in the modal layout", () => {
     await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
     const dialog = await screen.findByRole("dialog", { name: "Expense Request" });
     expect(dialog).toHaveTextContent("Sick request from Chidi Eze");
+  });
+
+  it("opens a record whose cards sit side by side in the widest dialog", async () => {
+    render(<ModalRequests size="xl" />);
+    await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
+    expect((await screen.findByRole("dialog", { name: "Expense Request" })).className).toMatch(/max-w-6xl/);
+  });
+
+  it("closes from the Close button at the foot of the dialog on desktop", async () => {
+    render(<ModalRequests size="xl" closeButton />);
+    await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
+    const dialog = await screen.findByRole("dialog", { name: "Expense Request" });
+    // The header's close icon is named Close too: the footer's button is the last.
+    const close = within(dialog).getAllByRole("button", { name: "Close" });
+    expect(close).toHaveLength(2);
+    await userEvent.click(close.at(-1)!);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("on a phone opens the same record in the sheet", async () => {

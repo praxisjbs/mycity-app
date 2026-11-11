@@ -334,11 +334,16 @@ const ApplicationSubmit = z
  */
 const CvUpload = z.object({ purpose: z.literal("cv").optional() }).strict();
 
-/** What applying answers: a reference to quote, never the row. */
+/**
+ * What applying answers: a reference to quote, never the row. `already_applied`: this email had
+ * applied for this role before, so nothing new was made; `reference` and `submitted_at` are the
+ * first application's, and Apply says so instead of Application Sent (GE, 08/11/2026).
+ */
 const ApplicationReceipt = z
   .object({
     reference: z.string(),
     submitted_at: isoDateTime,
+    already_applied: z.boolean(),
   })
   .strict();
 

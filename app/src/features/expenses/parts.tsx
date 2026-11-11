@@ -1,6 +1,6 @@
 import expenses from "@mycity/contract/schemas/expenses.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import type { ExpenseRequest, ExpenseRow } from "@mycity/contract/contract.gen.ts";
+import type { ExpenseBank, ExpenseCategory, ExpenseRequest, ExpenseRow } from "@mycity/contract/contract.gen.ts";
 import { useState, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
@@ -11,8 +11,8 @@ import { hasCapability } from "@/shell/access";
 import { paging } from "@/features/shared/wire";
 import type { Tone } from "@/api/types/common";
 import {
-  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, DataView, Details, ErrorState, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, IconButton, KeyValue,
-  LoadingRows, Money, MoneyField, Pager, Pill, SelectField, Sub, TextAreaField, TextField, Timeline, toast, toMoneyString, useConfirm, useContractForm, useModal, UploadField,
+  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, IconButton, KeyValue,
+  LoadingRows, Money, MoneyField, Pager, Pill, plural, Popover, RecordPicker, SelectField, Sub, TextAreaField, TextField, Timeline, toast, toMoneyString, useConfirm, useContractForm, useModal, UploadField, type ComboFieldProps,
 } from "@mycity/ui";
 
 /*
@@ -54,7 +54,54 @@ export const PAYEES: Array<[ExpenseRow["payee_type"], string]> = [
   ["partner", "Partner"],
   ["task_team", "Dedicated Task Team (DTT)"],
 ];
-const BANKS = ["Access Bank", "First Bank", "GTBank", "Opay", "Providus Bank", "Stanbic IBTC", "UBA", "Wema Bank", "Zenith Bank"].map((b) => [b, b] as [string, string]);
+
+/*
+ * Category: a button that opens a popover with a type filter and a search over the server's
+ * categories, 25 a page (TB, 11/11/2026: thirty or forty categories are searched, never scrolled).
+ */
+const CATEGORY_TYPES: Array<["" | ExpenseCategory["type"], string]> = [["", "All"], ["operating", "Operating"], ["capital", "Capital"]];
+
+function CategoryField({ value, label, onPick }: { value: string; label?: string | null; onPick: (id: string, name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [type, setType] = useState<"" | ExpenseCategory["type"]>("");
+  const list = usePaged("GET /api/v1/expense-categories", { filters: { active: "true", ...(type ? { type } : {}) }, sort: "name", enabled: open });
+  return (
+    <Popover
+      title="Pick Category"
+      open={open}
+      onOpenChange={setOpen}
+      className="w-80"
+      trigger={<Button iconRight="down" className="w-full justify-between">{value ? (label ?? "Category Picked") : "Pick Category"}</Button>}
+    >
+      <div className="flex flex-col gap-3">
+        <ChoiceField label="Category Type" value={type} onChange={setType} options={CATEGORY_TYPES} />
+        <RecordPicker<ExpenseCategory>
+          list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+          value={[]}
+          onChange={(rows) => {
+            const c = rows[0];
+            if (!c) return;
+            onPick(c.expense_category_id, c.name);
+            setOpen(false);
+          }}
+          id={(c) => c.expense_category_id}
+          title={(c) => c.name}
+          sub={(c) => (c.type === "capital" ? "Capital" : "Operating")}
+          placeholder="Search categories"
+        />
+      </div>
+    </Popover>
+  );
+}
+
+/*
+ * Bank: typed or picked. The server suggests the common banks and every bank a request has named;
+ * a bank it does not know is added as typed (Add, with a plus) and offered from then on (TB, 11/11/2026).
+ */
+function BankField(binding: Omit<ComboFieldProps<ExpenseBank>, "list" | "option" | "sub" | "placeholder">) {
+  const banks = usePaged("GET /api/v1/expenses/banks");
+  return <ComboField<ExpenseBank> {...binding} list={banks} option={(b) => b.bank_name} sub={(b) => (b.uses ? plural(b.uses, "request") : undefined)} placeholder="Zenith Bank" />;
+}
 
 /* Money in kobo for a total on the form, never in floating point. */
 const kobo = (v: string) => {
@@ -78,11 +125,10 @@ const EMPTY_LINE: LineValue = { description: "", quantity: "1", unit_price: "" }
  * Read Invoice and Suggest Category fill it for the person to check; nothing is saved until they press.
  */
 export function RequestForm({ close, existing, project }: { close: () => void; existing?: ExpenseRequest; project?: string }) {
-  const me = useMe();
-  const cats = useInfinite("GET /api/v1/expense-categories", { filters: { active: "true" }, sort: "name" });
   const projects = useInfinite("GET /api/v1/projects", { filters: { status: "active" } });
   const depts = useInfinite("GET /api/v1/departments", { filters: { active: "true" } });
   const [invoice, setInvoice] = useState(existing?.invoice ?? null);
+  const [category, setCategory] = useState<string | null>(existing?.category ?? null);
   const f = useContractForm(
     {
       purpose: existing?.purpose ?? "",
@@ -135,7 +181,10 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       const got = await read.run({ body: { document_id: invoice.document_id } });
       if (!got.available) return toast(got.reason === "limit" ? "AI limit reached this month" : got.reason === "unreadable" ? "This file cannot be read" : "AI is off");
       if (got.payee_name) f.set("payee_name", got.payee_name);
-      if (got.expense_category_id) f.set("expense_category_id", got.expense_category_id);
+      if (got.expense_category_id) {
+        f.set("expense_category_id", got.expense_category_id);
+        setCategory(null);
+      }
       if (got.lines.length) setLines(got.lines.map((l) => ({ description: l.description, quantity: l.quantity ?? "1", unit_price: l.unit_price })));
       toast("Invoice read. Check every line");
     } catch (e) {
@@ -149,6 +198,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       if (!got.available) return toast(got.reason === "limit" ? "AI limit reached this month" : "AI is off");
       if (!got.expense_category_id) return toast("No category fits");
       f.set("expense_category_id", got.expense_category_id);
+      setCategory(got.category);
       toast(`${got.category} picked`);
     } catch (e) {
       say(e);
@@ -162,7 +212,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       </Field>
       <Grid cols={2}>
         <Field label="Category" {...f.status("expense_category_id")}>
-          <SelectField placeholder="Pick One" options={cats.rows.map((c) => [c.expense_category_id, c.name])} {...paging(cats)} valueLabel={existing?.category} {...f.field("expense_category_id")} />
+          <CategoryField value={f.values.expense_category_id} label={category} onPick={(id, name) => { f.set("expense_category_id", id); setCategory(name); }} />
         </Field>
         <Field label="Project" optional>
           <SelectField placeholder="None" options={[["", "None"], ...projects.rows.map((p) => [p.project_id, p.name] as [string, string])]} {...paging(projects)} {...f.field("project_id")} />
@@ -209,9 +259,9 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       )}
       {!profile && (
         <Grid cols={2}>
-          <Field label="Payee Name" {...f.status("payee_name")}><TextField {...f.field("payee_name")} placeholder={me.display_name} /></Field>
-          <Field label="Bank" {...f.status("bank_name")}><SelectField placeholder="Pick One" options={BANKS} searchable {...f.field("bank_name")} /></Field>
-          <Field label="Account Name" {...f.status("account_name")}><TextField {...f.field("account_name")} /></Field>
+          <Field label="Payee Name" {...f.status("payee_name")}><TextField {...f.field("payee_name")} placeholder="Amaka Okafor" /></Field>
+          <Field label="Bank" {...f.status("bank_name")}><BankField {...f.field("bank_name")} /></Field>
+          <Field label="Account Name" {...f.status("account_name")}><TextField {...f.field("account_name")} placeholder="Amaka Okafor" /></Field>
           <Field label="Account Number" {...f.status("account_number")}>
             <TextField {...f.field("account_number")} inputMode="numeric" onChange={(v) => f.set("account_number", v.replace(/\D/g, "").slice(0, 10))} placeholder="0123456789" />
           </Field>

@@ -150,6 +150,17 @@ describe("Queries & Sanctions · who may raise", () => {
     await screen.findByRole("heading", { name: "Queries" });
     expect(screen.queryByRole("button", { name: "Raise a Query" })).toBeNull();
   }, 30000);
+
+  it("never offers the raiser as the employee (QUERY_SELF, fault #9 of 11/11)", async () => {
+    await signedInAs("cynthia@mycityapp.io", "queries");
+    fireEvent.click(await screen.findByRole("button", { name: "Raise a Query" }));
+    const dialog = await screen.findByRole("dialog");
+    // Her own department: her colleagues in it are offered, she never is (the server leaves her out).
+    fireEvent.change(within(dialog).getByPlaceholderText("Search people"), { target: { value: "Operations" } });
+    const offered = () => within(dialog).queryAllByRole("option").map((o) => o.textContent).join(" | ");
+    await waitFor(() => expect(offered()).toMatch(/Damilola Eke/), { timeout: 5000 });
+    expect(offered()).not.toMatch(/Cynthia Osakunih/);
+  }, 30000);
 });
 
 describe("Queries & Sanctions · Letter Templates", () => {

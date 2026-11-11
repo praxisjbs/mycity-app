@@ -224,13 +224,15 @@ function validityOf(validity, category) {
  * @param {object} actor
  * @param {{kind: "lead"|"partner", id: string, categoryId: string|null}} record
  * @param {object} body  DealFields
- * @param {{held: boolean, field?: string, allowSigned?: boolean, source?: string, identifiedOn?: string|null}} opts
+ * @param {{held: boolean, field?: string, allowSigned?: boolean, source?: string, identifiedOn?: string|null, signedBeforeHub?: boolean}} opts
  *   field: where a refusal lands ("deal" inside New Lead); allowSigned: New Partner's first deal;
+ *   signedBeforeHub: New Partner's "signed before the hub", carried on deal.signed so no delivery
+ *   checklist is raised for it (§13.2, In PR 5);
  *   source: where it came from, on its first history line and its events (`person`, or `import` from
  *   the tracker importer, M7 PR 4); identifiedOn: the day it was identified (its lead's), else today
  * @returns {Promise<{deal_id: string, number: string, stage: object}>}
  */
-async function createIn(client, actor, record, body, { held, field = null, allowSigned = false, source = "person", identifiedOn = null } = {}) {
+async function createIn(client, actor, record, body, { held, field = null, allowSigned = false, source = "person", identifiedOn = null, signedBeforeHub = false } = {}) {
   const at = (k) => (field ? `${field}.${k}` : k);
   refuseMoney(body, held);
   const stages = await lists.stagesOf(client);
@@ -297,7 +299,7 @@ async function createIn(client, actor, record, body, { held, field = null, allow
       key: EVENTS.DEAL_SIGNED,
       entity: { type: "partner_deal", id: dealId },
       actor,
-      payload: { deal_id: dealId, number, partner_id: record.kind === "partner" ? record.id : null, owner_id: body.owner_id, source },
+      payload: { deal_id: dealId, number, partner_id: record.kind === "partner" ? record.id : null, owner_id: body.owner_id, source, ...(signedBeforeHub ? { signed_before_hub: true } : {}) },
     });
   }
   return { deal_id: dealId, number, stage };
@@ -386,6 +388,40 @@ async function update(actor, scope, id, body) {
   return get(id, scope, actor);
 }
 
+/**
+ * The daily job's completion (§6.6, agreement-renewals): each live deal past the later of its validity
+ * and its event's end is Completed, each in its own transaction, and its partner's status kept (a partner
+ * with no live deal left is Dormant). Safe to run twice.
+ * @returns {Promise<{completed: number}>}
+ */
+async function completeLapsed() {
+  let completed = 0;
+  for (const id of await repo.lapsedLive(pool)) {
+    completed += await tx(async (client) => {
+      const deal = await repo.lock(client, id);
+      if (!deal || deal.status !== "live") return 0;
+      const { rowCount } = await client.query(
+        `UPDATE partnership_opportunity SET status = 'completed', completed_at = now()
+          WHERE partnership_opportunity_id = $1 AND status = 'live'
+            AND GREATEST(valid_until, event_ends_on) < (now() AT TIME ZONE 'Africa/Lagos')::date`,
+        [id],
+      );
+      if (rowCount !== 1) return 0;
+      await emit(client, {
+        key: EVENTS.DEAL_COMPLETED,
+        entity: { type: "partner_deal", id },
+        actor: null,
+        before: { status: "live" },
+        after: { status: "completed" },
+        payload: { deal_id: id, number: deal.number, partner_id: deal.partner_id, owner_id: deal.owner_id },
+      });
+      if (deal.partner_id) await require("../partners/partners.service").syncStatus(client, null, deal.partner_id);
+      return 1;
+    });
+  }
+  return { completed };
+}
+
 /** The deal behind a card or a 360, seen by the reader, or a 404. */
 async function assertSeen(db, id, scope) {
   const r = await repo.get(db, id, scope);
@@ -413,6 +449,7 @@ async function cardNames(db, ids) {
 
 module.exports = {
   MONEY,
+  completeLapsed,
   cardNames,
   assertOwner,
   holdsMoney,

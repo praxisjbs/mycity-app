@@ -245,6 +245,14 @@ describeDb("the organisation module against the real migrations", () => {
       expect(res.body.data.map((r) => r.photo_url)).toEqual([null, null]);
     });
 
+    test("exclude_self leaves the caller out, for a form that may not name them (Raise Query)", async () => {
+      const res = await asManager()(request(app).get("/api/v1/employees?exclude_self=true"));
+      expect(res.status).toBe(200);
+      expect(res.body.data.map((r) => r.display_name)).toEqual(["Ngozi Umeh"]);
+      const kept = await asManager()(request(app).get("/api/v1/employees?exclude_self=false"));
+      expect(kept.body.data.map((r) => r.display_name).sort()).toEqual(["Chidi Nwankwo", "Ngozi Umeh"]);
+    });
+
     test("the counts above it are computed, and say what needs a decision", async () => {
       const res = await asOps()(request(app).get("/api/v1/employees/summary"));
       expect(res.status).toBe(200);

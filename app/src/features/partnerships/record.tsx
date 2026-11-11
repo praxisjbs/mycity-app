@@ -2,6 +2,8 @@ import type { Contact, CustomValues, DealDetail, Field as CustomField, Interacti
 import type { ReactNode } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { PagedTable } from "@/features/shared/sections";
+import { hrefFor } from "@/lib/routes";
+import { Link } from "@/lib/router";
 import { Button, Card, CardHeader, DataView, Details, EmptyState, formatDate, formatDateTime, formatMoney, HelpTerm, KeyValue, LoadingRows, PhoneOnly, Pill, StageSwitcher, StatusPill, Timeline, toast, useModal } from "@mycity/ui";
 import { ContactForm } from "./forms/ContactForm";
 import { DealForm } from "./forms/DealForm";
@@ -154,9 +156,37 @@ export function InteractionsCard({ items, title = "Latest Interactions" }: { ite
 
 const KIND: Record<Interaction["interaction_type"], string> = { call: "Call", meeting: "Meeting", email: "Email", visit: "Visit", note: "Note" };
 
+/**
+ * One interaction whole: what was said and by whom. A message from a linked conversation shows who it
+ * was from and to and its first lines (§6.15); only the mailbox's owner may open the conversation.
+ */
+function InteractionDetail({ i }: { i: Interaction }) {
+  return (
+    <>
+      <KeyValue
+        items={[
+          ["When", formatDateTime(i.occurred_at)],
+          ["Kind", KIND[i.interaction_type]],
+          ["By", i.owner?.display_name ?? null],
+          ...(i.mail ? ([["From", i.mail.from], ["To", i.mail.to.join(", ") || null]] as Array<[string, ReactNode]>) : []),
+          ["Contact", i.contact?.name ?? null],
+        ]}
+      />
+      {i.summary && <p data-copy="content" className="mt-3 text-sm whitespace-pre-line">{i.summary}</p>}
+      {i.mail?.mail_thread_id && (
+        <p className="mt-3">
+          <Link className="font-semibold text-primary underline" to={hrefFor("mailbox", "inbox", { id: i.mail.mail_thread_id })}>Open in Mailbox</Link>
+        </p>
+      )}
+    </>
+  );
+}
+
 /** Activity: every interaction, newest first, and the stage and health history (a lead's deal's; a partner's deals'). */
 export function ActivityTab({ record, history }: { record: RecordKey; history?: Array<StageHistoryLine | RecordHistoryLine> }) {
+  const modal = useModal();
   const list = usePaged("GET /api/v1/partnerships/interactions", { filters: record.type === "partner" ? { partner_id: record.id } : { lead_id: record.id }, sort: "-occurred_at" });
+  const open = (i: Interaction) => modal.open({ title: i.subject.slice(0, 80), body: () => <InteractionDetail i={i} /> });
   return (
     <>
       <PagedTable<Interaction>
@@ -164,11 +194,12 @@ export function ActivityTab({ record, history }: { record: RecordKey; history?: 
         list={list}
         rowKey={(i) => i.partner_interaction_id}
         noun="interaction"
+        onRowClick={open}
         empty={{ title: "No Interactions Yet", text: "Log a call, meeting or note." }}
         columns={[
           { key: "w", label: "When", render: (i) => formatDateTime(i.occurred_at) },
           { key: "k", label: "Kind", render: (i) => <Pill>{KIND[i.interaction_type]}</Pill> },
-          { key: "s", label: "Subject", render: (i) => i.subject },
+          { key: "s", label: "Subject", render: (i) => (i.mail ? <span data-copy="content">{i.subject}<span className="block text-2xs text-subtle-foreground">{i.mail.from}</span></span> : i.subject) },
           { key: "b", label: "By", render: (i) => i.owner?.display_name ?? "None", desktop: true },
         ]}
       />
@@ -225,11 +256,6 @@ export function ContactsTab({ record, contacts, readOnly }: { record: RecordKey;
       ]}
     />
   );
-}
-
-/** Work: projects, tasks and events connected to the record (My Workspace's links arrive with M7 PR 5). */
-export function WorkTab() {
-  return <EmptyState title="No Work Yet" text="Projects, tasks and events show here." />;
 }
 
 /** A custom field's value as a person reads it. */

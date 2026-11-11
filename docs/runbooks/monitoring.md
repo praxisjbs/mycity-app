@@ -31,7 +31,7 @@ What each check means when it is not `up`:
 | `modules` | a module failed to load and is not mounted (`skipped` lists it) | `journalctl -u mycity-api-<env>` |
 | `migrations` | no ledger or no migrations applied yet | `deploy-gate` log, `docs/runbooks/deploy.md` |
 | `numbering` | a document type has no numbering scheme | the module's migration |
-| `outbox` | events are piling up (the worker is behind or down) | the worker |
+| `outbox` | events are piling up (the worker is behind or down), or a row has failed for good (degraded with 0 waiting) | the worker; for failed rows, the handler named in the Status brief |
 | `storage` | the media folder is missing or not writable | `/srv/mycity/<env>/media` |
 | `chromium`, `ffmpeg`, `clamd` | PDFs, voice and video, or upload scanning are unavailable | `ops/provision/provision.sh` installs them; `systemctl status clamav-daemon` |
 | `mail` | SMTP is not configured or refuses. When up it shows `sent_last_hour` of `per_hour`: at the limit, system mail waits for a slot (it is not lost) | Settings · Integrations, System Sender (else `SMTP_*` and `MAIL_SEND_PER_HOUR` in the `.env`); `docs/runbooks/dns-and-mail.md` §4 |

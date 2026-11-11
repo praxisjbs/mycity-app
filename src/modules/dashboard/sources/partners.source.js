@@ -57,7 +57,7 @@ const TABLES = Object.freeze({
     "signed_at",
   ],
   deal_member: ["deal_id", "employee_id"],
-  partnership_proposal: ["partnership_proposal_id", "partnership_opportunity_id", "number", "status", "value", "currency", "sent_at"],
+  partnership_proposal: ["partnership_proposal_id", "partnership_opportunity_id", "number", "status", "value", "currency", "sent_at", "view_count", "last_viewed_at"],
   partnership_agreement: ["partnership_opportunity_id", "status", "value", "signed_at"],
 });
 

@@ -53,6 +53,9 @@
  *   attendance.overtime_decided     its line manager tells the approvers over them too
  *   attendance.pay_item_changed     an item followed its day: audit, and the screens reload
  *   attendance.overtime_approved    overtime approved beforehand for a person's day: they are told
+ *   attendance.pay_items_taken,     a payroll run took its deductions and overtime at Submit, or
+ *   attendance.pay_items_released   gave them back on a Send Back (payroll.md §6.9): audit only,
+ *                                   one event for the run with the count, never an amount
  *   temporary_site.submitted        Add Work Site sent a site for approval (attendance.temporary_site
  *                                   tells its approvers): the others on it are told they are on it
  *   temporary_site.approved         its approval ended approved, or People added it directly: the
@@ -106,6 +109,8 @@ const EVENTS = defineEvents("people", {
   "attendance.pay_item_added": { summary: "An attendance deduction or overtime was added" },
   "attendance.pay_item_changed": { summary: "An attendance deduction or overtime followed its day" },
   "attendance.pay_item_waived": { summary: "An attendance deduction was waived" },
+  "attendance.pay_items_taken": { summary: "A payroll run took attendance deductions and overtime" },
+  "attendance.pay_items_released": { summary: "A payroll run gave back attendance deductions and overtime" },
   "attendance.overtime_decided": { summary: "Overtime was confirmed or cut" },
   "attendance.overtime_approved": { summary: "Overtime was approved beforehand" },
   "temporary_site.submitted": { summary: "A temporary site was sent for approval" },

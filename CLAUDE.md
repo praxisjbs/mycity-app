@@ -131,7 +131,10 @@ silently.
   desktop the list and the record sit side by side. A list and the record it opens are always
   `ListDetail` from `@mycity/ui` (`DetailPane` where desktop puts the record elsewhere). The gate
   taps each phone screen's rows and has no exemption. Expenses records open in the modal on desktop
-  too (F31 amended 04/11/2026, AJ; `docs/guides/expenses.md` §10).
+  too (F31 amended 04/11/2026, AJ; `docs/guides/expenses.md` §10), and so do Recruitment's Interviews
+  and Offers, in the widest dialog (F31 amended 08/11/2026, GE); its Candidates, Assessments
+  and Onboarding, in the wide dialog (F31 amended 11/11/2026, GE; a vacancy is a page of its own); and both payslips,
+  Payroll · Payslips and ESS · My Payslips (F31 amended 11/11/2026, JBS Praxis; `docs/guides/payroll.md` §10.3).
 - **Components only from `@mycity/ui`** (`packages/ui`, listed in `docs/COMPONENTS.md`). A missing
   one is added in `packages/ui` with `npm run new:component` (header, test and gallery page), never
   inside a feature; nothing new goes in `app/src/components/` or `public-app/src/components/`.
@@ -161,14 +164,17 @@ A Stop hook (`.claude/hooks/stop-check.js`) runs `check/progress.js`, `check/gui
 back with the reasons; fix them rather than arguing with them. If one genuinely does not apply (a
 refactor that moves no screen, a test-only change), say so to the user and give the PR line to use:
 `Progress-unchanged: <reason>`, `Guide-unchanged: <reason>` or `User-guide-unchanged: <reason>`.
-CI runs the same checks on every PR.
+CI runs those checks on every PR, and many more (see "The gates behind `npm run ci`" below).
 When your change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`, the hook also runs
 the screen gates (`components`, `palette`, `forms`, `dashes`, `five-second`, `two-shells`, `native-ui`); they have
-no exemption line. Fix the screen.
+no exemption line. Fix the screen. The hook is a fast subset: it leaves the slow gates (`a11y`,
+`mock-free`, the frontend tests and builds, the backend suite) to `npm run ci`, so a clean Stop is
+not a green PR.
 
 A task is not finished until:
 
-1. `npm run ci` passes, the whole suite.
+1. `npm run ci` passes, the whole suite, on Node 20 (below). A gate you could not run here is named
+   as unverified in your final message.
 2. **`docs/PROGRESS.md` is updated**: tick API, UI or Mobile on each screen you completed, set
    Status and Updated (day-first date), update the summary counts if a Status changed, and add a
    note under the module: date · initials · what was done · what is left. For foundation work,
@@ -181,6 +187,56 @@ A task is not finished until:
 6. For a frontend change, the PR body's **Native app feel** section says what you did on the phone
    and desktop shells (gate 11). No screenshots needed.
 7. Your final message lists what changed, what is left, and anything you could not verify.
+
+### The gates behind `npm run ci`
+
+`GATES` in `scripts/ci-local.js` is the list, and the only one that stays current;
+`npm run ci:list` prints it. Steps 1 to 4 name the gates whose rule is written there (`pagination`,
+`search-coverage`, `ai-no-writes` and `ai-awareness` among them). These are the rest:
+
+| Group | Gates (id) and what they refuse |
+|---|---|
+| Backend (needs PostgreSQL with pgvector, Redis, ffmpeg) | `test` (the whole jest suite) · `migration-numbers` · `migration-reversibility` (a DOWN, or the reason there is none, and the round trip runs) · `migration-idempotency` · `schema-drift` · `contract-columns` (contract keys are columns) · `route-contracts` (write routes validated) |
+| Frontend | `fe-typecheck` · `fe-lint` · `fe-test` · `fe-build` (gallery, app, public site) · `mock-free` (a release build carries no mock, F12 to F14) |
+| Screens (Chromium) | `five-second`, `two-shells`, `native-ui` (above) · `a11y`: **any** axe violation fails, whatever its impact, colour contrast included, on every gallery component page (390 and 1440 px, light and dark) and every staff-app screen (390 and 1440 px). Fix it in the component or the screen, never by turning a rule off (F7) |
+| Rules | `contrast` (gate 14: every text and surface token pair keeps 4.5:1 in light, dark and device dark; a token and its pair in `packages/contract/schemas/appearance.js` change together) · `date-format` (15) · `native-dialogs` (16) · `upload` (18) · `money` (20) · `ai-manifest-coverage` (9) · `ai-engine-boundary` (24) |
+| Pipeline guards | `contract`, `components-catalogue`, `env-template` (each generated file is current) · `module-catalogue` · `capabilities` · `public-surface` · `numbering-schemes` · `schedulers` (every scheduler is started) · `production-environment-refs` (only release and rollback reach production) · `ai-vendor-imports` · `ai-actions` · `shell` (LF and parses) |
+| Process | `codeowners`: every line of `.github/CODEOWNERS` has two or more owners (the author's own approval does not count), every path it names exists, and every folder in `src/modules/` and every guide in `docs/guides/` has its own line. A new module or guide adds its line in the same PR |
+
+How CI differs from your laptop:
+
+- **Node 20.** `.nvmrc` names it and `npm run ci` exits 2 on any other major. A cloud session's start
+  (`.claude/hooks/session-start.sh`) puts `/opt/node20` first. Where the image has none,
+  `npm install node@20` into a scratch folder and put its `node_modules/.bin` first on `PATH`.
+- **pgvector.** The backend gates need PostgreSQL with pgvector. `extension "vector" is not
+  available` means this database lacks it, and `migration-reversibility` and every integration file
+  fail on it. Where that is the only error, it is the container and not your change, but it is not
+  a pass either: list those gates as unverified and read the PR's backend jobs.
+- **Scope.** In GitHub, `scripts/check/lib/scope.js` decides how much a run needs. A change to
+  documents only (Markdown at the root, in `docs/` or directly in `.github/`, except
+  `docs/PROGRESS.md` and `MILESTONES.md`, which code reads) runs only the document gates
+  (`dashes`, `components-catalogue`, `components`, `progress`, `guides`, `readme-map`, `codeowners`,
+  `user-guide`). A PR that changes code runs only the sets its files can affect: a change under
+  `app/` skips the backend jobs and the gallery screens. A push to `main` whose tree a PR's full run
+  already passed runs the document gates only. A skipped job is not a pass of its gates, and a
+  laptop always runs everything.
+- **Strict in CI.** With `CI_STRICT=1` a gate whose script is an empty file ("NOT BUILT") fails the
+  run; locally it is reported and does not.
+- **Generated files are regenerated, never merged by hand.** On a merge conflict in one, take either
+  side, run its generator (after `npm ci`, if `node_modules` is empty) and commit the result:
+  `contract.gen.ts` and `contract.gen.meta.json` (`npm run gen:contract`), `docs/COMPONENTS.md`
+  (`gen:components`), `.env.example` (`gen:env`), `src/shared/ai/catalogue.snapshot.json`
+  (`gen:ai-catalogue`, gate 23). Each has a `--check` that CI runs.
+- **One gate, or one job's gates.** `npm run ci -- --only=a11y,contrast` runs the gates named (by
+  id); `--group=backend|frontend|screens|checks` runs a CI job's. Never run two screen-gate runs at
+  once: they share one demo build (the Stop hook already stands aside while `npm run ci` runs).
+
+## Training and handover videos
+
+Asked for a milestone's training or handover video ("make the Milestone 6 video")? Read
+`docs/runbooks/training-videos.md` in full first. It holds the pattern every video follows (measured
+from the M3 video), the tooling in `scripts/video/`, how to film, the pitfalls met and where the work
+stands. Bugs found while filming are fixed in the same branch and logged there (§7).
 
 ## Working conventions
 
@@ -202,6 +258,22 @@ A task is not finished until:
   here and in an agent. A background agent or a Workflow is for work long enough that waiting would
   block the person; say so when you start one. Slower in the foreground is fine; work lost with a
   session that ends is not.
+- **Plan first, then one chat a PR** (TB, 11/11/2026). A milestone, or any change cut into more
+  than one PR, is planned in its own planning chat on the most capable model available, at high
+  effort: never on a lighter model. The plan lives in the module's guide (its build plan appendix)
+  and names, for each PR, its scope and size, the model and effort to build it on, which PRs can
+  run in parallel and the order they merge in (for example "merge PR 3 before PR 5"), so parallel
+  work never conflicts. Each PR is then built in a **fresh chat** from the start prompt the
+  planning chat gives for it, so it carries only what that PR needs; the planning chat is asked
+  for the next prompt when a PR merges. A chat whose context is filling up (past about three
+  quarters) is closed and its next step started fresh from the guide and the handoff.
+- **Research has sources** (TB, 11/11/2026). A figure taken from law or from outside the
+  repository (a tax band, a statutory rate, a legal threshold) is researched in a session whose
+  environment allows network access (switched off again afterwards), from the primary text, and
+  is written down with its source (the instrument, the section, a link or the document, the date
+  checked). Nothing comes from memory or a model's guess. A figure with no legal source says so
+  in plain words ("no legal source: a company rule"). A source that changes is entered again by a
+  person; nothing updates a legal figure by itself.
 
 Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M4, community and mailbox) · TB Tom-Blake
 Asaah (Home, M6, M9, M10, M11) · LA Love Adeola (migrations and data, attendance, M7) · AJ Adole

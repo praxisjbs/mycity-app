@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payslip Sample</title>
+<style>
+  @page { size: A4; margin: 18mm 18mm 22mm 18mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #E4E4E7; font-family: "Geist", "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #09090B; }
+  .page { width: 210mm; min-height: 297mm; margin: 12px auto; background: #FFFFFF; padding: 18mm 18mm 22mm 18mm; position: relative; }
+  @media print { body { background: #FFFFFF; } .page { margin: 0; padding: 0; width: auto; min-height: 0; } }
+  .ribbon { position: absolute; top: 0; right: 0; background: #FFDF55; color: #09090B; font-size: 8.5pt; font-weight: 700; padding: 4px 14px; letter-spacing: 0.4px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 10px; border-bottom: 3px solid #FFDF55; margin-bottom: 18px; }
+  .wordmark { font-size: 18pt; font-weight: 700; color: #014339; letter-spacing: 0.2px; }
+  .meta { text-align: right; font-size: 9pt; color: #71717A; }
+  .meta strong { color: #014339; font-weight: 600; }
+  h1 { font-size: 14pt; font-weight: 700; color: #014339; margin: 0 0 2px 0; }
+  .period { font-size: 10.5pt; color: #71717A; margin: 0 0 14px 0; }
+  .who { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 28px; margin-bottom: 16px; padding: 10px 12px; border: 1px solid #E4E4E7; border-radius: 6px; }
+  .who div { display: flex; justify-content: space-between; gap: 12px; }
+  .who span:first-child { color: #71717A; }
+  .who span:last-child { font-weight: 600; text-align: right; }
+  h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; color: #014339; margin: 16px 0 4px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #E4E4E7; vertical-align: top; }
+  th { font-weight: 600; color: #014339; font-size: 9pt; }
+  .amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .detail { color: #71717A; font-size: 9pt; }
+  .total td { font-weight: 700; border-bottom: 2px solid #014339; }
+  .net { margin-top: 18px; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: #014339; color: #FFFFFF; border-radius: 6px; }
+  .net span:first-child { font-size: 11pt; font-weight: 600; letter-spacing: 0.3px; }
+  .net span:last-child { font-size: 16pt; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .foot { margin-top: 28px; padding-top: 8px; border-top: 1px solid #E4E4E7; font-size: 8.5pt; color: #71717A; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="ribbon">SAMPLE: FICTIONAL PERSON AND FIGURES</div>
+
+  <header class="head">
+    <div class="wordmark">MyCity App</div>
+    <div class="meta">
+      <div><strong>PAY-2026-10-0001</strong></div>
+      <div>30 October 2026</div>
+    </div>
+  </header>
+
+  <h1>Payslip</h1>
+  <p class="period">October 2026</p>
+
+  <section class="who">
+    <div><span>Name</span><span>Sample Person</span></div>
+    <div><span>Bank</span><span>Sample Bank</span></div>
+    <div><span>Staff Number</span><span>00042</span></div>
+    <div><span>Account</span><span>Ending 1234</span></div>
+    <div><span>Job Title</span><span>Operations Associate</span></div>
+    <div><span>Pay Date</span><span>30/10/2026</span></div>
+    <div><span>Department</span><span>Operations</span></div>
+    <div><span>Days Paid</span><span>26 of 26</span></div>
+  </section>
+
+  <h2>Earnings</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Detail</th><th class="amount">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>Monthly Pay</td><td class="detail"></td><td class="amount">₦450,000.00</td></tr>
+      <tr><td>Overtime</td><td class="detail">1 day</td><td class="amount">₦8,000.00</td></tr>
+      <tr class="total"><td>Total Earnings</td><td></td><td class="amount">₦458,000.00</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Deductions</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Detail</th><th class="amount">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>Lateness</td><td class="detail">2 late arrivals</td><td class="amount">₦3,500.00</td></tr>
+      <tr><td>Absence</td><td class="detail">1 day</td><td class="amount">₦17,307.69</td></tr>
+      <tr><td>Unpaid Leave</td><td class="detail">2 days, 12 to 13 October</td><td class="amount">₦34,615.38</td></tr>
+      <tr><td>Fine</td><td class="detail">QRY-0019, 1 of 3</td><td class="amount">₦15,000.00</td></tr>
+      <tr><td>Salary Advance Repayment</td><td class="detail">1 of 3</td><td class="amount">₦25,000.00</td></tr>
+      <tr class="total"><td>Total Deductions</td><td></td><td class="amount">₦95,423.07</td></tr>
+    </tbody>
+  </table>
+
+  <div class="net"><span>Net Pay</span><span>₦362,576.93</span></div>
+
+  <footer class="foot">MyCity App Ltd · Lagos</footer>
+</div>
+</body>
+</html>

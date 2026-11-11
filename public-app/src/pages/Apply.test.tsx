@@ -20,7 +20,39 @@ const type = (label: string, value: string) => fireEvent.change(screen.getByLabe
 const next = () => fireEvent.click(screen.getByRole("button", { name: "Next" }));
 const step = (title: string) => screen.findByRole("heading", { level: 2, name: title });
 
+/** Every step filled as it should be, for `email`, then Submit Application. */
+async function walk(container: HTMLElement, email: string) {
+  await step("About You");
+  type("Full Name", "Chiamaka Eze");
+  type("Email", email);
+  type("Phone", "803 123 4567");
+  type("Years of Experience", "9");
+  next();
+  await step("CV and Questions");
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+  fireEvent.change(input, { target: { files: [new File(["%PDF-1.7"], "Chiamaka Eze CV.pdf", { type: "application/pdf" })] } });
+  expect(await screen.findByText("Chiamaka Eze CV.pdf", {}, { timeout: 4000 })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: "Replace" })).toBeTruthy();
+  fireEvent.click(within(screen.getByRole("radiogroup", { name: "Have you led a sales team of three or more people?" })).getByRole("radio", { name: "Yes" }));
+  fireEvent.click(within(screen.getByRole("radiogroup", { name: "Which best describes the deals you have closed?" })).getByRole("radio", { name: "Over ₦50 million a year" }));
+  next();
+  await step("Why This Role");
+  type("Why This Role", "I have grown revenue for two Lagos media brands and want to build MyCityApp's.");
+  fireEvent.click(screen.getByRole("checkbox", { name: "I agree to the privacy notice" }));
+  fireEvent.click(screen.getByRole("button", { name: "Submit Application" }));
+}
+
 describe("Apply", () => {
+  it("an email that has applied for this role is told so, with its first reference, not Application Sent", async () => {
+    const { container } = draw("Hq5tN2wPz8Kc");
+    await walk(container, "Chiamaka.Eze@example.com");
+    expect(await screen.findByRole("heading", { name: "You Have Already Applied" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Application Sent" })).toBeNull();
+    expect(screen.getByText("APP-0016")).toBeTruthy();
+    expect(screen.getByText(/^chiamaka\.eze@example\.com applied for this role on \d{2}\/\d{2}\/\d{4}\. We kept that application\.$/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "See Other Roles" })).toBeTruthy();
+  }, 30000);
+
   it("holds each step until it is right, then sends the application and shows the reference", async () => {
     const { container } = draw("k7Qm2TxV9pLa");
     const aside = screen.getByRole("complementary", { name: "Apply" });

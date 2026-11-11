@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { parse, sectionOf } from "./router";
+import { NAV, parse, sectionOf } from "./router";
 
-/** The site's addresses (MILESTONES §6) and the header link each belongs to. */
+/** The site's addresses (MILESTONES §6) and the public links in its header. */
 describe("router", () => {
+  it("keeps personal-link pages out of the header navigation", () => {
+    expect(NAV.map(({ label }) => label)).toEqual(["Vacancy", "Verify Document", "Help"]);
+  });
+
   it.each([
     ["/", { page: "home" }, null],
     ["/jobs", { page: "careers" }, "Vacancy"],
@@ -20,6 +24,8 @@ describe("router", () => {
     ["/verify/OFF-0016", { page: "verify", number: "OFF-0016" }, "Verify Document"],
     ["/verify/t/Qd5mW8rTx3Kp", { page: "verify-qr", token: "Qd5mW8rTx3Kp" }, "Verify Document"],
     ["/proposal/abc", { page: "proposal", token: "abc" }, null],
+    ["/help", { page: "help" }, "Help"],
+    ["/help/", { page: "help" }, "Help"],
     ["/nowhere/at/all", { page: "not-found" }, null],
   ] as const)("%s", (path, route, section) => {
     expect(parse(path)).toEqual(route);

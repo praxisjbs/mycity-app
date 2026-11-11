@@ -1,11 +1,14 @@
 import type { LeadRow } from "@mycity/contract/contract.gen.ts";
 import { useState } from "react";
+import { api } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { useApi, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
-import { Button, Chips, DesktopOnly, formatWhen, ListDetail, PageHeader, Pill, StatusPill, useIsPhone, useModal, useSideBySide, Who } from "@mycity/ui";
+import { Button, Chips, DesktopOnly, ExportButton, formatWhen, ListDetail, PageHeader, Pill, StatusPill, useIsPhone, useModal, useSideBySide, Who } from "@mycity/ui";
 import { filterQuery, NO_FILTERS, RecordFilters, type RecordFilterValue } from "./filters";
 import { Lead360 } from "./Lead360";
 import { DealForm } from "./forms/DealForm";
@@ -18,16 +21,29 @@ type View = "open" | "new" | "qualified" | "converted" | "lost";
  * Partnerships · Leads (#52, docs/guides/partnerships.md §2, §10): the lead list, its status read from
  * its deal, beside the Lead 360 (`?id=`); a lost lead leaves the default list (the Lost chip shows it).
  */
+const CHIPS: Array<[View, string]> = [
+  ["open", "Open"],
+  ["new", "New"],
+  ["qualified", "Qualified"],
+  ["converted", "Converted"],
+  ["lost", "Lost"],
+];
+
 export function Leads({ id }: { id: string | null }) {
   const modal = useModal();
   const phone = useIsPhone();
   const beside = useSideBySide();
   const { navigate } = useRouter();
   const mayCreate = useMay("create");
+  const mayExport = useMay("export");
   const [view, setView] = useState<View>("open");
   const [filter, setFilter] = useState<RecordFilterValue>(NO_FILTERS);
   const s = useApi("GET /api/v1/partnerships/leads/summary");
-  const list = usePaged("GET /api/v1/partnerships/leads", { filters: { ...filterQuery(filter), ...(view === "open" ? {} : { status: view }) }, sort: "name" });
+  const filters = { ...filterQuery(filter), ...(view === "open" ? {} : { status: view }) };
+  const list = usePaged("GET /api/v1/partnerships/leads", { filters, sort: "name" });
+  // Where news waits (notifications.md §6): each chip carries its share; it opens where the news is.
+  const news = useViewNews();
+  useOpenWhereNews({ value: view, onChange: setView, values: CHIPS.map(([v]) => v), all: "open", skip: Boolean(id) });
   const openLead = (lid: string) => navigate(`/partnerships?tab=leads&id=${lid}`);
   const newDeal = (partnerId: string) => modal.open({ title: "New Deal", wide: true, body: (close) => <DealForm partnerId={partnerId} close={close} /> });
   const newLead = () => modal.open({ title: "New Lead", wide: true, body: (close) => <LeadForm close={close} onCreated={openLead} onNewDeal={(pid) => (close(), newDeal(pid))} /> });
@@ -37,7 +53,16 @@ export function Leads({ id }: { id: string | null }) {
   const top = Math.max(1, ...(s.data?.by_source ?? []).map((x) => x.leads));
   return (
     <>
-      <PageHeader title="Leads" sub="Organisations being pursued, with their deal" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newLead}>New Lead</Button> : undefined} />
+      <PageHeader title="Leads" sub="Organisations being pursued, with their deal" actions={
+          <>
+            {mayExport && (
+              <DesktopOnly>
+                <ExportButton onExport={() => saveExport(api.call("POST /api/v1/partnerships/exports", { body: { source: "partnerships.leads", filters: { ...filters, ...(list.q ? { q: list.q } : {}) } } }))} />
+              </DesktopOnly>
+            )}
+            {mayCreate && <Button variant="primary" icon="plus" onClick={newLead}>New Lead</Button>}
+          </>
+        } />
       {s.data && (
         <KpiTiles
           mobileCols={2}
@@ -48,7 +73,7 @@ export function Leads({ id }: { id: string | null }) {
           ]}
         />
       )}
-      <Chips label="Leads" value={view} onChange={setView} options={[["open", "Open"], ["new", "New"], ["qualified", "Qualified"], ["converted", "Converted"], ["lost", "Lost"]]} className="mt-3" />
+      <Chips label="Leads" value={view} onChange={setView} options={withNews(news, CHIPS, { all: "open" })} className="mt-3" />
       <RecordFilters value={filter} onChange={setFilter} kind="lead" />
       <ListDetail
         open={Boolean(id)}

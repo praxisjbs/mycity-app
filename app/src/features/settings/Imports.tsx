@@ -5,7 +5,8 @@ import { upload } from "@/api/upload";
 import { saveFile } from "@/api/download";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import type { ImportBatch, Importer, ImportRowRecord } from "@mycity/contract/contract.gen.ts";
+import type { ImportBatch, Importer, ImportRowRecord, ImportValueList } from "@mycity/contract/contract.gen.ts";
+import { ImportValues, initialChoices, type ValueChoices } from "./ImportValues";
 import {
   Banner,
   Button,
@@ -278,8 +279,8 @@ export function ImportWizard({ preferred, resume, close }: { preferred: string |
   return <ImportSteps importers={importers.data.importers} preferred={preferred} resume={resume} close={close} />;
 }
 
-/** Where an unfinished import is taken up: Map for one uploaded or mapped, Preview for one previewed. */
-const STEP_OF: Record<string, number> = { uploaded: 1, mapped: 1, previewed: 2 };
+/** Where an unfinished import is taken up: Map for one uploaded or mapped, Preview for one previewed (after Map Values when it has one). */
+const stepOf = (status: string, hasValues: boolean) => (status === "previewed" ? (hasValues ? 3 : 2) : status === "uploaded" || status === "mapped" ? 1 : 0);
 
 function ImportSteps({ importers, preferred, resume, close }: { importers: Importer[]; preferred: string | null; resume: ImportBatch | null; close: () => void }) {
   const [key, setKey] = useState(resume?.importer_key ?? preferred ?? importers[0]?.key ?? "");
@@ -298,6 +299,11 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
   const preview = useMutation("POST /api/v1/imports/:id/preview");
   const commit = useMutation("POST /api/v1/imports/:id/commit");
   const importer = importers.find((i) => i.key === key) ?? null;
+  // Map Values: an importer with list, person or place columns asks for each distinct value after Map.
+  const hasValues = (importer?.fields ?? []).some((f) => f.map_values);
+  const [values, setValues] = useState<ImportValueList | null>(null);
+  const [choices, setChoices] = useState<ValueChoices>({});
+  const saveValues = useMutation("PUT /api/v1/imports/:id/values");
 
   const rows = usePaged("GET /api/v1/imports/:id/rows", {
     params: { id: batch?.import_batch_id ?? "" },
@@ -448,8 +454,15 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
         }
         try {
           const saved = await setMapping.run({ params: { id: batch.import_batch_id }, body: { fields } });
-          const out = await preview.run({ params: { id: batch.import_batch_id }, body: {} });
           setRefused(null);
+          if (hasValues) {
+            const list = await api.call("GET /api/v1/imports/:id/values", { params: { id: batch.import_batch_id } });
+            setValues(list);
+            setChoices(initialChoices(list));
+            setBatch(saved);
+            return true;
+          }
+          const out = await preview.run({ params: { id: batch.import_batch_id }, body: {} });
           setBatch({ ...saved, ...out.batch, stats: out.stats });
           return true;
         } catch (e) {
@@ -463,6 +476,27 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
         }
       },
     },
+    ...(hasValues
+      ? [
+          {
+            title: "Map Values",
+            body: values ? <ImportValues list={values} choices={choices} onChange={setChoices} /> : <LoadingRows count={4} />,
+            // The choices are kept on the import and with its columns for the next sheet, then the preview runs.
+            check: async () => {
+              if (!batch) return false;
+              try {
+                await saveValues.run({ params: { id: batch.import_batch_id }, body: { values: choices, save_profile: true } });
+                const out = await preview.run({ params: { id: batch.import_batch_id }, body: {} });
+                setBatch({ ...out.batch, stats: out.stats });
+                return true;
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "Those values did not save");
+                return false;
+              }
+            },
+          },
+        ]
+      : []),
     {
       title: "Preview",
       body: batch && (
@@ -558,7 +592,7 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
   return (
     <Wizard
       steps={steps}
-      initialStep={resume ? (STEP_OF[resume.status] ?? 0) : 0}
+      initialStep={resume ? stepOf(resume.status, hasValues) : 0}
       finish="Commit Import"
       busy={commit.pending}
       onCancel={close}

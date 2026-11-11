@@ -1,4 +1,4 @@
-import type { ChecklistItem, DealDetail, DealRow, Field, LeadRow, ListValue, PartnerRow, RecordField, TemplateAsk } from "@mycity/contract/contract.gen.ts";
+import type { AgreementStatus, ChecklistItem, DealDetail, DealRow, Field, LeadRow, ListValue, PartnerRow, RecordField, TemplateAsk } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useApi, useInfinite } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
@@ -11,12 +11,6 @@ import { toast, type DocumentEditorField } from "@mycity/ui";
  * categories as options, the pills a lead, a partner and a deal show, and how a refusal lands.
  * Never a rule of the API's: the screens show what it decided.
  */
-
-/** A person's first name and initial, for a narrow column (Contracts & MOUs, on the mock until M7 PR 6). */
-export const short = (p: { display_name: string }) => {
-  const [a, b] = p.display_name.split(" ");
-  return `${a} ${b?.[0] ?? ""}.`;
-};
 
 /** A refusal in a toast: what the API said about the first field it named, else its own words, or a plain line. */
 export const fail = (e: unknown) => {
@@ -49,7 +43,7 @@ export function useHoldsMoney() {
 }
 
 /** May the reader do this in Partnerships (their grant)? */
-export function useMay(action: "create" | "edit") {
+export function useMay(action: "create" | "edit" | "export") {
   const { me } = useAuth();
   return !!me?.grants.partnerships?.includes(action);
 }
@@ -146,6 +140,33 @@ const DEAL_STATUS: Record<DealRow["status"], { label: string; tone: Tone }> = {
   lost: { label: "Lost", tone: "neutral" },
 };
 export const dealPill = (s: DealRow["status"]) => ({ tone: DEAL_STATUS[s].tone, text: DEAL_STATUS[s].label });
+
+/** An agreement's status as Contracts & MOUs names it (§6.8): approval reads In Approval while it waits. */
+export const AGREEMENT_STATUS: Record<AgreementStatus, { label: string; tone: Tone }> = {
+  draft: { label: "Draft", tone: "neutral" },
+  review: { label: "In Review", tone: "warn" },
+  approval: { label: "In Approval", tone: "warn" },
+  sent: { label: "Sent", tone: "info" },
+  viewed: { label: "Viewed", tone: "info" },
+  signed: { label: "Signed", tone: "ok" },
+  active: { label: "Active", tone: "ok" },
+  expiring: { label: "Expiring", tone: "warn" },
+  renewed: { label: "Renewed", tone: "neutral" },
+  closed: { label: "Closed", tone: "neutral" },
+};
+export const agreementPill = (s: AgreementStatus, approved = false) =>
+  approved && s === "approval" ? { tone: "ok" as Tone, text: "Approved" } : { tone: AGREEMENT_STATUS[s].tone, text: AGREEMENT_STATUS[s].label };
+
+/** Where one signer stands (§6.9): `void` signed a request that ended unsigned, so it binds nobody. */
+export const SIGNER_STATE: Record<"waiting" | "sent" | "viewed" | "signed" | "declined" | "void" | "expired", { label: string; tone: Tone }> = {
+  waiting: { label: "Waiting", tone: "neutral" },
+  sent: { label: "Sent", tone: "info" },
+  viewed: { label: "Viewed", tone: "info" },
+  signed: { label: "Signed", tone: "ok" },
+  declined: { label: "Declined", tone: "err" },
+  void: { label: "Void", tone: "neutral" },
+  expired: { label: "Expired", tone: "neutral" },
+};
 
 /** The region scopes a form offers (§6.3); `cities` asks for the cities. */
 export const SCOPES: Array<["cities" | "national" | "africa" | "worldwide", string]> = [

@@ -528,6 +528,9 @@ colleagues may see different chapters.
 4. To find a topic, use the search box at the top of the guide ([Search the guide](#start-user-guide-search)).
    From anywhere else, open search, type `guide` and a few words, such as `guide add employee`, and
    choose the result.
+5. To see how the careers site works for a candidate, press **Public Site Help**. The site's own
+   Help page opens in a new tab: how to find a role, apply, take an assessment, sign an offer and
+   check a document.
 
 ### Search the guide {#start-user-guide-search}
 

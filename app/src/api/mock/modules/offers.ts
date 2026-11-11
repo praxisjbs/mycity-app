@@ -388,8 +388,8 @@ function signersOf(o: MockOffer): SignerView[] {
   const a = appOf(o.application_id)!;
   const ended = o.status === "declined" ? "declined" : o.status === "expired" || o.status === "withdrawn" ? "expired" : "pending";
   return [
-    { name: s?.display_name ?? "Offer Signatory", title: s?.job_title ?? null, role: "mycity", status: o.company_signed_at ? "signed" : ended === "pending" ? "pending" : "expired", signed_at: o.company_signed_at },
-    { name: nameOf(a), title: null, role: "candidate", status: o.candidate_signed_at ? "signed" : ended, signed_at: o.candidate_signed_at },
+    { name: s?.display_name ?? "Offer Signatory", title: s?.job_title ?? null, role: "mycity", status: o.company_signed_at ? "signed" : ended === "pending" ? "pending" : "expired", signed_at: o.company_signed_at, method: o.company_signed_at ? "type" : null },
+    { name: nameOf(a), title: null, role: "candidate", status: o.candidate_signed_at ? "signed" : ended, signed_at: o.candidate_signed_at, method: o.candidate_signed_at ? "draw" : null },
   ];
 }
 

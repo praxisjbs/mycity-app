@@ -42,6 +42,28 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-10-20",
     built: true,
   }),
+  // Draft With AI on an SOP (docs/guides/knowledge.md §6.4): a department's procedure shaped into
+  // Purpose, Roles and Steps; a procedure names people, so DeepSeek never answers it.
+  "sop-draft": Object.freeze({
+    label: "Draft SOP",
+    module: "knowledge",
+    job: "default",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-11-11",
+    built: true,
+  }),
+  // Draft Lesson on a course's lesson item (docs/guides/knowledge.md §6.5): a lesson written from a
+  // pasted text or a PDF's text, only when the builder presses it; nothing kept until Use Lesson.
+  "training-lesson-draft": Object.freeze({
+    label: "Draft Lesson",
+    module: "knowledge",
+    job: "default",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-11-11",
+    built: true,
+  }),
   "data-answers": Object.freeze({
     label: "Data Answers",
     module: "praxis_ai",
@@ -305,6 +327,64 @@ const ACTIONS = Object.freeze({
     personal_data: true,
     chosen_by: "GE",
     chosen_at: "2026-11-04",
+    built: true,
+  }),
+  // M7 Proposal Studio (docs/guides/partnerships.md §6.10, §9): the question cards, the draft and a
+  // section's rewrite on Top Tier, chosen by JBS Praxis; contacts' names travel, so DeepSeek never answers.
+  "proposal-questions": Object.freeze({
+    label: "Proposal Questions",
+    module: "partnerships",
+    job: "top_tier",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-11-05",
+    reason: "Long drafting from many sources: the brief, a meeting transcript, the deal and its record, past accepted proposals and MyCity's proof points, written into the design kit's layouts",
+    // Anthropic Sonnet first, Gemini Pro when MyCity's Anthropic key is missing or failing (§13.1 item 21).
+    chain: Object.freeze([
+      ["anthropic", "sonnet"],
+      ["gemini", "pro"],
+    ]),
+    built: true,
+  }),
+  "proposal-draft": Object.freeze({
+    label: "Write Proposal",
+    module: "partnerships",
+    job: "top_tier",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-11-05",
+    reason: "Long drafting from many sources: the brief, a meeting transcript, the deal and its record, past accepted proposals and MyCity's proof points, written into the design kit's layouts",
+    // Anthropic Sonnet first, Gemini Pro when MyCity's Anthropic key is missing or failing (§13.1 item 21).
+    chain: Object.freeze([
+      ["anthropic", "sonnet"],
+      ["gemini", "pro"],
+    ]),
+    built: true,
+  }),
+  "proposal-rewrite": Object.freeze({
+    label: "Rewrite Section",
+    module: "partnerships",
+    job: "top_tier",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-11-05",
+    reason: "Long drafting from many sources: the brief, a meeting transcript, the deal and its record, past accepted proposals and MyCity's proof points, written into the design kit's layouts",
+    // Anthropic Sonnet first, Gemini Pro when MyCity's Anthropic key is missing or failing (§13.1 item 21).
+    chain: Object.freeze([
+      ["anthropic", "sonnet"],
+      ["gemini", "pro"],
+    ]),
+    built: true,
+  }),
+  // Write With AI in Send Proposal: the covering email's subject and message. Default, not Fast: a
+  // person reads it as a draft (ai-control.md §6.2), chosen by TB.
+  "proposal-message": Object.freeze({
+    label: "Proposal Message",
+    module: "partnerships",
+    job: "default",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-11-07",
     built: true,
   }),
 });

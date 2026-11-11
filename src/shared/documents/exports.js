@@ -184,15 +184,19 @@ function present(doc) {
 }
 
 /**
- * GET /exports/:id: one of the caller's own export files, as the screen waiting on it reads it.
- * Anyone else's, a document that is not an export, or one already removed, is a 404.
+ * GET /exports/:id: one of the caller's own export files, as the screen waiting on it reads it; or a
+ * generated document kept for good that the caller may read (a training certificate, offered by
+ * Download Certificate while the worker still renders it). Anyone else's, any other document, or one
+ * already removed, is a 404.
  * @param {{user_id: string}} user
  * @param {string} documentId
  */
 async function status(user, documentId, { db = defaultDb() } = {}) {
   const doc = await vault.get(db, documentId);
-  if (!doc || !docTypes.isExport(doc.doc_type) || !user || doc.uploaded_by !== user.user_id)
-    throw new AppError("NOT_FOUND", "Not found", 404);
+  if (!doc || !user) throw new AppError("NOT_FOUND", "Not found", 404);
+  const own = docTypes.isExport(doc.doc_type) && doc.uploaded_by === user.user_id;
+  const kept = !docTypes.isExport(doc.doc_type) && doc.source === "generated" && (await vault.canRead(db, user, doc));
+  if (!own && !kept) throw new AppError("NOT_FOUND", "Not found", 404);
   return present(doc);
 }
 

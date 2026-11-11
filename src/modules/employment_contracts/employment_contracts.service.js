@@ -65,9 +65,9 @@ async function visible(db, id, scope, opts) {
   return row;
 }
 
+/** The company's name as the offer letter prints it (the profile's display name, never null). */
 async function companyOf(db) {
-  const org = await profile.readProfile(db);
-  return org.legal_name || org.trading_name;
+  return profile.displayName(await profile.readProfile(db));
 }
 
 const payload = (ct, extra = {}) => ({
@@ -176,7 +176,10 @@ async function generateIn(client, actor, { offer, onboarding_case: onboardingCas
      VALUES ($1, $2, $3, $4, 'draft', $5, $6)`,
     [contractId, onboardingCase.onboarding_case_id, employee.employee_id, number, day(offer.start_date), doc.document_id],
   );
-  const { signature_request_id: requestId } = await signatures.requestIn(client, actor, {
+  // The candidate's signature is the actor here, and they have no login; a request is always someone's
+  // (signature_request.created_by), so it is opened as the company's signatory, its first signer.
+  const opener = actor && actor.user_id ? actor : { ...(actor || {}), user_id: signatory.user_id };
+  const { signature_request_id: requestId } = await signatures.requestIn(client, opener, {
     document_id: doc.document_id,
     subject_type: SUBJECT,
     subject_id: contractId,
@@ -358,7 +361,10 @@ async function sealIn(client, ctx) {
   return doc;
 }
 
-/** The hire signed: the last signature of the request. */
+/**
+ * The hire signed: the last signature of the request. The signed contract may be the last thing the
+ * case's documentation waited on, so the onboarding gate is asked in the same transaction.
+ */
 async function signedIn(client, ctx) {
   const ct = await repo.get(client, ctx.request.subject_id, { lock: true });
   if (!ct || !(await repo.setStatus(client, ct.employment_contract_id, ["sent", "draft"], "signed"))) return;
@@ -368,6 +374,7 @@ async function signedIn(client, ctx) {
     actor: ctx.actor || null,
     payload: payload(ct),
   });
+  await require("../onboarding/onboarding.service").contractSignedIn(client, ctx.actor || null, ct.onboarding_case_id);
 }
 
 async function declinedIn(client, ctx) {

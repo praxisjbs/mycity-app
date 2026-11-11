@@ -18,12 +18,14 @@ import type {
   PlaceView,
   StageHistoryLine,
 } from "@mycity/contract/contract.gen.ts";
-import type { Contract, Proposal } from "@/api/types/partnerships";
-import type { Status } from "@/api/types/performance";
-import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
+import type { ProposalContent, ProposalContentEdit, ProposalDetail, ProposalQuestion, ProposalTemplate } from "@mycity/contract/contract.gen.ts";
+import SAMPLE_HTML from "@mycity/ui/samples/proposal-kit.sample.html?raw";
+import SAMPLE_CONTENT from "@mycity/ui/samples/proposal-kit.sample.json";
+import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, uuid, type Req } from "../core";
 import { byId, byKey, refKey } from "../data/people";
 import { PARTNERS, type MockPartner } from "../data/partners";
 import { pickedPlace, placeOf } from "./maps";
+import { exportFile } from "./shared";
 import { mockCategories, mockFields, mockList } from "./partnerships_categories";
 
 /**
@@ -32,11 +34,11 @@ import { mockCategories, mockFields, mockList } from "./partnerships_categories"
  * interactions.js), by the API's own rules where a screen can see them: a lead's status read from its
  * deal's stage, reasons for a move back, On Hold and Closed Lost, the signed copy for a signed stage,
  * Stalled needing blockers, conversion making the partner. Everyone signed in sees every record, as
- * the Operations account the screen gates sign in as does (§6.1). Proposals, Contracts & MOUs and
- * Analytics stay on their INTERIM shapes below until M7 PR 6 to 8.
+ * the Operations account the screen gates sign in as does (§6.1). Proposals and the studio are in the
+ * contract's shapes (M7 PR 7), Contracts & MOUs in partnerships_agreements.ts (PR 6); Analytics stays on
+ * its INTERIM shape below until PR 8.
  */
 
-const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const k = (m: string) => Math.round(Number(m) * 100);
 const m = (kobo: number) => `${Math.trunc(kobo / 100)}.${String(kobo % 100).padStart(2, "0")}`;
 const now = () => new Date().toISOString();
@@ -68,6 +70,8 @@ const SIGNED = new Set(["signed", "active"]);
 const LEAD_STATUS: Record<string, LeadRow["status"]> = { prospect: "new", contacted: "contacted", meeting: "contacted", proposal: "qualified", negotiation: "qualified", closed_lost: "lost", signed: "converted", active: "converted" };
 
 const categoryOf = (id: string | null | undefined) => mockCategories().find((c) => c.partner_category_id === id) ?? null;
+/** A category's name, for the work pickers (partnerships_work.ts). */
+export const categoryNameOf = (id: string | null | undefined) => categoryOf(id)?.name ?? null;
 
 /* ------------------------------------------------------------------ *
  * Leads, partners and their deals
@@ -143,8 +147,8 @@ interface MockDeal {
   impact: string[];
 }
 
-const RECORDS: MockRecord[] = [];
-const DEALS: MockDeal[] = [];
+export const RECORDS: MockRecord[] = [];
+export const DEALS: MockDeal[] = [];
 const CONTACTS: Contact[] = [];
 const INTERACTIONS: Interaction[] = [];
 const DOCUMENTS: Array<PartnerDocument & { record_id: string }> = [];
@@ -286,6 +290,7 @@ function seed(p: MockPartner, i: number) {
     occurred_at: at(p.quiet_days, "11:00"),
     owner: refKey(p.owner),
     from_mail: false,
+    mail: null,
     created_at: at(p.quiet_days, "11:00"),
   });
   if (signed) {
@@ -304,8 +309,41 @@ function seed(p: MockPartner, i: number) {
 }
 PARTNERS.forEach(seed);
 
-const recordOf = (id: string | null | undefined) => RECORDS.find((r) => r.id === id) ?? null;
-const dealOf = (id: string | null | undefined) => DEALS.find((d) => d.id === id) ?? null;
+export const recordOf = (id: string | null | undefined) => RECORDS.find((r) => r.id === id) ?? null;
+
+/**
+ * Link to Partner on the mock (§6.15): each message of the linked conversation logged once on the
+ * record as an email interaction, its excerpt the first 300 characters.
+ */
+export function logLinkedMail(
+  record: { kind: "lead" | "partner"; id: string },
+  dealId: string | null,
+  owner: string,
+  threadId: string,
+  messages: Array<{ id: string; subject: string; text: string; from: string; to: string[]; at: string }>,
+) {
+  for (const m of messages) {
+    const key = sid(`interaction:mail:${m.id}`);
+    if (INTERACTIONS.some((x) => x.partner_interaction_id === key)) continue;
+    const text = m.text.replace(/\s+/g, " ").trim();
+    INTERACTIONS.unshift({
+      partner_interaction_id: key,
+      partner_id: record.kind === "partner" ? record.id : null,
+      lead_id: record.kind === "lead" ? record.id : null,
+      deal_id: dealId,
+      contact: null,
+      interaction_type: "email",
+      subject: m.subject || "(no subject)",
+      summary: text.length > 300 ? `${text.slice(0, 300)}…` : text || null,
+      occurred_at: m.at,
+      owner: refKey(owner),
+      from_mail: true,
+      mail: { from: m.from, to: m.to, mail_thread_id: threadId },
+      created_at: m.at,
+    });
+  }
+}
+export const dealOf = (id: string | null | undefined) => DEALS.find((d) => d.id === id) ?? null;
 const recordOfDeal = (d: MockDeal) => recordOf(d.partner_id ?? d.lead_id)!;
 const regionLabel = (r: MockRecord) =>
   r.region_scope === "cities" ? r.cities.map((c) => (c.formatted ?? "").split(",")[0]).join(", ") || null : r.region_scope ? { national: "National", africa: "Africa", worldwide: "Worldwide" }[r.region_scope] : null;
@@ -1079,96 +1117,397 @@ route("POST /api/v1/partnerships/interactions", (req) => {
     occurred_at: new Date(String(b.occurred_at)).toISOString(),
     owner: refKey(req.user!),
     from_mail: false,
+    mail: null,
     created_at: now(),
   };
   INTERACTIONS.unshift(x);
   return created(x);
 });
 
-/** A partner by id for the INTERIM screens below (Proposals, Contracts), by its name. */
-const find = (id: string) => {
-  const r = recordOf(id);
-  return r ? { name: r.name, owner: r.owner ?? "ngozi" } : null;
+
+/* ------------------------------------------------------------------ *
+ * Proposals and the studio (M7 PR 7, packages/contract/schemas/proposals.js), by the API's rules where a
+ * screen can see them: Write Draft waits on the required cards, at most three reshuffles a card, nothing
+ * sent without confirm, the link only while it works. Claude's answers are the kit's sample; the cards
+ * arrive with the brief, as the worker would bring them.
+ * ------------------------------------------------------------------ */
+
+type MockProposal = ProposalDetail & { _owner: string };
+const PROPOSALS: MockProposal[] = [];
+const TEMPLATES: ProposalTemplate[] = [];
+const SAMPLE = SAMPLE_CONTENT as unknown as ProposalContent;
+const LAYOUT_LABEL: Record<string, string> = { cover: "Cover", letter: "Letter", opportunity: "Opportunity", why_mycity: "Why MyCity", audience: "Audience", deliverables: "Deliverables", packages: "Packages", timeline: "Timeline", proof: "Proof", terms: "Terms", next_steps: "Next Steps", closing: "Closing", insight: "Insight" };
+const FIGURE_LAYOUTS = ["why_mycity", "audience", "proof"];
+const CARD_TEXT: Array<[ProposalQuestion["group_key"], string, ProposalQuestion["answer_kind"], boolean, string | null]> = [
+  ["partner", "What would make this season a success for them?", "long_text", true, null],
+  ["audience", "How many guests do they expect each night?", "number", true, "From the transcript, 00:21:51"],
+  ["offer", "Which packages should go on sale?", "multi_pick", false, "From the deal"],
+  ["money", "What is the early bird price?", "money", false, null],
+  ["timing", "When do tickets go on sale?", "date", false, null],
+  ["proof", "Which past results matter most to them?", "short_text", false, null],
+];
+const cardsOf = (seed: string): ProposalQuestion[] =>
+  CARD_TEXT.map(([group_key, question, answer_kind, required, from], i) => ({
+    proposal_question_id: sid(`card:${seed}:${i}`),
+    position: i,
+    group_key,
+    question,
+    why: "What the proposal says changes with the answer",
+    answer_kind,
+    options: answer_kind === "multi_pick" ? ["Regular", "VIP", "VVIP"] : null,
+    suggested: answer_kind === "number" ? 1500 : answer_kind === "multi_pick" ? ["Regular", "VIP"] : null,
+    suggested_from: from,
+    required,
+    answer: null,
+    state: "open",
+    replaces_id: null,
+    reshuffles: 0,
+  }));
+const contentFor = (p: { number: string; title: string; partner: string }): ProposalContent => ({
+  sections: SAMPLE.sections.map((s) => (s.layout === "cover" ? { ...s, title: p.title, prepared_for: p.partner, reference: p.number } : s)),
+});
+const canOf = (p: ProposalDetail): ProposalDetail["can"] => ({
+  edit: p.status === "draft",
+  send: p.status === "draft" && !!p.content,
+  revise: ["sent", "viewed", "declined", "expired", "withdrawn"].includes(p.status),
+  decide: ["sent", "viewed"].includes(p.status),
+  withdraw: ["sent", "viewed"].includes(p.status),
+  save_template: !!p.content,
+});
+const fresh = (p: MockProposal): ProposalDetail => {
+  const { _owner, ...out } = p;
+  void _owner;
+  return { ...out, can: canOf(p) };
+};
+const rowOfProposal = (p: MockProposal) => {
+  const d = fresh(p);
+  return {
+    partnership_proposal_id: d.partnership_proposal_id,
+    number: d.number,
+    version: d.version,
+    title: d.title,
+    status: d.status,
+    value: d.value,
+    currency: d.currency,
+    record: d.record,
+    deal_id: d.deal_id,
+    deal_title: d.deal_title,
+    owner: d.owner,
+    sent_at: d.sent_at,
+    first_viewed_at: d.first_viewed_at,
+    view_count: d.view_count,
+    valid_until: d.valid_until,
+    created_at: d.created_at,
+  };
+};
+function newProposal(deal: MockDeal, status: ProposalDetail["status"], n: number, extra: Partial<ProposalDetail> = {}): MockProposal {
+  const r = recordOfDeal(deal);
+  const number = `PRO-${String(n).padStart(4, "0")}`;
+  const title = status === "questions" ? deal.title : `${deal.title}, Together`;
+  const sent = ["sent", "viewed", "accepted"].includes(status);
+  return {
+    partnership_proposal_id: sid(`proposal:${number}:${status}`),
+    number,
+    version: 1,
+    title,
+    status,
+    value: deal.estimated_value,
+    currency: "NGN",
+    record: recordRef(r),
+    deal_id: deal.id,
+    deal_title: deal.title,
+    owner: person(deal.owner),
+    sent_at: sent ? `${isoDaysAgo(9)}T10:00:00.000Z` : null,
+    first_viewed_at: status === "viewed" || status === "accepted" ? `${isoDaysAgo(8)}T15:20:00.000Z` : null,
+    view_count: status === "viewed" ? 3 : status === "accepted" ? 5 : 0,
+    valid_until: sent ? isoDaysAhead(21) : null,
+    created_at: `${isoDaysAgo(12)}T09:00:00.000Z`,
+    brief: { notes: "They want three sold-out nights and a crowd that comes back.", transcript: null },
+    questions: status === "questions" ? cardsOf(number) : cardsOf(number).map((q) => ({ ...q, state: "answered", answer: q.suggested ?? "Full lawns and a crowd that returns" })),
+    content: status === "questions" ? null : contentFor({ number, title, partner: r.name }),
+    assets: [],
+    design_template_id: null,
+    sent_to: sent ? ["events@example.test"] : [],
+    sent_cc: [],
+    last_viewed_at: status === "viewed" ? `${isoDaysAgo(2)}T11:00:00.000Z` : null,
+    accepted_at: status === "accepted" ? `${isoDaysAgo(3)}T12:00:00.000Z` : null,
+    declined_at: null,
+    decline_reason: null,
+    withdrawn_at: null,
+    supersedes_id: null,
+    link_url: sent ? `https://go.mycityapp.io/proposal/${sid(`link:${number}`).replace(/-/g, "")}` : null,
+    ai: "on",
+    progress: null,
+    versions: [],
+    can: { edit: false, send: false, revise: false, decide: false, withdraw: false, save_template: false },
+    _owner: deal.owner ?? "ngozi",
+    ...extra,
+  };
+}
+DEALS.filter((d) => d.status === "open" || d.status === "live")
+  .slice(0, 4)
+  .forEach((d, i) => PROPOSALS.push(newProposal(d, (["viewed", "draft", "accepted", "questions"] as const)[i], 27 + i)));
+PROPOSALS.forEach((p) => (p.versions = [{ partnership_proposal_id: p.partnership_proposal_id, version: 1, status: p.status, sent_at: p.sent_at }]));
+TEMPLATES.push({ proposal_template_id: sid("ptemplate:festival"), name: "Festival Ticketing", partner_category_id: null, structure: { layouts: SAMPLE.sections.map((s) => s.layout), tone_notes: "Warm and direct." }, created_from_proposal_id: null, active: true });
+
+const proposalOf = (id: string) => PROPOSALS.find((p) => p.partnership_proposal_id === id) ?? null;
+const notNow = (message: string) => fail(409, "PROPOSAL_STATE", message);
+const touch = (p: MockProposal) => {
+  p.versions = p.versions.map((v) => (v.partnership_proposal_id === p.partnership_proposal_id ? { ...v, status: p.status, sent_at: p.sent_at } : v));
+  return ok(fresh(p));
 };
 
-const PROPS: Array<Proposal & { _doc: ReturnType<typeof doc> }> = [];
-function doc(ref: string, partner: string, what: string, lines: Array<[string, string]>, by: string) {
-  const total = lines.reduce((a, [, v]) => a + k(v), 0);
-  return { reference: ref, title: "Partnership Proposal", prepared_for: `Prepared for ${partner} · ${isoDaysAgo(17).split("-").reverse().join("/")}`, sections: [{ heading: "What we propose.", text: what }, { heading: "What MyCity brings.", text: "1.1 million monthly active residents, in-app placement in the right categories, and physical activation days." }, { heading: "What we ask.", text: `₦${(total / 100).toLocaleString("en-NG")}, payable half on signature and half on the first activation.` }], lines: lines.map(([label, amount]) => ({ label, amount })), total: m(total), footnote: `Drafted by the assistant from six answers, then edited by ${by}` };
-}
-[
-  ["PRO-0027", "Ember to Remember headline sponsor", "ProvidusBank", "9200000.00", S("ok", "Accepted"), "A headline sponsorship of the Ember to Remember campaign, across all four cities.", [["Headline placement, 14 weeks", "6200000.00"], ["Ticket confirmation branding", "1500000.00"], ["Activation days", "1500000.00"]], "Ngozi Eze"],
-  ["PRO-0030", "Healthcare activation, 4 cities", "Lonart-DS", "4100000.00", S("warn", "Viewed"), "A four-city health activation across Lagos, Abuja, Enugu and Port Harcourt, carried on the MyCityApp platform through the campaign window.", [["In-app category placement, 12 weeks", "2400000.00"], ["Eight activation days, four cities", "1200000.00"], ["Attribution reporting", "500000.00"]], "Bashir Lawal"],
-  ["PRO-0028", "Cinema listings integration", "Filmhouse Cinemas", "3600000.00", S("warn", "Viewed"), "Showtimes and ticketing in the city guide, with revenue attributed to the listing.", [["Listings integration", "2600000.00"], ["Launch campaign", "1000000.00"]], "Ngozi Eze"],
-  ["PRO-0025", "Hospitality bundle", "Eko Hotels", "2800000.00", S("err", "No response"), "A hospitality bundle for visitors arriving for city events.", [["Featured listing, 6 months", "1800000.00"], ["Event packages", "1000000.00"]], "Bashir Lawal"],
-].forEach((p, i) => PROPS.push({ proposal_id: sid(`prop:${i}`), number: p[0] as string, title: p[1] as string, partner: p[2] as string, value: p[3] as string, status: p[4] as Status, _doc: doc(p[0] as string, p[2] as string, p[5] as string, p[6] as Array<[string, string]>, p[7] as string) }));
-route("GET /api/v1/partnerships/proposals/summary", () => ok({ sent_this_year: 14, accepted: PROPS.filter((p) => p.status.tone === "ok").length + 4, viewed_no_reply: PROPS.filter((p) => p.status.text === "Viewed").length + 1, acceptance_rate: "36%" }));
-route("GET /api/v1/partnerships/proposals", (req) => paged(PROPS.map(({ _doc, ...p }) => (void _doc, p)), req, { search: (p) => [p.title, p.partner, p.number] }));
-route("GET /api/v1/partnerships/proposals/:id/document", (req) => {
-  const p = PROPS.find((x) => x.proposal_id === req.params.id);
-  return p ? ok(p._doc) : notFound();
+route("GET /api/v1/partnerships/proposals/summary", () => {
+  const decided = PROPOSALS.filter((p) => ["accepted", "declined"].includes(p.status));
+  const accepted = PROPOSALS.filter((p) => p.status === "accepted").length;
+  return ok({ sent_this_year: PROPOSALS.filter((p) => p.sent_at).length, accepted, viewed_no_reply: PROPOSALS.filter((p) => p.status === "viewed").length, acceptance_rate: decided.length ? Math.round((accepted / decided.length) * 100) : null });
+});
+route("GET /api/v1/partnerships/proposals", (req) =>
+  paged(
+    PROPOSALS.filter((p) => !PROPOSALS.some((n) => n.supersedes_id === p.partnership_proposal_id)).map(rowOfProposal),
+    req,
+    { search: (p) => [p.title ?? "", p.number, p.record.name, p.deal_title], filters: { status: (p, v) => p.status === v, deal_id: (p, v) => p.deal_id === v, partner_id: (p, v) => p.record.type === "partner" && p.record.id === v, lead_id: (p, v) => p.record.type === "lead" && p.record.id === v },
+      sort: {
+        created_at: (a, b) => a.created_at.localeCompare(b.created_at),
+        sent_at: (a, b) => (a.sent_at ?? "").localeCompare(b.sent_at ?? ""),
+        value: (a, b) => Number(a.value ?? 0) - Number(b.value ?? 0),
+      },
+    },
+  ),
+);
+route("GET /api/v1/partnerships/proposal-templates", (req) => paged(TEMPLATES, req, { search: (t) => [t.name], filters: { partner_category_id: () => true } }));
+route("GET /api/v1/partnerships/proposals/:id", (req) => {
+  const p = proposalOf(req.params.id);
+  return p ? ok(fresh(p)) : notFound();
+});
+route("GET /api/v1/partnerships/proposals/:id/preview", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p) return notFound();
+  if (!p.content) return notNow("This proposal has no draft yet");
+  const sections = p.content.sections.map((s) => ({
+    key: s.key,
+    layout: s.layout,
+    label: ("heading" in s && s.heading) || ("title" in s && s.title) || LAYOUT_LABEL[s.layout],
+    hidden: !!s.hidden,
+    pages: s.hidden ? 0 : 1,
+    fits: FIGURE_LAYOUTS.includes(s.layout) ? [s.layout, ...FIGURE_LAYOUTS.filter((l) => l !== s.layout)] : [s.layout],
+    images: s.layout === "cover" ? [{ field: "image_asset_id" as const, stand_in: true }, { field: "partner_logo_asset_id" as const, stand_in: false }] : s.layout === "closing" ? [{ field: "image_asset_id" as const, stand_in: true }] : [],
+    unconfirmed: s.unconfirmed ?? [],
+  }));
+  return ok({
+    html: SAMPLE_HTML,
+    sections,
+    checks: { stand_ins: sections.filter((s) => s.images.some((i) => i.stand_in) && !s.hidden).map((s) => ({ key: s.key, label: s.label })), unconfirmed: [{ key: "opportunity", figure: "2,100" }] },
+  });
 });
 route("POST /api/v1/partnerships/proposals", (req) => {
-  const { cities, ...b } = req.body as Record<string, string | number> & { cities?: unknown };
-  // Each city picked at level city (F27): never typed.
-  const picked = Array.isArray(cities) ? cities.map((c) => placeOf(c)) : [];
-  const partner = find(String(b.partner_id));
+  const deal = dealOf(String(req.body.deal_id ?? ""));
+  if (!deal) return invalid({ deal_id: ["Pick a deal"] });
+  const p = newProposal(deal, "questions", 31 + PROPOSALS.length, { brief: { notes: (req.body.notes as string) || null, transcript: null } });
+  p.partnership_proposal_id = uuid();
+  p.versions = [{ partnership_proposal_id: p.partnership_proposal_id, version: 1, status: p.status, sent_at: null }];
+  PROPOSALS.unshift(p);
+  return created(fresh(p));
+});
+route("POST /api/v1/partnerships/proposals/:id/retry", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p) return notFound();
+  p.progress = null;
+  return touch(p);
+});
+const cardRoute = (action: "answer" | "skip" | "reshuffle") =>
+  route(`POST /api/v1/partnerships/proposals/:id/questions/:qid/${action}`, (req) => {
+    const p = proposalOf(req.params.id);
+    const q = p?.questions.find((c) => c.proposal_question_id === req.params.qid && c.state !== "replaced");
+    if (!p || !q) return notFound();
+    if (action === "answer") {
+      const a = req.body.answer as ProposalQuestion["answer"];
+      if (a === null || a === "" || (Array.isArray(a) && !a.length)) return invalid({ answer: ["Give an answer"] });
+      if (q.answer_kind === "money" && !/^\d+\.\d{2}$/.test(String(a))) return invalid({ answer: ["Give an amount"] });
+      Object.assign(q, { answer: a, state: "answered" });
+    } else if (action === "skip") {
+      if (q.required) return fail(409, "PROPOSAL_STATE", "Answer this card", { answer: ["Required card"] });
+      Object.assign(q, { answer: null, state: "skipped" });
+    } else {
+      if (q.reshuffles >= 3) return notNow("Reshuffled three times");
+      q.state = "replaced";
+      p.questions.push({ ...q, proposal_question_id: uuid(), question: `${q.question.replace(/\?$/, "")}, from another angle?`, state: "open", answer: null, replaces_id: q.proposal_question_id, reshuffles: q.reshuffles + 1 });
+      p.questions.sort((a, b) => a.position - b.position);
+    }
+    return touch(p);
+  });
+cardRoute("answer");
+cardRoute("skip");
+cardRoute("reshuffle");
+route("POST /api/v1/partnerships/proposals/:id/draft", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p) return notFound();
+  if (p.status !== "questions") return notNow("A draft is already written");
+  if (p.questions.some((q) => q.required && q.state === "open")) return fail(409, "PROPOSAL_STATE", "Answer the required cards", { questions: ["Answer the required cards"] });
+  // The worker writes in minutes; the mock walks the same steps in seconds (the studio polls every four), then the kit's sample.
+  const step = (to: "writing" | "checking" | "laying_out") => ({ job: "draft" as const, step: to, failed: false, reason: null, at: new Date().toISOString() });
+  Object.assign(p, { status: "writing", progress: step("writing") });
+  setTimeout(() => p.status === "writing" && (p.progress = step("checking")), 3000);
+  setTimeout(() => p.status === "writing" && (p.progress = step("laying_out")), 6000);
+  setTimeout(() => {
+    if (p.status === "writing") Object.assign(p, { status: "draft", content: contentFor({ number: p.number, title: `${p.deal_title}, Together`, partner: p.record.name }), title: `${p.deal_title}, Together`, progress: null });
+  }, 9000);
+  return touch(p);
+});
+route("PATCH /api/v1/partnerships/proposals/:id/content", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p || !p.content) return notFound();
+  if (p.status !== "draft") return notNow("Revise a sent proposal to change it");
+  const op = req.body as ProposalContentEdit;
+  const list = [...p.content.sections];
+  const at = list.findIndex((s) => s.key === op.key);
+  if (op.op === "move") {
+    const to = op.direction === "up" ? at - 1 : at + 1;
+    if (at < 0 || to < 0 || to >= list.length) return invalid({ direction: ["Already at the end"] });
+    [list[at], list[to]] = [list[to], list[at]];
+  } else if (op.op === "hide" && at >= 0) list[at] = { ...list[at], hidden: op.hidden };
+  else if (op.op === "section") {
+    if (at >= 0) list[at] = op.section;
+    else list.splice(list.length - 1, 0, op.section);
+  } else if (op.op === "layout" && at >= 0) {
+    const s = list[at];
+    if (!FIGURE_LAYOUTS.includes(s.layout) || !FIGURE_LAYOUTS.includes(op.layout)) return invalid({ layout: ["Does not fit"] });
+    const figs = s.layout === "why_mycity" ? s.points.map(({ value, label }) => ({ value, label })) : s.layout === "audience" ? s.stats : s.layout === "proof" ? s.results : [];
+    const base = { key: s.key, hidden: s.hidden, sources: s.sources, unconfirmed: s.unconfirmed, heading: "heading" in s ? s.heading : "Why MyCity" };
+    list[at] =
+      op.layout === "audience"
+        ? { ...base, layout: "audience", intro: null, stats: figs, chart: null }
+        : op.layout === "proof"
+          ? { ...base, layout: "proof", logos: [], results: figs, chart: null }
+          : { ...base, layout: "why_mycity", points: figs.map((f) => ({ proof_point_id: null, ...f })), chart: null };
+  } else if (op.op === "image" && at < 0) return notFound();
+  p.content = { sections: list };
+  return touch(p);
+});
+route("POST /api/v1/partnerships/proposals/:id/sections/:key/rewrite", (req) => {
+  const p = proposalOf(req.params.id);
+  const s = p?.content?.sections.find((x) => x.key === req.params.key);
+  if (!p || !s) return notFound();
+  const section = "heading" in s ? { ...s, heading: `${s.heading.replace(/, Rewritten$/, "")}, Rewritten` } : s;
+  return ok({ available: true, reason: null, key: s.key, section, ai_run_id: null });
+});
+route("POST /api/v1/partnerships/proposals/:id/message", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p) return notFound();
+  return ok({ available: true, reason: null, subject: `${p.title ?? p.deal_title} for ${p.record.name}`, message: `Dear Ife,\n\nThank you for your time last week. The proposal is attached, and the link opens it online.\n\nI would be glad to talk it through on a call this week.\n\n${refKey(p._owner).display_name.split(" ")[0]}`, ai_run_id: null });
+});
+route("POST /api/v1/partnerships/proposals/:id/send", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p) return notFound();
+  const b = req.body as { to?: string[]; cc?: string[]; subject?: string; message?: string; confirm?: boolean };
   const f: Record<string, string[]> = {};
-  if (!partner) f.partner_id = ["Pick the partner"];
-  if (String(b.what ?? "").trim().length < 20) f.what = ["What we propose, in a sentence or two"];
-  if (String(b.why_now ?? "").trim().length < 10) f.why_now = ["Why now"];
-  if (!picked.length || picked.some((c) => !c)) f.cities = ["Pick a city"];
-  if (!(Number(b.weeks) >= 1)) f.weeks = ["How many weeks"];
-  if (!(Number(b.value) > 0)) f.value = ["The value we ask"];
+  if (!b.to?.length) f.to = ["Add an address"];
+  if (!b.subject?.trim()) f.subject = ["Give a subject"];
+  if (!b.message?.trim()) f.message = ["Write a message"];
+  if (b.confirm !== true) f.confirm = ["Confirm to send"];
   if (Object.keys(f).length) return invalid(f);
-  const n = 31 + PROPS.length - 4;
-  const ref = `PRO-${String(n).padStart(4, "0")}`;
-  const v = k(String(b.value));
-  const p = { proposal_id: sid(`prop:new:${n}`), number: ref, title: String(b.what).split(/[.,]/)[0].slice(0, 60), partner: partner!.name, value: String(b.value), status: S("neutral", "Draft"), _doc: doc(ref, partner!.name, `${String(b.what).trim()} ${String(b.why_now).trim()}`, [[`Placement in ${picked.map((c) => c!.line).join(", ")}, ${b.weeks} weeks`, m(Math.round(v * 0.7))], ["Activation and reporting", m(v - Math.round(v * 0.7))]], refKey(req.user!).display_name) };
-  PROPS.unshift(p);
-  const { _doc, ...out } = p;
-  void _doc;
-  return created(out);
+  if (p.status !== "draft") return notNow("Only a draft can be sent");
+  Object.assign(p, { status: "sent", sent_at: now(), sent_to: b.to, sent_cc: b.cc ?? [], valid_until: isoDaysAhead(30), link_url: `https://go.mycityapp.io/proposal/${uuid().replace(/-/g, "")}` });
+  return touch(p);
+});
+route("POST /api/v1/partnerships/proposals/:id/pdf", (req) => {
+  const p = proposalOf(req.params.id);
+  return p ? exportFile(req.user!, p.number, "pdf") : notFound();
+});
+const decideRoute = (action: "accept" | "decline" | "withdraw") =>
+  route(`POST /api/v1/partnerships/proposals/:id/${action}`, (req) => {
+    const p = proposalOf(req.params.id);
+    if (!p) return notFound();
+    if (!["sent", "viewed"].includes(p.status)) return notNow("Only a sent proposal");
+    if (action === "decline" && String(req.body.reason ?? "").trim().length < 1) return invalid({ reason: ["Give a reason"] });
+    if (action === "accept") Object.assign(p, { status: "accepted", accepted_at: now() });
+    if (action === "decline") Object.assign(p, { status: "declined", declined_at: now(), decline_reason: String(req.body.reason), link_url: null });
+    if (action === "withdraw") Object.assign(p, { status: "withdrawn", withdrawn_at: now(), link_url: null });
+    return touch(p);
+  });
+decideRoute("accept");
+decideRoute("decline");
+decideRoute("withdraw");
+route("POST /api/v1/partnerships/proposals/:id/revise", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p) return notFound();
+  if (!canOf(p).revise) return notNow("Only the newest sent version");
+  const next: MockProposal = { ...p, partnership_proposal_id: uuid(), version: p.version + 1, status: "draft", sent_at: null, first_viewed_at: null, last_viewed_at: null, view_count: 0, valid_until: null, link_url: null, sent_to: [], sent_cc: [], accepted_at: null, declined_at: null, decline_reason: null, withdrawn_at: null, supersedes_id: p.partnership_proposal_id, created_at: now() };
+  next.versions = [{ partnership_proposal_id: next.partnership_proposal_id, version: next.version, status: "draft", sent_at: null }, ...p.versions];
+  PROPOSALS.unshift(next);
+  return created(fresh(next));
+});
+route("POST /api/v1/partnerships/proposals/:id/save-as-template", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p || !p.content) return notFound();
+  const t: ProposalTemplate = { proposal_template_id: uuid(), name: String(req.body.name ?? "Template"), partner_category_id: null, structure: { layouts: p.content.sections.filter((s) => !s.hidden).map((s) => s.layout), tone_notes: null }, created_from_proposal_id: p.partnership_proposal_id, active: true };
+  TEMPLATES.unshift(t);
+  return created(t);
 });
 
-const CONTRACTS: Contract[] = [
-  ["Platform partnership MOU", "MTN Nigeria", "MOU", "2025-03-13", "2027-03-13", "18400000.00", S("ok", "Active")],
-  ["Sponsorship agreement", "ProvidusBank", "Contract", "2026-09-22", "2026-12-31", "9200000.00", S("ok", "Active")],
-  ["Data sharing MOU", "Lagos State Government", "MOU", null, null, "7500000.00", S("warn", "In review")],
-  ["Activation agreement", "Lonart-DS", "Contract", null, null, "4100000.00", S("neutral", "Draft")],
-].map((c, i) => ({ contract_id: sid(`con:${i}`), title: c[0] as string, partner: c[1] as string, kind: c[2] as Contract["kind"], start_on: c[3] as string | null, renewal_on: c[4] as string | null, value: c[5] as string, status: c[6] as Status }));
-route("GET /api/v1/partnerships/contracts/summary", () =>
-  ok({
-    active: CONTRACTS.filter((c) => c.status.text === "Active").length, in_review: CONTRACTS.filter((c) => c.status.text === "In review").length, draft: CONTRACTS.filter((c) => c.status.text === "Draft").length,
-    renewals_180: CONTRACTS.filter((c) => c.renewal_on && c.renewal_on <= isoDaysAhead(180)).length,
-    chain: ["Draft", "Review", "Approval", "Sent", "Viewed", "Signed", "Active", "Expiring", "Renewed"].map((label, i) => ({ label, state: i < 5 ? "done" : i === 5 ? "now" : null })),
-  }),
-);
-route("GET /api/v1/partnerships/contracts", (req) => paged(CONTRACTS, req, { search: (c) => [c.title, c.partner] }));
-route("GET /api/v1/partnerships/contracts/renewals", (req) => {
-  const today = new Date(`${isoDaysAgo(0)}T00:00:00Z`).getTime();
-  const rows = CONTRACTS.filter((c) => c.renewal_on).map((c) => ({ contract_id: c.contract_id, title: c.title, partner: c.partner, due: c.renewal_on!, days: Math.round((new Date(`${c.renewal_on}T00:00:00Z`).getTime() - today) / 86400000), owner: refKey(RECORDS.find((p) => p.name === c.partner)?.owner ?? "ngozi") })).sort((a, b) => a.days - b.days);
-  return paged(rows, req, { search: (r) => [r.title, r.partner] });
-});
-route("POST /api/v1/partnerships/contracts", (req) => {
-  const b = req.body as Record<string, string>;
-  const p = find(b.partner_id);
-  const f: Record<string, string[]> = {};
-  if (!p) f.partner_id = ["Pick the partner"];
-  if (!b.title?.trim()) f.title = ["Name the document"];
-  if (!(Number(b.value) > 0)) f.value = ["Enter the value"];
-  if (Object.keys(f).length) return invalid(f);
-  const c: Contract = { contract_id: sid(`con:new:${CONTRACTS.length}`), title: b.title.trim(), partner: p!.name, kind: (b.kind as Contract["kind"]) ?? "Contract", start_on: null, renewal_on: null, value: b.value, status: S("neutral", "Draft") };
-  CONTRACTS.unshift(c);
-  return created(c);
+// Analytics (§6.18): a period's figures in the contract's shape, the months of the period asked for.
+route("GET /api/v1/partnerships/analytics", (req) => {
+  const q = req.query as { period?: string; from?: string; to?: string };
+  const today = isoDaysAgo(0);
+  const y = Number(today.slice(0, 4));
+  const m = Number(today.slice(5, 7));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const lastOf = (yy: number, mm: number) => `${yy}-${pad(mm)}-${pad(new Date(Date.UTC(yy, mm, 0)).getUTCDate())}`;
+  const qStart = Math.floor((m - 1) / 3) * 3 + 1;
+  const period =
+    q.period === "custom" && q.from && q.to
+      ? { from: q.from, to: q.to }
+      : q.period === "year"
+        ? { from: `${y}-01-01`, to: `${y}-12-31` }
+        : q.period === "quarter"
+          ? { from: `${y}-${pad(qStart)}-01`, to: lastOf(y, qStart + 2) }
+          : { from: `${y}-${pad(m)}-01`, to: lastOf(y, m) };
+  const months: string[] = [];
+  for (let yy = Number(period.from.slice(0, 4)), mm = Number(period.from.slice(5, 7)); `${yy}-${pad(mm)}` <= period.to.slice(0, 7) && months.length < 60; mm === 12 ? ((yy += 1), (mm = 1)) : (mm += 1)) months.push(`${yy}-${pad(mm)}`);
+  const scale = months.length;
+  const owners: Array<[string, number[], string | null]> = [
+    ["ngozi", [5, 8, 2, 1, 9, 14200, 2], "Meets"],
+    ["bashir", [3, 4, 1, 0, 7, 6800, 1], null],
+    ["cynthia", [1, 2, 1, 1, 7, 21400, 0], "Exceeds"],
+  ];
+  const by_owner = owners.map(([key, [p, mt, pr, sg, act, dl, v], rating]) => ({
+    owner: refKey(key),
+    new_prospects: p * scale,
+    meetings_held: mt * scale,
+    proposals_sent: pr * scale,
+    partnerships_signed: sg * scale,
+    active_partnerships: act,
+    downloads: dl * scale,
+    vendor_leads: v * scale,
+    performance_rating: rating,
+  }));
+  const sum = (k: "new_prospects" | "meetings_held" | "proposals_sent" | "partnerships_signed") => by_owner.reduce((n, o) => n + o[k], 0);
+  return ok({
+    period,
+    kpis: { new_prospects: sum("new_prospects"), meetings_held: sum("meetings_held"), proposals_sent: sum("proposals_sent"), partnerships_signed: sum("partnerships_signed") },
+    by_owner,
+    signed_per_month: months.map((month, i) => ({ month, signed: [1, 2, 1, 3, 2, 2][i % 6], value: ["2500000.00", "4100000.00", "1200000.00", "6800000.00", "3000000.00", "2750000.00"][i % 6] })),
+    returns_per_month: months.map((month, i) => ({ month, gross_sales: ["1800000.00", "2400000.00", "960000.00"][i % 3], mycity_commission: ["144000.00", "192000.00", "76800.00"][i % 3], downloads: [14200, 18900, 6800][i % 3] })),
+    by_category: [
+      { partner_category_id: null, name: "Event", open: 6, signed: 2 * scale, value: "6600000.00" },
+      { partner_category_id: null, name: "Hospitality", open: 3, signed: scale, value: "1200000.00" },
+      { partner_category_id: null, name: "Vendor", open: 4, signed: 0, value: "0.00" },
+    ].map((c, i) => ({ ...c, partner_category_id: `00000000-0000-4000-8000-00000000070${i}` })),
+    by_region: [
+      { region: "Lagos", open: 7, signed: 2 * scale },
+      { region: "Abuja", open: 3, signed: scale },
+      { region: "National", open: 2, signed: 0 },
+      { region: "Port Harcourt", open: 1, signed: 0 },
+    ],
+    stage_conversion: [
+      ["prospect_identified", "Prospect Identified", "initial_contact", "Initial Contact", 14, 78],
+      ["initial_contact", "Initial Contact", "introductory_meeting_held", "Introductory Meeting Held", 9, 64],
+      ["introductory_meeting_held", "Introductory Meeting Held", "proposal_sent", "Proposal Sent", 6, 67],
+      ["proposal_sent", "Proposal Sent", "negotiation", "Negotiation", 4, 67],
+      ["negotiation", "Negotiation", "partnership_signed", "Partnership Signed", 3, 75],
+    ].map(([from_stage, from_label, to_stage, to_label, moved, rate]) => ({ from_stage: String(from_stage), from_label: String(from_label), to_stage: String(to_stage), to_label: String(to_label), moved: Number(moved), rate: Number(rate) })),
+  });
 });
 
-route("GET /api/v1/partnerships/analytics", () =>
-  ok({
-    period: isoDaysAgo(0).slice(0, 7), prospects: 9, meetings: 14, proposals: 4, signed: 2,
-    by_owner: [["ngozi", 5, 8, 2, 1, 9, 14200], ["bashir", 3, 4, 1, 0, 7, 6800], ["cynthia", 1, 2, 1, 1, 7, 21400]].map(([o, prospects, meetings, proposals, signed, active, downloads]) => ({ owner: refKey(o as string), prospects: prospects as number, meetings: meetings as number, proposals: proposals as number, signed: signed as number, active: active as number, downloads: downloads as number })),
-    signed_per_month: { labels: ["May", "Jun", "Jul", "Aug", "Sep", "Oct"], values: [1, 2, 1, 3, 2, 2] },
-    downloads: [{ label: "MTN Nigeria", pct: 100, value: "18,200" }, { label: "ProvidusBank", pct: 50, value: "9,100" }, { label: "Filmhouse Cinemas", pct: 0, value: "0", emphasis: "warn" }, { label: "Lagos State Government", pct: 0, value: "0", emphasis: "warn" }, { label: "Lonart-DS", pct: 0, value: "0", emphasis: "warn" }],
-    months: [["October", 9, 4, 2, 22], ["September", 7, 3, 2, 29], ["August", 8, 2, 3, 38], ["July", 6, 3, 1, 17], ["June", 5, 2, 2, 40], ["May", 4, 1, 1, 25]].map(([month, prospects, proposals, signed, conversion_pct]) => ({ month: month as string, prospects: prospects as number, proposals: proposals as number, signed: signed as number, conversion_pct: conversion_pct as number })),
-  }),
-);
+// Export on Partners and Leads, in the tracker's columns: a file made for the person who pressed it.
+route("POST /api/v1/partnerships/exports", (req) => exportFile(req.user!, String(req.body.source).replace("partnerships.", "")));

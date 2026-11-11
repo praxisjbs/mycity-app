@@ -6,6 +6,7 @@ import { byKey } from "../data/people";
 import { UPLOADS } from "../uploads";
 import { phoneOf, setPhone } from "./ess";
 import { me } from "./identity";
+import { dealOf, logLinkedMail, recordOf } from "./partnerships";
 
 /**
  * Each signed-in person's own mailbox on the mock, in the contract's shapes
@@ -391,4 +392,43 @@ route("PUT /api/v1/mailbox/signature/config", (req) => {
   for (const k of ["show_whatsapp", "show_app_links", "show_social_links", "show_legal"] as const) SIG_CONFIG[k] = b[k] !== false;
   SIG_CONFIG.updated_at = new Date().toISOString();
   return ok(SIG_CONFIG);
+});
+
+// Link to Partner (partnerships.md §6.15): a conversation of the person's own, linked to a lead or partner.
+const LINKS = new Map<string, { record_id: string; deal_id: string | null; bound_at: string }>();
+const contextOf = (threadId: string) => {
+  const l = LINKS.get(threadId);
+  const r = l ? recordOf(l.record_id) : null;
+  const d = l?.deal_id ? dealOf(l.deal_id) : null;
+  return {
+    mail_thread_id: threadId,
+    record: r ? { type: r.kind, id: r.id, number: r.number, name: r.name } : null,
+    deal: d ? { deal_id: d.id, number: d.number, title: d.title } : null,
+    bound_at: l?.bound_at ?? null,
+    bound_by: l ? "You" : null,
+  };
+};
+route("GET /api/v1/mailbox/threads/:id/partner", (req) => (findThread(req.user!, req.params.id) ? ok(contextOf(req.params.id)) : notFound()));
+route("POST /api/v1/mailbox/threads/:id/partner", (req) => {
+  const t = findThread(req.user!, req.params.id);
+  if (!t) return notFound();
+  const id = String(req.body.partner_id || req.body.lead_id || "");
+  const r = recordOf(id);
+  if (!r) return invalid({ partner_id: ["Pick the lead or the partner"] });
+  const deal = req.body.deal_id ? dealOf(String(req.body.deal_id)) : null;
+  LINKS.set(t.mail_thread_id, { record_id: r.id, deal_id: deal?.id ?? null, bound_at: new Date().toISOString() });
+  if (t.folder !== "spam")
+    logLinkedMail(
+      { kind: r.kind, id: r.id },
+      deal?.id ?? null,
+      req.user!,
+      t.mail_thread_id,
+      t.messages.map((m) => ({ id: m.mail_message_id, subject: t.subject, text: text(m.body_html), from: m.from.name ?? m.from.address, to: [...m.to, ...m.cc], at: m.sent_at })),
+    );
+  return ok(contextOf(t.mail_thread_id));
+});
+route("DELETE /api/v1/mailbox/threads/:id/partner", (req) => {
+  if (!findThread(req.user!, req.params.id)) return notFound();
+  LINKS.delete(req.params.id);
+  return ok(contextOf(req.params.id));
 });

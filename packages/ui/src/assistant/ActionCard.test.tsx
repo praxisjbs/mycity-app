@@ -55,6 +55,20 @@ describe("ActionCard", () => {
     expect(screen.queryByRole("button", { name: "Save Changes" })).toBeNull();
   });
 
+  it("offers no verb while a field shows a problem, Edit in its place, so a press is never refused (faults #1 and #8 of 11/11)", () => {
+    const onConfirm = vi.fn();
+    const props = { label: "Reject Leave", fields, values: { leave_request_ids: ["l1"] }, records: [records[0]!], status: "shown" as const, confirm: "press" as const, schema, onConfirm, onSave: () => undefined, onCancel: () => undefined };
+    const { rerender } = render(<ActionCard {...props} problems={{ reason: ["Say why"] }} />);
+    expect(screen.queryByRole("button", { name: /Reject Leave/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit" })).toHaveAttribute("data-variant", "primary");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    // Once Save Changes has cleared it, the verb is back and Edit steps aside.
+    rerender(<ActionCard {...props} problems={{}} />);
+    expect(screen.getByRole("button", { name: /Reject Leave/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit" })).not.toHaveAttribute("data-variant", "primary");
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it("names what its id fields hold, never counts them on the verb, and Edit picks them with the screen's picker", async () => {
     const taskFields: CardField[] = [
       { name: "title", label: "Title", kind: "text", required: true, options: null, long: false },
@@ -81,7 +95,8 @@ describe("ActionCard", () => {
     // An id nothing names is never printed (decision 32): its field reads as its problem alone; the verb counts no name.
     expect(screen.queryByText(nobody)).toBeNull();
     expect(screen.getByText("Pick one")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Task" })).toBeInTheDocument();
+    // Its press would be refused: Edit stands in the verb's place until the problem is fixed.
+    expect(screen.queryByRole("button", { name: "Create Task" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
     await userEvent.click(screen.getByRole("button", { name: "Pick Someone" }));
     // A field the screen gives no picker for stays as it is.

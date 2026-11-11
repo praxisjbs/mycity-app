@@ -13,9 +13,10 @@
  *                              proposer is told
  *   sanction.withdrawn         the approval was withdrawn before a decision
  *   consequence_step.saved     a rung added, moved, changed or retired on Chain Settings
- *   sanction_fine.accepted,    payroll took a fine into a run, settled it, or waived it (M6)
- *   sanction_fine.settled,
- *   sanction_fine.waived
+ *   sanction_fine.accepted,    payroll took a fine into a run, settled it, waived it, or gave an
+ *   sanction_fine.settled,     accepted one back to waiting (M6)
+ *   sanction_fine.waived,
+ *   sanction_fine.released
  *
  * After commit the approval's outcome is copied onto the sanction (`settle`), at least once
  * and idempotently: it changes only a sanction still pending.
@@ -38,6 +39,7 @@ const EVENTS = defineEvents("queries", {
   "sanction_fine.accepted": { summary: "Payroll accepted a fine into a run" },
   "sanction_fine.settled": { summary: "A fine was deducted from pay" },
   "sanction_fine.waived": { summary: "A fine was waived" },
+  "sanction_fine.released": { summary: "A fine payroll had accepted went back to waiting" },
 });
 
 /** Who approves a proposed sanction (shared/workflow/definitions.js, seeded in 3190). */

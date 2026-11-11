@@ -1,7 +1,8 @@
 /**
  * Recruitment · Interviews (docs/guides/recruitment.md §6.6, §10): Upcoming and Recent (the interviews
- * still to end first, then those past) or My Panels, beside the interview picked (ListDetail; on a
- * phone it opens in a sheet). The interview shows when and where, the Blind Panel (Submitted or
+ * still to end first, then those past) or My Panels, across the page; a row opens its interview in a
+ * wide dialog on desktop, its cards side by side, and in a sheet on a phone (ListDetail `modal`, F31 as
+ * amended 08/11/2026). The interview shows when and where, the Blind Panel (Submitted or
  * Waiting, a score only where the API gives one: Hidden until the round closes), the candidate's
  * Weighted Scorecard (for a reader whose scope holds the role), Candidate Details, once closed each
  * trait's ratings and average, the total, the report and its decision, and Round Activity. A panelist
@@ -50,7 +51,7 @@ import {
   useConfirm,
   useContractForm,
   useModal,
-  useSideBySide,
+  useIsPhone,
   useUnsavedChanges,
 } from "@mycity/ui";
 import { MyCard } from "./MyCard";
@@ -114,10 +115,10 @@ export function Interviews() {
   const [view, setView] = useState<"all" | "mine">(params.get("mine") === "true" ? "mine" : "all");
   // No sort: the API puts the interviews still to end first, soonest first, then those past, latest first.
   const list = usePaged("GET /api/v1/recruitment/interviews", { filters: view === "mine" ? { mine: "true" } : {} });
-  const beside = useSideBySide();
+  const phone = useIsPhone();
+  // Nothing opens unasked: a row opens its interview in the dialog, or the sheet on a phone (F31).
   const [picked, setPicked] = useState<string | null>(null);
-  // Beside the list the first interview shows unasked; on a phone one opens only when tapped (F31).
-  const shown = picked ?? (beside ? (list.rows[0]?.interview_id ?? null) : null);
+  const shown = picked;
   const schedule = () => modal.open({ title: "Schedule Interview", wide: true, body: (close) => <ScheduleForm close={close} onSaved={(x) => setPicked(x.interview_id)} /> });
   useScreenAction(mayEdit ? { label: "Schedule Interview", onSelect: schedule } : null);
   useNewLink(mayEdit ? schedule : null);
@@ -155,6 +156,9 @@ export function Interviews() {
         />
       </Toolbar>
       <ListDetail
+        layout="modal"
+        closeButton
+        size="xl"
         open={picked !== null}
         onClose={() => setPicked(null)}
         title="Interview"
@@ -172,6 +176,8 @@ export function Interviews() {
               { key: "who", label: "Candidate", render: (x) => <span className={cn(x.interview_id === shown ? "font-semibold" : "font-medium")}>{x.candidate_name}</span> },
               { key: "role", label: "Role", render: (x) => x.vacancy.title, desktop: true },
               { key: "when", label: "Date", render: (x) => formatDateTime(x.scheduled_start) },
+              { key: "ends", label: "Ends", render: (x) => formatTime(x.scheduled_end), desktop: true },
+              { key: "how", label: "How", render: (x) => INTERVIEW_TYPE[x.interview_type], desktop: true },
               {
                 key: "panel",
                 label: "Panel",
@@ -186,20 +192,19 @@ export function Interviews() {
             ]}
           />
         }
-        // Beside the list: the interview and its panel; the rest of the record follows in full width below,
-        // in even pairs. On a phone the whole record is in its sheet.
-        detail={shown ? <InterviewRecord key={shown} id={shown} part={beside ? "top" : "all"} /> : null}
+        // The dialog lays the cards out side by side; a phone's sheet stacks them.
+        detail={shown ? <InterviewRecord key={shown} id={shown} part={phone ? "all" : "wide"} /> : null}
       />
-      {beside && shown && <InterviewRecord key={`${shown}-rest`} id={shown} part="rest" />}
     </>
   );
 }
 
 /**
- * One interview: the summary and its Blind Panel (`top`, beside the list), the scorecard, details, activity
- * and the round's result (`rest`, full width below the list on desktop), or all of it (`all`, a phone's sheet).
+ * One interview. `wide` (the desktop dialog): the summary, the Blind Panel, the Weighted Scorecard and
+ * Candidate Details two by two, then Round Activity across the dialog, then the round's traits and
+ * result once closed. `all` (a phone's sheet): the same, one under another.
  */
-export function InterviewRecord({ id, part = "all" }: { id: string; part?: "top" | "rest" | "all" }) {
+export function InterviewRecord({ id, part = "all" }: { id: string; part?: "wide" | "all" }) {
   const modal = useModal();
   const confirm = useConfirm();
   const mayEdit = useAuth().can("recruitment", "edit");
@@ -207,7 +212,7 @@ export function InterviewRecord({ id, part = "all" }: { id: string; part?: "top"
   const shut = useMutation("POST /api/v1/recruitment/interviews/:id/close");
   const x = read.data;
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
-  if (!x) return part === "rest" ? null : <Card><LoadingRows count={8} /></Card>;
+  if (!x) return <Card><LoadingRows count={8} /></Card>;
   const reload = () => {
     read.reload();
     invalidate("/api/v1/recruitment/interviews");
@@ -352,22 +357,17 @@ export function InterviewRecord({ id, part = "all" }: { id: string; part?: "top"
       )}
     </>
   );
-  if (part === "top")
+  if (part === "wide")
     return (
       <Stack>
-        {summary}
-        {blindPanel}
-      </Stack>
-    );
-  if (part === "rest")
-    return (
-      <Stack className="mt-3">
-        {/* The same split as the list and the record above, so the columns line up. */}
-        <Grid cols="1.4/1">
-          {scorecard ?? details}
-          {scorecard ? details : activity}
+        {/* Two by two, each card at its own height: the dialog scrolls as one. */}
+        <Grid cols={2} scroll={false} flush>
+          {summary}
+          {blindPanel}
+          {scorecard}
+          {details}
         </Grid>
-        {scorecard && activity}
+        {activity}
         {result}
       </Stack>
     );

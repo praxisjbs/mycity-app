@@ -83,11 +83,12 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [ThemePreview](#themepreview) | `ThemePreview` | A small copy of the hub drawn in a dark palette and two faces: the rail, a page title, two KPI cards, a list with a selected row, status pills, a field and the yellow button. | beta |
 | Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
 | Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
-| Display | [VerifyCard](#verifycard) | `VerifyCard`, `Match` | What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself with its download. | beta |
+| Display | [VerifyCard](#verifycard) | `VerifyCard`, `Match` | What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself (an agreement's headings, clauses and tables included) with its download. | beta |
 | Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, drawn from its measured loudness, which fill as it plays. | stable |
 | Display | [YearsMedal](#yearsmedal) | `YearsMedal` | The years a person has been at MyCity, large, inside a gold laurel. | beta |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [QuestionMap](#questionmap) | `QuestionMap` | The questions of a sitting as numbered squares: the one in hand in yellow, each answered one in green, a press moving to that question. | beta |
+| Navigation | [SectionNav](#sectionnav) | `SectionNav` | A long page's contents: its sections as links with icons, the one in view marked as the page scrolls, a press scrolling to it. | beta |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
 | Navigation | [StageSwitcher](#stageswitcher) | `StageSwitcher` | A deal's stages in order, the current one marked; one press on another stage moves the deal there. | beta |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
@@ -121,10 +122,12 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped. | stable |
+| Forms | [MonthField](#monthfield) | `MonthField` | A month picked from a year's twelve, bound to a form: the field reads "October 2026" and the value is the month's first day for the wire. | beta |
 | Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
+| Forms | [QuestionCard](#questioncard) | `QuestionCard` | One question the Proposal Studio asks before a draft: the question, why it is asked, an answer field matched to its kind, a suggested answer with where it came from, and Skip and Reshuffle. | beta |
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
 | Forms | [RatingField](#ratingfield) | `RatingField` | A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; disabled locks a given rating in place, readOnly draws one already given or a panel's mean. | beta |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
@@ -146,6 +149,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file and saves it on the device that pressed, once the worker has made it. | stable |
 | Data | [FormatButton](#formatbutton) | `FormatButton` | A button that makes one file in a format: the format straight away when there is one, a choice of formats when there are two or more. | stable |
 | Data | [Kanban](#kanban) | `Kanban`, `KanbanCardBody` | A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19). | stable |
+| Data | [OrderList](#orderlist) | `OrderList` | Rows a person keeps in an order they set: dragged by their handle on desktop, and moved with Move Up and Move Down in each row's menu on both shells. | beta |
 | Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
 | Charts | [AreaChart](#areachart) | `AreaChart` | A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter. | stable |
@@ -155,6 +159,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
 | Charts | [TrendChart](#trendchart) | `TrendChart` | One to three figures over time on one scale, with an optional target line, gaps where nothing was recorded, and a readout that follows the pointer. | beta |
+| Documents | [DocumentFrame](#documentframe) | `DocumentFrame` | A document the server drew, a proposal's pages, in a sealed frame exactly as it prints, scaled to its column, its sections pressable for the editor beside it. | beta |
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
@@ -166,7 +171,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
-| Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML. | beta |
+| Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, tables, bold, italic, links), drawn as elements, never as injected HTML. | beta |
+| Documents | [VideoPlayer](#videoplayer) | `VideoPlayer` | A video inside a page, nothing loaded until Play Video is pressed: a YouTube video through YouTube's privacy-enhanced domain, or an uploaded MP4 fetched with the session. | beta |
 | Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
 | Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
 | Maps | [PlaceSearch](#placesearch) | `PlaceSearch` | Finds an address through our own API and hands back the place with its coordinates. | stable |
@@ -189,7 +195,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's hero, glass teal in light and Deep Green in dark: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now. | beta |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
-| Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
+| Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
 | Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
 | Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
 | Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary. | beta |
@@ -409,7 +415,7 @@ A list and the record a row opens: side by side on a wide desktop, and on a phon
 |---|---|
 | Use | Any list whose row opens a record on the same screen: leave requests, payslips, proposals, offers, letter templates. DetailPane is the same rule for a record the desktop layout places elsewhere on the page (under the list beside a chart, above the list). `useSideBySide()` says when a first pick may show unasked. |
 | Avoid | A record with its own screen (navigate to its `id`); a reader read one at a time that fills the screen (SplitPanes: the mailbox, chat); a form (Modal); a record shown below its list on a phone, in any shape. |
-| Phone | No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `layout="modal"` (Expenses, F31 as amended 04/11/2026) opens the record in the centred dialog at every desktop width too, and the list takes the full width. |
+| Phone | No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `fillUntilPicked` (Knowledge Hub · Training, ESS · My Training) gives the list the full width on desktop until a record is picked. `layout="modal"` (Expenses, F31 as amended 04/11/2026; Recruitment's Interviews and Offers, amended 08/11/2026, with `size="xl"` and `closeButton`, a Close button at the dialog's foot on desktop; its Candidates and Assessments, amended 11/11/2026, with `size="wide"`) opens the record in the centred dialog at every desktop width too, and the list takes the full width. |
 | Accessibility | The sheet is the shared Modal: titled by `title`, focus moves in and returns to the row on close, Esc and the phone's Back close it (F29). Side by side, the record is a plain column after the list in reading order. |
 | Status | stable |
 | Exports | `ListDetail`, `DetailPane` |
@@ -432,6 +438,9 @@ A list and the record a row opens: side by side on a wide desktop, and on a phon
 | `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
 | `className` | `string` |  | Layout classes only (spacing), on the side-by-side grid. |
 | `layout` | `"beside" \| "modal"` |  | `beside` (the default): the record beside the list on a wide desktop. `modal`: the list takes the full width and a picked record opens in the shared Modal at every width, the centred dialog on desktop and the sheet on a phone (F31 as amended for Expenses). Nothing shows unasked. |
+| `size` | `"md" \| "wide" \| "xl"` |  | The dialog's desktop width: `md`, `wide` (the default for `cols="1/1.5"`), or `xl` for a record whose cards sit side by side in the dialog (`layout="modal"`: Recruitment's Interviews and Offers). |
+| `closeButton` | `boolean` |  | A Close button in the dialog's footer on desktop, for a long record read top to bottom (`layout="modal"`: Interviews and Offers). A phone's sheet drags down instead. |
+| `fillUntilPicked` | `boolean` |  | Side by side, the list keeps the full width until a record is picked, then makes room for it: a list with no first record worth showing unasked (Knowledge Hub · Training, ESS · My Training). |
 
 **DetailPane** props (`DetailPaneProps`)
 
@@ -905,7 +914,7 @@ Labelled rows, each a bar and its figure: pipeline stages, a department's spend,
 |---|---|
 | Use | A handful of named measures a person reads top to bottom, where the label matters as much as the figure. |
 | Avoid | A figure over time (use AreaChart); comparing one measure across categories (use BarChart); a single measure (use Meter). |
-| Phone | The same rows, with a narrower label column; the bar keeps its figure beside it. |
+| Phone | Each row stacks: the label and its figure on one line, the bar under them at full width, so a long label or a figure with a pill (89, Provisional) never runs past the card. |
 | Accessibility | Each row is a meter with its own name and figure, so the proportion is read rather than guessed from a colour. |
 | Status | stable |
 | Exports | `Bars` |
@@ -934,7 +943,7 @@ An approval route: the steps already done, the one in hand, and what is still to
 |---|---|
 | Use | Above a record that waits on people (an expense claim, a leave request, a requisition, an offer). |
 | Avoid | What has already happened with dates (use Timeline); a progress figure (use ProgressBar or Meter); more than six steps. |
-| Phone | The steps wrap onto as many lines as they need; the arrows stay between them, never a sideways scroll. |
+| Phone | The steps wrap onto as many lines as they need; the arrows stay between them, never a sideways scroll. With `stack` they sit one under another, an arrow down between each (a payroll run's five statuses on a phone). |
 | Accessibility | An ordered list whose current step says so in words, so the state is never the colour of a pill alone. |
 | Status | stable |
 | Exports | `Chain` |
@@ -949,6 +958,7 @@ An approval route: the steps already done, the one in hand, and what is still to
 |---|---|---|---|
 | `steps` | `ChainStep[]` | yes | The steps, first to last. |
 | `label` | `string` |  | Names the route for screen readers; "Approval route" unless set. |
+| `stack` | `boolean` |  | The steps one under another, an arrow down between each, where a row would wrap: a phone's list of statuses. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -2460,7 +2470,7 @@ What happened to a record, newest or oldest first: a rail of dated events, each 
 
 ### VerifyCard
 
-What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself with its download.
+What a check of a document found, on the site's large card: before any check a Deep Green shield over a title and a line; after it a verdict band (verified in green, altered in amber, not found in red) with its glyph, the record as label and value rows with each hash marked Matches or Differs, a note, and for a QR check the document itself (an agreement's headings, clauses and tables included) with its download.
 
 | | |
 |---|---|
@@ -2484,7 +2494,7 @@ What a check of a document found, on the site's large card: before any check a D
 | `text` | `ReactNode` |  | One line under it (This document is genuine and unchanged.). |
 | `items` | `ReadonlyArray<KeyValueItem>` |  | The record, label and value (Document, Reference, Signed By, Signed On, Issued By, Content Hash, Artifact Hash). |
 | `note` | `ReactNode` |  | A line under the rows (what to do when nothing was found). |
-| `document` | `{ heading: string; title: string; paragraphs: ReadonlyArray<string>; action?: ReactNode }` |  | A QR check's document: its heading, title, opening words and its download. |
+| `document` | `{ heading: string; title: string; paragraphs: ReadonlyArray<string>; blocks?: RichTextBlock[] \| null; action?: ReactNode }` |  | A QR check's document: its heading, title, opening words and its download; or, for a document with headings, clauses and tables (an agreement), the whole text as `blocks`, drawn in place of the words. |
 | `empty` | `{ title: string; text: string }` |  | Before a check: the title and line under the shield. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -2625,6 +2635,38 @@ The questions of a sitting as numbered squares: the one in hand in yellow, each 
 
 ```tsx
 <QuestionMap label="Questions" count={3} at={0} answered={[true, false, false]} onPick={go} />
+```
+
+### SectionNav
+
+A long page's contents: its sections as links with icons, the one in view marked as the page scrolls, a press scrolling to it.
+
+| | |
+|---|---|
+| Use | The public site's Help page, at the left of the guide (`column`, inside StickyColumns aside) and as a row under the header on a phone (`bar`). |
+| Avoid | Switching what a page shows (use Tabs or SegmentedControl); narrowing a list (use Chips or TeamList); the staff app's User Guide (use Reader). |
+| Phone | `bar`: one row of pills that sticks under the header and scrolls sideways inside itself, the one in view kept in sight; each is a 44 px target. `column` is left off below 1041 px and `bar` above it, so a page gives both. |
+| Accessibility | A nav named by `label` of real links to each section's id, the one in view marked aria-current="location". The caller gives each section its id and a scroll margin under the header. |
+| Status | beta |
+| Exports | `SectionNav` |
+| Import | `import { SectionNav } from "@mycity/ui";` |
+| File | `packages/ui/src/navigation/SectionNav.tsx` |
+| Test | `packages/ui/src/navigation/SectionNav.test.tsx` |
+| Gallery | `packages/ui/src/navigation/SectionNav.gallery.tsx` (`npm run gallery`, `#/SectionNav`) |
+
+**SectionNav** props (`SectionNavProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | Names the nav for assistive technology (Help Contents). |
+| `items` | `ReadonlyArray<SectionNavItem>` | yes | The sections, top to bottom. |
+| `variant` | `"column" \| "bar"` |  | `column` (the default): a column of rows, desktop only. `bar`: a row of pills under the header, below 1041 px only. |
+| `title` | `string` |  | A heading over the column, in spaced capitals (On This Page); the bar has none. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<SectionNav label="Help Contents" items={[{ id: "public-home", label: "Home", icon: "home" }, { id: "public-apply", label: "Apply", icon: "send" }]} />
+<SectionNav variant="bar" label="Help Contents" items={items} />
 ```
 
 ### SegmentedControl
@@ -2902,7 +2944,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 | `children` | `ModalContent` |  | The body, or a function of `close`. |
 | `footer` | `ModalContent` |  | Footer buttons only (Cancel, then the primary), or a function of `close`. A body can also use ModalFooter. |
 | `wide` | `boolean` |  | The wider desktop dialog (tables, documents). Same as size="wide". |
-| `size` | `"sm" \| "md" \| "wide"` |  | Desktop width: `sm` a confirmation, `md` a form (the default), `wide` a table or document. |
+| `size` | `"sm" \| "md" \| "wide" \| "xl"` |  | Desktop width: `sm` a confirmation, `md` a form (the default), `wide` a table or document, `xl` a record whose cards sit side by side (an interview, an offer). |
 | `full` | `boolean` |  | A full-screen sheet on a phone (a composer, a long form, a reader). No change on desktop. |
 | `side` | `boolean` |  | A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. |
 | `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. |
@@ -3854,6 +3896,44 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 <MoneyField {...form.field("amount")} />
 ```
 
+### MonthField
+
+A month picked from a year's twelve, bound to a form: the field reads "October 2026" and the value is the month's first day for the wire.
+
+| | |
+|---|---|
+| Use | Every month a person enters in a form: a payroll run's month (New Run), a period that is a whole month. The contract's `monthStart` is the rule it meets. |
+| Avoid | A day (use DateField); a month stepped through on a screen that is not a form, such as a calendar's month (a screen's own switch); <input type="month"> (the browser draws it, gate 21). |
+| Phone | The months open in a bottom sheet titled by the field's label, three to a row, each a 44 px target; the year switch sits above them. |
+| Accessibility | The button is named by its Field's label and the month it holds, and says it opens a dialog. Each month is a button named by its month and year, pressed when it is the value; months outside min and max are disabled, and the year arrows stop at their years. |
+| Status | beta |
+| Exports | `MonthField` |
+| Import | `import { MonthField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/MonthField.tsx` |
+| Test | `packages/ui/src/form/MonthField.test.tsx` |
+| Gallery | `packages/ui/src/form/MonthField.gallery.tsx` (`npm run gallery`, `#/MonthField`) |
+
+**MonthField** props (`MonthFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The month as its first day, ISO (2026-10-01), or "" for none. |
+| `onChange` | `(iso: string) => void` | yes | Called with the first day of the month picked. |
+| `onBlur` | `() => void` |  | Called when the months close, so the form checks the field as it would on leaving an input. |
+| `min` | `string` |  | The earliest month that may be picked: any ISO date in it. |
+| `max` | `string` |  | The latest month that may be picked: any ISO date in it. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id; the Field supplies one otherwise. |
+| `name` | `string` |  | The field's name, so a failed submit can focus it. |
+| `placeholder` | `string` |  | What the button reads with no month: a format example, at most 3 words. |
+| `disabled` | `boolean` |  | Shown and not changed: the months do not open. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<Field label="Month" {...form.status("period")}><MonthField min="2024-01-01" max={todayIso()} {...form.field("period")} /></Field>
+```
+
 ### MoreFields
 
 The fields a form rarely needs, closed under one More row until the person opens it.
@@ -3990,6 +4070,48 @@ Several places picked from our own address search, each a chip with Remove: a pr
 
 ```tsx
 <PlacesField {...f.field("cities")} places={places} />
+```
+
+### QuestionCard
+
+One question the Proposal Studio asks before a draft: the question, why it is asked, an answer field matched to its kind, a suggested answer with where it came from, and Skip and Reshuffle.
+
+| | |
+|---|---|
+| Use | The studio's Questions step (docs/guides/partnerships.md §6.10): cards grouped (The Partner, The Offer, Audience and Reach, Money, Timing, Proof), answered one by one. |
+| Avoid | A form's ordinary field (use Field with its control); a yes or no setting (use Switch); a survey of many fields at once (use a Wizard). |
+| Phone | One card fills the width; the answer field is 16 px and every button a 44 px target, Save Answer full width with Skip and Reshuffle above it. |
+| Accessibility | The question is the field's accessible name; Why is a help term beside it. Save Answer, Use Suggestion, Skip and Reshuffle are buttons that stay busy while their work runs (F26). |
+| Status | beta |
+| Exports | `QuestionCard` |
+| Import | `import { QuestionCard } from "@mycity/ui";` |
+| File | `packages/ui/src/form/QuestionCard.tsx` |
+| Test | `packages/ui/src/form/QuestionCard.test.tsx` |
+| Gallery | `packages/ui/src/form/QuestionCard.gallery.tsx` (`npm run gallery`, `#/QuestionCard`) |
+
+**QuestionCard** props (`QuestionCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `question` | `string` | yes | The question, as Claude asked it. |
+| `why` | `string \| null` |  | Why it is asked, in one line, behind the Why help term; none when null. |
+| `group` | `string` | yes | The card's group as the screen names it ("The Offer"). |
+| `kind` | `"short_text" \| "long_text" \| "number" \| "money" \| "date" \| "pick" \| "multi_pick"` | yes | The answer field it takes. |
+| `options` | `readonly string[] \| null` |  | The choices of a pick or a multi-pick. |
+| `suggested` | `QuestionAnswer` |  | Claude's suggested answer, in the card's kind, or null. |
+| `suggestedFrom` | `string \| null` |  | Where the suggestion comes from ("From the transcript, 00:21:51"). |
+| `required` | `boolean` |  | A required card cannot be skipped. |
+| `answer` | `QuestionAnswer` |  | The answer kept, or null. |
+| `state` | `"open" \| "answered" \| "skipped"` | yes | Where the card stands. |
+| `position` | `string` |  | The card's place among its group's or all cards ("3 of 9"). |
+| `onAnswer` | `(value: QuestionAnswer) => unknown` | yes | Keep an answer: hand back the save (F26). |
+| `onSkip` | `() => unknown` |  | Skip the card; not offered on a required card. |
+| `onReshuffle` | `() => unknown` |  | A different question in its place; left out when none remain. |
+| `error` | `string \| null` |  | The server's word on the answer, at most 4 words. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+```tsx
+<QuestionCard group="The Offer" question="What is the early bird price?" kind="money" state="open" onAnswer={(v) => answer(card, v)} />
 ```
 
 ### RadioCards
@@ -4873,6 +4995,37 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 <Kanban columns={stages} onMove={(card, from, to) => move(card, to)} onOpen={openRecord} empty={<EmptyState title="No Tasks Yet" />} />
 ```
 
+### OrderList
+
+Rows a person keeps in an order they set: dragged by their handle on desktop, and moved with Move Up and Move Down in each row's menu on both shells.
+
+| | |
+|---|---|
+| Use | A short ordered set a person arranges: a course's items, a form's steps, a route's stops (up to about 40 rows). |
+| Avoid | A server-paged list of records (DataView); stages a card moves between (Kanban); picking and ordering cards for a row (CardPicker); dragging as the only way to move a row. |
+| Phone | No dragging (F19): each row's menu opens as an action sheet with Move Up and Move Down beside the row's own actions; every menu button is a 44 px target. |
+| Accessibility | An ordered list named by `label`. Move Up and Move Down are real menu items named for their row, so a keyboard and a screen reader reorder without dragging; a polite status reads a row's new place. While a move is on its way the list says aria-busy and every menu stays focusable but does not open (F26). |
+| Status | beta |
+| Exports | `OrderList` |
+| Import | `import { OrderList } from "@mycity/ui";` |
+| File | `packages/ui/src/data/OrderList.tsx` |
+| Test | `packages/ui/src/data/OrderList.test.tsx` |
+| Gallery | `packages/ui/src/data/OrderList.gallery.tsx` (`npm run gallery`, `#/OrderList`) |
+
+**OrderList** props (`OrderListProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `OrderListItem[]` | yes | The rows, in their order. |
+| `label` | `string` | yes | Names the list for assistive technology ("Course Items"). |
+| `onMove` | `(key: string, to: number) => unknown` |  | Moves a row to a new place (0 is the top). Hand back the work (a promise) and the list waits until it settles. Without it the order is fixed and nothing drags. |
+| `empty` | `ReactNode` |  | What shows when there are no rows. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<OrderList label="Course Items" items={items.map((i) => ({ key: i.id, name: i.title, content: <ItemRow item={i} />, menu: [{ label: "Edit Item", icon: "edit", onSelect: () => edit(i) }] }))} onMove={(key, to) => reorder(key, to)} />
+```
+
 ### Pager
 
 Page controls under a list, showing the server's true total ("312 employees") and Previous and Next.
@@ -5186,6 +5339,38 @@ One to three figures over time on one scale, with an optional target line, gaps 
 
 ## Documents
 
+### DocumentFrame
+
+A document the server drew, a proposal's pages, in a sealed frame exactly as it prints, scaled to its column, its sections pressable for the editor beside it.
+
+| | |
+|---|---|
+| Use | The Proposal Studio's preview and the public Proposal page: complete HTML from the server's document engine, with its own stylesheet and pages (docs/guides/partnerships.md §6.11). |
+| Avoid | A received email (use EmailFrame); our own long text (use Reader); a stored PDF file (use PdfViewer). |
+| Phone | The frame takes the screen's width and the document lays itself out in one column by its own rules; on desktop its pages keep their designed width and are scaled down to fit, never scrolled sideways. Pull to refresh never starts on it. |
+| Accessibility | An iframe named by `title`, as its aria-label so no browser tooltip appears. Nothing in the document runs. With `onSelect`, each section is a focusable button inside the frame: Enter or Space selects it, as a press does. |
+| Status | beta |
+| Exports | `DocumentFrame` |
+| Import | `import { DocumentFrame } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/DocumentFrame.tsx` |
+| Test | `packages/ui/src/documents/DocumentFrame.test.tsx` |
+| Gallery | `packages/ui/src/documents/DocumentFrame.gallery.tsx` (`npm run gallery`, `#/DocumentFrame`) |
+
+**DocumentFrame** props (`DocumentFrameProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `html` | `string` | yes | The document's complete HTML, as the server drew it (its pictures and fonts embedded). |
+| `title` | `string` | yes | What a screen reader announces for the frame: the document's name. |
+| `designWidth` | `number` |  | The width the document is laid out at on desktop, in CSS pixels. Default 1328, the proposal kit's pages and their margin. |
+| `selected` | `string \| null` |  | The section shown as selected (its `data-section`), or none. |
+| `onSelect` | `(key: string) => void` |  | A section was pressed or chosen from the keyboard; without it the document is only read. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the document's own. |
+
+```tsx
+<DocumentFrame title="Proposal PRO-0012" html={preview.html} selected={key} onSelect={setKey} />
+```
+
 ### DocumentPreview
 
 A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both.
@@ -5316,6 +5501,7 @@ A User Guide chapter's body: numbered steps with Open links, notes, tables and a
 | `fetchImage` | `(url: string) => Promise<Blob>` |  | Fetches a picture that needs the session; without it the address is drawn as it is. |
 | `onLink` | `(href: string, from: GuideLinkFrom) => void` |  | Called for a screen (`/people?tab=x`) or a section (`#slug`) link; without it they are plain links. |
 | `onZoom` | `(shot: string) => void` |  | Called when a picture is pressed, to show it full size. |
+| `home` | `string` |  | The site the guide is read on (`https://go.mycityapp.io` on its Help page): a link to it is followed in place through onLink, by its path, not opened in a new tab. |
 | `highlight` | `number \| null` |  | The step to mark as the one the reader came back to. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -5596,13 +5782,13 @@ An article list beside the article: the Knowledge Hub's shape, and anything else
 
 ### RichText
 
-Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML.
+Formatted text the server sent as blocks (headings, paragraphs, lists, tables, bold, italic, links), drawn as elements, never as injected HTML.
 
 | | |
 |---|---|
-| Use | A policy's text on Policy Updates and Knowledge Hub · Policies; any text a person wrote that the API gives back as blocks. `look="site"` is the public site's: a role's text in its body ink, a numbered heading's number on a Deep Green badge, bullets as small yellow squares. |
+| Use | A policy's text on Policy Updates and Knowledge Hub · Policies; an agreement's wording with its options table on Contracts & MOUs and the signing page; any text a person wrote that the API gives back as blocks. `look="site"` is the public site's: a role's text in its body ink, a numbered heading's number on a Deep Green badge, bullets as small yellow squares. |
 | Avoid | Text being written (use RichTextField); an email's own HTML (use EmailFrame); a short plain answer (a paragraph is enough). |
-| Phone | The same text at the phone's body size; long words and links wrap rather than push the page sideways. |
+| Phone | The same text at the phone's body size; long words and links wrap rather than push the page sideways. A table becomes a card a row, each cell under its column's name, since a phone shows no table. |
 | Accessibility | Real headings, lists and links in reading order, so a screen reader can move by heading; pass `top` so the headings sit under the page's own. |
 | Status | beta |
 | Exports | `RichText` |
@@ -5622,6 +5808,36 @@ Formatted text the server sent as blocks (headings, paragraphs, lists, bold, ita
 
 ```tsx
 <RichText blocks={version.body} top={3} />
+```
+
+### VideoPlayer
+
+A video inside a page, nothing loaded until Play Video is pressed: a YouTube video through YouTube's privacy-enhanced domain, or an uploaded MP4 fetched with the session.
+
+| | |
+|---|---|
+| Use | A course's video item (ESS · My Training), a short walkthrough a page plays in place. |
+| Avoid | A chat's or a document list's video opened full screen (MediaViewer); a video's first frame in a list (MediaTile); any site but YouTube in a frame (open it in a new tab). |
+| Phone | Full width at 16:9, with Play Video a 44 px target in the middle; the video's own controls play it, and full screen is the phone's. |
+| Accessibility | The player is named by `title`: Play Video's name carries it, and the frame and the video are labelled by it (no title tooltip). Nothing plays or loads by itself; while an MP4 arrives the box says aria-busy, and one that fails says so in words with Try Again. |
+| Status | beta |
+| Exports | `VideoPlayer` |
+| Import | `import { VideoPlayer } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/VideoPlayer.tsx` |
+| Test | `packages/ui/src/documents/VideoPlayer.test.tsx` |
+| Gallery | `packages/ui/src/documents/VideoPlayer.gallery.tsx` (`npm run gallery`, `#/VideoPlayer`) |
+
+**VideoPlayer** props (`VideoPlayerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | yes | The video's title: the player's accessible name, and the line over its Play button. |
+| `youtubeId` | `string \| null` |  | A YouTube video's id (the API reads it from the link): it plays from youtube-nocookie.com. |
+| `load` | `() => Promise<Blob>` |  | An uploaded video's bytes, fetched with the session only when Play Video is pressed (an MP4). Key the player by the video, so another one starts again from its poster. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<VideoPlayer key={item.id} title="Why Data Matters" youtubeId="dQw4w9WgXcQ" />
 ```
 
 ## Maps
@@ -6316,7 +6532,7 @@ The public site's hero, glass teal in light and Deep Green in dark: the page's h
 
 | | |
 |---|---|
-| Use | size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design. |
+| Use | size index for the site's front door (the careers index) and size role for a vacancy (the team as a gold pill, the role's facts as chips, its actions and a note), size page for an inner page's short head (Help: its title, at a role's size), each inside PublicPage layout full. l, m and pane stay for the pages not yet moved to the approved design. |
 | Avoid | The staff app; decoration under a page that has its own heading already; text more than a line. |
 | Phone | Edge to edge. index: still the first screen, 16 px at the sides, the search's button full width under its box, the figures closer; its lede is hidden (a page subtitle is desktop only). role: All Roles stays at the top left, the actions and the note are left off (the page's bar carries Apply). l and m: the heading 24 px, the skyline shorter, the line under the heading hidden. The pane becomes a compact band above the card (from 1040 px down), its `wide` part left off. |
 | Accessibility | The heading is the page's h1 (data-ui page-title, or content when it names a record); the skyline, the scrim and the street grid are decorative (aria-hidden) and still under reduced motion, when the parts no longer rise and the figures show their value at once. A counting figure is read as its final value. All Roles is a link. index and role take the page's theme, their inks AA on its ground (tokens.css --site-*); the earlier panels take the dark theme's tokens, so they keep AA on Deep Green whatever the page's theme. |
@@ -6337,7 +6553,7 @@ The public site's hero, glass teal in light and Deep Green in dark: the page's h
 | `facts` | `ReadonlyArray<{ icon: IconName; text: string }>` |  | The record's facts as chips on the panel, each a glyph and a few words (Lagos, Hybrid, Full Time). |
 | `children` | `ReactNode` |  | What sits under the heading: a search field; on the pane, the clock and the progress. |
 | `wide` | `ReactNode` |  | The pane only: what it adds where it stands beside the page (1041 px and wider), such as the steps; left off the compact band. |
-| `size` | `"index" \| "role" \| "l" \| "m" \| "pane"` |  | `index`: the site's front door, the first screen. `role`: a vacancy's head. `l` (the default), `m` and `pane`: the earlier panels (a front door, a record's page, the context pane PublicPage stands beside a form). |
+| `size` | `"index" \| "role" \| "page" \| "l" \| "m" \| "pane"` |  | `index`: the site's front door, the first screen. `role`: a vacancy's head. `page`: a short head for an inner page, its title at a role's size and an optional line (Help). `l` (the default), `m` and `pane`: the earlier panels (a front door, a record's page, the context pane PublicPage stands beside a form). |
 | `accent` | `string` |  | index and role: the word of a string `title` drawn in the brand yellow (Work With Us, accent Us). |
 | `stats` | `ReadonlyArray<{ value: number; label: string }>` |  | index: the figures under the search, each counting up from 0 as the hero opens (Open Roles, Teams Hiring, Cities). |
 | `back` | `{ label: string; href: string }` |  | role: the link back at the top left (All Roles); it goes through PublicPage's navigate. |
@@ -6352,6 +6568,7 @@ The public site's hero, glass teal in light and Deep Green in dark: the page's h
 <SkylineHero size="m" eyebrow="Marketing & Sales" title="Partnerships Associate" facts={[{ icon: "pin", text: "Lagos" }]} />
 <SkylineHero size="pane" record eyebrow="Your Application" title="Partnerships Associate" text="This link is yours until 12/11/2026." />
 <SkylineHero size="index" eyebrow="Hiring in Lagos and Abuja" title="Work With Us" accent="Us" text="Building the app that knows every Nigerian city." stats={[{ value: 12, label: "Open Roles" }]}><SiteSearch tone="hero" ... /></SkylineHero>
+<SkylineHero size="page" title="Here to Guide" />
 <SkylineHero size="role" record back={{ label: "All Roles", href: "/jobs" }} eyebrow="Marketing & Sales" title="Head, Sales & Revenue" facts={facts} note="12 people have applied">{actions}</SkylineHero>
 ```
 
@@ -6429,7 +6646,7 @@ The trail: the last places a person went on this device and the one ahead, each 
 
 ### ActionCard
 
-An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired.
+An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired.
 
 | | |
 |---|---|

@@ -91,6 +91,37 @@ export async function press(root: HTMLElement, name: string | RegExp) {
   await settled();
 }
 
+/**
+ * Opens `root`'s More Actions: a pointer menu on a computer, an action sheet on a phone (a tap opens
+ * it, its rows are plain buttons). Gives back its items by name, and the element each is.
+ */
+async function openMore(root: HTMLElement): Promise<Array<{ name: string; el: HTMLElement }>> {
+  const trigger = within(root).getAllByRole("button", { name: "More Actions" })[0]!;
+  if (window.matchMedia("(max-width: 760px)").matches) {
+    fireEvent.click(trigger);
+    const sheet = await screen.findByRole("dialog", { name: /Actions$/ });
+    return within(sheet.querySelector("ul")!).getAllByRole("button").map((el) => ({ name: el.textContent ?? "", el }));
+  }
+  fireEvent.pointerDown(trigger, { button: 0, pointerType: "mouse" });
+  return (await screen.findAllByRole("menuitem")).map((el) => ({ name: el.textContent ?? "", el }));
+}
+
+/** Opens `root`'s More Actions and chooses `name` from it (a record's actions behind its main button). */
+export async function choose(root: HTMLElement, name: string) {
+  const item = (await openMore(root)).find((x) => x.name === name);
+  if (!item) throw new Error(`More Actions has no ${name}`);
+  fireEvent.click(item.el);
+  await settled();
+}
+
+/** What `root`'s More Actions holds, by name; the menu is closed again after. */
+export async function moreActions(root: HTMLElement): Promise<string[]> {
+  const names = (await openMore(root)).map((x) => x.name);
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+  await settled();
+  return names;
+}
+
 /** Types into the field labelled `label` inside `root`. */
 export const type = (root: HTMLElement, label: string | RegExp, value: string) => fireEvent.change(within(root).getByLabelText(label), { target: { value } });
 

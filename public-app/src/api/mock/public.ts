@@ -1,6 +1,7 @@
-import type { ApplicationReceipt, ApplyLink, ApplyQuestion, AssessmentSession, PublicJob, PublicJobCard, PublicJobsSummary, PublicQuestion, SignCodeSent, SignerView, SigningView, VerifyByToken, VerifyResult } from "@mycity/contract/contract.gen.ts";
+import type { ApplicationReceipt, ApplyLink, ApplyQuestion, AssessmentSession, PublicJob, PublicJobCard, PublicJobsSummary, PublicProposal, PublicQuestion, SignCodeSent, SignerView, SigningView, VerifyByToken, VerifyResult } from "@mycity/contract/contract.gen.ts";
 import signatureSchemas from "@mycity/contract/schemas/signatures.js";
 import candidates from "@mycity/contract/schemas/candidates.js";
+import PROPOSAL_HTML from "@mycity/ui/samples/proposal-kit.sample.html?raw";
 import { fail, inDays, invalid, ok, paged, route, type Req } from "./core";
 
 /**
@@ -349,6 +350,14 @@ const LINKS = new Map<string, Link>([
   ["k7Qm2TxV9pLa", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
   ["Bv3nQ8sLp2Wd", { slug: "graphics-and-motion-designer-lagos", expires_at: inDays(2), receipt: null, email: null }],
   ["Wn4cR8yHj2Zs", { slug: "studio-assistant-lagos", expires_at: inDays(-1), receipt: null, email: null }],
+  ["Hq5tN2wPz8Kc", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
+]);
+/**
+ * Who has applied for which role, by role slug and email: a repeat is told it applied. Chiamaka
+ * applied for Head, Sales & Revenue a few days ago, so applying again as her shows it.
+ */
+const APPLIED = new Map<string, ApplicationReceipt>([
+  ["head-sales-revenue-lagos|chiamaka.eze@example.com", { reference: "APP-0016", submitted_at: inDays(-4), already_applied: false }],
 ]);
 const opaque = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"[b % 56]).join("");
 const liveLink = (token: string) => {
@@ -396,8 +405,17 @@ route("POST /api/public/v1/apply/:token", (req: Req) => {
   if (!checked.success) for (const i of checked.error.issues) (fields[i.path.join(".") || "body"] ??= []).push(i.message);
   Object.assign(fields, answersOf(r, ((req.body as { answers?: Record<string, string> }).answers ?? {}) as Record<string, string>));
   if (Object.keys(fields).length) return invalid(fields);
-  l.receipt = { reference: `APP-${String(++nextApp).padStart(4, "0")}`, submitted_at: new Date().toISOString() };
-  l.email = String((req.body as { email?: string }).email ?? "");
+  const email = String((req.body as { email?: string }).email ?? "").trim().toLowerCase();
+  /* The same email for the same role again: nothing new, and the applicant is told (the API's already_applied). */
+  const first = APPLIED.get(`${l.slug}|${email}`);
+  if (first) {
+    l.receipt = { ...first, already_applied: true };
+    l.email = email;
+    return ok(l.receipt);
+  }
+  l.receipt = { reference: `APP-${String(++nextApp).padStart(4, "0")}`, submitted_at: new Date().toISOString(), already_applied: false };
+  l.email = email;
+  APPLIED.set(`${l.slug}|${email}`, l.receipt);
   r.applicants += 1;
   return ok(l.receipt);
 });
@@ -589,8 +607,8 @@ const LETTER = (name: string, first: string, role: string, pay: string, start: s
   `${SIGNATORY.name}, ${SIGNATORY.title}, for MyCity App Ltd`,
 ];
 const signers = (candidate: string, signed: string | null, company = "2026-10-30T15:05:00.000Z"): SignerView[] => [
-  { name: SIGNATORY.name, title: SIGNATORY.title, role: "mycity", status: "signed", signed_at: company },
-  { name: candidate, title: null, role: "candidate", status: signed ? "signed" : "pending", signed_at: signed },
+  { name: SIGNATORY.name, title: SIGNATORY.title, role: "mycity", status: "signed", signed_at: company, method: "type" },
+  { name: candidate, title: null, role: "candidate", status: signed ? "signed" : "pending", signed_at: signed, method: signed ? "draw" : null },
 ];
 const OFF_0017_SIGNED = "2026-10-23T19:12:00.000Z"; // 23/10/2026, 20:12 in Lagos
 const offerOf = (reference: string, name: string, first: string, role: string, pay: string, start: string, manager: string, issued_at: string, expires_at: string, signed: string | null, email: string): Offer => ({
@@ -607,13 +625,65 @@ const offerOf = (reference: string, name: string, first: string, role: string, p
     expires_at,
     state: signed ? "signed" : "awaiting",
     letter: LETTER(name, first, role, pay, start, manager),
+    blocks: null,
     code_verified: false,
     signers: signers(name, signed),
     signed_at: signed,
     verify_number: signed ? reference : null,
   },
 });
+/* ── Agreement signing (docs/guides/partnerships.md §6.9): the same page, its words the agreement's ──
+ * AGR-2026-0007 for Harbour Lights waits for its partner's signatory first, MyCity's countersignature
+ * after: Ngozi's link (Ag4pR7wLm2Qx) may sign; the CEO's (Ab8sK2vNe5Wq) waits for her.
+ */
+const sp = (text: string, bold = false) => ({ text, bold, italic: false, href: null });
+const AGREEMENT_BLOCKS = (business: string, event: string): NonNullable<SigningView["blocks"]> => [
+  { kind: "heading", level: 2, spans: [sp("Deal Merchant Agreement")] },
+  { kind: "paragraph", spans: [sp("Business Name: "), sp(business, true)] },
+  { kind: "paragraph", spans: [sp(`Event: ${event}`)] },
+  { kind: "heading", level: 2, spans: [sp("Financials")] },
+  {
+    kind: "table",
+    head: [[], [sp("Regular")], [sp("VIP")]],
+    rows: [
+      [[sp("Original Price")], [sp("₦12,000.00")], [sp("₦30,000.00")]],
+      [[sp("Discount")], [sp("10%")], [sp("10%")]],
+      [[sp("Deal Price")], [sp("₦10,800.00")], [sp("₦27,000.00")]],
+      [[sp("MyCity's Commission per Sale")], [sp("₦864.00")], [sp("₦2,160.00")]],
+    ],
+  },
+  { kind: "heading", level: 2, spans: [sp("Fine Print")] },
+  { kind: "numbered", items: [[sp("Event registration and check-in on MyCityApp.")], [sp("Amplification across MyCity's channels.")], [sp("Branded presence and souvenirs on the day.")]] },
+  { kind: "paragraph", spans: [sp("The above prices, specifications and conditions are hereby accepted.")] },
+];
+const agreementOf = (reference: string, signer: string, partnerFirst: boolean, expires_at: string): Offer => ({
+  email: partnerFirst ? "ngozi@harbourlights.example.test" : "ceo@mycityapp.example.test",
+  code_sent_at: null,
+  tries: 0,
+  view: {
+    reference,
+    document_type: "agreement",
+    title: "Deal Merchant Agreement: Harbour Lights Festival",
+    company: "MyCity App Ltd",
+    signer_name: signer,
+    issued_at: new Date().toISOString(),
+    expires_at,
+    state: "awaiting",
+    letter: ["Deal Merchant Agreement", "Business Name: Harbour Lights", "Event: Harbour Lights Festival"],
+    blocks: AGREEMENT_BLOCKS("Harbour Lights", "Harbour Lights Festival"),
+    code_verified: false,
+    signers: [
+      { name: "Ngozi Adebayo", title: "Founder", role: "partner", status: "pending", signed_at: null, method: null },
+      { name: "Adaeze Okonkwo", title: "Chief Executive Officer", role: "mycity", status: "pending", signed_at: null, method: null },
+    ],
+    signed_at: null,
+    verify_number: null,
+  },
+});
+
 const OFFERS = new Map<string, Offer>([
+  ["Ag4pR7wLm2Qx", agreementOf("AGR-2026-0007", "Ngozi Adebayo", true, inDays(28))],
+  ["Ab8sK2vNe5Wq", agreementOf("AGR-2026-0007", "Adaeze Okonkwo", false, inDays(28))],
   ["Rt8wN2kPz5Gb", offerOf("OFF-0018", "Dayo Martins", "Dayo", "Content Producer", "₦500,000.00", "1 December 2026", "Content Lead", new Date().toISOString(), inDays(9), null, "dayo.martins@example.test")],
   ["Yc3vB6mQh9Ls", offerOf("OFF-0017", "Chiamaka Eze", "Chiamaka", "Content Producer", "₦480,000.00", "16 November 2026", "Content Lead", "2026-10-21T09:00:00.000Z", "2026-11-05T22:59:59.000Z", OFF_0017_SIGNED, "chiamaka.eze@example.test")],
   ["Gz7kT4pXw2Nd", offerOf("OFF-0013", "Kemi Adebayo", "Kemi", "Studio Assistant", "₦200,000.00", "1 October 2026", "Studio Manager", inDays(-9), inDays(-2), null, "kemi.adebayo@example.test")],
@@ -687,8 +757,14 @@ route("POST /api/public/v1/sign/:token/sign", (req) => {
   return parsed<{ signature_png?: string; typed?: string }>(signatureSchemas.SignSubmit, req.body, (b) => {
     const at = new Date().toISOString();
     o.signature = b.signature_png ?? b.typed;
-    Object.assign(o.view, { state: "signed", signed_at: at, verify_number: o.view.reference, signers: o.view.signers.map((x) => (x.role === "candidate" ? { ...x, status: "signed", signed_at: at } : x)) });
-    VERIFY.set(o.view.reference, record(o.view.reference, o.view.title, o.view.signers, "matches", "matches"));
+    const method = b.signature_png ? ("draw" as const) : ("type" as const);
+    const mark = (list: SignerView[]) => list.map((x) => (x.name === o.view.signer_name || (o.view.document_type !== "agreement" && x.role === "candidate") ? { ...x, status: "signed" as const, signed_at: at, method } : x));
+    o.view.signers = mark(o.view.signers);
+    // Every link to the same document sees the same signers.
+    for (const other of OFFERS.values()) if (other !== o && other.view.reference === o.view.reference) other.view.signers = o.view.signers.map((x) => ({ ...x }));
+    const all = o.view.signers.every((x) => x.status === "signed");
+    Object.assign(o.view, { state: "signed", signed_at: at, verify_number: all ? o.view.reference : null });
+    if (all) VERIFY.set(o.view.reference, record(o.view.reference, o.view.title, o.view.signers, "matches", "matches", o.view.document_type));
     return ok(viewOf(o));
   });
 });
@@ -698,7 +774,13 @@ route("POST /api/public/v1/sign/:token/decline", (req) => {
   const refused = mayAct(o);
   if (refused) return refused;
   return parsed(signatureSchemas.SignDecline, req.body, () => {
-    Object.assign(o.view, { state: "declined", signers: o.view.signers.map((x) => (x.role === "candidate" ? { ...x, status: "declined" } : x)) });
+    // A decline ends it for everyone: a signature already made on it is void.
+    const ended = o.view.signers.map((x) =>
+      x.name === o.view.signer_name || (o.view.document_type !== "agreement" && x.role === "candidate") ? { ...x, status: "declined" as const } : x.status === "signed" ? { ...x, status: "void" as const } : x,
+    );
+    Object.assign(o.view, { state: "declined", signers: ended });
+    for (const other of OFFERS.values())
+      if (other !== o && other.view.reference === o.view.reference) Object.assign(other.view, { state: other.view.state === "signed" ? "void" : "declined", signers: ended.map((x) => ({ ...x })) });
     return ok(viewOf(o));
   });
 });
@@ -708,9 +790,9 @@ route("POST /api/public/v1/sign/:token/decline", (req) => {
  * altered (the content hash differs), OFF-0009 both, OFF-0099 not found; OFF-0018 is added genuine
  * when it is signed above. Signed times are Lagos's.
  */
-const record = (reference: string, title: string, people: SignerView[], content: VerifyResult["content"], artifact: VerifyResult["artifact"]): VerifyResult => ({
+const record = (reference: string, title: string, people: SignerView[], content: VerifyResult["content"], artifact: VerifyResult["artifact"], type: VerifyResult["document_type"] = "offer_letter", extra: Partial<VerifyResult> = {}): VerifyResult => ({
   reference,
-  document_type: "offer_letter",
+  document_type: type,
   title,
   issued_by: "MyCity App Ltd",
   issued_at: people[0]?.signed_at ?? new Date().toISOString(),
@@ -720,6 +802,8 @@ const record = (reference: string, title: string, people: SignerView[], content:
   signed_outside: false,
   content,
   artifact,
+  certificate: null,
+  ...extra,
 });
 const VERIFY = new Map<string, VerifyResult>(
   ([
@@ -729,18 +813,65 @@ const VERIFY = new Map<string, VerifyResult>(
     ["OFF-0009", "Seun Ajayi", "Video Editor", "2026-08-28T10:10:00.000Z", "differs", "differs"],
   ] as const).map(([ref, who, role, at, content, artifact]) => [ref, record(ref, `Offer of Employment: ${role}`, signers(who, at, new Date(Date.parse(at) - 3 * 86400000).toISOString()), content, artifact)]),
 );
+// Two agreements: AGR-2026-0003 signed in the hub and active (its QR Av9kD3nQe6Tz); AGR-2026-0002
+// signed on paper and recorded, so it verifies by reference only and says so.
+VERIFY.set(
+  "AGR-2026-0003",
+  record("AGR-2026-0003", "Deal Merchant Agreement: Lagos Food Week", [{ name: "Tolu Bankole", title: "Director", role: "partner", status: "signed", signed_at: "2026-09-12T10:20:00.000Z", method: "draw" }], "matches", "matches", "agreement", { record_status: "active" }),
+);
+VERIFY.set(
+  "AGR-2026-0002",
+  record("AGR-2026-0002", "Memorandum of Understanding: Ibadan Book Fair", [{ name: "Funke Ade", title: "Chair", role: "partner", status: "signed", signed_at: "2026-08-02T11:00:00.000Z", method: "paper" }], "matches", "matches", "agreement", { record_status: "expiring", signed_outside: true }),
+);
+// A training certificate (docs/guides/knowledge.md §6.10): its number alone shows the holder, the
+// course and the publisher who signed it; an invented person.
+VERIFY.set(
+  "CERT-2026-0019",
+  record("CERT-2026-0019", "Data Protection and the NDPA", [{ name: "Kelechi Nwosu", title: "Head, Operations & People", role: "mycity", status: "signed", signed_at: null, method: null }], "matches", "matches", "training_certificate", {
+    issued_at: "2026-11-30T14:05:00.000Z",
+    certificate: { holder_name: "Ifunanya Adaobi Bello", course_number: "TRN-0004", course_title: "Data Protection and the NDPA", completed_on: "2026-11-30", items: 6, minutes: 120 },
+  }),
+);
 route("GET /api/public/v1/verify/:ref", (req) => {
   const r = VERIFY.get(req.params.ref.trim().toUpperCase());
   return r ? ok(r) : fail(404, "NOT_FOUND", "No signed document has this reference.");
 });
 
 /* The QR printed on each page of a sealed document opens it by its key, with the document itself. */
-const QR = new Map<string, string>([["Qd5mW8rTx3Kp", "OFF-0017"]]);
+const QR = new Map<string, string>([
+  ["Qd5mW8rTx3Kp", "OFF-0017"],
+  ["Av9kD3nQe6Tz", "AGR-2026-0003"],
+]);
 route("GET /api/public/v1/verify/t/:token", (req) => {
   const ref = QR.get(req.params.token);
   const r = ref ? VERIFY.get(ref) : undefined;
   const offer = [...OFFERS.values()].find((o) => o.view.reference === ref);
-  if (!r || !offer) return fail(404, "NOT_FOUND", "This link is not valid. Check you scanned the whole code.");
-  const out: VerifyByToken = { ...r, document: { title: offer.view.title, letter: offer.view.letter, file_name: `${r.reference}.pdf`, url: `/api/public/v1/verify/t/${req.params.token}/document` } };
+  if (!r || (!offer && r.document_type !== "agreement")) return fail(404, "NOT_FOUND", "This link is not valid. Check you scanned the whole code.");
+  const doc = offer
+    ? { title: offer.view.title, letter: offer.view.letter, blocks: offer.view.blocks }
+    : { title: r.title, letter: ["Deal Merchant Agreement", "Business Name: Lagos Food Week"], blocks: AGREEMENT_BLOCKS("Lagos Food Week", "Lagos Food Week 2026") };
+  const out: VerifyByToken = { ...r, document: { ...doc, file_name: `${r.reference}.pdf`, url: `/api/public/v1/verify/t/${req.params.token}/document` } };
   return ok(out);
+});
+
+/* ── A proposal's private link ──
+ * The kit's own sample (packages/ui/src/documents/proposal-kit.sample.html, drawn by the kit from
+ * templates/proposals/sample.json), as the server would send it. A second link stands for a declined,
+ * expired or withdrawn proposal: the same 404 the API answers with.
+ */
+const PROPOSALS = new Map<string, PublicProposal>([
+  [
+    "Hn5vR2qLx8Tc",
+    {
+      title: "Selling Out Harmattan Jazz Weekend, Together",
+      partner_name: "Harmattan Jazz Weekend",
+      html: PROPOSAL_HTML,
+      owner_contact: { name: "Ngozi Eze", title: "Partnerships Lead, MyCity", email: "ngozi.eze@mycityapp.io", phone: "+234 803 555 0142" },
+      valid_until: inDays(30).slice(0, 10),
+    },
+  ],
+]);
+route("GET /api/public/v1/proposals/:token", (req) => {
+  const r = PROPOSALS.get(req.params.token);
+  return r ? ok(r) : fail(404, "TOKEN_INVALID", "This proposal is no longer available");
 });

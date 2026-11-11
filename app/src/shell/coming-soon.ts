@@ -76,13 +76,13 @@ export const COMING: Record<string, string[]> = {
   "recruitment/offers": ["Offer letters generated from the role and the candidate", "Sent by mail and signed on a phone", "Signed offers lock and can be verified"],
   "recruitment/onboarding": ["Documents first, then pre-onboarding, then onboarding", "A checklist per hire, with what is outstanding", "Onboarding opens only when documentation is complete"],
   "recruitment/talent-pool": ["Strong candidates kept for future roles", "Why each was not hired this time", "Invite them to apply when a role opens"],
+  "recruitment/analytics": ["Candidates at each stage across every role", "Screening scores in bands", "Read within your own scope"],
 
   /* Payroll */
-  "payroll/payroll-runs": ["Run payroll for the month, previewed before it is approved", "Operations, then the CEO, approve each run", "Bank file and payslips generated on approval"],
-  "payroll/payslips": ["Every payslip in every run", "Email payslips to staff in one step", "Correct and reissue with a full trail"],
-  "payroll/salary-structure": ["Grades, bands and allowances", "Effective dates, so history stays right", "Who is on which grade"],
-  "payroll/deductions": ["Loans, advances and sanction deductions", "Each linked to its source", "Recovered over the months you set"],
-  "payroll/statutory": ["PAYE, pension and NHF, calculated for Nigeria", "Remittance schedules for each authority", "Year-end figures for each employee"],
+  "payroll/payroll-runs": ["Run payroll for the month, previewed before it is approved", "Operations prepare each run and the CEO approves it", "Payslips publish to each person on approval"],
+  "payroll/payslips": ["Every payslip in every run", "Email payslips to staff in one step", "Download them all as one PDF"],
+  "payroll/deductions": ["Fines, advances and attendance deductions", "Each linked to its source", "Recovered over the months you set"],
+  "payroll/configurations": ["The pay day, 30 unless you choose another", "Advanced payroll, switched on from a date you pick", "Statutory rates and salary grades, entered when ready"],
 
   /* Partnerships */
   "partnerships/pipeline": ["Every deal by stage, from first contact to signed", "Value signed this year, and what has stalled", "Filter by stage, category, region, owner and health"],
@@ -103,7 +103,6 @@ export const COMING: Record<string, string[]> = {
   /* Knowledge Hub */
   "knowledge/policies": ["Every company policy, versioned and signed", "The Attendance policy as a worksheet", "Who has acknowledged each version"],
   "knowledge/sops": ["Step-by-step procedures for each department", "Owners keep them current", "Linked from the screens they describe"],
-  "knowledge/faqs": ["Answers to the questions staff ask most", "Search in plain words", "Suggest a new question"],
   "knowledge/training": ["Training material and onboarding courses", "Track who has completed what", "Assign training to a person or team"],
 
   /* Praxis AI */
@@ -125,4 +124,5 @@ export const COMING: Record<string, string[]> = {
   "knowledge/user-guide": ["How to use every screen, step by step", "Pictures of each screen, numbered", "Open a screen from a step and come back"],
   "people/departments": ["Every department, its head and its people", "Set a head, move people, merge or retire", "Reporting lines and rights follow the head"],
   "expenses/projects": ["Each project's budget and spend", "Raise a request for a project", "Committed and spent per project"],
+  "ess/my-training": ["The courses assigned to you, due first", "Lessons, videos and links in one place", "Your certificates, ready to download"],
 };

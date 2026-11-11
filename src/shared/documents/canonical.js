@@ -173,6 +173,70 @@ const BUILDER_SOURCE = Object.assign(Object.create(null), {
     body_markdown: str(d.body_markdown),
     rules: d.rules ? sortedKeys(d.rules) : null,
   }),
+
+  /**
+   * An SOP version as staff read it (docs/guides/knowledge.md §6.3): the SOP, its department, the
+   * version and what it says, step by step, with each step's screen and file. Nobody signs an SOP;
+   * the hash says a version read later is the one published. The note, the publisher and the dates
+   * are about the version, not in it.
+   */
+  SOP_VERSION: (d) => ({
+    v: 1,
+    type: "SOP_VERSION",
+    number: str(d.number),
+    department_id: str(d.department_id),
+    version: int(d.version),
+    title: str(d.title),
+    purpose: str(d.purpose),
+    scope: str(d.scope),
+    roles: (Array.isArray(d.roles) ? d.roles : []).map(str),
+    steps: (Array.isArray(d.steps) ? d.steps : []).map((s) => ({
+      text: str(s && s.text),
+      who: str(s && s.who),
+      screen_key: str(s && s.screen_key),
+      document_id: str(s && s.document_id),
+    })),
+  }),
+
+  /**
+   * A partnership agreement as its signers sign it (docs/guides/partnerships.md §6.8, §6.9): the
+   * reference, title and kind, the wording as it was frozen at Send for Signature (Markdown, the
+   * record's values already in it, the signer's own names still to fill), its term, its value, and
+   * the version of the category template it was written from. The signers, their evidence, the
+   * approval and the record's later edits (a partner renamed) are about the agreement, not in it.
+   */
+  PARTNERSHIP_AGREEMENT: (d) => ({
+    v: 1,
+    type: "PARTNERSHIP_AGREEMENT",
+    number: str(d.number),
+    title: str(d.title),
+    kind: str(d.kind),
+    body_markdown: str(d.body_markdown),
+    starts_on: str(d.starts_on),
+    ends_on: str(d.ends_on),
+    currency: str(d.currency || m.CURRENCY),
+    value: money(d.value),
+    template_key: str(d.template_key),
+    template_version: int(d.template_version),
+  }),
+
+  /**
+   * A training certificate as it states its facts (docs/guides/knowledge.md §6.9, §6.10): the
+   * certificate's number, the holder's full name as on their employee record, the course's number
+   * and title, the completion date (Lagos) and the publisher who signed the course, with their job
+   * title. Fixed at completion: a person or course renamed later keeps the certificate as issued.
+   */
+  TRAINING_CERTIFICATE: (d) => ({
+    v: 1,
+    type: "TRAINING_CERTIFICATE",
+    number: str(d.number),
+    holder_name: str(d.holder_name),
+    course_number: str(d.course_number),
+    course_title: str(d.course_title),
+    completed_on: str(d.completed_on),
+    publisher_name: str(d.publisher_name),
+    publisher_title: str(d.publisher_title),
+  }),
 });
 
 /** The only thing anything looks a builder up in. Insertion order preserved. */

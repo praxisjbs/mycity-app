@@ -91,6 +91,11 @@ const UPDATE_COLUMNS = [
   "bank_name",
   "account_number",
   "gross_monthly",
+  // The tax and pension numbers payroll's statutory report reads (migration 6020, docs/guides/payroll.md §4.1).
+  "tax_id",
+  "pension_pin",
+  "pension_administrator",
+  "nhf_number",
 ];
 
 /** The login a person has, as the register and the 360 name it. */
@@ -192,6 +197,7 @@ async function list(db, query, scope) {
     query.employment_type ?? null,
     query.line_manager_id ?? null,
     query.contract === "ending" ? lagos.today() : null,
+    query.exclude_self === "true" && scope && scope.employee_id ? scope.employee_id : null,
   ];
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
   const page = await pageQuery(
@@ -212,6 +218,7 @@ async function list(db, query, scope) {
         AND ($5::text IS NULL OR e.employment_type = $5)
         AND ($6::uuid IS NULL OR e.line_manager_id = $6)
         AND ($7::date IS NULL OR (e.status = 'active' AND e.contract_ends_on IS NOT NULL AND e.contract_ends_on <= $7::date + 30))
+        AND ($8::uuid IS NULL OR e.employee_id <> $8)
         ${s.and}
       ORDER BY ${orderBy(query, EMPLOYEE_SORTS, "e.employee_id")}`,
     params,
@@ -986,6 +993,30 @@ async function setBirthday(db, employeeId, { day, month }) {
 }
 
 /**
+ * A hire's Bank Verification Number (migration 5040), entered once by them on the upload page (M5).
+ * Not in UPDATE_COLUMNS, so it never reaches an audit row's before or after. Answers whether it was
+ * set before, or null when there is no such person.
+ */
+async function setBvn(db, employeeId, bvn) {
+  const row = await one(
+    db,
+    `WITH old AS (SELECT bvn IS NOT NULL AS had FROM employee WHERE employee_id = $1 FOR UPDATE)
+     UPDATE employee e SET bvn = $2, updated_at = now()
+       FROM old
+      WHERE e.employee_id = $1
+      RETURNING old.had`,
+    [employeeId, bvn],
+  );
+  return row ? { had: row.had } : null;
+}
+
+/** Whether the person's BVN is on record (never the number). */
+async function hasBvn(db, employeeId) {
+  const row = await one(db, "SELECT bvn IS NOT NULL AS has FROM employee WHERE employee_id = $1", [employeeId]);
+  return Boolean(row && row.has);
+}
+
+/**
  * Move a person to another staff number. A staff number is not a field of the form, so
  * it is not in UPDATE_COLUMNS: only the roster reaches this, when the sheet takes back a
  * number it says belongs to someone else.
@@ -1348,6 +1379,8 @@ module.exports = {
   EMPLOYEE_COLUMNS,
   namesOf,
   setBirthday,
+  setBvn,
+  hasBvn,
   photoDocumentOf,
   setPhotoDocument,
   INSERT_COLUMNS,

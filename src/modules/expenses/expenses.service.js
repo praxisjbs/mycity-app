@@ -114,6 +114,19 @@ const list = (query, scope, reader) =>
   repo.list(pool, { ...newestFirst(query), reader_employee_id: (reader && reader.employee_id) || null, reader_user_id: (reader && reader.user_id) || null }, scope);
 
 /** The caller's own requests (ESS · My Requests). */
+/**
+ * The banks the Bank field offers before any request names them (TB, 11/11/2026: kept and offered,
+ * never a closed list). A bank typed that is not here is saved with its request and offered from then on.
+ */
+const COMMON_BANKS = [
+  "Access Bank", "Citibank", "Ecobank", "Fidelity Bank", "First Bank", "FCMB", "Globus Bank", "GTBank", "Jaiz Bank",
+  "Keystone Bank", "Kuda", "Moniepoint", "Opay", "PalmPay", "Polaris Bank", "Providus Bank", "Stanbic IBTC",
+  "Standard Chartered", "Sterling Bank", "Union Bank", "UBA", "Unity Bank", "Wema Bank", "Zenith Bank",
+];
+
+/** GET /expenses/banks: the common banks and the ones requests have named, most used first, narrowed by `q`. */
+const banks = (query) => repo.banks(pool, query, COMMON_BANKS);
+
 const listMine = (employeeId, query) => repo.list(pool, { ...newestFirst(query), employee_id: employeeId }, ALL);
 
 /** The requests waiting on the caller now (Expenses · Approvals), oldest sent first. */
@@ -713,6 +726,8 @@ async function cardNames(db, values) {
 }
 
 module.exports = {
+  COMMON_BANKS,
+  banks,
   EDITABLE,
   CANCELLABLE,
   WITHDRAWABLE,

@@ -105,6 +105,25 @@ describe("DocumentEditor", () => {
     expect(screen.getByRole("cell", { name: "Fee" })).toBeInTheDocument();
   });
 
+  it.each([
+    ["editing", false],
+    ["read only", true],
+  ])("marks the wording as content while %s, so a table in it is the document's and not a list", async (_state, readOnly) => {
+    render(
+      <DocumentEditor
+        label="Wording"
+        fields={FIELDS}
+        readOnly={readOnly}
+        value="<table><tr><th>Item</th><th>Amount</th></tr><tr><td>Fee</td><td>10</td></tr></table>"
+        onChange={vi.fn()}
+      />,
+    );
+    await open();
+    const table = (await screen.findByRole("columnheader", { name: "Amount" })).closest("table")!;
+    expect(screen.getByRole("textbox", { name: "Wording" })).toHaveAttribute("data-copy", "content");
+    expect(table.closest("[data-copy=content]")).not.toBeNull();
+  });
+
   it("read only shows the wording with no toolbar", async () => {
     render(<DocumentEditor label="Wording" fields={FIELDS} readOnly value={`<p>${CHIP}</p>`} onChange={vi.fn()} />);
     await open();

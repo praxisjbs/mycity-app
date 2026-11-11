@@ -82,7 +82,7 @@ async function moveIn(client, actor, deal, body, { source = "person" } = {}) {
     [deal.deal_id, ...Object.values(changes)],
   );
   await repo.addHistory(client, { deal_id: deal.deal_id, kind: "stage", from: deal.stage, to: rule.to.code, reason, source, user_id: actor ? actor.user_id : null });
-  const payload = { deal_id: deal.deal_id, number: deal.number, from: deal.stage, to: rule.to.code, meaning: rule.to.meaning, owner_id: deal.owner_id, moved_by: actor ? actor.user_id : null, source };
+  const payload = { deal_id: deal.deal_id, number: deal.number, title: deal.title, from: deal.stage, to: rule.to.code, to_label: rule.to.label || rule.to.code, meaning: rule.to.meaning, owner_id: deal.owner_id, moved_by: actor ? actor.user_id : null, source };
   await emit(client, { key: EVENTS.DEAL_STAGE_CHANGED, entity: { type: "partner_deal", id: deal.deal_id }, actor, before: { stage: deal.stage }, after: { stage: rule.to.code }, payload });
   if (rule.to.meaning === "closed_lost") await emit(client, { key: EVENTS.DEAL_LOST, entity: { type: "partner_deal", id: deal.deal_id }, actor, payload });
 

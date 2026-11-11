@@ -1,28 +1,46 @@
 "use strict";
 /**
- * Onboarding: the SQL (docs/guides/offers.md §4, §6). Writes onboarding_case and
- * onboarding_checklist_item; reads the active document requirements the checklist is built from.
- * Never emits (BACKEND_GUIDE §2).
+ * Onboarding: the SQL (docs/guides/offers.md §4, §6). Writes onboarding_case,
+ * onboarding_checklist_item, onboarding_guarantor, document_requirement, onboarding_plan and
+ * onboarding_plan_step; reads the hire's offer, employee, department and documents, and the SOPs a
+ * plan step points to. Never emits (BACKEND_GUIDE §2).
  *
- * PR 5 opens a case at the offer's acceptance. The uploads, verifications and the documentation
- * gate come with the onboarding backend (PR 6).
+ * Scope: a case belongs to its owner, the vacancy's hiring manager (onboarding_case.owner_id), as an
+ * offer and a contract do; `team` holders see the cases of the people below them.
  */
+const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
+const { scopeClause } = require("../../shared/rbac/scope");
 
-/** The case, with who it is for. */
+/* ------------------------------------------------------------------ *
+ * Cases
+ * ------------------------------------------------------------------ */
+
+/** The case, with who it is for and what the offer says of the role. */
 const ROWS = `
   SELECT oc.onboarding_case_id, oc.application_id, oc.offer_id, oc.employee_id, oc.owner_id,
          oc.status, oc.starts_on, oc.completed_at, oc.privacy_acknowledged_at,
          oc.documentation_completed_at, oc.cancelled_at, oc.end_reason, oc.created_at, oc.updated_at,
          ou.user_id AS owner_user_id,
-         btrim(e.first_name || ' ' || e.last_name) AS employee_name
+         btrim(e.first_name || ' ' || e.last_name) AS employee_name,
+         e.first_name AS employee_first_name, e.last_name AS employee_last_name,
+         e.work_email::text AS employee_email,
+         o.job_title, o.department_id, d.name AS department
     FROM onboarding_case oc
+    JOIN offer o ON o.offer_id = oc.offer_id
+    LEFT JOIN department d ON d.department_id = o.department_id
     LEFT JOIN employee e ON e.employee_id = oc.employee_id
     LEFT JOIN employee owner ON owner.employee_id = oc.owner_id
     LEFT JOIN app_user ou ON ou.employee_id = owner.employee_id AND ou.status = 'active'`;
 
+/** Required items not yet verified: what the list counts as outstanding. */
+const OUTSTANDING = `
+  (SELECT count(*)::int FROM onboarding_checklist_item i
+     LEFT JOIN document_requirement r ON r.document_requirement_id = i.document_requirement_id
+    WHERE i.onboarding_case_id = x.onboarding_case_id AND COALESCE(r.required, true) AND i.status <> 'verified')`;
+
 async function get(db, id, { lock = false } = {}) {
   if (lock) await db.query("SELECT 1 FROM onboarding_case WHERE onboarding_case_id = $1 FOR UPDATE", [id]);
-  const { rows } = await db.query(`SELECT * FROM (${ROWS}) x WHERE x.onboarding_case_id = $1`, [id]);
+  const { rows } = await db.query(`SELECT x.*, ${OUTSTANDING} AS items_outstanding FROM (${ROWS}) x WHERE x.onboarding_case_id = $1`, [id]);
   return rows[0] || null;
 }
 
@@ -30,6 +48,33 @@ async function get(db, id, { lock = false } = {}) {
 async function byOffer(db, offerId) {
   const { rows } = await db.query(`SELECT * FROM (${ROWS}) x WHERE x.offer_id = $1`, [offerId]);
   return rows[0] || null;
+}
+
+/** The application's case, if it has one (an application has at most one, the table's UNIQUE). */
+async function byApplication(db, applicationId) {
+  const { rows } = await db.query(`SELECT * FROM (${ROWS}) x WHERE x.application_id = $1`, [applicationId]);
+  return rows[0] || null;
+}
+
+const SORTS = { starts_on: "x.starts_on", created_at: "x.created_at" };
+
+/** Recruitment · Onboarding's list, 25 a page, within the reader's scope. */
+function list(db, query, scope) {
+  const params = [query.status ?? null, query.department_id ?? null, query.q ?? null];
+  const s = scopeClause(scope, { column: "x.owner_id" }, params);
+  return pageQuery(
+    db,
+    `SELECT x.onboarding_case_id, x.employee_name AS hire_name, x.job_title, x.department, x.status,
+            x.starts_on, ${OUTSTANDING} AS items_outstanding, x.created_at, ${TOTAL_COL}
+       FROM (${ROWS}) x
+      WHERE ($1::text IS NULL OR x.status = $1)
+        AND ($2::uuid IS NULL OR x.department_id = $2)
+        AND ($3::text IS NULL OR search_fold(coalesce(x.employee_name, '') || ' ' || x.job_title) LIKE '%' || search_fold($3) || '%')
+        ${s.and}
+      ORDER BY ${orderBy(query, SORTS, "x.onboarding_case_id")}`,
+    params,
+    query,
+  );
 }
 
 async function insertCase(client, row) {
@@ -42,17 +87,44 @@ async function insertCase(client, row) {
   return rows[0].onboarding_case_id;
 }
 
+/** Move a case on, only from the statuses given. True when it moved. */
+async function setStatus(client, id, from, to, { documentationCompleted = false } = {}) {
+  const { rowCount } = await client.query(
+    `UPDATE onboarding_case
+        SET status = $3,
+            documentation_completed_at = CASE WHEN $4 THEN now() ELSE documentation_completed_at END
+      WHERE onboarding_case_id = $1 AND status = ANY($2::text[])`,
+    [id, from, to, documentationCompleted],
+  );
+  return rowCount === 1;
+}
+
+/** The hire accepted the privacy notice; the first time is kept. */
+async function acknowledgePrivacy(client, id) {
+  await client.query(
+    "UPDATE onboarding_case SET privacy_acknowledged_at = COALESCE(privacy_acknowledged_at, now()) WHERE onboarding_case_id = $1",
+    [id],
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The checklist
+ * ------------------------------------------------------------------ */
+
 /**
  * The document requirements a new case's checklist is built from: the active ones, in the order the
  * Checklist settings put them. Every case takes the whole list; `required` says which hold the gate.
  */
 async function activeRequirements(db) {
   // pagination:complete the Checklist settings' own list, a few dozen rows, copied whole onto a case
-  const { rows } = await db.query(
+  const { rows } = await completeQuery(
+    db,
     `SELECT document_requirement_id, name, required, display_order
        FROM document_requirement
       WHERE active = true
-      ORDER BY display_order, name`,
+      ORDER BY display_order, name, document_requirement_id`,
+    [],
+    { label: "The document requirements" },
   );
   return rows;
 }
@@ -66,15 +138,349 @@ async function requiredCount(db) {
 }
 
 /** The case's checklist, one item a requirement. */
-async function insertItems(client, caseId, requirements) {
-  for (const r of requirements) {
+async function insertItems(client, caseId, wanted) {
+  for (const r of wanted) {
     await client.query(
       `INSERT INTO onboarding_checklist_item (onboarding_case_id, document_requirement_id, title, status, display_order)
        VALUES ($1, $2, $3, 'pending', $4)`,
       [caseId, r.document_requirement_id, r.name, r.display_order || 0],
     );
   }
-  return requirements.length;
+  return wanted.length;
 }
 
-module.exports = { ROWS, get, byOffer, insertCase, activeRequirements, requiredCount, insertItems };
+const ITEM = `
+  SELECT i.onboarding_checklist_item_id, i.onboarding_case_id, i.document_requirement_id, i.title,
+         COALESCE(r.kind, 'file') AS kind, COALESCE(r.required, true) AS required, i.status,
+         i.document_id, i.entered_value, i.uploaded_at, i.verified_at, i.verified_by, i.rejected_reason,
+         i.display_order, d.original_name, d.bytes, d.mime, d.scan_status
+    FROM onboarding_checklist_item i
+    LEFT JOIN document_requirement r ON r.document_requirement_id = i.document_requirement_id
+    LEFT JOIN document d ON d.document_id = i.document_id`;
+
+/** A case's checklist in the settings' order. */
+async function items(db, caseId) {
+  // pagination:complete one case's checklist, one item a requirement (a few dozen at most)
+  const { rows } = await completeQuery(
+    db,
+    `${ITEM} WHERE i.onboarding_case_id = $1 ORDER BY i.display_order, i.title, i.onboarding_checklist_item_id`,
+    [caseId],
+    { label: "A checklist" },
+  );
+  return rows;
+}
+
+async function item(db, caseId, itemId, { lock = false } = {}) {
+  if (lock)
+    await db.query("SELECT 1 FROM onboarding_checklist_item WHERE onboarding_checklist_item_id = $1 FOR UPDATE", [itemId]);
+  const { rows } = await db.query(`${ITEM} WHERE i.onboarding_case_id = $1 AND i.onboarding_checklist_item_id = $2`, [caseId, itemId]);
+  return rows[0] || null;
+}
+
+/** The hire sent an item: the file, the typed value or both; back to `uploaded` for checking again. */
+async function itemUploaded(client, itemId, { document_id: documentId, entered_value: value }) {
+  await client.query(
+    `UPDATE onboarding_checklist_item
+        SET status = 'uploaded', document_id = $2, entered_value = $3, uploaded_at = now(),
+            verified_at = NULL, verified_by = NULL, rejected_reason = NULL
+      WHERE onboarding_checklist_item_id = $1`,
+    [itemId, documentId || null, value || null],
+  );
+}
+
+async function itemVerified(client, itemId, userId) {
+  const { rowCount } = await client.query(
+    `UPDATE onboarding_checklist_item
+        SET status = 'verified', verified_at = now(), verified_by = $2, rejected_reason = NULL
+      WHERE onboarding_checklist_item_id = $1 AND status = 'uploaded'`,
+    [itemId, userId || null],
+  );
+  return rowCount === 1;
+}
+
+async function itemRejected(client, itemId, reason) {
+  const { rowCount } = await client.query(
+    `UPDATE onboarding_checklist_item
+        SET status = 'rejected', rejected_reason = $2, verified_at = NULL, verified_by = NULL
+      WHERE onboarding_checklist_item_id = $1 AND status IN ('uploaded', 'verified')`,
+    [itemId, reason],
+  );
+  return rowCount === 1;
+}
+
+/** A file the hire sent through this case's link: on their employee record, from no signed-in user. */
+async function strangerDocument(db, documentId, employeeId) {
+  const { rows } = await db.query(
+    `SELECT document_id, original_name, bytes, mime, scan_status
+       FROM document
+      WHERE document_id = $1 AND entity_type = 'employee' AND entity_id = $2::text
+        AND uploaded_by IS NULL AND is_current`,
+    [documentId, employeeId],
+  );
+  return rows[0] || null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Guarantors
+ * ------------------------------------------------------------------ */
+
+const GUARANTOR = `
+  SELECT g.onboarding_guarantor_id, g.onboarding_case_id, g.position, g.kind, g.full_name, g.relationship,
+         g.organisation, g.job_title, g.phone, g.email::text AS email, g.years_known, g.form_document_id,
+         g.check_status, g.check_note, g.checked_at, d.original_name, d.bytes, d.mime
+    FROM onboarding_guarantor g
+    LEFT JOIN document d ON d.document_id = g.form_document_id`;
+
+async function guarantors(db, caseId) {
+  // pagination:complete one case's guarantors, two at most (the table's CHECK on position)
+  const { rows } = await completeQuery(db, `${GUARANTOR} WHERE g.onboarding_case_id = $1 ORDER BY g.position`, [caseId], {
+    label: "A case's guarantors",
+  });
+  return rows;
+}
+
+async function guarantor(db, caseId, guarantorId, { lock = false } = {}) {
+  if (lock) await db.query("SELECT 1 FROM onboarding_guarantor WHERE onboarding_guarantor_id = $1 FOR UPDATE", [guarantorId]);
+  const { rows } = await db.query(`${GUARANTOR} WHERE g.onboarding_case_id = $1 AND g.onboarding_guarantor_id = $2`, [caseId, guarantorId]);
+  return rows[0] || null;
+}
+
+/** The hire enters or corrects a guarantor; a correction waits for its check again. */
+async function saveGuarantor(client, caseId, g) {
+  const { rows } = await client.query(
+    `INSERT INTO onboarding_guarantor (onboarding_case_id, position, kind, full_name, relationship, organisation,
+                                       job_title, phone, email, years_known, form_document_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (onboarding_case_id, position) DO UPDATE
+        SET kind = EXCLUDED.kind, full_name = EXCLUDED.full_name, relationship = EXCLUDED.relationship,
+            organisation = EXCLUDED.organisation, job_title = EXCLUDED.job_title, phone = EXCLUDED.phone,
+            email = EXCLUDED.email, years_known = EXCLUDED.years_known, form_document_id = EXCLUDED.form_document_id,
+            check_status = 'pending', check_note = NULL, checked_by = NULL, checked_at = NULL
+     RETURNING onboarding_guarantor_id`,
+    [
+      caseId,
+      g.position,
+      g.kind,
+      g.full_name,
+      g.relationship,
+      g.organisation || null,
+      g.job_title || null,
+      g.phone,
+      g.email || null,
+      g.years_known ?? null,
+      g.form_document_id || null,
+    ],
+  );
+  return rows[0].onboarding_guarantor_id;
+}
+
+async function recordCheck(client, guarantorId, { check_status: status, check_note: note }, userId) {
+  await client.query(
+    `UPDATE onboarding_guarantor
+        SET check_status = $2, check_note = $3, checked_by = $4, checked_at = now()
+      WHERE onboarding_guarantor_id = $1`,
+    [guarantorId, status, note || null, userId || null],
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The Checklist settings
+ * ------------------------------------------------------------------ */
+
+const REQUIREMENT = `
+  SELECT document_requirement_id, code::text AS code, name, description, kind, required, expires, active, display_order
+    FROM document_requirement`;
+const REQUIREMENT_SORTS = { display_order: "x.display_order", name: "x.name" };
+
+function requirements(db, query) {
+  return pageQuery(
+    db,
+    `SELECT x.*, ${TOTAL_COL} FROM (${REQUIREMENT}) x
+      WHERE ($1::text IS NULL OR search_fold(x.name || ' ' || x.code) LIKE '%' || search_fold($1) || '%')
+      ORDER BY ${orderBy(query, REQUIREMENT_SORTS, "x.document_requirement_id")}`,
+    [query.q ?? null],
+    query,
+  );
+}
+
+async function requirement(db, id) {
+  const { rows } = await db.query(`${REQUIREMENT} WHERE document_requirement_id = $1`, [id]);
+  return rows[0] || null;
+}
+
+async function requirementByCode(db, code) {
+  const { rows } = await db.query(`${REQUIREMENT} WHERE code = $1`, [code]);
+  return rows[0] || null;
+}
+
+/** A new requirement goes last unless the settings place it. */
+async function insertRequirement(client, r) {
+  const { rows } = await client.query(
+    `INSERT INTO document_requirement (code, name, description, kind, required, expires, display_order)
+     VALUES ($1, $2, $3, $4, $5, $6, (SELECT COALESCE(max(display_order), 0) + 10 FROM document_requirement))
+     RETURNING document_requirement_id`,
+    [r.code, r.name, r.description || null, r.kind, r.required, r.expires],
+  );
+  return rows[0].document_requirement_id;
+}
+
+const REQUIREMENT_EDITABLE = ["name", "description", "kind", "required", "expires", "active", "display_order"];
+
+async function updateRequirement(client, id, patch) {
+  const keys = REQUIREMENT_EDITABLE.filter((k) => patch[k] !== undefined);
+  if (keys.length === 0) return;
+  await client.query(
+    `UPDATE document_requirement SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(", ")}, updated_at = now()
+      WHERE document_requirement_id = $1`,
+    [id, ...keys.map((k) => (k === "description" ? patch[k] || null : patch[k]))],
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The Plans settings
+ * ------------------------------------------------------------------ */
+
+const PLAN = `
+  SELECT p.onboarding_plan_id, p.department_id, d.name AS department, p.name, p.active, p.updated_at,
+         (SELECT count(*)::int FROM onboarding_plan_step s WHERE s.onboarding_plan_id = p.onboarding_plan_id) AS step_count
+    FROM onboarding_plan p
+    LEFT JOIN department d ON d.department_id = p.department_id`;
+const PLAN_SORTS = { name: "x.name", updated_at: "x.updated_at" };
+
+function plans(db, query) {
+  return pageQuery(
+    db,
+    `SELECT x.*, ${TOTAL_COL} FROM (${PLAN}) x
+      WHERE ($1::text IS NULL OR search_fold(x.name || ' ' || coalesce(x.department, '')) LIKE '%' || search_fold($1) || '%')
+      ORDER BY ${orderBy(query, PLAN_SORTS, "x.onboarding_plan_id")}`,
+    [query.q ?? null],
+    query,
+  );
+}
+
+async function plan(db, id) {
+  const { rows } = await db.query(`${PLAN} WHERE p.onboarding_plan_id = $1`, [id]);
+  return rows[0] || null;
+}
+
+/** The plan a department's hire follows: its own while active, else the company's default. */
+async function planFor(db, departmentId) {
+  const { rows } = await db.query(
+    `${PLAN} WHERE p.active AND (p.department_id = $1 OR p.department_id IS NULL)
+      ORDER BY (p.department_id IS NULL), p.onboarding_plan_id LIMIT 1`,
+    [departmentId || null],
+  );
+  return rows[0] || null;
+}
+
+/** The plan already kept for a department (or the default, for null). */
+async function planOfDepartment(db, departmentId) {
+  const { rows } = await db.query(
+    "SELECT onboarding_plan_id FROM onboarding_plan WHERE department_id IS NOT DISTINCT FROM $1",
+    [departmentId || null],
+  );
+  return rows[0] ? rows[0].onboarding_plan_id : null;
+}
+
+async function insertPlan(client, p, userId) {
+  const { rows } = await client.query(
+    `INSERT INTO onboarding_plan (department_id, name, active, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $4) RETURNING onboarding_plan_id`,
+    [p.department_id || null, p.name, p.active, userId || null],
+  );
+  return rows[0].onboarding_plan_id;
+}
+
+async function updatePlan(client, id, p, userId) {
+  await client.query(
+    `UPDATE onboarding_plan SET department_id = $2, name = $3, active = $4, updated_by = $5, updated_at = now()
+      WHERE onboarding_plan_id = $1`,
+    [id, p.department_id || null, p.name, p.active, userId || null],
+  );
+}
+
+/** A plan's steps, saved whole in the order given. Cases keep the copies they were given. */
+async function replaceSteps(client, planId, given) {
+  await client.query("DELETE FROM onboarding_plan_step WHERE onboarding_plan_id = $1", [planId]);
+  let position = 0;
+  for (const s of given) {
+    position += 1;
+    await client.query(
+      `INSERT INTO onboarding_plan_step (onboarding_plan_id, position, title, description, owner_role, due_offset_days, sop_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [planId, position, s.title, s.description || null, s.owner_role, s.due_offset_days, s.sop_id || null],
+    );
+  }
+}
+
+async function steps(db, planId) {
+  // pagination:complete one plan's steps, forty at most (OnboardingPlanSave)
+  const { rows } = await completeQuery(
+    db,
+    `SELECT s.onboarding_plan_step_id, s.position, s.title, s.description, s.owner_role, s.due_offset_days, s.sop_id
+       FROM onboarding_plan_step s
+      WHERE s.onboarding_plan_id = $1
+      ORDER BY s.position, s.onboarding_plan_step_id`,
+    [planId],
+    { label: "A plan's steps" },
+  );
+  return rows;
+}
+
+/** The SOPs the steps name, as M10's knowledge base keeps them; only those still in force. */
+async function sops(db, ids) {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (wanted.length === 0) return [];
+  // pagination:complete the SOPs one plan names, forty at most (one a step)
+  const { rows } = await completeQuery(
+    db,
+    "SELECT sop_id, number::text AS number, title FROM sop WHERE sop_id = ANY($1::uuid[]) AND status = 'active' ORDER BY number, sop_id",
+    [wanted],
+    { label: "A plan's SOPs" },
+  );
+  return rows;
+}
+
+async function departmentExists(db, id) {
+  const { rows } = await db.query("SELECT 1 FROM department WHERE department_id = $1 AND active IS NOT FALSE", [id]);
+  return rows.length === 1;
+}
+
+module.exports = {
+  ROWS,
+  get,
+  byOffer,
+  byApplication,
+  list,
+  insertCase,
+  setStatus,
+  acknowledgePrivacy,
+  activeRequirements,
+  requiredCount,
+  insertItems,
+  items,
+  item,
+  itemUploaded,
+  itemVerified,
+  itemRejected,
+  strangerDocument,
+  guarantors,
+  guarantor,
+  saveGuarantor,
+  recordCheck,
+  requirements,
+  requirement,
+  requirementByCode,
+  insertRequirement,
+  updateRequirement,
+  plans,
+  plan,
+  planFor,
+  planOfDepartment,
+  insertPlan,
+  updatePlan,
+  replaceSteps,
+  steps,
+  sops,
+  departmentExists,
+};

@@ -8,7 +8,8 @@
  *                   website, owner and custom values; `lead_id` kept; since today
  *   the deal        its `partner_id` set, its `lead_id` kept
  *   what moves      contacts, documents, interactions and linked mail (each by its own module);
- *                   Workspace links with M7 PR 5, agreements with PR 6
+ *                   the projects, tasks and events connected to the lead, through the Workspace
+ *                   services (relinkIn, M7 PR 5); its agreements (agreements.service moveToPartnerIn)
  *   the signed copy among the partner's documents, on the deal
  *   the lead        Converted, with `converted_partner_id`, read only from then on
  *   events          partner.created, lead.converted (deal.signed is the stage move's)
@@ -68,6 +69,12 @@ async function convertIn(client, actor, { lead_id, deal_id, signed_copy_document
   await client.query("UPDATE partner_contact SET partner_id = $2, lead_id = NULL WHERE lead_id = $1", [lead_id, partnerId]);
   await documents.moveToPartner(client, lead_id, partnerId);
   await require("../interactions/interactions.service").moveToPartner(client, lead_id, partnerId);
+  await require("../agreements/agreements.service").moveToPartnerIn(client, lead_id, partnerId);
+  // Connect to Partner's links follow the lead (docs/guides/workspace.md §6), each through its own service.
+  const moved = { lead_id, partner_id: partnerId };
+  await require("../projects/projects.service").relinkIn(client, actor, moved);
+  await require("../tasks/tasks.service").relinkIn(client, actor, moved);
+  await require("../calendar/calendar.service").relinkIn(client, actor, moved);
   if (signed_copy_document_id) {
     await documents.attachIn(client, actor, {
       record: { kind: "partner", id: partnerId },
@@ -92,7 +99,7 @@ async function convertIn(client, actor, { lead_id, deal_id, signed_copy_document
     actor,
     before: { status: lead.status },
     after: { status: "converted", converted_partner_id: partnerId },
-    payload: { lead_id, number: lead.number, partner_id: partnerId, deal_id, owner_id: lead.owner_id },
+    payload: { lead_id, number: lead.number, name: lead.name, partner_id: partnerId, deal_id, owner_id: lead.owner_id },
   });
   return { partner_id: partnerId, converted: true };
 }

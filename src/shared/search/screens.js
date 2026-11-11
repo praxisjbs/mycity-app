@@ -78,12 +78,12 @@ const SCREENS = Object.freeze([
   s("recruitment", "offers", "Offers", ["offer letter", "offer"]),
   s("recruitment", "onboarding", "Onboarding", ["new joiners", "induction", "onboard"]),
   s("recruitment", "talent-pool", "Talent Pool", ["pipeline of candidates", "future candidates"]),
+  s("recruitment", "analytics", "Analytics", ["recruitment analytics", "hiring funnel", "screening scores"]),
 
   s("payroll", "payroll-runs", "Payroll Runs", ["payroll", "run payroll", "salaries"]),
   s("payroll", "payslips", "Payslips", ["payslip", "pay slip", "salary slip"]),
-  s("payroll", "salary-structure", "Salary Structure", ["grades", "salary bands", "pay scale"]),
-  s("payroll", "deductions", "Deductions", ["deduction", "loans", "advances"]),
-  s("payroll", "statutory", "Statutory", ["paye", "pension", "nhf", "tax", "remittance"]),
+  s("payroll", "deductions", "Deductions", ["deduction", "fines", "advances", "salary advance"]),
+  s("payroll", "configurations", "Configurations", ["advanced payroll", "statutory", "paye", "pension", "nhf", "grades", "pay day", "salary structure", "pay components"]),
 
   s("partnerships", "pipeline", "Pipeline", ["deals", "partnership pipeline", "crm"]),
   s("partnerships", "categories", "Categories", ["partnership types", "partner categories", "pipeline settings", "stages", "agreement templates", "delivery checklist", "custom fields", "proof points"]),
@@ -100,8 +100,7 @@ const SCREENS = Object.freeze([
   s("expenses", "categories", "Categories", ["expense categories", "expense types"]),
 
   s("knowledge", "policies", "Policies", ["policy", "handbook", "rules", "attendance policy", "grace period", "lateness policy", "clock in rules"]),
-  s("knowledge", "sops", "SOPs", ["sop", "procedures", "processes", "how to"]),
-  s("knowledge", "faqs", "FAQs", ["faq", "questions", "help"]),
+  s("knowledge", "sops", "SOPs", ["sop", "procedures", "process", "processes", "how we work", "standard operating procedure"]),
   s("knowledge", "training", "Training", ["courses", "learning", "lessons"]),
 
   s("praxis_ai", "ask", "Ask", ["ai", "assistant", "chat", "question"]),
@@ -131,15 +130,16 @@ const SCREENS = Object.freeze([
   s("settings", "security", "Security", ["password rules", "sessions", "two step", "failed sign ins"]),
   s("settings", "audit-log", "Audit Log", ["audit", "history", "who changed", "activity log"]),
   s("settings", "imports", "Imports", ["import", "upload", "spreadsheet", "import history"]),
-  s("knowledge", "user-guide", "User Guide", ["help", "manual", "how to", "guide", "instructions", "tutorial", "quick start", "getting started"]),
+  s("knowledge", "user-guide", "User Guide", ["help", "faq", "faqs", "questions", "manual", "how to", "guide", "instructions", "tutorial", "quick start", "getting started"]),
   s("people", "departments", "Departments", ["department", "function", "functions", "team", "teams", "unit", "head of department", "department head", "move people", "merge department"]),
   s("ess", "my-requests", "My Requests", ["expense", "expenses", "claim", "reimbursement", "my expenses", "raise an expense"]),
   s("expenses", "projects", "Projects", ["project spend", "project budget", "spend per project"]),
+  s("ess", "my-training", "My Training", ["my training", "my courses", "courses", "learning", "certificate", "certificates", "lessons"]),
   // new:screen adds screens above this line
 ]);
 
 /**
- * @typedef {{grants: Record<string, string[]>, capabilities: string[], is_ceo: boolean, manages_people: boolean}} Reader
+ * @typedef {{grants: Record<string, string[]>, capabilities: string[], is_ceo: boolean, manages_people: boolean, heads_department?: boolean}} Reader
  */
 
 /**
@@ -180,6 +180,8 @@ function tabVisible(screen, reader) {
   if (module === "home" && tab === "reports") return hasCapability(reader, "home.reports");
   // Knowledge Hub · Policies is for those who write policies; everyone reads theirs on Policy Updates.
   if (module === "knowledge" && tab === "policies") return hasCapability(reader, "policies.manage");
+  // Knowledge Hub · Training is for those who build and assign courses; everyone takes theirs on My Training.
+  if (module === "knowledge" && tab === "training") return hasCapability(reader, "training.manage");
   // A line manager decides their team's leave on People · Leave (docs/guides/ess.md §2).
   if (module === "people" && !full) return tab === "attendance" || tab === "organogram" || (tab === "leave" && reader.manages_people);
   // Announcements is for those who post them (`announcements.post`, as every route asks).

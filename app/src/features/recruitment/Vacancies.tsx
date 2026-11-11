@@ -1,9 +1,9 @@
 /**
- * Recruitment · Vacancies (docs/guides/recruitment.md §6.1, §10): the roles MyCity is hiring for,
- * their lifecycle (draft, open, paused, closed), the seats the organogram leaves empty, and the
- * funnel across every role. A vacancy opens in its sheet with its public link, Edit, the lifecycle,
- * Questions, Scorecard and See Candidates. Careers Settings and Candidate Emails open from here
- * (`?panel=settings`, `?panel=emails`).
+ * Recruitment · Vacancies (docs/guides/recruitment.md §6.1, §10): the roles MyCity is hiring for and
+ * their lifecycle (draft, open, paused, closed). A pressed vacancy opens as a page of its own
+ * (`?id=`, Back to Vacancies; a record with its own screen, F31), with its public link, the
+ * lifecycle, and Edit Vacancy, Questions, Scorecard and See Candidates under More Actions. View Empty Seats lists the seats the organogram
+ * leaves empty. Careers Settings and Candidate Emails open from here (`?panel=settings`, `?panel=emails`).
  */
 import { useEffect, useRef, useState } from "react";
 import type { SeatSuggestion, Vacancy, VacancyDetail } from "@mycity/contract/contract.gen.ts";
@@ -12,14 +12,13 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useAuth } from "@/auth/AuthProvider";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
+import { useTrailTitle } from "@/lib/trail";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
-  Bars,
   Button,
   Card,
   CardHeader,
   CheckboxField,
-  DesktopOnly,
   ErrorState,
   FilterSelect,
   formatDate,
@@ -27,6 +26,9 @@ import {
   Grid,
   HelpTerm,
   KeyValue,
+  BackButton,
+  Menu,
+  type MenuItem,
   LoadingRows,
   PageHeader,
   Pill,
@@ -42,9 +44,6 @@ import { CareersSettings } from "./CareersSettings";
 import { QuestionsForm, ScorecardForm } from "./VacancyQuestions";
 import { VacancyForm } from "./VacancyForm";
 import { EMPLOYMENT, PATTERN_LABEL, pill, say, STAGE_LABEL, VACANCY_STATUS } from "./shared";
-
-/** Each stage holds the candidates at it now (not a cumulative funnel), so bars scale to the largest stage. */
-const funnelTop = (funnel: ReadonlyArray<{ count: number }>) => Math.max(0, ...funnel.map((x) => x.count));
 
 const STATUSES: Array<[string, string]> = [
   ["", "All Statuses"],
@@ -66,36 +65,41 @@ export function Vacancies() {
   const [status, setStatus] = useState("");
   const summary = useApi("GET /api/v1/recruitment/vacancies/summary");
   const list = usePaged("GET /api/v1/recruitment/vacancies", { filters: status ? { status: status as Vacancy["status"] } : {} });
-  const seats = usePaged("GET /api/v1/recruitment/vacancies/suggested");
   const { can } = useAuth();
   const mayCreate = can("recruitment", "create");
+  const { navigate } = useRouter();
 
   const newVacancy = (seat?: SeatSuggestion) =>
-    modal.open({ title: "New Vacancy", wide: true, body: (close) => <VacancyForm close={close} seat={seat} onSaved={(v) => openVacancy(v.vacancy_id, v.title)} /> });
-  const openVacancy = (id: string, title = "Vacancy") => modal.open({ title, wide: true, body: (close) => <VacancySheet id={id} close={close} /> });
+    modal.open({ title: "New Vacancy", wide: true, body: (close) => <VacancyForm close={close} seat={seat} onSaved={(v) => openVacancy(v.vacancy_id)} /> });
+  // A vacancy is a page of its own: its address holds it, so Back, a link and ⌘K all reach it.
+  const openVacancy = (id: string) => {
+    modal.close();
+    navigate(hrefFor("recruitment", "vacancies", { id }));
+  };
+  const emptySeats = () => modal.open({ title: "Suggested From Organogram", wide: true, body: () => <EmptySeats mayCreate={mayCreate} onCreate={newVacancy} /> });
   const settings = () => modal.open({ title: "Careers Settings", wide: true, body: (close) => <CareersSettings close={close} /> });
   const emails = () => modal.open({ title: "Candidate Emails", wide: true, body: (close) => <CandidateEmails close={close} /> });
 
   useScreenAction(mayCreate ? { label: "New Vacancy", onSelect: () => newVacancy() } : null);
   useNewLink(mayCreate ? () => newVacancy() : null);
 
-  // A vacancy found with ⌘K (`?id=`), or a panel asked for (`?panel=`), opens once and leaves the address.
+  // A panel asked for (`?panel=`) opens once and leaves the address; a vacancy (`?id=`) is its page.
   const [params, setParams] = useSearchParams();
   const linked = params.get("id");
   const panel = params.get("panel");
   const opened = useRef<string | null>(null);
   useEffect(() => {
-    const ask = linked ? `id:${linked}` : panel ? `panel:${panel}` : null;
-    // Cleared once handled, so the same record asked for again opens again.
-    if (!ask) return void (opened.current = null);
-    if (opened.current === ask) return;
-    opened.current = ask;
-    setParams({ id: null, panel: null }, { replace: true });
-    if (linked) openVacancy(linked);
-    else if (panel === "settings") settings();
+    // Cleared once handled, so the same panel asked for again opens again.
+    if (!panel) return void (opened.current = null);
+    if (opened.current === panel) return;
+    opened.current = panel;
+    setParams({ panel: null }, { replace: true });
+    if (panel === "settings") settings();
     else if (panel === "emails") emails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linked, panel]);
+  }, [panel]);
+
+  if (linked) return <VacancySheet key={linked} id={linked} close={() => navigate(hrefFor("recruitment", "vacancies"))} page />;
 
   const s = summary.data;
   const counted = (n: number | undefined) => (n === undefined ? "–" : String(n));
@@ -106,7 +110,7 @@ export function Vacancies() {
         sub={s ? `${s.open} open · ${s.applicants} applicants` : undefined}
         actions={
           <>
-            <Button icon="globe" onClick={() => s && window.open(s.careers_url, "_blank", "noopener")}>Careers Page</Button>
+            <Button icon="globe" onClick={() => s && window.open(s.site_url, "_blank", "noopener")}>Careers Page</Button>
             <Button icon="mail" onClick={emails}>Candidate Emails</Button>
             <Button icon="cog" onClick={settings}>Careers Settings</Button>
             {mayCreate && <Button variant="primary" icon="plus" onClick={() => newVacancy()}>New Vacancy</Button>}
@@ -124,6 +128,7 @@ export function Vacancies() {
       />
       <Toolbar>
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUSES} />
+        <Button icon="users" onClick={emptySeats}>View Empty Seats</Button>
       </Toolbar>
       <PagedTable<Vacancy>
         title="Vacancies"
@@ -132,7 +137,7 @@ export function Vacancies() {
         rowKey={(v) => v.vacancy_id}
         noun="vacancy"
         nounPlural="vacancies"
-        onRowClick={(v) => openVacancy(v.vacancy_id, v.title)}
+        onRowClick={(v) => openVacancy(v.vacancy_id)}
         empty={{ title: "No Vacancies Yet" }}
         columns={[
           { key: "role", label: "Role", render: (v) => <span className="font-semibold">{v.title}</span> },
@@ -144,37 +149,34 @@ export function Vacancies() {
           { key: "status", label: "Status", badge: true, render: statusOf },
         ]}
       />
-      <Grid cols={2} className="mt-3">
-        <PagedTable<SeatSuggestion>
-          title="Suggested From Organogram"
-          list={seats}
-          rowKey={(x) => x.org_seat_id}
-          noun="seat"
-          nounPlural="seats"
-          empty={{ title: "No Empty Seats" }}
-          columns={[
-            { key: "title", label: "Seat", render: (x) => <span className="font-semibold">{x.title}</span> },
-            { key: "dept", label: "Department", render: (x) => x.department },
-            ...(mayCreate ? [{ key: "go", label: "", align: "n" as const, render: (x: SeatSuggestion) => <Button size="sm" onClick={() => newVacancy(x)}>Create Vacancy</Button> }] : []),
-          ]}
-        />
-        <DesktopOnly unmount>
-          <Card>
-            <CardHeader title="Funnel, All Roles" />
-            {s ? (
-              <Bars rows={s.funnel.map((x) => ({ label: STAGE_LABEL[x.stage], percent: funnelTop(s.funnel) ? Math.round((x.count * 100) / funnelTop(s.funnel)) : 0, value: String(x.count) }))} />
-            ) : (
-              <LoadingRows />
-            )}
-          </Card>
-        </DesktopOnly>
-      </Grid>
     </>
   );
 }
 
-/** A vacancy: its details and public link, the lifecycle, Questions, Scorecard and See Candidates. */
-export function VacancySheet({ id, close }: { id: string; close: () => void }) {
+/** The seats the organogram leaves empty, 25 a page, each with Create Vacancy (guide §3 step 1). */
+function EmptySeats({ mayCreate, onCreate }: { mayCreate: boolean; onCreate: (seat: SeatSuggestion) => void }) {
+  const seats = usePaged("GET /api/v1/recruitment/vacancies/suggested");
+  return (
+    <PagedTable<SeatSuggestion>
+      list={seats}
+      rowKey={(x) => x.org_seat_id}
+      noun="seat"
+      nounPlural="seats"
+      empty={{ title: "No Empty Seats" }}
+      columns={[
+        { key: "title", label: "Seat", render: (x) => <span className="font-semibold">{x.title}</span> },
+        { key: "dept", label: "Department", render: (x) => x.department },
+        ...(mayCreate ? [{ key: "go", label: "", align: "n" as const, render: (x: SeatSuggestion) => <Button size="sm" onClick={() => onCreate(x)}>Create Vacancy</Button> }] : []),
+      ]}
+    />
+  );
+}
+
+/**
+ * A vacancy. `page`: its own page (Back to Vacancies, its title the page's heading, the trail named
+ * after it); otherwise the body of a dialog, as New Vacancy's card opens it.
+ */
+export function VacancySheet({ id, close, page = false }: { id: string; close: () => void; page?: boolean }) {
   const modal = useModal();
   const { navigate } = useRouter();
   const read = useApi("GET /api/v1/recruitment/vacancies/:id", { params: { id } });
@@ -182,8 +184,11 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
   const pause = useMutation("POST /api/v1/recruitment/vacancies/:id/pause");
   const resume = useMutation("POST /api/v1/recruitment/vacancies/:id/resume");
   const v = read.data;
-  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
-  if (!v) return <LoadingRows count={6} />;
+  // The trail reads the role's title for this place, not the screen's (F29).
+  useTrailTitle(page ? v?.title : null);
+  const backTo = page ? <BackButton label="Back to Vacancies" onBack={close} /> : null;
+  if (read.error) return <>{backTo}<ErrorState error={read.error} onRetry={read.reload} /></>;
+  if (!v) return <>{backTo}<LoadingRows count={6} /></>;
   const reload = () => {
     read.reload();
     invalidate("/api/v1/recruitment/vacancies");
@@ -208,10 +213,26 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
   const traits = v.questions.filter((q) => q.active && q.purpose === "interview");
   const asks = v.questions.filter((q) => q.active && q.purpose === "application");
   const live = v.status !== "closed";
-  // A form opened from here goes back to the sheet when it closes (the app holds one dialog at a time).
-  const back = () => modal.open({ title: v.title, wide: true, body: (done) => <VacancySheet id={id} close={done} /> });
+  // A form opened from here sits over the vacancy, which is still there when the form closes.
+  const back = () => modal.close();
+  const seeCandidates = () => (close(), navigate(hrefFor("recruitment", "candidates", { vacancy: v.vacancy_id })));
+  const editing = v.can_edit && live;
+  const more: MenuItem[] = [
+    { label: "See Candidates", icon: "users", onSelect: seeCandidates },
+    ...(editing
+      ? ([
+          { label: "Edit Vacancy", icon: "edit", onSelect: () => modal.open({ title: "Edit Vacancy", wide: true, body: () => <VacancyForm vacancy={v} close={back} onSaved={reload} /> }) },
+          { label: "Questions", icon: "list", onSelect: () => modal.open({ title: "Questions", wide: true, body: () => <QuestionsForm vacancy={v} close={back} onSaved={reload} /> }) },
+          { label: "Scorecard", icon: "target", onSelect: () => modal.open({ title: "Scorecard", body: () => <ScorecardForm vacancy={v} close={back} onSaved={reload} /> }) },
+          "sep",
+          { label: "Close Vacancy", icon: "x", danger: true, onSelect: () => modal.open({ title: "Close Vacancy", body: () => <CloseForm vacancy={v} close={back} onSaved={reload} /> }) },
+        ] as MenuItem[])
+      : []),
+  ];
   return (
     <>
+      {backTo}
+      {page && <PageHeader title={<span data-copy="content">{v.title}</span>} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {statusOf(v)}
         <Pill dot={false}>{v.number}</Pill>
@@ -243,16 +264,16 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
       />
       <Grid cols={2} className="mt-3">
         <Card>
-          <CardHeader title={<HelpTerm help={SCORECARD_HELP}>Scorecard Weights</HelpTerm>} />
+          <CardHeader title={<HelpTerm help={SCORECARD_HELP}>Scorecard Weights</HelpTerm>} level={3} />
           <KeyValue items={v.scorecard.map((p) => [p.name, p.active ? `${p.weight}%` : "Off"])} />
         </Card>
         <Card>
-          <CardHeader title="Candidates by Stage" />
+          <CardHeader title="Candidates by Stage" level={3} />
           <KeyValue items={v.by_stage.map((x) => [STAGE_LABEL[x.stage], String(x.count)])} />
         </Card>
       </Grid>
       <Card className="mt-3">
-        <CardHeader title="Interview Traits" />
+        <CardHeader title="Interview Traits" level={3} />
         {traits.length ? (
           <ol className="list-decimal space-y-1 pl-5 text-sm">
             {traits.map((t) => (
@@ -274,7 +295,7 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
         )}
       </Card>
       <Card className="mt-3" data-copy="content">
-        <CardHeader title="Description" />
+        <CardHeader title="Description" level={3} />
         <RichText blocks={v.description_blocks} top={4} />
         {v.requirements_blocks && (
           <>
@@ -289,19 +310,16 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
           </>
         )}
       </Card>
+      {/* One button in view, the lifecycle's next step; the rest wait behind More Actions. */}
       <FormFooter>
-        <Button onClick={() => (close(), navigate(hrefFor("recruitment", "candidates", { vacancy: v.vacancy_id })))}>See Candidates</Button>
-        {v.can_edit && live && (
-          <>
-            <Button onClick={() => modal.open({ title: "Edit Vacancy", wide: true, body: () => <VacancyForm vacancy={v} close={back} onSaved={reload} /> })}>Edit</Button>
-            <Button onClick={() => modal.open({ title: "Questions", wide: true, body: () => <QuestionsForm vacancy={v} close={back} onSaved={reload} /> })}>Questions</Button>
-            <Button onClick={() => modal.open({ title: "Scorecard", body: () => <ScorecardForm vacancy={v} close={back} onSaved={reload} /> })}>Scorecard</Button>
-            <Button onClick={() => modal.open({ title: "Close Vacancy", body: () => <CloseForm vacancy={v} close={back} onSaved={reload} /> })}>Close Vacancy</Button>
-            {v.status === "draft" && <Button variant="primary" onClick={step(publish.run, `${v.number} published`)}>Publish</Button>}
-            {v.status === "open" && <Button variant="primary" onClick={step(pause.run, `${v.number} paused`)}>Pause</Button>}
-            {v.status === "paused" && <Button variant="primary" onClick={step(resume.run, `${v.number} open again`)}>Resume</Button>}
-          </>
+        {more.length > 1 ? (
+          <Menu label="Vacancy Actions" trigger={(p) => <Button {...p} icon="dots">More Actions</Button>} items={more} />
+        ) : (
+          <Button onClick={seeCandidates}>See Candidates</Button>
         )}
+        {v.can_edit && live && v.status === "draft" && <Button variant="primary" onClick={step(publish.run, `${v.number} published`)}>Publish</Button>}
+        {v.can_edit && live && v.status === "open" && <Button variant="primary" onClick={step(pause.run, `${v.number} paused`)}>Pause</Button>}
+        {v.can_edit && live && v.status === "paused" && <Button variant="primary" onClick={step(resume.run, `${v.number} open again`)}>Resume</Button>}
       </FormFooter>
     </>
   );

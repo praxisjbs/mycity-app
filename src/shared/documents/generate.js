@@ -65,6 +65,14 @@
  * signature after the body, a Signature Certificate page with each signer's evidence, and the QR that
  * verifies it (src/modules/signatures/signatures.signed-pdf.js hands these to the doc type's seal).
  *
+ * A doc type whose every document carries wording of its own (an M7 agreement, filled from its
+ * category's template and edited in Draft) declares `ownWording: true` with `templateChoice: true`.
+ * The caller then passes `wording`, the document's Markdown, with the template (and version) it was
+ * written from: the wording is rendered by the one Markdown renderer inside the letterhead in place of
+ * the template's body, its names filled from `data` as any template's are (an agreement's signer at
+ * sealing), and the document records the template key and version it came from. With `heading:
+ * false` the letterhead prints no title above it, the wording carrying its own.
+ *
  * Brand: the Logo uploaded on Settings · Organisation (else assets/brand/logo.png when
  * present, else the company's name in the letterhead's type) and the Geist fonts
  * (assets/fonts/*.woff2) are embedded as data URLs, because the PDF renderer fetches nothing.
@@ -96,8 +104,12 @@ const SENSITIVITIES = new Set(["normal", "personal", "restricted"]);
  * @param {string} docType  snake_case
  * @param {{template: string, numbering?: string|null, sensitivity?: string, title: (data: object) => string,
  *          landscape?: boolean, label?: string, module?: string|null, signable?: boolean, wet?: boolean,
- *          export?: boolean, templateChoice?: boolean,
- *          signedBy?: (data: object) => ({name: string, role: string, signature?: string|null}|null)}} spec
+ *          export?: boolean, templateChoice?: boolean, ownWording?: boolean, heading?: boolean,
+ *          signedBy?: (data: object) => ({name: string, role: string, signature?: string|null}|null),
+ *          draw?: (data: object, context: {org: object, number: string|null, today: string}) => string}} spec
+ *   draw  a document that draws its own pages instead of a letter on the letterhead (the proposal
+ *         design kit, docs/guides/partnerships.md §6.11): it returns the complete HTML, checks its own
+ *         data, and its PDF carries no letterhead footer, the pages saying where they are themselves.
  */
 function defineDocType(docType, spec) {
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(docType))
@@ -118,10 +130,14 @@ function defineDocType(docType, spec) {
     throw new Error(`defineDocType(${docType}): signedBy is (data) => the signer`);
   if (spec.letter !== undefined && typeof spec.letter !== "function")
     throw new Error(`defineDocType(${docType}): letter is (data) => ({ date, to })`);
+  if (spec.draw !== undefined && typeof spec.draw !== "function")
+    throw new Error(`defineDocType(${docType}): draw is (data, context) => the HTML`);
   if (spec.appendix !== undefined && typeof spec.appendix !== "function")
     throw new Error(`defineDocType(${docType}): appendix is (data) => [{ title, markdown }]`);
   if (spec.sealing !== undefined && typeof spec.sealing !== "function")
     throw new Error(`defineDocType(${docType}): sealing is (data) => { signers, certificate, qr, verify_url, reference } or null`);
+  if (spec.ownWording === true && spec.templateChoice !== true)
+    throw new Error(`defineDocType(${docType}): ownWording needs templateChoice, to name the template the wording came from`);
   if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec)
     throw new Error(`defineDocType: ${docType} is already defined`);
   DOC_TYPES.set(
@@ -254,7 +270,7 @@ function renderDocumentHtml(template, data, context) {
 function docOf(spec, data, title) {
   const letter = spec.letter ? spec.letter(data) || null : null;
   return {
-    title,
+    title: spec.heading === false ? null : title,
     signer: spec.signedBy ? spec.signedBy(data) || null : null,
     letter: letter ? { date: letter.date, to: (letter.to || []).filter(Boolean).map((line) => ({ line })) } : null,
     appendix: spec.appendix ? (spec.appendix(data) || []).filter((x) => x && x.markdown) : [],
@@ -299,6 +315,8 @@ async function previewPdf(db, { doc_type: docType, template: chosen, data, numbe
  *   template  a template key, for a doc type declared with templateChoice
  *   template_version  a saved version of the template rather than the current one: a signed
  *             document sealed with the wording it was approved under (M5 offers), never a later edit
+ *   wording   the document's own Markdown, for a doc type declared with ownWording: rendered in
+ *             place of the template's body (an agreement's edited wording)
  * @returns {Promise<object>} the document row, render_status "pending"
  */
 async function generate(
@@ -312,19 +330,28 @@ async function generate(
     date,
     template: chosen,
     template_version: wanted = null,
+    wording = null,
   },
 ) {
   if (!inTransaction(client))
     throw new Error("documents.generate must run inside atomically()");
   const spec = specOf(docType);
   const templateKey = templateKeyOf(docType, spec, chosen);
-  const checked = variables.parseData("document", templateKey, data);
+  // A document that draws itself checks its own data; a template's data is checked against its variables.
+  const checked = spec.draw ? data : variables.parseData("document", templateKey, data);
   const template =
     wanted === null || wanted === undefined
       ? await templates.current(client, "document", templateKey)
       : await templates.version(client, "document", templateKey, wanted);
   if (!template)
     throw new Error(`documents.generate: ${templateKey} has no version ${wanted}`);
+  if ((wording !== null && wording !== undefined) !== (spec.ownWording === true))
+    throw new Error(
+      spec.ownWording
+        ? `documents.generate: ${docType} is rendered from its own wording; pass wording`
+        : `documents.generate: ${docType} renders its template; it takes no wording`,
+    );
+  const page = spec.ownWording ? { ...template, body: String(wording), format: "markdown" } : template;
   const day = date
     ? lagos.assertDate(String(date).slice(0, 10), "date")
     : lagos.today();
@@ -336,12 +363,14 @@ async function generate(
       .trim()
       .slice(0, 200) || docType;
   const org = await orgProfile(client);
-  const html = renderDocumentHtml(template, checked, {
-    org,
-    number,
-    today: day,
-    doc: docOf(spec, checked, title),
-  });
+  const html = spec.draw
+    ? spec.draw(checked, { org, number, today: day })
+    : renderDocumentHtml(page, checked, {
+        org,
+        number,
+        today: day,
+        doc: docOf(spec, checked, title),
+      });
 
   const id = crypto.randomUUID();
   const doc = await vault.insertRow(client, {
@@ -410,6 +439,7 @@ async function renderPending(
   const bytes = await toPdf(row.render_html, {
     footer: row.number,
     landscape: spec.landscape,
+    bare: Boolean(spec.draw),
   });
   if (
     !Buffer.isBuffer(bytes) ||
