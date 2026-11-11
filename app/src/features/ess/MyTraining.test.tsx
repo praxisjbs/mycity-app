@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import type { ReactNode } from "react";
 import { ModalProvider } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession, sid } from "@/api/mock/core";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
@@ -131,6 +132,18 @@ describe("ESS · My Training", () => {
     fireEvent.click(within(sheet).getByRole("button", { name: "Add Proof" }));
     expect(await screen.findByRole("heading", { name: "Completed" }, { timeout: 5000 })).toBeTruthy();
   }, 40000);
+
+  it("downloads a completed course's certificate from the list and from the course", async () => {
+    const call = vi.spyOn(api, "call");
+    await signedIn();
+    list("Completed");
+    await screen.findByText("Platform Walkthrough", {}, { timeout: 5000 });
+    fireEvent.click(screen.getAllByRole("button", { name: "Download Certificate" })[0]!);
+    await waitFor(() => expect(call).toHaveBeenCalledWith("POST /api/v1/training/me/courses/:id/certificate", expect.objectContaining({ body: {} })), { timeout: 5000 });
+    await course("Platform Walkthrough");
+    const done = await screen.findByRole("heading", { name: "Completed", level: 2 }, { timeout: 5000 });
+    expect(within(done.closest<HTMLElement>("[data-card]") ?? document.body).getByRole("button", { name: "Download Certificate" })).toBeTruthy();
+  }, 30000);
 
   it("opens the course a task or a notice names, by the course or the person's enrolment (?id=)", async () => {
     await signedIn(sid("training-enrolment:TRN-0006:cynthia"));

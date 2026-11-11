@@ -1,7 +1,8 @@
 import training from "@mycity/contract/schemas/training.js";
 import type { Assignment, Course, CourseRow, CourseState, Department, EnrolmentRow, EnrolmentStatus, ItemCreate, ItemKind, RoleOption, TrainingItem } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { usePhotos } from "@/api/download";
 import { upload } from "@/api/upload";
@@ -23,6 +24,7 @@ import {
   DataView,
   EmptyState,
   ErrorState,
+  ExportButton,
   Field,
   FileRow,
   formatDate,
@@ -650,6 +652,16 @@ function People({ c }: { c: Course }) {
           },
           { key: "completed_at", label: "Completed", sortable: true, render: (r) => (r.completed_at ? formatDate(r.completed_at) : null) },
           { key: "c", label: "Certificate", desktop: true, render: (r) => (r.certificate_number ? <span data-copy="content">{r.certificate_number}</span> : null) },
+          {
+            key: "x",
+            label: "",
+            render: (r) =>
+              r.certificate_number ? (
+                <ExportButton message="Certificate downloaded" onExport={() => saveExport(api.call("POST /api/v1/training/enrolments/:id/certificate", { params: { id: r.training_enrolment_id }, body: {} }))}>
+                  Download Certificate
+                </ExportButton>
+              ) : null,
+          },
         ]}
       />
     </>

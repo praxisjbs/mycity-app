@@ -1,7 +1,8 @@
 import training from "@mycity/contract/schemas/training.js";
 import type { MyCourse, MyCourseRow, MyItem, MyTrainingList } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useState } from "react";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { fetchFile, saveFile, useFileBlob } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
@@ -17,6 +18,7 @@ import {
   DocumentPreview,
   EmptyState,
   ErrorState,
+  ExportButton,
   Field,
   FileRow,
   formatDate,
@@ -110,6 +112,7 @@ export function MyTraining({ id }: { id: string | null }) {
                 ? [
                     { key: "c", label: "Completed", render: (r: MyCourseRow) => (r.completed_at ? formatDate(r.completed_at) : null) },
                     { key: "n", label: "Certificate", render: (r: MyCourseRow) => (r.certificate_number ? <span data-copy="content">{r.certificate_number}</span> : null) },
+                    { key: "x", label: "", render: (r: MyCourseRow) => (r.certificate_number ? <DownloadCertificate courseId={r.training_course_id} /> : null) },
                   ]
                 : []),
             ]}
@@ -118,6 +121,15 @@ export function MyTraining({ id }: { id: string | null }) {
         detail={sel ? <CourseView id={sel} /> : null}
       />
     </>
+  );
+}
+
+/** Download Certificate: the PDF made at completion, waited on while it renders and saved on this device. */
+function DownloadCertificate({ courseId }: { courseId: string }) {
+  return (
+    <ExportButton message="Certificate downloaded" onExport={() => saveExport(api.call("POST /api/v1/training/me/courses/:id/certificate", { params: { id: courseId }, body: {} }))}>
+      Download Certificate
+    </ExportButton>
   );
 }
 
@@ -330,6 +342,11 @@ function Finish({ c }: { c: MyCourse }) {
             ...(c.proof_url || c.proof_document_name ? ([["Proof", <span key="p" data-copy="content" className="wrap-any">{c.proof_url ?? c.proof_document_name}</span>]] as Array<[string, React.ReactNode]>) : []),
           ]}
         />
+        {c.certificate_number && (
+          <div className="mt-3 flex justify-end">
+            <DownloadCertificate courseId={c.training_course_id} />
+          </div>
+        )}
       </Card>
     );
   if (!c.enrolled || !c.proof_required || !all) return null;

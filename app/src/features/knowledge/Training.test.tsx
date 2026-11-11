@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import type { ReactNode } from "react";
 import { ModalProvider, toast } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession, sid } from "@/api/mock/core";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
@@ -168,6 +169,15 @@ describe("Knowledge Hub · Training", () => {
     expect((await screen.findAllByText("Overdue", {}, { timeout: 5000 })).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Remind Overdue" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Remind Overdue" }).getAttribute("aria-busy")).toBeNull(), { timeout: 5000 });
+  }, 30000);
+
+  it("downloads anyone's certificate from People", async () => {
+    const call = vi.spyOn(api, "call");
+    await signedIn();
+    await open("Platform Walkthrough");
+    fireEvent.click(screen.getByRole("radio", { name: /People/ }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Download Certificate" }, { timeout: 5000 }))[0]!);
+    await waitFor(() => expect(call).toHaveBeenCalledWith("POST /api/v1/training/enrolments/:id/certificate", expect.objectContaining({ body: {} })), { timeout: 5000 });
   }, 30000);
 
   it("opens the course a link names (?id=)", async () => {

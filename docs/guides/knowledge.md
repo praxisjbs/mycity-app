@@ -531,8 +531,9 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
   with `OrderList` (new: drag on desktop, Move Up and Move Down in each item's menu everywhere); an
   item opens in place in the course (All Items, Next Item), so a phone never stacks a sheet on a
   sheet; Undone reads Mark Not Done (a button is Verb Noun); a course's title and summary are changed
-  in Settings' Course Details. Left: Download Certificate on My Training and Training · People, once
-  PR 4's two routes are in the contract.
+  in Settings' Course Details. Download Certificate on My Training (the Completed list and the
+  completed course) and on Training · People, on PR 4's two routes, walked on the live API to the
+  PDF.
 - 11/11/2026 · TB · PR 4 built: the certificate (§6.9, §6.10). Cynthia approved the sample as drawn
   (§13 item 4). Decided on the way: the certificate draws its own page (`draw`, no letterhead) from
   the template; the QR opens `/verify/<number>`, as the number alone shows a certificate; the holder's
