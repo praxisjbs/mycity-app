@@ -150,6 +150,30 @@ describe("My Requests", () => {
   }, 40000);
 });
 
+describe("New Request · Category and Bank (review of 11/11/2026)", () => {
+  it("Category opens a popover filtered by type and searched by name; Bank keeps a bank it does not know", async () => {
+    await as("chidera@mycityapp.io", <MyRequestsPage />, "My Requests");
+    fireEvent.click(screen.getAllByRole("button", { name: "New Request" })[0]);
+    const form = await screen.findByRole("dialog", { name: "New Request" }, { timeout: 5000 });
+    fireEvent.click(within(form).getByRole("button", { name: "Pick Category" }));
+    const pop = await screen.findByRole("dialog", { name: "Pick Category" }, { timeout: 5000 });
+    fireEvent.click(within(pop).getByRole("radio", { name: "Capital" }));
+    const option = await within(pop).findAllByRole("option", {}, { timeout: 5000 });
+    const name = option[0].textContent ?? "";
+    expect(name).toMatch(/Capital/);
+    fireEvent.click(option[0]);
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Pick Category" })).toBeNull(), { timeout: 3000 });
+    expect(within(form).queryByRole("button", { name: "Pick Category" })).toBeNull();
+
+    const bank = within(form).getByRole("combobox", { name: "Bank" });
+    fireEvent.focus(bank);
+    fireEvent.change(bank, { target: { value: "Coda Bank" } });
+    const add = await screen.findByRole("option", { name: /Add.*Coda Bank/ }, { timeout: 5000 });
+    fireEvent.click(add);
+    expect((within(form).getByRole("combobox", { name: "Bank" }) as HTMLInputElement).value).toBe("Coda Bank");
+  }, 40000);
+});
+
 describe("Expenses · amounts as typed", () => {
   it("New Budget takes an amount typed with commas and no decimals; nothing is refused as a wrong format", async () => {
     await as("cynthia@mycityapp.io", <Expenses tab="budgets" id={null} />, "Budgets");

@@ -28,14 +28,17 @@ My Requests lists every request you raised, newest first, with who it waits on n
 2. Press **New Request** at the top right.
    ![The New Request form](shot:expenses-new-request)
 3. Write the **Purpose**: what the money is for.
-4. Pick the **Category**. Press **Suggest Category** to have one picked from your purpose and
-   items; check it before you send.
+4. Press **Pick Category**. Choose **Operating** or **Capital** to narrow the list, type part of a
+   name to search, then press the category. Or press **Suggest Category** to have one picked from
+   your purpose and items; check it before you send.
 5. Pick a **Project** if the money is for one, and check the **Department**.
 6. Fill in each item: what it is, its **Quantity** and **Unit Price**. Press
    **Add Line** for another item, and the bin beside an item to take it out.
 7. Pick the **Payee**: **Staff**, **Vendor**, **Partner** or **Dedicated Task Team (DTT)**.
 8. For yourself, tick **Use My Company Account** to be paid into the bank account on your profile.
    For anyone else, fill in **Payee Name**, **Bank**, **Account Name** and **Account Number**.
+   Type the **Bank** and pick it from the list; if it is not there, press **Add** to keep it as
+   typed, and it is offered to everyone from then on.
 9. Attach the invoice under **Invoice**. Press **Read Invoice** to fill the payee and the items from
    it, then check every line.
 10. Press **Send Request**. Or press **Save Draft** to finish it later.
@@ -56,6 +59,9 @@ My Requests lists every request you raised, newest first, with who it waits on n
 ```shot expenses-my-requests
 open: /ess?tab=my-requests
 as: staff
+sources:
+  - app/src/features/expenses/MyRequests.tsx
+  - app/src/features/expenses/parts.tsx
 marks:
   1: button "New Request" | Raise a request
 ```
@@ -63,6 +69,9 @@ marks:
 ```shot expenses-new-request
 open: /ess?tab=my-requests
 as: staff
+sources:
+  - app/src/features/expenses/MyRequests.tsx
+  - app/src/features/expenses/parts.tsx
 do:
   - click: button "New Request"
 crop: modal
@@ -149,6 +158,12 @@ Disbursements lists requests the CEO approved, **Waiting to Pay**, and those **P
    counts them; press it to list them.
 2. Press the payment, then **Add Reference**.
 3. Fill in the **Bank Reference**, then press **Add Reference**.
+
+### See a payment's receipt {#expenses-receipt needs="expenses view, cap expenses.finance"}
+
+1. Open [Expenses · Disbursements](/expenses?tab=disbursements) and press a payment under **Paid**.
+2. Press **Open Receipt** beside **Receipt** to check the transfer. **None** means no receipt was
+   attached.
 
 ```shot expenses-disbursements
 open: /expenses?tab=disbursements
