@@ -83,6 +83,20 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     job_description: "## Key Responsibilities\n\n- Sign and grow the venues and brands in the city guides.",
   });
 
+  /**
+   * The document requirements a case's checklist is built from. Send Offer is refused while there is
+   * no required one (guide §11), so every send below needs these; the Checklist settings that enter
+   * them are PR 6.
+   */
+  async function requirements() {
+    await pool.query(
+      `INSERT INTO document_requirement (code, name, required, display_order)
+       VALUES ('valid_id', 'A valid ID', true, 1), ('passport_photo', 'Passport photograph', true, 2),
+              ('nysc', 'NYSC certificate', false, 3)
+       ON CONFLICT (code) DO UPDATE SET active = true, required = EXCLUDED.required`,
+    );
+  }
+
   /** Submit, both approvals, the outbox: the offer approved with its letter and request. */
   async function approved(offerId) {
     const sub = await h.as("ops").post(`/recruitment/offers/${offerId}/submit`).send({});
@@ -96,6 +110,7 @@ describeDb("Recruitment · Offers against the real migrations", () => {
   }
 
   async function signedAndSent(offerId) {
+    await requirements();
     const signed = await h.as("ops").post(`/recruitment/offers/${offerId}/sign`).send({ full_name: "Ada Obi", title: "Operations & People Lead", method: "type", typed: "Ada Obi", consent: true });
     expect(signed.status).toBe(200);
     const sent = await h.as("ops").post(`/recruitment/offers/${offerId}/send`).send({});
@@ -228,6 +243,122 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     const hashes = await one("SELECT array_agg(DISTINCT content_hash) AS h FROM signature WHERE signature_request_id = (SELECT signature_request_id FROM offer WHERE offer_id = $1)", [offer.offer_id]);
     expect(hashes.h).toHaveLength(1);
   }, 60_000);
+
+  test("Send Offer is refused while the onboarding checklist has no required item", async () => {
+    const appId = await applicant("Chidera");
+    await requirements();
+    await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    await approved(offer.offer_id);
+    expect((await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/sign`).send({ full_name: "Ada Obi", method: "type", typed: "Ada Obi", consent: true })).status).toBe(200);
+
+    await pool.query("UPDATE document_requirement SET active = false");
+    const refusedSend = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/send`).send({});
+    expect(refusedSend.status).toBe(422);
+    expect(refusedSend.body.error.code).toBe("NO_REQUIREMENTS");
+
+    await requirements();
+    expect((await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/send`).send({})).status).toBe(200);
+  }, 60_000);
+
+  test("Submit needs the employment type and the work pattern: the employee is created from them", async () => {
+    const appId = await applicant("Zainab");
+    await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    await h.as("ops").patch(`/recruitment/offers/${offer.offer_id}`).send({ work_pattern: null });
+    const refusedSubmit = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/submit`).send({});
+    expect(refusedSubmit.status).toBe(422);
+    expect(refusedSubmit.body.error.code).toBe("NO_WORK_PATTERN");
+  }, 60_000);
+
+  test("acceptance makes the employee, the case and the contract in one transaction, then the hire signs", async () => {
+    const appId = await applicant("Nkem");
+    await requirements();
+    await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    await approved(offer.offer_id);
+    await signedAndSent(offer.offer_id);
+    const [offerMail] = mails("offer-sent").filter((m) => m.to.email === "nkem.okafor@example.test");
+
+    // The candidate signs: one transaction does the rest.
+    const t = tokenOf(offerMail);
+    expect((await pub().post(`/sign/${t}/code`).send({})).status).toBe(200);
+    expect((await pub().post(`/sign/${t}/code/verify`).send({ code: codesSent().pop() })).status).toBe(200);
+    expect((await pub().post(`/sign/${t}/sign`).send({ full_name: "Nkem Okafor", method: "draw", signature_png: PNG, consent: true })).status).toBe(200);
+    await drain();
+
+    // The employee: no seat, no login, the candidate's address as both emails until onboarding completes.
+    const hire = await one(
+      "SELECT staff_number, work_email::text AS work_email, personal_email::text AS personal_email, job_title, start_date, employment_type, work_pattern, line_manager_id, confirmation_due_on FROM employee WHERE work_email = $1",
+      ["nkem.okafor@example.test"],
+    );
+    expect(hire).toMatchObject({
+      work_email: "nkem.okafor@example.test",
+      personal_email: "nkem.okafor@example.test",
+      job_title: "Partnerships Manager",
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      line_manager_id: null,
+    });
+    expect(hire.staff_number).toBeTruthy();
+    expect(hire.confirmation_due_on).toBeTruthy();
+    expect(await one("SELECT count(*)::int AS n FROM app_user WHERE email = $1", ["nkem.okafor@example.test"])).toEqual({ n: 0 });
+
+    // The card is at Documentation, not Hired: hireIn waits for Complete Onboarding (PR 6).
+    expect(await one("SELECT stage, status FROM application WHERE application_id = $1", [appId])).toEqual({ stage: "documentation", status: "active" });
+
+    // The case, with one checklist item for each active requirement.
+    const kase = await one("SELECT onboarding_case_id, status, employee_id, starts_on FROM onboarding_case WHERE offer_id = $1", [offer.offer_id]);
+    expect(kase.status).toBe("documentation");
+    expect(kase.employee_id).toBeTruthy();
+    const items = await one("SELECT count(*)::int AS n FROM onboarding_checklist_item WHERE onboarding_case_id = $1", [kase.onboarding_case_id]);
+    expect(items).toEqual({ n: 3 });
+
+    // The contract: generated, waiting for the company, the hire second.
+    const row = await one("SELECT employment_contract_id, number::text AS number, status FROM employment_contract WHERE onboarding_case_id = $1", [kase.onboarding_case_id]);
+    expect(row.status).toBe("draft");
+    expect(row.number).toMatch(/^CON-\d{4}$/);
+    const contract = (await h.as("ops").get(`/recruitment/contracts/${row.employment_contract_id}`)).body;
+    expect(contract).toMatchObject({ status: "draft", can_sign: true, can_resend: false });
+    expect(contract.signers.map((x) => [x.role, x.status])).toEqual([
+      ["mycity", "pending"],
+      ["employee", "pending"],
+    ]);
+
+    // The candidate's sealed offer is offer-signed with the copy, not signature-completed.
+    const sealed = mails("offer-signed").filter((m) => m.to.email === "nkem.okafor@example.test");
+    expect(sealed).toHaveLength(1);
+    expect(sealed[0].data).toMatchObject({ vacancy_title: "Partnerships Manager", reference: offer.number });
+    expect(sealed[0].attachments).toHaveLength(1);
+    expect(mails("signature-completed").filter((m) => m.to.email === "nkem.okafor@example.test")).toHaveLength(0);
+    // The company's signatory still gets the service's own.
+    expect(mails("signature-completed").filter((m) => m.to.email === "ops@mycity.test").length).toBeGreaterThan(0);
+
+    // No contract link exists before the company signs.
+    expect(mails("contract-sent")).toHaveLength(0);
+    const tooEarly = await h.as("ops").post(`/recruitment/contracts/${row.employment_contract_id}/resend`).send({});
+    expect(tooEarly.status).toBe(409);
+
+    // Sign for Company: the hire's link is made and mailed.
+    const companySigned = await h.as("ops").post(`/recruitment/contracts/${row.employment_contract_id}/sign`).send({ full_name: "Ada Obi", title: "Operations & People Lead", method: "type", typed: "Ada Obi", consent: true });
+    expect(companySigned.status).toBe(200);
+    expect(companySigned.body).toMatchObject({ status: "sent", can_sign: false, can_resend: true });
+    const [contractMail] = mails("contract-sent").filter((m) => m.to.email === "nkem.okafor@example.test");
+    expect(contractMail.data).toMatchObject({ vacancy_title: "Partnerships Manager", reference: row.number });
+
+    // The hire signs their own link: the contract is signed and sealed.
+    const ct = tokenOf(contractMail);
+    const contractPage = await pub().get(`/sign/${ct}`);
+    expect(contractPage.status).toBe(200);
+    expect(contractPage.body.letter.join("\n")).toContain("Contract of Employment");
+    expect((await pub().post(`/sign/${ct}/code`).send({})).status).toBe(200);
+    expect((await pub().post(`/sign/${ct}/code/verify`).send({ code: codesSent().pop() })).status).toBe(200);
+    expect((await pub().post(`/sign/${ct}/sign`).send({ full_name: "Nkem Okafor", method: "draw", signature_png: PNG, consent: true })).status).toBe(200);
+    await drain();
+    expect(await one("SELECT status FROM employment_contract WHERE employment_contract_id = $1", [row.employment_contract_id])).toEqual({ status: "signed" });
+    // The case stays at documentation: the checklist is still owed (PR 6).
+    expect(await one("SELECT status FROM onboarding_case WHERE onboarding_case_id = $1", [kase.onboarding_case_id])).toEqual({ status: "documentation" });
+  }, 90_000);
 
   test("a refused send shows on the offer; Change Email corrects the address and sends a fresh link", async () => {
     const appId = await applicant("Ifunanya");

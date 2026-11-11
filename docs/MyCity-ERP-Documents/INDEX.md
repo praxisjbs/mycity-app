@@ -13,6 +13,7 @@ listed with them below.
 | `EMAIL-naming-approval.md` | The naming approval section to paste into the requirements email to Cynthia. Not a client document on its own. | Any markdown reader, or a text editor |
 | `partnership-samples/` | MyCity's partnership documents, redacted: the Deal Merchant Agreement now; the ticketing template and a sample proposal when MyCity sends them. Added 5 November 2026 for M7's category templates and proposal kit (`docs/guides/partnerships.md`). | Any markdown reader, or a text editor |
 | `letter-samples/` | MyCity's six disciplinary letters (query, attendance query, caution, warning, suspension, dismissal), redacted: names, dates and offences are placeholders. Added 27 October 2026 for M3's letter templates. | Any markdown reader, or a text editor |
+| `onboarding-samples/` | MyCity's offer and onboarding documents, redacted: the short sample offer letter, the Employee Data, Guarantor and Providus Salary Account forms, the October 2026 Incentive Plan and an outline of the HR Induction deck. Added 11 November 2026 for M5 (`docs/guides/offers.md`). | Any markdown reader, or a text editor |
 
 ## Opening the two HTML files
 

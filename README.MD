@@ -171,7 +171,8 @@ mycity-app/
 │   └── shard-sequencer.js    deals jest's files to CI's backend shards by expected cost (jest --shard)
 ├── docs/
 │   ├── MyCity-ERP-Documents/ the client document pack
-│   │   └── letter-samples/   MyCity's six disciplinary letters, redacted to placeholders (queries.md §6.7)
+│   │   ├── letter-samples/   MyCity's six disciplinary letters, redacted to placeholders (queries.md §6.7)
+│   │   └── onboarding-samples/ MyCity's offer letter, joiner forms, incentive plan and induction outline, redacted (offers.md)
 │   ├── BACKEND_GUIDE.md      how to write backend code (read first)
 │   ├── MIGRATIONS.md         migration and reference-seed conventions (read before any migration)
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
@@ -550,13 +551,14 @@ The design is `docs/guides/offers.md`; the build plan and its log `docs/handoff/
 |---|---|
 | `offers` | built in M5 PR 3: `.service` (New Offer with the score snapshot, a draft's edits, Submit for Approval on `recruitment.offer`, the approval settled from the outbox, the company's signature, Send and Resend, Withdraw, Not Progressing, the signatures hooks, the Offers settings), `.render` (one set of values and one Markdown renderer for the record, the signing page and the PDF), `.repo`, `.events` (the `offer_letter` doc type, `defineSignable("offer")`), `.routes`, `.controller`, `.ai` (New Offer as a card), `.search`; mail `offer-sent`. No public routes and no expiry job of its own: signing is `signatures`' page, and `signature-reminders` ends a lapsed offer's request, which expires the offer. The screens (M5 PR 4) are Recruitment · Offers in `app/src/features/recruitment/` (§5.7's row) and the public Sign Offer and Verify Document, `public-app/src/pages/SignOffer.tsx` and `Verify.tsx` |
 | `signatures` | built in M5 PR 2, shared with M7: `.service` (`defineSignable`, `requestIn`, `signAsStaffIn`, `endFor`, the signing page's steps), `.code` (the six-digit email code), `.public.routes` (`/sign/:token` and its code, sign, decline and document; `/verify/:ref`, `/verify/t/:token` and its document), `.certificate`, `.signed-pdf` (sealing from the outbox: the sealed copy, its artifact hash, the copies mailed), `.verify` (two verdicts), `.events`, `.repo`; `jobs/schedulers/signature-reminders` ends lapsed requests; mails `signature-code`, `signature-completed` |
-| `onboarding` | `.public.routes` (candidate document upload), `.checklist` (documentation before onboarding), `.plans`, `.sop` |
-| `employment_contracts` | `.lifecycle` |
+| `onboarding` | M5 PR 5 opened the hire's case: `.service` (`openCaseIn` in the acceptance transaction, the checklist from the active document requirements, `requiredCount` for Send Offer), `.repo`, `.events` (`onboarding.opened`). PR 6 fills the rest: `.public.routes` (candidate document upload), `.checklist` (documentation before onboarding), `.plans`, `.sop`, `.controller`, `.routes`, `.ai` |
+| `employment_contracts` | built in M5 PR 5: `.service` (`generateIn` at the offer's acceptance, Sign for Company and Resend, `cancelIn`, the signatures hooks, the Contract settings), `.render` (one set of values and one Markdown renderer for the signing page and the PDF), `.repo`, `.lifecycle` (the four statuses and their moves), `.events` (the `employment_contract` doc type, `defineSignable("employment_contract")`), `.routes`, `.controller`, `.ai` (nothing offered: no AI drafts a contract), `.search`; mail `contract-sent` |
 
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
 `offer-packet`, `employment-contract`, `signature-certificate`, and the offer and onboarding mails
-(`offer-sent`, `offer-signed`, `onboarding-documents`: their wording and variables are M4's, built and
-edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4's, built).
+(`offer-sent`, `offer-signed`, `contract-sent`, `onboarding-documents`: their wording and variables are
+M4's, built and edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4's,
+built).
 
 ### 5.9 M6 · Payroll & Notifications · TB, AJ · 23 to 27 Nov
 

@@ -26,7 +26,7 @@ const ROWS = `
          o.range_reason, o.additional_terms, o.terms_version, o.submitted_at,
          a.vacancy_id, a.stage AS application_stage, a.status AS application_status,
          btrim(k.first_name || ' ' || k.last_name) AS candidate_name, k.first_name AS candidate_first_name,
-         k.last_name AS candidate_last_name, k.email::text AS candidate_email,
+         k.last_name AS candidate_last_name, k.email::text AS candidate_email, k.phone AS candidate_phone,
          v.title AS vacancy_title, v.hiring_manager_id, v.salary_min::text AS salary_min, v.salary_max::text AS salary_max,
          v.location AS vacancy_location,
          d.name AS department, w.name AS worksite_name,

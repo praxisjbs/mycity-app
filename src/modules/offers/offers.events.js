@@ -54,7 +54,7 @@ const FLOW = "recruitment.offer";
 const DOC_TYPE = "offer_letter";
 
 /** The emails this module sends: worded on Candidate Emails, their variables declared by candidates.events.js. */
-const EMAILS = Object.freeze({ sent: "offer-sent" });
+const EMAILS = Object.freeze({ sent: "offer-sent", signed: "offer-signed" });
 
 defineDocType(DOC_TYPE, {
   label: "Offer Letter",
@@ -78,6 +78,7 @@ signatures.defineSignable("offer", {
   contentHash: (db, offerId) => service().contentHashOf(db, offerId),
   seal: (client, ctx) => service().sealIn(client, ctx),
   onCompleted: (client, ctx) => service().acceptedIn(client, ctx),
+  sealedMailFor: (db, ctx) => service().sealedMailFor(db, ctx),
   onDeclined: (client, ctx) => service().declinedIn(client, ctx),
   onEnded: (client, ctx) => service().endedIn(client, ctx),
 });

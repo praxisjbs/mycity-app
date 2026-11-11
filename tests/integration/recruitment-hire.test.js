@@ -191,6 +191,7 @@ describeDb("Recruitment · the hand-over to M5 against the real migrations", () 
       "candidate-not-progressed",
       "offer-sent",
       "offer-signed",
+      "contract-sent",
       "onboarding-documents",
     ]);
     const offer = list.body.data.find((e) => e.key === "offer-sent");

@@ -35,8 +35,9 @@ const CvState = z.enum(["none", "checking", "clean", "infected"]);
 const M4Stage = z.enum(M4_STAGES);
 
 /**
- * The candidate emails Operations & People may edit (guide §6.8): M4's five, then the three M5 sends
- * (offer-sent, offer-signed, onboarding-documents), kept in the same store so one screen words them all.
+ * The candidate emails Operations & People may edit (guide §6.8): M4's five, then the four M5 sends
+ * (offer-sent, offer-signed, contract-sent, onboarding-documents), kept in the same store so one
+ * screen words them all.
  */
 const CandidateEmailKey = z.enum([
   "application-received",
@@ -46,6 +47,7 @@ const CandidateEmailKey = z.enum([
   "candidate-not-progressed",
   "offer-sent",
   "offer-signed",
+  "contract-sent",
   "onboarding-documents",
 ]);
 
@@ -374,6 +376,15 @@ const OfferSignedEmailVars = z
   .strict();
 
 /**
+ * contract-sent (M5): the employment contract is ready to sign, after the company signed it.
+ * `reference`: the contract's number (CON-0004); `sign_url`: the public /sign/<token> link;
+ * `expires_at`: when the link stops working.
+ */
+const ContractSentEmailVars = z
+  .object({ vacancy_title: z.string(), reference: z.string(), sign_url: z.string(), expires_at: isoDateTime })
+  .strict();
+
+/**
  * onboarding-documents (M5): the documents to send before the first day. `documents_url`: the public
  * page that takes them; `due_on`: the day they are needed by, when it is set.
  */
@@ -482,6 +493,7 @@ const TABLES = {
   CandidateNotProgressedEmailVars: { table: null, reason: "the variables of templates/email/candidate-not-progressed.html" },
   OfferSentEmailVars: { table: null, reason: "the variables of templates/email/offer-sent.html" },
   OfferSignedEmailVars: { table: null, reason: "the variables of templates/email/offer-signed.html" },
+  ContractSentEmailVars: { table: null, reason: "the variables of templates/email/contract-sent.html" },
   OnboardingDocumentsEmailVars: { table: null, reason: "the variables of templates/email/onboarding-documents.html" },
 };
 
@@ -524,5 +536,6 @@ module.exports = {
   CandidateNotProgressedEmailVars,
   OfferSentEmailVars,
   OfferSignedEmailVars,
+  ContractSentEmailVars,
   OnboardingDocumentsEmailVars,
 };

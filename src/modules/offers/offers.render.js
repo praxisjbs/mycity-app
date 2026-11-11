@@ -22,7 +22,15 @@ const profile = require("../../shared/organisation/profile");
 
 const TEMPLATE = "offer-letter";
 
-const EMPLOYMENT = { full_time: "Full-time", part_time: "Part-time", contract: "Contract", internship: "Internship" };
+// The employee's own types (organisation EMPLOYMENT_TYPES), which the offer carries: a contractor
+// or an intern read as nothing while this map held the vacancy's spellings.
+const EMPLOYMENT = {
+  full_time: "Full-time",
+  part_time: "Part-time",
+  contractor: "Contractor",
+  consultant: "Consultant",
+  intern: "Intern",
+};
 const PATTERN = { on_site: "On site", hybrid: "Hybrid", remote: "Remote" };
 
 const day = (v) => (v ? (v instanceof Date ? lagos.dateOf(v) : String(v).slice(0, 10)) : null);

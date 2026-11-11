@@ -204,9 +204,9 @@ three test parts are off, and **Interview** when the interview part is off.
 
 ### Change the candidate emails {#recruitment-vacancies-emails needs="recruitment edit"}
 
-Candidates get eight emails: application received, invitation to apply, assessment, interview, not
-progressing, offer sent, offer signed and onboarding documents. The last three go out from Offers and
-Onboarding.
+Candidates get nine emails: application received, invitation to apply, assessment, interview, not
+progressing, offer sent, offer signed, contract sent and onboarding documents. The last four go out
+from Offers and Onboarding.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **Candidate Emails** at the top.

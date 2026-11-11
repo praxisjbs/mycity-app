@@ -13,6 +13,9 @@
  *     seal: (client, ctx) => documentRow,                // documents.generate with the signatures,
  *                                                        // the certificate and the QR (ctx below)
  *     onSigned, onCompleted, onDeclined, onEnded,        // (client, ctx) in the same transaction
+ *     sealedMailFor,                                     // (db, {request, signer}) the module's own
+ *                                                        // wording for one signer's sealed copy, or null
+ 
  *   });
  *
  * and sends a document for signature inside its own transaction:
@@ -61,7 +64,7 @@ const origin = () => String(config.PUBLIC_ORIGIN).replace(/\/+$/, "");
  * @param {string} subjectType  e.g. "offer", "employment_contract", "partnership_agreement"
  * @param {{document_type: string, letter: Function, contentHash: Function, seal: Function,
  *          onSigned?: Function, onCompleted?: Function, onDeclined?: Function, onEnded?: Function,
- *          recordStatus?: Function}} adapter
+ *          recordStatus?: Function, sealedMailFor?: Function}} adapter
  */
 function defineSignable(subjectType, adapter) {
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(subjectType)) throw new Error(`defineSignable: "${subjectType}" is snake_case`);

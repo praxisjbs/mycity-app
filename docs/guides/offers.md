@@ -10,7 +10,7 @@
 | Capabilities | none; who approves an offer is the `recruitment.offer` flow on Settings · Approvals, not a capability |
 | Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, and a new public Upload Documents row (PR 6 registers it with `npm run new:screen`); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
 | Status | Draft |
-| Last changed | 07/11/2026 |
+| Last changed | 11/11/2026 |
 
 The public pages (`public-app/src/pages/SignOffer.tsx`, `Verify.tsx`) joined **Frontend paths** with
 PR 4, which wired them. The People 360 Documents tab joins with PR 7; until then `foundation.md` owns
@@ -32,7 +32,7 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | Recruitment · Offers (`offers`) | staff app | `recruitment` view; a hiring manager their vacancies (team scope) | every offer: number, candidate, role, compensation, status, expiry; the offer's letter as the candidate will read it, its approval chain and signers | New Offer (from a shortlisted application), Edit, Submit for Approval, Approve and Reject (approvers), Send Offer, Resend, Withdraw, Download PDF |
-| Recruitment · Onboarding (`onboarding`) | staff app | `recruitment` view | every onboarding case: hire, role, start date, status, checklist progress; one case's checklist, contract and plan | Verify and Reject a document, Request Document, Send Reminder, Mark Step Done, Complete Onboarding; Checklist and Plans settings |
+| Recruitment · Onboarding (`onboarding`) | staff app | `recruitment` view | every onboarding case: hire, role, start date, status, checklist progress; one case's checklist, contract and plan | Verify and Reject a document, Request Document, Send Reminder, Sign for Company and Resend Contract on the contract, Mark Step Done, Complete Onboarding; Checklist, Plans and Contract settings |
 | Recruitment · Candidates (`candidates`) | staff app | as M4 | the Offer column (GE) | Open Offer on the sheet of a card at Offer or after (Offers opened by `?application=`); Make Offer on a shortlisted one (`?new=1&application=`) |
 | Public · Sign Offer (`/sign/<token>`) | go.mycityapp.io | the candidate holding the link | the letter, the signing steps, the outcome | Send Code, sign (draw or type), Accept and Sign, Decline the Offer |
 | Public · Verify Document (`/verify/<number>`, `/verify/t/<token>`) | go.mycityapp.io | anyone | status, signers, the two verdicts; by QR token the document too | look up a reference |
@@ -74,17 +74,35 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    email code, types full name and title, draws or types a signature, ticks the consent, and
    presses Accept and Sign (partnerships.md §6.9 is the signing service, built here first). Decline
    the Offer takes a reason and ends the offer.
-5. **Accept (one transaction).** The signature row is written with its evidence and both hashes;
-   the PDF is sealed. Then:
-   - `organisation.createEmployee` creates the employee **without a seat**, no login invited;
-   - `candidates.hireIn(client, actor, applicationId, { employee_id })` (GE's) moves the
-     application `offer → hired`, sets status `hired`, fills the vacancy's Organogram seat and
-     closes the vacancy as `filled` when its hires reach its openings;
-   - the onboarding case opens at `documentation`, its checklist built from the active document
-     requirements;
-   - the employment contract is generated from the offer, the final job description, the vacancy
-     and the hire's details, and sent for its own signature;
-   - `offer-signed` and `onboarding-documents` are emailed, the latter with the Upload Documents link.
+5. **Accept (one transaction).** The candidate's signature is the offer's last, so the signatures
+   service calls the offer's `onCompleted` hook (`offers.acceptedIn`) inside the transaction that
+   writes it. There, all or nothing:
+   - the offer becomes `accepted`;
+   - `organisation.createEmployee` creates the employee **without a seat and without a login**,
+     from the offer: names, job title, department, worksite, employment type, work pattern, start
+     date, probation (the confirmation date), phone, and the candidate's email as both the work and
+     the personal email until Complete Onboarding takes the company address (AJ, 11/11/2026);
+   - `candidates.advanceIn(client, actor, applicationId, "documentation")` moves the card from
+     Offer to Documentation (GE's pipeline, recruitment.md §6.3); a false answer refuses the whole
+     acceptance, so the candidate is told to try again rather than half-hired;
+   - the onboarding case opens at `documentation` with the employee, its checklist one item for
+     each active document requirement;
+   - the employment contract is numbered (CON), generated from the standard contract wording in
+     force (its version kept on the document), the offer's terms, the final job description and the
+     hire's staff number, and its signature request opened with **the company first and the hire
+     second** (AJ, 11/11/2026): the Offer Signatory named on the Offers settings, or whoever signed the
+     offer for the company when none is named now. The signatory is told it waits for them.
+   The sealed offer then reaches the candidate as `offer-signed` (Candidate Emails), with the sealed
+   copy attached, in place of the signatures service's own `signature-completed`; the company's
+   signatory still receives that one (AJ, 11/11/2026). `onboarding-documents` and its Upload
+   Documents link come with the upload page (PR 6). The application stays at Documentation until
+   onboarding completes: `candidates.hireIn` is called by Complete Onboarding (step 8), not here.
+5a. **The contract.** The Offer Signatory presses Sign for Company on the hire's case, signed in
+   with no email code. The hire's link is then made and emailed as `contract-sent` (Candidate
+   Emails) after commit; Resend Contract makes a fresh one and revokes the earlier. The hire signs on
+   `/sign/<token>` as for the offer. Their signature, the last, marks the contract `signed`, and the
+   sealed copy is mailed to both. Declined or lapsed, the contract is `cancelled` and the case's
+   owner told.
 6. **Documentation.** The hire uploads on `/onboard/<token>` after accepting the privacy notice.
    The checklist is MyCity's New Joiner list, entered on the Checklist settings: proof of residential
    address, a valid ID, educational and professional certificates (with NYSC), evidence of separation
@@ -100,7 +118,9 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    contract is signed, the case moves to `pre_onboarding`. Nothing before that opens onboarding.
 8. **Onboarding.** On the start date the case moves to `onboarding` and the department's plan steps
    are added, each with an owner and a due date and linked to the department's SOPs. Complete
-   Onboarding (every step done) closes the case and invites the hire's login.
+   Onboarding (every step done) asks for the hire's company email, closes the case, calls
+   `candidates.hireIn` (the application to Hired, the Organogram seat filled, the vacancy closed as
+   filled when its openings are) and invites the hire's login to the company email.
 9. **Verify.** Every signed document carries a QR on each page linking to `/verify/t/<token>`;
    a typed reference shows status and verdicts, not content (A9).
 
@@ -161,6 +181,10 @@ employee record (masked, never sent to an AI model).
 | `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | | status, signers, the two verdicts; no content; only a sealed copy |
 | `GET /api/public/v1/verify/t/:token` | → `VerifyByToken` | the sealed copy's QR key | | the record and the document |
 | `GET /api/public/v1/verify/t/:token/document` | PDF | the QR key | | the sealed copy |
+| `POST /api/v1/recruitment/contracts/:id/sign` | `SignSubmit` → `EmploymentContractView` | `recruitment` view, and the signer named on its request | | the company's signature, in the hub; the hire's link is then made and mailed (`contract-sent`) |
+| `POST /api/v1/recruitment/contracts/:id/resend` | `EmptyBody` → `EmploymentContractView` | `recruitment` edit | | a fresh link to the hire, every earlier one revoked; once the company has signed |
+| `GET /api/v1/recruitment/contracts/:id/document` | PDF | `recruitment` view | | the sealed copy once there is one, else the copy generated at acceptance |
+| `GET/PUT /api/v1/recruitment/contracts/settings/template`, `POST .../template/restore` | `ContractTemplate`, `ContractTemplateSave` | `recruitment` edit | | the standard contract wording, a `template_version` of `employment-contract` |
 | `GET/POST /api/public/v1/onboard/:token` | `UploadPack`, `UploadItem` | public token `onboarding.upload` | | privacy notice first |
 
 ## 6 · Rules and calculations
@@ -175,6 +199,15 @@ employee record (masked, never sent to an AI model).
 - Not Progressing (M4) or Close Vacancy revokes every open `offer.sign` and `onboarding.upload` token of that application (an outbox handler on `application.not_progressed`); Not Progress All never touches an application at `offer` or later (GE).
 - Every signature row holds `content_hash` (over the canonical payload, recomputable) and `artifact_hash` (over the stored bytes the vault returns). The verify page reports both verdicts (A12).
 - A signed document is locked; edits make a new offer.
+- Submit for Approval needs the start date, the department, the employment type and the work
+  pattern, every field the employee is created from, so an approved offer can always be accepted.
+- Send Offer is refused until the onboarding checklist has at least one active required item.
+- Acceptance is one transaction (§3 step 5): if any part refuses, the candidate's signature is not
+  kept and they are asked to try again.
+- The contract is signed by the company first, then the hire; the hire's link exists only after the
+  company's signature. Its wording is the version in force at acceptance, kept on its document, so a
+  later edit never changes a contract already generated.
+- Until Complete Onboarding, the hire's work email is their candidate email.
 - Documentation completes when every required item is verified, both guarantors have passed their reference checks, the BVN is entered and the contract is signed. Onboarding never opens before that.
 - A personal guarantor has known the hire four years or more; the two are not the same kind.
 - Onboarding plan steps come from the hire's department plan; Complete Onboarding needs every step done, then the login is invited (`users.invite`).
@@ -187,13 +220,17 @@ employee record (masked, never sent to an AI model).
 | `offer.created`, `offer.updated` | New Offer, a draft's edit | audit |
 | `offer.submitted`, `offer.approved`, `offer.rejected` | the approval flow | the approvers hear through the flow; approved tells the owner and the Offer Signatory; rejected the owner |
 | `offer.sent`, `offer.resent` | Send Offer, Resend | the service queues `offer-sent` after commit with a link made then |
-| `offer.accepted` | the offer's signature request completes (`signature.completed`, the candidate's signature last) | tells the owner; starts onboarding (PR 5) |
+| `offer.accepted` | the offer's signature request completes (`signature.completed`, the candidate's signature last) | tells the owner; in the same transaction the employee, the move to Documentation, the case and the contract (§3 step 5) |
+| `contract.generated` | at acceptance | tells the company's signatory the contract waits for them |
+| `contract.company_signed`, `contract.resent` | Sign for Company, Resend Contract | the service queues `contract-sent` after commit with a link made then |
+| `contract.signed` | the hire signed, the last signature | tells the case's owner; the sealed copy goes to both |
+| `contract.cancelled` | the hire declined, or the request lapsed | tells the case's owner |
 | `signature.requested`, `.viewed`, `.signed`, `.declined`, `.ended` | the signing steps (signatures) | audit; the owning module reacts through its `defineSignable` hooks in the same transaction |
 | `signature.completed` | the last signer signed | outbox: the sealed copy generated with the signatures, the certificate and the QR (`signatures.signed-pdf`) |
 | `document.generated` (a sealed copy) | the worker rendered it | its stored bytes' hash on every signature row (`artifact_hash`); `signature.sealed` |
-| `signature.sealed` | | every signer mailed the sealed copy (`signature-completed`) |
+| `signature.sealed` | | every signer mailed the sealed copy (`signature-completed`), except where the signed record's module words its own: the candidate of an offer gets `offer-signed` with the copy |
 | `offer.declined`, `offer.expired`, `offer.withdrawn` | the candidate declines; the request lapses; Withdraw or Not Progressing | declined and expired tell the owner; the links stop working |
-| `onboarding.opened` | after `offer.signed` | email `onboarding-documents` with the upload link |
+| `onboarding.opened` | at acceptance, in the signing transaction | audit; `onboarding-documents` with the upload link from PR 6 |
 | `onboarding.item_uploaded`, `.item_verified`, `.item_rejected` | | notify Operations & People / the hire |
 | `onboarding.completed` | Complete Onboarding | invite the hire's login |
 | `signature-reminders` job | daily, 06:17 Lagos | ends requests past their end; their links stop working |
@@ -252,6 +289,10 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 - A file over the upload engine's limit: refused, with the limit named.
 - No document requirements set: Send Offer is refused until the checklist has at least one required item.
 - The hire leaves before the start date: Withdraw on the case ends it; the employee is archived.
+- No Offer Signatory named when the offer is accepted: the contract's company signer is whoever
+  signed the offer for the company.
+- The hire declines the contract or lets it lapse: the contract is `cancelled` and the owner told;
+  the case stays at documentation.
 
 ## 12 · Donor code
 
@@ -273,10 +314,21 @@ Decided 06/11/2026 (AJ):
 
 Open:
 
-1. **Still owed by MyCity:** a sample employment contract (the contract template follows the offer
-   letter's clauses until it comes), the blank Employee Data, Guarantor and Account Opening forms,
-   the full New Hire Induction deck, and the Incentive Policy (October 2026). The sample offer
-   letter and the New Joiner list arrived on 06/11/2026.
+1. **Still owed by MyCity:** a sample employment contract. Until it comes the shipped wording
+   (`templates/documents/employment-contract.html`) is a placeholder built from the offer letter's
+   terms, which Operations & People replace on the contract settings without a code change. The
+   sample offer letter and the New Joiner list arrived on 06/11/2026; the Employee Data, Guarantor
+   and Account Opening forms, the HR Induction deck and the Incentive Plan on 07/11/2026, redacted in
+   `docs/MyCity-ERP-Documents/onboarding-samples/`.
+
+Decided 11/11/2026 (AJ), for PR 5:
+
+- The candidate gets `offer-signed` with the sealed copy, not `signature-completed` as well.
+- The contract is signed by the company first, then the hire; its invitation is `contract-sent`, a
+  ninth Candidate Email beside GE's eight.
+- The hire's work email is their candidate email until Complete Onboarding asks for the company one.
+- The application stays at Documentation until Complete Onboarding calls `hireIn` (GE's pipeline,
+  #88), which supersedes the 06/11 plan of `hireIn` at acceptance.
 
 ## 14 · Change log
 
@@ -288,3 +340,4 @@ Open:
 - 07/11/2026 · AJ · Merged with `main` after GE's hand-over (#88): `offer-sent` uses Candidate Emails' wording and `candidates.OfferSentEmailVars` (the offers contract's own copy removed); Send moves the card to Offer, and an offer ending unsigned moves it back to Shortlist (`offerEndedIn`).
 - 07/11/2026 · AJ · PR 4, the screens (§2, §5, §10): Recruitment · Offers on the contract (the figures, the list beside the offer, Monthly Pay against the vacancy's range, the approval with Approve and Reject through the workflow routes for whom it waits on, Signers, History from the offer's dates, the letter on paper, the actions per `can_*`; New and Edit Offer as a four-step wizard; Sign for the Company; Offer Settings), opened by `?id=`, `?new=1`, `?application=`, `?status=` and `?panel=settings`; `OfferListQuery.application_id` for the board's Open Offer (Make Offer on a shortlisted card); Sign Offer and Verify Document on the signatures routes (the email code, name, title, draw or type, the consent, the signers; every signer and the status on Verify). The code's field messages are four words (Ask for another code).
 - 07/11/2026 · AJ · PR 4: the failed send (§5, §11): `OfferDetail.candidate_email`, `send_refused_at` and `can_change_email`; Change Email (`POST /:id/recipient`, `OfferRecipient`) through `candidates.correctEmailIn` and `signatures.setSignerEmailIn`.
+- 11/11/2026 · AJ · PR 5, acceptance to hire (§3 steps 5, 5a and 8, §5, §6, §7, §11, §13): the acceptance transaction (employee, Documentation, case, contract), the contract signed company then hire with its routes and wording settings, `offer-signed` with the sealed copy for the candidate, `contract-sent`, Submit needing employment type and work pattern, Send refused without a required checklist item. `hireIn` moves to Complete Onboarding, as GE's pipeline (#88) has it.

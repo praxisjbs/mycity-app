@@ -351,6 +351,8 @@ const ENTITY_ROUTES = Object.freeze({
   application_assessment: { ...screen("recruitment", "assessments"), param: "sitting" }, // search:none a sitting is found through its candidate (src/modules/candidates/candidates.search.js)
   interview: screen("recruitment", "interviews"),
   offer: screen("recruitment", "offers"),
+  // A hire's contract opens on their onboarding case (src/modules/employment_contracts).
+  employment_contract: { ...screen("recruitment", "onboarding"), param: "case" },
   // search:none not built yet (src/modules/onboarding)
   onboarding: {
     ...screen("recruitment", "onboarding"),

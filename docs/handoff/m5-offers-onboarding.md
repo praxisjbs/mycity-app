@@ -146,7 +146,7 @@ earlier: M5's forms use help terms.
 - [x] PR 2 · Signatures service (06/11/2026; reviewed by AJ 07/11/2026, for LA)
 - [x] PR 3 · Offers backend (06/11/2026; the Head of Department grant and the board's Offer column confirmed by AJ 07/11/2026, for GE)
 - [x] PR 4 · Offers screens (07/11/2026)
-- [ ] PR 5 · Acceptance to hire
+- [x] PR 5 · Acceptance to hire (11/11/2026)
 - [ ] PR 6 · Onboarding backend
 - [ ] PR 7 · Onboarding screens
 - [ ] PR 8 · Close-out
@@ -170,11 +170,43 @@ earlier: M5's forms use help terms.
   ₦5,000 a business onboarded, annual leave after six months). The second letter is shorter than the
   standard wording of 06/11; the offer's Incentives and Benefits fields already carry its extra lines.
 - Still owed by MyCity: a sample employment contract (PR 5).
+- Filed 11/11/2026 (AJ): the documents of 07/11 redacted into
+  `docs/MyCity-ERP-Documents/onboarding-samples/` (names to placeholders or roles; the bank's terms
+  not copied). PR 5 ships a placeholder standard contract from the offer's terms until MyCity's
+  sample contract arrives (AJ, 11/11).
 
 ---
 
 ## 6 · Log
 
+- 11/11/2026 · AJ · PR 5, acceptance to hire (guide §3 steps 5 and 5a, §5 to §7, §11). The candidate's
+  signature runs one transaction in `offers.acceptedIn`: the offer accepted, `organisation.createEmployee`
+  (no seat, no login, the candidate's address as both emails), `candidates.advanceIn(..., "documentation")`
+  whose false answer refuses the whole acceptance, `onboarding.openCaseIn` (the case at documentation,
+  its checklist one item an active requirement), then `employment_contracts.generateIn`: a CON number,
+  the wording in force kept on the document, and the request opened with the company first and the hire
+  second, no link issued. Sign for Company makes and mails the hire's link (`contract-sent`); Resend
+  revokes the earlier. `src/modules/employment_contracts/` is built; `src/modules/onboarding/` holds
+  only the case opening, the rest is PR 6.
+  - Decided here, with AJ: the candidate gets `offer-signed` with the sealed copy in place of
+    `signature-completed`, through a new optional `sealedMailFor(db, {request, signer})` on
+    `defineSignable`; the company's signatory still gets `signature-completed`.
+  - `hireIn` is **not** called at acceptance. GE's `candidates.pipeline.js` (#88) has
+    `offer → documentation → pre_onboarding → onboarding → hired`, so the application stays at
+    Documentation and Complete Onboarding calls `hireIn` (PR 6). This supersedes decisions 10 and 11
+    of 06/11, written before that pipeline landed; nothing else in them changes.
+  - Submit for Approval now also needs the employment type and the work pattern (the employee record
+    has both NOT NULL), and Send Offer is refused while the checklist has no required item (the §11
+    leftover from PR 3).
+  - The line manager is left empty at creation: the Organogram seat settles it when `hireIn` fills it
+    at Complete Onboarding, so no reporting line is guessed from the offer's free-text reports-to.
+  - Fixed on the way past: `offers.render.EMPLOYMENT` held the vacancy's spellings
+    (`contract`, `internship`), so an offer to a contractor, consultant or intern printed no
+    employment type. It now holds the employee's own five.
+  - Not verified here: `npm run ci` has not run. The workspace's `node_modules` holds Windows builds
+    (`sharp`) and its `@mycity/*` links do not resolve from this session's Linux shell, so the suite
+    and `npm run gen:contract` must be run on the machine itself. Every file changed passes
+    `node --check`.
 - 07/11/2026 · AJ · The open reviews, taken by AJ (every M5 item falls to AJ): nothing in PR 1 to 3
   breaks an existing structure. 5020's CHECKs on `signature_request` and `signature` meet no other
   writer (M7's agreements do not write them yet) and no row older than 5020; 5090 drops tables no

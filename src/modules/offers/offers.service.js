@@ -24,6 +24,7 @@
  */
 const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
+const { config } = require("../../config/env");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
@@ -40,6 +41,8 @@ const { scopeFor } = require("../../middleware/rbac");
 const signatures = require("../signatures/signatures.service");
 const candidates = require("../candidates/candidates.service");
 const organisation = require("../organisation/organisation.service");
+const onboarding = require("../onboarding/onboarding.service");
+const contracts = require("../employment_contracts/employment_contracts.service");
 const repo = require("./offers.repo");
 const render = require("./offers.render");
 const { EVENTS, FLOW, DOC_TYPE, EMAILS } = require("./offers.events");
@@ -379,6 +382,11 @@ async function submit(actor, scope, id) {
     if (o.status !== "draft") throw refused("NOT_DRAFT", "Only a draft offer can be submitted");
     if (!o.start_date) throw refused("NO_START", "Set the start date", 422, { start_date: ["Set the start date"] });
     if (!o.department_id) throw refused("NO_DEPARTMENT", "Set the department", 422, { department_id: ["Set the department"] });
+    // The employee is created from these at acceptance (guide §6), so an approved offer can always
+    // be accepted: both are NOT NULL on the employee record.
+    if (!o.employment_type)
+      throw refused("NO_EMPLOYMENT_TYPE", "Set the employment type", 422, { employment_type: ["Set the employment type"] });
+    if (!o.work_pattern) throw refused("NO_WORK_PATTERN", "Set the work pattern", 422, { work_pattern: ["Set the work pattern"] });
     const signatory = await repo.signatory(client);
     if (!signatory || !signatory.user_id)
       throw refused("NO_SIGNATORY", "Name the Offer Signatory in Offers settings first");
@@ -519,6 +527,10 @@ async function send(actor, scope, id) {
     if (o.status !== "approved") throw refused("NOT_APPROVED", "Only an approved offer can be sent");
     const company = o.signature_request_id ? (await signatures.signersOf(client, o.signature_request_id)).find((s) => s.role === "mycity") : null;
     if (!company || company.status !== "signed") throw refused("NOT_SIGNED", "The offer is not signed for the company yet");
+    // An accepted offer builds its checklist from the requirements in force, so an empty list would
+    // open a case with nothing to ask the hire for (guide §11).
+    if ((await onboarding.requiredCount(client)) === 0)
+      throw refused("NO_REQUIREMENTS", "Set at least one required document on the Onboarding checklist first", 422);
     const days = (o.terms && o.terms.valid_days) || VALID.default;
     const expires = new Date(Date.now() + days * 24 * 3600 * 1000);
     await signatures.setExpiryIn(client, o.signature_request_id, expires);
@@ -661,11 +673,107 @@ async function sealIn(client, ctx) {
   return doc;
 }
 
-/** The candidate signed: the last signature. Onboarding opens from here (PR 5). */
+/**
+ * What the employee record starts as (guide §3 step 5). The offer holds every field it is made
+ * from, which is why Submit for Approval asks for them. No seat and no login: the Organogram seat
+ * and the line manager are settled when Complete Onboarding calls `hireIn` (PR 6), and the login is
+ * invited then. The candidate's address is both the work and the personal email until Complete
+ * Onboarding takes the company one (AJ, 11/11/2026).
+ */
+function employeeFrom(o, pay) {
+  const probation = o.probation_months === null || o.probation_months === undefined ? null : Number(o.probation_months);
+  const start = o.start_date ? new Date(o.start_date) : null;
+  let confirmation = null;
+  if (start && probation) {
+    const d = new Date(start);
+    d.setMonth(d.getMonth() + probation);
+    confirmation = lagos.dateOf(d);
+  }
+  return {
+    first_name: o.candidate_first_name,
+    last_name: o.candidate_last_name,
+    work_email: o.candidate_email,
+    personal_email: o.candidate_email,
+    phone: o.candidate_phone || null,
+    job_title: o.job_title,
+    department_id: o.department_id,
+    worksite_id: o.worksite_id || null,
+    employment_type: o.employment_type,
+    work_pattern: o.work_pattern,
+    start_date: typeof o.start_date === "string" ? o.start_date.slice(0, 10) : lagos.dateOf(o.start_date),
+    confirmation_due_on: confirmation,
+    gross_monthly: render.totalOf(pay),
+  };
+}
+
+/**
+ * Who signs the hire's contract for the company: the Offer Signatory named now, and when none is
+ * named, whoever signed this offer for the company (guide §11). Both carry the login the signature
+ * is made with.
+ */
+async function contractSignatoryIn(client, o) {
+  const named = await repo.signatory(client);
+  if (named && named.user_id) return named;
+  if (!o.signature_request_id) return null;
+  const rows = await require("../signatures/signatures.repo").signaturesOf(client, o.signature_request_id);
+  const company = rows.find((s) => s.signer_role === "mycity" && s.signer_type === "user" && s.signer_id);
+  return company
+    ? { user_id: company.signer_id, name: company.signer_name, email: company.signer_email, job_title: company.signer_title || null }
+    : null;
+}
+
+/**
+ * The candidate signed: the last signature of the offer's request, inside the transaction that
+ * writes it (guide §3 step 5). All or nothing: the offer is accepted, the employee created, the
+ * card moved to Documentation, the case opened at documentation with its checklist, and the
+ * employment contract generated and opened for the company's signature. If any part refuses, the
+ * signature is not kept and the candidate is asked to try again.
+ */
 async function acceptedIn(client, ctx) {
   const o = await repo.get(client, ctx.request.subject_id, { lock: true });
   if (!o || !(await repo.setStatus(client, o.offer_id, ["sent"], "accepted", { accepted_at: new Date() }))) return;
-  await emit(client, { key: EVENTS.OFFER_ACCEPTED, entity: { type: SUBJECT, id: o.offer_id }, actor: ctx.actor || null, payload: ownerPayload(o) });
+  const actor = ctx.actor || NOBODY;
+  const pay = await repo.payLines(client, o.offer_id);
+
+  const employee = await organisation.createEmployee(client, employeeFrom(o, pay), actor);
+  if (!(await candidates.advanceIn(client, actor, o.application_id, "documentation")))
+    throw refused("NOT_MOVED", "This application cannot move to Documentation", 409);
+  const onboardingCase = await onboarding.openCaseIn(client, actor, { offer: o, employee });
+  await contracts.generateIn(client, actor, {
+    offer: o,
+    onboarding_case: onboardingCase,
+    employee,
+    signatory: await contractSignatoryIn(client, o),
+  });
+
+  await emit(client, {
+    key: EVENTS.OFFER_ACCEPTED,
+    entity: { type: SUBJECT, id: o.offer_id },
+    actor: ctx.actor || null,
+    payload: ownerPayload(o, { employee_id: employee.employee_id, onboarding_case_id: onboardingCase.onboarding_case_id }),
+  });
+}
+
+/**
+ * The sealed offer's mail, a signer at a time (signatures' mailSealed). The candidate is the one
+ * person an offer is about, so they get `offer-signed` from Candidate Emails with the sealed copy
+ * attached, in place of the service's own `signature-completed`; the company's signatory still
+ * receives that one (AJ, 11/11/2026; guide §7).
+ */
+async function sealedMailFor(db, { request, signer }) {
+  if (signer.signer_role !== "candidate") return null;
+  const o = await repo.get(db, request.subject_id);
+  if (!o) return null;
+  return {
+    template: EMAILS.signed,
+    recipient: { first_name: o.candidate_first_name, last_name: o.candidate_last_name, email: o.candidate_email },
+    data: {
+      vacancy_title: o.job_title,
+      reference: o.number,
+      verify_url: `${String(config.PUBLIC_ORIGIN).replace(/\/+$/, "")}/verify/${encodeURIComponent(o.number)}`,
+      start_on: o.start_date ? String(o.start_date instanceof Date ? lagos.dateOf(o.start_date) : o.start_date).slice(0, 10) : null,
+    },
+  };
 }
 
 async function declinedIn(client, ctx) {
@@ -771,6 +879,7 @@ module.exports = {
   contentHashOf,
   sealIn,
   acceptedIn,
+  sealedMailFor,
   declinedIn,
   endedIn,
   documentOf,

@@ -92,20 +92,32 @@ async function sealed(documentId) {
   }
 }
 
+/**
+ * The sealed copy to each signer. A module may word one signer's mail itself, where the document is
+ * about that person and its own email says more than this one does (`sealedMailFor` on its
+ * defineSignable: the candidate of an offer gets `offer-signed`). It answers null for the signers it
+ * leaves to `signature-completed`. The sealed copy is attached either way, and the jobId stays the
+ * signature's, so a handler that runs twice still mails once.
+ */
 async function mailSealed(requestId) {
   const r = await repo.request(pool, requestId);
   if (!r || !r.sealed_at) return 0;
   const queues = require("../../jobs/queues");
+  const adapter = service().adapterOf(r.subject_type);
   let sent = 0;
   for (const s of await repo.signaturesOf(pool, requestId)) {
     if (s.status !== "signed") continue;
+    const own = adapter.sealedMailFor ? await adapter.sealedMailFor(pool, { request: r, signer: s }) : null;
     await queues.enqueue(
       "email-send",
-      EMAILS.completed,
+      own ? own.template : EMAILS.completed,
       {
         to: { name: s.signer_name, email: s.signer_email },
-        template: EMAILS.completed,
-        data: { title: r.title, reference: r.reference, verify_url: `${origin()}/verify/${encodeURIComponent(r.reference)}` },
+        ...(own && own.recipient ? { recipient: own.recipient } : {}),
+        template: own ? own.template : EMAILS.completed,
+        data: own
+          ? own.data
+          : { title: r.title, reference: r.reference, verify_url: `${origin()}/verify/${encodeURIComponent(r.reference)}` },
         attachments: [{ document_id: r.sealed_document_id }],
       },
       { jobId: `signature-completed-${s.signature_id}` },
