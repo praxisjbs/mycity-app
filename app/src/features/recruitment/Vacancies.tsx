@@ -1,8 +1,8 @@
 /**
  * Recruitment · Vacancies (docs/guides/recruitment.md §6.1, §10): the roles MyCity is hiring for and
- * their lifecycle (draft, open, paused, closed). A vacancy opens in the wide dialog on desktop and a
- * sheet on a phone (ListDetail `modal`, F31 as amended 11/11/2026), with its public link, Edit, the
- * lifecycle, Questions, Scorecard and See Candidates. View Empty Seats lists the seats the organogram
+ * their lifecycle (draft, open, paused, closed). A pressed vacancy opens as a page of its own
+ * (`?id=`, Back to Vacancies; a record with its own screen, F31), with its public link, the
+ * lifecycle, and Edit Vacancy, Questions, Scorecard and See Candidates under More Actions. View Empty Seats lists the seats the organogram
  * leaves empty. Careers Settings and Candidate Emails open from here (`?panel=settings`, `?panel=emails`).
  */
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +12,7 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useAuth } from "@/auth/AuthProvider";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
+import { useTrailTitle } from "@/lib/trail";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
   Button,
@@ -25,7 +26,7 @@ import {
   Grid,
   HelpTerm,
   KeyValue,
-  ListDetail,
+  BackButton,
   Menu,
   type MenuItem,
   LoadingRows,
@@ -66,14 +67,14 @@ export function Vacancies() {
   const list = usePaged("GET /api/v1/recruitment/vacancies", { filters: status ? { status: status as Vacancy["status"] } : {} });
   const { can } = useAuth();
   const mayCreate = can("recruitment", "create");
-  // A pressed vacancy opens in the wide dialog on desktop and a sheet on a phone; nothing opens unasked.
-  const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
+  const { navigate } = useRouter();
 
   const newVacancy = (seat?: SeatSuggestion) =>
-    modal.open({ title: "New Vacancy", wide: true, body: (close) => <VacancyForm close={close} seat={seat} onSaved={(v) => openVacancy(v.vacancy_id, v.title)} /> });
-  const openVacancy = (id: string, title = "Vacancy") => {
+    modal.open({ title: "New Vacancy", wide: true, body: (close) => <VacancyForm close={close} seat={seat} onSaved={(v) => openVacancy(v.vacancy_id)} /> });
+  // A vacancy is a page of its own: its address holds it, so Back, a link and ⌘K all reach it.
+  const openVacancy = (id: string) => {
     modal.close();
-    setPicked({ id, title });
+    navigate(hrefFor("recruitment", "vacancies", { id }));
   };
   const emptySeats = () => modal.open({ title: "Suggested From Organogram", wide: true, body: () => <EmptySeats mayCreate={mayCreate} onCreate={newVacancy} /> });
   const settings = () => modal.open({ title: "Careers Settings", wide: true, body: (close) => <CareersSettings close={close} /> });
@@ -82,23 +83,23 @@ export function Vacancies() {
   useScreenAction(mayCreate ? { label: "New Vacancy", onSelect: () => newVacancy() } : null);
   useNewLink(mayCreate ? () => newVacancy() : null);
 
-  // A vacancy found with ⌘K (`?id=`), or a panel asked for (`?panel=`), opens once and leaves the address.
+  // A panel asked for (`?panel=`) opens once and leaves the address; a vacancy (`?id=`) is its page.
   const [params, setParams] = useSearchParams();
   const linked = params.get("id");
   const panel = params.get("panel");
   const opened = useRef<string | null>(null);
   useEffect(() => {
-    const ask = linked ? `id:${linked}` : panel ? `panel:${panel}` : null;
-    // Cleared once handled, so the same record asked for again opens again.
-    if (!ask) return void (opened.current = null);
-    if (opened.current === ask) return;
-    opened.current = ask;
-    setParams({ id: null, panel: null }, { replace: true });
-    if (linked) openVacancy(linked);
-    else if (panel === "settings") settings();
+    // Cleared once handled, so the same panel asked for again opens again.
+    if (!panel) return void (opened.current = null);
+    if (opened.current === panel) return;
+    opened.current = panel;
+    setParams({ panel: null }, { replace: true });
+    if (panel === "settings") settings();
     else if (panel === "emails") emails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linked, panel]);
+  }, [panel]);
+
+  if (linked) return <VacancySheet key={linked} id={linked} close={() => navigate(hrefFor("recruitment", "vacancies"))} page />;
 
   const s = summary.data;
   const counted = (n: number | undefined) => (n === undefined ? "–" : String(n));
@@ -129,34 +130,24 @@ export function Vacancies() {
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUSES} />
         <Button icon="users" onClick={emptySeats}>View Empty Seats</Button>
       </Toolbar>
-      <ListDetail
-        layout="modal"
-        size="wide"
-        open={picked !== null}
-        onClose={() => setPicked(null)}
-        title={picked?.title ?? "Vacancy"}
-        list={
-          <PagedTable<Vacancy>
-            title="Vacancies"
-            list={list}
-            search="Search roles"
-            rowKey={(v) => v.vacancy_id}
-            noun="vacancy"
-            nounPlural="vacancies"
-            onRowClick={(v) => openVacancy(v.vacancy_id, v.title)}
-            empty={{ title: "No Vacancies Yet" }}
-            columns={[
-              { key: "role", label: "Role", render: (v) => <span className="font-semibold">{v.title}</span> },
-              { key: "dept", label: "Department", render: (v) => v.department ?? "–", desktop: true },
-              { key: "openings", label: "Openings", align: "n", render: (v) => v.positions, desktop: true },
-              { key: "where", label: "Location", render: (v) => (v.work_pattern === "remote" ? "Remote" : (v.location ?? "–")), desktop: true },
-              { key: "apps", label: "Applicants", align: "n", render: (v) => v.applicants },
-              { key: "closes", label: "Closes", render: closesOn },
-              { key: "status", label: "Status", badge: true, render: statusOf },
-            ]}
-          />
-        }
-        detail={picked ? <VacancySheet key={picked.id} id={picked.id} close={() => setPicked(null)} /> : null}
+      <PagedTable<Vacancy>
+        title="Vacancies"
+        list={list}
+        search="Search roles"
+        rowKey={(v) => v.vacancy_id}
+        noun="vacancy"
+        nounPlural="vacancies"
+        onRowClick={(v) => openVacancy(v.vacancy_id)}
+        empty={{ title: "No Vacancies Yet" }}
+        columns={[
+          { key: "role", label: "Role", render: (v) => <span className="font-semibold">{v.title}</span> },
+          { key: "dept", label: "Department", render: (v) => v.department ?? "–", desktop: true },
+          { key: "openings", label: "Openings", align: "n", render: (v) => v.positions, desktop: true },
+          { key: "where", label: "Location", render: (v) => (v.work_pattern === "remote" ? "Remote" : (v.location ?? "–")), desktop: true },
+          { key: "apps", label: "Applicants", align: "n", render: (v) => v.applicants },
+          { key: "closes", label: "Closes", render: closesOn },
+          { key: "status", label: "Status", badge: true, render: statusOf },
+        ]}
       />
     </>
   );
@@ -181,7 +172,11 @@ function EmptySeats({ mayCreate, onCreate }: { mayCreate: boolean; onCreate: (se
   );
 }
 
-export function VacancySheet({ id, close }: { id: string; close: () => void }) {
+/**
+ * A vacancy. `page`: its own page (Back to Vacancies, its title the page's heading, the trail named
+ * after it); otherwise the body of a dialog, as New Vacancy's card opens it.
+ */
+export function VacancySheet({ id, close, page = false }: { id: string; close: () => void; page?: boolean }) {
   const modal = useModal();
   const { navigate } = useRouter();
   const read = useApi("GET /api/v1/recruitment/vacancies/:id", { params: { id } });
@@ -189,8 +184,11 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
   const pause = useMutation("POST /api/v1/recruitment/vacancies/:id/pause");
   const resume = useMutation("POST /api/v1/recruitment/vacancies/:id/resume");
   const v = read.data;
-  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
-  if (!v) return <LoadingRows count={6} />;
+  // The trail reads the role's title for this place, not the screen's (F29).
+  useTrailTitle(page ? v?.title : null);
+  const backTo = page ? <BackButton label="Back to Vacancies" onBack={close} /> : null;
+  if (read.error) return <>{backTo}<ErrorState error={read.error} onRetry={read.reload} /></>;
+  if (!v) return <>{backTo}<LoadingRows count={6} /></>;
   const reload = () => {
     read.reload();
     invalidate("/api/v1/recruitment/vacancies");
@@ -215,7 +213,7 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
   const traits = v.questions.filter((q) => q.active && q.purpose === "interview");
   const asks = v.questions.filter((q) => q.active && q.purpose === "application");
   const live = v.status !== "closed";
-  // A form opened from here sits over the vacancy's dialog, which is still open when the form closes.
+  // A form opened from here sits over the vacancy, which is still there when the form closes.
   const back = () => modal.close();
   const seeCandidates = () => (close(), navigate(hrefFor("recruitment", "candidates", { vacancy: v.vacancy_id })));
   const editing = v.can_edit && live;
@@ -233,6 +231,8 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
   ];
   return (
     <>
+      {backTo}
+      {page && <PageHeader title={<span data-copy="content">{v.title}</span>} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {statusOf(v)}
         <Pill dot={false}>{v.number}</Pill>
