@@ -12,7 +12,7 @@ line to §3.
 | Owner | TB (Tom-Blake Asaah) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 18 Dec 2026 (MILESTONES §15) |
-| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 praxisjbs/mycity-app#113; PR 2 praxisjbs/mycity-app#120; PR 3 praxisjbs/mycity-app#115; PR 4 praxisjbs/mycity-app#117; PR 5 praxisjbs/mycity-app#118; the training fixes praxisjbs/mycity-app#124 |
+| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 praxisjbs/mycity-app#113; PR 2 praxisjbs/mycity-app#120; PR 3 praxisjbs/mycity-app#115; PR 4 praxisjbs/mycity-app#117; PR 5 praxisjbs/mycity-app#118; the training fixes praxisjbs/mycity-app#124; PR 6 praxisjbs/mycity-app#127 |
 
 Praxis AI and AI Control, M10's other half, were brought forward and are built (`praxis-ai.md`,
 `ai-control.md`); this tracker is the Knowledge Hub's only.
