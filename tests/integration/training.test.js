@@ -28,6 +28,10 @@ const canonical = require("../../src/shared/documents/canonical");
 const realtime = require("../../src/services/realtime/emitter");
 const reminders = require("../../src/modules/notifications/notifications.reminders");
 const training = require("../../src/modules/training/training.service");
+const documents = require("../../src/shared/documents/generate");
+const storage = require("../../src/services/storage/storage.service");
+const pdfText = require("../../src/services/media/pdf-text");
+const chromium = require("../../src/services/pdf/chromium");
 
 jest.mock("../../src/jobs/queues", () => ({
   enqueue: jest.fn(async () => ({ id: "1" })),
@@ -186,6 +190,7 @@ describeDb("training against the real migrations", () => {
   afterEach(() => jest.restoreAllMocks());
 
   afterAll(async () => {
+    await chromium.close();
     await require("../../src/shared/observability/error-reporter").flush();
     await pool.end();
   });
@@ -361,6 +366,95 @@ describeDb("training against the real migrations", () => {
     expect((await as("sales").get("/training/me?list=completed")).body.data).toEqual([
       expect.objectContaining({ status: "completed", certificate_number: `CERT-${YEAR}-0001` }),
     ]);
+  });
+
+  test("the certificate: issued after completion, drawn on one A4 page with the facts as issued, told, downloaded and verified", async () => {
+    const place = await enrolmentOf(ids.course, "sales");
+    expect(place).toMatchObject({ certificate_holder_name: "Tayo Ade", certificate_course_title: "Code of Conduct" });
+    // The worker generated it after the completion committed; the PDF is still to render.
+    const doc = await one("SELECT document_id, doc_type, entity_type, entity_id, subject_employee_id, sensitivity, render_status, title FROM document WHERE document_id = $1", [place.certificate_document_id]);
+    expect(doc).toMatchObject({ doc_type: "training_certificate", entity_type: "training_enrolment", entity_id: place.training_enrolment_id, subject_employee_id: employeeId("sales"), sensitivity: "personal", render_status: "pending", title: `CERT-${YEAR}-0001` });
+    expect((await as("sales").get(`/training/me/courses/${ids.course}`)).body).toMatchObject({ certificate_ready: false });
+    // Not verifiable until its PDF exists.
+    expect((await request(app).get(`/api/public/v1/verify/CERT-${YEAR}-0001`)).status).toBe(404);
+
+    // Download Certificate waits for it, on the device that asked; nobody else waits on it.
+    const pending = await as("sales").post(`/training/me/courses/${ids.course}/certificate`);
+    expect(pending.status).toBe(202);
+    expect(pending.body).toEqual({ document_id: doc.document_id, file_name: `CERT-${YEAR}-0001.pdf`, status: "pending" });
+    expect((await as("sales").get(`/exports/${doc.document_id}`)).body.status).toBe("pending");
+    expect((await as("staff").get(`/exports/${doc.document_id}`)).status).toBe(404);
+
+    const rendered = await documents.renderPending(doc.document_id, { db: pool });
+    expect(rendered).toMatchObject({ render_status: "done" });
+    expect(rendered.locked_at).toBeTruthy();
+    const bytes = await storage.get(rendered.storage_key);
+    expect(bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(bytes.toString("latin1").match(/\/Type\s*\/Page[^s]/g)).toHaveLength(1);
+    const text = await pdfText.read(rendered.storage_key);
+    for (const words of ["Tayo Ade", "Code of Conduct", `CERT-${YEAR}-0001`, "Ngozi Eze", "People Lead", "has successfully completed the training"])
+      expect(text).toContain(words);
+    // Letter-spaced headings read a letter at a time.
+    for (const words of ["CERTIFICATE", "ofCompletion", "THISISTOCERTIFYTHAT", "PUBLISHEDTHISTRAINING", "LEARNING&DEVELOPMENT"])
+      expect(text.replace(/\s+/g, "")).toContain(words);
+
+    await drain();
+    expect(await noticesOf("sales", "training.certificate_ready")).toEqual([
+      { title: "Certificate ready", body: `Code of Conduct, CERT-${YEAR}-0001.`, entity_type: "training_enrolment", entity_id: place.training_enrolment_id },
+    ]);
+    expect((await as("sales").get("/training/me?list=completed")).body.data[0]).toMatchObject({ certificate_ready: true });
+    const done = await as("sales").post(`/training/me/courses/${place.training_enrolment_id}/certificate`);
+    expect(done.body).toMatchObject({ status: "done" });
+
+    // The person's and training.manage's only.
+    expect((await as("sales").get(`/documents/${doc.document_id}/content`)).headers["content-type"]).toBe("application/pdf");
+    expect((await as("ops").get(`/documents/${doc.document_id}/content`)).status).toBe(200);
+    expect((await as("staff").get(`/documents/${doc.document_id}/content`)).status).toBe(404);
+    expect((await as("ops").post(`/training/enrolments/${place.training_enrolment_id}/certificate`)).body).toMatchObject({ status: "done" });
+    expect((await as("staff").post(`/training/enrolments/${place.training_enrolment_id}/certificate`)).status).toBe(403);
+    // A person not on the course, or on it without a certificate, has none to download.
+    expect((await as("staff").post(`/training/me/courses/${ids.course}/certificate`)).body.error.code).toBe("NO_CERTIFICATE");
+
+    // Verify a Document: by its number alone, in any case; the facts as issued, the two verdicts.
+    const verify = (n = `CERT-${YEAR}-0001`) => request(app).get(`/api/public/v1/verify/${n}`);
+    const res = await verify(`cert-${YEAR}-0001`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      reference: `CERT-${YEAR}-0001`,
+      document_type: "training_certificate",
+      title: "Code of Conduct",
+      status: "completed",
+      content: "matches",
+      artifact: "matches",
+      signers: [{ name: "Ngozi Eze", title: "People Lead", role: "mycity", status: "signed", signed_at: null, method: null }],
+      certificate: { holder_name: "Tayo Ade", course_title: "Code of Conduct", completed_on: TODAY, items: 4 },
+    });
+    // Renamed later, the certificate stays as issued and still verifies.
+    await as("ops").patch(`/training/courses/${ids.course}`, { title: "Code of Conduct 2027" });
+    await q("UPDATE employee SET last_name = 'Adebayo' WHERE employee_id = $1", [employeeId("sales")]);
+    expect((await verify()).body).toMatchObject({ content: "matches", artifact: "matches", certificate: { holder_name: "Tayo Ade", course_title: "Code of Conduct" } });
+    await q("UPDATE employee SET last_name = 'Ade' WHERE employee_id = $1", [employeeId("sales")]);
+    await as("ops").patch(`/training/courses/${ids.course}`, { title: "Code of Conduct" });
+    // Its facts altered in the database: the content differs. Its file replaced: the artifact differs.
+    await q("UPDATE training_enrolment SET certificate_holder_name = 'Someone Else' WHERE training_enrolment_id = $1", [place.training_enrolment_id]);
+    expect((await verify()).body).toMatchObject({ content: "differs", artifact: "matches" });
+    await q("UPDATE training_enrolment SET certificate_holder_name = 'Tayo Ade' WHERE training_enrolment_id = $1", [place.training_enrolment_id]);
+    await storage.put(rendered.storage_key, Buffer.concat([bytes, Buffer.from("%")]), { overwrite: true });
+    expect((await verify()).body).toMatchObject({ content: "matches", artifact: "differs" });
+    await storage.put(rendered.storage_key, bytes, { overwrite: true });
+    expect((await verify()).body).toMatchObject({ content: "matches", artifact: "matches" });
+    expect((await verify(`CERT-${YEAR}-9999`)).status).toBe(404);
+  }, 120_000);
+
+  test("a course with Issue Certificate off completes with no number and nothing to download", async () => {
+    const course = await builtCourse("Fire Drill", { issue_certificate: false });
+    await as("ops").post(`/training/courses/${course.training_course_id}/assignments`, { everyone: false, employee_ids: [employeeId("staff")] });
+    expect((await finish("staff", course)).status).toBe("completed");
+    const place = await enrolmentOf(course.training_course_id, "staff");
+    expect(place).toMatchObject({ certificate_number: null, certificate_hash: null, certificate_holder_name: null, certificate_document_id: null });
+    await drain();
+    expect((await enrolmentOf(course.training_course_id, "staff")).certificate_document_id).toBeNull();
+    expect((await as("staff").post(`/training/me/courses/${course.training_course_id}/certificate`)).body.error.code).toBe("NO_CERTIFICATE");
   });
 
   test("with Proof Required the last Mark Done waits for Add Proof, a link or a file; a course without it asks for none", async () => {

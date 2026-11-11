@@ -116,11 +116,70 @@ describe("Draft Lesson (§6.5)", () => {
   });
 });
 
+describe("the certificate's page (§6.9)", () => {
+  const cert = require("./training.certificate");
+  const png = "data:image/png;base64,iVBORw0KGgo=";
+  const data = {
+    number: "CERT-2026-0019",
+    holder_name: "Ifunanya <b>Bello</b>",
+    course_title: "Data Protection & the NDPA",
+    items: 6,
+    items_word: "items",
+    length: "2 hours",
+    completed_on: "2026-11-30",
+    issued_on: "2026-11-30",
+    year: "2026",
+    signer_name: "Kelechi Nwosu",
+    signer_title: "Head, Operations & People",
+    signature: png,
+    qr: png,
+    verify_at: "go.mycityapp.io/verify",
+  };
+  const org = { name: "MyCity App Ltd", display_name: "MyCity App", logo: null };
+
+  test("prints the approved wording and the facts, every value escaped, and nothing it would fetch", () => {
+    const html = cert.draw(data, { org });
+    for (const words of ["Certificate", "of Completion", "This is to certify that", "has successfully completed the training", "Published this training", "Learning &amp; Development", "· MYCITY APP LTD · CERTIFIED TRAINING ·"])
+      expect(html).toContain(words);
+    expect(html).toContain("Ifunanya &lt;b&gt;Bello&lt;/b&gt;");
+    expect(html).toContain("Data Protection &amp; the NDPA");
+    expect(html).toContain("30 November 2026");
+    expect(html).toContain("Issued 30/11/2026");
+    expect(html).not.toMatch(/<script|https?:\/\/(?!www\.w3\.org)/);
+    expect(html).toContain("data:font/woff2;base64,");
+  });
+
+  test("the organisation's logo when Settings has one, else its name as the wordmark", () => {
+    expect(cert.draw(data, { org })).toContain('<div class="brand-mark"><i></i>MyCity App</div>');
+    const withLogo = cert.draw(data, { org: { ...org, logo: png } });
+    expect(withLogo).toContain(`<img class="brand-logo" src="${png}"`);
+  });
+
+  test("refuses a signature or QR that is not a PNG data URL, and a length is optional", () => {
+    expect(() => cert.draw({ ...data, signature: "https://example.org/s.png" }, { org })).toThrow();
+    expect(cert.draw({ ...data, length: null }, { org })).not.toContain("About");
+  });
+
+  test("a course's length in words", () => {
+    expect(cert.lengthOf(null)).toBeNull();
+    expect(cert.lengthOf(1)).toBe("1 minute");
+    expect(cert.lengthOf(45)).toBe("45 minutes");
+    expect(cert.lengthOf(60)).toBe("1 hour");
+    expect(cert.lengthOf(100)).toBe("1.5 hours");
+    expect(cert.lengthOf(120)).toBe("2 hours");
+  });
+
+  test("the seal's ring names the organisation; the petals are 24 lobes", () => {
+    expect(cert.sealRing("MyCity App Ltd")).toBe("· MYCITY APP LTD · CERTIFIED TRAINING ·");
+    expect(cert.petals(84, 12).match(/M/g)).toHaveLength(24);
+  });
+});
+
 describe("the routes", () => {
   const routes = routesOf(require("./training.routes").router);
 
   test("the person's own routes are self; every other route needs the knowledge grant and training.manage", () => {
-    expect(routes.length).toBe(22);
+    expect(routes.length).toBe(24);
     for (const r of routes) {
       if (r.path.startsWith("/me")) {
         expect(r.contract.self).toBe(true);
