@@ -1,6 +1,6 @@
 import training from "@mycity/contract/schemas/training.js";
 import type { MyCourse, MyCourseRow, MyItem, MyTrainingList } from "@mycity/contract/contract.gen.ts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { fetchFile, saveFile, useFileBlob } from "@/api/download";
@@ -140,11 +140,28 @@ const EMPTY: Record<MyTrainingList, { icon: "book" | "check"; title: string; tex
   library: { icon: "book", title: "Library Is Empty", text: "Open courses appear here." },
 };
 
+/**
+ * Brings an element's top back into view in whatever scrolls it (the pane beside the list, the
+ * sheet on a phone), when it has scrolled above: an item opened from far down a long PDF or lesson
+ * starts at its top, and All Items returns to the list rather than to the middle of the course.
+ */
+function toTop(el: HTMLElement | null) {
+  for (let box = el?.parentElement; el && box; box = box.parentElement) {
+    if (box.scrollHeight > box.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(box).overflowY)) {
+      const above = el.getBoundingClientRect().top - box.getBoundingClientRect().top - parseFloat(getComputedStyle(box).paddingTop || "0");
+      if (above < 0) box.scrollTop += above;
+      return;
+    }
+  }
+}
+
 /** One course as the person takes it: its facts, its items (one open at a time), proof and completion. */
 function CourseView({ id }: { id: string }) {
   const { data: c, error, reload } = useApi("GET /api/v1/training/me/courses/:id", { params: { id } });
   const [open, setOpen] = useState<string | null>(null);
+  const top = useRef<HTMLDivElement>(null);
   useEffect(() => setOpen(null), [id]);
+  useEffect(() => toTop(top.current), [open]);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!c)
     return (
@@ -154,7 +171,7 @@ function CourseView({ id }: { id: string }) {
     );
   const item = c.items.find((i) => i.training_item_id === open) ?? null;
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={top} className="flex flex-col gap-3">
       <CourseCard c={c} />
       {item ? <ItemView c={c} it={item} back={() => setOpen(null)} next={nextOf(c, item)} onNext={setOpen} /> : <ItemList c={c} onOpen={setOpen} />}
       {!item && <Finish c={c} />}
@@ -222,7 +239,11 @@ function ItemList({ c, onOpen }: { c: MyCourse; onOpen: (id: string) => void }) 
   );
 }
 
-/** The item open: its content, then Mark Done (or Undone) and the next item, full width on a phone. */
+/**
+ * The item open: its content, then Mark Done (or Undone), the next item and All Items again at the
+ * foot (a PDF grows to its pages, so the way back is beside where the reading ends), full width on a
+ * phone.
+ */
 function ItemView({ c, it, back, next, onNext }: { c: MyCourse; it: MyItem; back: () => void; next: MyItem | null; onNext: (id: string) => void }) {
   const done = useMutation("POST /api/v1/training/me/items/:id/done");
   const undone = useMutation("POST /api/v1/training/me/items/:id/undone");
@@ -258,6 +279,9 @@ function ItemView({ c, it, back, next, onNext }: { c: MyCourse; it: MyItem; back
       </div>
       <ActionGroup>
         <div className="mt-3 flex flex-wrap justify-end gap-2 phone:flex-col-reverse">
+          <Button icon="left" onClick={back} block={phone} className="desk:mr-auto">
+            All Items
+          </Button>
           {next && (
             <Button iconRight="right" onClick={() => onNext(next.training_item_id)} block={phone}>
               Next Item
@@ -309,7 +333,11 @@ function ItemContent({ it }: { it: MyItem }) {
   );
 }
 
-/** A PDF or a picture from the vault, drawn in the viewer once its bytes arrive. */
+/**
+ * A PDF or a picture from the vault, drawn in the viewer once its bytes arrive. A PDF grows to its
+ * pages (`page`), so the pane or the sheet scrolls through it to the item's actions and back to the
+ * top, rather than a frame inside the course holding the scroll.
+ */
 function FilePreview({ documentId, name, mime }: { documentId: string; name: string; mime: string }) {
   const { blob, href, failed: refused } = useFileBlob(fileUrl(documentId));
   if (refused) return <EmptyState bare icon="doc" title="File Not Open" text="Try again shortly." />;
@@ -324,7 +352,7 @@ function FilePreview({ documentId, name, mime }: { documentId: string; name: str
         }
       />
     );
-  return <DocumentPreview name={name} mime={mime} href={href} file={blob} height="lg" />;
+  return <DocumentPreview name={name} mime={mime} href={href} file={blob} height="page" />;
 }
 
 /** Add Proof once every item is done, where the course asks; the course's completion and its certificate. */

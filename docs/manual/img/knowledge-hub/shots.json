@@ -1,7 +1,38 @@
 {
+  "knowledge-add-item": {
+    "spec": "cd617a6ed8bccad7",
+    "source": "e9b47879534a1b0b",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "knowledge-assign": {
+    "spec": "33115a0a12ab0551",
+    "source": "e9b47879534a1b0b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "knowledge-attendance": {
     "spec": "9e6b83868d0c44bb",
     "source": "d69a1daab1ffcc79",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-course": {
+    "spec": "4d93d0afaec31c87",
+    "source": "e9b47879534a1b0b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-course-people": {
+    "spec": "2a1ae6b2f9375f0c",
+    "source": "e9b47879534a1b0b",
     "devices": [
       "desktop",
       "phone"
@@ -81,6 +112,14 @@
   },
   "knowledge-sops": {
     "spec": "50e701365c2105b0",
+    "source": "e9b47879534a1b0b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-training": {
+    "spec": "a42606f6aa65274d",
     "source": "e9b47879534a1b0b",
     "devices": [
       "desktop",

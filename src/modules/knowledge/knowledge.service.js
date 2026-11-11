@@ -279,9 +279,10 @@ async function discardDraft(user, id) {
 /**
  * POST /knowledge/sops/:id/publish (§6.3): a draft that says something (a purpose, a step) and
  * differs from the version in force, with a note from Version 2. It becomes the next number, in
- * force at once, its content hash over what staff read.
+ * force at once, its content hash over what staff read. `quiet` (the staging seed only, §6.12; no
+ * route passes it) tells nobody.
  */
-async function publish(user, id, body) {
+async function publish(user, id, body, { quiet = false } = {}) {
   const sopId = await tx(async (client) => {
     const sop = await sopOf(client, id);
     await repo.lock(client, sop.sop_id);
@@ -317,6 +318,7 @@ async function publish(user, id, body) {
         department_id: sop.department_id,
         title: content.title,
         version: number,
+        ...(quiet ? { quiet: true } : {}),
       },
     });
     return sop.sop_id;
