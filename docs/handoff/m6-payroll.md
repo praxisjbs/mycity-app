@@ -147,9 +147,10 @@ email links (PR 12), then the staging seed and the User Guide (PR 8, last).
 - [x] Pay day for short months confirmed in code and test (`payDateOf`, `payslips.test.js` "the pay date") (11/11/2026)
 
 ### PR 9 · The statutory research register (LA, network on; docs only)
-- [ ] Each primary text read; §6.16 filled with section, figure, base, threshold, link, day checked
-- [ ] §13.3 items 2 to 4 answered with citations or left open with what is missing
-- [ ] MyCity's accountant confirms; a §13.1 line with the date
+- [x] Each primary text read; §6.16 filled with section, figure, base, threshold, link, day checked (11/11/2026): the
+      Pension Reform Act 2014 and the NHF Act's own text could not be reached, so those rows are Unverified with what is missing
+- [x] §13.3 items 2 to 4 answered with citations or left open with what is missing (11/11/2026): 2 in part, 3 answered, 4 open
+- [ ] MyCity's accountant confirms; the §13.1 line (item 38, pending) gains the date (TB obtains it)
 
 ### PR 10 · Legal sources, Remove Change, monthly wording (full stack)
 - [ ] Contract: the source or `no_legal_source` on `StatutoryRatesSave` and the briefs; `gen:contract`, `gen:ai-catalogue`
@@ -158,7 +159,8 @@ email links (PR 12), then the staging seed and the User Guide (PR 8, last).
 - [ ] Report prints sources; tests; screen gates; `npm run ci` green
 
 ### PR 11 · The statutory engine to the research (after PR 9 and PR 10)
-- [ ] Relief reshaped or removed, conventions fixed where the law settles them, ITF and NSITF as cited
+- [ ] Relief reshaped or removed, conventions fixed where the law settles them, ITF and NSITF as cited (and, from PR 9,
+      PAYE on the year to date, NHF by choice, the minimum-wage exemption: the guide's Appendix A, PR 11)
 - [ ] Tax and pension numbers on People · Employees' form
 - [ ] Tests on labelled rates that follow the cited shapes; `npm run ci` green
 
@@ -167,6 +169,8 @@ email links (PR 12), then the staging seed and the User Guide (PR 8, last).
 - [ ] A test that an employee's email link equals their bell's; `npm run ci` green
 
 ## 3 · Log
+
+- 11/11/2026 · JP · PR 9 built (documentation only), the statutory research register. The session's network was opened to the government and gazette sites for the research (a personal environment holding only those hosts) and closed after it. Read: the Nigeria Tax Act 2025 and the Nigeria Tax Administration Act 2025 as gazetted (No. 117 of 26 June 2025), each checked against the House's certified copy of January 2026 (same figures and sections, the later sections numbered one lower); the Business Facilitation (Miscellaneous Provisions) Act 2022 (No. 32 of 17 February 2023); the Industrial Training Fund (Amendment) Act 2011 (No. 108 of 22 June 2011); the Employee's Compensation Act 2010 (No. 101 of 20 December 2010). Not reached: the Pension Reform Act 2014 (PenCom's uploads answer 404, PLAC and BPSR refused the connection, the gazette is not in the archive), the NHF Act's own text (FMBN 404), the deduction-at-source regulations and the Joint Revenue Board's PAYE guidelines (404, then refused), the National Minimum Wage (Amendment) Act 2024, any NSITF regulation since 2012 (its FAQ answer is drawn by script). Found: PAYE bands as reported, a year's, the year's deductions to equal the year's tax (so the `annualised` reading fails a joiner and a variable month and the engine must work on the year to date); no Consolidated Relief Allowance; rent relief is the person's own declared claim; pension and NHF reduce taxable pay by law; NHF is voluntary in the private sector and on monthly income, not basic; ITF needs 25 or more employees since 8 February 2023, not 5 or ₦50 million; NSITF's 1% is the Act's first-two-years minimum; the minimum wage exempts from PAYE. Written: the guide's §0.2, §6.16 (both tables), §6.12 rules 11, 14 and 15, §13.1 item 38 (the accountant's confirmation, pending), §13.2 item 22, §13.3 items 2 to 4, Appendix A (PR 9's upload line and its built note, PR 11's scope and size), §14; MILESTONES §11's amended block; PROGRESS. Left: TB obtains MyCity's accountant's confirmation (§13.1 item 38); someone with network access reads the Pension Reform Act 2014 and the NHF Act's text; then PR 11.
 
 - 11/11/2026 · JP · Milestone 6 audit against the Milestones Review of 11 November 2026 (documentation only). TB's corrections recorded in the guide (§13.1 items 29 to 37; §6.11 rule 1; §6.12 rules 11 to 15; §6.16 the statutory register, unverified; §4.2 and §5 owed; §10; Appendix A PR 8 to PR 12 with lanes, models, efforts and merge order; Appendix B items 8 and 9), MILESTONES §11 (amended 11/11/2026, the stale CEO-or-COO line struck, ITF and NSITF marked unverified), CLAUDE.md's Working conventions (plan first, then one chat a PR; research has sources) and PROGRESS. PR 7 is recorded as merged (praxisjbs/mycity-app#116). Found: the pay day logic is right (28 and 29 February, 30 April for 31) but the screen offers no Last Day of Month; PAYE Basis reads as a choice to deduct annually; no statutory version carries a source and none can be removed; the `relief` item is the Consolidated Relief Allowance's shape, which public summaries of the Nigeria Tax Act 2025 say was abolished on 1 January 2026; a notice's email link ignores the route map's `self`, so an employee's "Your payslip is ready" email opens Payroll · Payslips; on staging mail is paused (only invitations and password resets go) and failed outbox rows keep the Events check amber, so no payroll mail can be demonstrated; the mail plan's hourly limit (`docs/runbooks/dns-and-mail.md` §5) caps how fast Email All can go. Next: PR 9, PR 10 and PR 12 in parallel; PR 11; PR 8 last.
 
