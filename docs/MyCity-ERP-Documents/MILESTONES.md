@@ -1073,9 +1073,11 @@ record and M6's only source of truth.
   (s.30(2)(a)(vi)). Pension and NHF contributions reduce taxable pay by law (s.30(2)(a)), so neither is a convention.
   **NHF is voluntary for private-sector staff** (2.5% of monthly income; the Business Facilitation Act 2022, s.45) and
   **ITF applies from 25 employees** (1% of annual payroll; the same Act, s.41), so "advanced mode adds NHF and ITF" above
-  means where they apply. NSITF's 1% of monthly payroll is the Employee's Compensation Act's rate for its first two
-  years (s.33(1)); today's rate and pension's rates stay unverified. MyCity's accountant confirms the register before any
-  figure is entered.
+  means where they apply. NSITF's 1% of monthly payroll is the Employee's Compensation Act's minimum (s.33(1)) and
+  NSITF's stated rate today; pension is at least 8% from the employee and 10% from the employer of monthly emoluments
+  (Pension Reform Act 2014, s.4(1)); PAYE is remitted by the 10th of the next month (Withholding Regulations 2024, reg
+  7(1)(b)(i)). The PAYE method and the pension threshold stay unverified. MyCity's accountant confirms the register before
+  any figure is entered.
 
 ### Definition of done
 
