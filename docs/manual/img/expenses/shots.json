@@ -33,7 +33,7 @@
   },
   "expenses-my-requests": {
     "spec": "b8097a54f4f67419",
-    "source": "e5705fd55c8c863a",
+    "source": "d101be4bffb558de",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "expenses-new-request": {
     "spec": "ab3d67169748512c",
-    "source": "e5705fd55c8c863a",
+    "source": "d101be4bffb558de",
     "devices": [
       "desktop",
       "phone"

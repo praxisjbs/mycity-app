@@ -103,7 +103,7 @@ mycity-app/
 ├── templates/documents/      PDF templates (HTML); fonts/ the faces a document embeds itself (the training certificate's Cormorant Garamond, OFL)
 ├── templates/email/          mail templates (HTML)
 ├── templates/import/         import template definitions
-├── assets/brand/             logo vector masters, pin mark, app icons
+├── assets/brand/             logo.png (the lockup on every PDF until Settings · Organisation holds a Logo); vector masters, pin mark, app icons
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
