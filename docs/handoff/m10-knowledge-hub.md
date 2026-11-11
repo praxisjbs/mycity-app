@@ -12,7 +12,7 @@ line to §3.
 | Owner | TB (Tom-Blake Asaah) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 18 Dec 2026 (MILESTONES §15) |
-| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 praxisjbs/mycity-app#113; PR 3 on `claude/m10-training-backend-8jd67a` |
+| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 praxisjbs/mycity-app#113; PR 3 praxisjbs/mycity-app#115 |
 
 Praxis AI and AI Control, M10's other half, were brought forward and are built (`praxis-ai.md`,
 `ai-control.md`); this tracker is the Knowledge Hub's only.
@@ -76,7 +76,7 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 - [x] Courses, items, publish with signature, assignments, enrolments, tasks, progress, proof, completion (11/11/2026)
 - [x] Reminders, `training-lesson-draft`, search, AI reads (11/11/2026)
 - [x] Tests, including 300 people assigned at once (11/11/2026)
-- [ ] `npm run ci` green; the PR marked ready
+- [x] `npm run ci` green; the PR marked ready (#115, 11/11/2026)
 
 ### PR 4 · Certificates
 - [ ] `training-certificate.html` from the signed-off sample, embedded fonts
