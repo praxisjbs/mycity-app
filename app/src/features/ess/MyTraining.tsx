@@ -179,8 +179,6 @@ function CourseCard({ c }: { c: MyCourse }) {
           ...(c.due_on ? ([[<HelpTerm key="d" help="The date it was set for.">Due</HelpTerm>, formatDate(c.due_on)]] as Array<[React.ReactNode, string]>) : []),
           ["Length", minutesText(c.minutes)],
           ...(c.enrolled ? ([["Progress", <Meter key="p" pct={pct(doneCount(c), c.items.length)} label={`${doneCount(c)} of ${c.items.length}`} name="Course progress" />]] as Array<[string, React.ReactNode]>) : []),
-          ...(c.completed_at ? ([["Completed", formatDate(c.completed_at)]] as Array<[string, string]>) : []),
-          ...(c.certificate_number ? ([["Certificate", <span key="n" data-copy="content">{c.certificate_number}</span>]] as Array<[string, React.ReactNode]>) : []),
         ]}
       />
       {!c.enrolled && (

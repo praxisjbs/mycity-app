@@ -240,8 +240,10 @@ not use them; a later release drops them (MIGRATIONS §8), together with
   engine's video limit); the course shows PDFs and images in the viewer, plays MP4 and offers
   anything else as a download.
 - **Video link**: an `https` URL. A YouTube link (`youtube.com/watch`, `youtu.be`, `youtube.com/shorts`)
-  plays in the course through `youtube-nocookie.com` (the staff app's CSP gains that `frame-src`);
-  any other video link opens in a new tab.
+  plays in the course through `youtube-nocookie.com` (the staff app's CSP gains that `frame-src`, on
+  the staff host only); nothing loads from YouTube until the person presses Play Video
+  (`VideoPlayer`). Any other video link opens in a new tab. An uploaded MP4 is fetched with the
+  session the same way, on Play Video.
 - **Course link**: an `https` URL to an outside course; it opens in a new tab.
 - **Lesson**: Markdown from the rich text editor (`RichTextField`, 20 to 20,000 characters). The
   editor sends HTML (`lesson_html`), which the server keeps as Markdown through the one converter
@@ -412,8 +414,8 @@ else's training in M10 (§13).
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | Knowledge Hub · SOPs | Department chips, Search SOPs, the list (SOP, Department, Version, Updated); an SOP: title, number, department, version, updated, Purpose, Scope, Roles Involved, numbered Steps (text, Who, Open Screen, the file); Versions; a writer: New SOP, Edit SOP, Save Draft, Discard Changes, Draft With AI (Yours beside Drafted, Keep Mine, Use This Draft), Publish SOP (Note), Archive SOP, the State chips (Published, Draft, Archived) | Screen: the screen this step happens on, where the SOP is listed under Procedures; Draft With AI: wording kept, steps found | Why SOPs are not the User Guide, the writer rule, versions: §1.1, §6 here |
-| Knowledge Hub · Training | State chips (All, Draft, Published, Archived), the list (Course, Items, Library, Assigned, Completed, Overdue); a course: Items (each: kind, title, minutes; Add Item, Upload File, Video Link, Course Link, Lesson, Draft Lesson; drag to order), People (Status chips: Not Started, In Progress, Completed, Overdue; Employee, Department, Due, Progress, Completed, Certificate; Remind Overdue), Assignments (Audience, Due Within, New Joiners, Assigned, Withdraw), Settings (Library, Proof Required, Proof Prompt, Issue Certificate); Publish Course (Your Signature), Assign Training, Archive Course | Library: anyone may take it; New Joiners: enrols those who join later; Proof Required: asked at the end | How enrolment, tasks and reminders work: §6.7, §6.11 |
-| ESS · My Training | To Do (course, due, Overdue), In Progress (progress), Completed (date, Download Certificate), Library (course, length, Start); a course: its items with Done marks, the open item (lesson, viewer, player, Open Link), Mark Done, Add Proof (Link or File), the completion with Download Certificate | Due: the date it was set for | How certificates are signed and verified: §6.9, the manual |
+| Knowledge Hub · Training | State chips (All, Draft, Published, Archived), the list (Course, State, Items, Library, Assigned, Completed, Overdue); a course beside it: its facts (Number, Items, Length, Published, Completed), Items (each: kind, title, minutes; Add Item with Upload File, Video Link, Course Link, Lesson; Draft Lesson beside the editor, Yours beside Drafted, Keep Mine, Use Lesson; each item's menu: Edit Item, Remove Item, Move Up, Move Down; drag to order), People (Status chips: Everyone, Not Started, In Progress, Completed, Overdue; Employee, Status, Department, Due, Progress, Completed, Certificate; Remind Overdue), Assignments (Audience, State, Due Within, New Joiners, Assigned, Assigned On, Withdraw), Settings (Library, Proof Required, Issue Certificate as switches; Course Details: Title, Summary, Proof Prompt, Save Course); Publish Course (Your Signature), Assign Training (Who Takes It: Everyone or Pick Who with Departments, Roles, People; Due Within (Days); Keep Assigning New Joiners), Archive Course (Reason) | Library: anyone may take it; New Joiners: enrols those who join later; Proof Required: asked at the end; Your Signature: printed on every certificate; Due: the date it was set for; Link: a YouTube link plays in the course | How enrolment, tasks and reminders work: §6.7, §6.11 |
+| ESS · My Training | List chips (To Do, In Progress, Completed, Library); To Do and In Progress (course, status, Due, Progress), Completed (date, certificate number, Download Certificate), Library (course, Length); a course beside the list: its facts (Due, Length, Progress), Start Course for a Library course, its items with Done marks; an item opens in place (All Items): the lesson as text, a PDF or a picture in the viewer, an MP4 or a YouTube video behind Play Video, Open Link for any other link, Download File for anything else; Mark Done, Mark Not Done (until completion), Next Item; Proof with the course's prompt and Add Proof (Link or File); Completed with the certificate number, the proof and Download Certificate | Due: the date it was set for | How certificates are signed and verified: §6.9, the manual |
 | User Guide's help for a screen | Procedures: SOP titles with their department | Nothing | How the link is made: §3 step 3 |
 
 ### 10.2 Phone layout
@@ -421,8 +423,8 @@ else's training in M10 (§13).
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Knowledge Hub · SOPs | Department chips scrolling sideways, then SOP cards (title, department, version); an SOP opens in a bottom sheet (F31) with its steps as a numbered list | Updated column; Versions behind a row in the sheet | New SOP in the floating button (writers); Publish SOP at the foot of the draft's sheet | More, then Knowledge Hub |
-| Knowledge Hub · Training | Course cards (title, completed of assigned, overdue pill); a course opens in a bottom sheet with Items, People and Settings as a segmented control | Assignments' table (a list of cards instead); the drag handle (Move Up and Move Down in each item's menu) | New Course in the floating button; Assign Training and Publish Course at the sheet's foot | More, then Knowledge Hub |
-| ESS · My Training | To Do cards first (title, due, a progress bar), then In Progress, Completed, Library as chips | Library's summaries (title and length only) | Mark Done full width at the foot of an item's sheet; Add Proof full width | ESS tabs |
+| Knowledge Hub · Training | Course cards (title, state pill, completed of assigned, overdue pill); a course opens in a full bottom sheet with Items, People, Assignments and Settings as a segmented control | Items, Library, Assigned and Department columns; Assignments' table (a list of cards instead); the drag handle (Move Up and Move Down in each item's menu) | New Course in the floating button; Assign Training or Publish Course, and Archive Course, full width at the sheet's foot | More, then Knowledge Hub |
+| ESS · My Training | To Do cards first (title, status pill, due, a progress bar), then In Progress, Completed, Library as chips; a course opens in a full bottom sheet | Library's summaries (title and length only); the subtitle | Mark Done full width at the foot of the open item in the course's sheet, Next Item under it; Start Course and Add Proof full width | ESS tabs |
 
 ## 11 · Edge cases
 
@@ -499,6 +501,21 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 - [ ] ⌘K finds an SOP, a course and My Training; FAQs are nowhere.
 
 ## 14 · Change log
+
+- 11/11/2026 · TB · PR 5 built: Knowledge Hub · Training and ESS · My Training on the contract,
+  desktop and phone (§10), walked on the live API (a course built with a lesson, a YouTube link and
+  a PDF, reordered, published with a drawn signature, assigned to everyone; taken on a phone to its
+  certificate number). The Training tab follows `training.manage` in both mirrors; ⌘K's New Course;
+  the staff host's CSP frames `youtube-nocookie.com`. Decided on the way: a lesson crosses the wire as
+  the editor's HTML (`lesson_html` in `ItemCreate`, `TrainingItem` and `LessonSuggestion`), kept as
+  Markdown by the server's one converter, as Policies' text is, because `RichTextField` speaks HTML
+  and no screen converts text itself (§5, §6.5); nothing loads from YouTube, and no uploaded video is
+  fetched, until Play Video (`VideoPlayer`, new in `packages/ui`); a course's items are kept in order
+  with `OrderList` (new: drag on desktop, Move Up and Move Down in each item's menu everywhere); an
+  item opens in place in the course (All Items, Next Item), so a phone never stacks a sheet on a
+  sheet; Undone reads Mark Not Done (a button is Verb Noun); a course's title and summary are changed
+  in Settings' Course Details. Left: Download Certificate on My Training and Training · People, once
+  PR 4's two routes are in the contract.
 
 - 11/11/2026 · TB · PR 3 built: the `training` module (§5's routes for `/training` but Download
   Certificate's two, which come with the certificate in PR 4), Draft Lesson, the reminder, joiners

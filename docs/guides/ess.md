@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #56 My Requests (M8), #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
-| Last changed | 26/10/2026 |
+| Last changed | 11/11/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -441,6 +441,10 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · ESS · My Training (#110) built on the contract (M10 PR 5, `knowledge.md` §10): To Do,
+  In Progress, Completed and Library, a course beside the list (a sheet on a phone) with its items
+  opened in place, Mark Done, Start Course and Add Proof. `?id=` opens a course by its id or the
+  person's enrolment's, so ESS's screen switch now passes the record id to My Training.
 - 11/11/2026 · TB · ESS gains My Training (`my-training`, #110, M10), added with `npm run new:screen` as an empty screen: staff take their assigned and Library courses there, mark items done, add proof and download their certificates. Its rules, API and §10 rows are `docs/guides/knowledge.md`'s.
 - 09/11/2026 · JP · M6 PR 4 built My Payslips' API in `ess.earnings.js` (`docs/guides/payroll.md` Appendix A): §5's seven routes (the list, the summary, one payslip, its PDF, Email a Copy, Download All and Deductions) are built over `payslips.service` with the caller's own employee id, and this module still reads none of payroll's tables. A person's figures are never masked from them. §4's `payslip` row is read through the payslips service, not directly. No screen changed (PR 7); the open question of what In the run means is `docs/guides/payroll.md` §13.3 item 2.
 - 09/11/2026 · JP · §3 step 4: the pay day is the 30th unless MyCity sets another (it read "normally the 27th"; `docs/guides/payroll.md` §13.1 item 24). No screen changed.
