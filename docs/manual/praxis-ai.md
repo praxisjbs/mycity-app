@@ -145,7 +145,8 @@ conversations, and one opens full screen when you press it.
 4. Check every field. To change the words, a day, a choice or a person, press **Edit**, change the
    field and press **Save Changes**. People and leave types are picked as on the screen's own form.
    A field with a problem says so beside it, for example *Say why*. A field Praxis AI could not match
-   to your records says *Pick one*: press **Edit** and pick it.
+   to your records says *Pick one*: press **Edit** and pick it. While a field has a problem, the card
+   offers **Edit** in place of its button; once **Save Changes** clears it, the button is back.
 5. Press the card's button to make the change, for example **Create Task** or **Approve Leave**. A
    card that acts on several records says how many, for example *Approve Leave ×4*.
 6. Under the card, **Done** lists each record and what happened to it. Press **Open** on a line to

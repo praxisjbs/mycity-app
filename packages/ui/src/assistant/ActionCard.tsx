@@ -1,7 +1,7 @@
 /**
  * @component ActionCard
  * @group Assistant
- * @summary An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired.
+ * @summary An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired.
  * @use Inside an answer (AnswerBubble's card slot) when the answer carries a card (docs/guides/praxis-ai.md §6.11): the screen passes the card as the API drew it (its records, and the names its id fields hold, so no id reads as a code), the action's contract schema for Edit, a `picker` that binds each id field's `picks` to the screen's own picker, and what each press does. A suggested card reads as a question with the verb and Not Now.
  * @avoid A form the person fills from empty (the screen's own form); a confirmation dialog (useConfirm); an answer's screen button (AnswerBubble's link); a list of records to browse (DataView).
  * @phone Full width inside the answer; the buttons are 44 px targets with the verb full width at the foot; Edit's fields are one column; the result's Open buttons are 44 px.
@@ -38,7 +38,7 @@ export interface CardField {
   /** A text of several lines (a message, a note, a reason). */
   long: boolean;
   /** What an id field, or a list of ids, is picked with on Edit (AiCardPicks); the screen's `picker` draws it. */
-  picks?: "colleague" | "task_assignee" | "task_member" | "department" | "project" | "leave_type" | "task" | "employee" | "worksite" | "policy" | "place" | "site_member" | "partner" | "lead" | "partner_deal" | null;
+  picks?: "colleague" | "task_assignee" | "task_member" | "department" | "project" | "leave_type" | "task" | "employee" | "worksite" | "policy" | "place" | "site_member" | "partner" | "lead" | "partner_deal" | "hiring_manager" | null;
 }
 
 /**
@@ -179,6 +179,8 @@ export function ActionCard({ label, fields, values, problems, records, names = [
   const verb = verbOf(label, fields, values, count);
   const open = status === "shown";
   const problemOn = (name: string) => problems[name]?.[0];
+  // A card showing a problem is fixed before it is pressed: its press would be refused, so Edit takes the verb's place.
+  const unsettled = Object.values(problems).some((m) => m && m.length > 0);
 
   return (
     <div role="group" aria-label={title} className={cn("flex flex-col gap-2.5 rounded-box border border-border bg-background p-3", className)}>
@@ -271,11 +273,11 @@ export function ActionCard({ label, fields, values, problems, records, names = [
               </Button>
             )}
             {schema && onSave && (
-              <Button icon="edit" onClick={() => setEditing(true)}>
+              <Button icon="edit" variant={unsettled ? "primary" : undefined} className={unsettled ? "phone:w-full" : undefined} onClick={() => setEditing(true)}>
                 Edit
               </Button>
             )}
-            {onConfirm && (
+            {onConfirm && !unsettled && (
               <Button variant="primary" icon={confirm === "fresh_sign_in" ? "lock" : undefined} className="phone:w-full" onClick={onConfirm}>
                 {verb}
               </Button>

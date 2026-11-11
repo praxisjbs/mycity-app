@@ -10,10 +10,11 @@
  * The public reads (publicPage, publicDepartments, publicCities, publicBySlug) name their columns: what reaches a stranger is the
  * service's allow-list, and these queries never hand it a whole row.
  */
-const { personJson } = require("../../shared/db/person");
+const { personJson, photoUrlSql } = require("../../shared/db/person");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
 const { M4_STAGES } = require("./vacancies.lifecycle");
+const { maySit } = require("../interviews/interviews.repo");
 
 /** The setting rows this module keeps (Careers Settings, guide §6.1). */
 const SETTINGS = Object.freeze({ about: "recruitment.about_company", traits: "recruitment.default_traits" });
@@ -378,7 +379,7 @@ function suggested(db, query, scope) {
     db,
     `SELECT s.org_seat_id, s.title, s.department_id, d.name AS department,
             COALESCE(btrim(lm.first_name || ' ' || lm.last_name), up.title) AS reports_to,
-            ${personJson("lm", "lmd")} AS line_manager, ${TOTAL_COL}
+            CASE WHEN ${maySit("lm")} THEN ${personJson("lm", "lmd")} END AS line_manager, ${TOTAL_COL}
        FROM org_seat s
        JOIN department d ON d.department_id = s.department_id
        LEFT JOIN employee lm ON lm.employee_id = s.line_manager_id
@@ -390,6 +391,29 @@ function suggested(db, query, scope) {
         AND ($2::uuid IS NULL OR s.org_seat_id = $2)
         ${s.and}
       ORDER BY s.created_at DESC, s.org_seat_id`,
+    params,
+    query,
+  );
+}
+
+/**
+ * Who may be a vacancy's hiring manager, a page of 25 searched by name: active, holding Recruitment
+ * through an active login (or the CEO), as a panelist (decision 5), and in the writer's scope, as
+ * checkRefs requires on the save (guide §6.1).
+ */
+function hiringManagers(db, query, scope) {
+  const params = [query.q || null];
+  const s = scopeClause(scope, { column: "e.employee_id" }, params);
+  return pageQuery(
+    db,
+    `SELECT e.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, e.job_title,
+            d.name AS department, ${photoUrlSql("e")} AS photo_url, ${TOTAL_COL}
+       FROM employee e
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE ${maySit("e")}
+        AND ($1::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($1) || '%')
+        ${s.and}
+      ORDER BY e.first_name, e.last_name, e.employee_id`,
     params,
     query,
   );
@@ -596,6 +620,7 @@ module.exports = {
   seat,
   activeEmployee,
   holdsRecruitment,
+  hiringManagers,
   departmentExists,
   departmentName,
   settings,

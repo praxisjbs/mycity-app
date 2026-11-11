@@ -239,7 +239,8 @@ const VacanciesSummary = z
 /**
  * GET /recruitment/vacancies/suggested: a vacant seat on the organogram with no live vacancy, with
  * what New Vacancy fills in from it: the title, the department, who it reports to and the seat's line
- * manager as the hiring manager.
+ * manager as the hiring manager, only when they may be one (HiringManagerPage's rule); else null, and
+ * the form leaves Hiring Manager to be picked.
  */
 const SeatSuggestion = z
   .object({
@@ -255,6 +256,15 @@ const SeatSuggestion = z
 const SeatSuggestionPage = Paged(SeatSuggestion);
 /** `org_seat_id` finds the one seat the Organogram's Create Vacancy opened New Vacancy from. */
 const SeatSuggestionListQuery = listQuery({ org_seat_id: uuid.optional() });
+
+/**
+ * GET /recruitment/vacancies/hiring-managers: who may be a vacancy's hiring manager, for New Vacancy's
+ * and Edit Vacancy's picker and the New Vacancy card's question. The save's own rule (an active person
+ * in the writer's scope who holds Recruitment through an active login, or the CEO; guide §6.1), so the
+ * picker never offers someone the save refuses.
+ */
+const HiringManagerListQuery = listQuery();
+const HiringManagerPage = Paged(PersonRef);
 
 /* ------------------------------------------------------------------ *
  * Staff: writes
@@ -787,6 +797,8 @@ const TABLES = {
   },
   SeatSuggestionPage: { table: null, reason: "a page of vacant seats" },
   SeatSuggestionListQuery: { table: null, reason: "list controls for Suggested From Organogram" },
+  HiringManagerListQuery: { table: null, reason: "list controls for the people who may be a hiring manager" },
+  HiringManagerPage: { table: null, reason: "a page of people who may be a hiring manager" },
   VacancyCreate: {
     table: "vacancy",
     virtual: {
@@ -860,6 +872,8 @@ module.exports = {
   SeatSuggestion,
   SeatSuggestionPage,
   SeatSuggestionListQuery,
+  HiringManagerListQuery,
+  HiringManagerPage,
   VacancyCreate,
   VacancyEdit,
   VacancyAdd,

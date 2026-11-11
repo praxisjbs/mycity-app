@@ -17,7 +17,7 @@ import type { SeatSuggestion, VacancyDetail } from "@mycity/contract/contract.ge
 import type { PersonRef } from "@/api/types/common";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
-import { EmployeePicker } from "@/features/shared/pickers";
+import { HiringManagerPicker } from "@/features/shared/pickers";
 import { places, placeValue } from "@/features/shared/places";
 import { paging } from "@/features/shared/wire";
 import { useAddressPrefill, type PrefillSchema } from "@/shell/screen-action";
@@ -260,7 +260,7 @@ function VacancyFormBody({ vacancy, seat, filled, close, onSaved, start, gathere
                   <SelectField options={departments.rows.map((d) => [d.department_id, d.name] as [string, string])} placeholder="Pick a department" {...paging(departments)} {...f.field("department_id")} />
                 </Field>
                 <Field label="Hiring Manager" {...f.status("hiring_manager")}>
-                  <EmployeePicker value={f.values.hiring_manager} onChange={(p) => f.set("hiring_manager", p)} filters={{ status: "active" }} />
+                  <HiringManagerPicker value={f.values.hiring_manager} onChange={(p) => f.set("hiring_manager", p)} />
                 </Field>
               </Grid>
               <Grid cols={3}>

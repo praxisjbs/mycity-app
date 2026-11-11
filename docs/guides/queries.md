@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 03/11/2026 |
+| Last changed | 11/11/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -194,7 +194,10 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 
 - One path: `queries.service.raise()` for the form, a rule, the AI's route and a script.
 - Subject 4 to 150 characters, details 20 to 4,000. The employee must be active and must not be the
-  person raising it.
+  person raising it. Raise a Query's Employee picker offers only those: it asks `GET /employees` for
+  `status=active` and `exclude_self=true`, so the raiser and a leaver are never offered and
+  `QUERY_SELF` or `EMPLOYEE_NOT_ACTIVE` is met only by a call that bypasses the screen (fault #9 of
+  the 11/11 brief).
 - `response_due_at` is raised-at plus the response window, **24 hours** (MyCity's handbook §4.7.1:
   "not later than 24 hours after receipt"; AJ, 27/10/2026), a constant (`RESPONSE_HOURS`) until a
   setting is asked for. After it passes without a response the query still waits, and a decision may
@@ -597,6 +600,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 11/11/2026 · JP · Fault #9 of the 11/11 staging brief (`QUERY_SELF: employee_id` at `POST /queries`): Raise a Query's Employee picker offered the raiser and anyone archived or suspended, and only the server refused them. It now asks for active people with the new `exclude_self` filter on `GET /employees` (`foundation.md` §5), so neither is offered (§6.2).
 - 09/11/2026 · JP · M6 PR 3 (`payroll.md` §6.6, §7): a sanction issued with a fine now tells the holders of `payroll` edit "Fine Waiting for Payroll", from an outbox handler of `deductions.events.js` on `sanction.issued` (§7); the fine's events `sanction_fine.accepted`, `.waived` and `.released` are written by `sanctions.fines` when Payroll · Deductions accepts, waives or releases it. Nothing in the sanctions module changed.
 - 09/11/2026 · JP · M6 PR 2 (`payroll.md` §6.6 rule 5): `sanctions.fines.release(client, id, actor, reason)` returns a fine payroll had accepted to `pending`, so it can be accepted again or waived (§6.6); it writes `sanction_fine.released` and refuses a fine not accepted (409 `FINE_NOT_MOVABLE`). That no instalment is yet in a run is payroll's rule to hold, not the fine's. The run's lock settles a fine whose last instalment applied through the existing `settle`.
 - 06/11/2026 · JP · The `templates` module gains `templates.agreements`, the wording of Partnerships' agreement templates on the same `template_version` store (`docs/guides/partnerships.md` §6.8, M7 PR 2). Letter templates, their routes, variables and screen are unchanged.

@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #38 Vacancies, #39 Candidates, #40 Assessments, #41 Interviews, #44 Talent Pool; public #107 Home, #80 Careers, #81 Vacancy, #82 Apply, #83 Assessment |
 | Status | Built |
-| Last changed | 09/11/2026 |
+| Last changed | 11/11/2026 |
 
 Sources: MILESTONES §9 (scope, A9, A10, definition of done) and §1 (A23 as amended 01/11/2026);
 REUSE_MAP §5; MILESTONE_QUESTIONS Q4, Q9, Q10; DATABASE_SCHEMA M4; the discovery call of
@@ -64,7 +64,8 @@ never sign in.
 
 1. **A seat falls empty.** A vacant `org_seat` with no live vacancy shows on Vacancies under Suggested
    From Organogram, 25 a page. Create Vacancy (there, or on the Organogram) opens New Vacancy with the
-   seat's title, department and reporting line filled in, and its line manager as the hiring manager, so
+   seat's title, department and reporting line filled in, and its line manager as the hiring manager when
+   they may be one (§6.1; otherwise Hiring Manager is left to pick), so
    its interview starts with the role and the department answered; from the Organogram the form first
    looks the seat up (`/suggested?org_seat_id=`). The vacancy keeps
    `org_seat_id`. Nothing is created until someone saves (`organogram.md` §3).
@@ -221,7 +222,8 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 |---|---|---|---|---|
 | `GET /recruitment/vacancies/summary` | `VacanciesSummary` | `recruitment` view · all/team | no | Open, applicants (every application to an open or paused role, whatever became of it: the list's Applicants summed over those roles), in interview, past closing date; funnel by stage (active applications only); `site_url`, this environment's public site, its index (Careers Page) |
 | `GET /recruitment/vacancies` | `VacancyListQuery` → `VacancyPage` | `recruitment` view · all/team | yes | Filters `status`, `department_id`, `q`; sort `closes_at`, `title`, `created_at`, `published_at` |
-| `GET /recruitment/vacancies/suggested` | `SeatSuggestionListQuery` → `SeatSuggestionPage` | `recruitment` view · all/team | yes | Vacant seats with no draft, open or paused vacancy, each with its line manager (`line_manager`); `org_seat_id` finds one (the Organogram's Create Vacancy); a team reader sees the seats whose line manager is in their scope |
+| `GET /recruitment/vacancies/suggested` | `SeatSuggestionListQuery` → `SeatSuggestionPage` | `recruitment` view · all/team | yes | Vacant seats with no draft, open or paused vacancy, each with its line manager (`line_manager`, null unless they may be a hiring manager, §6.1); `org_seat_id` finds one (the Organogram's Create Vacancy); a team reader sees the seats whose line manager is in their scope |
+| `GET /recruitment/vacancies/hiring-managers` | `HiringManagerListQuery` → `HiringManagerPage` | `recruitment` view · all/team | yes | Who may be a vacancy's hiring manager, searched by name: the save's rule (§6.1), the panel's predicate (`interviews.repo` `maySit`) within the reader's scope. New Vacancy's and Edit Vacancy's Hiring Manager picker, and the New Vacancy card's question and Edit |
 | `GET /recruitment/vacancies/:id` | `VacancyDetail` | `recruitment` view · all/team | no | With its questions in use (a retired one is left out) and scorecard weights; the description, must have and nice to have both as written (Markdown, for Edit) and as blocks (`*_blocks`, for the sheet) |
 | `POST /recruitment/vacancies` | `VacancyCreate` → `VacancyDetail` | `recruitment` create | no | `publish: true` publishes in the same transaction. A seat holds one live vacancy (422 on `org_seat_id`) |
 | `PATCH /recruitment/vacancies/:id` | `VacancyEdit` → `VacancyDetail` | `recruitment` edit · all/team | no | A closed vacancy is not edited. An optional field sent empty ("" or null) is cleared; one left out stays. Switching to remote removes the place. The pay band is checked against what is kept |
@@ -321,7 +323,9 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 - A remote vacancy has no place: switching one to remote removes it. The hiring manager must be an
   active employee in the writer's scope who holds `recruitment` view through an active login (or is
   the CEO), as a panelist must (decision 5): their notices open Recruitment's screens ("No Recruitment
-  access" otherwise; GE, 05/11/2026). A vacant seat holds one live (draft, open or paused) vacancy.
+  access" otherwise; GE, 05/11/2026). The Hiring Manager picker offers only those people
+  (`GET /vacancies/hiring-managers`), and a seat's line manager is filled in only when they are one,
+  so the save's refusal is met only by a call that bypasses the screen (fault #3 of the 11/11 brief). A vacant seat holds one live (draft, open or paused) vacancy.
 - The slug is made once, at first publish, from the title and the location's city
   (`content-producer-lagos`), with `-2`, `-3` on a clash, made while holding a lock on that base so two
   roles published at once cannot take the same one. It never changes: pausing, resuming and
@@ -677,7 +681,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
   `vacancies.list` (open roles, applicants, closing dates), `candidates.list` (by vacancy and stage,
   weighted total, provisional flag), `interviews.list` (upcoming, awaiting feedback, blind as §6.6),
   `assessments.list` (the library), `assessments.sittings` (awaiting marking), `talent_pool.list` (the
-  pool); `vacancies.get` (one vacancy with its questions and scorecard), `candidates.get` (one
+  pool), `vacancies.hiring_managers` (who may be a hiring manager, §6.1); `vacancies.get` (one vacancy with its questions and scorecard), `candidates.get` (one
   application). No summary is declared. A card or a read never names a vacancy outside the asker's scope,
   by id, number or title.
 - **AI actions and routes**: routes to New Vacancy (prefill title, department), to a candidate, to
@@ -695,6 +699,9 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
   (about ten questions) and drafts the vacancy as a card the person confirms; it is the action
   `vacancies.create` of `vacancies.ai.js` with `VacancyAdd` as its input (the place as its token), and
   Save Vacancy is `vacancies.edit` with `VacancyChange`. Each runs the screen's own service function.
+  "Who is the hiring manager?" offers and matches only `vacancies.hiring_managers`, and Edit picks the
+  hiring manager from the same list (`picks: hiring_manager`), so a card never holds someone the save
+  refuses.
 
 ## 10 · On screen and mobile
 
@@ -785,6 +792,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 11/11/2026 · JP · Fault #3 of the 11/11 staging brief (`VALIDATION_FAILED: hiring_manager_id` at `POST /recruitment/vacancies`): New Vacancy's Hiring Manager offered every active employee, and a seat filled in its line manager unchecked, while the save takes only someone in the writer's scope who holds Recruitment. `GET /vacancies/hiring-managers` (§5) lists exactly them with the panel's own predicate; New Vacancy's interview, Edit Vacancy and the New Vacancy card (its question, its matching and its Edit) pick from it; a seat's line manager is filled in only when eligible (§3 step 1, §6.1, §9). Fault #4 (`vacancy_id` at Invite to Apply) was already fixed by #79.
 - 10/11/2026 · TB · Found while filming the M4 videos and fixed: Candidates, Assessments (the library and
   Sittings) and Talent Pool open a record beside the list on a wide desktop (F31), as Vacancies does; the
   board keeps its full width until a card is pressed. New Vacancy's questions and the vacancy form send a

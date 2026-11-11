@@ -59,7 +59,8 @@ how many people raised.
 1. Open [Queries & Sanctions · Queries](/queries?tab=queries).
 2. Press **Raise a Query** at the top right.
    ![Raise a Query](shot:queries-raise)
-3. Under **Employee**, type the person's name and pick them. You cannot raise a query on yourself.
+3. Under **Employee**, type the person's name and pick them. Only people who work here now are
+   offered, and never you: you cannot raise a query on yourself.
 4. Type a short **Subject**, such as `Missing clock-out on Thursday`.
 5. Under **What Happened**, say what happened, with the date. Use at least 20 characters.
 6. To cite a policy, pick it under **Policy**. Only policies in force are offered.

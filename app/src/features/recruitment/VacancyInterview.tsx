@@ -17,7 +17,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import vacancySchemas from "@mycity/contract/schemas/vacancies.js";
 import type { FollowUpQuestion } from "@mycity/contract/contract.gen.ts";
 import { useApi, useInfinite, useMutation } from "@/api/hooks";
-import { EmployeePicker } from "@/features/shared/pickers";
+import { HiringManagerPicker } from "@/features/shared/pickers";
 import { lineOf, places } from "@/features/shared/places";
 import { paging } from "@/features/shared/wire";
 import {
@@ -227,7 +227,7 @@ function Interview({ start, close, onDone, ai }: Props & { ai: boolean }) {
             />
           </Field>
           <Field label="Hiring Manager" help="Needed before the role is published. They follow its candidates and decide after interviews." {...f.status("hiring_manager")}>
-            <EmployeePicker value={v.hiring_manager} onChange={(p) => f.set("hiring_manager", p)} filters={{ status: "active" }} />
+            <HiringManagerPicker value={v.hiring_manager} onChange={(p) => f.set("hiring_manager", p)} />
           </Field>
         </Grid>
       ),
