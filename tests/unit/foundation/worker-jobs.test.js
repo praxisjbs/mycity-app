@@ -95,6 +95,7 @@ describe("job registry", () => {
       "system-health-sample",
       "talent-pool-purge",
       "task-recurrence",
+      "training-joiners",
       "urgent-repeats",
       "user-guide-index",
       "workflow-timeout",

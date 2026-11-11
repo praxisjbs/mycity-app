@@ -195,6 +195,24 @@ const BUILDER_SOURCE = Object.assign(Object.create(null), {
     template_key: str(d.template_key),
     template_version: int(d.template_version),
   }),
+
+  /**
+   * A training certificate as it states its facts (docs/guides/knowledge.md §6.9, §6.10): the
+   * certificate's number, the holder's full name as on their employee record, the course's number
+   * and title, the completion date (Lagos) and the publisher who signed the course, with their job
+   * title. Fixed at completion: a person or course renamed later keeps the certificate as issued.
+   */
+  TRAINING_CERTIFICATE: (d) => ({
+    v: 1,
+    type: "TRAINING_CERTIFICATE",
+    number: str(d.number),
+    holder_name: str(d.holder_name),
+    course_number: str(d.course_number),
+    course_title: str(d.course_title),
+    completed_on: str(d.completed_on),
+    publisher_name: str(d.publisher_name),
+    publisher_title: str(d.publisher_title),
+  }),
 });
 
 /** The only thing anything looks a builder up in. Insertion order preserved. */

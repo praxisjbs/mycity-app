@@ -52,8 +52,8 @@ saying who agreed and when.
 | M7 Partnerships, CRM & Trackers | 8 | 0 | 0 | 8 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
-| M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **105** | **4** | **5** | **96** | **0** | **0** |
+| M10 Staff Knowledge Hub & AI Assistance | 8 | 1 | 2 | 5 | 0 | 0 |
+| **Total** | **105** | **2** | **7** | **96** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Five ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8),
@@ -847,10 +847,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
-| 110 | My Training | `my-training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| 110 | My Training | `my-training` | M10 | TB | ☑ | ☐ | ☐ | In progress | 11/11/2026 |
 
 **Notes**
 
+- 11/11/2026 · TB · My Training (#110) API ticked (M10 PR 3, `docs/guides/knowledge.md` §5): `GET /training/me` (To Do, In Progress, Completed, Library), a course as the person takes it (by its id or their enrolment's, the link a task and a notice carry), Start, Mark Done, Undone and Add Proof (a link or a file), completion with its certificate number. Left: Download Certificate (PR 4) and the screen (PR 5).
 - 11/11/2026 · TB · My Training (#110) added for M10 (`docs/guides/knowledge.md`; MILESTONES §18 amended 11/11/2026): where staff take their assigned and Library courses, mark items done, add proof and download their certificates. Added with `npm run new:screen` (catalogue, route map, ⌘K, Coming Soon, an empty screen); FAQs (#64) dropped in the same change, so the staff app stays at 96 screens. Built in M10 PR 5 on the API of PR 3 and PR 4. Left: the screen.
 
 - 27/10/2026 · JP · Org Chart (#91): each department's head carries a Head mark, and Acting Head marks whoever acts for an open head role, as on People · Organogram (#92, People's notes); a person's sheet gains Head Of · nothing left
@@ -1357,12 +1358,13 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Dropped | 11/11/2026 |
-| 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| 65 | Training | `training` | M10 | TB | ☑ | ☐ | ☐ | In progress | 11/11/2026 |
 | 66 | Announcements | `announcements` | M10 | TB | ☐ | ☐ | ☐ | Dropped | 29/10/2026 |
 | 102 | User Guide | `user-guide` | M0 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 
 **Notes**
 
+- 11/11/2026 · TB · M10 PR 3, the training backend (`docs/guides/knowledge.md` §5 to §9): Training (#65) API ticked. The `training` module: courses and their four kinds of item (a file claimed from the upload engine into the vault, a video link whose YouTube id is read from it, a course link, a lesson in Markdown), Publish Course with the publisher's signature stored in the vault and their name and job title copied, Archive Course withdrawing its assignments; Assign Training to everyone, departments, roles or people, everyone it reaches enrolled in the press's transaction (a Library starter moved onto it, the earlier due date kept), each place's task "Complete <course>" set through `tasks.service` and its notice by the worker; Withdraw Assignment, Training · People, Remind Overdue and the reminder engine's `training_due`; joiners enrolled on `employee.created`, `employee.updated` and `access.roles_set` and by the `training-joiners` job at 06:00 Lagos; leavers' open places closed; Draft Lesson (`training-lesson-draft`, Default, chosen by TB); ⌘K (courses for `training.manage`, the person's own and the Library's) and four AI reads. Migration `10420` lets a task name its enrolment. Tests: `tests/integration/training.test.js` (14, 300 people assigned at once among them), `src/modules/training/training.test.js` (26), the certificate's canonical payload pinned. Left: PR 4 (the certificate's PDF, Download Certificate's two routes and verification), PR 5 (the screens, the Training tab's `training.manage` rule in both mirrors and ⌘K's New Course), PR 6.
 - 11/11/2026 · TB · M10 PR 1, contract and data (`docs/guides/knowledge.md` Appendix A): contracts `knowledge.js` (SOPs) and `training.js` (courses, items, assignments, enrolments, My Training), migrations `10400` (`sop`, `sop_version`, `sop_step`) and `10410` (`training_course`, `training_item`, `training_assignment`, `training_assignment_audience`, `training_enrolment`, `training_item_progress`), seed `10490` (`sops.manage` and `training.manage` for Operations & People and Implementation; the `sop`, `training_course` and `training_certificate` numbering schemes), the capabilities catalogued, the schemes in `schemes.js`, Settings' labels and the contract's document types, the `training` module's folder, the `training_enrolment` record type. Tests: `tests/integration/knowledge-schema.test.js` (16); the capability and numbering lists in `settings.test.js` and `home-schema.test.js`; the mock's. No screen and no route yet. Left: PR 2 (SOPs) and PR 3 (training) in parallel, then PR 4 to PR 6.
 - 11/11/2026 · TB · M10 Knowledge Hub planned (`docs/guides/knowledge.md`, tracker `docs/handoff/m10-knowledge-hub.md`), from TB's eight answers of 11/11/2026 and the Modules Review of 4 November: FAQs (#64) dropped (the User Guide and Praxis AI answer questions), so Knowledge Hub keeps Policies, SOPs, Training and the User Guide; SOPs (#63) are each department's own structured, versioned procedures written by its head or `sops.manage`, read by everyone and listed under Procedures on the screens their steps name; Training (#65) is a course of files, video links, course links and lessons, assigned with a due date and a task or open in the Library, completed by Mark Done with optional proof and a signed certificate verified on `go.mycityapp.io`; ESS · My Training (#110) added. M10 stays 8 screens. The certificate sample drawn (`docs/MyCity-ERP-Documents/training-samples/`). Left: MyCity signs off the sample; PR 1 to PR 6 (the guide's Appendix A).
 

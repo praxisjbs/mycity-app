@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "49801c54aa1adb7ebbb53989f8abc0c46a7640890ef7056b9b881070018e8697",
+  "source_hash": "018ae222e18e0708d7d26acc1bbd863553c009dd0fa81234f30d0c94a61ba8e6",
   "schemas": 2116,
-  "endpoints": 938,
+  "endpoints": 960,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "bd0c841b66fd87d133084a1d57db9f572a13ef5e1d6f3de41081b6f154646a9d",
@@ -69,7 +69,7 @@
     "packages/contract/schemas/system_health.js": "b8f88ebb106feef46f22f1ddefceede5619593afccd7244f75d6b6db626378f7",
     "packages/contract/schemas/talent_pool.js": "0838168b19d903f183f38a489f4de88ad080f17145fed88da3e8043e66e7fe19",
     "packages/contract/schemas/targets.js": "eff6112a0f0268c5ec65807b359ceff164c6bfc3ddab0a4bde80dfa23962a869",
-    "packages/contract/schemas/tasks.js": "37b3a0cc8c02f562f7a6cce9991debb6d2d85223b99a843313f167fcb0122dc9",
+    "packages/contract/schemas/tasks.js": "53111003e7982af969283e14481c5f3533fa97946268c75b3666b793288da6c4",
     "packages/contract/schemas/templates.js": "5c68262e21422e9f522f31ebeab2e9bc0b22faecccb972a28c9631f99738a301",
     "packages/contract/schemas/training.js": "b762b22b6c5c43d5c81ed5b23c5ac9d8533f84e1c11e808565330c7cbfbad17d",
     "packages/contract/schemas/user_guide.js": "c56cfa7fc4883be90d1b14446c4918f77a912e75d2dd87826ed17a500aa9571f",
@@ -141,6 +141,7 @@
     "src/modules/targets/targets.routes.js": "e7c6091372ecf23ae3ff46ddc1678a33475548d0dadad04f078a7533dc3e2031",
     "src/modules/tasks/tasks.routes.js": "c9d2d773299b1b4b754f850b95ea661b15fb837fa70f57f5d2c6ce2ffc9a27a1",
     "src/modules/templates/templates.routes.js": "4dc159605fd892f5003d7f57afdac92131ec4a2e40ab3d3c3173b67fae2ddcc9",
+    "src/modules/training/training.routes.js": "aa885b2f33fb263bce3eacf0aece80474df580b7ed6188c0493e67191a43823d",
     "src/modules/user_guide/user_guide.public.routes.js": "7be5f10945c7e37408e6c2e48eb96e9b626a6162e2f7a5f71c168c8ea044e76e",
     "src/modules/user_guide/user_guide.routes.js": "c1a679cf2b6339a9d9f474f59834026bc8752c84f3e83106726e40307b73d2aa",
     "src/modules/users/users.routes.js": "7ae43569a5eba7045ba4e0da675f395051f0a576ca2002dd5885cd9c1f1651df",
