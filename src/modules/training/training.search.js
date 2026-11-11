@@ -13,7 +13,7 @@ module.exports = [
     module: "knowledge",
     capability: "training.manage",
     label: "Courses",
-    words: ["course", "courses", "training", "learning"],
+    words: ["course", "courses", "learning"],
     from: "training_course c",
     key: "c.training_course_id",
     columns: ["c.number", "c.title"],
@@ -24,7 +24,7 @@ module.exports = [
     type: "training_enrolment",
     module: "ess",
     label: "My Training",
-    words: ["training", "course", "courses", "my training", "certificate", "learning"],
+    words: ["course", "courses", "certificate", "learning"],
     from: `training_course c
       JOIN app_user u ON u.status = 'active'
       LEFT JOIN training_enrolment te ON te.training_course_id = c.training_course_id AND te.employee_id = u.employee_id`,

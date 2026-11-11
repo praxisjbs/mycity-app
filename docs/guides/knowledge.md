@@ -505,7 +505,9 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
   item removed (or Proof Required turned off) completes, in the same transaction, anyone now done; a
   task may name a `training_enrolment` (migration `10420`); the certificate's hash is the canonical
   payload `TRAINING_CERTIFICATE`; My Training opens a course by its id or the person's enrolment's;
-  an assignment naming only people keeps Keep Assigning off; Assigned counts everyone on the course.
+  an assignment naming only people keeps Keep Assigning off; Assigned counts everyone on the course;
+  ⌘K's two course groups take the words course, courses, learning (and certificate), never "training",
+  which would turn a search for "Training Week" into a search of My Training.
 - 11/11/2026 · TB · PR 1 built: the contracts, migrations `10400` and `10410`, seed `10490`, the capabilities and schemes (§4, §8). Decided on the way: a published SOP version's CHECK spells out `version IS NOT NULL` (a CHECK lets NULL through); `training_item`'s position is unique at commit, so a reorder can swap two; a change to an item sends the whole item (`ItemCreate`, no second schema); My Training's lists are one query, `list` (`to_do`, `in_progress`, `completed`, `library`). Settings · Documents & Numbering lists the three new schemes (SOP, Training Course, Training Certificate).
 - 11/11/2026 · TB · Written from TB's eight answers of 11/11/2026 and the Modules Review of 4
   November 2026: FAQs leave the hub (Announcements left on 29/10/2026); SOPs are each department's
