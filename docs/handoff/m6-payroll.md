@@ -160,7 +160,7 @@ email links (PR 12), then the staging seed and the User Guide (PR 8, last).
 - [x] PAYE Basis: TB answered (guide §13.2 item 32): `NO_CONVENTIONS` counts the two flags, an unset basis reads as annualised (11/11/2026)
 - [x] Report prints sources; tests; screen gates at 390 and 1440 px (11/11/2026)
 - [x] Checked on the real API on desktop and phone (a local database, the mock's people, the API, worker and app live) (11/11/2026)
-- [x] `npm run ci` green on Node 20, all 52 gates in 27 min 5 s, after `main` was merged in (no rebase; the generated files were current), and the PR marked ready: praxisjbs/mycity-app#130 (11/11/2026)
+- [x] `npm run ci` green on Node 20, all 52 gates in 27 min 5 s, after `main` was merged in (no rebase; the generated files were current), and the PR marked ready: praxisjbs/mycity-app#130 (11/11/2026); then PR 9 (praxisjbs/mycity-app#128) and M8 (praxisjbs/mycity-app#125) merged, so `main` was merged in again (the guide's §6.12 rule 11 keeps PR 9's text with PR 10's lines; PROGRESS, the handoff and the Change log keep both; the two contract files regenerated, not merged by hand) and the whole run passed all 52 again in 21 min 13 s (11/11/2026)
 
 ### PR 11 · The statutory engine to the research (after PR 9 and PR 10)
 - [ ] Relief reshaped or removed, conventions fixed where the law settles them, ITF and NSITF as cited (and, from PR 9,
