@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "0ef2a5eee6f9fc1740e3ffbbaf6e7f5c07d2a1b8b50598ee5f15f42e599eee99",
+  "source_hash": "7ee686d5afbb3d0dd8479a1eec1b675b174a5a1912dc0fe1d9af99bde2a2eb29",
   "schemas": 2125,
-  "endpoints": 974,
+  "endpoints": 976,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "bd0c841b66fd87d133084a1d57db9f572a13ef5e1d6f3de41081b6f154646a9d",
@@ -119,7 +119,7 @@
     "src/modules/partner_pipeline/partner_pipeline.routes.js": "e1c5c45b31f0dff88c23fddcc649b26c5fa903966cc66c01a474fb1c7ab96b3c",
     "src/modules/partners/partners.routes.js": "24e3e036fe56b475697716524aa471717f2a05a75c82f9d06511f6f297b624ba",
     "src/modules/partnership_analytics/partnership_analytics.routes.js": "0315d6dc241e169625be8269bf0ef5f6270939b2a2094b119525902cda6dc667",
-    "src/modules/payroll/payroll.routes.js": "eaf14bafe1a65ad142720a20d9a4b0aed9e522f7892c003e6b8fbd416b796060",
+    "src/modules/payroll/payroll.routes.js": "4461771db19d6464281058558c5abaf8da46e21a8abd851241afb739b87897b2",
     "src/modules/payslips/payslips.routes.js": "51dc1ad5475eaf365399db0b1e283f54381e24a91bc399c3048f67087587ff5c",
     "src/modules/policies/policies.routes.js": "fc507d3124b59274a3e08503c3486274689960ead168914538b114bb87640916",
     "src/modules/projects/projects.routes.js": "1c0cdf35062d44cbfa5a4c555893249b1a3c874c92843c83b9a1fbf3057c9bc7",
@@ -136,7 +136,7 @@
     "src/modules/security/security.routes.js": "2148273cc406a5725539fcfb75ff74008a69e3bb40a0c939e1eaeb33c74f0f4f",
     "src/modules/settings/settings.routes.js": "24e880ee10c223bc347fa980803a2e1bb28bf02d373c73451a26cbcb2029e802",
     "src/modules/signatures/signatures.public.routes.js": "375ffee4e52190da561c5f59a3c99dc261cf237bc4864f704a0b992453e5f67e",
-    "src/modules/statutory/statutory.routes.js": "7dc6893958a13f08cdbab9663def51a223b09081bb0e8aacd1bdb88157eec689",
+    "src/modules/statutory/statutory.routes.js": "96b470987168f34553671e3498c750807143a1bd6af36dcd9f369cd00bf26b9b",
     "src/modules/system_health/system_health.routes.js": "b0206f05a5d47ff95dd4cee168b2696491628abb758be7318159731ab104f950",
     "src/modules/talent_pool/talent_pool.routes.js": "20e792a4ae388c7a85200404daa6a95c278012a5af42dffaa45dad45f26b338d",
     "src/modules/targets/targets.routes.js": "e7c6091372ecf23ae3ff46ddc1678a33475548d0dadad04f078a7533dc3e2031",
