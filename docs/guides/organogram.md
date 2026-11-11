@@ -10,7 +10,7 @@
 | Capabilities | none; the builder and People · Departments are the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026), #103 People · Departments (JBS Praxis, 27/10/2026) |
 | Status | Built |
-| Last changed | 05/11/2026 |
+| Last changed | 11/11/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -504,6 +504,8 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · ESS's screen switch (`app/src/features/ess/index.tsx`) gains My Training (`knowledge.md`); ESS · Org Chart is unchanged.
+- 11/11/2026 · JP · Create Vacancy on a vacant seat fills in its line manager as the hiring manager only when they may be one (active, holding Recruitment, in the writer's scope); otherwise New Vacancy leaves Hiring Manager to pick (`recruitment.md` §6.1, fault #3 of the 11/11 staging brief).
 - 10/11/2026 · JP · The employee record gains the tax and pension numbers payroll's statutory report reads (`tax_id`, `pension_pin`, `pension_administrator`, `nhf_number`; migration `6020`, `docs/guides/payroll.md` §4.1): `PATCH /employees/:id` takes them and the 360 returns them, masked as `employee.statutory`. Like the other restricted fields they are never rendered on an organogram card, a person's sheet or the PDF (§6). No screen asks for them yet.
 - 06/11/2026 · GE · A hire fills its vacant seat: `organisation.fillSeat` (§6) for Recruitment's
   `vacancies.hiredIn`, with `org_seat.filled` (§7). The person takes the seat's department and line,

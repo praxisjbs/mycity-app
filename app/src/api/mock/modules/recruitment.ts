@@ -196,6 +196,15 @@ R("GET /api/v1/recruitment/vacancies/suggested", "view", (req) =>
   ),
 );
 
+// Who may be a hiring manager: the panel's rule (holds Recruitment), as the save holds them to (guide §6.1).
+R("GET /api/v1/recruitment/vacancies/hiring-managers", "view", (req) =>
+  paged(
+    PEOPLE.filter(maySit).map((p) => ref(p)!),
+    req,
+    { search: (p) => [p.display_name] },
+  ),
+);
+
 R("GET /api/v1/recruitment/vacancies/settings", "view", (req) => ok({ ...D.SETTINGS, can_edit: can(req, "edit") }));
 R("PUT /api/v1/recruitment/vacancies/settings", "edit", (req) =>
   parse<{ about_company?: string; default_traits?: string[] }>(vacancySchemas.CareersSettingsSave, req.body, (b) => {

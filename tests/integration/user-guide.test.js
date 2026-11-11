@@ -207,7 +207,7 @@ describeDb("the User Guide against the real migrations and chapters", () => {
     expect(help.headers["cache-control"]).toBe("public, max-age=300");
     const read = c.user_guide.GuideChapter.parse(help.body);
     expect(read.kind).toBe("public-help");
-    expect(read.sections.map((s) => s.slug)).toEqual(["public-home", "public-careers", "public-vacancy", "public-apply", "public-assessment", "public-sign", "public-verify"]);
+    expect(read.sections.map((s) => s.slug)).toEqual(["public-home", "public-careers", "public-vacancy", "public-apply", "public-assessment", "public-sign", "public-proposal", "public-agreement", "public-verify"]);
 
     const pic = await request(app).get("/api/public/v1/help/images/public-home.desktop.png");
     expect(pic.status).toBe(200);

@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 07/11/2026 |
+| Last changed | 11/11/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -144,7 +144,7 @@ Every list pages at 25 through `shared/http/paged.js`. Every route has a contrac
 
 | Route | Permission |
 |---|---|
-| `GET /employees` (search, department, status, work pattern, employment type; sort) | `people` view |
+| `GET /employees` (search, department, status, work pattern, employment type; sort; `exclude_self=true` leaves the caller out, for a form that may not name them, Raise a Query) | `people` view |
 | `GET /employees/summary` | `people` view |
 | `GET /employees/:id` (the 360: profile, job, reporting line, login, documents, history; masked per viewer) | `people` view |
 | `POST /employees`, `PATCH /employees/:id`, `POST /employees/:id/archive`, `POST /employees/:id/restore` | `people` create, edit, delete |
@@ -1186,6 +1186,8 @@ screen.
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · Settings · Documents & Numbering lists M10's three schemes, SOP (`SOP-0001`), Training Course (`TRN-0001`) and Training Certificate (`CERT-2026-0001`, by year), seeded in `10490`; the contract's `DOC_TYPES` and the screen's labels name them (`docs/guides/knowledge.md` §4).
+- 11/11/2026 · JP · `GET /employees` takes `exclude_self` (§5): `true` leaves the caller out of the page, in SQL, so Raise a Query never offers the raiser (`queries.md` §6.2, fault #9 of the 11/11 staging brief).
 - 10/11/2026 · JP · `shared/db/effective-dated` gains `replace` (a change for a day that already has a version joins it, updated in place, rather than being refused) and `addVersionSet` (a version made of several rows that start and end together: a PAYE table, a person's pay split), for M6 PR 5's Configurations (`docs/guides/payroll.md` §4.2, §13.2 item 26). The employee record gains the four tax and pension numbers the `employee.statutory` mask already named, written through the organisation service. Nothing else changes for an existing caller.
 - 07/11/2026 · LA · Map Values on the import engine (§5, §10.1; M7 PR 4, `partnerships.md` §6.13): the step,
   `GET` and `PUT /imports/:id/values`, the choices kept on the batch's mapping and its profile, a

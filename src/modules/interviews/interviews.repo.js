@@ -205,16 +205,19 @@ async function myFeedback(db, interviewId, employeeId) {
 }
 
 /**
- * Employee `e` may sit on a panel: active, with an active login that holds `recruitment` view (or the
- * CEO). One predicate for the picker (panelists) and the check on a save (eligible).
+ * The employee aliased `e` may sit on a panel: active, with an active login that holds `recruitment`
+ * view (or the CEO). One predicate for the picker (panelists) and the check on a save (eligible), and
+ * for who may be a vacancy's hiring manager (decision 5; vacancies.repo hiringManagers).
+ * @param {string} e  the employee table's alias in the query
  */
-const MAY_SIT = `e.status = 'active' AND EXISTS (
+const maySit = (e) => `${e}.status = 'active' AND EXISTS (
     SELECT 1 FROM app_user u
-     WHERE u.employee_id = e.employee_id AND u.status = 'active'
+     WHERE u.employee_id = ${e}.employee_id AND u.status = 'active'
        AND (u.is_ceo = true OR EXISTS (
              SELECT 1 FROM user_role ur JOIN permission p ON p.role_id = ur.role_id
               WHERE ur.user_id = u.user_id AND p.module_key = 'recruitment' AND p.can_view = true
                 AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE))))`;
+const MAY_SIT = maySit("e");
 
 /** Employees who may sit on a panel, of those named. */
 async function eligible(db, employeeIds) {
@@ -498,6 +501,7 @@ async function actorOf(db, userId) {
 
 module.exports = {
   BLIND,
+  maySit,
   list,
   get,
   scheduledFor,

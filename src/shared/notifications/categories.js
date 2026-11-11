@@ -193,8 +193,8 @@ const DOMAIN_TO_CATEGORY = Object.freeze({
   // knowledge
   policy: "knowledge",
   sop: "knowledge",
-  faq: "knowledge",
   training_course: "knowledge",
+  training_enrolment: "knowledge",
 });
 
 /** Module key → category, for an event whose first segment is not mapped above. */

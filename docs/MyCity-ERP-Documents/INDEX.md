@@ -13,6 +13,7 @@ listed with them below.
 | `EMAIL-naming-approval.md` | The naming approval section to paste into the requirements email to Cynthia. Not a client document on its own. | Any markdown reader, or a text editor |
 | `partnership-samples/` | MyCity's partnership documents, redacted: the Deal Merchant Agreement now; the ticketing template and a sample proposal when MyCity sends them. Added 5 November 2026 for M7's category templates and proposal kit (`docs/guides/partnerships.md`). | Any markdown reader, or a text editor |
 | `payroll-samples/` | Drafts for MyCity to approve before M6 builds them: the payslip sample (fictional person and figures, simple payroll, A4). Added 8 November 2026 for M6's payslip template (`docs/guides/payroll.md` §6.10). | Double click `payslip-sample.html`; it opens in any browser |
+| `training-samples/` | Drafts for MyCity to approve before M10 builds them: the training certificate of completion (fictional person, signer and number, A4 landscape). Added 11 November 2026 for M10's certificate template (`docs/guides/knowledge.md` §6.9). | Double click `certificate-sample.html`; it opens in any browser |
 | `letter-samples/` | MyCity's six disciplinary letters (query, attendance query, caution, warning, suspension, dismissal), redacted: names, dates and offences are placeholders. Added 27 October 2026 for M3's letter templates. | Any markdown reader, or a text editor |
 
 ## Opening the two HTML files

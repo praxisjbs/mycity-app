@@ -56,6 +56,7 @@ const SCREENS = Object.freeze({
     "policy-updates",
     "my-security",
     "org-chart",
+    "my-training",
   ],
   community: ["channels", "direct-messages", "announcements"],
   mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash", "signature"],
@@ -91,7 +92,7 @@ const SCREENS = Object.freeze({
     "budgets",
     "categories",
   ],
-  knowledge: ["policies", "sops", "faqs", "training", "user-guide"],
+  knowledge: ["policies", "sops", "training", "user-guide"],
   praxis_ai: ["ask", "history"],
   ai_control: ["actions", "models", "spend"],
   settings: [
@@ -400,9 +401,10 @@ const ENTITY_ROUTES = Object.freeze({
   // Knowledge Hub
   // A section or task of the User Guide, by its slug: the guide opens at it (user_guide.search.js).
   guide_section: screen("knowledge", "user-guide"),
-  sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge)
-  faq: screen("knowledge", "faqs"), // search:none not built yet (src/modules/knowledge)
-  training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/knowledge)
+  sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge, M10 PR 2)
+  training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/training, M10 PR 3)
+  // A person's place on a course opens it on their own My Training (docs/guides/knowledge.md §9).
+  training_enrolment: screen("ess", "my-training"), // search:none not built yet (src/modules/training, M10 PR 3)
 
   // Praxis AI
   // A conversation opens on Ask, where it can be read and continued (docs/guides/praxis-ai.md §9).

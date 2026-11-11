@@ -32,6 +32,7 @@ import {
   Grid,
   HelpTerm,
   KeyValue,
+  ListDetail,
   LoadingRows,
   NumberField,
   PageHeader,
@@ -46,6 +47,7 @@ import {
   useContractForm,
   UploadField,
   useModal,
+  useSideBySide,
 } from "@mycity/ui";
 import { AssessmentQuestions } from "./AssessmentQuestions";
 import { ASSESSMENT_TYPE, bodySchema, pill, say, sayRefusal, SITTING_STATUS, STAGE_LABEL, useVacancyOptions } from "./shared";
@@ -63,8 +65,26 @@ export function Assessments() {
   const summary = useApi("GET /api/v1/recruitment/assessments/summary");
   const library = usePaged("GET /api/v1/recruitment/assessments");
   const sittings = usePaged("GET /api/v1/recruitment/assessments/sittings", { filters: marking ? { marking: "true" } : {} });
-  const openAssessment = (id: string, title = "Assessment") => modal.open({ title, wide: true, body: (close) => <AssessmentSheet id={id} close={close} /> });
-  const openSittingId = (id: string, title = "Sitting") => modal.open({ title, wide: true, body: (close) => <SittingSheet id={id} close={close} /> });
+  // On a wide desktop an assessment or a sitting sits beside its list (F31), the first one until another
+  // is pressed; on a phone, and where two columns do not fit, it opens in the sheet or dialog.
+  const beside = useSideBySide();
+  const [picked, setPicked] = useState<{ kind: "library" | "sittings"; id: string; title: string } | null>(null);
+  const first = view === "library"
+    ? library.rows[0] && { kind: "library" as const, id: library.rows[0].assessment_definition_id, title: library.rows[0].name }
+    : sittings.rows[0] && { kind: "sittings" as const, id: sittings.rows[0].application_assessment_id, title: sittings.rows[0].candidate_name };
+  const shown = (picked?.kind === view ? picked : null) ?? (beside ? (first ?? null) : null);
+  const openAssessment = (id: string, title = "Assessment") => {
+    if (!beside) return modal.open({ title, wide: true, body: (close) => <AssessmentSheet id={id} close={close} /> });
+    modal.close();
+    setView("library");
+    setPicked({ kind: "library", id, title });
+  };
+  const openSittingId = (id: string, title = "Sitting") => {
+    if (!beside) return modal.open({ title, wide: true, body: (close) => <SittingSheet id={id} close={close} /> });
+    modal.close();
+    setView("sittings");
+    setPicked({ kind: "sittings", id, title });
+  };
   const openSitting = (s: Sitting) => openSittingId(s.application_assessment_id, s.candidate_name);
   const importOne = () => modal.open({ title: "Import Assessment", body: (close) => <ImportForm close={close} onImported={(a) => openAssessment(a.assessment_definition_id, a.name)} /> });
   const create = () => modal.open({ title: "New Assessment", body: (close) => <AssessmentForm close={close} onSaved={(a) => openAssessment(a.assessment_definition_id, a.name)} /> });
@@ -125,49 +145,69 @@ export function Assessments() {
         <SegmentedControl label="Which List" value={view} onChange={setView} options={[["library", "Assessments"], ["sittings", "Sittings"]]} />
         {view === "sittings" && <SegmentedControl label="Which Sittings" value={marking ? "mark" : "all"} onChange={(v) => setMarking(v === "mark")} options={[["all", "All"], ["mark", "To Mark"]]} small />}
       </Toolbar>
-      {view === "library" ? (
-        <PagedTable<Assessment>
-          title="Assessments"
-          list={library}
-          search="Search assessments"
-          rowKey={(a) => a.assessment_definition_id}
-          noun="assessment"
-          onRowClick={(a) => openAssessment(a.assessment_definition_id, a.name)}
-          empty={{ title: "No Assessments Yet" }}
-          columns={[
-            { key: "name", label: "Assessment", render: (a) => <span className="font-semibold">{a.name}</span> },
-            { key: "type", label: "Type", render: (a) => ASSESSMENT_TYPE[a.assessment_type] },
-            { key: "minutes", label: "Minutes", align: "n", render: (a) => a.duration_minutes ?? "Untimed", desktop: true },
-            { key: "questions", label: "Questions", align: "n", render: (a) => a.question_count, desktop: true },
-            { key: "sent", label: "Sent", align: "n", render: (a) => a.sent, desktop: true },
-            { key: "avg", label: "Average", align: "n", render: (a) => (a.average_score === null ? "–" : Math.round(a.average_score)) },
-            { key: "status", label: "Status", badge: true, render: (a) => (a.active ? pill(["ok", "Active"]) : pill(["neutral", "Off"])) },
-          ]}
-        />
-      ) : (
-        <PagedTable<Sitting>
-          title="Sittings"
-          list={sittings}
-          search="Search candidates"
-          rowKey={(x) => x.application_assessment_id}
-          noun="sitting"
-          onRowClick={openSitting}
-          empty={{ title: marking ? "Nothing to Mark" : "None Sent Yet" }}
-          columns={[
-            { key: "who", label: "Candidate", render: (x) => <span className="font-semibold">{x.candidate_name}</span> },
-            { key: "what", label: "Assessment", render: (x) => x.assessment_name },
-            { key: "role", label: "Role", render: (x) => x.vacancy_title, desktop: true },
-            { key: "state", label: "State", badge: true, render: (x) => pill(SITTING_STATUS[x.status]) },
-            { key: "score", label: "Score", align: "n", render: (x) => (x.score === null ? (x.to_mark ? `${x.to_mark} to mark` : "–") : Math.round(x.score)) },
-          ]}
-        />
-      )}
+      <ListDetail
+        open={false}
+        onClose={() => setPicked(null)}
+        title={view === "library" ? "Assessment" : "Sitting"}
+        list={
+          view === "library" ? (
+            <PagedTable<Assessment>
+              title="Assessments"
+              list={library}
+              search="Search assessments"
+              rowKey={(a) => a.assessment_definition_id}
+              noun="assessment"
+              onRowClick={(a) => openAssessment(a.assessment_definition_id, a.name)}
+              selectedKey={beside && shown?.kind === "library" ? shown.id : undefined}
+              empty={{ title: "No Assessments Yet" }}
+              columns={[
+                { key: "name", label: "Assessment", render: (a) => <span className="font-semibold">{a.name}</span> },
+                { key: "type", label: "Type", render: (a) => ASSESSMENT_TYPE[a.assessment_type] },
+                { key: "minutes", label: "Minutes", align: "n", render: (a) => a.duration_minutes ?? "Untimed", desktop: true },
+                { key: "questions", label: "Questions", align: "n", render: (a) => a.question_count, desktop: true },
+                { key: "sent", label: "Sent", align: "n", render: (a) => a.sent, desktop: true },
+                { key: "avg", label: "Average", align: "n", render: (a) => (a.average_score === null ? "–" : Math.round(a.average_score)) },
+                { key: "status", label: "Status", badge: true, render: (a) => (a.active ? pill(["ok", "Active"]) : pill(["neutral", "Off"])) },
+              ]}
+            />
+          ) : (
+            <PagedTable<Sitting>
+              title="Sittings"
+              list={sittings}
+              search="Search candidates"
+              rowKey={(x) => x.application_assessment_id}
+              noun="sitting"
+              onRowClick={openSitting}
+              selectedKey={beside && shown?.kind === "sittings" ? shown.id : undefined}
+              empty={{ title: marking ? "Nothing to Mark" : "None Sent Yet" }}
+              columns={[
+                { key: "who", label: "Candidate", render: (x) => <span className="font-semibold">{x.candidate_name}</span> },
+                { key: "what", label: "Assessment", render: (x) => x.assessment_name },
+                { key: "role", label: "Role", render: (x) => x.vacancy_title, desktop: true },
+                { key: "state", label: "State", badge: true, render: (x) => pill(SITTING_STATUS[x.status]) },
+                { key: "score", label: "Score", align: "n", render: (x) => (x.score === null ? (x.to_mark ? `${x.to_mark} to mark` : "–") : Math.round(x.score)) },
+              ]}
+            />
+          )
+        }
+        detail={
+          beside && shown ? (
+            <Card>
+              {shown.kind === "library" ? (
+                <AssessmentSheet key={shown.id} id={shown.id} close={() => setPicked(null)} inline />
+              ) : (
+                <SittingSheet key={shown.id} id={shown.id} title={shown.title} close={() => setPicked(null)} inline />
+              )}
+            </Card>
+          ) : null
+        }
+      />
     </>
   );
 }
 
 /** An assessment: its settings, its questions with their points, and what the library does with it. */
-function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
+function AssessmentSheet({ id, close, inline = false }: { id: string; close: () => void; inline?: boolean }) {
   const modal = useModal();
   const { can } = useAuth();
   const mayEdit = can("recruitment", "edit");
@@ -182,8 +222,9 @@ function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
     read.reload();
     invalidate("/api/v1/recruitment/assessments");
   };
-  // A form opened from here goes back to the sheet when it closes (the app holds one dialog at a time).
-  const back = () => modal.open({ title: a.name, wide: true, body: (done) => <AssessmentSheet id={id} close={done} /> });
+  // A form opened from here goes back to the assessment when it closes: beside the list it is still
+  // there; in the dialog it opens again (the app holds one dialog at a time).
+  const back = () => (inline ? modal.close() : modal.open({ title: a.name, wide: true, body: (done) => <AssessmentSheet id={id} close={done} /> }));
   /** The assessment as a file another MyCity hub can take (`mycity-assessment-1`). */
   const exportIt = async () => {
     try {
@@ -204,6 +245,9 @@ function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
   };
   return (
     <>
+      {/* A card title keeps to four words (gate 8): beside the list the name leads the card instead. */}
+      {inline && <CardHeader title="Assessment" />}
+      {inline && <p className="mb-2 font-semibold">{a.name}</p>}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {a.active ? pill(["ok", "Active"]) : pill(["neutral", "Off"])}
         <Pill dot={false}>{a.code}</Pill>
@@ -220,12 +264,12 @@ function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
       />
       {a.instructions && (
         <Card className="mt-3" data-copy="content">
-          <CardHeader title="Instructions" />
+          <CardHeader title="Instructions" level={3} />
           <p className="text-sm whitespace-pre-line">{a.instructions}</p>
         </Card>
       )}
       <Card className="mt-3">
-        <CardHeader title="Questions" />
+        <CardHeader title="Questions" level={3} />
         {a.questions.length ? (
           <ol className="list-decimal space-y-2 pl-5 text-sm" data-copy="content">
             {a.questions.map((q) => (
@@ -406,7 +450,7 @@ function BulkSendForm({ assessment, close }: { assessment: AssessmentDetail; clo
 }
 
 /** A sitting: when it was sent and taken, each answer, and Mark Answers for what is marked by hand. */
-function SittingSheet({ id, close }: { id: string; close: () => void }) {
+function SittingSheet({ id, close, title, inline = false }: { id: string; close: () => void; title?: string; inline?: boolean }) {
   const mayEdit = useAuth().can("recruitment", "edit");
   const read = useApi("GET /api/v1/recruitment/assessments/sittings/:id", { params: { id } });
   const cancel = useMutation("POST /api/v1/recruitment/assessments/sittings/:id/cancel");
@@ -428,6 +472,7 @@ function SittingSheet({ id, close }: { id: string; close: () => void }) {
   };
   return (
     <>
+      {inline && <CardHeader title={title ?? s.assessment_name} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {pill(SITTING_STATUS[s.status])}
         <span className="text-sm text-subtle-foreground">{`${s.assessment_name} · ${s.vacancy_title}`}</span>
@@ -487,7 +532,7 @@ function Marking({ sitting, mayMark, onSaved, close }: { sitting: SittingDetail;
         {sitting.answers.map((a, i) => (
           <li key={a.assessment_question_id}>
             <Card>
-              <CardHeader title={`Question ${i + 1}`} right={<span className="text-sm text-subtle-foreground">{`Up to ${a.max_score}`}</span>} />
+              <CardHeader level={3} title={`Question ${i + 1}`} right={<span className="text-sm text-subtle-foreground">{`Up to ${a.max_score}`}</span>} />
               <p className="mb-2 text-sm" data-copy="content">{a.prompt}</p>
               {a.question_type === "choice" ? (
                 <p className="text-sm">{a.options?.find((o) => o.id === a.response)?.text ?? "Not answered"} <b>{` · ${a.awarded_score ?? 0} points`}</b></p>

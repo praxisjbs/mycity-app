@@ -9,13 +9,12 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { PoliciesTab } from "@/features/policies/PoliciesHub";
-import { Accordion, ArticleBody, Button, Card, Chips, ChoiceField, DataView, DateField, ErrorState, Field, formatDate, FormFooter, Grid, LoadingRows, Meter, PageHeader, Pill, Reader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { ArticleBody, Button, Card, ChoiceField, DataView, DateField, ErrorState, Field, formatDate, FormFooter, Grid, LoadingRows, Meter, PageHeader, Pill, Reader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { UserGuide } from "./UserGuide";
 
 export default function Knowledge({ tab, id }: ModuleScreenProps) {
   switch (tab) {
     case "sops": return <Articles kind="sop" id={id} />;
-    case "faqs": return <Faqs />;
     case "training": return <Training />;
     case "user-guide":
       return <UserGuide id={id} />;
@@ -124,55 +123,6 @@ function ArticleForm({ kind, close }: { kind: ArticleKind; close: () => void }) 
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Publish</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-/* ───────────── FAQs ───────────── */
-
-function Faqs() {
-  const modal = useModal();
-  const { can } = useAuth();
-  const s = useApi("GET /api/v1/knowledge/faqs/summary");
-  const [topic, setTopic] = useState("");
-  const list = usePaged("GET /api/v1/knowledge/faqs", { filters: topic ? { topic } : {} });
-  return (
-    <>
-      <PageHeader title="FAQs" sub="Answered in a sentence or two" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New FAQ", body: (close) => <FaqForm close={close} topics={s.data?.topics.map((t) => t.topic) ?? []} /> })}>New FAQ</Button>} />
-      {s.data && <StatStrip items={[{ label: "Questions", value: s.data.questions }, { label: "Asked This Month", value: s.data.asked_this_month }, { label: "Most Asked", value: s.data.most_asked }, { label: "Unanswered", value: s.data.unanswered, tone: s.data.unanswered ? "warn" : "ok" }, { label: "From Praxis AI", value: s.data.from_ai, desktop: true }]} />}
-      <Grid cols="1.4/1">
-        <div>
-          {s.data && <Chips value={topic} onChange={setTopic} options={[["", `All ${s.data.questions}`], ...s.data.topics.map((t) => [t.topic, `${t.topic} ${t.count}`] as [string, string])]} />}
-          {list.loading && !list.rows.length ? <LoadingRows /> : <Accordion items={list.rows.map((q, i) => ({ title: q.question, body: q.answer ?? <span className="text-warning">Waiting for a decision, not for wording.</span>, open: i === 0 }))} />}
-        </div>
-      </Grid>
-    </>
-  );
-}
-
-function FaqForm({ close, topics }: { close: () => void; topics: string[] }) {
-  const f = useContractForm({ question: "", answer: "", topic: topics[0] ?? "" }, { question: (v) => (v.trim().length < 8 ? "Write the question" : null), answer: (v) => (v.trim().length < 8 ? "A sentence or two" : v.length > 400 ? "Two sentences at most" : null) });
-  const save = useMutation("POST /api/v1/knowledge/faqs");
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      await save.run({ body: f.values });
-      invalidate("/api/v1/knowledge/faqs");
-      close();
-      toast("FAQ added");
-    } catch {
-      f.setServerErrors(save.fields);
-    }
-  };
-  return (
-    <>
-      <Field label="Question" {...f.field("question")}><TextField {...f.field("question")} /></Field>
-      <Field label="Answer" {...f.field("answer")}><TextAreaField {...f.field("answer")} /></Field>
-      <Field label="Topic"><SelectField options={topics.map((t) => [t, t])} {...f.field("topic")} /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Add FAQ</Button>
       </FormFooter>
     </>
   );

@@ -3,17 +3,17 @@ title: Help
 kind: public-help
 order: 2000
 milestones: M4
-summary: How to find a role, apply, take an assessment, sign an offer and check a document on MyCityApp's careers site.
+summary: How to find a role, apply, take an assessment, sign an offer, read a proposal, sign an agreement and check a document on MyCityApp's public site.
 icon: globe
 ---
 
-This is how MyCityApp's careers site, [go.mycityapp.io](https://go.mycityapp.io), works. You never
+This is how MyCityApp's public site, [go.mycityapp.io](https://go.mycityapp.io), works. You never
 need an account: the pages you fill in open from a link of your own.
 
 Every page has the same bar at the top: the MyCityApp mark, which opens the front page, and the
 links **Vacancy**, **Verify Document** and **Help**. On a phone they are in the menu at the top
-right. Your private Apply, Assessment and Sign Offer links arrive by email and are not in the
-navigation. The moon or sun beside them switches between light and dark, and the site keeps your
+right. Your private Apply, Assessment, Sign Offer, Proposal and Sign Agreement links arrive by
+email and are not in the navigation. The moon or sun beside them switches between light and dark, and the site keeps your
 choice on your device.
 
 ## The Front Page {#public-home icon=home}
@@ -270,9 +270,87 @@ declined after.
 An offer past its day says *This Offer Has Expired*, and one withdrawn says *Offer Withdrawn*. If you
 open `/sign` without the private link, the page says *Use Your Offer Email*.
 
+## Your Proposal {#public-proposal icon=doc}
+
+If MyCity sends you a proposal, you read it on this page, from the link in the email we sent. You
+need no account.
+
+### Read your proposal {#public-proposal-read}
+
+1. Open the link in your email.
+2. The top of the page names who the proposal is prepared for, its title, and the day it is valid
+   until when it has one.
+3. Scroll to read the proposal, page by page, as MyCity designed it.
+   ![A proposal](shot:public-proposal)
+4. **Your Contact**, at the foot, names the person at MyCity who sent it, with their email and phone.
+5. Press the email button at the top of the page to write to them.
+
+### Keep a copy {#public-proposal-download}
+
+1. Press **Download PDF**, at the top of the page or under **Your Contact**.
+2. The PDF saves to your device with the same pages.
+
+### When a proposal link does not work {#public-proposal-link}
+
+![A proposal that is no longer open](shot:public-proposal-closed)
+
+A proposal link stops working when the proposal is withdrawn, declined or past its day. The page then
+says *This Link Does Not Open*. Reply to the email the link came with and MyCity will send a new one.
+
+## Sign an Agreement {#public-agreement icon=signature}
+
+If MyCity asks you to sign a partnership agreement, you sign it on this page, from the link in the
+email we sent. Signing it is agreeing to it. You need no account.
+
+### Read the agreement and confirm it is you {#public-agreement-read}
+
+1. Open the link in your email.
+2. The agreement's number and the day the link expires are at the left, with the three steps.
+3. The agreement shows in full, then **Signers**: who signs for MyCity and for your organisation, and
+   who has signed.
+   ![The agreement, before signing](shot:public-agreement)
+4. Under **Confirm Your Email**, press **Send Code**. A six-digit code goes to the address the link
+   was sent to, and the page shows where.
+5. Type or paste the **Email Code**. A full code is checked straight away. **Confirm Code** checks it
+   too.
+
+The code works for ten minutes. **Send Again** sends another after a minute. After five wrong codes,
+you must ask for another.
+
+### Sign the agreement {#public-agreement-sign}
+
+1. Under **Sign Below**, check your **Full Name** and add your **Title**.
+2. Under **Signature**, pick **Draw** and sign in the box with a finger or a mouse, or **Type** and
+   type it.
+   ![Sign Below](shot:public-agreement-below)
+3. Tick **Agree to Sign Electronically**.
+4. Press **Sign Agreement**. The page says *Agreement Signed*, with the agreement's reference and
+   **Verify This Document**.
+
+You and MyCity each get the signed copy by email. A signed agreement is locked. It cannot change.
+
+### When someone signs before you {#public-agreement-wait}
+
+Some agreements are signed by more than one person, in order. If someone must sign first, the page
+says *You sign after* and their name.
+
+![Waiting for another signer](shot:public-agreement-wait)
+
+Open the link again once they have signed.
+
+### Decline the agreement {#public-agreement-decline}
+
+1. Press **Decline to Sign**, at either step.
+2. Type the **Reason for Declining** and press **Confirm Decline**. **Back to the Agreement** goes back
+   instead.
+3. The page says *Agreement Declined*. MyCity's partnerships team is told, with your reason.
+
+A link past its day says *This Link Has Expired*, and one MyCity took back says
+*Agreement Withdrawn*.
+
 ## Verify a Document {#public-verify icon=shield}
 
-Anyone can check a document MyCity signed and sealed, such as an offer letter, on this page. It shows
+Anyone can check a document MyCity signed and sealed, such as an offer letter or an agreement, on this page. It shows
 whether it is genuine and unchanged, never what it says.
 
 ### Check a reference {#public-verify-reference}
@@ -287,6 +365,17 @@ whether it is genuine and unchanged, never what it says.
    says which was altered: the record, the stored file, or both.
 
 A reference nobody issued shows *Not Found*.
+
+### Check an agreement {#public-verify-agreement}
+
+1. Open [Verify a Document](https://go.mycityapp.io/verify) and type the reference printed on the
+   agreement, such as `AGR-2026-0003`. Press **Verify**.
+   ![A verified agreement](shot:public-verify-agreement)
+2. *Document Verified* means it is genuine and unchanged.
+3. The record shows the **Document** as a partnership agreement, its **Status**, and who signed for the
+   Company and for the Partner, with the day and time.
+4. **Agreement** shows where it stands now: *Active*, *Expiring*, *Expired*, *Renewed* or *Closed*.
+5. An agreement signed on paper reads *Signed outside the hub* as its **Status**.
 
 ### Scan the QR code {#public-verify-qr}
 
@@ -426,4 +515,62 @@ do:
 marks:
   1: text "Content Hash" | Over what was signed
   2: text "Artifact Hash" | Over the stored file
+```
+
+```shot public-proposal
+site: public
+open: /proposal/Hn5vR2qLx8Tc
+do:
+  - wait: text "Your Contact"
+marks:
+  1: link "Download PDF" | Save a copy
+```
+
+```shot public-proposal-closed
+site: public
+open: /proposal/Wd3kP9sMb6Ye
+do:
+  - wait: text "Proposal"
+```
+
+```shot public-agreement
+site: public
+open: /sign/Ag4pR7wLm2Qx
+do:
+  - wait: button "Send Code"
+marks:
+  1: button "Send Code" | A code to your email
+```
+
+```shot public-agreement-below
+site: public
+open: /sign/Ag4pR7wLm2Qx
+do:
+  - click: button "Send Code"
+  - click: css input[autocomplete="one-time-code"]
+  - press: 4
+  - press: 8
+  - press: 2
+  - press: 9
+  - press: 1
+  - press: 3
+  - wait: button "Sign Agreement"
+marks:
+  1: button "Sign Agreement" | Signs and agrees
+```
+
+```shot public-agreement-wait
+site: public
+open: /sign/Ab8sK2vNe5Wq
+do:
+  - wait: text "You sign after Ngozi Adebayo. Open this link again once they have."
+```
+
+```shot public-verify-agreement
+site: public
+open: /verify/AGR-2026-0003
+do:
+  - wait: text "Document Verified"
+marks:
+  1: text "Status" | Where it stands
 ```

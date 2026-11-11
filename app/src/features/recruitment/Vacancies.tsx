@@ -27,6 +27,7 @@ import {
   Grid,
   HelpTerm,
   KeyValue,
+  ListDetail,
   LoadingRows,
   PageHeader,
   Pill,
@@ -36,6 +37,7 @@ import {
   toast,
   Toolbar,
   useModal,
+  useSideBySide,
 } from "@mycity/ui";
 import { CandidateEmails } from "./CandidateEmails";
 import { CareersSettings } from "./CareersSettings";
@@ -69,10 +71,19 @@ export function Vacancies() {
   const seats = usePaged("GET /api/v1/recruitment/vacancies/suggested");
   const { can } = useAuth();
   const mayCreate = can("recruitment", "create");
+  // On a wide desktop a vacancy sits beside the list (F31), the first one until another is pressed;
+  // on a phone, and where two columns do not fit, it opens in the sheet or dialog.
+  const beside = useSideBySide();
+  const [picked, setPicked] = useState<string | null>(null);
+  const shown = picked ?? (beside ? (list.rows[0]?.vacancy_id ?? null) : null);
 
   const newVacancy = (seat?: SeatSuggestion) =>
     modal.open({ title: "New Vacancy", wide: true, body: (close) => <VacancyForm close={close} seat={seat} onSaved={(v) => openVacancy(v.vacancy_id, v.title)} /> });
-  const openVacancy = (id: string, title = "Vacancy") => modal.open({ title, wide: true, body: (close) => <VacancySheet id={id} close={close} /> });
+  const openVacancy = (id: string, title = "Vacancy") => {
+    if (!beside) return modal.open({ title, wide: true, body: (close) => <VacancySheet id={id} close={close} /> });
+    modal.close();
+    setPicked(id);
+  };
   const settings = () => modal.open({ title: "Careers Settings", wide: true, body: (close) => <CareersSettings close={close} /> });
   const emails = () => modal.open({ title: "Candidate Emails", wide: true, body: (close) => <CandidateEmails close={close} /> });
 
@@ -125,24 +136,39 @@ export function Vacancies() {
       <Toolbar>
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUSES} />
       </Toolbar>
-      <PagedTable<Vacancy>
-        title="Vacancies"
-        list={list}
-        search="Search roles"
-        rowKey={(v) => v.vacancy_id}
-        noun="vacancy"
-        nounPlural="vacancies"
-        onRowClick={(v) => openVacancy(v.vacancy_id, v.title)}
-        empty={{ title: "No Vacancies Yet" }}
-        columns={[
-          { key: "role", label: "Role", render: (v) => <span className="font-semibold">{v.title}</span> },
-          { key: "dept", label: "Department", render: (v) => v.department ?? "–", desktop: true },
-          { key: "openings", label: "Openings", align: "n", render: (v) => v.positions, desktop: true },
-          { key: "where", label: "Location", render: (v) => (v.work_pattern === "remote" ? "Remote" : (v.location ?? "–")), desktop: true },
-          { key: "apps", label: "Applicants", align: "n", render: (v) => v.applicants },
-          { key: "closes", label: "Closes", render: closesOn },
-          { key: "status", label: "Status", badge: true, render: statusOf },
-        ]}
+      <ListDetail
+        open={false}
+        onClose={() => setPicked(null)}
+        title="Vacancy"
+        list={
+          <PagedTable<Vacancy>
+            title="Vacancies"
+            list={list}
+            search="Search roles"
+            rowKey={(v) => v.vacancy_id}
+            noun="vacancy"
+            nounPlural="vacancies"
+            onRowClick={(v) => openVacancy(v.vacancy_id, v.title)}
+            selectedKey={beside ? (shown ?? undefined) : undefined}
+            empty={{ title: "No Vacancies Yet" }}
+            columns={[
+              { key: "role", label: "Role", render: (v) => <span className="font-semibold">{v.title}</span> },
+              { key: "dept", label: "Department", render: (v) => v.department ?? "–", desktop: true },
+              { key: "openings", label: "Openings", align: "n", render: (v) => v.positions, desktop: true },
+              { key: "where", label: "Location", render: (v) => (v.work_pattern === "remote" ? "Remote" : (v.location ?? "–")), desktop: true },
+              { key: "apps", label: "Applicants", align: "n", render: (v) => v.applicants },
+              { key: "closes", label: "Closes", render: closesOn },
+              { key: "status", label: "Status", badge: true, render: statusOf },
+            ]}
+          />
+        }
+        detail={
+          shown ? (
+            <Card>
+              <VacancySheet key={shown} id={shown} close={() => setPicked(null)} inline />
+            </Card>
+          ) : null
+        }
       />
       <Grid cols={2} className="mt-3">
         <PagedTable<SeatSuggestion>
@@ -174,7 +200,7 @@ export function Vacancies() {
 }
 
 /** A vacancy: its details and public link, the lifecycle, Questions, Scorecard and See Candidates. */
-export function VacancySheet({ id, close }: { id: string; close: () => void }) {
+export function VacancySheet({ id, close, inline = false }: { id: string; close: () => void; inline?: boolean }) {
   const modal = useModal();
   const { navigate } = useRouter();
   const read = useApi("GET /api/v1/recruitment/vacancies/:id", { params: { id } });
@@ -208,10 +234,12 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
   const traits = v.questions.filter((q) => q.active && q.purpose === "interview");
   const asks = v.questions.filter((q) => q.active && q.purpose === "application");
   const live = v.status !== "closed";
-  // A form opened from here goes back to the sheet when it closes (the app holds one dialog at a time).
-  const back = () => modal.open({ title: v.title, wide: true, body: (done) => <VacancySheet id={id} close={done} /> });
+  // A form opened from here goes back to the vacancy when it closes: beside the list it is still
+  // there; in the dialog it opens again (the app holds one dialog at a time).
+  const back = () => (inline ? modal.close() : modal.open({ title: v.title, wide: true, body: (done) => <VacancySheet id={id} close={done} /> }));
   return (
     <>
+      {inline && <CardHeader title={v.title} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {statusOf(v)}
         <Pill dot={false}>{v.number}</Pill>
@@ -241,18 +269,19 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
           ],
         ]}
       />
-      <Grid cols={2} className="mt-3">
+      {/* Beside the list the pane is too narrow for two cards in a row: they stack. */}
+      <Grid cols={inline ? 1 : 2} className="mt-3">
         <Card>
-          <CardHeader title={<HelpTerm help={SCORECARD_HELP}>Scorecard Weights</HelpTerm>} />
+          <CardHeader title={<HelpTerm help={SCORECARD_HELP}>Scorecard Weights</HelpTerm>} level={3} />
           <KeyValue items={v.scorecard.map((p) => [p.name, p.active ? `${p.weight}%` : "Off"])} />
         </Card>
         <Card>
-          <CardHeader title="Candidates by Stage" />
+          <CardHeader title="Candidates by Stage" level={3} />
           <KeyValue items={v.by_stage.map((x) => [STAGE_LABEL[x.stage], String(x.count)])} />
         </Card>
       </Grid>
       <Card className="mt-3">
-        <CardHeader title="Interview Traits" />
+        <CardHeader title="Interview Traits" level={3} />
         {traits.length ? (
           <ol className="list-decimal space-y-1 pl-5 text-sm">
             {traits.map((t) => (
@@ -274,7 +303,7 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
         )}
       </Card>
       <Card className="mt-3" data-copy="content">
-        <CardHeader title="Description" />
+        <CardHeader title="Description" level={3} />
         <RichText blocks={v.description_blocks} top={4} />
         {v.requirements_blocks && (
           <>

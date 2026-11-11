@@ -186,6 +186,9 @@ const DOC_TYPES = [
   "requisition",
   "disbursement",
   "budget",
+  "sop",
+  "training_course",
+  "training_certificate",
 ];
 const DocType = z.enum(DOC_TYPES);
 const NumberingReset = z.enum(["never", "yearly", "monthly"]);

@@ -861,7 +861,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "settings.NumberingSchemeChange",
-      "schema_sha": "33cf200824778762",
+      "schema_sha": "8a8ca346ce9172ff",
       "screen": null
     },
     {
@@ -1834,7 +1834,7 @@
       "risk": null,
       "bulk": null,
       "schema": "organisation.EmployeeListQuery",
-      "schema_sha": "dfcf3c65b0a27544",
+      "schema_sha": "6189341a0eea358a",
       "screen": null
     },
     {
@@ -2385,6 +2385,17 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "vacancies.hiring_managers",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "vacancies.HiringManagerListQuery",
+      "schema_sha": "463693b1b2726c8c",
       "screen": null
     },
     {

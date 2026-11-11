@@ -1344,8 +1344,14 @@ route("POST /api/v1/partnerships/proposals/:id/draft", (req) => {
   if (!p) return notFound();
   if (p.status !== "questions") return notNow("A draft is already written");
   if (p.questions.some((q) => q.required && q.state === "open")) return fail(409, "PROPOSAL_STATE", "Answer the required cards", { questions: ["Answer the required cards"] });
-  // The worker writes in minutes; the mock's draft is the kit's sample, at once.
-  Object.assign(p, { status: "draft", content: contentFor({ number: p.number, title: `${p.deal_title}, Together`, partner: p.record.name }), title: `${p.deal_title}, Together`, progress: null });
+  // The worker writes in minutes; the mock walks the same steps in seconds (the studio polls every four), then the kit's sample.
+  const step = (to: "writing" | "checking" | "laying_out") => ({ job: "draft" as const, step: to, failed: false, reason: null, at: new Date().toISOString() });
+  Object.assign(p, { status: "writing", progress: step("writing") });
+  setTimeout(() => p.status === "writing" && (p.progress = step("checking")), 3000);
+  setTimeout(() => p.status === "writing" && (p.progress = step("laying_out")), 6000);
+  setTimeout(() => {
+    if (p.status === "writing") Object.assign(p, { status: "draft", content: contentFor({ number: p.number, title: `${p.deal_title}, Together`, partner: p.record.name }), title: `${p.deal_title}, Together`, progress: null });
+  }, 9000);
   return touch(p);
 });
 route("PATCH /api/v1/partnerships/proposals/:id/content", (req) => {

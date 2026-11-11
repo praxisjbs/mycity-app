@@ -100,8 +100,8 @@ function signerOf(s, request) {
   };
 }
 
-/** AgreementDetail. */
-async function detailOf(db, a) {
+/** AgreementDetail, for `actor` (who may decide its approval, §6.9). */
+async function detailOf(db, a, actor = null) {
   const countersigned = await countersignedOf(db, a);
   const progress = a.signature_request_id ? await signatures.progressOf(db, a.signature_request_id) : null;
   const catalog = await signing.catalogOf(db, a);
@@ -115,7 +115,7 @@ async function detailOf(db, a) {
     blocks: await signing.blocksOf(db, a.partnership_agreement_id),
     missing_fields: await signing.missingOf(db, a),
     workflow_instance_id: a.workflow_instance_id || null,
-    approval: await approval.viewOf(db, a),
+    approval: await approval.viewOf(db, a, actor),
     returned_reason: a.status === "draft" ? a.returned_reason || null : null,
     countersigned,
     suggested_signers: await signing.suggestedSigners(db, a, countersigned),
@@ -138,11 +138,11 @@ async function list(query, scope) {
   return { ...page, data: page.data.map(rowOf) };
 }
 
-/** GET /agreements/:id. */
-async function get(id, scope) {
+/** GET /agreements/:id, and what every action answers, for the reader (`actor`). */
+async function get(id, scope, actor = null) {
   const a = await repo.get(pool, id, scope);
   if (!a) throw notFound();
-  return detailOf(pool, a);
+  return detailOf(pool, a, actor);
 }
 
 /** GET /agreements/summary: the cards above Contracts & MOUs. */

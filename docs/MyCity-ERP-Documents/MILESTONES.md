@@ -1361,6 +1361,20 @@ enforced permission keys, checked by a gate.
 `praxis-ls/src/modules/hr/sop_onboarding/` (783); `house-rules.tsx` (617). Company announcements, HR
 policies, SOPs, training resources, searchable FAQ. Articles are versioned and permission-filtered.
 
+*Amended 11 November 2026 (TB; the Modules Review of 4 November 2026; `docs/guides/knowledge.md` §1.1).*
+**FAQs are removed**: the User Guide and Praxis AI answer questions. **Announcements were removed** on
+29/10/2026: Staff Community keeps them. **SOPs are each department's own procedures**, independent of the
+system (how to use a screen is the User Guide's): structured (Purpose, Scope, Roles Involved, numbered Steps
+each with who, the screen it happens on and a file), versioned, written by the department's head or the new
+capability `sops.manage`, read by everyone, and listed under Procedures on the screens their steps name.
+**Training is a small learning system**: a course of files, video links, outside course links and written
+lessons, assigned to everyone, departments, roles or people with a due date and a task in My Workspace, or
+open to anyone in the Library; staff take it on a new tab, **ESS · My Training**, mark each item done, add
+proof where the course asks for it, and receive a **MyCity certificate of completion** (an A4 landscape PDF
+with the course publisher's signature, a number and a QR verified on `go.mycityapp.io`), issued
+automatically. Draft With AI (SOPs) and Draft Lesson (training) run on the Default job. Courses and the
+certificate are new; nothing is taken from a donor for them.
+
 ### AI assistant
 
 **Narrowed on 10 October (A23): the assistant reads, it never writes.** Cynthia and Tom-Blake
@@ -1409,7 +1423,9 @@ budget versus actual this month.
 
 ### Definition of done
 
-Policies, SOPs, announcements, training resources and FAQs are searchable and permission-filtered.
+Policies, SOPs and training are searchable and permission-filtered (FAQs and announcements removed, amended
+11/11/2026). A department head publishes an SOP that appears under Procedures on the screen it names; a course
+is assigned, taken on a phone and completed with a certificate whose QR verifies on `go.mycityapp.io`.
 ⌘K finds every page, tab and record the user may open, and nothing they may not. The assistant
 answers each of the six target questions with data-backed, auditable answers citing their records.
 A user without expense permission asks about expenses and is told it is not available to them.
@@ -1588,6 +1604,16 @@ components. It reuses the `payroll` permission key, its writes behind the new ca
 Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js`,
 the app's catalogue and `docs/PROGRESS.md` (rows #47 and #49 Dropped, #109 added).
 
+**Amended 11/11/2026 (TB, M10 PR 0).** The inventory stays at 105 and the admin surface at 96: **Knowledge
+Hub · FAQs** (`faqs`) is dropped (the 4 November Modules Review: the User Guide and Praxis AI answer
+questions), and **Employee Self-Service · My Training** (`my-training`, M10) joins, where staff take their
+assigned and Library courses and keep their certificates. Knowledge Hub keeps four tabs: Policies, SOPs,
+Training and the User Guide. My Training reuses the `knowledge` permission key (own only); courses are built
+behind the new capability `training.manage`, and SOPs written by a department's head or `sops.manage`.
+Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.js`,
+`src/shared/search/screens.js`, the app's catalogue and `docs/PROGRESS.md` (row #64 Dropped, #110 added). Its
+engineering shape is in `docs/guides/knowledge.md`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries eight of the
 screens (six of the 92 approved, Proposal, ratified 05/11/2026, and Home, ratified 06/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1597,7 +1623,7 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | (ungrouped) | **Home** | 4 | Overview · Team · Alerts · Reports | M1 |
 | (ungrouped) | **My Workspace** | 5 | Today · Tasks · Projects · Calendar · Analytics | M2 |
-| (ungrouped) | **Employee Self-Service** | 12 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · Org Chart · My Security | M1 |
+| (ungrouped) | **Employee Self-Service** | 13 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · My Training · Org Chart · My Security | M1, M10 (My Training, 11/11/2026) |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
 | People | **People** | 7 | Employees · Organogram · Departments · Attendance · Leave · Devices · Worksites | M1, M2 (Departments) |
@@ -1607,7 +1633,7 @@ staff never navigates to it to do their job.
 | People | **Payroll** | 4 | Payroll Runs · Payslips · Deductions · Configurations | M6 (Salary Structure and Statutory folded into Configurations, 09/11/2026) |
 | Business | **Partnerships** | 7 | Pipeline · Categories · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 (Categories ratified 05/11/2026) |
 | Business | **Expenses** | 7 | My Requests (shown in ESS) · Requisitions · Approvals · Disbursements · Projects · Budgets · Categories | M8 (Projects added 04/11/2026, AJ; its tab and PROGRESS row in M8 PR 7) |
-| System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · User Guide | M1 (Policies), M10, M0 (User Guide) |
+| System | **Knowledge Hub** | 4 | Policies · SOPs · Training · User Guide | M1 (Policies), M10, M0 (User Guide); FAQs dropped 11/11/2026 |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
 | System | **Settings** | 13 | Organisation · Status · Performance · Faults · Users · Roles & Permissions · Approvals · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
 
@@ -1617,7 +1643,7 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | Public | **Public site** | 9 | Home · Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Help · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026; Home ratified 06/11/2026; Help ratified 08/11/2026) |
 
-Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
+Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026) and its FAQs tab (TB, 11/11/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
 (the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Home, Careers, Vacancy, Apply,
 Assessment and Help in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to

@@ -7,6 +7,14 @@
       "phone"
     ]
   },
+  "qs-add-lead": {
+    "spec": "48889f8a9b486996",
+    "source": "42b665864296c5ff",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "qs-add-task": {
     "spec": "221d9119480a0a72",
     "source": "c6f053b128d408ea",
@@ -17,7 +25,15 @@
   },
   "qs-agree": {
     "spec": "663deb49e9bb88ca",
-    "source": "c05adc05f6f28d7c",
+    "source": "6b8f8d00bd97c8aa",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-agreement": {
+    "spec": "46d926cf44de79b9",
+    "source": "42b665864296c5ff",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +65,7 @@
   },
   "qs-approve-leave": {
     "spec": "f974e711363d9efc",
-    "source": "c2eca4c119e659e9",
+    "source": "b2dfda1ba0e1a20d",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +81,7 @@
   },
   "qs-check-in": {
     "spec": "590035331c4ca0f0",
-    "source": "13875b6467b08f35",
+    "source": "f5973bfc7f82b5b7",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +89,7 @@
   },
   "qs-clock-in": {
     "spec": "51edfe0fed8ea055",
-    "source": "6e29848ebad45719",
+    "source": "c3f45bf81ffca267",
     "devices": [
       "desktop",
       "phone"
@@ -127,6 +143,14 @@
       "phone"
     ]
   },
+  "qs-log-interaction": {
+    "spec": "2866c5e00fda28af",
+    "source": "42b665864296c5ff",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "qs-login-help": {
     "spec": "a5b16cc1c0b9bd35",
     "source": "7002a286e78940c2",
@@ -161,7 +185,7 @@
   },
   "qs-policy": {
     "spec": "76af8b46d1d2858d",
-    "source": "be09d801666ff83c",
+    "source": "7b6aa29e1de155b0",
     "devices": [
       "desktop",
       "phone"
@@ -193,7 +217,7 @@
   },
   "qs-request-leave": {
     "spec": "0db81a71cb5f5bc5",
-    "source": "4c99e11f48a5b189",
+    "source": "5ccd7c288f4a16d9",
     "devices": [
       "desktop",
       "phone"
@@ -218,6 +242,14 @@
   "qs-search": {
     "spec": "eee935c1ee9404c8",
     "source": "44de18a6a6a5a3a2",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-send-proposal": {
+    "spec": "ebe5e4751c49aeea",
+    "source": "42b665864296c5ff",
     "devices": [
       "desktop",
       "phone"

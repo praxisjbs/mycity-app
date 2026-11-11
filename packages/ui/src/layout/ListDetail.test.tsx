@@ -65,6 +65,29 @@ describe("ListDetail side by side", () => {
     expect(screen.getByText("Alone")).toBeInTheDocument();
   });
 
+  it("with fillUntilPicked, gives a board the full width until a record is picked, then puts it beside", async () => {
+    function Board() {
+      const [picked, setPicked] = useState<string | null>(null);
+      const shown = REQUESTS.find((r) => r.id === picked);
+      return (
+        <ListDetail
+          fillUntilPicked
+          open={picked !== null}
+          onClose={() => setPicked(null)}
+          title="Candidate"
+          list={<button type="button" onClick={() => setPicked("b")}>Chidi Eze</button>}
+          detail={shown && <p>{`${shown.type} leave for ${shown.name}`}</p>}
+        />
+      );
+    }
+    const { container } = render(<Board />);
+    expect(container.querySelector("[data-grid]")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Chidi Eze" }));
+    expect(screen.getByText("Sick leave for Chidi Eze")).toBeInTheDocument();
+    expect(container.querySelector("[data-grid]")).not.toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<Requests />);
     expect(await axe(container)).toHaveNoViolations();

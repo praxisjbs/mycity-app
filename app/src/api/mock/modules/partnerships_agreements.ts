@@ -8,11 +8,12 @@
  */
 import type { AgreementDetail, AgreementRow, AgreementStatus, RenewalRow, RichTextBlock, Signer, SignerInput, TemplateKind } from "@mycity/contract/contract.gen.ts";
 import { created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
-import { refKey } from "../data/people";
+import { refKey, SIGN_INS } from "../data/people";
 import { DEALS, dealOf, recordOf, RECORDS } from "./partnerships";
 
 type Body = Record<string, unknown>;
 const now = () => new Date().toISOString();
+const mayDecide = (user: string | null) => Boolean(user) && SIGN_INS[user!]?.view === "ceo";
 
 interface MockAgreement {
   id: string;
@@ -30,7 +31,7 @@ interface MockAgreement {
   fields: Record<string, string | null>;
   /** The fields still empty, by path. */
   empty: string[];
-  approval: AgreementDetail["approval"];
+  approval: Omit<NonNullable<AgreementDetail["approval"]>, "can_decide"> | null;
   returned_reason: string | null;
   countersigned: boolean;
   signers: Signer[];
@@ -141,7 +142,8 @@ function suggested(a: MockAgreement): SignerInput[] {
   return out;
 }
 
-function detailOf(a: MockAgreement): AgreementDetail {
+/** The detail, with Approve and Reject offered to whoever may decide its approval: the CEO, who may decide any stage. */
+function detailOf(a: MockAgreement, user: string | null = null): AgreementDetail {
   const signed = ["signed", "active", "expiring", "renewed"].includes(a.status) || (a.status === "closed" && Boolean(a.signed_at));
   return {
     ...rowOf(a),
@@ -153,7 +155,7 @@ function detailOf(a: MockAgreement): AgreementDetail {
     blocks: blocksOf(a),
     missing_fields: a.empty.map((p) => LABEL[p] ?? p),
     workflow_instance_id: a.approval ? sid(`agr-wf:${a.id}`) : null,
-    approval: ["review", "approval"].includes(a.status) ? a.approval : null,
+    approval: ["review", "approval"].includes(a.status) && a.approval ? { ...a.approval, can_decide: a.approval.state === "waiting" && mayDecide(user) } : null,
     returned_reason: a.status === "draft" ? a.returned_reason : null,
     countersigned: a.countersigned,
     suggested_signers: suggested(a),
@@ -288,8 +290,30 @@ route("GET /api/v1/partnerships/agreements", (req) =>
 
 route("GET /api/v1/partnerships/agreements/:id", (req) => {
   const a = byIdOf(req);
-  return a ? ok(detailOf(a)) : notFound();
+  return a ? ok(detailOf(a, req.user)) : notFound();
 });
+
+/**
+ * POST /workflow/instances/:id/approve|reject for an agreement's approval, through organisation.ts's decide chain;
+ * null for any other id. Head of Department first, then the CEO; a rejection returns it to Draft with its reason.
+ */
+export function decideAgreement(user: string, wid: string, approve: boolean, reason?: string | null) {
+  const a = AGREEMENTS.find((x) => x.approval && sid(`agr-wf:${x.id}`) === wid);
+  if (!a) return null;
+  if (a.approval?.state !== "waiting") return fail(409, "APPROVAL_DECIDED", "This approval was already decided");
+  if (!mayDecide(user)) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  if (!approve) {
+    if (!String(reason ?? "").trim()) return invalid({ reason: ["is required"] });
+    Object.assign(a, { status: "draft", approval: null, returned_reason: String(reason).trim() });
+    return ok({ workflow_instance_id: wid, state: "rejected", stage_name: null });
+  }
+  if (a.approval.stage === "Head of Department") {
+    Object.assign(a, { status: "approval", approval: { state: "waiting", stage: "CEO", waiting_on: "The CEO" } });
+    return ok({ workflow_instance_id: wid, state: "pending", stage_name: "CEO" });
+  }
+  Object.assign(a, { status: "approval", approval: { state: "approved", stage: null, waiting_on: null } });
+  return ok({ workflow_instance_id: wid, state: "approved", stage_name: null });
+}
 
 route("POST /api/v1/partnerships/agreements", (req) => {
   const b = req.body as Body;

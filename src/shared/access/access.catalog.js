@@ -103,7 +103,7 @@ const MODULE_CATALOG = [
     key: "knowledge",
     area: "system",
     label: "Knowledge Hub",
-    description: "Policies, SOPs, FAQs, training and announcements",
+    description: "Policies, SOPs, training and the User Guide",
   },
   {
     key: "praxis_ai",
@@ -233,6 +233,18 @@ const CAPABILITY_CATALOG = [
     module: "knowledge",
     label: "Manage Policies",
     description: "Write, publish, withdraw and archive company policies, and see who has acknowledged them.",
+  },
+  {
+    code: "sops.manage",
+    module: "knowledge",
+    label: "Manage SOPs",
+    description: "Write, publish and archive any department's SOPs.",
+  },
+  {
+    code: "training.manage",
+    module: "knowledge",
+    label: "Manage Training",
+    description: "Build, publish, assign and archive courses, and see everyone's progress and certificates.",
   },
   {
     code: "mailbox.signature",

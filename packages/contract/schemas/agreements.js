@@ -220,9 +220,13 @@ const AgreementDetail = AgreementRow.extend({
   /** The labels of the fields still empty: Submit names them. */
   missing_fields: z.array(z.string()),
   workflow_instance_id: uuid.nullable(),
-  /** Its approval: the stage waiting and who it waits on, or approved once every stage has. */
+  /**
+   * Its approval: the stage waiting and who it waits on, or approved once every stage has. `can_decide`:
+   * the waiting stage names the reader (the CEO may decide any stage; never the person who submitted it),
+   * so Approve and Reject show on the card; they go to the approval's own routes (workflow.js).
+   */
   approval: z
-    .object({ state: z.enum(["waiting", "approved"]), stage: z.string().nullable(), waiting_on: z.string().nullable() })
+    .object({ state: z.enum(["waiting", "approved"]), stage: z.string().nullable(), waiting_on: z.string().nullable(), can_decide: z.boolean() })
     .strict()
     .nullable(),
   /** Why it came back to Draft (rejected, changes asked for, withdrawn), until it is submitted again. */

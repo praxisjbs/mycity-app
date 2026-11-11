@@ -67,7 +67,7 @@ export function ExportAction({ source, filters, label }: { source: string; filte
  * page it returns, and the footer pages through them.
  */
 export function PagedTable<R>({
-  list, columns, title, right, search, onRowClick, noun, nounPlural, empty, wide, rowKey,
+  list, columns, title, right, search, onRowClick, noun, nounPlural, empty, wide, rowKey, selectedKey,
 }: {
   list: PagedResult<R>;
   columns: DataViewColumn<R>[];
@@ -80,6 +80,8 @@ export function PagedTable<R>({
   nounPlural?: string;
   empty?: { title: ReactNode; text?: ReactNode };
   wide?: boolean;
+  /** The row whose record is in view beside the list (ListDetail). */
+  selectedKey?: string;
 }) {
   return (
     <DataView
@@ -98,6 +100,7 @@ export function PagedTable<R>({
       loading={list.loading}
       error={list.error}
       onRowClick={onRowClick}
+      selectedKey={selectedKey}
       empty={empty ?? (list.q ? { title: "Nothing Matches", text: "Try another search." } : undefined)}
       wide={wide}
       /* The table's own title names its pages, so two lists on one screen are two landmarks a screen reader can tell apart. */

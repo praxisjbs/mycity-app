@@ -102,7 +102,6 @@ export const COMING: Record<string, string[]> = {
   /* Knowledge Hub */
   "knowledge/policies": ["Every company policy, versioned and signed", "The Attendance policy as a worksheet", "Who has acknowledged each version"],
   "knowledge/sops": ["Step-by-step procedures for each department", "Owners keep them current", "Linked from the screens they describe"],
-  "knowledge/faqs": ["Answers to the questions staff ask most", "Search in plain words", "Suggest a new question"],
   "knowledge/training": ["Training material and onboarding courses", "Track who has completed what", "Assign training to a person or team"],
 
   /* Praxis AI */
@@ -124,4 +123,5 @@ export const COMING: Record<string, string[]> = {
   "knowledge/user-guide": ["How to use every screen, step by step", "Pictures of each screen, numbered", "Open a screen from a step and come back"],
   "people/departments": ["Every department, its head and its people", "Set a head, move people, merge or retire", "Reporting lines and rights follow the head"],
   "expenses/projects": ["Each project's budget and spend", "Raise a request for a project", "Committed and spent per project"],
+  "ess/my-training": ["The courses assigned to you, due first", "Lessons, videos and links in one place", "Your certificates, ready to download"],
 };

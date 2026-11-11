@@ -233,6 +233,27 @@ const SCHEMES = Object.freeze({
     reset: "yearly",
     include_period: true,
   }, // M8 a department's budget for a year, "BUD-2027-0001" (seeded in 8099)
+  sop: {
+    prefix: "SOP",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M10 a department's standard operating procedure, "SOP-0001" (seeded in 10490)
+  training_course: {
+    prefix: "TRN",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M10 a training course, "TRN-0001" (seeded in 10490)
+  training_certificate: {
+    prefix: "CERT",
+    padding: 4,
+    separator: "-",
+    reset: "yearly",
+    include_period: true,
+  }, // M10 a certificate of completion, "CERT-2026-0001" (seeded in 10490)
 });
 
 const DOC_TYPES = Object.freeze(Object.keys(SCHEMES));

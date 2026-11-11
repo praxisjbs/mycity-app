@@ -8,6 +8,7 @@ import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
 import { decideExpense, expenseInstance } from "./expenses";
 import { decideOffer, offerInstance, offersWaitingOn } from "./offers";
+import { decideAgreement } from "./partnerships_agreements";
 import { decidePayrollRun, payrollRunInstance } from "./payroll";
 import { decidePlan, decideTargetChange, decideUnbind, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
@@ -146,7 +147,9 @@ const text = (a: string | null, b: string | null) => String(a ?? "").localeCompa
 
 route("GET /api/v1/employees", (req) => {
   const asked = req.query.status;
-  return paged(scopeOf(req.user!).filter((p) => (asked === "archived" ? true : visible(p))).map(listRow), req, {
+  // exclude_self: a picker whose form may not name the caller (Raise Query) never offers them.
+  const self = req.query.exclude_self === "true" ? byKey(req.user!)?.employee_id : undefined;
+  return paged(scopeOf(req.user!).filter((p) => (asked === "archived" ? true : visible(p)) && p.employee_id !== self).map(listRow), req, {
     search: (r) => [r.display_name, r.job_title, r.department, r.staff_number],
     filters: {
       department_id: (r, v) => r.department_id === v,
@@ -156,6 +159,7 @@ route("GET /api/v1/employees", (req) => {
       line_manager_id: (r, v) => r.line_manager?.employee_id === v,
       // The demo's contracts end 120 days on (record()), so none ends within 30.
       contract: () => false,
+      exclude_self: () => true,
     },
     sort: {
       display_name: (a, b) => text(a.display_name, b.display_name),
@@ -1005,6 +1009,7 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
       decideTargetChange(req.user!, req.params.id, approve, reason) ??
       decideExpense(req.user!, req.params.id, approve, reason) ??
       decideOffer(req.user!, req.params.id, approve, reason) ??
+      decideAgreement(req.user!, req.params.id, approve, reason) ??
       decidePayrollRun(req.user!, req.params.id, approve, reason) ??
       notFound()
     );
