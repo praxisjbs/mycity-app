@@ -179,6 +179,7 @@ Schema migration file(s): `migrations/2010_workspace.sql`, `migrations/2020_work
 (numbered below 2100 already merged; it applies out of order, which MIGRATIONS.md §3 allows); Performance's
 `2100_performance_foundation.sql` (the commitment columns, `commitment_set`, `weekly_summary`) and
 `2400_performance_commitments.sql` (`entity_type` `task`, a Recovery task's pointer; `rescope_reason`);
+Knowledge Hub's `10420_training_tasks.sql` (`entity_type` `training_enrolment`, a training task's pointer);
 `2500_workspace_projects.sql` (`project.created_by`, its status CHECK and indexes),
 `2510_task_late_reasons.sql` (`task_late_reason`; the CHECK on `task.late_reason` dropped) and
 `2520_calendar_invitations.sql` (`calendar_event.ics_sequence`). Reference-data file(s):
@@ -286,7 +287,9 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
 - **Pointer, never a stored link.** `link_url` on the wire is `linkFor(entity_type, entity_id)` (and
   Counts Towards `linkFor("target", employee_target_id)` or `linkFor("key_result", id)`), worked out on
   every read. M2 allows `entity_type` `partner`, `vacancy`, `goal`, `key_result`, `scorecard`,
-  `performance_review`, `improvement_plan` and `task`; a type the route map does not know is a 422.
+  `performance_review`, `improvement_plan` and `task`, and M10 `training_enrolment` (a course a person
+  was assigned, set by the training module and done by it when they complete the course,
+  `completeForRecord`; knowledge.md §6.7); a type the route map does not know is a 422.
 - **Counts Towards** (performance.md §6.18): one of the assignee's lines on their binding scorecard for
   the quarter of the task's month, or a key result they own in a live plan (binding, or unbound or
   revising while its head changes it, performance.md §6.22); a line that is not the
@@ -671,6 +674,7 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · M10 PR 3 (`knowledge.md` §6.7): a task may name a `training_enrolment` (migration `10420`, `TaskEntityType`); the training module sets "Complete <course>" for each assigned person through `create`, and the new `completeForRecord` moves a record's open tasks to Done when its course completes, as `cancelForRecord` cancels them. Nothing on My Workspace's screens changes: such a task opens My Training.
 - 08/11/2026 · JP · M7 PR 8 (`partnerships.md` §6.15): `PartnerLinkFields` takes `open`, showing Partner and Deal at once with no Disconnect, for a form whose whole purpose is the link: Mailbox's Link to Partner reuses Workspace's pickers rather than a copy. Nothing on My Workspace's screens changes.
 - 07/11/2026 · AJ · M7 PR 5 (`partnerships.md` §6.16, Appendix A): Connect to Partner on New Project, New Task and New Event and their edits (Partner, leads marked, and Deal; Disconnect), written by the three services after Partnerships checks the person sees the record and the deal (`partners.work.checkLink`); a task made in a connected project takes its link; `partner_link` on every task, project and event, named only for a reader who sees the record; the Partner filter on Tasks and Projects (`partner_id`, `lead_id`); `relinkIn` moves a lead's work to its partner on conversion (`project.relinked`, `task.relinked`, `calendar_event.relinked`); a signed deal's event days are an event its partner keeps (`entity_type` `partner`, with the deal's `deal_id`); the Workspace cards carry the optional partner and deal (§2 to §11).
 - 05/11/2026 · GE · The calendar's write path takes a transaction from another module: `createIn`,

@@ -704,6 +704,10 @@ and a question asked before a card keeps what it asked for in the answer's `meta
   later release drops them with `ai_message_citation.knowledge_article_version_id` (MIGRATIONS §8); until
   then they keep the `updated_at` triggers and vector dimension they were owed only if something reads them.
 
+**Built 11/11/2026, M10 PR 3** (`docs/guides/knowledge.md` §6.7):
+- `10420` a task's record may be a `training_enrolment` (`task_entity_check` widened, as `2400` did for
+  `task`): each assigned person's "Complete <course>" task points at their place on the course.
+
 ### M11 Handover · 11000 to 11999 · TB
 
 No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `restore-drill.js`).

@@ -215,6 +215,7 @@ const SCHEDULERS = Object.freeze([
   "agreement-renewals",
   "proposal-expiry",
   "signature-reminders",
+  "training-joiners",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */
