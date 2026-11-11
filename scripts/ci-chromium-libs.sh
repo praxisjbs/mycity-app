@@ -11,10 +11,14 @@
 #      set another job of this run has shared. The moment one is there, the job stops its own
 #      install and installs the shared files without going to the mirror.
 #   3. A try that fails is tried once more, still watching; after the second, the job keeps
-#      watching for up to WAIT_SHARED seconds before it gives up on the others.
-#   4. Only then the last resort: Playwright's own list from a fresh package index with
-#      --fix-missing, less the Japanese, Chinese and Thai fonts (OPTIONAL_FONTS), which no screen of
-#      the hub or the public site uses.
+#      watching for another job's set until LAST_RESORT_AT.
+#   4. The last resort, which starts by LAST_RESORT_AT seconds into the step whatever the tries and
+#      the wait have done: Playwright's own list from a fresh package index with --fix-missing, less
+#      the fonts no screen of the hub or the public site uses (OPTIONAL_FONTS).
+#
+# The step is capped (ci.yml's timeout-minutes), so the tries and the wait share a budget that leaves
+# the last resort its own time before the cap (11/11/2026: the mirror refused five fonts in every job
+# of a run, both tries and the wait took the whole 12 minutes, and no job reached the last resort).
 #
 # No job refuses to share. Whatever set a job installed itself (from the cache, the mirror or the
 # last resort) is put in ~/chromium-share and named in $GITHUB_OUTPUT `share`; the next step
@@ -33,11 +37,15 @@ set -u
 DEBS="$HOME/chromium-debs"
 SHARE_DIR="$HOME/chromium-share"
 POLL=3
-WAIT_SHARED="${WAIT_SHARED:-240}"
+# Seconds into the step by which the last resort starts; it has up to six minutes of its own.
+LAST_RESORT_AT="${LAST_RESORT_AT:-420}"
+STARTED=$SECONDS
+left() { echo $((LAST_RESORT_AT - (SECONDS - STARTED))); }
 out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
 
-# Fonts Playwright lists for pages in other scripts; the gates render English, with emoji.
-OPTIONAL_FONTS="fonts-ipafont-gothic fonts-wqy-zenhei fonts-tlwg-loma-otf"
+# Fonts Playwright lists for pages in other scripts, and its spare fallbacks; the gates render
+# English with the app's own font, Liberation and emoji, which stay.
+OPTIONAL_FONTS="fonts-ipafont-gothic fonts-wqy-zenhei fonts-tlwg-loma-otf fonts-freefont-ttf fonts-unifont xfonts-cyrillic xfonts-scalable"
 
 # Playwright's apt package list for Chromium, as its own install would ask for (its dry run).
 playwright_packages() {
@@ -106,8 +114,11 @@ fi
 got="$(mktemp -d)"
 tried_shared=""
 for attempt in 1 2; do
-  # 2. From the mirror, watching for another job's set while it runs.
-  timeout 300 npx playwright install-deps chromium &
+  # 2. From the mirror, watching for another job's set while it runs; never past the budget.
+  cap=$(left)
+  [ "$cap" -gt 300 ] && cap=300
+  if [ "$cap" -lt 30 ]; then echo "::warning::No time left for try $attempt; going on"; break; fi
+  timeout "$cap" npx playwright install-deps chromium &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
     if [ -z "$tried_shared" ] && which="$(find_shared "$got")"; then
@@ -131,9 +142,9 @@ for attempt in 1 2; do
   stop_apt
 done
 
-# 3. The mirror failed this job twice: another job may still get the set, so wait for it a while.
+# 3. The mirror failed this job: another job may still get the set, so wait for it until the budget ends.
 if [ -z "$tried_shared" ]; then
-  for _ in $(seq $((WAIT_SHARED / POLL))); do
+  while [ "$(left)" -gt 0 ]; do
     if which="$(find_shared "$got")"; then use_shared "$got" "$which" || true; break; fi
     sleep "$POLL"
   done
@@ -143,7 +154,7 @@ fi
 packages="$(playwright_packages | grep -vxF -f <(tr ' ' '\n' <<<"$OPTIONAL_FONTS"))"
 if [ -n "$packages" ]; then
   # shellcheck disable=SC2086 # one word a package
-  if timeout 300 sudo apt-get update -q && timeout 300 sudo apt-get install -y -q --no-install-recommends --fix-missing $packages; then
+  if timeout 120 sudo apt-get update -q && timeout 240 sudo apt-get install -y -q --no-install-recommends --fix-missing $packages; then
     fetched "$got"
     share "$SHARED-lite" "$got"
     echo "::warning::Chromium's system libraries installed without the optional fonts ($OPTIONAL_FONTS): the runner's apt mirror could not serve them"
