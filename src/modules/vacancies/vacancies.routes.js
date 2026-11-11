@@ -3,12 +3,14 @@
  * /api/v1/recruitment/vacancies: Recruitment · Vacancies (docs/guides/recruitment.md §5).
  *
  *   GET  /, /summary, /suggested, /:id      `recruitment` view, scope by hiring manager
+ *   GET  /hiring-managers                   `recruitment` view: who may be a hiring manager (the picker)
  *   POST /                                  `recruitment` create: New Vacancy (draft, or published)
  *   PATCH /:id                              `recruitment` edit
  *   POST /:id/publish, /pause, /resume, /close   `recruitment` edit: the lifecycle
  *   PUT  /:id/questions, /:id/scorecard     `recruitment` edit
  *   GET, PUT /settings                      Careers Settings: view; edit
- *   GET, POST /assist, POST /:id/assist/questions   `recruitment` edit: Write With AI, nothing kept
+ *   GET, POST /assist, POST /assist/follow-ups, POST /:id/assist/questions   `recruitment` edit: Write With AI
+ *                                           and New Vacancy's interview, nothing kept
  *
  * The careers page is vacancies.public.routes.js (/api/public/v1/jobs).
  */
@@ -30,6 +32,10 @@ route(router, "get", "/suggested",
   { query: v.SeatSuggestionListQuery, response: v.SeatSuggestionPage, summary: "Vacant seats with no vacancy yet" },
   requirePermission("recruitment", "view"), controller.suggested);
 
+route(router, "get", "/hiring-managers",
+  { query: v.HiringManagerListQuery, response: v.HiringManagerPage, summary: "Who may be a vacancy's hiring manager" },
+  requirePermission("recruitment", "view"), controller.hiringManagers);
+
 route(router, "get", "/settings",
   { response: v.CareersSettings, summary: "Careers Settings: About MyCityApp and the Default Traits" },
   requirePermission("recruitment", "view"), controller.settings);
@@ -45,6 +51,10 @@ route(router, "get", "/assist",
 route(router, "post", "/assist",
   { body: v.JdDraftRequest, response: v.JdDraft, summary: "Draft a job description; nothing is kept" },
   requirePermission("recruitment", "edit"), controller.assist);
+
+route(router, "post", "/assist/follow-ups",
+  { body: v.FollowUpsRequest, response: v.FollowUps, summary: "Two questions about the role for New Vacancy's interview; nothing is kept" },
+  requirePermission("recruitment", "edit"), controller.followUps);
 
 route(router, "get", "/",
   { query: v.VacancyListQuery, response: v.VacancyPage, summary: "Vacancies the reader may see" },

@@ -20,14 +20,84 @@ const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
 const { RecordRef, TemplateKind } = require("./partner_pipeline");
 const { AnswerValue } = require("./proposals");
+const { RichTextBlock } = require("./policies");
+const { SignatureRequestStatus, SignatureMethod, SignaturePng } = require("./signatures");
+const { SealedSigner, CertificateLine } = require("./offers");
 
 const AgreementStatus = z.enum(["draft", "review", "approval", "sent", "viewed", "signed", "active", "expiring", "renewed", "closed"]);
 /** Which side a signer signs for: the partner's signatory, or MyCity's countersignatory. */
 const SignerSide = z.enum(["partner", "mycity"]);
-const SignerState = z.enum(["waiting", "sent", "viewed", "signed", "declined"]);
+/**
+ * Where one signer stands: waiting for an earlier signer; sent their link; opened it; signed; declined;
+ * `void`, signed on a request another declined or that lapsed or was withdrawn, which binds nobody; or
+ * `expired`, unsigned when the request ended.
+ */
+const SignerState = z.enum(["waiting", "sent", "viewed", "signed", "declined", "void", "expired"]);
 
 /** An ask's or a field's value by its key: what the template was filled with. */
 const FieldValues = z.record(z.string().regex(/^[a-z][a-z0-9_.]{0,79}$/), AnswerValue);
+
+/**
+ * What a category template may say (§6.8): the roots of the names its wording reads, so a template that names
+ * a root it cannot fill is refused when it is saved (shared/templates/variables). The finer check, that a
+ * name under a root is one of `AGREEMENT_RECORD_FIELDS`, a custom field of the category or an ask of the
+ * template, is the template service's. Every part is optional here: a draft is filled as far as the record
+ * goes, and Submit names what is still empty (§6.8).
+ */
+const TemplateText = z.string().nullable().optional();
+const AgreementVars = z
+  .object({
+    partner: z
+      .object({ name: TemplateText, legal_name: TemplateText, headquarters: TemplateText, region: TemplateText })
+      .optional(),
+    contact: z.object({ full_name: TemplateText, title: TemplateText, phones: TemplateText, email: TemplateText }).optional(),
+    deal: z
+      .object({
+        title: TemplateText,
+        event_title: TemplateText,
+        event_starts_on: isoDate.nullable().optional(),
+        event_ends_on: isoDate.nullable().optional(),
+        objective: TemplateText,
+        expected_attendance: z.number().int().nullable().optional(),
+        comments: TemplateText,
+        valid_until: isoDate.nullable().optional(),
+        validity_label: TemplateText,
+        /** The options table: a head row (the option labels), then a row per term (Original Price, Deal Price...). */
+        options: z.object({ head: z.array(z.string()), rows: z.array(z.array(z.string())) }).strict().optional(),
+      })
+      .optional(),
+    category: z.object({ checklist: z.array(z.string()).optional() }).optional(),
+    /** The partner's signer, filled when the agreement is signed: the signature stamped as its image or typed name. */
+    signer: z
+      .object({
+        name: TemplateText,
+        title: TemplateText,
+        signed_on: isoDate.nullable().optional(),
+        signature: z
+          .object({ signature: SignaturePng.nullable(), typed: z.string().nullable(), name: z.string() })
+          .strict()
+          .nullable()
+          .optional(),
+      })
+      .optional(),
+    custom: z.record(z.string(), z.unknown()).optional(),
+    ask: z.record(z.string(), z.unknown()).optional(),
+    /** The agreement itself, for its PDF's title; not a field a template names. */
+    agreement: z.object({ number: z.string(), title: z.string() }).strict().optional(),
+    /** Once signed: every signature, the certificate and the QR the sealed copy prints (signatures service). */
+    sealing: z
+      .object({
+        signers: z.array(SealedSigner),
+        certificate: z.array(CertificateLine),
+        qr: z.string(),
+        verify_url: z.string(),
+        reference: z.string(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
+  })
+  .strict();
 
 /* ------------------------------------------------------------------ *
  * Writing
@@ -43,10 +113,13 @@ const AgreementGenerate = z
   })
   .strict();
 
-/** Edit, in Draft only. An empty required field blocks Submit and is named. */
+/**
+ * Edit, in Draft only: the wording as DocumentEditor's HTML (each field still empty a chip), the values and
+ * asks (filling the chips still open), and the term. An empty required field blocks Submit and is named.
+ */
 const AgreementUpdate = z
   .object({
-    body: z.string().max(200000).optional(),
+    body_html: z.string().max(400000).optional(),
     fields: FieldValues.optional(),
     starts_on: isoDate.nullable().optional(),
     ends_on: isoDate.nullable().optional(),
@@ -105,10 +178,13 @@ const Signer = z
   .object({
     name: z.string(),
     title: z.string().nullable(),
-    email: z.string(),
+    /** Null for a signature recorded from paper. */
+    email: z.string().nullable(),
     side: SignerSide,
     state: SignerState,
     signed_at: isoDateTime.nullable(),
+    /** Drawn, typed, or signed on paper and recorded. */
+    method: SignatureMethod.nullable(),
   })
   .strict();
 
@@ -137,12 +213,31 @@ const AgreementDetail = AgreementRow.extend({
   template_key: z.string().nullable(),
   template_version: z.number().int().nullable(),
   fields: FieldValues,
-  body: z.string().nullable(),
-  /** The required fields still empty: Submit names them. */
+  /** The wording as DocumentEditor opens it, each field still empty a chip; edited in Draft only. */
+  body_html: z.string().nullable(),
+  /** The same wording as blocks (headings, numbered clauses, tables), as the screen and the signer read it. */
+  blocks: z.array(RichTextBlock),
+  /** The labels of the fields still empty: Submit names them. */
   missing_fields: z.array(z.string()),
   workflow_instance_id: uuid.nullable(),
+  /**
+   * Its approval: the stage waiting and who it waits on, or approved once every stage has. `can_decide`:
+   * the waiting stage names the reader (the CEO may decide any stage; never the person who submitted it),
+   * so Approve and Reject show on the card; they go to the approval's own routes (workflow.js).
+   */
   approval: z
-    .object({ stage: z.string(), waiting_on: z.string().nullable() })
+    .object({ state: z.enum(["waiting", "approved"]), stage: z.string().nullable(), waiting_on: z.string().nullable(), can_decide: z.boolean() })
+    .strict()
+    .nullable(),
+  /** Why it came back to Draft (rejected, changes asked for, withdrawn), until it is submitted again. */
+  returned_reason: z.string().nullable(),
+  /** Whether the template asks MyCity to countersign; Send for Signature then names MyCity's signer. */
+  countersigned: z.boolean(),
+  /** The signers Send for Signature offers: the partner's signatory contact, then MyCity's when countersigned. */
+  suggested_signers: z.array(SignerInput).max(4),
+  /** Its latest signature request: open, completed, or how it ended (declined, lapsed, withdrawn) and why. */
+  signing: z
+    .object({ status: SignatureRequestStatus, end_reason: z.string().nullable() })
     .strict()
     .nullable(),
   signers: z.array(Signer).max(4),
@@ -153,8 +248,11 @@ const AgreementDetail = AgreementRow.extend({
   renews_agreement_id: uuid.nullable(),
   closed_at: isoDateTime.nullable(),
   close_reason: z.string().nullable(),
-  /** The reference and the QR's link, once sealed. */
-  verify: z.object({ reference: z.string(), qr_url: z.string() }).strict().nullable(),
+  /**
+   * Once signed: the reference, the verification page it opens (status, signers and verdicts, never the
+   * content) and that link as a QR to show or print.
+   */
+  verify: z.object({ reference: z.string(), url: z.string(), qr: z.string().regex(/^data:image\/png;base64,/) }).strict().nullable(),
 }).strict();
 
 const AgreementListQuery = listQuery(
@@ -197,61 +295,24 @@ const AgreementsSummary = z
   })
   .strict();
 
-/* ------------------------------------------------------------------ *
- * Signing and verification (the signatures service, shared with M5)
- * ------------------------------------------------------------------ */
-
-const SignTokenParams = z.object({ token: z.string().min(16).max(200) }).strict();
-
-/** The six-digit code emailed to the address the link was sent to; ten minutes, five tries. */
-const SignCodeVerify = z.object({ code: z.string().regex(/^\d{6}$/, "Six digits") }).strict();
-
-/** A drawn signature as the pad gives it: a PNG data URL, at most about 1.5 MB. */
-const SignaturePng = z
-  .string()
-  .max(2000000, "Too large")
-  .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/, "Draw your signature");
-
-/** Sign Agreement: full name and title, drawn or typed, and I Agree to Sign Electronically. */
-const SignSubmit = z
+/** agreement-sign: a signer's link, mailed at Send for Signature and Send Again; never kept, never in the outbox. */
+const AgreementSignEmailVars = z
   .object({
-    full_name: text(120),
-    title: optionalText(120),
-    method: z.enum(["draw", "type"]),
-    signature_png: SignaturePng.optional(),
-    typed: text(120).optional(),
-    consent: z.literal(true),
-  })
-  .strict()
-  .refine((v) => v.method !== "draw" || Boolean(v.signature_png), { message: "Draw your signature", path: ["signature_png"] })
-  .refine((v) => v.method !== "type" || Boolean(v.typed), { message: "Type your signature", path: ["typed"] });
-
-/** By reference: AGR-2026-0001. A reference is not a secret, so it reveals no content. */
-const VerifyRefParams = z.object({ ref: z.string().trim().min(3).max(60) }).strict();
-
-const VerifyResult = z
-  .object({
-    reference: z.string(),
     title: z.string(),
-    status: z.enum(["signed", "active", "expiring", "expired", "renewed", "closed"]),
-    signers: z.array(
-      z
-        .object({
-          name: z.string(),
-          title: z.string().nullable(),
-          side: SignerSide,
-          signed_at: isoDateTime.nullable(),
-        })
-        .strict(),
-    ),
-    /** Signed on paper and recorded, not in the hub. */
-    signed_outside: z.boolean(),
-    /** The two checks (A12): the content matches what was signed; the stored file is the one sealed. */
-    verdicts: z.object({ content: z.boolean(), artifact: z.boolean() }).strict(),
-    /** Only when opened from the document's QR. */
-    document: z.object({ file_name: z.string(), url: z.string() }).strict().optional(),
+    reference: z.string(),
+    record_name: z.string(),
+    company: z.string(),
+    sign_url: z.string(),
+    expires_at: isoDateTime.nullable(),
+    message: z.string().nullable(),
+    /** A second signer (MyCity's) signs once the partner has. */
+    after: z.string().nullable(),
   })
   .strict();
+
+/* Signing and verification are the signatures service's, shared with M5: schemas/signatures.js
+ * (SignTokenParams, SignCodeVerify, SignaturePng, SignSubmit, SignDecline, VerifyRefParams,
+ * VerifyResult, VerifyByToken), moved there on 06/11/2026 (GE, LA; docs/guides/offers.md). */
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const ROW = {
@@ -261,11 +322,12 @@ const ROW = {
   owner: "the person, from employee and department",
 };
 const TABLES = {
+  AgreementVars: { table: null, reason: "the names a category template may read, declared for the template engine" },
   AgreementGenerate: {
     table: "partnership_agreement",
     virtual: { deal_id: "written as partnership_opportunity_id", asks: "kept in fields with the record's values" },
   },
-  AgreementUpdate: { table: "partnership_agreement" },
+  AgreementUpdate: { table: "partnership_agreement", virtual: { body_html: "written as body, through the one Markdown converter" } },
   SignerInput: { table: null, reason: "a signer confirmed for the signature request" },
   AgreementSend: { table: null, reason: "the signers and message the signature request is made with" },
   SignedCopyRecord: { table: null, reason: "a paper signature: signed_document_id, signed_at, signed_outside and the signer" },
@@ -277,8 +339,13 @@ const TABLES = {
     table: "partnership_agreement",
     virtual: {
       ...ROW,
+      body_html: "body, as the editor opens it",
+      blocks: "body, as headings, clauses and tables",
       missing_fields: "the template's required fields still empty",
       approval: "the waiting stage of its workflow_instance",
+      countersigned: "its category template's countersigned",
+      suggested_signers: "the record's signatory contact, and MyCity's signer when countersigned",
+      signing: "its signature request's status and end_reason",
       signers: "its signature request's signers",
       document: "the document behind document_id",
       signed_document: "the document behind signed_document_id",
@@ -294,11 +361,7 @@ const TABLES = {
   },
   RenewalPage: { table: null, reason: "a page of renewals due" },
   AgreementsSummary: { table: null, reason: "figures over the agreements" },
-  SignTokenParams: { table: null, reason: "the signing link's :token" },
-  SignCodeVerify: { table: null, reason: "the one-time code a signer was emailed" },
-  SignSubmit: { table: null, reason: "a signature and its evidence, kept on the signature row" },
-  VerifyRefParams: { table: null, reason: "a document's reference" },
-  VerifyResult: { table: null, reason: "what verification shows: status, signers and the two verdicts" },
+  AgreementSignEmailVars: { table: null, reason: "the variables of templates/email/agreement-sign.html" },
 };
 
 module.exports = {
@@ -307,6 +370,7 @@ module.exports = {
   SignerSide,
   SignerState,
   FieldValues,
+  AgreementVars,
   AgreementGenerate,
   AgreementUpdate,
   SignerInput,
@@ -323,10 +387,5 @@ module.exports = {
   RenewalRow,
   RenewalPage,
   AgreementsSummary,
-  SignTokenParams,
-  SignCodeVerify,
-  SignaturePng,
-  SignSubmit,
-  VerifyRefParams,
-  VerifyResult,
+  AgreementSignEmailVars,
 };

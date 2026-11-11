@@ -30,6 +30,7 @@ const CONTENTS: GuideContents = {
   quick_start: [{ slug: "qs-add-employee", title: "Add an Employee", role: "People & HR" }],
   answers: true,
   voice: false,
+  public_help_url: "https://go.mycityapp.io/help",
 };
 
 const CHAPTER: GuideChapter = {
@@ -108,6 +109,8 @@ vi.mock("@/api/hooks", () => ({
     error: null,
     reload: () => undefined,
   }),
+  // Procedures under a section (Procedures.tsx): none here.
+  useInfinite: () => ({ rows: [], page: undefined, loading: false, error: null }),
 }));
 vi.mock("@/lib/router", () => ({
   useRouter: () => ({ navigate: m.navigate, location: { path: "/knowledge", module: "knowledge", tab: "user-guide", id: null, params: m.params } }),
@@ -157,6 +160,13 @@ describe("User Guide", () => {
     await userEvent.click(screen.getByRole("button", { name: "Open Screen" }));
     expect(m.navigate).toHaveBeenCalledWith("/people?tab=employees");
     expect(JSON.parse(sessionStorage.getItem(GUIDE_RETURN) as string)).toMatchObject({ id: "people-employees", step: null });
+  });
+
+  it("points to the public site's own Help, in a new tab", () => {
+    draw(null);
+    const link = screen.getByRole("link", { name: /Public Site Help/ });
+    expect(link.getAttribute("href")).toBe("https://go.mycityapp.io/help");
+    expect(link.getAttribute("target")).toBe("_blank");
   });
 
   it("groups the Quick Start's cards by role", () => {

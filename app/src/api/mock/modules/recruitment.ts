@@ -13,6 +13,7 @@ import type {
   RichTextBlock,
   RichTextSpan,
   Interview,
+  InterviewActivity,
   InterviewDetail,
   ScorecardPart,
   ScorecardWeight,
@@ -22,13 +23,14 @@ import type {
   VacancyDetail,
   VacancyQuestion,
 } from "@mycity/contract/contract.gen.ts";
-import type { OfferRow, OnboardingDetail } from "@/api/types/recruitment";
+import type { OnboardingDetail } from "@/api/types/recruitment";
 import type { Status } from "@/api/types/performance";
 import type { RawResponse } from "../../client";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, DEPARTMENTS, grantsFor, PEOPLE, ref, refKey } from "../data/people";
 import * as D from "../data/recruitment";
 import { pickAnAddress, placeOf } from "./maps";
+import { withdrawOffersOf } from "./offers";
 import { WORKSITES as SITES } from "./worksites";
 import { exportFile } from "./shared";
 import { UPLOADS } from "../uploads";
@@ -37,7 +39,8 @@ import { UPLOADS } from "../uploads";
  * Recruitment on the mock (docs/guides/recruitment.md §5), in the contract's shapes: Vacancies, Careers
  * Settings, Candidates and their emails, Assessments and sittings, Interviews with the blind card, and
  * the Talent Pool. Bodies are checked by the contract's own schemas, so a form meets the API's words.
- * Fixtures live in data/recruitment.ts. M5's Offers and Onboarding stay INTERIM at the end of the file.
+ * Fixtures live in data/recruitment.ts. M5's Offers are in offers.ts; its Onboarding stays INTERIM at
+ * the end of this file.
  */
 
 /* ------------------------------------------------------------------ *
@@ -93,7 +96,12 @@ const vref = (v: VacancyDetail) => ({ vacancy_id: v.vacancy_id, number: v.number
 const appsOf = (v: VacancyDetail) => D.APPLICATIONS.filter((a) => vacancyOfApp(a).vacancy_id === v.vacancy_id);
 const traitsOf = (v: VacancyDetail) => v.questions.filter((q) => q.active && q.purpose === "interview");
 const STAGES = D.M4_STAGES;
-const reached = (a: D.MockApplication, stage: string) => STAGES.indexOf(a.stage) >= STAGES.indexOf(stage as (typeof STAGES)[number]);
+/** Where a stage sits on the board; M5's Offer and after are past every M4 stage. */
+const rank = (stage: string) => {
+  const i = (STAGES as readonly string[]).indexOf(stage);
+  return i < 0 ? STAGES.length : i;
+};
+const reached = (a: D.MockApplication, stage: string) => rank(a.stage) >= rank(stage);
 
 /** A line's spans: **bold** and *italic* only, which is what the vacancy texts use. */
 const spansOf = (line: string): RichTextSpan[] =>
@@ -135,10 +143,11 @@ function vacancyView(v: VacancyDetail, req: Req): VacancyDetail {
     requirements_blocks: blocksOf(v.requirements),
     nice_to_have_blocks: blocksOf(v.nice_to_have),
     applicants: apps.length,
-    in_progress: live.length,
+    // Not Progress All reaches only the M4 stages; Offer and after are M5's.
+    in_progress: live.filter((a) => (STAGES as readonly string[]).includes(a.stage)).length,
     past_closing: v.status === "open" && closesPast,
     days_open: v.published_at ? daysSince(v.published_at) - (v.closed_at ? daysSince(v.closed_at) : 0) : null,
-    by_stage: v.board_stages.map((stage) => ({ stage, count: live.filter((a) => a.stage === stage).length })),
+    by_stage: STAGES.map((stage) => ({ stage, count: live.filter((a) => a.stage === stage).length })),
     can_edit: v.status !== "closed" && can(req, "edit"),
   };
 }
@@ -174,7 +183,7 @@ R("GET /api/v1/recruitment/vacancies/summary", "view", () => {
     applicants: VACANCIES.filter((v) => v.status === "open" || v.status === "paused").reduce((n, v) => n + appsOf(v).length, 0),
     in_interview: live.filter((a) => a.stage === "interview").length,
     past_closing: VACANCIES.filter((v) => v.status === "open" && v.closes_at && Date.parse(v.closes_at) < Date.now()).length,
-    careers_url: "https://go.mycityapp.io/jobs",
+    site_url: "https://go.mycityapp.io/",
     funnel: STAGES.map((stage) => ({ stage, count: D.APPLICATIONS.filter((a) => reached(a, stage)).length })),
   });
 });
@@ -184,6 +193,15 @@ R("GET /api/v1/recruitment/vacancies/suggested", "view", (req) =>
     D.SEATS.filter((s) => !VACANCIES.some((v) => v.org_seat_id === s.org_seat_id && v.status !== "closed")),
     req,
     { search: (s) => [s.title, s.department], filters: { org_seat_id: (s, id) => s.org_seat_id === id } },
+  ),
+);
+
+// Who may be a hiring manager: the panel's rule (holds Recruitment), as the save holds them to (guide §6.1).
+R("GET /api/v1/recruitment/vacancies/hiring-managers", "view", (req) =>
+  paged(
+    PEOPLE.filter(maySit).map((p) => ref(p)!),
+    req,
+    { search: (p) => [p.display_name] },
   ),
 );
 
@@ -197,17 +215,61 @@ R("PUT /api/v1/recruitment/vacancies/settings", "edit", (req) =>
   }),
 );
 
-R("GET /api/v1/recruitment/vacancies/assist", "edit", () => ok({ available: true, reason: null }));
+/** Whether the mock's AI answers; a test switches it off to walk New Vacancy's interview without it. */
+export const ASSIST = { available: true };
+const assistOff = () => ({ available: false, reason: "off" as const });
+
+R("GET /api/v1/recruitment/vacancies/assist", "edit", () => ok(ASSIST.available ? { available: true, reason: null } : assistOff()));
+
+type Interviewed = { must_haves?: string; extras?: string; area?: string; positions?: number; follow_ups: Array<{ question: string; answer?: string }> };
+/** A line of an answer per list item. */
+const itemsOf = (text?: string) => (text ?? "").split(/\n|;|(?<=\.)\s+/).map((t) => t.replace(/^[-*]\s*/, "").trim()).filter((t) => t.length > 3);
+
 R("POST /api/v1/recruitment/vacancies/assist", "edit", (req) =>
-  parse<{ title: string; instruction: string; min_experience_years?: number }>(vacancySchemas.JdDraftRequest, req.body, (b) =>
-    ok({
+  parse<{ title: string; instruction?: string; min_experience_years?: number; interview?: Interviewed }>(vacancySchemas.JdDraftRequest, req.body, (b) => {
+    if (b.interview) {
+      // New Vacancy's interview: drafted from the answers, plainly when the AI is off (never an error).
+      const a = b.interview;
+      const musts = itemsOf(a.must_haves);
+      const answered = a.follow_ups.filter((f) => f.answer).map((f) => `- ${f.answer}`);
+      const overview = `MyCityApp is hiring ${a.positions && a.positions > 1 ? `${a.positions} people` : "one person"} as ${b.title}${a.area ? `, based in ${a.area}` : ""}.`;
+      const lines = musts.length ? musts : ["Own the work of the role from plan to result, week by week."];
+      return ok({
+        ...(ASSIST.available ? { available: true, reason: null, ai_run_id: sid(`ai:jd:${Date.now()}`) } : { ...assistOff(), ai_run_id: null }),
+        description: [overview, `## Key Responsibilities\n\n${lines.map((m) => `- ${m}`).join("\n")}`, ...(answered.length ? [`## About the Role\n\n${answered.join("\n")}`] : [])].join("\n\n"),
+        requirements: [...(b.min_experience_years !== undefined ? [`- ${b.min_experience_years}+ years of relevant experience.`] : []), ...musts.map((m) => `- ${m}`)].join("\n") || null,
+        nice_to_have: itemsOf(a.extras).map((e) => `- ${e}`).join("\n") || null,
+      });
+    }
+    if (!ASSIST.available) return ok({ ...assistOff(), description: null, requirements: null, nice_to_have: null, ai_run_id: null });
+    const line = b.instruction ?? "";
+    return ok({
       available: true,
       reason: null,
-      description: `The ${b.title} ${b.instruction.charAt(0).toLowerCase()}${b.instruction.slice(1).replace(/\.?$/, ".")}\n\n## Key Responsibilities\n- Own the work of the role from plan to result, week by week.\n- Report progress to your manager with clear figures.\n- Work closely with the teams around you across MyCityApp.`,
+      description: `The ${b.title} ${line.charAt(0).toLowerCase()}${line.slice(1).replace(/\.?$/, ".")}\n\n## Key Responsibilities\n- Own the work of the role from plan to result, week by week.\n- Report progress to your manager with clear figures.\n- Work closely with the teams around you across MyCityApp.`,
       requirements: `- ${b.min_experience_years ?? 3} years in a similar role.\n- Clear writing and speaking in English.\n- Lives in, or will move to, Lagos.`,
       nice_to_have: "Experience in a consumer app or media business.",
       ai_run_id: sid(`ai:jd:${Date.now()}`),
-    }),
+    });
+  }),
+);
+
+/** New Vacancy's interview: two questions about this role from the answers so far, none when the AI is off. */
+R("POST /api/v1/recruitment/vacancies/assist/follow-ups", "edit", (req) =>
+  parse<{ title: string }>(vacancySchemas.FollowUpsRequest, req.body, (b) =>
+    ok(
+      ASSIST.available
+        ? {
+            available: true,
+            reason: null,
+            questions: [
+              { question: `Which tools will the ${b.title} use every week?`, hint: "Name the software and equipment the role works with." },
+              { question: `Who will the ${b.title} work with most closely?`, hint: "The teams or partners they deal with day to day." },
+            ],
+            ai_run_id: sid(`ai:follow:${Date.now()}`),
+          }
+        : { ...assistOff(), questions: [], ai_run_id: null },
+    ),
   ),
 );
 
@@ -528,7 +590,8 @@ function candidateRow(a: D.MockApplication): CandidatesCandidate {
 /** Where a card may move now: any column ahead, or the one just behind (candidates.pipeline). */
 function nextStages(a: D.MockApplication): D.MockApplication["stage"][] {
   if (a.status !== "active" || vacancyOfApp(a).status === "closed") return [];
-  const board = vacancyOfApp(a).board_stages as D.MockApplication["stage"][];
+  // Offer is set only by M5's steps, never by hand.
+  const board = vacancyOfApp(a).board_stages.filter((s) => s !== "offer") as D.MockApplication["stage"][];
   const i = board.indexOf(a.stage);
   return i < 0 ? board.filter((s) => s !== a.stage) : board.filter((_, k) => k > i || k === i - 1);
 }
@@ -662,7 +725,7 @@ R("POST /api/v1/recruitment/candidates/invitations", "create", (req) =>
   parse<{ first_name: string; last_name: string; email: string; vacancy_id: string }>(candidateSchemas.ApplyInvite, req.body, (b) => {
     const v = vacancy(b.vacancy_id);
     if (!v || v.status !== "open") return field("vacancy_id", "Pick an open vacancy");
-    if (appsOf(v).some((a) => a.email.toLowerCase() === b.email.toLowerCase())) return field("email", "They have applied for this role");
+    if (appsOf(v).some((a) => a.email.toLowerCase() === b.email.toLowerCase())) return field("email", "Applied for this role");
     return ok({ email: b.email, expires_at: `${isoDaysAhead(7)}T22:59:59.000Z` });
   }),
 );
@@ -691,6 +754,7 @@ R("POST /api/v1/recruitment/candidates/:id/move", "edit", (req) =>
     parse<{ stage: D.MockApplication["stage"]; reason?: string }>(candidateSchemas.CandidateMove, req.body, (b) => {
       if (a.status !== "active") return fail(409, "MOVE_NOT_ALLOWED", "Reopen this candidate before moving them");
       if (b.stage === a.stage) return fail(409, "MOVE_NOT_ALLOWED", "The candidate is already at this stage");
+      if ((b.stage as string) === "offer") return fail(409, "MOVE_NOT_ALLOWED", "An offer moves a candidate to Offer");
       if (!vacancyOfApp(a).board_stages.includes(b.stage)) return fail(409, "MOVE_NOT_ALLOWED", "This role does not use that stage");
       if (!nextStages(a).includes(b.stage)) return fail(409, "MOVE_NOT_ALLOWED", "Move one stage back at most");
       moveTo(a, b.stage, req.user, b.reason);
@@ -706,6 +770,8 @@ function notProgress(a: D.MockApplication, reason: string, by: string | null) {
   a.history.push({ to: "not_progressed", days: 0, by: by ?? undefined, reason });
   sittingsOf(a).filter((s) => s.status === "sent" || s.status === "in_progress").forEach((s) => (s.status = "cancelled"));
   roundsOf(a).filter((x) => x.status === "scheduled").forEach(cancelRound);
+  // M5: the open offer is withdrawn with it (the API's outbox handler on application.not_progressed).
+  withdrawOffersOf(a.application_id);
 }
 
 // On a closed role too, as the API allows: a role closed with people still in it lets them be told.
@@ -986,7 +1052,7 @@ function send(a: D.MockApplication, d: AssessmentDetail, startWithin: number, du
   };
   SITTINGS.unshift(s);
   // Sent an assessment, they are at Assessment, as the API moves them (only forward, only on its board).
-  if (STAGES.indexOf(a.stage) < STAGES.indexOf("assessment") && vacancyOfApp(a).board_stages.includes("assessment")) moveTo(a, "assessment", null);
+  if (rank(a.stage) < rank("assessment") && vacancyOfApp(a).board_stages.includes("assessment")) moveTo(a, "assessment", null);
   return s;
 }
 
@@ -1175,6 +1241,44 @@ function scoreNow(x: D.MockInterview): number | null {
   return s === null ? null : round1(s * 10);
 }
 
+/** Round Activity written by the mock's own writes (a schedule, a change, a cancel, Candidate Details). */
+const LOGGED = new Map<string, InterviewActivity[]>();
+function logged(x: D.MockInterview, kind: InterviewActivity["kind"], user: string | null | undefined) {
+  LOGGED.set(x.interview_id, [
+    { event_id: sid(`ev:${x.interview_id}:${kind}:${Date.now()}:${Math.random()}`), kind, occurred_at: new Date().toISOString(), actor_name: nameOf(user), panelist_name: null },
+    ...(LOGGED.get(x.interview_id) ?? []),
+  ]);
+}
+
+/**
+ * The interview's events, newest first, the latest 25 (interviews.repo activity): what the mock wrote,
+ * and for the fixtures what their data says happened: scheduled a week before (or as it was made),
+ * each card in, a reminder the morning after the end to each seat still waiting, the close, the report.
+ */
+function activityOf(x: D.MockInterview): InterviewActivity[] {
+  const ev = (key: string, kind: InterviewActivity["kind"], occurred_at: string, actor_name: string | null, panelist_name: string | null = null): InterviewActivity => ({
+    event_id: sid(`ev:${x.interview_id}:${key}`),
+    kind,
+    occurred_at,
+    actor_name,
+    panelist_name,
+  });
+  const own = LOGGED.get(x.interview_id) ?? [];
+  const out = [...own];
+  if (!own.some((e) => e.kind === "scheduled")) {
+    const made = new Date(Math.min(Date.parse(x.start) - 7 * 86_400_000, Date.now() - 3_600_000)).toISOString();
+    out.push(ev("scheduled", "scheduled", made, vacancyOfApp(app(x.application_id)!).hiring_manager?.display_name ?? null));
+  }
+  for (const c of cardsOf(x)) {
+    if (c.submitted_days !== null) out.push(ev(`in:${c.employee_key}`, "feedback_submitted", at(c.submitted_days, "16:30"), nameOf(c.employee_key)));
+    else if (x.status === "scheduled" && x.round_status === "open" && Date.parse(x.end) < Date.now() - 86_400_000)
+      out.push(ev(`due:${c.employee_key}`, "feedback_due", new Date(Date.parse(x.end) + 86_400_000).toISOString(), null, nameOf(c.employee_key)));
+  }
+  if (x.status !== "cancelled" && x.round_status === "closed" && x.closed_days !== null) out.push(ev("closed", "round_closed", at(x.closed_days, "17:00"), null));
+  if (x.report) out.push(ev("reported", "reported", at(x.report.days, "12:00"), nameOf(x.report.by)));
+  return out.sort((a, b) => b.occurred_at.localeCompare(a.occurred_at)).slice(0, 25);
+}
+
 function interviewRow(x: D.MockInterview, req: Req): Interview {
   const a = app(x.application_id)!;
   const mine = cardsOf(x).find((c) => c.employee_key === req.user);
@@ -1261,6 +1365,9 @@ function interviewDetail(x: D.MockInterview, req: Req): InterviewDetail {
           submitted_at: mine.submitted_days === null ? null : at(mine.submitted_days, "16:30"),
         }
       : null,
+    /* The candidate's scorecard, for a reader whose scope holds the role (the mock's grant is every role). */
+    ...(can(req, "view") ? { scorecard: scorecardOf(a), weighted_total: weighted(scorecardOf(a)).weighted_total } : { scorecard: null, weighted_total: null }),
+    activity: activityOf(x),
     can_edit: edit && live,
     can_close: edit && live && Date.parse(x.start) <= Date.now(),
     can_report: closed && x.status !== "cancelled" && (edit || v.hiring_manager?.employee_id === byKey(req.user)?.employee_id),
@@ -1280,7 +1387,16 @@ R("GET /api/v1/recruitment/interviews", "view", (req) => {
         application_id: (x, id) => x.application_id === id,
         status: (x, s) => x.status === s,
       },
-      sort: { scheduled_start: (a, b) => a.scheduled_start.localeCompare(b.scheduled_start) },
+      /* With no sort (interviews.repo SORTS): still to end first, soonest first, then the past, latest first. */
+      sort: {
+        soonest: (a, b) => {
+          const pa = Date.parse(a.scheduled_end) < now;
+          const pb = Date.parse(b.scheduled_end) < now;
+          if (pa !== pb) return pa ? 1 : -1;
+          return pa ? b.scheduled_start.localeCompare(a.scheduled_start) : a.scheduled_start.localeCompare(b.scheduled_start);
+        },
+        scheduled_start: (a, b) => a.scheduled_start.localeCompare(b.scheduled_start),
+      },
     },
   );
 });
@@ -1389,7 +1505,8 @@ R("POST /api/v1/recruitment/interviews", "edit", (req) =>
     const refused = applySchedule(x, b);
     if (refused) return refused;
     INTERVIEWS.unshift(x);
-    if (STAGES.indexOf(a.stage) < STAGES.indexOf("interview") && vacancyOfApp(a).board_stages.includes("interview")) moveTo(a, "interview", req.user);
+    logged(x, "scheduled", req.user);
+    if (rank(a.stage) < rank("interview") && vacancyOfApp(a).board_stages.includes("interview")) moveTo(a, "interview", req.user);
     return created(interviewDetail(x, req));
   }),
 );
@@ -1425,6 +1542,7 @@ R("PATCH /api/v1/recruitment/interviews/:id", "edit", (req) =>
     parse<ScheduleBody>(interviewSchemas.InterviewReschedule, req.body, (b) => {
       const refused = applySchedule(x, b);
       if (refused) return refused;
+      logged(x, "rescheduled", req.user);
       /* A panel left with only submitted seats closes as the last card would (schedule.reschedule). */
       closeIfDone(x);
       return ok(interviewDetail(x, req));
@@ -1436,6 +1554,7 @@ R("POST /api/v1/recruitment/interviews/:id/cancel", "edit", (req) =>
   liveRound(req, (x) =>
     parse<{ reason: string }>(interviewSchemas.InterviewCancel, req.body, () => {
       cancelRound(x);
+      logged(x, "cancelled", req.user);
       return ok(interviewDetail(x, req));
     }),
   ),
@@ -1545,6 +1664,7 @@ R("PUT /api/v1/recruitment/interviews/:id/details", "edit", (req) => {
       x.details.relevant = relevant;
       /* A round with its report has its form made again with the new details. */
       if (x.report) x.form_document_id = sid(`doc:form:${x.interview_id}:${Date.now()}`);
+      logged(x, "details_saved", req.user);
       return ok(interviewDetail(x, req));
     },
   );
@@ -1644,7 +1764,7 @@ R("POST /api/v1/recruitment/pool/:id/invite", "edit", (req) => {
   return parse<{ vacancy_id: string }>(poolSchemas.PoolInvite, req.body, (b) => {
     const v = vacancy(b.vacancy_id);
     if (!v || v.status !== "open") return field("vacancy_id", "Pick an open vacancy");
-    if (appsOf(v).some((a) => a.candidate_id === p.candidate_id)) return field("vacancy_id", "They have applied for this role");
+    if (appsOf(v).some((a) => a.candidate_id === p.candidate_id)) return field("vacancy_id", "Applied for this role");
     p.invited_at = nowIso();
     p.invited_vacancy = vref(v);
     return ok(p);
@@ -1661,62 +1781,10 @@ R("POST /api/v1/recruitment/pool/:id/remove", "edit", (req) => {
 });
 
 /* ------------------------------------------------------------------ *
- * M5 (INTERIM, owner AJ): Offers and Onboarding, until M5 puts them on the contract
+ * M5 (INTERIM, owner AJ): Onboarding, until M5 puts it on the contract (PR 7). Offers are in offers.ts.
  * ------------------------------------------------------------------ */
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
-
-const OFFERS: OfferRow[] = [
-  ["OFF-0018", "Kunle Afolabi", "Head, Sales & Revenue", "1200000.00", 2, -5, S("warn", "Awaiting signature")],
-  ["OFF-0017", "Dayo Martins", "Content Producer", "460000.00", 30, 15, S("ok", "Signed")],
-  ["OFF-0016", "Kemi Bello", "Partnerships Associate", "440000.00", 38, 23, S("err", "Declined")],
-].map((o, i) => ({ offer_id: sid(`off:${i}`), number: o[0] as string, candidate: o[1] as string, role: o[2] as string, salary: o[3] as string, issued_on: o[4] == null ? null : isoDaysAgo(o[4] as number), expires_on: o[5] == null ? null : isoDaysAgo(o[5] as number), status: o[6] as Status }));
-route("GET /api/v1/recruitment/offers/summary", () => ok({ awaiting_signature: OFFERS.filter((o) => o.status.text === "Awaiting signature").length, signed_this_year: 11, declined: OFFERS.filter((o) => o.status.tone === "err").length, average_days_to_sign: "2.4 days" }));
-route("GET /api/v1/recruitment/offers", (req) => paged(OFFERS, req, { search: (o) => [o.candidate, o.role, o.number] }));
-route("GET /api/v1/recruitment/offers/:id/letter", (req) => {
-  const o = OFFERS.find((x) => x.offer_id === req.params.id);
-  if (!o) return notFound();
-  const d = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "on sending");
-  const first = o.candidate.split(" ")[0];
-  const money = `₦${Number(o.salary).toLocaleString("en-NG")}`;
-  return ok({
-    reference: o.number,
-    title: "Offer of Employment",
-    date_line: `${o.candidate} · ${o.role} · Issued ${d(o.issued_on)} · Expires ${d(o.expires_on)}`,
-    paragraphs: [
-      [{ text: "Dear " }, { text: first, filled: true }, { text: "," }],
-      [{ text: "We are pleased to offer you the position of " }, { text: o.role, filled: true }, { text: " at MyCity App Ltd, with a start date to be agreed with you." }],
-      [{ text: "Your gross monthly salary will be " }, { text: money, filled: true }, { text: ", subject to a probationary period of six months. Working days are Monday to Saturday." }],
-      [{ text: "This offer is conditional upon satisfactory documentation, and expires on " }, { text: d(o.expires_on), filled: true }, { text: "." }],
-      [{ text: "Yours sincerely," }],
-    ],
-    signer: "C. Osakunih",
-    signer_role: "For MyCity App Ltd",
-    fields_note: o.status.text === "Signed" ? "Signed. Payload and stored bytes verified" : `Awaiting signature · go.mycityapp.io/sign/${o.number}`,
-  });
-});
-route("POST /api/v1/recruitment/offers", (req) => {
-  const b = req.body as { candidate_id?: string; salary?: string; start_date?: string; expires_on?: string };
-  const a = APPS.find((x) => x.candidate_id === b.candidate_id || x.application_id === b.candidate_id);
-  const f: Record<string, string[]> = {};
-  if (!a) f.candidate_id = ["Pick the candidate"];
-  if (!(Number(b.salary) > 0)) f.salary = ["Enter the gross monthly salary"];
-  if (!b.start_date) f.start_date = ["Pick the start date"];
-  if (!b.expires_on) f.expires_on = ["Pick when the offer expires"];
-  if (Object.keys(f).length) return invalid(f);
-  const n = Math.max(...OFFERS.map((o) => Number(o.number.slice(4)))) + 1;
-  const o: OfferRow = { offer_id: sid(`off:new:${n}`), number: `OFF-${String(n).padStart(4, "0")}`, candidate: fullName(a!), role: vacancyOfApp(a!).title, salary: b.salary!, issued_on: null, expires_on: b.expires_on!, status: S("neutral", "Draft") };
-  OFFERS.unshift(o);
-  return created(o);
-});
-route("POST /api/v1/recruitment/offers/:id/send", (req) => {
-  const o = OFFERS.find((x) => x.offer_id === req.params.id);
-  if (!o) return notFound();
-  if (o.status.text !== "Draft") return fail(409, "NOT_DRAFT", "Only a draft offer can be sent.");
-  o.issued_on = isoDaysAgo(0);
-  o.status = S("warn", "Awaiting signature");
-  return ok(o);
-});
 
 const DOCS = ["Signed offer letter", "Employment contract", "Valid ID", "Passport photograph", "Bank verification number", "Academic certificates", "Data privacy acknowledgement"];
 const ONB: OnboardingDetail[] = [

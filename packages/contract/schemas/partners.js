@@ -15,11 +15,11 @@
  * Statuses: active while any deal is live; dormant when none is; closed by Close Partner.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
-const { PlaceInput, PlaceView } = require("./maps");
-const { RegionScope, DealHealth, DealFields, DealRow, Deliverable, Field, CustomValues, CustomFilter, listCode, flag } = require("./partner_pipeline");
+const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
+const { RegionScope, DealHealth, DealFields, DealRow, Deliverable, RecordHistoryLine, Field, CustomValues, CustomFilter, listCode, flag } = require("./partner_pipeline");
 const { Interaction } = require("./interactions");
 
 const PartnerStatus = z.enum(["active", "dormant", "closed"]);
@@ -100,17 +100,29 @@ const ContactUpdate = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field");
 
+/** Edit Contact as a card: the contact beside the fields that change. */
+const ContactChange = z
+  .object({
+    partner_contact_id: recordId("contact"),
+    first_name: text(80).optional(),
+    last_name: text(80).optional(),
+    job_title: z.string().trim().max(120).nullable().optional(),
+    email: email.nullable().optional(),
+    phones: z.array(phone).max(4).optional(),
+    signatory: z.boolean().optional(),
+    primary_contact: z.boolean().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["partner_contact_id"]), nothingOn("partner_contact_id"));
+
 /* ------------------------------------------------------------------ *
  * Partners
  * ------------------------------------------------------------------ */
 
 const signedEvidence = (v) => Boolean(v.signed_copy_document_id) !== (v.signed_before_hub === true);
 
-/**
- * New Partner: an organisation whose relationship is already signed. Its first deal is at a signed or
- * active stage (the server checks the stage's meaning), with the signed copy or "signed before the hub".
- */
-const PartnerCreate = z
+/** A partner's own fields, shared by New Partner and Edit Partner (as a lead's are, LeadFields). */
+const PartnerFields = z
   .object({
     name: text(150),
     legal_name: optionalText(200),
@@ -118,16 +130,25 @@ const PartnerCreate = z
     region: RegionInput,
     industry: optionalText(80),
     website: optionalText(200),
-    headquarters: PlaceInput.optional(),
+    /** Picked from the address search at the level of an area; null or left out for none. */
+    headquarters: PlaceInput.nullish(),
     logo_document_id: blank(uuid),
     owner_id: uuid,
     since: blank(isoDate),
     custom: CustomValues.optional(),
-    contact: ContactInput,
-    deal: DealFields,
-    signed_copy_document_id: blank(uuid),
-    signed_before_hub: z.boolean().optional(),
   })
+  .strict();
+
+/**
+ * New Partner: an organisation whose relationship is already signed. Its first deal is at a signed or
+ * active stage (the server checks the stage's meaning), with the signed copy or "signed before the hub".
+ */
+const PartnerCreate = PartnerFields.extend({
+  contact: ContactInput,
+  deal: DealFields,
+  signed_copy_document_id: blank(uuid),
+  signed_before_hub: z.boolean().optional(),
+})
   .strict()
   .refine(signedEvidence, { message: "Attach the signed copy", path: ["signed_copy_document_id"] });
 
@@ -150,6 +171,51 @@ const PartnerUpdate = z
 
 /** Close Partner: its open deals are lost with it, each with this reason. */
 const PartnerClose = z.object({ reason: z.string().trim().min(10, "At least 10 characters").max(1000) }).strict();
+
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards on partners and contacts (docs/guides/partnerships.md §9; praxis-ai.md §6.11,
+ * decision 33): flat fields the chat can carry, each reaching the screen's own service function.
+ * A card records a partner signed before the hub; a signed copy is a file, attached on its screen.
+ * ------------------------------------------------------------------ */
+
+/** New Partner as a card: the organisation, its primary contact and its first deal, signed before the hub. */
+const PartnerAdd = z
+  .object({
+    name: text(150),
+    partner_category_id: uuid,
+    region_scope: RegionScope,
+    /** With `cities`: the city, picked as every address is. */
+    city: PlaceToken.optional(),
+    industry: optionalText(80),
+    owner_id: uuid,
+    since: blank(isoDate),
+    contact_first_name: text(80),
+    contact_last_name: text(80),
+    contact_job_title: optionalText(120),
+    contact_email: blank(email),
+    contact_phone: blank(phone),
+    deal_title: text(150),
+    /** A signed or active stage; the first signed one when left out. */
+    deal_stage: listCode.optional(),
+    estimated_value: blank(money),
+  })
+  .strict()
+  .refine((v) => v.region_scope !== "cities" || Boolean(v.city), { message: "Pick a city", path: ["city"] });
+
+/** Edit Partner as a card: the partner beside the fields that change. */
+const PartnerChange = z
+  .object({
+    partner_id: recordId("partner"),
+    name: text(150).optional(),
+    legal_name: z.string().trim().max(200).nullable().optional(),
+    partner_category_id: uuid.optional(),
+    industry: z.string().trim().max(80).nullable().optional(),
+    website: z.string().trim().max(200).nullable().optional(),
+    owner_id: uuid.optional(),
+    since: isoDate.nullable().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["partner_id"]), nothingOn("partner_id"));
 
 /** One partner as the list shows it. */
 const PartnerRow = z
@@ -212,6 +278,8 @@ const PartnersSummary = z
     quiet: z.number().int().min(0),
     live_deals: z.number().int().min(0),
     signed_value: money,
+    /** The days without contact that make an active partner quiet: the enabled Partner Inactivity rule's, else 30 (§6.12). */
+    quiet_days: z.number().int().min(1),
   })
   .strict();
 
@@ -253,6 +321,8 @@ const Partner360 = z
       .strict(),
     deliverables: z.array(Deliverable).max(25),
     custom_fields: z.array(Field).max(200),
+    /** The stage and health lines of the deals the reader sees, the latest 25, newest first (Activity, §6.2). */
+    history: z.array(RecordHistoryLine).max(25),
   })
   .strict();
 
@@ -352,6 +422,8 @@ const PartnerWorkItem = z
   .object({
     kind: WorkKind,
     id: uuid,
+    /** A project's or task's number; null for an event. */
+    number: z.string().nullable(),
     title: z.string(),
     status: z.string(),
     /** A task's or project's due day, an event's day. */
@@ -377,21 +449,85 @@ const PartnerWorkPage = Paged(PartnerWorkItem)
 
 /**
  * Connect to Partner (§6.16): the link a project, task or event carries, to a partner or a lead and
- * one of its deals. Joins ProjectCreate, TaskCreate, CalendarEventCreate and their edit fields in M7
- * PR 5, with the Workspace services that write it, so no request takes a field nothing writes.
+ * one of its deals. Its keys join ProjectCreate, TaskCreate and CalendarEventCreate (and their edit
+ * fields as `partnerLinkEditFields`), written by the Workspace services after Partnerships checks the
+ * person sees the record and the deal (partners.work checkLink).
  */
-const PartnerLink = z
-  .object({
-    partner_id: blank(uuid),
-    lead_id: blank(uuid),
-    deal_id: blank(uuid),
-  })
-  .strict()
-  .refine((v) => !(v.partner_id && v.lead_id), { message: "A partner or a lead, not both", path: ["lead_id"] })
-  .refine((v) => !v.deal_id || Boolean(v.partner_id || v.lead_id), { message: "Pick the partner first", path: ["partner_id"] });
+const partnerLinkFields = {
+  partner_id: blank(uuid),
+  lead_id: blank(uuid),
+  deal_id: blank(uuid),
+};
+/** A link's two rules, on a create body: a partner or a lead, not both; a deal only with one of them. */
+const linkRules = (schema) =>
+  schema
+    .refine((v) => !(v.partner_id && v.lead_id), { message: "A partner or a lead, not both", path: ["lead_id"] })
+    .refine((v) => !v.deal_id || Boolean(v.partner_id || v.lead_id), { message: "Pick the partner first", path: ["partner_id"] });
+const PartnerLink = linkRules(z.object(partnerLinkFields).strict());
 
-/** The Partner filter My Workspace's lists gain with it (PR 5). */
-const PartnerLinkQuery = z.object({ partner_id: uuid.optional() }).strict();
+/**
+ * The link on an edit: only what changes. A new partner or lead clears the other and, unless one is
+ * given, the deal; `null` on both disconnects (the service decides against the work as it stands).
+ */
+const partnerLinkEditFields = {
+  partner_id: uuid.nullable().optional(),
+  lead_id: uuid.nullable().optional(),
+  deal_id: uuid.nullable().optional(),
+};
+/** An edit names a partner or a lead, not both. */
+const linkEditRules = (schema) => schema.refine((v) => !(v.partner_id && v.lead_id), { message: "A partner or a lead, not both", path: ["lead_id"] });
+
+/**
+ * The link as a task, project or event carries it on the way out. The names are filled only for a
+ * reader who sees the record (and the deal) in Partnerships; anyone else reads the ids alone, so
+ * connecting never shows a partner to someone who could not open it (§6.16, A24).
+ */
+const PartnerLinkView = z
+  .object({
+    partner_id: uuid.nullable(),
+    lead_id: uuid.nullable(),
+    deal_id: uuid.nullable(),
+    name: z.string().nullable(),
+    number: z.string().nullable(),
+    deal_number: z.string().nullable(),
+    deal_title: z.string().nullable(),
+  })
+  .strict();
+
+/** The Partner filter on My Workspace's Tasks and Projects: a partner or a lead. */
+const PartnerLinkQuery = z.object({ partner_id: uuid.optional(), lead_id: uuid.optional() }).strict();
+
+const LinkKind = z.enum(["partner", "lead"]);
+
+/** Connect to Partner's Partner (GET /work/records): partners not closed and leads still open, that the reader sees; `kind` one of the two. */
+const PartnerLinkRecordQuery = listQuery({ kind: LinkKind.optional() }, ["name"]);
+const PartnerLinkRecord = z
+  .object({
+    kind: LinkKind,
+    id: uuid,
+    number: z.string(),
+    name: z.string(),
+    category: z.string().nullable(),
+  })
+  .strict();
+const PartnerLinkRecordPage = Paged(PartnerLinkRecord);
+
+/**
+ * Connect to Partner's Deal (GET /work/deals): the record's open and live deals the reader sees; with
+ * no record (a Praxis AI card's Deal), every open and live deal they see.
+ */
+const PartnerLinkDealQuery = listQuery({ partner_id: uuid.optional(), lead_id: uuid.optional() });
+const PartnerLinkDeal = z
+  .object({
+    deal_id: uuid,
+    number: z.string(),
+    title: z.string(),
+    status: z.enum(["open", "live"]),
+    /** The partner's or lead's name. */
+    record_name: z.string(),
+  })
+  .strict();
+const PartnerLinkDealPage = Paged(PartnerLinkDeal);
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const ORGANISATION = {
@@ -406,13 +542,64 @@ const DEAL_NESTED = {
   table: "partnership_opportunity",
   virtual: { venue: "a place row, owner deal.venue", validity: "validity_days or valid_until", member_ids: "deal_member rows", options: "deal_option rows" },
 };
+/* ------------------------------------------------------------------ *
+ * The Partnership Tracker import and the exports in its columns (§6.13, M7 PR 4)
+ * ------------------------------------------------------------------ */
+
+/**
+ * One row of MyCity's tracker, as the importer's extract reads it from the workbook: each cell as
+ * written (the contact details already split into an email and phones, Partnership Type into its
+ * category and commission, the dates read day-first), checked by the importer's own rules.
+ */
+const TrackerImportRow = z
+  .object({
+    name: text(150),
+    industry: optionalText(80),
+    contact_name: optionalText(160),
+    position: optionalText(120),
+    email: optionalText(200),
+    phones: optionalText(200),
+    region: optionalText(500),
+    objective: optionalText(2000),
+    category: optionalText(120),
+    commission_pct: z.number().min(0).max(100).optional(),
+    stage: optionalText(120),
+    impact: optionalText(1000),
+    owner: optionalText(120),
+    identified_on: blank(isoDate),
+    current_stage: optionalText(200),
+    next_action: optionalText(300),
+    expected_close_on: blank(isoDate),
+    status: z.enum(["on_track", "follow_up_required", "stalled", "active", "closed"]).optional(),
+    comments: optionalText(2000),
+    website: optionalText(200),
+    other: optionalText(4000),
+  })
+  .strict();
+
+/**
+ * What an export of Partners, Leads or their deals is made from: the list's own filters, in the
+ * tracker's columns; or Analytics' period (`partnerships.analytics`, its AnalyticsQuery).
+ */
+const PartnershipExportRequest = z
+  .object({
+    source: z.enum(["partnerships.partners", "partnerships.leads", "partnerships.deals", "partnerships.analytics"]),
+    /** The list's filters as its screen holds them (PartnerListQuery, LeadListQuery or DealListQuery, without the page; AnalyticsQuery for Analytics). */
+    filters: z.record(z.unknown()).optional(),
+  })
+  .strict();
+
 const TABLES = {
+  TrackerImportRow: { table: null, reason: "one row of MyCity's tracker workbook as the importer reads it; written as a lead or a partner" },
+  PartnershipExportRequest: { table: null, reason: "which list to export and its filters; nothing is kept but the file" },
   RegionInput: { table: null, reason: "a record's region_scope and the place rows of its cities" },
   RegionView: { table: null, reason: "a record's region_scope and its cities' places" },
   ContactInput: { table: "partner_contact" },
   Contact: { table: "partner_contact" },
   ContactCreate: { table: "partner_contact" },
   ContactUpdate: { table: "partner_contact" },
+  ContactChange: { table: "partner_contact" },
+  PartnerFields: { table: "partner", virtual: { region: ORGANISATION.region, headquarters: ORGANISATION.headquarters } },
   PartnerCreate: {
     table: "partner",
     virtual: ORGANISATION,
@@ -422,6 +609,21 @@ const TABLES = {
     table: "partner",
     virtual: { region: ORGANISATION.region, headquarters: ORGANISATION.headquarters },
   },
+  PartnerAdd: {
+    table: "partner",
+    virtual: {
+      city: "a place row, owner partner.cities",
+      contact_first_name: "the primary partner_contact.first_name",
+      contact_last_name: "the primary partner_contact.last_name",
+      contact_job_title: "the primary partner_contact.job_title",
+      contact_email: "the primary partner_contact.email",
+      contact_phone: "the primary partner_contact.phone",
+      deal_title: "its first partnership_opportunity.title",
+      deal_stage: "its first partnership_opportunity.stage",
+      estimated_value: "its first partnership_opportunity.estimated_value",
+    },
+  },
+  PartnerChange: { table: "partner" },
   PartnerClose: { table: null, reason: "the reason, kept as partner.close_reason and on each open deal lost with it" },
   PartnerRow: {
     table: "partner",
@@ -467,10 +669,19 @@ const TABLES = {
   PartnerWorkItem: { table: null, reason: "a project, task or event connected to a record" },
   PartnerWorkPage: { table: null, reason: "a page of a record's work and the counts hidden from the reader" },
   PartnerLink: { table: "task" },
+  PartnerLinkView: { table: null, reason: "the partner or lead and deal a project, task or event is for, named for the reader" },
   PartnerLinkQuery: { table: null, reason: "the Partner filter on My Workspace's lists" },
+  PartnerLinkRecordQuery: { table: null, reason: "list controls for Connect to Partner's Partner" },
+  PartnerLinkRecord: { table: null, reason: "a partner or a lead Connect to Partner offers" },
+  PartnerLinkRecordPage: { table: null, reason: "a page of partners and leads to connect work to" },
+  PartnerLinkDealQuery: { table: null, reason: "list controls for Connect to Partner's Deal" },
+  PartnerLinkDeal: { table: null, reason: "an open or live deal Connect to Partner offers" },
+  PartnerLinkDealPage: { table: null, reason: "a page of a record's deals to connect work to" },
 };
 
 module.exports = {
+  TrackerImportRow,
+  PartnershipExportRequest,
   TABLES,
   PartnerStatus,
   RegionInput,
@@ -479,9 +690,13 @@ module.exports = {
   Contact,
   ContactCreate,
   ContactUpdate,
+  ContactChange,
+  PartnerFields,
   PartnerCreate,
   PartnerUpdate,
   PartnerClose,
+  PartnerAdd,
+  PartnerChange,
   PartnerRow,
   PartnerDetail,
   PartnerListQuery,
@@ -499,6 +714,18 @@ module.exports = {
   PartnerWorkQuery,
   PartnerWorkItem,
   PartnerWorkPage,
+  partnerLinkFields,
+  partnerLinkEditFields,
+  linkRules,
+  linkEditRules,
   PartnerLink,
+  PartnerLinkView,
   PartnerLinkQuery,
+  LinkKind,
+  PartnerLinkRecordQuery,
+  PartnerLinkRecord,
+  PartnerLinkRecordPage,
+  PartnerLinkDealQuery,
+  PartnerLinkDeal,
+  PartnerLinkDealPage,
 };

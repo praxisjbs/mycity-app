@@ -91,6 +91,11 @@ const UPDATE_COLUMNS = [
   "bank_name",
   "account_number",
   "gross_monthly",
+  // The tax and pension numbers payroll's statutory report reads (migration 6020, docs/guides/payroll.md §4.1).
+  "tax_id",
+  "pension_pin",
+  "pension_administrator",
+  "nhf_number",
 ];
 
 /** The login a person has, as the register and the 360 name it. */
@@ -192,6 +197,7 @@ async function list(db, query, scope) {
     query.employment_type ?? null,
     query.line_manager_id ?? null,
     query.contract === "ending" ? lagos.today() : null,
+    query.exclude_self === "true" && scope && scope.employee_id ? scope.employee_id : null,
   ];
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
   const page = await pageQuery(
@@ -212,6 +218,7 @@ async function list(db, query, scope) {
         AND ($5::text IS NULL OR e.employment_type = $5)
         AND ($6::uuid IS NULL OR e.line_manager_id = $6)
         AND ($7::date IS NULL OR (e.status = 'active' AND e.contract_ends_on IS NOT NULL AND e.contract_ends_on <= $7::date + 30))
+        AND ($8::uuid IS NULL OR e.employee_id <> $8)
         ${s.and}
       ORDER BY ${orderBy(query, EMPLOYEE_SORTS, "e.employee_id")}`,
     params,
@@ -1195,6 +1202,43 @@ async function updateSeat(db, seatId, patch) {
   return findSeatById(db, seatId);
 }
 
+/** A vacant seat taken by a person: filled from today (organisation.service fillSeat). */
+async function fillSeat(db, seatId, employeeId, filledOn) {
+  await db.query(
+    `UPDATE org_seat SET status = 'filled', filled_by_employee_id = $2, filled_on = $3, updated_at = now()
+      WHERE org_seat_id = $1 AND status = 'vacant'`,
+    [seatId, employeeId, filledOn],
+  );
+  return findSeatById(db, seatId);
+}
+
+/**
+ * Who answers to a seat: the people whose solid or dotted line points at it, and the open roles
+ * under it. Whole, because every one of them moves to the person who fills it.
+ */
+async function reportsOfSeat(db, seatId) {
+  // pagination:complete every line pointing at a seat moves to the person who fills it
+  const { rows: people } = await completeQuery(
+    db,
+    `SELECT e.employee_id, (e.line_manager_seat_id = $1) AS solid, (e.dotted_manager_seat_id = $1) AS dotted
+       FROM employee e
+      WHERE (e.line_manager_seat_id = $1 OR e.dotted_manager_seat_id = $1) AND e.status <> 'archived'
+      ORDER BY e.employee_id`,
+    [seatId],
+    { label: "the people under a seat", ceiling: TREE_CEILING },
+  );
+  // pagination:complete every open role under a seat moves to the person who fills it
+  const { rows: roles } = await completeQuery(
+    db,
+    `SELECT s.org_seat_id FROM org_seat s
+      WHERE s.line_manager_seat_id = $1 AND s.status <> 'closed'
+      ORDER BY s.org_seat_id`,
+    [seatId],
+    { label: "the open roles under a seat", ceiling: TREE_CEILING },
+  );
+  return { people, seats: roles.map((r) => r.org_seat_id) };
+}
+
 /**
  * Whether MyCity's names at this checksum were applied (organisation.service.recordNamesApplied);
  * with no checksum, whether any version ever was.
@@ -1376,6 +1420,8 @@ module.exports = {
   findSeatByTitle,
   insertSeat,
   updateSeat,
+  fillSeat,
+  reportsOfSeat,
   tree,
   departmentHeads,
   highestStaffNumberSeq,

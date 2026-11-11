@@ -1,0 +1,4 @@
+<section class="page page--{{ layout }}{{#if tone}} tone-{{ tone }}{{/if}}{{#if bleed}} bleed-{{ bleed }}{{/if}}" data-section="{{ key }}" data-layout="{{ layout }}" data-page="{{ page_no }}" aria-label="{{ label }}">
+{{> body}}
+{{#if route}}<footer class="route"><span class="route-ref">{{ reference }}</span><span class="route-line" aria-hidden="true">{{#each stops}}<i class="stop{{#if past}} stop--past{{/if}}{{#if here}} stop--here{{/if}}"></i>{{/each}}</span><span class="route-count">{{ page_no }} / {{ total }}</span></footer>{{/if}}
+</section>

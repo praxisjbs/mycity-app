@@ -78,6 +78,10 @@ async function get(client, employeeId) {
     bank_name: row.bank_name ?? null,
     account_number: row.account_number ?? null,
     gross_monthly: money(row.gross_monthly),
+    tax_id: row.tax_id ?? null,
+    pension_pin: row.pension_pin ?? null,
+    pension_administrator: row.pension_administrator ?? null,
+    nhf_number: row.nhf_number ?? null,
     created_at: at(row.created_at),
     photo_url: photoPath(row.photo_document_id, PHOTO_VARIANTS.profile),
   };

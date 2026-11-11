@@ -146,7 +146,8 @@ async function summary(db, query, scope) {
 async function vacancy(db, id, { lock = false } = {}) {
   const { rows } = await db.query(
     `SELECT v.vacancy_id, v.number::text AS number, v.title, v.status, v.closes_at, v.min_experience_years,
-            v.hiring_manager_id
+            v.hiring_manager_id, v.location,
+            (SELECT d.name FROM department d WHERE d.department_id = v.department_id) AS department
        FROM vacancy v WHERE v.vacancy_id = $1${lock ? " FOR SHARE" : ""}`,
     [id],
   );
@@ -185,6 +186,11 @@ async function insertCandidate(client, { first_name: first, last_name: last, ema
     [first, last, email, phone, consented],
   );
   return rows[0].candidate_id;
+}
+
+/** A person's address corrected (M5's Change Email on a sent offer, through candidates.correctEmailIn). */
+async function setEmail(client, id, email) {
+  await client.query("UPDATE candidate SET email = $2 WHERE candidate_id = $1", [id, email]);
 }
 
 /** What a later application may add to a person already known: a phone they had not given. */
@@ -430,6 +436,7 @@ module.exports = {
   candidateByEmail,
   insertCandidate,
   fillCandidate,
+  setEmail,
   cvOnLink,
   cvsOnLink,
   applicationOf,

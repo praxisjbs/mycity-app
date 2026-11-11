@@ -54,7 +54,7 @@ function sampleFigure(entry) {
     on_leave: 1,
     no_clock_out_yesterday: 1,
     aged: 2,
-    agreements: 3,
+    deals: 3,
     requests: 5,
     leave_type: "Annual",
     groups: {},
@@ -164,12 +164,13 @@ describe("the catalogue", () => {
     }
   });
 
-  test("live cards have a value and records; hidden ones carry no query and name their milestone", () => {
+  test("live cards have a value and records; a hidden one would carry no query and name its milestone", () => {
     for (const e of LIVE) {
       expect(typeof e.value).toBe("function");
       expect(typeof e.detail.list).toBe("function");
     }
-    expect(HIDDEN.map((e) => [e.id, e.until])).toEqual([["payroll_run_state", "M6"]]);
+    // M6 made the last hidden card live (Payroll In Progress, docs/guides/payroll.md §3.8).
+    expect(HIDDEN.map((e) => [e.id, e.until])).toEqual([]);
     for (const e of HIDDEN) {
       expect(e.value).toBeUndefined();
       expect(e.caption).toBeUndefined();
@@ -327,10 +328,10 @@ describe("figures", () => {
     for (const id of kpi.LIVE_IDS) expect([id, figures[id]]).toEqual([id, null]);
   });
 
-  test("a hidden card answers null and an unknown id is left out; neither reads anything", async () => {
+  test("an unknown id is left out and reads nothing", async () => {
     const query = jest.fn();
-    const figures = await kpi.figuresFor({ query }, ["payroll_run_state", "no_such_card", "payroll_run_state"], ctx);
-    expect(figures).toEqual({ payroll_run_state: null });
+    const figures = await kpi.figuresFor({ query }, ["no_such_card", "no_such_card"], ctx);
+    expect(figures).toEqual({});
     expect(query).not.toHaveBeenCalled();
   });
 
@@ -673,9 +674,9 @@ describe("which cards a person's Overview shows", () => {
       { source: "user", ids: ["proposals_out", "reviews_due"] },
     ],
     [
-      "junk, repeats, hidden and Team cards in a pick are dropped",
+      "junk, repeats and Team cards in a pick are dropped",
       {
-        picks: ["headcount", 7, null, "headcount", "no_such_card", "payroll_run_state", "team_present", "proposals_out"],
+        picks: ["headcount", 7, null, "headcount", "no_such_card", "team_present", "proposals_out"],
         roleCards: [],
         homeView: "staff",
         eligible: everything,
@@ -1409,9 +1410,9 @@ describe("the prune, the assistant and ⌘K", () => {
       module: "ess",
     });
     expect(result.page).toMatchObject({ number: 1, size: 25, total: 2, has_next: false });
-    // A Team card belongs to its tab, and a hidden one to M6: neither is found.
+    // A Team card belongs to its tab and is not found here; Payroll In Progress is, for a reader who may see it.
     expect((await provider.search({}, { term: "present", page: 1, user: {} })).items).toEqual([]);
-    expect((await provider.search({}, { term: "payroll", page: 1, user: {} })).items).toEqual([]);
+    expect((await provider.search({}, { term: "payroll", page: 1, user: {} })).items.map((i) => i.id)).toEqual(["payroll_run_state"]);
   });
 
   test("⌘K pages the whole catalogue at 25", async () => {

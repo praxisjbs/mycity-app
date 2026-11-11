@@ -320,6 +320,9 @@ const DOC_LABELS = Object.freeze({
   requisition: "Requisition",
   disbursement: "Disbursement",
   budget: "Budget",
+  sop: "SOP",
+  training_course: "Training Course",
+  training_certificate: "Training Certificate",
 });
 
 /** The year and the year and month of today, in Lagos. */

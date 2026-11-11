@@ -15,17 +15,17 @@
  * application is write-only: the answer is a reference, never a score or a stage.
  */
 const { z } = require("zod");
-const { uuid, text, email, phone, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, email, phone, isoDate, isoDateTime, listQuery, Paged } = require("./common");
 const { DocumentRef } = require("./documents");
 const { AssessmentType, SittingStatus } = require("./assessments");
 const { InterviewStatus, RoundStatus } = require("./interviews");
-const { ApplicationStage, ScorecardCode, VacancyRef, VacancyQuestionType, M4_STAGES } = require("./vacancies");
+const { ApplicationStage, ScorecardPart, VacancyRef, VacancyQuestionType, M4_STAGES } = require("./vacancies");
 
 /* ------------------------------------------------------------------ *
  * Code lists
  * ------------------------------------------------------------------ */
 
-/** active: in the pipeline. not_progressed: stopped with a reason (Reopen undoes it). M5 sets hired. */
+/** active: in the pipeline. not_progressed: stopped with a reason (Reopen undoes it). hired: set by candidates.hireIn when M5's onboarding completes. */
 const ApplicationStatus = z.enum(["active", "not_progressed", "withdrawn", "hired"]);
 /** careers: the careers page. invited: Invite to Apply from Candidates. pool: Invite to Apply from the Talent Pool. */
 const ApplicationSource = z.enum(["careers", "invited", "pool"]);
@@ -34,13 +34,19 @@ const CvState = z.enum(["none", "checking", "clean", "infected"]);
 /** The board's columns in M4 (decided 04/11/2026). */
 const M4Stage = z.enum(M4_STAGES);
 
-/** The five candidate emails Operations & People may edit (guide §6.8). */
+/**
+ * The candidate emails Operations & People may edit (guide §6.8): M4's five, then the three M5 sends
+ * (offer-sent, offer-signed, onboarding-documents), kept in the same store so one screen words them all.
+ */
 const CandidateEmailKey = z.enum([
   "application-received",
   "apply-invite",
   "assessment-invite",
   "interview-invite",
   "candidate-not-progressed",
+  "offer-sent",
+  "offer-signed",
+  "onboarding-documents",
 ]);
 
 /* ------------------------------------------------------------------ *
@@ -73,18 +79,6 @@ const Candidate = z
   .strict();
 
 const CandidatePage = Paged(Candidate);
-
-/** One part of an application's weighted scorecard (guide §6.5). */
-const ScorecardPart = z
-  .object({
-    code: ScorecardCode,
-    name: z.string(),
-    active: z.boolean(),
-    weight: z.number().int().min(0).max(100),
-    score: z.number().min(0).max(100).nullable(),
-    provisional: z.boolean(),
-  })
-  .strict();
 
 /** An answer to one of the vacancy's Apply questions. */
 const ApplicationAnswer = z
@@ -293,10 +287,13 @@ const ApplyQuestion = z
   })
   .strict();
 
-/** GET /api/public/v1/apply/:token: the role, its questions, and when the link lapses. */
+/** GET /api/public/v1/apply/:token: the role as the form's pane names it, its questions, and when the link lapses. */
 const ApplyLink = z
   .object({
     vacancy_title: z.string(),
+    vacancy_department: z.string().nullable(),
+    /** The role's place line; null for a remote role. */
+    vacancy_location: z.string().nullable(),
     expires_at: isoDateTime,
     questions: z.array(ApplyQuestion).max(10),
   })
@@ -335,11 +332,16 @@ const ApplicationSubmit = z
  */
 const CvUpload = z.object({ purpose: z.literal("cv").optional() }).strict();
 
-/** What applying answers: a reference to quote, never the row. */
+/**
+ * What applying answers: a reference to quote, never the row. `already_applied`: this email had
+ * applied for this role before, so nothing new was made; `reference` and `submitted_at` are the
+ * first application's, and Apply says so instead of Application Sent (GE, 08/11/2026).
+ */
 const ApplicationReceipt = z
   .object({
     reference: z.string(),
     submitted_at: isoDateTime,
+    already_applied: z.boolean(),
   })
   .strict();
 
@@ -360,6 +362,30 @@ const ApplyInviteEmailVars = z
 /** candidate-not-progressed: Not Progressing. The reason is kept on the record, not sent. `careers_url`: the public /jobs page. */
 const CandidateNotProgressedEmailVars = z.object({ vacancy_title: z.string(), careers_url: z.string() }).strict();
 
+/**
+ * offer-sent (M5 sends it): the offer is ready to sign. `reference`: the offer's number (OFF-0018);
+ * `sign_url`: the public /sign/<token> link; `expires_at`: when the link and the offer lapse.
+ */
+const OfferSentEmailVars = z
+  .object({ vacancy_title: z.string(), reference: z.string(), sign_url: z.string(), expires_at: isoDateTime })
+  .strict();
+
+/**
+ * offer-signed (M5): the candidate signed. `verify_url`: the public /verify/<number> page for the
+ * signed letter; `start_on`: the agreed first day, when it is set.
+ */
+const OfferSignedEmailVars = z
+  .object({ vacancy_title: z.string(), reference: z.string(), verify_url: z.string(), start_on: isoDate.nullable() })
+  .strict();
+
+/**
+ * onboarding-documents (M5): the documents to send before the first day. `documents_url`: the public
+ * page that takes them; `due_on`: the day they are needed by, when it is set.
+ */
+const OnboardingDocumentsEmailVars = z
+  .object({ vacancy_title: z.string(), documents_url: z.string(), due_on: isoDate.nullable() })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   Candidate: {
@@ -379,7 +405,6 @@ const TABLES = {
     },
   },
   CandidatePage: { table: null, reason: "a page of applications" },
-  ScorecardPart: { table: null, reason: "one part of the weighted scorecard, worked out on read" },
   ApplicationAnswer: { table: null, reason: "one answer of application.answers (jsonb) beside its question" },
   StageMove: { table: null, reason: "one entity_state_history row of the application, with its days" },
   CandidateSitting: { table: null, reason: "an application_assessment as the candidate's sheet lists it" },
@@ -460,6 +485,9 @@ const TABLES = {
   ApplicationReceivedEmailVars: { table: null, reason: "the variables of templates/email/application-received.html" },
   ApplyInviteEmailVars: { table: null, reason: "the variables of templates/email/apply-invite.html" },
   CandidateNotProgressedEmailVars: { table: null, reason: "the variables of templates/email/candidate-not-progressed.html" },
+  OfferSentEmailVars: { table: null, reason: "the variables of templates/email/offer-sent.html" },
+  OfferSignedEmailVars: { table: null, reason: "the variables of templates/email/offer-signed.html" },
+  OnboardingDocumentsEmailVars: { table: null, reason: "the variables of templates/email/onboarding-documents.html" },
 };
 
 module.exports = {
@@ -471,7 +499,6 @@ module.exports = {
   CandidateEmailKey,
   Candidate,
   CandidatePage,
-  ScorecardPart,
   ApplicationAnswer,
   StageMove,
   CandidateSitting,
@@ -500,4 +527,7 @@ module.exports = {
   ApplicationReceivedEmailVars,
   ApplyInviteEmailVars,
   CandidateNotProgressedEmailVars,
+  OfferSentEmailVars,
+  OfferSignedEmailVars,
+  OnboardingDocumentsEmailVars,
 };

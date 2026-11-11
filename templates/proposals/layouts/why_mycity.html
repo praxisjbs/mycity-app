@@ -1,0 +1,5 @@
+<header class="page-head"><h2 class="h1">{{ heading }}</h2></header>
+<div class="figures cols-{{ cols }}{{#if visual}} figures--side{{/if}} figures--n{{ count }}">
+  {{#each points}}<div class="figure"><div class="figure-value fig {{ size }}">{{ value }}</div><div class="figure-label">{{ label }}</div></div>{{/each}}
+</div>
+{{#if visual}}<div class="why-side"><div class="panel">{{> body}}</div></div>{{/if}}

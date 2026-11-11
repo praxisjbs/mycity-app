@@ -2,7 +2,7 @@
 title: Recruitment
 module: recruitment
 milestones: M4
-summary: From an empty seat to a shortlist: vacancies, candidates, assessments, interviews and the talent pool.
+summary: From an empty seat to a signed offer: vacancies, candidates, assessments, interviews, offers and the talent pool.
 icon: brief
 ---
 
@@ -11,9 +11,9 @@ page. Anyone can apply there with a CV. You screen the applications, send tests,
 and keep good people for later.
 
 Open it from **Recruitment** in the menu on a computer. On a phone, press **More** in the bar at the
-bottom, then **Recruitment**. This chapter covers five tabs along the top: **Vacancies**,
-**Candidates**, **Assessments**, **Interviews** and **Talent Pool**. What candidates see is in
-[The Public Site](#public-careers).
+bottom, then **Recruitment**. This chapter covers seven tabs along the top: **Vacancies**,
+**Candidates**, **Assessments**, **Interviews**, **Offers**, **Talent Pool** and **Analytics**. What candidates see
+is in [The Public Site](#public-careers).
 
 > **Important:** Operations & People, Management, Implementation and the CEO see every vacancy. A
 > Head of Department sees the vacancies whose hiring manager is in their team, and their candidates.
@@ -31,16 +31,18 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
 2. The tiles count the **Open Vacancies**, the **Applicants**, those **In Interview** and the roles
    **Past Closing Date**. A phone shows two tiles a row. **Applicants** counts everyone who applied
    to an open or paused role, whatever became of them.
-3. The list shows each role with its department, location, applicants, closing day and status.
+3. The list shows each role with its department, openings, location, applicants, closing day and
+   status.
    A role's applicants are counted the same way, so the tile is the open and paused roles' added up.
-4. On a computer, the funnel shows how many candidates stand at each stage.
-5. Press a vacancy. On a computer it opens beside the list; on a phone it opens in a sheet.
+4. Press a vacancy. On a computer it opens in a window over the list; on a phone it opens in a sheet.
    ![A vacancy's sheet](shot:recruitment-vacancy-sheet)
-6. The sheet shows the role's details and its public link. Press **Copy Link** to share it. Its
+5. The sheet shows the role's details and its public link. Press **Copy Link** to share it. Its
    description, required experience and what we look for read with their headings and lists, as
    the careers page shows them.
-7. Press **See Candidates** to open its candidates on the board.
-8. Press **Careers Page** at the top to open the careers page as a candidate sees it.
+6. At its foot is the vacancy's next step: **Publish**, **Pause** or **Resume**. Its other actions
+   are under **More Actions**.
+7. Press **More Actions**, then **See Candidates**, to open its candidates on the board.
+8. Press **Careers Page** at the top to open the public website as a candidate sees it.
 
 | Status | What it means |
 |---|---|
@@ -52,28 +54,40 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
 
 ### Write a new vacancy {#recruitment-vacancies-new needs="recruitment create"}
 
-The form has three steps: **Role**, **Details** and **Pay and Publish**. Each step checks its own
-fields before **Next** lets you on.
+**New Vacancy** asks you about the role one question at a time, then drafts the vacancy from your
+answers. The bar at the top counts the questions, such as `Question 3 of 10`. Only the job title is
+needed: press **Skip** on any other question you cannot answer yet. Each question's help term says
+what a useful answer gives.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **New Vacancy** at the top right. On a phone it is in **Quick Actions**.
    ![New Vacancy](shot:recruitment-vacancy-new)
-3. On **Role**, type the **Job Title** and pick the **Department** and the **Hiring Manager**.
-4. Type how many **Positions** you are hiring, pick the **Employment** type and, if you like, who the
-   role **Reports To**. Press **Next**.
-5. On **Details**, pick the **Arrangement**, such as hybrid. You may add an **Arrangement Note**, such
-   as `2 days in office, 3 from home`.
-6. Start typing the area under **Location** and pick it from the list. A remote role has no location.
-7. Fill in the **Working Days** and the **Probation Months**. Pick the day it **Closes On** and, if
-   you like, the **Target Start**.
-8. Write the **Description**. On the careers page it follows the About MyCityApp paragraph by itself.
-9. Fill in **Required Experience and Qualifications** and, if you like, **What We Look For**.
-   Press **Next**.
-10. On **Pay and Publish**, type the **Years of Experience** needed and the salary band, **Salary
-    From** and **Salary To**. Tick **Show Salary on Careers** to show the band there.
-11. **Publish Now** is ticked. Leave it to put the vacancy on the careers page now, and press
+3. Type the **Job Title** and press **Next**.
+4. Pick the **Department** and the **Hiring Manager**. Only people with access to Recruitment, in
+   your reach, are offered as **Hiring Manager**. Press **Next**.
+5. Type how many **Positions** you are hiring and pick the **Employment** type. Press **Next**.
+6. Pick the **Arrangement**, such as hybrid. You may add an **Arrangement Note**, such as
+   `2 days in office, 3 from home`, and the **Working Days**. Press **Next**.
+7. Start typing the area under **Location** and pick it from the list. A remote role skips this
+   question.
+8. Type the salary band, **Salary From** and **Salary To**, as you would write it, such as
+   `350,000`. Tick **Show Salary on Careers** to show it there.
+9. Under **Your Answer**, say what the role must have and what it will do, in your own words. Add the
+   **Years of Experience** needed.
+10. Add who the role **Reports To**, and anything else candidates should know: what would set
+    someone apart, the perks, the team.
+11. The hub then asks two questions of its own about this role. Answer them, or press **Skip**.
+12. Press **Draft Vacancy**. The vacancy opens in three steps, **Role**, **Details** and **Pay and
+    Publish**, with your answers and a drafted **Description**, **Required Experience and
+    Qualifications** and **What We Look For**.
+13. Check each step and press **Next**. On **Details**, pick the day it **Closes On**. You may add the
+    **Probation Months** and the **Target Start**.
+14. **Publish Now** is ticked. Leave it to put the vacancy on the careers page now, and press
     **Publish Vacancy**.
-12. Or untick it and press **Save Draft** to finish later.
+15. Or untick it and press **Save Draft** to finish later.
+
+To skip the questions, press **Use Blank Form** on any question. The three steps open with what you
+have answered so far, and you fill in the rest yourself.
 
 | Field | What to enter | Needed to publish |
 |---|---|---|
@@ -87,6 +101,9 @@ fields before **Next** lets you on.
 | Salary band | The lowest and highest pay | No |
 | **Closes On** | A day after today; it closes at 23:59 Lagos time | Yes |
 
+> **Tip:** When AI is off or has reached its limit, there are eight questions, not ten, and
+> **Draft Vacancy** writes a plain draft from your answers. Read it and add to it before you publish.
+
 A new vacancy takes its interview traits from [Careers Settings](#recruitment-vacancies-settings),
 and its scorecard at the usual weights. Change either before you publish.
 
@@ -94,8 +111,10 @@ and its scorecard at the usual weights. Change either before you publish.
 
 ### Draft the description with AI {#recruitment-vacancies-write-ai needs="recruitment edit"}
 
-1. On a new vacancy, or one you opened with **Edit**, fill in the title, the department and anything
-   you know first.
+**Draft Vacancy**, at the end of a new vacancy's questions, drafts it for you. To draft the
+description again, or for a vacancy you opened with **Edit**:
+
+1. Fill in the title, the department and anything you know first.
 2. On **Details**, type a line in **About the Role** and press **Write With AI**.
 3. When you have already typed a description, the hub asks first, under **Replace Your Text**.
    Press **Replace Text** to go on.
@@ -103,18 +122,20 @@ and its scorecard at the usual weights. Change either before you publish.
    For**, in MyCity's usual shape.
 5. Read it and change what you need. Nothing is saved until you save the vacancy.
 
-> **Tip:** When **Write With AI** is not shown, AI is off or has reached its limit. Its help term
-> says which. Write the description yourself; the form works as before.
+> **Tip:** When **Write With AI** is not shown, AI is off or has reached its limit. Write the
+> description yourself; the form works as before.
 
 ### Start from an empty seat {#recruitment-vacancies-suggested needs="recruitment create"}
 
-**Suggested From Organogram** lists the vacant seats on the organogram that have no vacancy yet.
+**View Empty Seats** lists the vacant seats on the organogram that have no vacancy yet.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
-2. Find the seat under **Suggested From Organogram**. It shows 25 seats a page; page on below it.
+2. Press **View Empty Seats** beside the status filter, and find the seat. It shows 25 seats a page;
+   page on below it.
 3. Press **Create Vacancy** beside it.
-4. **New Vacancy** opens with the seat's title, department and reporting line filled in, and the
-   seat's manager as the **Hiring Manager**. Change any of them if they do not fit.
+4. **New Vacancy** opens with the seat's title, department and reporting line already answered, and
+   the seat's manager as the **Hiring Manager** when they have access to Recruitment (otherwise pick
+   one). Change any of them if they do not fit.
 5. Follow [Write a new vacancy](#recruitment-vacancies-new) from step 3. Nothing is made until you
    save.
 6. {needs="people edit"} You can also press **Create Vacancy** on a vacant seat on
@@ -128,16 +149,18 @@ A seat holds one draft, open or paused vacancy at a time. Once it has one, it le
 2. For a draft, press **Publish**. It goes on the careers page at its own link.
 3. To stop applications for a while, press **Pause**. The link keeps working and says so.
 4. Press **Resume** to take applications again.
-5. To end it, press **Close Vacancy** and pick why: filled, cancelled or on hold.
+5. To end it, press **More Actions**, then **Close Vacancy**, and pick why: filled, cancelled or on hold.
 6. When candidates are still in progress, tick **Not Progress All** to tell them all now. Each gets
-   the not progressing email.
+   the not progressing email. A candidate who has been sent an offer is left as they are.
 7. Press **Close Vacancy**.
 
-The link is made when you first publish and never changes, even after a pause.
+The link is made when you first publish and never changes, even after a pause. When every opening of
+a role is hired, the role closes as filled by itself, and its Organogram role is filled by the new
+person.
 
 | The hub says | Why | What to do |
 |---|---|---|
-| *Its closing day has passed* | **Resume** needs a closing day still to come | Press **Edit**, pick a new **Closes On**, save, then press **Resume** |
+| *Its closing day has passed* | **Resume** needs a closing day still to come | Press **More Actions**, then **Edit Vacancy**; pick a new **Closes On**, save, then press **Resume** |
 
 A closed vacancy cannot be changed or opened again. Write a new one instead. Candidates you did not
 stop stay where they are, and you can still [stop them](#recruitment-candidates-not-progressing) one
@@ -146,11 +169,11 @@ by one.
 ### Change a vacancy {#recruitment-vacancies-edit needs="recruitment edit"}
 
 1. Open the vacancy on [Recruitment · Vacancies](/recruitment?tab=vacancies).
-2. Press **Edit**. The same three steps open with what is saved.
+2. Press **More Actions**, then **Edit Vacancy**. The same three steps open with what is saved.
 3. Change what you need. Emptying a field that is not needed clears it.
 4. Press **Save Vacancy**. The careers page shows the change at once.
 
-Making a role remote removes its location. A closed vacancy has no **Edit**.
+Making a role remote removes its location. A closed vacancy has no **Edit Vacancy**.
 
 ### Set the questions {#recruitment-vacancies-questions needs="recruitment edit"}
 
@@ -158,7 +181,7 @@ A vacancy asks two kinds of question. Its Apply questions are on the form a cand
 interview traits are what each panelist rates, from 1 to 10.
 
 1. Open the vacancy on [Recruitment · Vacancies](/recruitment?tab=vacancies).
-2. Press **Questions**.
+2. Press **More Actions**, then **Questions**.
 3. Under the Apply questions, add a question. Pick written, yes or no, or a choice, and whether it
    must be answered.
 4. Under the interview traits, take out a trait that does not fit the role, or add one of its own.
@@ -175,7 +198,7 @@ The scorecard ranks the role's candidates. It has five parts: screening, psychom
 case study and interview.
 
 1. Open the vacancy on [Recruitment · Vacancies](/recruitment?tab=vacancies).
-2. Press **Scorecard**.
+2. Press **More Actions**, then **Scorecard**.
 3. Switch off a part this role skips. Screening or interview must stay on.
 4. Type each part's weight as a whole number. The parts left on add up to 100.
 5. Save the scorecard. Every candidate's total changes at once.
@@ -185,8 +208,9 @@ three test parts are off, and **Interview** when the interview part is off.
 
 ### Change the candidate emails {#recruitment-vacancies-emails needs="recruitment edit"}
 
-Candidates get five emails: application received, invitation to apply, assessment, interview and
-not progressing.
+Candidates get eight emails: application received, invitation to apply, assessment, interview, not
+progressing, offer sent, offer signed and onboarding documents. The last three go out from Offers and
+Onboarding.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **Candidate Emails** at the top.
@@ -229,8 +253,10 @@ Candidates is the board: each application as a card, in a column for its stage.
 2. The tiles count the **Candidates**, those **To Screen**, those **In Interview** and those
    **Shortlisted**.
 3. Pick a role in the vacancy filter to see only its candidates.
-4. The columns are **Applied**, **Screening**, **Assessment**, **Interview** and **Shortlist**.
-   A role that skips a stage has no column for it.
+4. The columns are **Applied**, **Screening**, **Assessment**, **Interview** and **Shortlist**,
+   side by side in one row, then **Offer** once offers are in use: the candidates sent an offer. A role
+   that skips a stage has no column for it. On a narrow screen, scroll the board sideways to reach the
+   last columns.
 5. Each card shows the name, the role, the screening score and how many days it has been at its
    stage.
 6. On a phone, press a stage at the top to see its cards, one stage at a time.
@@ -245,7 +271,7 @@ The best weighted total comes first. A score never moves, rejects or hides anyon
 ### Open a candidate {#recruitment-candidates-sheet}
 
 1. Press a card on [Recruitment · Candidates](/recruitment?tab=candidates). On a computer it opens
-   beside the board; on a phone it opens in a sheet.
+   in a window over the board; on a phone it opens in a sheet.
    ![A candidate's sheet](shot:recruitment-candidate-sheet)
 2. The sheet shows their details, their CV, their answers and their assessments and interviews.
 3. **Screening** shows the score, **Provisional** while it is the estimate, and the AI's summary.
@@ -253,6 +279,12 @@ The best weighted total comes first. A score never moves, rejects or hides anyon
    many parts have a score yet.
 5. **Stage History** lists each move, who made it and when.
 6. Press **View CV** to open the CV.
+7. At its foot is the candidate's next step, such as *Move to Interview*. Everything else you can do
+   for them is under **More Actions**, with **Not Progressing** last.
+8. {needs="recruitment create"} At **Shortlist**, press **Make Offer** to start an offer for them on
+   [Offers](#recruitment-offers-new).
+9. At **Offer** or after, press **Open Offer** to see their offer on
+   [Recruitment · Offers](/recruitment?tab=offers).
 
 A CV that is *Being checked* is still being scanned for viruses. It opens once it is clean. A CV
 with a virus never opens, and the sheet says so.
@@ -260,7 +292,7 @@ with a virus never opens, and the sheet says so.
 ### Score one candidate with AI {#recruitment-candidates-score needs="recruitment edit"}
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
-2. Press **Score With AI**.
+2. Press **More Actions**, then **Score With AI**.
 3. AI reads the CV, the cover letter and the answers against the role and its must-meet conditions.
 4. The score, from 0 to 100, and a short summary replace the estimate. **Provisional** goes.
 
@@ -297,16 +329,18 @@ The role keeps its conditions. Next time, leave them as they are and they are us
 
 1. Open [Recruitment · Candidates](/recruitment?tab=candidates).
 2. On a computer, drag the card to its new column.
-3. Or open the candidate and press the button for the stage, such as *Move to Interview*. On a phone
-   it is at the foot of the sheet.
+3. Or open the candidate and press the button for the stage, such as *Move to Interview*. The next
+   stage ahead is the button at its foot; any other stage is under **More Actions**.
 
-A card can move to any stage ahead of it, or one stage back. **Shortlist** is the last column for
-now. Each move goes in **Stage History**, and the days at stage start again.
+A card can move to any stage ahead of it, or one stage back, up to **Shortlist**. Nobody drags a card
+into **Offer**: sending an offer moves it there, and an offer declined or lapsed brings it back to
+**Shortlist**. Once the offer is signed, the candidate continues on Onboarding, and a candidate hired
+leaves the board. Each move goes in **Stage History**, and the days at stage start again.
 
 ### Stop a candidate {#recruitment-candidates-not-progressing needs="recruitment edit"}
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
-2. Press **Not Progressing**.
+2. Press **More Actions**, then **Not Progressing**.
 3. Type the **Reason**, at least 10 characters. Only staff read it.
 4. Press **Not Progressing**.
 
@@ -325,7 +359,7 @@ You can stop a candidate of a closed vacancy too. They cannot be moved, scored o
 ### Keep a candidate for later {#recruitment-candidates-pool needs="recruitment create"}
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
-2. Press **Add to Pool**.
+2. Press **More Actions**, then **Add to Pool**.
 3. Under **Why Keep Them**, type why they are worth keeping, at least 5 characters.
 4. Press **Add to Pool**. They are kept in the [Talent Pool](#recruitment-pool) for 24 months.
 
@@ -335,7 +369,7 @@ from a role you cannot see, the hub says *Already in the pool*.
 ### Send an assessment {#recruitment-candidates-assess needs="recruitment edit"}
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
-2. Press **Send Assessment**.
+2. Press **More Actions**, then **Send Assessment**.
 3. Pick the **Assessment**. Only active ones are offered.
 4. Under **Start Within Days**, type how many days they have to start it, from 1 to 14. It starts
    at 3.
@@ -350,7 +384,7 @@ A candidate takes each assessment once. To send one to everyone at a stage, use
 ### Schedule an interview from the board {#recruitment-candidates-interview needs="recruitment edit"}
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
-2. Press **Schedule Interview**.
+2. Press **More Actions**, then **Schedule Interview**.
 3. Follow [Schedule an interview](#recruitment-interviews-schedule) from step 4. The candidate is
    picked already.
 
@@ -381,7 +415,8 @@ Assessments holds MyCity's tests and take-home briefs, and every sitting a candi
 3. Press **Assessments** at the top for the library, or **Sittings** for who took what.
 4. Each assessment shows its name, type, minutes, questions, how many were sent, the average and its
    status.
-5. Press an assessment to see its questions, and the **Points** each option scores.
+5. Press an assessment to see its questions, and the **Points** each option scores. On a computer it
+   opens in a window over the list; on a phone it opens in a sheet.
 
 An assessment is timed, with minutes and a clock, or untimed: a take-home brief due by a day.
 
@@ -475,7 +510,8 @@ an earlier stage move to **Assessment**.
    ![Sittings awaiting marking](shot:recruitment-sittings)
 2. Each sitting shows the candidate, the assessment, where it stands and the score.
 3. Press **To Mark** to see only those waiting for marks. **Awaiting Marking**, at the top, counts them.
-4. Press a sitting to read each answer. Open a file, or the link they gave.
+4. Press a sitting to read each answer. Open a file, or the link they gave. On a computer it opens
+   in a window over the list; on a phone it opens in a sheet.
 
 | Where it stands | What it means |
 |---|---|
@@ -508,16 +544,28 @@ the others' cards until the round closes.
 ### Read the interviews {#recruitment-interviews-read}
 
 1. Open [Recruitment · Interviews](/recruitment?tab=interviews).
-2. **Upcoming** shows what is coming; press **Past** for those held, or **My Panels** for those you
-   sit on.
-3. Each shows the candidate, the role, when, how many of the panel have submitted, and the round.
-4. Press an interview. On a computer it opens beside the list; on a phone it opens in a sheet.
+2. **Upcoming and Recent** lists what is coming first, soonest first, then those held. Press
+   **My Panels** for the ones you sit on, or **All Interviews** for every one you may see.
+3. Each shows the candidate, the role, the date, when it ends, how it is held, the panel, and the
+   round: **Scheduled**, how many cards are in, **Closed** or **Cancelled**. On a phone the list
+   keeps the candidate, the date, the panel and the round.
+4. Press an interview. On a computer it opens in a wide window: the interview, **Blind Panel**,
+   **Weighted Scorecard** and **Candidate Details** sit two by two, with **Round Activity** across
+   the window under them. Press **Close** at its foot to go back to the list. On a phone it opens
+   in a sheet, one part under another.
    ![An interview's sheet](shot:recruitment-interview-sheet)
 5. It shows when and where, or the video link, and the **Candidate Details**.
-6. The panel shows each person as **Submitted** or **Waiting**.
+6. **Blind Panel** shows each person as **Submitted** or **Waiting**. A submitted score reads
+   **Hidden** until the round closes.
+7. **Weighted Scorecard** shows the candidate's score at each part and its weight, with the total.
+   It shows only if the role is yours to see; a panelist alone does not see it.
+8. **Round Activity** shows who scheduled or changed it, each card submitted, each reminder, the
+   close and the report, with when.
 
 While the round is open, nobody reads another person's card. That includes the hiring manager and
 the CEO.
+
+A candidate at the **Interview** stage shows here only once an interview is scheduled for them.
 
 ### Schedule an interview {#recruitment-interviews-schedule needs="recruitment edit"}
 
@@ -606,8 +654,8 @@ A closed round never opens again. The hiring manager is told it has closed.
 Once the round closes, everyone who may see the interview reads the results.
 
 1. Open the interview on [Recruitment · Interviews](/recruitment?tab=interviews).
-2. Each trait shows every panelist's rating and the average across the panel.
-3. Each panelist's decision and comments show under their name.
+2. **Blind Panel** shows each panelist's score and decision.
+3. Each trait shows every panelist's rating and the average across the panel.
 4. The total is the panel's average rating times ten, out of 100. It is the interview's part of the
    scorecard.
 
@@ -637,6 +685,156 @@ To change it later, press **Edit Report**. Each save makes the form again.
 A candidate the panel selects moves to **Shortlist** on the
 [board](#recruitment-candidates-move).
 
+## Offers {#recruitment-offers screen=recruitment/offers icon=doc}
+
+Offers is where a shortlisted candidate's offer of employment is made, approved, signed for MyCity and
+sent. The candidate reads and signs it on their phone, and signing it is accepting it.
+
+![The Offers screen](shot:recruitment-offers)
+
+An offer goes through these, in order:
+
+| Status | What it means |
+|---|---|
+| **Draft** | Being written. Only a draft can change |
+| **With Approval** | Waiting for the Head of Department, then the CEO |
+| **Approved** | Approved. The Offer Signatory signs it for MyCity, then it can be sent |
+| **With Candidate** | Sent. The candidate has until it expires to sign |
+| **Accepted** | Signed by the candidate. It is locked |
+| **Declined**, **Expired**, **Withdrawn** | Ended. Another offer can be made for the same candidate |
+
+### Read the offers {#recruitment-offers-read}
+
+1. Open [Recruitment · Offers](/recruitment?tab=offers).
+2. The tiles count the offers **With Approval**, with the drafts under it, those **To Send**, those
+   **With Candidates** and those **Accepted This Month**.
+3. Pick a **Status** to see only those offers, or search by number, name or role.
+4. Each row shows the offer's number, the candidate, the role, the start date, the year's pay
+   (with **Outside Range** when it is), the status, when it was sent and when it expires. On a phone
+   the list keeps the candidate and the status.
+5. Press an offer. On a computer it opens in a wide window: the offer, with **Signers** under its
+   details, beside **Monthly Pay**, with **Approval** under the pay; **History** runs across the
+   window under them. Press **Close** at its foot to go back to the list. On a phone it opens in a sheet,
+   one part under another.
+   ![An offer](shot:recruitment-offer-record)
+6. The offer shows the role, the department, the start date, when it expires, and the **Score**
+   the candidate had when the offer was made.
+7. **Monthly Pay** lists each pay line, the **Monthly Total** and the year's pay. **Vacancy Range**
+   is the role's monthly range. A total outside it shows **Outside Range**, with the reason.
+8. **Approval**, under the pay on a computer, shows each stage and who approved or rejected it, with any reason.
+9. **Signers**, under the offer's details on a computer, shows who signs for MyCity and the candidate, and whether each has signed.
+10. **History** lists when it was made, submitted, approved, signed, sent and how it ended.
+11. Press **View Letter**, beside **Withdraw Offer**, to read the letter as the candidate will. It opens
+    in a window of its own. Once the PDF is made, **Open in Tab** opens it in the browser and
+    **Download PDF** saves it.
+
+### Make an offer {#recruitment-offers-new needs="recruitment create"}
+
+Only a candidate at **Shortlist** can get an offer, and only one open offer at a time.
+
+1. Open [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **New Offer**. On a phone it is in **Quick Actions**.
+   ![New Offer](shot:recruitment-offer-new)
+3. Pick the **Candidate**. The form fills in from their vacancy: the **Job Title**, the
+   **Department**, who they report to, the work pattern and the job description.
+4. Change anything that differs for this offer, then press **Next**.
+5. Under **Pay Lines**, type each line's name and its **Monthly Amount**. Press **Add Pay Line** for
+   another, such as an allowance. The **Monthly Total** adds them up.
+6. If the total is outside the vacancy's range, type **Why Outside the Range**. The approvers read
+   it. Press **Next**.
+7. Pick the **Start Date**. **Days to Sign** is how long the candidate has once it is sent, 15 unless
+   you change it. Fill in the rest that applies, then press **Next**.
+8. Type any **Additional Terms** for this offer alone. **Schedule A** is the job description printed
+   at the end; change it if this role differs.
+9. Press **Draft Offer**. It shows as **Draft**.
+
+To change a draft, press **Edit Offer**, change it and press **Save Offer**.
+
+> **Tip:** From [Recruitment · Candidates](/recruitment?tab=candidates), **Make Offer** on a
+> shortlisted candidate's sheet opens New Offer with them picked.
+
+### Send it for approval {#recruitment-offers-submit needs="recruitment edit"}
+
+1. Open the draft on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Submit for Approval**. It shows as **With Approval**.
+
+It needs a **Department** and a **Start Date**, and an Offer Signatory named in
+[Offer settings](#recruitment-offers-settings). The Head of Department approves first, then the CEO.
+If one rejects it, it comes back as **Draft** with their reason under **Approval**.
+
+### Approve or reject an offer {#recruitment-offers-approve}
+
+You approve an offer only when it waits for you. It is also on My Approvals.
+
+1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Read the pay and the reason if it is outside the range. Press **View Letter** to read the letter.
+3. Press **Approve Offer**. Or press **Reject Offer**, type the **Reason** and press **Reject Offer**.
+
+When the CEO approves, the letter is made with the standard wording then in force, and the Offer
+Signatory is told.
+
+### Sign it for MyCity {#recruitment-offers-sign}
+
+Only the Offer Signatory signs, once the offer is **Approved**. You are already signed in, so no code
+is asked for.
+
+1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Sign for Company**.
+   ![Sign for the company](shot:recruitment-offer-sign)
+3. Check your **Full Name** and **Title**.
+4. Under **Signature**, pick **Draw** and sign in the box, or **Type** and type it under
+   **Typed Signature**.
+5. Tick **Agree to Sign Electronically**.
+6. Press **Sign Offer**. **Signers** shows you as signed.
+
+### Send it to the candidate {#recruitment-offers-send needs="recruitment edit"}
+
+1. Open the signed offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Send Offer**. The candidate gets an email with their own signing link.
+3. It shows as **With Candidate**, with the day it expires. The candidate's card moves to **Offer** on
+   the [board](#recruitment-candidates-read).
+
+If they cannot find the email, press **Resend Offer**. A new link goes out and the old one stops
+working. What the candidate sees is in [Sign an offer](#public-sign).
+
+When they sign, it shows as **Accepted** and both of you get the signed copy by email. If they
+decline, or it expires, their card goes back to **Shortlist** and you can make another offer.
+
+### When the email does not arrive {#recruitment-offers-email needs="recruitment edit"}
+
+If the mail server refuses the candidate's address, the offer says so in red at the top, with the
+address and when.
+
+1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Change Email**, at the top or beside **Resend Offer**.
+   ![Change Email](shot:recruitment-offer-email)
+3. Type the right **Email** and press **Send to Email**.
+4. A new link goes to the new address and the old one stops working. The candidate's address
+   changes on every application of theirs.
+
+An address another candidate already uses is refused with *Another candidate has it*. A refusal that
+arrives later as a mail of its own does not show here: if the candidate says nothing arrived, check
+the address with them and use **Change Email** or **Resend Offer**.
+
+### Withdraw an offer {#recruitment-offers-withdraw needs="recruitment edit"}
+
+1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
+2. Press **Withdraw Offer**, type the **Reason** and press **Withdraw Offer**.
+
+Its link stops working. An offer still **With Approval** can be withdrawn only by who submitted it,
+or the CEO. An accepted offer cannot be withdrawn.
+
+### Offer settings {#recruitment-offers-settings needs="recruitment edit"}
+
+1. Open [Recruitment · Offers](/recruitment?tab=offers) and press **Offer Settings**.
+   ![Offer Settings](shot:recruitment-offer-settings)
+2. Press **Offer Signatory**, pick who **Signs for the Company** and press **Save Signatory**. They
+   need a login to sign.
+3. Press **Standard Offer Letter** to change the letter's wording. It is Markdown; the names in
+   braces under it, such as `{{ job_title }}`, are filled from each offer.
+4. Press **Save Letter**. Offers approved from now on use it; those already approved keep theirs.
+5. **Restore Default** puts MyCity's own wording back. Yours stays in the history.
+
 ## Talent Pool {#recruitment-pool screen=recruitment/talent-pool icon=star}
 
 The Talent Pool keeps good candidates who were not hired this time, for 24 months.
@@ -651,7 +849,8 @@ The Talent Pool keeps good candidates who were not hired this time, for 24 month
 3. Each person shows the role they applied for, their score, when they were added and why.
 4. **Kept Until** is the day they leave the pool by themselves.
 5. **Invited** shows when someone has been invited to a later role.
-6. Press a person to open them. On a phone, when they were added and why are in the sheet.
+6. Press a person to open them. On a computer they open beside the list, the first one until you
+   press another; on a phone they open in a sheet, with when they were added and why.
 
 The score is the one from the role they came from, with **Provisional** when it is the estimate.
 
@@ -685,6 +884,27 @@ Their row then shows **Invited**. When they apply, their application comes from 
 
 Only you, and the CEO, can open the file it makes.
 
+## Analytics {#recruitment-analytics screen=recruitment/analytics icon=chart}
+
+Analytics holds Recruitment's figures and charts, across every role you may see.
+
+![The Analytics screen](shot:recruitment-analytics)
+
+### Read the charts {#recruitment-analytics-read}
+
+1. Open [Recruitment · Analytics](/recruitment?tab=analytics).
+2. Along the top, the tiles count the **Open Vacancies**, the **Candidates**, those **Shortlisted** and
+   the offers **Accepted This Month**.
+3. **Funnel, All Roles** shows how many candidates stand at each stage now, from **Applied** to
+   **Shortlist**.
+4. **Screening Scores** shows how many candidates fall in each band of screening score: the AI's read
+   of the CV when there is one, otherwise the estimate from the form.
+5. **Assessment Averages** shows each assessment's average score. Beside its title, how many
+   answers wait to be marked.
+6. **Offers and Pool** shows the offers **With Approval**, **To Send** and **With Candidates**, and who
+   is **In the Pool**, **Invited Back** and **Hired From the Pool**.
+7. On a phone the tiles come two a row and the cards sit one under the other.
+
 ```shot recruitment-vacancies
 open: /recruitment?tab=vacancies
 as: operations
@@ -696,11 +916,10 @@ marks:
 open: /recruitment?tab=vacancies
 as: operations
 do:
-  - click: row 1
-  - wait: button "Questions"
+  - click: text "Head, Sales & Revenue"
+  - wait: button "Copy Link"
 marks:
-  1: button "Questions" | Apply questions and interview traits
-  2: button "Scorecard" | The parts and their weights
+  1: button "Copy Link" | Copy the role's public link
 ```
 
 ```shot recruitment-vacancy-new
@@ -741,10 +960,10 @@ open: /recruitment?tab=candidates
 as: operations
 do:
   - click: row 1
-  - wait: button "Score With AI"
+  - wait: button "More Actions"
 marks:
-  1: button "Score With AI" | AI reads the CV
-  2: button "Not Progressing" | Stop with a reason
+  1: button "Move to Screening" | The next step
+  2: button "More Actions" | Every other action
 ```
 
 ```shot recruitment-screen-ai
@@ -793,7 +1012,6 @@ as: operations
 do:
   - click: row 1
   - wait: button "Mark Answers"
-crop: modal
 marks:
   1: button "Mark Answers" | Save the marks
 ```
@@ -811,6 +1029,7 @@ as: operations
 do:
   - click: row 1
   - wait: text "Candidate Details"
+crop: modal
 marks:
   1: text "Candidate Details" | Filled once for the whole panel
 ```
@@ -841,4 +1060,72 @@ open: /recruitment?tab=talent-pool
 as: operations
 marks:
   1: row 1 | A person kept for later
+```
+
+```shot recruitment-analytics
+open: /recruitment?tab=analytics
+as: operations
+marks:
+  1: text "Funnel, All Roles" | Candidates at each stage now
+  2: text "Screening Scores" | Candidates by screening score
+```
+
+```shot recruitment-offers
+open: /recruitment?tab=offers
+as: operations
+marks:
+  1: button "New Offer" | Make an offer
+  2: row 1 | An offer: press it to open
+```
+
+```shot recruitment-offer-record
+open: /recruitment?tab=offers
+as: operations
+do:
+  - click: text "Tunde Bakare"
+  - wait: button "Sign for Company"
+crop: modal
+marks:
+  1: text "Outside Range" | Pay outside the role's range
+  2: button "Sign for Company" | The Offer Signatory signs here
+```
+
+```shot recruitment-offer-new
+open: /recruitment?tab=offers&new=1
+as: operations
+do:
+  - wait: label "Candidate"
+crop: modal
+marks:
+  1: label "Candidate" | Shortlisted candidates only
+```
+
+```shot recruitment-offer-sign
+open: /recruitment?tab=offers
+as: operations
+do:
+  - click: text "Tunde Bakare"
+  - click: button "Sign for Company"
+  - wait: label "Full Name"
+crop: modal
+marks:
+  1: role radio "Type" | Or type your signature
+```
+
+```shot recruitment-offer-settings
+open: /recruitment?tab=offers&panel=settings
+as: operations
+do:
+  - wait: text "Offer Signatory"
+```
+
+```shot recruitment-offer-email
+open: /recruitment?tab=offers
+as: operations
+do:
+  - click: text "Dayo Martins"
+  - wait: button "Change Email"
+crop: modal
+marks:
+  1: button "Change Email" | Correct the address
 ```

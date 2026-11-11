@@ -16,7 +16,7 @@
  * The code lists the service switches on, deal health and interaction types, are seeded (7190).
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { PlaceInput, PlaceView } = require("./maps");
 
@@ -54,6 +54,9 @@ const percent = z
   .string()
   .regex(/^\d{1,3}(\.\d{1,2})?$/, "must be a percentage like 8 or 12.50")
   .refine((v) => Number(v) <= 100, "must be 100 or less");
+
+/** A count a form types (expected attendance): a whole number, or the digits typed. */
+const count = z.union([z.number().int().min(0).max(10000000), z.string().trim().regex(/^\d{1,8}$/, "Whole number").transform(Number)]);
 
 /** A query-string boolean: "true" or "false". */
 const flag = z.enum(["true", "false"]).transform((v) => v === "true");
@@ -114,6 +117,24 @@ const CategoryRow = Category.extend({
   leads: z.number().int().min(0),
 }).strict();
 
+/**
+ * An ask (§6.8): a value the person gives when an agreement is generated, with its label and type, and
+ * where MyCity's wording has one, its default. Named in the wording as `{{ ask.<key> }}`.
+ */
+const TemplateAsk = z
+  .object({
+    key: z.string().regex(/^[a-z][a-z0-9_]{0,39}$/, "Lower case letters"),
+    label: text(60),
+    type: FieldType,
+    options: z.array(text(80)).min(1).max(50).optional(),
+    default: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict()
+  .refine((v) => !["pick", "multi_pick"].includes(v.type) || (v.options && v.options.length > 0), {
+    message: "Add the choices",
+    path: ["options"],
+  });
+
 const CategoryTemplate = z
   .object({
     partner_category_template_id: uuid,
@@ -124,9 +145,56 @@ const CategoryTemplate = z
     is_default: z.boolean(),
     countersigned: z.boolean(),
     active: z.boolean(),
+    asks: z.array(TemplateAsk).max(30),
     version: z.number().int().min(0).nullable(),
   })
   .strict();
+
+/**
+ * A record field a template may name (§6.8). `signer.*` are filled by the signing service when the
+ * agreement is signed (§6.9); `deal.options` is the options table and `category.checklist` the numbered
+ * clauses of the delivery checklist.
+ */
+const RecordFieldType = z.enum(["text", "number", "date", "table", "list", "signature"]);
+const RecordField = z
+  .object({
+    field: z.string(),
+    label: z.string(),
+    type: RecordFieldType,
+    source: z.enum(["record", "signing"]),
+  })
+  .strict();
+
+const rf = (field, label, type = "text", source = "record") => Object.freeze({ field, label, type, source });
+
+/** Every record field a category template may name, in the order the editor offers them. */
+const AGREEMENT_RECORD_FIELDS = Object.freeze([
+  rf("today", "Date", "date"),
+  rf("org.name", "MyCity Name"),
+  rf("partner.name", "Business Name"),
+  rf("partner.legal_name", "Legal Name"),
+  rf("partner.headquarters", "Address"),
+  rf("partner.region", "Region"),
+  rf("contact.full_name", "Contact Person"),
+  rf("contact.title", "Contact Position"),
+  rf("contact.phones", "Phone Numbers"),
+  rf("contact.email", "Email"),
+  rf("deal.title", "Deal Title"),
+  rf("deal.event_title", "Event Title"),
+  rf("deal.event_starts_on", "Event Starts", "date"),
+  rf("deal.event_ends_on", "Event Ends", "date"),
+  rf("deal.objective", "Objective"),
+  rf("deal.expected_attendance", "Expected Attendance", "number"),
+  rf("deal.comments", "Comments"),
+  rf("deal.valid_until", "Valid Until", "date"),
+  rf("deal.validity_label", "Validity"),
+  rf("deal.options", "Deal Options", "table"),
+  rf("category.checklist", "Delivery Checklist", "list"),
+  rf("signer.name", "Signer Name", "text", "signing"),
+  rf("signer.title", "Signer Title", "text", "signing"),
+  rf("signer.signed_on", "Date Signed", "date", "signing"),
+  rf("signer.signature", "Signature", "signature", "signing"),
+]);
 
 const ChecklistItem = z
   .object({
@@ -197,14 +265,39 @@ const CategoryUpdate = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field");
 
-/** Add Template: a template's wording is saved through the templates routes; this names it for the category. */
+/** The editor's wording, as HTML: what the template editor saves and Use Draft hands it. */
+const wordingHtml = z.string().trim().min(1, "Write the agreement").max(100000, "Too long");
+
+/**
+ * Add Template: the agreement's name, kind and wording in one save, so no category ever holds a template
+ * with nothing to fill. The key is made from the category and the label when left out; it never changes.
+ */
 const CategoryTemplateCreate = z
   .object({
-    template_key: z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,79}$/, "must be a template's key"),
+    template_key: z.string().trim().regex(/^[a-z][a-z0-9-]{1,63}$/, "must be a template's key").optional(),
     kind: TemplateKind,
     label: text(80),
     is_default: z.boolean().optional(),
     countersigned: z.boolean().optional(),
+    title: optionalText(150),
+    body_html: wordingHtml,
+    asks: z.array(TemplateAsk).max(30).optional(),
+  })
+  .strict();
+
+/** The picked template with its wording, for the editor (GET /category-templates/:id). */
+const CategoryTemplateDetail = CategoryTemplate.extend({
+  title: z.string().nullable(),
+  body_html: z.string(),
+  record_fields: z.array(RecordField).max(60),
+}).strict();
+
+/** Save the wording as the template's next version; the asks are replaced when given. */
+const TemplateWordingSave = z
+  .object({
+    title: z.string().trim().max(150).nullable().optional(),
+    body_html: wordingHtml,
+    asks: z.array(TemplateAsk).max(30).optional(),
   })
   .strict();
 
@@ -243,11 +336,26 @@ const ProposedField = z
   })
   .strict();
 
+/** What the model is asked to return for Tidy With AI, checked before anyone sees it. */
+const TemplateTidyOutput = z
+  .object({
+    /** The agreement as Markdown, each value that belongs to a record or an ask written as its {{ field }}. */
+    body_markdown: z.string().min(1).max(150000),
+    fields: z.array(ProposedField).max(100),
+  })
+  .strict();
+
+/**
+ * Tidy With AI's answer: the tidied wording for the editor (headings, numbered clauses, the financials grid
+ * as a table, each proposed field a chip), or why there is none: AI is off or its limit is reached (§11).
+ */
 const TemplateTidyDraft = z
   .object({
-    /** The tidied wording: headings, numbered clauses, the financials grid as a table, fields as placeholders. */
-    body: z.string(),
+    available: z.boolean(),
+    reason: z.enum(["off", "limit"]).nullable(),
+    body_html: z.string().nullable(),
     fields: z.array(ProposedField).max(100),
+    ai_run_id: uuid.nullable(),
   })
   .strict();
 
@@ -462,11 +570,12 @@ const DealFields = z
     event_title: optionalText(150),
     event_starts_on: blank(isoDate),
     event_ends_on: blank(isoDate),
-    venue: PlaceInput.optional(),
-    expected_attendance: z.number().int().min(0).max(10000000).optional(),
+    /** Picked from the address search; null or left out for none. */
+    venue: PlaceInput.nullish(),
+    expected_attendance: blank(count),
     objective: optionalText(2000),
     /** A stage of MyCity's list; the first active stage when left out. */
-    stage: listCode.optional(),
+    stage: blank(listCode),
     /** Projected value: the owner's estimate. */
     estimated_value: blank(money),
     commission_pct: blank(percent),
@@ -478,7 +587,7 @@ const DealFields = z
     member_ids: z.array(uuid).max(20).optional(),
     options: z.array(DealOptionInput).max(5, "At most five options").optional(),
     impact: z.array(listCode).max(9).optional(),
-    impact_rating: ImpactRating.optional(),
+    impact_rating: blank(ImpactRating),
     impact_note: optionalText(500),
     comments: optionalText(2000),
     custom: CustomValues.optional(),
@@ -502,7 +611,7 @@ const DealUpdate = z
     event_starts_on: isoDate.nullable().optional(),
     event_ends_on: isoDate.nullable().optional(),
     venue: PlaceInput.nullable().optional(),
-    expected_attendance: z.number().int().min(0).max(10000000).nullable().optional(),
+    expected_attendance: count.nullable().optional(),
     objective: z.string().trim().max(2000).nullable().optional(),
     estimated_value: money.nullable().optional(),
     commission_pct: percent.nullable().optional(),
@@ -545,6 +654,73 @@ const HealthSet = z
   .strict()
   .refine((v) => v.health !== "stalled" || Boolean(v.blockers), { message: "Say what is in the way", path: ["blockers"] });
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's cards on deals (§9; docs/guides/praxis-ai.md §6.11, decision 33): flat fields the
+ * chat can carry, each reaching the screen's own service function. A deal's options, venue, team,
+ * validity, commission and custom values are set on its 360.
+ * ------------------------------------------------------------------ */
+
+/** New Deal as a card, on a partner (a lead has the one deal it was captured with). */
+const DealAdd = z
+  .object({
+    partner_id: recordId("partner"),
+    title: text(150),
+    event_title: optionalText(150),
+    event_starts_on: blank(isoDate),
+    event_ends_on: blank(isoDate),
+    objective: optionalText(2000),
+    stage: listCode.optional(),
+    estimated_value: blank(money),
+    expected_close_on: blank(isoDate),
+    next_action: optionalText(300),
+    next_action_on: blank(isoDate),
+    owner_id: uuid,
+  })
+  .strict()
+  .refine(endsOnOrAfter, ENDS_BEFORE);
+
+/** Edit Deal as a card: the deal beside the fields that change. */
+const DealChange = z
+  .object({
+    deal_id: recordId("deal"),
+    title: text(150).optional(),
+    event_title: z.string().trim().max(150).nullable().optional(),
+    event_starts_on: isoDate.nullable().optional(),
+    event_ends_on: isoDate.nullable().optional(),
+    expected_attendance: z.number().int().min(0).max(10000000).nullable().optional(),
+    objective: z.string().trim().max(2000).nullable().optional(),
+    estimated_value: money.nullable().optional(),
+    expected_close_on: isoDate.nullable().optional(),
+    next_action: z.string().trim().max(300).nullable().optional(),
+    next_action_on: isoDate.nullable().optional(),
+    owner_id: uuid.optional(),
+    impact_rating: ImpactRating.nullable().optional(),
+    impact_note: z.string().trim().max(500).nullable().optional(),
+    comments: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict()
+  .refine(changesBeside(["deal_id"]), nothingOn("deal_id"))
+  .refine(endsOnOrAfter, ENDS_BEFORE);
+
+/** The stage switcher as a card. A move into a signed stage needs the signed copy, so the card sends the person to the 360. */
+const DealStageChange = z
+  .object({
+    deal_id: recordId("deal"),
+    stage: listCode,
+    reason: blank(z.string().trim().min(10, "At least 10 characters").max(1000)),
+  })
+  .strict();
+
+/** Set Health as a card. Stalled needs its blockers. */
+const DealHealthChange = z
+  .object({
+    deal_id: recordId("deal"),
+    health: DealHealth,
+    blockers: blank(z.string().trim().min(10, "At least 10 characters").max(1000)),
+  })
+  .strict()
+  .refine((v) => v.health !== "stalled" || Boolean(v.blockers), { message: "Say what is in the way", path: ["blockers"] });
+
 /** One line of a deal's history: a stage move or a health change. */
 const StageHistoryLine = z
   .object({
@@ -560,6 +736,13 @@ const StageHistoryLine = z
     changed_at: isoDateTime,
   })
   .strict();
+
+/** A history line on a record's 360 (the Partner 360's Activity, §6.2): the line and the deal it is about. */
+const RecordHistoryLine = StageHistoryLine.extend({
+  deal_id: uuid,
+  deal_number: z.string(),
+  deal_title: z.string(),
+}).strict();
 
 /** A delivery checklist item raised as a Workspace task on signing (§6.7); its status is its task's. */
 const Deliverable = z
@@ -743,8 +926,32 @@ const DealReturn = z
   })
   .strict();
 
+/** Enter Returns as a card (with `partnerships.money`): the deal and its month beside the figures. */
+const DealReturnChange = ReturnSave.extend({ deal_id: recordId("deal"), month: ReturnMonth }).strict();
+
 const ReturnListQuery = listQuery({ year: z.coerce.number().int().min(2000).max(2100).optional() }, ["month"]);
 const ReturnPage = Paged(DealReturn);
+
+/**
+ * One row of the Partnership Returns import (§6.14): a deal's month, named by the deal's number or by
+ * its partner's name and its title, with the month's figures. `line_key` is the deal and the month,
+ * made by the importer's extract so a month imported again replaces itself.
+ */
+const ReturnImportRow = z
+  .object({
+    line_key: text(400),
+    deal_number: optionalText(40),
+    partner: optionalText(150),
+    deal_title: optionalText(150),
+    month: ReturnMonth,
+    units_sold: z.number().int().min(0).optional(),
+    gross_sales: blank(money),
+    mycity_commission: blank(money),
+    paid_to_partner: blank(money),
+    downloads: z.number().int().min(0).optional(),
+    note: optionalText(500),
+  })
+  .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const DEAL = {
@@ -763,6 +970,7 @@ const DEAL_FIELDS = {
   options: "deal_option rows",
 };
 const TABLES = {
+  ReturnImportRow: { table: null, reason: "one row of the Partnership Returns sheet as the importer reads it; written as a deal_return" },
   RecordRef: { table: null, reason: "the lead or partner a deal, proposal or agreement is on" },
   Category: { table: "partner_category" },
   CategoryRow: {
@@ -788,10 +996,29 @@ const TABLES = {
   CategoryPage: { table: null, reason: "a page of categories" },
   CategoryCreate: { table: "partner_category" },
   CategoryUpdate: { table: "partner_category" },
-  CategoryTemplateCreate: { table: "partner_category_template" },
+  TemplateAsk: { table: null, reason: "an ask inside partner_category_template.asks" },
+  RecordField: { table: null, reason: "a record field a template may name; a catalogue, not a row" },
+  CategoryTemplateCreate: {
+    table: "partner_category_template",
+    virtual: { title: "the wording's title, kept in template_version", body_html: "the wording, saved as template_version's Markdown" },
+  },
   CategoryTemplateUpdate: { table: "partner_category_template" },
+  CategoryTemplateDetail: {
+    table: "partner_category_template",
+    virtual: {
+      version: "the current template_version.version of its key",
+      title: "template_version.title",
+      body_html: "template_version.body rendered for the editor",
+      record_fields: "the record fields a template may name",
+    },
+  },
+  TemplateWordingSave: {
+    table: null,
+    reason: "new wording saved as the template's next template_version, and its asks",
+  },
   TemplateTidy: { table: null, reason: "pasted wording for Tidy With AI; nothing is kept" },
   ProposedField: { table: null, reason: "a field Tidy With AI proposes; nothing is kept until Use Draft" },
+  TemplateTidyOutput: { table: null, reason: "the model's answer for Tidy With AI, checked before anyone sees it" },
   TemplateTidyDraft: { table: null, reason: "Tidy With AI's draft; nothing is kept until Use Draft" },
   ChecklistItemCreate: { table: "partner_category_checklist_item" },
   ChecklistItemUpdate: { table: "partner_category_checklist_item" },
@@ -828,6 +1055,10 @@ const TABLES = {
   DealCreate: { table: "partnership_opportunity", virtual: DEAL_FIELDS },
   DealUpdate: { table: "partnership_opportunity", virtual: DEAL_FIELDS },
   StageMove: { table: null, reason: "a stage move: the deal's stage and a partnership_stage_history line" },
+  DealAdd: { table: "partnership_opportunity" },
+  DealChange: { table: "partnership_opportunity", virtual: { deal_id: "partnership_opportunity.partnership_opportunity_id" } },
+  DealStageChange: { table: null, reason: "a stage move as a card: the deal, its stage and a partnership_stage_history line" },
+  DealHealthChange: { table: "partnership_opportunity", virtual: { deal_id: "partnership_opportunity.partnership_opportunity_id" } },
   HealthSet: { table: "partnership_opportunity" },
   StageHistoryLine: {
     table: "partnership_stage_history",
@@ -835,6 +1066,17 @@ const TABLES = {
       from_label: "the from stage's or health's label",
       to_label: "the to stage's or health's label",
       by: "the person behind changed_by",
+    },
+  },
+  RecordHistoryLine: {
+    table: "partnership_stage_history",
+    virtual: {
+      from_label: "the from stage's or health's label",
+      to_label: "the to stage's or health's label",
+      by: "the person behind changed_by",
+      deal_id: "partnership_stage_history.partnership_opportunity_id, named as every later table names it",
+      deal_number: "the deal's number",
+      deal_title: "the deal's title",
     },
   },
   Deliverable: {
@@ -861,6 +1103,7 @@ const TABLES = {
   PipelineSummary: { table: null, reason: "Pipeline's figures over the deals" },
   ReturnParams: { table: null, reason: "the :id and :month path parameters" },
   ReturnSave: { table: "deal_return" },
+  DealReturnChange: { table: "deal_return" },
   DealReturn: { table: "deal_return", virtual: { entered_by_name: "the name behind entered_by" } },
   ReturnListQuery: { table: null, reason: "list controls for a deal's returns" },
   ReturnPage: { table: null, reason: "a page of a deal's returns" },
@@ -891,7 +1134,13 @@ module.exports = {
   RecordRef,
   Category,
   CategoryRow,
+  TemplateAsk,
+  RecordFieldType,
+  RecordField,
+  AGREEMENT_RECORD_FIELDS,
   CategoryTemplate,
+  CategoryTemplateDetail,
+  TemplateWordingSave,
   ChecklistItem,
   Field,
   CategoryDetail,
@@ -903,6 +1152,7 @@ module.exports = {
   CategoryTemplateUpdate,
   TemplateTidy,
   ProposedField,
+  TemplateTidyOutput,
   TemplateTidyDraft,
   ChecklistItemCreate,
   ChecklistItemUpdate,
@@ -932,7 +1182,12 @@ module.exports = {
   DealUpdate,
   StageMove,
   HealthSet,
+  DealAdd,
+  DealChange,
+  DealStageChange,
+  DealHealthChange,
   StageHistoryLine,
+  RecordHistoryLine,
   Deliverable,
   DealRow,
   DealDetail,
@@ -942,8 +1197,10 @@ module.exports = {
   PipelineDeal,
   PipelineSummary,
   ReturnMonth,
+  ReturnImportRow,
   ReturnParams,
   ReturnSave,
+  DealReturnChange,
   DealReturn,
   ReturnListQuery,
   ReturnPage,

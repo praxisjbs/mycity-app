@@ -1,0 +1,5 @@
+<header class="page-head"><h2 class="h1">{{ heading }}</h2></header>
+{{#if visual}}<div class="deliv-illus">{{> body}}</div>{{/if}}
+<ol class="items{{#if two}} items--2{{/if}}">
+  {{#each items}}<li class="item"><span class="item-icon"><svg viewBox="0 0 24 24" aria-hidden="true">{{#each paths}}<path d="{{ d }}"/>{{/each}}</svg><span class="item-no">{{ n }}</span></span><div><div class="item-title">{{ title }}</div>{{#if detail}}<p class="item-detail">{{ detail }}</p>{{/if}}</div></li>{{/each}}
+</ol>

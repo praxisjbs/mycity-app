@@ -7,7 +7,7 @@ import { useFreshSignIn, type ConfirmedWay } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
 import { schemas, type AiActionCard, type AiActionResult, type Department } from "@mycity/contract/contract.gen.ts";
 import { LeaveTypeSelect } from "@/features/people/Leave";
-import { ColleaguePicker, DepartmentPicker, EmployeePicker, PolicyPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, WorksitePicker, type PolicyChoice, type ProjectChoice, type TaskChoice, type WorksiteChoice } from "@/features/shared/pickers";
+import { ColleaguePicker, DepartmentPicker, EmployeePicker, HiringManagerPicker, PartnerDealPicker, PartnerRecordPicker, PolicyPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, WorksitePicker, type PartnerDealChoice, type PartnerRecordChoice, type PolicyChoice, type ProjectChoice, type TaskChoice, type WorksiteChoice } from "@/features/shared/pickers";
 import { places } from "@/features/shared/places";
 import { hrefFor } from "@/lib/routes";
 import { useRouter } from "@/lib/router";
@@ -94,7 +94,8 @@ const idsIn = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
  * list, decision 32), a task the person can see (Wait On Task's own list), someone on People's
  * register (the employee pickers of People's forms), a worksite in use, a policy a query or rule may
  * cite, a place picked as every address is (AddressField, F27: the card holds the place's token),
- * and the people Add Work Site may put on a site, the person included. What is already picked
+ * the people Add Work Site may put on a site, the person included, and who may be a vacancy's hiring
+ * manager (New Vacancy's own list). What is already picked
  * reads by the name the card carries; a pick made here keeps its own, until Save Changes has the
  * server name it again.
  */
@@ -108,6 +109,8 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
   const [tasks, setTasks] = useState<TaskChoice[]>(() => ids.map((id) => ({ task_id: id, number: "", title: nameOf(id) })));
   const [worksites, setWorksites] = useState<WorksiteChoice[]>(() => ids.map((id) => ({ worksite_id: id, name: nameOf(id), code: "" })));
   const [policies, setPolicies] = useState<PolicyChoice[]>(() => ids.map((id) => ({ policy_id: id, number: "", title: nameOf(id) })));
+  const [records, setRecords] = useState<PartnerRecordChoice[]>(() => ids.map((id) => ({ id, number: "", name: nameOf(id) })));
+  const [deals, setDeals] = useState<PartnerDealChoice[]>(() => ids.map((id) => ({ deal_id: id, number: "", title: nameOf(id) })));
   const set = (picked: string[]) => onChange(many ? picked : (picked[0] ?? null));
   const pickPeople = (p: PersonRef[]) => (setPeople(p), set(p.map((x) => x.employee_id)));
   switch (field.picks) {
@@ -127,12 +130,19 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
       return <TaskPicker value={tasks} onChange={(t) => (setTasks(t), set(t.map((x) => x.task_id)))} />;
     case "employee":
       return <EmployeePicker value={people} onChange={pickPeople} multiple={many} filters={{ status: "active" }} placeholder="Search staff" />;
+    case "hiring_manager":
+      return <HiringManagerPicker value={people} onChange={pickPeople} />;
     case "site_member":
       return <ColleaguePicker value={people} onChange={pickPeople} multiple withSelf placeholder="Search people" />;
     case "worksite":
       return <WorksitePicker value={worksites} onChange={(w) => (setWorksites(w), set(w.map((x) => x.worksite_id)))} />;
     case "policy":
       return <PolicyPicker value={policies} onChange={(p) => (setPolicies(p), set(p.map((x) => x.policy_id)))} />;
+    case "partner":
+    case "lead":
+      return <PartnerRecordPicker kind={field.picks} value={records} onChange={(r) => (setRecords(r), set(r.map((x) => x.id)))} />;
+    case "partner_deal":
+      return <PartnerDealPicker value={deals} onChange={(d) => (setDeals(d), set(d.map((x) => x.deal_id)))} />;
     case "place":
       // The card holds the place's token alone; a device location while search is down holds none, so the field asks again.
       return <AddressField value={ids[0] ? { token: ids[0] } : null} onChange={(v) => set(v?.token ? [v.token] : [])} places={places} />;

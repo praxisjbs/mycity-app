@@ -1,7 +1,31 @@
 {
+  "public-agreement": {
+    "spec": "a2b72046588b9892",
+    "source": "b329ac64c6d8945c",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-agreement-below": {
+    "spec": "405456181c44d9a5",
+    "source": "b329ac64c6d8945c",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-agreement-wait": {
+    "spec": "93918ab1d4f2c702",
+    "source": "b329ac64c6d8945c",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "public-apply": {
     "spec": "b6f0b9175d8ca747",
-    "source": "d1eb783ff7026ece",
+    "source": "bf9619edce2b406a",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +33,7 @@
   },
   "public-apply-questions": {
     "spec": "0c5521efda000ca1",
-    "source": "d1eb783ff7026ece",
+    "source": "bf9619edce2b406a",
     "devices": [
       "desktop",
       "phone"
@@ -17,15 +41,15 @@
   },
   "public-assessment-file": {
     "spec": "b71d852a0f0e5354",
-    "source": "8961bd3cb79d9c80",
+    "source": "fbfae55d99997cb1",
     "devices": [
       "desktop",
       "phone"
     ]
   },
   "public-assessment-question": {
-    "spec": "6f3bf9ed480627c7",
-    "source": "8961bd3cb79d9c80",
+    "spec": "75e88a48e2c6803b",
+    "source": "fbfae55d99997cb1",
     "devices": [
       "desktop",
       "phone"
@@ -33,31 +57,95 @@
   },
   "public-assessment-start": {
     "spec": "7f13a051832c0a7f",
-    "source": "8961bd3cb79d9c80",
+    "source": "fbfae55d99997cb1",
     "devices": [
       "desktop",
       "phone"
     ]
   },
   "public-assessment-submit": {
-    "spec": "56aa16facc35faec",
-    "source": "8961bd3cb79d9c80",
+    "spec": "5381b60be50114be",
+    "source": "fbfae55d99997cb1",
     "devices": [
       "desktop",
       "phone"
     ]
   },
   "public-careers": {
-    "spec": "de839e2f56e1b8d0",
-    "source": "2a33b21d738b7159",
+    "spec": "9318d41f0c7b798b",
+    "source": "d83869a87059ef12",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-home": {
+    "spec": "fed174db5e21883c",
+    "source": "19c3c215002d89d3",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-proposal": {
+    "spec": "ddc4fdc435deabe8",
+    "source": "558b83310c63d062",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-proposal-closed": {
+    "spec": "1d21aed210bf1982",
+    "source": "558b83310c63d062",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-sign": {
+    "spec": "d82e693975510176",
+    "source": "b329ac64c6d8945c",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-sign-below": {
+    "spec": "48c8c3981dea1849",
+    "source": "b329ac64c6d8945c",
     "devices": [
       "desktop",
       "phone"
     ]
   },
   "public-vacancy": {
-    "spec": "980d58e8600ef561",
-    "source": "81b53fc70760c17f",
+    "spec": "9f254efa0ed9d466",
+    "source": "30c1c4333354db57",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-verify": {
+    "spec": "bdadc6d729a58dae",
+    "source": "ddd32f07e982c923",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-verify-agreement": {
+    "spec": "674cb11364f1e7be",
+    "source": "ddd32f07e982c923",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-verify-certificate": {
+    "spec": "e9c161869823d53c",
+    "source": "ddd32f07e982c923",
     "devices": [
       "desktop",
       "phone"

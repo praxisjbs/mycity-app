@@ -7,8 +7,11 @@
  *
  *   pending(query)                 fines waiting for payroll, a page of 25
  *   accept(client, id, actor)      M6: taken into a run
- *   settle(client, id, actor)      M6: deducted, the run paid
+ *   settle(client, id, actor)      M6: deducted, the run approved
  *   waive(client, id, actor, why)  M6 or People: not deducted
+ *   release(client, id, actor, why) M6: an accepted fine goes back to pending, to be accepted again
+ *                                  or waived (docs/guides/payroll.md §6.6 rule 5). The fine only moves
+ *                                  here; that no instalment is in a run yet is payroll's rule to hold
  *
  * M6 calls these inside its own transaction; each writes its event and refuses a move
  * the fine is not in a state for.
@@ -37,5 +40,7 @@ async function move(client, id, from, to, key, actor, reason = null) {
 const accept = (client, id, actor) => move(client, id, "pending", "accepted", EVENTS.SANCTION_FINE_ACCEPTED, actor);
 const settle = (client, id, actor) => move(client, id, "accepted", "settled", EVENTS.SANCTION_FINE_SETTLED, actor);
 const waive = (client, id, actor, reason) => move(client, id, "pending", "waived", EVENTS.SANCTION_FINE_WAIVED, actor, reason);
+const release = (client, id, actor, reason = null) =>
+  move(client, id, "accepted", "pending", EVENTS.SANCTION_FINE_RELEASED, actor, reason);
 
-module.exports = { pending, accept, settle, waive };
+module.exports = { pending, accept, settle, waive, release };

@@ -12,7 +12,6 @@
  * @example <StepBar steps={["About You", "CV and Questions", "Why This Role"]} at={1} vertical decorative />
  */
 import { cn } from "../lib/cn";
-import { Icon } from "../icons/Icon";
 
 export interface StepBarProps {
   /** The steps' titles in order, Title Case, at most 4 words each. */
@@ -21,38 +20,48 @@ export interface StepBarProps {
   at: number;
   /** Also name the step in hand after its number ("Step 2 of 4 · Access"). Off inside Wizard, which shows the title as its heading. */
   titled?: boolean;
-  /** A column of the steps by name, each with its number or a tick, for a pane beside the form (the public site's Apply). */
+  /** A column of the steps by name, each in a numbered circle (yellow for the one in hand, green once done), for the aside beside the form (PublicPage layout split `steps`: Apply, Sign Offer). */
   vertical?: boolean;
+  /** vertical: every step done (the application sent, the offer signed). */
+  complete?: boolean;
   /** Hides the bar from assistive technology, when another bar on the screen already names the steps (the Wizard's own). */
   decorative?: boolean;
   /** Layout classes only (spacing). */
   className?: string;
 }
 
-export function StepBar({ steps, at, titled = false, vertical = false, decorative = false, className }: StepBarProps) {
+export function StepBar({ steps, at, titled = false, vertical = false, complete = false, decorative = false, className }: StepBarProps) {
   if (steps.length === 0) return null;
   const here = Math.min(Math.max(Math.trunc(at) || 0, 0), steps.length - 1);
   if (vertical)
     return (
       <ol className={cn("flex list-none flex-col p-0", className)} {...(decorative ? { "aria-hidden": true } : { "aria-label": "Steps" })}>
-        {steps.map((title, i) => (
-          <li key={`${i}:${title}`} aria-current={i === here ? "step" : undefined} className="relative flex items-center gap-3 pb-5 last:pb-0">
-            {i < steps.length - 1 && (
-              <span aria-hidden="true" className={cn("absolute top-8 bottom-0 left-3.5 w-0.5 -translate-x-1/2 rounded-full transition-colors duration-500", i < here ? "bg-primary" : "bg-border")} />
-            )}
-            <span
-              className={cn(
-                "relative flex size-7 flex-none items-center justify-center rounded-full text-xs font-strong transition-colors duration-300",
-                i < here && "bg-primary text-primary-foreground",
-                i === here && "bg-primary text-primary-foreground ring-4 ring-primary/25",
-                i > here && "border border-border text-muted-foreground",
-              )}
+        {steps.map((title, i) => {
+          const done = complete || i < here;
+          const now = !complete && i === here;
+          return (
+            <li
+              key={`${i}:${title}`}
+              aria-current={now ? "step" : undefined}
+              data-step={done ? "done" : now ? "on" : undefined}
+              className={cn("relative flex min-h-11.5 items-center gap-3 text-md transition-colors duration-300", now ? "font-semibold text-foreground" : "text-muted-foreground")}
             >
-              {i < here ? <Icon name="ok" /> : i + 1}
-            </span>
-            <span className={cn("text-sm transition-colors duration-300", i === here ? "font-strong text-foreground" : "text-muted-foreground")}>{title}</span>
-          </li>
-        ))}
+              {i < steps.length - 1 && <span aria-hidden="true" className="absolute top-9 left-3.75 h-5 w-0.5 bg-canvas-line-strong" />}
+              <b
+                className={cn(
+                  "grid size-8 flex-none place-items-center rounded-full border-2 text-md font-bold transition-all duration-300",
+                  done && "border-success bg-success-soft text-success",
+                  now && "border-primary bg-primary text-primary-foreground",
+                  !done && !now && "border-canvas-line-strong text-muted-foreground",
+                )}
+              >
+                {i + 1}
+              </b>
+              {done && <span className="sr-only">Done: </span>}
+              {title}
+            </li>
+          );
+        })}
       </ol>
     );
 

@@ -1,18 +1,29 @@
+import leads from "@mycity/contract/schemas/leads.js";
 import { invalidate, useMutation } from "@/api/hooks";
-import "@/api/types/partnerships";
-import { Button, Field, FormFooter, rules, TextAreaField, toast, useContractForm } from "@mycity/ui";
+import { Button, Field, FormFooter, TextAreaField, toast, useContractForm } from "@mycity/ui";
+import { failed } from "../lib";
 
-/** Close as Lost, on the mock until M7 PR 3. */
+/** Close as Lost (docs/guides/partnerships.md §6.4): why, and the deal moves to Closed Lost. */
 export function LoseLead({ id, close }: { id: string; close: () => void }) {
-  const f = useContractForm({ reason: "" }, { reason: rules.required("Give a reason") });
-  const reason = f.values.reason;
+  const f = useContractForm({ reason: "" }, leads.LeadLose);
   const lose = useMutation("POST /api/v1/partnerships/leads/:id/lose");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await lose.run({ params: { id }, body: { reason: f.values.reason.trim() } });
+      invalidate("/api/v1/partnerships");
+      close();
+      toast("Lead closed as lost");
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
   return (
     <>
-      <Field label="Why" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Partner withdrew" /></Field>
+      <Field label="Why" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Chose another app" /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={lose.pending} onClick={async () => { if (!f.check()) return; await lose.run({ params: { id }, body: { reason } }); invalidate("/api/v1/partnerships/leads"); close(); toast("Lead closed as lost"); }}>Close as Lost</Button>
+        <Button variant="danger" onClick={submit}>Close as Lost</Button>
       </FormFooter>
     </>
   );

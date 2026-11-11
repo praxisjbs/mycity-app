@@ -143,7 +143,7 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
       ["interview", true, 25],
     ]);
     expect(v.questions.filter((x) => x.purpose === "interview").map((x) => x.prompt)).toEqual(TRAITS);
-    expect(v.board_stages).toEqual(["application", "screening", "assessment", "interview", "shortlist"]);
+    expect(v.board_stages).toEqual(["application", "screening", "assessment", "interview", "shortlist", "offer"]);
     expect(v.closes_at).toBe(new Date(lagos.endOfDayExclusive(closesOn()).getTime() - 1000).toISOString());
   });
 
@@ -166,8 +166,19 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
 
     const careers = await pub().get("/jobs");
     expect(careers.status).toBe(200);
+    const opsCode = (await one("SELECT code::text AS code FROM department WHERE department_id = $1", [dept])).code;
     expect(careers.body.data).toEqual([
-      { slug: "head-sales-revenue-lagos", title: "Head, Sales & Revenue", department: "Operations", location: "Victoria Island, Lagos", work_pattern: "hybrid" },
+      {
+        slug: "head-sales-revenue-lagos",
+        title: "Head, Sales & Revenue",
+        department: "Operations",
+        department_code: opsCode,
+        location: "Victoria Island, Lagos",
+        work_pattern: "hybrid",
+        work_pattern_note: "2 days in office, 3 from home",
+        employment_type: "full_time",
+        closes_at: live.body.closes_at,
+      },
     ]);
     expect((await pub().get("/jobs?q=revenue")).body.page.total).toBe(1);
     expect((await pub().get("/jobs?q=engineer")).body.page.total).toBe(0);
@@ -177,9 +188,8 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     expect(role.body).toMatchObject({ state: "open", how_we_hire: ["apply", "screening", "assessment", "interview"], working_days: "Monday to Saturday", applicants: 0 });
     // The role's Markdown texts arrive as blocks from the one renderer, so the page draws elements, never HTML.
     const text = (spans) => spans.map((x) => x.text).join("");
-    expect(role.body.about_company).toHaveLength(1);
-    expect(role.body.about_company[0].kind).toBe("paragraph");
-    expect(text(role.body.about_company[0].spans)).toMatch(/^MyCityApp is a digital city/);
+    // About MyCityApp is the index's (/jobs/summary), never each role's.
+    expect(role.body).not.toHaveProperty("about_company");
     expect(role.body.description.map((b) => b.kind)).toEqual(["paragraph", "heading", "heading", "bullets"]);
     expect(role.body.description[1]).toMatchObject({ kind: "heading", level: 2 });
     expect(text(role.body.description[1].spans)).toBe("Key Responsibilities");
@@ -252,7 +262,7 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
       parts: { screening: { active: true, weight: 30 }, psychometric: off, technical: off, case_study: off, interview: { active: true, weight: 70 } },
     });
     expect(card.status).toBe(200);
-    expect(card.body.board_stages).toEqual(["application", "screening", "interview", "shortlist"]);
+    expect(card.body.board_stages).toEqual(["application", "screening", "interview", "shortlist", "offer"]);
     expect((await pub().get("/jobs/head-sales-revenue-lagos")).body.how_we_hire).toEqual(["apply", "screening", "interview"]);
   });
 
@@ -268,6 +278,18 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     const noGrant = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Field Officer Lead", hiring_manager_id: h.people.staff.employee_id }));
     expect(noGrant.status).toBe(422);
     expect(noGrant.body.error.fields).toEqual({ hiring_manager_id: ["No Recruitment access"] });
+    // The picker offers only who the save takes (fault #3 of 11/11): holding Recruitment, in the writer's scope.
+    const offered = async (who) => {
+      const res = await h.as(who).get("/recruitment/vacancies/hiring-managers");
+      expect(res.status).toBe(200);
+      expect(c.vacancies.HiringManagerPage.safeParse(res.body).success).toBe(true);
+      return res.body.data.map((p) => p.employee_id);
+    };
+    const forOps = await offered("ops");
+    expect(forOps).toEqual(expect.arrayContaining([h.people.ops.employee_id, h.people.hod.employee_id]));
+    expect(forOps).not.toContain(h.people.staff.employee_id);
+    // The Head leads the staff member, who holds no Recruitment: only the Head is offered.
+    expect(await offered("hod")).toEqual([h.people.hod.employee_id]);
 
     const list = await h.as("hod").get("/recruitment/vacancies");
     expect(list.body.data.map((v) => v.title)).toEqual(["Field Coordinator"]);
@@ -302,6 +324,10 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     ]);
     const other = await h.as("ops").get(`/recruitment/vacancies/suggested?org_seat_id=${dept}`);
     expect(other.body.data).toEqual([]);
+    // A line manager without Recruitment is not filled in as the hiring manager: the save would refuse them.
+    await q("UPDATE org_seat SET line_manager_id = $1 WHERE org_seat_id = $2", [h.people.staff.employee_id, seat.org_seat_id]);
+    const unfit = await h.as("ops").get(`/recruitment/vacancies/suggested?org_seat_id=${seat.org_seat_id}`);
+    expect(unfit.body.data).toEqual([expect.objectContaining({ org_seat_id: seat.org_seat_id, line_manager: null })]);
     await q("UPDATE org_seat SET line_manager_id = NULL WHERE org_seat_id = $1", [seat.org_seat_id]);
     // A Head of Department sees only the seats of people they lead.
     expect((await h.as("hod").get("/recruitment/vacancies/suggested")).body.data).toEqual([]);
@@ -343,7 +369,8 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
           values: {
             title: "Content Producer",
             department_id: "Operations",
-            hiring_manager_id: h.people.ops.employee_id,
+            // Written by name: matched among who may be a hiring manager (vacancies.hiring_managers).
+            hiring_manager_id: "Ada Obi",
             employment_type: "full_time",
             work_pattern: "hybrid",
             location: "Yaba",
@@ -361,6 +388,9 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     const card = asked.body.card;
     expect(card).toMatchObject({ action_key: "vacancies.create", label: "New Vacancy", schema: "vacancies.VacancyAdd", problems: {} });
     expect(card.names).toEqual(expect.arrayContaining([expect.objectContaining({ type: "department", label: "Operations" }), expect.objectContaining({ type: "place", label: "Yaba, Lagos" })]));
+    expect(card.values.hiring_manager_id).toBe(h.people.ops.employee_id);
+    // Edit picks the hiring manager from the same list as New Vacancy's own picker.
+    expect(card.fields.find((f) => f.name === "hiring_manager_id")).toMatchObject({ picks: "hiring_manager" });
     const pressed = await h.press("ops", card.ai_action_draft_id);
     expect(pressed.status).toBe(200);
     const made = await one("SELECT vacancy_id, number::text AS number, status, location FROM vacancy WHERE title = 'Content Producer'");
@@ -513,5 +543,146 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     }
     const kept = await keep(["Lives in Lagos", "Fluent in English", "Five years of sales experience"]);
     expect(kept.conditions).toEqual(["Lives in Lagos", "Fluent in English", "Five years of sales experience"]);
+  });
+
+  test("the careers page lists closing soonest first, one department at a time; the index's summary counts the same roles", async () => {
+    // A careers page of four roles of our own: everything earlier tests left live is closed first.
+    await q("UPDATE vacancy SET status = 'closed', close_reason = 'cancelled', closed_at = now() WHERE status IN ('open', 'paused')");
+    const day = (n) => lagos.addDays(lagos.today(), n);
+    const make = async (over) => {
+      const r = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ publish: true, ...over }));
+      expect(r.status).toBe(201);
+      return r.body;
+    };
+    const late = await make({ title: "Finance Officer", closes_on: day(30) });
+    const soon = await make({ title: "Operations Intern", closes_on: day(5), employment_type: "internship", work_pattern: "on_site", work_pattern_note: undefined });
+    const abuja = await make({ title: "City Editor", department_id: programmes, location: { token: area("Wuse, Abuja", "Abuja") }, closes_on: day(12), work_pattern: "on_site", work_pattern_note: undefined });
+    const open = await make({ title: "Data Analyst", closes_on: day(40) });
+    const paused = await make({ title: "Video Editor", closes_on: day(2) });
+    await h.as("ops").post(`/recruitment/vacancies/${paused.vacancy_id}/pause`).send({});
+    // A role with no closing date (none is made on screen today) comes after every dated one.
+    await q("UPDATE vacancy SET closes_at = NULL WHERE vacancy_id = $1", [open.vacancy_id]);
+    const [ops, prog] = await Promise.all([dept, programmes].map(async (id) => (await one("SELECT code::text AS code, name FROM department WHERE department_id = $1", [id]))));
+
+    const list = await pub().get("/jobs");
+    expect(list.status).toBe(200);
+    expect(list.body.data.map((x) => x.slug)).toEqual([soon.slug, abuja.slug, late.slug, open.slug]);
+    expect(list.body.data[0]).toMatchObject({ title: "Operations Intern", department: ops.name, department_code: ops.code, employment_type: "internship", work_pattern: "on_site", work_pattern_note: null, closes_at: soon.closes_at });
+    expect(list.body.data[3].closes_at).toBeNull();
+
+    // One department at a time, by its code, with the search or without; an unknown code is an empty page.
+    const byDept = await pub().get(`/jobs?department=${encodeURIComponent(prog.code.toLowerCase())}`);
+    expect(byDept.body.data.map((x) => x.slug)).toEqual([abuja.slug]);
+    expect((await pub().get(`/jobs?department=${ops.code}&q=analyst`)).body.data.map((x) => x.slug)).toEqual([open.slug]);
+    expect((await pub().get(`/jobs?department=${ops.code}&q=editor`)).body.page.total).toBe(0);
+    const none = await pub().get("/jobs?department=NOPE");
+    expect(none.status).toBe(200);
+    expect(none.body.page.total).toBe(0);
+    expect((await pub().get("/jobs?page_size=100")).status).toBe(422);
+
+    const summary = await pub().get("/jobs/summary");
+    expect(summary.status).toBe(200);
+    expect(summary.body).toMatchObject({
+      open: 4,
+      departments: [ops, prog].sort((a, b) => a.name.localeCompare(b.name)).map((d) => ({ code: d.code, name: d.name, open: d === ops ? 3 : 1 })),
+      cities: [{ name: "Lagos", open: 3 }, { name: "Abuja", open: 1 }],
+    });
+    expect(summary.body.closing_soon).toEqual(list.body.data.slice(0, 3));
+    expect(summary.body.about_company[0]).toMatchObject({ kind: "paragraph" });
+    expect(JSON.stringify(summary.body)).not.toContain(soon.vacancy_id);
+
+    // A role past its closing time leaves the list and the figures at once.
+    await q("UPDATE vacancy SET closes_at = now() - interval '1 minute' WHERE vacancy_id = $1", [soon.vacancy_id]);
+    const after = (await pub().get("/jobs/summary")).body;
+    expect(after.open).toBe(3);
+    expect(after.closing_soon.map((x) => x.slug)).toEqual([abuja.slug, late.slug, open.slug]);
+    expect(after.departments.find((d) => d.code === ops.code).open).toBe(2);
+  });
+
+  test("New Vacancy's interview: two follow-ups about the role on Default (never DeepSeek), an unfair one dropped; none and no error when the AI is off", async () => {
+    const answers = {
+      title: "Data Analyst",
+      department_id: dept,
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      interview: { positions: "1", area: "Yaba, Lagos", must_haves: "SQL and spreadsheets. Weekly figures for every team.", follow_ups: [] },
+    };
+    expect((await h.as("staff").post("/recruitment/vacancies/assist/follow-ups").send(answers)).status).toBe(403);
+    const sent = script({
+      text: JSON.stringify({
+        questions: [
+          { question: "Which tools will the Data Analyst use every week?", hint: "Name the software the role works in." },
+          { question: "What age range would suit the Data Analyst best?", hint: "A range." },
+        ],
+      }),
+    });
+    const res = await h.as("ops").post("/recruitment/vacancies/assist/follow-ups").send(answers);
+    expect(res.status).toBe(200);
+    expect(c.vacancies.FollowUps.safeParse(res.body).success).toBe(true);
+    expect(res.body).toMatchObject({ available: true, reason: null, questions: [{ question: "Which tools will the Data Analyst use every week?", hint: "Name the software the role works in." }] });
+    expect(sent).toHaveLength(1);
+    // The model reads the role with its department named, and the answers given, and nothing else.
+    const told = JSON.stringify(sent[0]);
+    expect(told).toContain("Operations");
+    expect(told).toContain("Yaba, Lagos");
+    expect(told).not.toContain(dept);
+    expect(await one("SELECT purpose, vendor, prompt_key FROM ai_run WHERE run_id = $1", [res.body.ai_run_id])).toEqual({ purpose: "vacancy-follow-ups", vendor: "gemini", prompt_key: "vacancy-follow-ups" });
+
+    // A model that fails, or the AI switched off: no questions, and the interview goes on.
+    script({ text: "not json" }, { text: "still not json" });
+    const failed = await h.as("ops").post("/recruitment/vacancies/assist/follow-ups").send(answers);
+    expect(failed.status).toBe(200);
+    expect(failed.body).toMatchObject({ available: false, questions: [] });
+    const drafts = require("../../src/services/ai/drafts");
+    jest.spyOn(drafts, "availability").mockResolvedValue({ available: false, reason: "off" });
+    const off = await h.as("ops").post("/recruitment/vacancies/assist/follow-ups").send(answers);
+    expect(off.body).toEqual({ available: false, reason: "off", questions: [], ai_run_id: null });
+  });
+
+  test("New Vacancy's draft from the interview: the model's in MyCity's shape, or a plain draft from the answers when the AI cannot, never an error", async () => {
+    const body = {
+      title: "Data Analyst",
+      department_id: dept,
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      min_experience_years: "2",
+      interview: {
+        positions: "2",
+        work_pattern_note: "Two office days",
+        area: "Yaba, Lagos",
+        must_haves: "SQL and spreadsheets.\nBuild the weekly figures every team plans by.",
+        extras: "Looker Studio",
+        follow_ups: [{ question: "Which tools will the Data Analyst use every week?", answer: "Google Sheets and Looker Studio." }],
+      },
+    };
+    const sent = script({
+      text: JSON.stringify({
+        description:
+          "The Data Analyst turns MyCityApp's listings and bookings into the weekly figures every team plans by.\n\n## Key Responsibilities\n\n### 1. Reporting\n\n- Build the weekly figures.",
+        requirements: "- 2+ years with SQL and spreadsheets.",
+        nice_to_have: "Experience with Looker Studio.",
+      }),
+    });
+    const res = await h.as("ops").post("/recruitment/vacancies/assist").send(body);
+    expect(res.status).toBe(200);
+    expect(c.vacancies.JdDraft.safeParse(res.body).success).toBe(true);
+    expect(res.body).toMatchObject({ available: true, requirements: "- 2+ years with SQL and spreadsheets." });
+    expect(JSON.stringify(sent[0])).toContain("Google Sheets and Looker Studio.");
+
+    // The model fails: the plain draft from the person's own answers.
+    script({ text: "not json" }, { text: "still not json" });
+    const plain = await h.as("ops").post("/recruitment/vacancies/assist").send(body);
+    expect(plain.status).toBe(200);
+    expect(plain.body).toMatchObject({ available: false, reason: "off", ai_run_id: null, nice_to_have: "- Looker Studio" });
+    expect(plain.body.description).toMatch(/^MyCityApp is hiring 2 people as Data Analyst, in the Operations team, based in Yaba, Lagos\./);
+    expect(plain.body.requirements).toBe("- 2+ years of relevant experience.\n- SQL and spreadsheets.\n- Build the weekly figures every team plans by.");
+
+    // Write With AI on the form, with the AI off, still says so and drafts nothing.
+    const drafts = require("../../src/services/ai/drafts");
+    jest.spyOn(drafts, "availability").mockResolvedValue({ available: false, reason: "off" });
+    const form = await h.as("ops").post("/recruitment/vacancies/assist").send({ title: "Data Analyst", instruction: "Turns figures into weekly reports." });
+    expect(form.body).toEqual({ available: false, reason: "off", description: null, requirements: null, nice_to_have: null, ai_run_id: null });
+    const off = await h.as("ops").post("/recruitment/vacancies/assist").send(body);
+    expect(off.body).toMatchObject({ available: false, reason: "off", description: expect.stringMatching(/^MyCityApp is hiring 2 people/) });
   });
 });

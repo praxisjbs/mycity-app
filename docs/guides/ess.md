@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #56 My Requests (M8), #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
-| Last changed | 26/10/2026 |
+| Last changed | 11/11/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -42,11 +42,12 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · My Devices (`my-devices`) | Staff app | Every employee | Owned by LA: devices used to clock in, up to 3 | Register this device |
 | ESS · Policy Updates (`policy-updates`) | Staff app | Every employee | Owned by TB (policies.md): every policy that applies to them, those to acknowledge first, as clean text or sentences with what changed; approvers, the versions waiting on them | Acknowledge, Later, Download PDF; an approver approves and signs |
 | ESS · My Performance (`my-performance`) | Staff app | Every employee | Score to date, rating, this month's check-in, commitments on time, agreement; My Scorecard, This Month's Check-In, My Commitments (Performance PR 4), Rolls Up To, My Reviews, My PIP when open (Performance PR 3; `docs/guides/performance.md` §10) | Agree Scorecard, Disagree With Reason; Start Check-In, Save Draft, Submit Check-In, Dictate, Tidy With AI, Add Evidence, Change Score; open a review and download a closed one's PDF; a link to their own scorecard opens My Scorecard |
-| ESS · My Payslips (`my-payslips`) | Staff app | Every employee | Payslips by year, gross, net, deductions, next payday, a preview | Change year, preview a month, download a PDF, email a copy, open the deductions breakdown |
+| ESS · My Payslips (`my-payslips`) | Staff app | Every employee | Payslips by year, gross, net, deductions, next payday, a month's payslip in a modal | Change year, open a month, download a PDF, email a copy, Download All of the year, open the deductions breakdown |
 | ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, cancel a request while it waits or before it starts, open a request or a figure's list, open the leave calendar |
 | ESS · My Requests (`my-requests`) | Staff app | Every employee | Their own expense requests: KPI cards, the list, a request in the modal. Built by M8 (`docs/guides/expenses.md` §2, §10), listed here because it is an ESS tab | New Request, Edit, Send Again, Cancel Request |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | One tab, a Queries and Sanctions switch: their queries (open first) and their sanctions | Respond to an open query; open a letter. Sanctions are read only |
 | ESS · My Documents (`my-documents`) | Staff app | Every employee | Their vault: contracts, certificates, ID; signed, verified, expiring, missing | Upload a requested document, preview, download |
+| ESS · My Training (`my-training`, M10) | Staff app | Every employee, own | Owned by TB (`knowledge.md`): the courses assigned to them (due first), in progress, completed with their certificates, and the Library | Start a course, Mark Done, Add Proof, Download Certificate |
 | ESS · My Security (`my-security`) | Staff app | Every employee | Password (when it was changed), two-step sign-in, the PIN, passkeys, where they are signed in, recent sign-ins with how each began; a link to My Devices | Change password; set up, change or turn off two-step (no Turn Off while a role they hold requires it) and choose how often it asks; new recovery codes; set, change or remove the PIN; add, rename or remove a passkey; sign out one device or all the others; open My Devices |
 | Shell avatar (rail, phone top bar, More) | Staff app | Every employee | The photo from My Profile, or initials | |
 | People · Employees (employee record) | Staff app | People; Download Their Data the CEO only | The same employee record | Where People edit the fields an employee cannot; the CEO asks for a copy of one person's data (Download Their Data) |
@@ -83,7 +84,8 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    recorded (My Queries · Sanctions) and any deduction is accepted into the payroll run (M6) → the
    approved payslip shows it in My Payslips, and the Deductions figure opens the list of months with
    deductions, each with its query. If the query is waived nothing is deducted.
-4. **Payslips** become visible when Payroll approves and locks the run (normally the 27th). Until
+4. **Payslips** become visible when Payroll approves and locks the run (the pay day is the 30th unless
+   MyCity sets another, `docs/guides/payroll.md` §6.11). Until
    then the month shows "In the run".
 5. **Leave.** A request from My Leave goes to the line manager, then to Operations & People when it
    is over 5 days (the leave flow, `docs/guides/foundation.md` §6.5) → approved leave counts down the
@@ -138,10 +140,13 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `POST /profile/photo` | multipart `file` (purpose `avatar`, 5 MB, an image) → `DocumentRef` (the stored file, as every upload answers) | `ess` · own | | Built 19/10/2026. Through `organisation.photo.setPhoto`; a file that is not an image is a 415 |
 | `DELETE /profile/photo` | → `EssProfile` | `ess` · own | | Built 19/10/2026. Clears the pointer; the file stays in the vault |
 | `POST /profile/export` | `EmptyBody` → `ExportFile` (documents, 202) | `ess` · own | | Built 19/10/2026. Download My Data (§3 step 8): the file reserved and the request audited at once, built after commit and downloaded where it was asked for. Pressed again the same Lagos day, the same file again; when the CEO already made one for this person that day, a 429 `DATA_EXPORT_LIMIT` |
-| `GET /payslips` | `EssPayslipQuery` (`year`) → `PayslipPage` | `ess` · own | yes | Locked payslips only |
-| `GET /payslips/:id/pdf` | → PDF | `ess` · own | | |
-| `POST /payslips/:id/email` | → `{ sent }` | `ess` · own | | To the work email |
-| `GET /deductions` | `PageQuery` → `DeductionPage` | `ess` · own | yes | Month, amount, reason, query |
+| `GET /payslips` | `EssPayslipQuery` (`year`) → `PayslipPage` | `ess` · own | yes | Built 09/11/2026 (M6 PR 4). Published payslips of the year, newest month first; each carries its run's status and whether it has a deduction (`docs/guides/payroll.md` §5, §13.3 item 2) |
+| `GET /payslips/summary` | `EssPayslipQuery` → `EssPayslipSummary` | `ess` · own | | Built 09/11/2026. Gross, Net Received, Payslips and Deductions over the year's published payslips; Next Payday by the pay day |
+| `GET /payslips/:id` | → `PayslipDetail` | `ess` · own | | Built 09/11/2026. Its earning and deduction lines; someone else's, or one not yet published, is a 404 |
+| `GET /payslips/:id/pdf` | → PDF | `ess` · own | | Built 09/11/2026. 409 `NOT_READY` while the document engine renders it |
+| `POST /payslips/:id/email` | `EmptyBody` → `PayslipCopySent` | `ess` · own | | Built 09/11/2026. To the work email with the PDF attached, once a minute (429 `EMAIL_TOO_SOON`) |
+| `POST /payslips/export` | `EssPayslipQuery` (`year`) → `ExportFile` (documents, 202) | `ess` · own | | Built 09/11/2026. Download All: the year's payslips as one PDF, a page each, kept 24 hours; 409 `NO_PAYSLIPS` for a year with none |
+| `GET /deductions` | `PageQuery` → `EssDeductionPage` | `ess` · own | yes | Built 09/11/2026. Each instalment of a fine or an advance that is not cancelled, newest month first, with its place ("1 of 3") and the fine's query number |
 | `GET /leave` | `EssLeaveListQuery` (`status`, `year`) → `LeavePage` | `ess` · own | yes | Built 17/10/2026. The caller's own requests |
 | `GET /leave/calendar` | `EssLeaveCalendarQuery` (`month`) → `LeavePage` | `ess` · own, wider by rule | yes | Built 18/10/2026. Approved and waiting leave touching the month: the caller's own and everyone under them in the reporting tree; everyone for the CEO and People with scope all (Operations & People) (the team lead, 18/10/2026) |
 | `GET /leave/balances` | `EssLeaveBalanceQuery` (`year`) → `LeaveBalances` | `ess` · own | | Built 17/10/2026. Every active type: entitled, taken, booked, pending, remaining |
@@ -184,9 +189,13 @@ check ownership, not the `settings` grant (README §5.2).
   `docs/guides/performance.md` §6.12). Rolls Up To reads each linked line's path to the organisational
   goal, read only.
 - A payslip is visible only once its run is approved and locked. The preview is the PDF the
-  document engine produces for that payslip, not a screen layout.
+  document engine produces for that payslip, not a screen layout; until that PDF has loaded the
+  payslip is drawn from its own lines (`docs/guides/payroll.md` §10.3). A month whose run is
+  approved and not yet paid reads In the run (`docs/guides/payroll.md` §13.1 item 28).
 - MyCity runs simple payroll: staff are treated as contractors and consultants, so no screen
-  mentions PAYE or pension, and Payroll sits behind an advanced option (12 October).
+  mentions PAYE or pension in simple mode (12 October). Payroll itself is visible; only its advanced option
+  (statutory deductions and salary grades) is switched on from a date on Payroll · Configurations (4
+  November; `docs/guides/payroll.md` §13.1 is the record, and the single source for M6).
 - A deduction reaches a payslip only from an upheld query. The Deductions figure opens every month
   that carried one, with its query reference.
 - My Queries is one tab with a switch, Queries and Sanctions (meeting 26/10/2026: ESS has twelve
@@ -348,7 +357,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | ESS · My Devices (`my-devices`) | Owned by LA: the attendance guide §1 | The attendance guide | The attendance guide §1, §7 (device rules) |
 | ESS · Policy Updates (`policy-updates`) | Owned by TB: policies.md §10.1 | policies.md | policies.md §6 |
 | ESS · My Performance (`my-performance`) | As `docs/guides/performance.md` §10.1 lists: the quarter and reviewer (desktop subtitle); Score to Date, Rating, This Month, Commitments On Time, Agreement; a banner when something waits (Agree Scorecard, or Start Check-In with its due date); My Scorecard, This Month's Check-In, My Commitments (this month's, each with its state and original date, Send Commitments while some are not sent), Rolls Up To, My Reviews, My PIP when open | Help terms on Score to Date, Change Score and Evidence (performance §10.1) | How scoring and the review chain work: performance §6.9, §6.12 |
-| ESS · My Payslips (`my-payslips`) | The year (‹ year ›), Email a Copy, Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; Payslips, 2026 (Month, Net, Status: Paid, Paid with a deduction, In the run); the selected payslip's PDF preview with Email a Copy and Download PDF. Deductions opens Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries). A month still in the run opens "In This Month's Run, Appears once the run is approved." | None | "This is the document the engine produces": §6. A deduction only from an upheld query, waived means nothing deducted: §3 step 3, §6. No PAYE or pension line: §6. Visible once Payroll approves, normally the 27th: §3 step 4. The Salary Deductions subtitle and "Click a month to preview it" are removed |
+| ESS · My Payslips (`my-payslips`) | The year (‹ year ›, from the start year to this one), Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; 2026 Payslips (Month, Net, Status: Paid, Paid with a deduction, In the run); a month opens its payslip in the modal (its PDF, Preparing while it renders) with Download PDF and Email a Copy. Deductions opens Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries). A link to a payslip opens it; a link to a deduction opens Salary Deductions | Help term on **In the run**: approved, and the pay is not yet transferred | "This is the document the engine produces": §6. A deduction only from an upheld query, waived means nothing deducted: §3 step 3, §6. No PAYE or pension line: §6. Visible once Payroll approves, normally the 27th: §3 step 4. The Salary Deductions subtitle and "Click a month to preview it" are removed |
 | ESS · My Leave (`my-leave`) | "2026 entitlement" (desktop subtitle); Leave Calendar (a month of approved and waiting leave, the reader's own marked You and in yellow, waiting ones marked Waiting; this year and next) and Request Leave; Entitlement, Taken, Approved Upcoming, Remaining, each opening its list or request (Taken: Leave Taken, the year's approved leave that has begun; Approved Upcoming: the next booked leave, read on its own, and nothing when none is booked); My Requests (Type, From, To, Days, Approver: the person it waits on by name, else the stage, as §6 says; Status), a row opens the request with Cancel Request while it waits or before it starts, which asks first (Keep It, Cancel Request); Entitlement by type (allowance, bar, taken, booked, pending, left; No set allowance for a type without one). Request Leave: Leave Type (the types People offer, each with what is left of the year the First Day falls in: "Annual · 12 days left"; a type with no allowance by its name alone), First Day and Last Day (DD/MM/YYYY; a typed day the calendar greys out reads "Pick 21/10/2026 or later" at once, a Last Day in another year "Ends in another year", one past the allowance "32 working days, 19 left" after Send), Note (Optional); Cancel, Send Request, whose message names who it went to ("Sent to Kemi Alade") | None | "Leave is approved by your line manager in one step" and "The calendar shows clashes before you submit": §3 step 5, §6 |
 | ESS · My Queries (`my-queries`) | The Queries and Sanctions switch, each with its count; Queries (Number, Subject, Raised, Status), open ones first, the picked query beside the list with View Letter and Respond; Sanctions (Sanction, Query, Reason, Date, Fine), each opening its letter. Owned by the queries guide §10 | Help on Respond By | The 24 hours to respond: §3 step 3 (an open query shows its own due time). "Most queries close with no action", the response kept beside the decision, disagreement read before the decision: §6. Who can see a query: §8. A deduction only after an upheld sanction: §3 step 3. The flowchart and the page subtitle are removed |
 | ESS · My Documents (`my-documents`) | Upload Document (What Is It, then the drop box "PDF, Word, Excel or a photo, up to 15 MB", the vault's document limit and types; the upload starts as soon as the file is chosen; a larger file is refused before it is sent, "Larger than 15 MB"); Documents, Signed, Verified, Expiring, Missing; Vault (Document, Uploaded, Status, Expires); a row opens the document (Uploaded, Status, Expires, Reference; View File on a PDF or a photo, which opens it full screen in the file viewer with Download and, on a phone, Share; Download, or Upload Document on a missing one); the chosen document's preview, a PDF's pages drawn in the app | None | "Signed documents carry two hashes and a public verification link": §6. What each status means: `docs/guides/foundation.md` §6.9. A missing document blocks onboarding only for a new hire: §3 step 6, §11. The "Your vault" subtitle and "Click any row to preview it" are removed |
@@ -379,7 +388,7 @@ Coming Soon from the module's delivery state.
 | ESS · My Devices (`my-devices`) | As the attendance guide §10.2: the device cards with their status | The subtitle; a device's detail in a bottom sheet | Register This Device, as the attendance guide | As My Profile |
 | ESS · Policy Updates (`policy-updates`) | As policies.md §10.2: To Acknowledge cards with Acknowledge full width, then policy cards | The subtitle | Acknowledge, as policies.md | As My Profile |
 | ESS · My Performance (`my-performance`) | The banner when something waits, the five figures two to a row, then icon cards: My Scorecard, This Month's Check-In, My Commitments (this month's count and how many on time), Rolls Up To, My Reviews, My PIP | The subtitle; the month columns of My Scorecard | Start Check-In, full width; the check-in is a full-screen sheet, one line per card, Submit Check-In in its footer | As My Profile |
-| ESS · My Payslips (`my-payslips`) | The year switcher (44 px targets), Email a Copy, Download All; the stats two to a row; then the months as a list with a status pill | The subtitle and the preview beside the list: a month opens its payslip as a full sheet (F31) | Download PDF, at the foot of the month's sheet | As My Profile |
+| ESS · My Payslips (`my-payslips`) | The year switcher (44 px targets) and Download All; the stats two to a row (Gross left off); then the months as a list with a status pill | The subtitle, the Gross figure; a month opens its payslip in a modal on desktop at every width and as a full sheet on a phone (F31 as amended for payslips, `docs/guides/payroll.md` §10.3) | Download PDF, at the foot of the month's sheet or modal, Email a Copy beside it | As My Profile |
 | ESS · My Leave (`my-leave`) | Request Leave; the four KPI cards two to a row, each opening its list as a sheet; icon cards My Requests and Entitlement | The subtitle; the requests table (a list in the My Requests sheet); the entitlement card (its sheet) | Request Leave opens the form as a full sheet, Send Request full width | As My Profile |
 | ESS · My Queries (`my-queries`) | The switch as a segmented control at the top, then the chosen list as cards | The Number and Query columns | A tapped query opens in a sheet with Respond at its foot; a sanction opens its letter | As My Profile |
 | ESS · My Documents (`my-documents`) | Upload Document; the five stats; the documents as a list with a status pill | The Expires column, and the preview beside the list: a document opens its details as a sheet, with View File (the file viewer, full screen, swiped and pinched) and Download | Upload Document; on a missing document, Upload Document in its sheet | As My Profile |
@@ -399,7 +408,9 @@ Deductions figure and every form open the shared modal.
 ## 11 · Edge cases
 
 - **No photo**: initials, with the + to upload.
-- **Payslip not yet approved**: the month shows "In the run"; no PDF.
+- **Payslip not yet approved**: the month has no row until the CEO approves its run; approved and not yet
+  paid, it reads "In the run" (`docs/guides/payroll.md` §13.1 item 28). Until its PDF has rendered the
+  payslip shows Preparing and no Download PDF.
 - **A year with no payslips** (before the start date): the year switcher stops at the start year.
 - **Employee on leave**: attendance actions are unavailable (attendance guide); ESS is otherwise open.
 - **Suspended employee**: no access to the app at all, ESS included (attendance guide §2).
@@ -427,10 +438,22 @@ Deductions figure and every form open the shared modal.
   sign off before the inventory, the route table and the permission catalogue are changed. TB.
 - **Device approval**: the 12 October meeting said a registered device is accepted without People
   approving it; My Devices (LA) currently says People review a new device. LA and TB to agree.
-- **My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?
+- ~~**My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?~~ Settled
+  08/11/2026: Payroll is not hidden behind the advanced option (that is only statutory and grades,
+  `docs/guides/payroll.md` §13.1). The tab shows to every employee; with no published payslip it says so,
+  and Coming Soon stays until M6's API is built.
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · ESS · My Training (#110) built on the contract (M10 PR 5, `knowledge.md` §10): To Do,
+  In Progress, Completed and Library, a course beside the list (a sheet on a phone) with its items
+  opened in place, Mark Done, Start Course and Add Proof. `?id=` opens a course by its id or the
+  person's enrolment's, so ESS's screen switch now passes the record id to My Training.
+- 11/11/2026 · JP · M6 PR 7 rebuilt My Payslips on the contract (`app/src/features/ess/Payslips.tsx`, on `features/payroll/parts.tsx`; `docs/guides/payroll.md` Appendix A): a month opens its payslip in the shared Modal at every desktop width and as a full sheet on a phone (F31 as amended for payslips), its PDF once rendered, with Download PDF and Email a Copy; Download All of the year in the header; the year switch runs from the person's start year; In the run is a month approved and not yet paid (JBS Praxis, 11/11/2026; payroll §13.1 item 28), so the open question is closed. §2, §6, §10.1, §10.2 and §11 match. Email a Copy moved from the header to the payslip, beside Download PDF, since it is one payslip's.
+- 11/11/2026 · TB · ESS gains My Training (`my-training`, #110, M10), added with `npm run new:screen` as an empty screen: staff take their assigned and Library courses there, mark items done, add proof and download their certificates. Its rules, API and §10 rows are `docs/guides/knowledge.md`'s.
+- 09/11/2026 · JP · M6 PR 4 built My Payslips' API in `ess.earnings.js` (`docs/guides/payroll.md` Appendix A): §5's seven routes (the list, the summary, one payslip, its PDF, Email a Copy, Download All and Deductions) are built over `payslips.service` with the caller's own employee id, and this module still reads none of payroll's tables. A person's figures are never masked from them. §4's `payslip` row is read through the payslips service, not directly. No screen changed (PR 7); the open question of what In the run means is `docs/guides/payroll.md` §13.3 item 2.
+- 09/11/2026 · JP · §3 step 4: the pay day is the 30th unless MyCity sets another (it read "normally the 27th"; `docs/guides/payroll.md` §13.1 item 24). No screen changed.
+- 08/11/2026 · JP · Payroll's lines brought into line with the 4 November review and `docs/guides/payroll.md` (M6's single source of truth): §6's simple-payroll bullet, §13's My Payslips visibility settled; §10.2's My Payslips row now says the payslip opens in a modal at every desktop width (JBS Praxis, 08/11/2026; built with M6's PR 7). No screen of ESS changed yet.
 - 05/11/2026 · AJ · My Requests (#56) moved from Expenses into ESS, after My Leave (M8 handoff decision 8). Its screen, rules and API are M8's, in `docs/guides/expenses.md`; `app/src/features/ess/index.tsx` renders `features/expenses/MyRequests.tsx`.
 
 - 03/11/2026 · JP · Record Leave, Add Type, Save Type and Send Response are Praxis AI cards (§9;

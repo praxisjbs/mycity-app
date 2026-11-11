@@ -1851,6 +1851,54 @@ async function lockPayItems(client, ids) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Payroll's hand-off (attendance.pay.js takeIntoRun and releaseFromRun, docs/guides/payroll.md §4.4, §6.9)
+ * ------------------------------------------------------------------ */
+
+/** The items named, locked in a stable order, with what pricing them needs (a batch, one run's worth). */
+async function lockPayItemsForRun(client, ids) {
+  const { rows } = await client.query(
+    `SELECT ${PAY_ITEM}, e.gross_monthly::text AS gross_monthly, e.work_pattern
+       FROM attendance_pay_item pi JOIN employee e ON e.employee_id = pi.employee_id
+      WHERE pi.attendance_pay_item_id = ANY($1::uuid[])
+      ORDER BY pi.attendance_pay_item_id FOR UPDATE OF pi`,
+    [ids],
+  );
+  return rows;
+}
+
+/** Put an item's price on it: payroll prices an item that had none when its day closed. */
+function setPayItemAmount(client, id, amount) {
+  return client.query("UPDATE attendance_pay_item SET amount = $2::numeric WHERE attendance_pay_item_id = $1", [id, amount]);
+}
+
+/**
+ * Freeze the items into a run: pending deductions and confirmed overtime with no run. Answers the
+ * ids it froze, so a caller can tell that an item changed (was waived, cut or taken) in between.
+ */
+async function takePayItems(client, ids, runId) {
+  const { rows } = await client.query(
+    `UPDATE attendance_pay_item
+        SET status = 'in_run', payroll_run_id = $2
+      WHERE attendance_pay_item_id = ANY($1::uuid[]) AND payroll_run_id IS NULL
+        AND ((kind = 'overtime' AND status = 'confirmed') OR (kind <> 'overtime' AND status = 'pending'))
+      RETURNING attendance_pay_item_id`,
+    [ids, runId],
+  );
+  return rows.map((r) => r.attendance_pay_item_id);
+}
+
+/** Put a run's frozen items back: a deduction to pending, confirmed overtime to confirmed. */
+async function releasePayItems(client, runId) {
+  const { rowCount } = await client.query(
+    `UPDATE attendance_pay_item
+        SET status = CASE WHEN kind = 'overtime' THEN 'confirmed' ELSE 'pending' END, payroll_run_id = NULL
+      WHERE payroll_run_id = $1 AND status = 'in_run'`,
+    [runId],
+  );
+  return rowCount;
+}
+
+/* ------------------------------------------------------------------ *
  * Overtime approved beforehand (§6.17, Pre-Approved)
  * ------------------------------------------------------------------ */
 
@@ -2052,6 +2100,10 @@ module.exports = {
   listPayItems,
   payItemsByIds,
   lockPayItems,
+  lockPayItemsForRun,
+  setPayItemAmount,
+  takePayItems,
+  releasePayItems,
   overtimeApprovalOn,
   upsertOvertimeApproval,
 };

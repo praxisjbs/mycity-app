@@ -14,6 +14,7 @@ import { at, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid
 import { byKey, refKey, SIGN_INS, teamOf } from "../data/people";
 import { CATEGORY_NAMES, PROJECT_NAMES, SEED, type SeedRequest } from "../data/expenses";
 import { UPLOADS } from "../uploads";
+import { sendBackPayrollRun } from "./payroll";
 
 /*
  * Expenses on the contract's paths and shapes (docs/guides/expenses.md §5): requests and their
@@ -434,7 +435,8 @@ export function decideExpense(user: string, wid: string, approve: boolean, reaso
 }
 route("POST /api/v1/workflow/instances/:id/request-changes", (req) => {
   const r = byWid(req.params.id);
-  if (!r) return notFound();
+  // Another module's approval sent back: a payroll run returns to Draft with the reason.
+  if (!r) return sendBackPayrollRun(req.user!, req.params.id, (req.body as { reason?: string })?.reason) ?? notFound();
   if (r.status !== "submitted" || deciderOf(r) !== req.user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
   const reason = (req.body as { reason?: string })?.reason;
   if (!reason?.trim()) return invalid({ reason: ["is required"] });

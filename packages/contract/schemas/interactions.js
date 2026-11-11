@@ -34,6 +34,15 @@ const Interaction = z
     owner: PersonRef.nullable(),
     /** Logged from a linked mail thread. */
     from_mail: z.boolean(),
+    /**
+     * A message from a linked thread as the record's readers see it (§6.15): who it was from and to;
+     * its subject and the first 300 characters of its text are `subject` and `summary`. The thread's id
+     * only for its mailbox's owner, who alone opens the whole conversation.
+     */
+    mail: z
+      .object({ from: z.string(), to: z.array(z.string()).max(100), mail_thread_id: uuid.nullable() })
+      .strict()
+      .nullable(),
     created_at: isoDateTime,
   })
   .strict();
@@ -96,7 +105,8 @@ const TABLES = {
       deal_id: "partner_interaction.partnership_opportunity_id",
       contact: "the partner_contact behind contact_id",
       owner: "the person, from employee and department",
-      from_mail: "mail_message_id is set",
+      from_mail: "logged from a linked mail message (mail_from is set)",
+      mail: "mail_from, mail_to and mail_thread_id, the thread named only to its mailbox's owner",
     },
   },
   InteractionCreate: { table: "partner_interaction", virtual: { deal_id: "written as partnership_opportunity_id" } },

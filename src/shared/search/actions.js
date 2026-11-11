@@ -23,7 +23,8 @@
  * the bell is everyone's own. `capability` is the authority it needs on top (README §5.2),
  * where its screen opens to more people than may take it: the Alerts tab opens to whoever
  * may clear alerts, New Rule only to those who may manage the rules; New Report needs
- * `home.reports`, as its tab does.
+ * `home.reports`, as its tab does. `orHead` lets a department's head take it without the
+ * capability: New SOP is the head's for their own department (docs/guides/knowledge.md §6.2).
  */
 const routeMap = require("../route-map");
 const catalog = require("../access/access.catalog");
@@ -48,9 +49,9 @@ const RUNS = new Set([
  * @param {string} key  snake_case, unique
  * @param {string} label  Verb Noun, at most 3 words, as the screen's button reads
  * @param {{screen?: string, params?: Record<string, string>, run?: string, need?: [string, string]|null,
- *          capability?: string|null, words?: string[]}} opts
+ *          capability?: string|null, orHead?: boolean, words?: string[]}} opts
  */
-function a(key, label, { screen = null, params = {}, run = null, need, capability = null, words = [] }) {
+function a(key, label, { screen = null, params = {}, run = null, need, capability = null, orHead = false, words = [] }) {
   const [module, tab] = screen ? screen.split(".") : [null, null];
   return Object.freeze({
     key,
@@ -61,6 +62,7 @@ function a(key, label, { screen = null, params = {}, run = null, need, capabilit
     run,
     need: need === undefined ? (module ? [module, "view"] : null) : need,
     capability,
+    orHead,
     words: Object.freeze(words),
   });
 }
@@ -95,6 +97,13 @@ const ACTIONS = Object.freeze([
     params: { action: "temporary-site" },
     need: ["people", "approve"],
     words: ["temporary site", "send people out", "field assignment", "client site", "out of station"],
+  }),
+  a("new_category", "New Partner Category", {
+    screen: "partnerships.categories",
+    params: { action: "new" },
+    need: ["partnerships", "edit"],
+    capability: "partnerships.configure",
+    words: ["category", "partnership type", "partner type", "new type", "agreement template", "set up a category"],
   }),
   a("import_staff", "Import Staff", {
     screen: "settings.imports",
@@ -132,6 +141,13 @@ const ACTIONS = Object.freeze([
     params: { action: "new" },
     need: ["recruitment", "edit"],
     words: ["book interview", "set up interview", "interview panel", "invite to interview"],
+  }),
+  // M5 (docs/guides/offers.md §9): New Offer opens on `new=1`, as the assistant's route does.
+  a("new_offer", "New Offer", {
+    screen: "recruitment.offers",
+    params: { new: "1" },
+    need: ["recruitment", "create"],
+    words: ["make an offer", "offer letter", "job offer", "offer of employment"],
   }),
   a("start_import", "Start Import", {
     screen: "settings.imports",
@@ -184,6 +200,21 @@ const ACTIONS = Object.freeze([
     capability: "policies.manage",
     words: ["policy", "write a policy", "company policy", "handbook", "attendance policy"],
   }),
+  a("new_sop", "New SOP", {
+    screen: "knowledge.sops",
+    params: { action: "new" },
+    need: ["knowledge", "view"],
+    capability: "sops.manage",
+    orHead: true,
+    words: ["sop", "write an sop", "procedure", "standard operating procedure", "department procedure"],
+  }),
+  a("new_course", "New Course", {
+    screen: "knowledge.training",
+    params: { action: "new" },
+    need: ["knowledge", "create"],
+    capability: "training.manage",
+    words: ["course", "build a course", "create a course", "new lesson"],
+  }),
   a("raise_query", "Raise a Query", {
     screen: "queries.queries",
     params: { action: "new" },
@@ -205,6 +236,19 @@ const ACTIONS = Object.freeze([
     params: { action: "new" },
     need: ["workspace", "create"],
     words: ["task", "add task", "create task", "to do", "todo", "set a task", "assign work"],
+  }),
+  // Payroll Runs opens its New Run on `action=new`, the screen's own New action (docs/guides/payroll.md §9, §10).
+  a("new_run", "New Run", {
+    screen: "payroll.payroll-runs",
+    params: { action: "new" },
+    need: ["payroll", "create"],
+    words: ["payroll run", "run payroll", "open a month", "pay run", "new payroll", "monthly payroll"],
+  }),
+  a("record_advance", "Record Advance", {
+    screen: "payroll.deductions",
+    params: { action: "new" },
+    need: ["payroll", "create"],
+    words: ["salary advance", "advance", "record an advance", "pay ahead", "loan"],
   }),
   // A commitment is a task marked as one (docs/guides/performance.md §6.11): New Task with it ticked.
   a("new_commitment", "New Commitment", {
@@ -381,12 +425,39 @@ const ACTIONS = Object.freeze([
     capability: "expenses.finance",
     words: ["set a budget", "department budget", "budget"],
   }),
-  a("new_expense_category", "New Category", {
+  a("new_expense_category", "New Expense Category", {
     screen: "expenses.categories",
     params: { action: "new" },
     need: ["expenses", "create"],
     capability: "expenses.finance",
     words: ["expense category", "add category"],
+  }),
+  // Partnerships (docs/guides/partnerships.md §9): a lead with its first deal; a partner already signed.
+  a("new_lead", "New Lead", {
+    screen: "partnerships.leads",
+    params: { action: "new" },
+    need: ["partnerships", "create"],
+    words: ["lead", "prospect", "add a lead", "new deal", "sponsor", "tracker"],
+  }),
+  a("new_partner", "New Partner", {
+    screen: "partnerships.partners",
+    params: { action: "new" },
+    need: ["partnerships", "create"],
+    words: ["partner", "signed partner", "add a partner"],
+  }),
+  // The Proposal Studio's brief (§6.10 step 1): a lead or partner and its deal, then the notes.
+  a("new_proposal", "New Proposal", {
+    screen: "partnerships.proposals",
+    params: { action: "new" },
+    need: ["partnerships", "create"],
+    words: ["proposal", "write a proposal", "pitch", "deck", "sponsor"],
+  }),
+  // An agreement is generated from a deal's category template (§6.8): the form picks the deal.
+  a("new_agreement", "Generate Agreement", {
+    screen: "partnerships.contracts-and-mous",
+    params: { action: "new" },
+    need: ["partnerships", "create"],
+    words: ["agreement", "mou", "contract", "deal merchant", "new agreement", "new mou", "new contract"],
   }),
 ]);
 

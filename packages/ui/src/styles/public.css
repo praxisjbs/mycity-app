@@ -1,0 +1,975 @@
+/*
+ * The public site (go.mycityapp.io), drawn as the approved design: PublicPage's header, menu and
+ * footer and its split (sign-in) layout, SkylineHero's index and role heroes and the skyline they draw,
+ * PageIntro, SiteSearch, Reveal and Stagger, and the rise of a page's parts as it opens. These classes
+ * are the components' own: a feature uses the components, never the classes (FRONTEND_GUIDE §6). base.css imports it, so both apps'
+ * stylesheets have it with nothing added. Colours are tokens only (tokens.css). The design's widths
+ * are the shells' own: 1180 px (the menu takes the nav), 1040 px (the sign-in layout stacks) and
+ * 760 px (the phone shell). Every motion here stops under reduced motion (base.css).
+ */
+
+/* A page's width on the public site: 1200 px, 32 px at each side, 16 px on a phone. */
+@utility public-wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 32px;
+  @media (max-width: 760px) {
+    padding-inline: 16px;
+  }
+}
+
+/* Under a yellow lg Button on the pointer: its own glow. */
+@utility shadow-primary-glow {
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+@layer components {
+  /* ---- The site ---- */
+  .ps-site {
+    min-height: 100vh;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--foreground);
+  }
+  .ps-site h1, .ps-site h2, .ps-site h3 { text-wrap: balance; }
+  /* A part of a hero, a page's intro or the split aside rising as the page opens, held back in order.
+     Only the components draw these (FRONTEND_GUIDE §6: motion comes with the components). */
+  .ps-rise { animation: hero-rise .9s cubic-bezier(.2, .7, .2, 1) both; }
+  .ps-rise-1 { animation-delay: .05s; }
+  .ps-rise-2 { animation-delay: .18s; }
+  .ps-rise-3 { animation-delay: .32s; }
+  .ps-rise-4 { animation-delay: .46s; }
+  .ps-rise-5 { animation-delay: .6s; }
+
+  /* ---- Header: one glass bar, the brand, the nav on its bottom edge, the theme and the menu ---- */
+  .ps-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--canvas-glass);
+    -webkit-backdrop-filter: saturate(160%) blur(16px);
+    backdrop-filter: saturate(160%) blur(16px);
+    border-bottom: 1px solid var(--canvas-line);
+  }
+  .ps-header-in { display: flex; align-items: center; gap: 24px; min-height: 64px; }
+  .ps-brand { display: flex; align-items: center; gap: 12px; min-height: 44px; margin-right: auto; color: inherit; text-decoration: none; }
+  .ps-mark { width: 36px; height: 36px; border-radius: 11px; background: var(--deep); display: grid; place-items: center; flex: none; }
+  .ps-mark-secondary { background: var(--secondary); }
+  .ps-brand-name { display: flex; flex-direction: column; line-height: 1.1; }
+  .ps-brand-name b { font-size: 18px; letter-spacing: -.02em; font-weight: 700; color: var(--foreground); }
+  .ps-brand-name span { font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
+  .ps-nav { display: flex; align-items: stretch; gap: 6px; align-self: stretch; }
+  .ps-nav a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--canvas-soft);
+    text-decoration: none;
+    transition: color .25s;
+  }
+  .ps-nav a::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -1px;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: var(--primary);
+    transform: scaleX(0);
+    transition: transform .3s ease;
+  }
+  .ps-nav a:hover, .ps-nav a[aria-current="page"] { color: var(--foreground); }
+  .ps-nav a[aria-current="page"] { font-weight: 700; }
+  .ps-nav a:hover::after, .ps-nav a[aria-current="page"]::after { transform: scaleX(1); }
+  .ps-drop { display: flex; flex-direction: column; padding: 8px 24px 24px; border-top: 1px solid var(--canvas-line); }
+  .ps-drop a {
+    display: flex;
+    align-items: center;
+    min-height: 52px;
+    font-size: 18px;
+    font-weight: 500;
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid var(--canvas-line);
+  }
+  .ps-drop a[aria-current="page"] { font-weight: 700; }
+  /* The menu button shows below 1181 px (xl:hidden on it). */
+  @media (max-width: 1180px) {
+    .ps-nav { display: none; }
+  }
+  @media (min-width: 1181px) {
+    .ps-drop { display: none; }
+  }
+  @media (max-width: 760px) {
+    .ps-header-in { min-height: 60px; gap: 12px; }
+    .ps-header .ps-brand-name span { display: none; }
+    .ps-drop { padding: 8px 16px 24px; }
+  }
+
+  /* ---- The hero and the footer: the site's ground of the theme, a deeper glass teal in light and Deep Green in
+     dark (tokens.css --site-*). Their rules are written in --deep and the on-deep inks; here those take the theme's. ---- */
+  .ps-hero, .ps-foot {
+    --deep: var(--site-ground);
+    --on-deep: var(--site-ink);
+    --on-deep-hero: var(--site-ink-hero);
+    --on-deep-lede: var(--site-ink-lede);
+    --on-deep-chip: var(--site-ink-chip);
+    --on-deep-back: var(--site-ink-back);
+    --on-deep-link: var(--site-ink-link);
+    --on-deep-note: var(--site-ink-note);
+    --on-deep-label: var(--site-ink-label);
+    --on-deep-base: var(--site-ink-base);
+    --on-deep-gold: var(--site-ink-gold);
+    --sky-top: var(--site-sky-top);
+    --sky-mid: var(--site-sky-mid);
+    --sky-low: var(--site-sky-low);
+    --sky-far: var(--site-sky-far);
+    --sky-near: var(--site-sky-near);
+    --sky-window-cool: var(--site-sky-window-cool);
+    --sky-cable: var(--site-sky-cable);
+    --sky-road: var(--site-sky-road);
+    --sky-palm: var(--site-sky-palm);
+  }
+
+  /* ---- Footer: the site's ground under the skyline's edge, the skyline faint behind it ---- */
+  /* The footer lays its columns out by its own width (a container), so it never spills past itself where it is
+     narrower than the window (inside the gallery's frames); on a page it is the page's width, as before. */
+  .ps-foot { position: relative; isolation: isolate; margin-top: 120px; background: var(--deep); color: var(--on-deep-base); container-type: inline-size; }
+  .ps-foot-art {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    opacity: var(--site-art);
+    filter: blur(3px) saturate(1.1);
+    -webkit-mask-image: linear-gradient(to top, black 25%, transparent 92%);
+    mask-image: linear-gradient(to top, black 25%, transparent 92%);
+    pointer-events: none;
+  }
+  .ps-foot-art svg { display: block; width: 100%; height: 100%; }
+  .ps-foot-edge { position: absolute; left: 0; right: 0; top: -70px; display: block; width: 100%; height: 72px; fill: var(--deep); }
+  .ps-foot-in { padding-top: 64px; padding-bottom: 28px; }
+  .ps-foot-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 48px; }
+  .ps-foot-nav { grid-column: span 3; display: grid; grid-template-columns: subgrid; row-gap: 48px; }
+  .ps-foot .ps-brand { margin-right: 0; }
+  .ps-foot .ps-brand-name b { color: var(--on-deep); }
+  .ps-foot-tag { margin: 16px 0 22px; max-width: 30ch; font-size: 16px; color: var(--on-deep-link); }
+  .ps-clock {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--on-deep) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-deep) 12%, transparent);
+  }
+  .ps-clock > svg { color: var(--site-accent); }
+  .ps-clock span { font-size: 14px; }
+  .ps-clock time { font-size: 19px; font-weight: 700; letter-spacing: -.02em; color: var(--on-deep); font-variant-numeric: tabular-nums; }
+  .ps-foot h2 { margin: 0 0 16px; font-size: 15px; font-weight: 600; letter-spacing: normal; color: var(--on-deep); }
+  .ps-foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .ps-foot li a { font-size: 15px; color: var(--on-deep-link); text-decoration: none; transition: color .2s; }
+  .ps-foot li a:hover { color: var(--site-accent); }
+  .ps-foot-base {
+    margin-top: 52px;
+    padding-top: 20px;
+    border-top: 1px solid color-mix(in srgb, var(--on-deep) 12%, transparent);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 14px;
+  }
+  .ps-foot-base b { font-weight: 600; color: var(--on-deep); }
+  .ps-top {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--on-deep) 20%, transparent);
+    background: transparent;
+    color: var(--on-deep-link);
+    transition: background .2s, color .2s, transform .2s;
+  }
+  .ps-top:hover { background: var(--primary); color: var(--primary-foreground); transform: translateY(-3px); }
+  .ps-foot-more { padding-bottom: 24px; }
+  @container (max-width: 1040px) {
+    .ps-foot-grid { grid-template-columns: 1fr 1fr; }
+    .ps-foot-grid > :first-child, .ps-foot-nav { grid-column: 1 / -1; }
+  }
+  @container (max-width: 760px) {
+    .ps-foot-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .ps-foot ul { gap: 0; }
+    .ps-foot li a { display: inline-flex; align-items: center; min-height: 44px; }
+    .ps-foot-clear { padding-bottom: 88px; }
+  }
+
+  /* ---- Hero: the drawn skyline behind, a scrim over it, the page's head on top ---- */
+  .ps-hero { position: relative; overflow: hidden; isolation: isolate; background: var(--deep); color: var(--on-deep-hero); }
+  .ps-hero-art { position: absolute; inset: -20px; z-index: -2; transform: scale(1.03); }
+  .ps-hero-art svg { display: block; width: 100%; height: 100%; }
+  .ps-hero-scrim { position: absolute; inset: 0; z-index: -1; }
+  .ps-hero-in {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 32px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .ps-hero h1 {
+    margin: 22px 0 0;
+    font-size: clamp(44px, 6.4vw, 92px);
+    line-height: .95;
+    letter-spacing: -.045em;
+    font-weight: 800;
+    color: var(--on-deep);
+    text-shadow: var(--site-glow);
+  }
+  .ps-hero h1 em { font-style: normal; color: var(--site-accent); }
+  .ps-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px 8px 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--deep) 45%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-deep) 18%, transparent);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--on-deep-lede);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  .ps-pill-gold {
+    padding: 8px 16px;
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+    color: var(--on-deep-gold);
+    font-weight: 600;
+  }
+  .ps-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); animation: ps-ping 2.4s ease-out infinite; }
+  .ps-lede { margin: 18px 0 0; max-width: 40ch; font-size: clamp(17px, 1.5vw, 20px); line-height: 1.5; color: var(--on-deep-lede); text-wrap: balance; }
+  .ps-hero-slot { margin-top: 32px; width: min(620px, 100%); display: flex; justify-content: center; }
+  .ps-stats { margin: 28px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 44px; }
+  /* The label comes first for a screen reader (dt, dd) and second on the screen. */
+  .ps-stat { display: flex; flex-direction: column-reverse; align-items: center; }
+  .ps-stat dd { margin: 0; font-size: 32px; line-height: 1; letter-spacing: -.03em; font-weight: 700; color: var(--on-deep); font-variant-numeric: tabular-nums; }
+  .ps-stat dt { margin-top: 6px; font-size: 14px; line-height: 1.6; color: var(--on-deep-label); }
+
+  /* The index: the first screen under the header, the skyline blurred and slowly breathing. */
+  .ps-hero-index { min-height: calc(100svh - 64px); display: flex; align-items: center; justify-content: center; }
+  .ps-hero-index .ps-hero-in { width: 100%; }
+  .ps-hero-index .ps-hero-art { filter: blur(5px) saturate(1.15); will-change: transform; animation: ps-breathe 22s ease-in-out infinite alternate; }
+  .ps-hero-index .ps-hero-scrim {
+    background:
+      radial-gradient(60% 70% at 50% 45%, color-mix(in srgb, var(--deep) 62%, transparent), color-mix(in srgb, var(--deep) 30%, transparent) 80%),
+      linear-gradient(180deg, color-mix(in srgb, var(--deep) 25%, transparent), color-mix(in srgb, var(--deep) 55%, transparent));
+  }
+  .ps-hero[data-still] .ps-hero-art { animation: none; }
+
+  /* A role: All Roles at the left, the role centred, the foot fading into the page. */
+  .ps-hero-role .ps-hero-art { filter: blur(2.5px) saturate(1.2); }
+  .ps-hero-role::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    height: 140px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--canvas));
+  }
+  .ps-hero-role .ps-hero-scrim {
+    background:
+      radial-gradient(55% 65% at 50% 52%, color-mix(in srgb, var(--deep) 72%, transparent), color-mix(in srgb, var(--deep) 22%, transparent) 85%),
+      linear-gradient(180deg, color-mix(in srgb, var(--deep) 45%, transparent), color-mix(in srgb, var(--deep) 15%, transparent) 40%, color-mix(in srgb, var(--deep) 60%, transparent));
+  }
+  .ps-role-top { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 18px 32px 0; }
+  .ps-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 16px 0 12px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--on-deep-back);
+    text-decoration: none;
+    background: color-mix(in srgb, var(--deep) 45%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-deep) 16%, transparent);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    transition: background .2s;
+  }
+  .ps-back:hover { background: color-mix(in srgb, var(--deep) 70%, transparent); color: var(--on-deep); }
+  .ps-hero-role .ps-hero-in { padding: 8px 32px 44px; }
+  .ps-hero-role h1 { margin-top: 14px; max-width: 18ch; font-size: clamp(36px, 1rem + 3.4vw, 60px); }
+  .ps-chips { margin: 20px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .ps-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--deep) 50%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-deep) 16%, transparent);
+    font-size: 14.5px;
+    color: var(--on-deep-chip);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  .ps-chip > svg { width: 18px; height: 18px; color: var(--site-accent); }
+  .ps-hero-acts { margin-top: 22px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+  .ps-applied { margin-top: 14px; font-size: 14px; color: var(--on-deep-note); }
+  @media (max-width: 760px) {
+    .ps-hero-in { padding: 40px 16px 48px; }
+    .ps-role-top { padding: 16px 16px 0; }
+    .ps-hero-role .ps-hero-in { padding: 24px 16px 56px; }
+    .ps-hero-acts, .ps-applied { display: none; }
+    .ps-stats { gap: 28px; }
+    .ps-stat dd { font-size: 28px; }
+  }
+
+  /* ---- The drawn skyline (Skyline.draw.tsx): each part in its token ---- */
+  .ps-sky-top { stop-color: var(--sky-top); }
+  .ps-sky-mid { stop-color: var(--sky-mid); }
+  .ps-sky-low { stop-color: var(--sky-low); }
+  .ps-sky-sun { stop-color: var(--primary); }
+  .ps-sky-far { fill: var(--sky-far); }
+  .ps-sky-near { fill: var(--sky-near); }
+  .ps-sky-gold { fill: var(--primary); }
+  .ps-sky-cool { fill: var(--sky-window-cool); }
+  .ps-sky-ground { fill: var(--deep); }
+  .ps-sky-cable { stroke: var(--sky-cable); }
+  .ps-sky-road { stroke: var(--sky-road); }
+  .ps-sky-palm { stroke: var(--sky-palm); }
+  .ps-sky-win { animation: ps-twinkle 6s ease-in-out infinite alternate; }
+  [data-still] .ps-sky-win { animation: none; }
+
+  /* ---- An inner page's opening: eyebrow, a large headline with one accent word, a lede, a hairline ---- */
+  .ps-intro-in { padding-top: 48px; padding-bottom: 32px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 48px; align-items: end; }
+  .ps-eyebrow { margin: 0 0 16px; font-size: 12px; font-weight: 600; letter-spacing: .3em; text-transform: uppercase; color: var(--muted-foreground); }
+  .ps-intro h1 { margin: 0; max-width: 15ch; font-size: clamp(40px, 1.5rem + 3.2vw, 68px); line-height: 1.02; letter-spacing: -.04em; font-weight: 800; }
+  .ps-accent { font-style: normal; color: var(--accent-foreground); }
+  .ps-intro-lede { margin: 18px 0 0; max-width: 44ch; font-size: 18px; line-height: 1.6; color: var(--canvas-soft); }
+  .ps-rule hr { margin: 0; border: 0; border-top: 1px solid var(--canvas-line); }
+  @media (max-width: 1040px) {
+    .ps-intro-in { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .ps-intro-in { padding-top: 56px; padding-bottom: 36px; gap: 28px; }
+    .ps-eyebrow { letter-spacing: .24em; }
+  }
+
+  /* ---- Search: the hero's white box with its button, and the intro's box beside the headline ---- */
+  .ps-search { display: flex; align-items: center; border-radius: 999px; }
+  .ps-search:focus-within { outline: 2px solid var(--ring); outline-offset: 3px; }
+  .ps-search > svg { flex: none; }
+  .ps-search input { flex: 1; min-width: 0; min-height: 44px; border: 0; outline: 0; background: transparent; font: 500 16px var(--face-body); }
+  .ps-search-hero { width: min(620px, 100%); gap: 8px; padding: 8px 8px 8px 22px; background: var(--paper); box-shadow: var(--site-lift); }
+  .ps-search-hero > svg { color: var(--search-muted); }
+  .ps-search-hero input { padding: 10px 4px; color: var(--search-ink); }
+  .ps-search-hero input::placeholder { color: var(--search-muted); }
+  .ps-search-intro { width: min(440px, 100%); gap: 10px; padding: 6px 6px 6px 18px; background: var(--card); border: 1.5px solid var(--canvas-line-strong); box-shadow: var(--canvas-shadow); }
+  .ps-search-intro > svg { color: var(--muted-foreground); }
+  .ps-search-intro input { padding: 10px 0; color: var(--foreground); }
+  @media (max-width: 760px) {
+    .ps-search-hero { flex-wrap: wrap; border-radius: 24px; padding: 12px; }
+    .ps-search-hero > [data-ui="button"] { width: 100%; }
+  }
+
+  /* ---- PublicPage layout split, the sign-in layout: a sticky aside of bands beside the work, which waits centred ---- */
+  .ps-auth {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+    display: grid;
+    grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+    gap: 72px;
+    align-items: start;
+  }
+  .ps-auth-aside { position: sticky; top: 64px; height: calc(100svh - 64px); color: var(--canvas-soft); isolation: isolate; }
+  .ps-auth-aside::before {
+    content: "";
+    position: absolute;
+    inset: 0 -32px;
+    z-index: -2;
+    background: radial-gradient(90% 60% at 20% 30%, var(--canvas-glow), transparent 70%);
+  }
+  .ps-auth-art {
+    position: absolute;
+    left: -32px;
+    right: -32px;
+    bottom: 0;
+    z-index: -1;
+    height: 52%;
+    opacity: var(--canvas-art);
+    filter: blur(1.5px) saturate(1.1);
+    -webkit-mask-image: linear-gradient(to top, black 35%, transparent);
+    mask-image: linear-gradient(to top, black 35%, transparent);
+    pointer-events: none;
+  }
+  .ps-auth-art svg { display: block; width: 100%; height: 100%; }
+  .ps-auth-inner { position: relative; height: 100%; display: flex; flex-direction: column; padding: 8px 0 24px; }
+  .ps-auth-band { padding: 24px 0; display: flex; flex-direction: column; justify-content: center; }
+  .ps-auth-main, .ps-auth-foot { border-top: 1px solid var(--canvas-line); }
+  .ps-auth-main { flex: 1; min-height: 0; }
+  .ps-auth-foot { padding-bottom: 0; }
+  .ps-auth-id b { display: block; font-size: 19px; letter-spacing: -.02em; color: var(--foreground); }
+  .ps-auth-id span { font-size: 14px; color: var(--muted-foreground); }
+  .ps-auth-body > * { max-width: 44ch; }
+  /* The h1 rides small over the display line, in the eyebrow's spaced capitals. */
+  .ps-auth-title { line-height: 1.5; }
+  .ps-auth-h { margin: 0 0 14px; font-size: clamp(28px, 2.6vw, 38px); line-height: 1.1; letter-spacing: -.03em; font-weight: 700; color: var(--foreground); text-wrap: balance; }
+  .ps-auth-h-l { font-size: clamp(32px, 3vw, 44px); line-height: 1.05; letter-spacing: -.035em; font-weight: 800; }
+  .ps-auth-text { margin: 0; font-size: 17px; line-height: 1.7; color: var(--canvas-soft); }
+  .ps-auth-extra { margin-top: 24px; }
+  .ps-auth-steps { margin-top: 28px; }
+  .ps-auth-credit { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; line-height: 1.6; color: var(--muted-foreground); }
+  .ps-auth-credit b { font-weight: 600; color: var(--foreground); }
+  .ps-auth-work { position: sticky; top: 64px; min-width: 0; min-height: calc(100svh - 64px); display: flex; flex-direction: column; justify-content: center; padding: 32px 0; }
+  @media (max-height: 720px) {
+    .ps-auth-band { padding: 16px 0; }
+    .ps-auth-h:not(.ps-auth-h-l) { font-size: 28px; }
+  }
+  @media (max-width: 1040px) {
+    .ps-auth { grid-template-columns: 1fr; gap: 0; padding: 0 16px; }
+    .ps-auth-aside { position: relative; top: auto; height: auto; }
+    .ps-auth-art, .ps-auth-foot, .ps-auth-steps { display: none; }
+    .ps-auth-inner { padding: 20px 0 0; }
+    .ps-auth-band { padding: 16px 0; }
+    .ps-auth-work { position: static; min-height: 0; padding: 8px 0 40px; }
+  }
+
+  /* ---- Reveal: a block rising into view, again each time it comes back ---- */
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity .75s ease var(--rd, 0s),
+      transform .75s cubic-bezier(.2, .7, .2, 1) var(--rd, 0s),
+      box-shadow .25s ease,
+      border-color .25s ease;
+  }
+  [data-reveal="left"] { transform: translateX(-32px); }
+  [data-reveal="right"] { transform: translateX(32px); }
+  /* A phone has no room at its sides: a block from either side rises from below there, so the page never scrolls sideways. */
+  @media (max-width: 760px) {
+    [data-reveal="left"], [data-reveal="right"] { transform: translateY(24px); }
+  }
+  [data-reveal][data-visible] { opacity: 1; transform: none; }
+  [data-reveal][data-visible]:hover { transition-delay: 0s; }
+  [data-reveal][data-lift][data-visible]:hover { transform: translateY(-4px); }
+  [data-reveal][data-lift="shadow"][data-visible]:hover { box-shadow: var(--canvas-shadow); }
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] { opacity: 1 !important; transform: none !important; }
+  }
+  /* Reveal scroll: the rise follows the scroll, fully in a third of the way in, where the browser can. */
+  @supports (animation-timeline: view()) {
+    [data-reveal-scroll] { animation: ps-fadeup linear both; animation-timeline: view(); animation-range: entry 0% entry 35%; }
+  }
+}
+@keyframes ps-fadeup { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
+
+@keyframes ps-breathe { from { transform: scale(1.03); } to { transform: scale(1.14); } }
+@keyframes ps-ping { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent); } 80%, 100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--primary) 0%, transparent); } }
+@keyframes ps-twinkle { from { opacity: .35; } to { opacity: .85; } }
+
+/* Dark only: a faint sheen at the top of each of the site's cards, where light has its glass teal (tokens.css --canvas-gloss). */
+@layer components {
+  [data-canvas] :is(.ps-panel, .ps-card, .ps-result, .ps-tile, .ps-mini, .ps-file, .ps-hsteps li, .ps-kpis li, .ps-cta[data-tone="card"], .ps-search-intro, .bg-card) {
+    background-image: var(--canvas-gloss);
+  }
+}
+
+/* The page's own scrollbar on the public site: the site's lines on its ground (the thin bar is base.css's). */
+:root:has([data-canvas]) {
+  --sb: var(--canvas-line-strong);
+  --sb-hover: var(--canvas-line-deep);
+}
+:root:has([data-canvas])::-webkit-scrollbar-track { background: var(--canvas); }
+/* Firefox draws only thin; a standard scrollbar-color elsewhere would turn off the 6 px bar above. */
+@supports (-moz-appearance: none) {
+  :root:has([data-canvas]) { scrollbar-color: var(--canvas-line-strong) var(--canvas); }
+}
+
+/*
+ * The approved design's page blocks (06/11/2026), each drawn by its own component: Panel (the card a
+ * person works in, with its progress, top line, title and foot), PageMessage (an outcome), SectionHead,
+ * FeatureGrid, RoleRow and RoleListTop, TeamList, RoleTile, HireSteps, CtaCard, RolePart with RichText
+ * look site, IconList, Quote look feature, RoleCard and ShareCard, the phone's bar, Countdown ring,
+ * QuestionMap, SignatureField look pad, Letter, VerifyCard, UploadField look zone and FileRow.
+ */
+@layer components {
+  /* ---- Panel: the site's card ---- */
+  .ps-panel { position: relative; border-radius: 24px; background: var(--card); border: 1px solid var(--canvas-line); box-shadow: var(--canvas-shadow); }
+  .ps-panel-in { padding: 32px; }
+  .ps-panel-bar { height: 6px; border-radius: 999px; background: var(--canvas-line); overflow: hidden; margin-bottom: 28px; }
+  .ps-panel-bar > span { display: block; height: 100%; width: var(--fill, 0%); background: var(--primary); border-radius: 999px; transition: width .5s cubic-bezier(.2, .7, .2, 1); }
+  .ps-panel-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; min-height: 24px; }
+  .ps-panel-top > small { font-size: 14px; font-weight: 600; color: var(--eyebrow); }
+  .ps-panel-title { margin: 0; font-size: clamp(24px, 2.2vw, 30px); line-height: 1.1; letter-spacing: -.035em; font-weight: 700; color: var(--foreground); outline: none; }
+  .ps-panel-body { margin-top: 28px; }
+  .ps-panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px 32px; border-top: 1px solid var(--canvas-line); background: var(--canvas-hover); border-radius: 0 0 24px 24px; }
+  .ps-panel-foot > :only-child { margin-left: auto; }
+  .ps-saved { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--success); }
+  .ps-saved[data-state="saving"] { opacity: .6; }
+  .ps-saved[data-state="error"] { color: var(--destructive); }
+  .ps-panel { --control-h: 50px; }
+  @media (max-width: 760px) {
+    .ps-panel-in { padding: 28px 20px; }
+    .ps-panel-foot { padding: 16px 20px; }
+  }
+
+  /* ---- PageMessage: an outcome, its tick landing, the reference to quote ---- */
+  .ps-outcome { padding: 52px 32px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+  .ps-outcome-ic { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; animation: ps-pop .6s cubic-bezier(.2, 1.4, .4, 1) both; }
+  .ps-outcome-ic > svg { width: 44px; height: 44px; stroke-width: 2.5; }
+  .ps-outcome-ic[data-tone="ok"] { background: color-mix(in srgb, var(--success) 14%, var(--card)); color: var(--success); }
+  .ps-outcome-ic[data-tone="warn"] { background: color-mix(in srgb, var(--warning) 14%, var(--card)); color: var(--warning); }
+  .ps-outcome-ic[data-tone="err"] { background: color-mix(in srgb, var(--destructive) 14%, var(--card)); color: var(--destructive); }
+  .ps-outcome-ic[data-tone="neutral"] { background: var(--canvas-hover); color: var(--accent-foreground); }
+  .ps-outcome h2 { margin: 24px 0 0; font-size: clamp(24px, 2.2vw, 30px); line-height: 1.1; letter-spacing: -.035em; font-weight: 700; }
+  .ps-outcome-text { margin: 10px 0 0; max-width: 40ch; font-size: 16.5px; color: var(--muted-foreground); }
+  .ps-outcome-text p { margin: 0; }
+  .ps-outcome-text p + p { margin-top: 8px; }
+  .ps-ref { margin-top: 24px; display: inline-flex; flex-direction: column; align-items: center; padding: 18px 32px; border-radius: 20px; background: var(--canvas-hover); border: 1px dashed var(--canvas-line-strong); }
+  .ps-ref span { font-size: 14px; color: var(--muted-foreground); }
+  .ps-ref b { font-size: 24px; letter-spacing: .02em; color: var(--foreground); }
+  .ps-outcome-acts { margin-top: 28px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+
+  /* ---- SectionHead: a kicker or an eyebrow, a heading, a line, an action ---- */
+  .ps-kicker { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 16px; font-size: 14px; font-weight: 600; color: var(--eyebrow); }
+  .ps-kicker::before { content: ""; width: 24px; height: 2px; background: currentColor; border-radius: 2px; }
+  .ps-h2 { margin: 0; font-size: clamp(30px, 3.2vw, 44px); line-height: 1.05; letter-spacing: -.035em; font-weight: 700; color: var(--foreground); }
+  .ps-h2-m { font-size: clamp(24px, 2.4vw, 30px); letter-spacing: -.03em; }
+  .ps-sub { margin: 14px 0 0; max-width: 46ch; font-size: 17px; color: var(--muted-foreground); text-wrap: balance; }
+  .ps-head-c { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .ps-head-split { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
+
+  /* ---- FeatureGrid: What We Build ---- */
+  .ps-build { margin-top: 44px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .ps-build > :first-child { grid-row: span 2; }
+  .ps-feature {
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    border-radius: 24px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    background: radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--sky-cable) 28%, transparent), transparent 55%), var(--deep);
+    color: var(--on-deep-link);
+  }
+  .ps-feature h3 { margin: 0 0 14px; font-size: 26px; line-height: 1.1; letter-spacing: -.03em; color: var(--on-deep); }
+  .ps-feature-text p { margin: 0 0 14px; font-size: 16px; line-height: 1.6; }
+  .ps-feature-act { margin-top: auto; align-self: flex-start; position: relative; z-index: 1; }
+  .ps-feature-pin { position: absolute; right: -40px; bottom: -30px; width: 260px; height: 260px; opacity: .1; color: var(--primary); }
+  .ps-tile {
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    border-radius: 20px;
+    padding: 26px;
+    background: var(--card);
+    border: 1px solid var(--canvas-line);
+    transition: box-shadow .3s, border-color .3s;
+  }
+  .ps-tile::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--primary); transform: scaleX(0); transform-origin: left; transition: transform .35s ease; }
+  .ps-tile:hover { box-shadow: var(--canvas-shadow); border-color: var(--canvas-line-strong); }
+  .ps-tile:hover::before { transform: scaleX(1); }
+  .ps-tile-ic { width: 46px; height: 46px; border-radius: 13px; background: var(--deep); color: var(--primary); display: grid; place-items: center; margin-bottom: 22px; }
+  .ps-tile h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.02em; }
+  .ps-tile p { margin: 0; font-size: 15px; color: var(--muted-foreground); }
+  @media (max-width: 1040px) {
+    .ps-build { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ps-build > :first-child { grid-row: auto; grid-column: 1 / -1; }
+  }
+  @media (max-width: 760px) {
+    .ps-build { grid-template-columns: 1fr; }
+    .ps-feature, .ps-tile { padding: 28px; border-radius: 24px; }
+  }
+
+  /* ---- RoleRow, RoleListTop: the careers list ---- */
+  .ps-list-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--canvas-line); font-size: 15px; color: var(--muted-foreground); }
+  .ps-list-top b { color: var(--foreground); }
+  .ps-role {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 24px;
+    align-items: center;
+    padding: 22px 20px;
+    margin: 0 -20px;
+    border-radius: 20px;
+    border-bottom: 1px solid var(--canvas-line);
+    color: inherit;
+    text-decoration: none;
+    transition: background .25s;
+  }
+  .ps-role:hover { background: var(--canvas-hover); }
+  .ps-role-team { font-size: 13.5px; font-weight: 600; color: var(--eyebrow); }
+  .ps-role-title { display: block; margin-top: 2px; font-size: clamp(19px, 1.7vw, 22px); line-height: 1.2; letter-spacing: -.025em; font-weight: 600; color: var(--foreground); }
+  .ps-facts { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 14.5px; color: var(--muted-foreground); }
+  .ps-facts > span { display: inline-flex; align-items: center; gap: 7px; }
+  .ps-facts svg { width: 17px; height: 17px; }
+  .ps-role-end { display: flex; align-items: center; gap: 20px; }
+  .ps-closes { font-size: 13.5px; color: var(--muted-foreground); text-align: right; white-space: nowrap; }
+  .ps-closes b { display: block; color: var(--foreground); font-weight: 600; font-size: 15px; }
+  .ps-go { width: 44px; height: 44px; flex: none; border-radius: 50%; border: 1px solid var(--canvas-line-strong); display: grid; place-items: center; color: var(--foreground); transition: background .25s, border-color .25s, transform .25s; }
+  .ps-role:hover .ps-go { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); transform: translateX(4px); }
+  @media (max-width: 760px) {
+    .ps-role { grid-template-columns: 1fr; gap: 14px; padding: 22px 16px; margin: 0 -16px; }
+    .ps-role-end { justify-content: space-between; }
+    .ps-closes { text-align: left; }
+  }
+
+  /* ---- TeamList: one team at a time, a column on desktop, a row of pills on a phone ---- */
+  .ps-teams { list-style: none; margin: 32px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .ps-team {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 0;
+    background: transparent;
+    color: var(--canvas-soft);
+    font: 500 15px var(--face-body);
+    text-align: left;
+    cursor: pointer;
+    transition: background .2s, color .2s;
+  }
+  .ps-team:hover { background: var(--canvas-hover); color: var(--foreground); }
+  .ps-team[aria-pressed="true"] { background: var(--deep); color: var(--on-deep); }
+  .ps-team small { min-width: 28px; height: 26px; padding: 0 8px; border-radius: 999px; display: inline-grid; place-items: center; font-size: 13px; font-weight: 600; background: var(--canvas); color: var(--muted-foreground); }
+  .ps-team[aria-pressed="true"] small { background: var(--primary); color: var(--primary-foreground); }
+  .ps-side-note { margin: 28px 0 0; padding-top: 20px; border-top: 1px solid var(--canvas-line); font-size: 15px; color: var(--muted-foreground); }
+  .ps-side-note a { font-weight: 600; color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
+  @media (max-width: 1040px) {
+    .ps-teams { flex-direction: row; overflow-x: auto; gap: 8px; margin-top: 24px; padding-bottom: 6px; }
+    .ps-teams > li { flex: none; }
+    .ps-team { width: auto; border: 1px solid var(--canvas-line-strong); border-radius: 999px; white-space: nowrap; }
+    .ps-side-note { display: none; }
+  }
+
+  /* ---- SectionNav: a long page's contents, the section in view marked; a column on desktop, a row of pills on a phone ---- */
+  .ps-secnav ul { list-style: none; margin: 24px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .ps-secnav a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    color: var(--canvas-soft);
+    font: 500 15px var(--face-body);
+    text-decoration: none;
+    transition: background .2s, color .2s;
+  }
+  .ps-secnav a > svg { width: 18px; height: 18px; flex: none; color: var(--muted-foreground); transition: color .2s; }
+  .ps-secnav a:hover { background: var(--canvas-hover); color: var(--foreground); }
+  .ps-secnav a[aria-current="location"] { background: var(--deep); color: var(--on-deep); }
+  .ps-secnav a[aria-current="location"] > svg { color: var(--primary); }
+  .ps-secnav-bar {
+    position: sticky;
+    top: var(--stick-top, 64px);
+    z-index: 5;
+    margin: 0 -16px;
+    padding: 10px 16px;
+    background: var(--canvas);
+    border-bottom: 1px solid var(--canvas-line);
+  }
+  .ps-secnav-bar ul { margin: 0; flex-direction: row; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .ps-secnav-bar ul::-webkit-scrollbar { display: none; }
+  .ps-secnav-bar li { flex: none; }
+  .ps-secnav-bar a { border: 1px solid var(--canvas-line-strong); border-radius: 999px; white-space: nowrap; gap: 8px; font-size: 14px; }
+  @media (min-width: 761px) and (max-width: 1040px) { .ps-secnav-bar { margin: 0 -32px; padding-inline: 32px; } }
+  /* The phone's header is 60 px (.ps-header-in), so the bar sits right under it. */
+  @media (max-width: 760px) { .ps-secnav-bar { top: 60px; } }
+
+  /* ---- SkylineHero size page: an inner page's short head, its title and one line ---- */
+  .ps-hero-page .ps-hero-in { padding: 48px 32px 56px; }
+  .ps-hero-page h1 { margin-top: 0; }
+  @media (max-width: 760px) { .ps-hero-page .ps-hero-in { padding: 28px 16px 36px; } }
+
+  /* ---- RoleTile: a role in a few lines (Closing Soon, More Roles) ---- */
+  .ps-mini {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 24px;
+    border-radius: 20px;
+    background: var(--card);
+    border: 1px solid var(--canvas-line);
+    color: inherit;
+    text-decoration: none;
+    transition: box-shadow .25s;
+  }
+  .ps-mini:hover { box-shadow: var(--canvas-shadow); }
+  .ps-mini > span { font-size: 13.5px; font-weight: 600; color: var(--eyebrow); }
+  .ps-mini > b { font-size: 19px; line-height: 1.25; letter-spacing: -.02em; color: var(--foreground); }
+  .ps-mini > small { font-size: 14.5px; color: var(--muted-foreground); }
+  .ps-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  @media (max-width: 1040px) { .ps-tiles { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 760px) { .ps-tiles { grid-template-columns: 1fr; } }
+
+  /* ---- HireSteps: How We Hire ---- */
+  .ps-steps { position: relative; margin: 52px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+  .ps-steps::before { content: ""; position: absolute; left: 12%; right: 12%; top: 28px; height: 2px; background: repeating-linear-gradient(90deg, var(--canvas-line-strong) 0 10px, transparent 10px 18px); }
+  .ps-step { position: relative; text-align: center; padding: 0 12px; }
+  .ps-step-n { position: relative; width: 56px; height: 56px; margin: 0 auto 20px; border-radius: 50%; display: grid; place-items: center; background: var(--canvas); border: 2px solid var(--accent-foreground); color: var(--accent-foreground); font-size: 20px; font-weight: 700; }
+  .ps-step:first-child .ps-step-n { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .ps-step h3 { margin: 0 0 6px; font-size: 19px; letter-spacing: -.02em; }
+  .ps-step p { margin: 0; font-size: 15px; color: var(--muted-foreground); }
+  .ps-hsteps { margin: 8px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .ps-hsteps li { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--canvas-line); font-size: 15px; font-weight: 600; }
+  .ps-hsteps b { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--canvas); border: 2px solid var(--accent-foreground); color: var(--accent-foreground); font-size: 15px; }
+  @media (max-width: 1040px) {
+    .ps-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 48px; }
+    .ps-steps::before { display: none; }
+  }
+  @media (max-width: 760px) {
+    .ps-steps, .ps-hsteps { grid-template-columns: 1fr; }
+  }
+
+  /* ---- CtaCard: Know Someone Great?, Verify a Document ---- */
+  .ps-ctas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .ps-cta { position: relative; overflow: hidden; height: 100%; min-height: 260px; border-radius: 28px; padding: 36px; display: flex; flex-direction: column; gap: 14px; }
+  .ps-cta h3 { margin: 0; font-size: clamp(24px, 2.2vw, 30px); line-height: 1.1; letter-spacing: -.03em; }
+  .ps-cta p { margin: 0; max-width: 36ch; font-size: 16px; }
+  .ps-cta-act { margin-top: auto; align-self: flex-start; }
+  .ps-cta[data-tone="deep"] {
+    background: radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 60%), linear-gradient(135deg, var(--deep), var(--paper-brand));
+    color: var(--on-deep-link);
+  }
+  .ps-cta[data-tone="deep"] h3 { color: var(--on-deep); }
+  .ps-cta[data-tone="card"] { background: var(--card); border: 1px solid var(--canvas-line); }
+  .ps-cta[data-tone="card"] p { color: var(--muted-foreground); }
+  .ps-cta-ic { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent); }
+  .ps-cta-ic > svg { width: 28px; height: 28px; }
+  .ps-cta[data-tone="card"] .ps-cta-ic { background: var(--canvas); color: var(--accent-foreground); border-color: var(--canvas-line-strong); }
+  @media (max-width: 760px) {
+    .ps-ctas { grid-template-columns: 1fr; }
+    .ps-cta { padding: 28px; border-radius: 24px; }
+  }
+
+  /* ---- RolePart and RichText look site: a vacancy's text ---- */
+  .ps-part { padding-bottom: 44px; margin-bottom: 44px; border-bottom: 1px solid var(--canvas-line); }
+  .ps-part:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+  .ps-part > h2 { margin: 0 0 16px; font-size: clamp(23px, 2.2vw, 28px); line-height: 1.15; letter-spacing: -.03em; font-weight: 700; }
+  .ps-rte { color: var(--canvas-soft); }
+  .ps-rte p { margin: 0 0 14px; max-width: 66ch; font-size: 16.5px; line-height: 1.75; }
+  .ps-rte h3, .ps-rte h4 { margin: 30px 0 12px; display: flex; align-items: center; gap: 14px; font-size: 18px; letter-spacing: -.02em; color: var(--foreground); }
+  .ps-rte h3:first-child, .ps-rte h4:first-child { margin-top: 0; }
+  .ps-rte h3 > [data-n], .ps-rte h4 > [data-n] { width: 30px; height: 30px; flex: none; border-radius: 9px; display: grid; place-items: center; background: var(--deep); color: var(--primary); font-size: 16px; }
+  .ps-rte ul, .ps-rte ol { margin: 0 0 14px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; max-width: 66ch; }
+  .ps-rte li { position: relative; padding-left: 28px; font-size: 16px; line-height: 1.65; }
+  .ps-rte li::before { content: ""; position: absolute; left: 4px; top: 9px; width: 9px; height: 9px; border-radius: 3px; background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+  .ps-rte a { color: var(--foreground); font-weight: 600; }
+  @media (max-width: 760px) { .ps-rte p { font-size: 16px; } }
+
+  /* ---- IconList: what a role is measured on ---- */
+  .ps-kpis { margin: 8px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .ps-kpis li { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--canvas-line); font-size: 15px; font-weight: 500; }
+  .ps-kpis svg { flex: none; width: 20px; height: 20px; color: var(--accent-foreground); }
+  @media (max-width: 760px) { .ps-kpis { grid-template-columns: 1fr; } }
+
+  /* ---- Quote look feature: What We Are Looking For ---- */
+  .ps-quote {
+    margin: 8px 0 0;
+    padding: 32px;
+    border-radius: 24px;
+    background: radial-gradient(90% 120% at 100% 0%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 60%), var(--deep);
+    color: var(--on-deep);
+    font-size: clamp(19px, 1.9vw, 24px);
+    line-height: 1.35;
+    letter-spacing: -.02em;
+    font-weight: 600;
+  }
+  .ps-quote-more { display: block; margin-top: 16px; font-size: 16px; line-height: 1.6; font-weight: 400; letter-spacing: 0; color: var(--on-deep-link); }
+  .ps-quote-more p { margin: 0; }
+  .ps-quote-more p + p { margin-top: 10px; }
+  @media (max-width: 760px) { .ps-quote { padding: 28px; } }
+
+  /* ---- KeyValue rows and tiles: the public site's label and value pairs ---- */
+  .ps-kv { margin: 0; display: flex; flex-direction: column; }
+  .ps-kv > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--canvas-line); }
+  .ps-kv > div:last-child { border-bottom: 0; }
+  .ps-kv dt { font-size: 14.5px; color: var(--muted-foreground); }
+  .ps-kv dd { margin: 0; text-align: right; font-size: 14.5px; font-weight: 600; color: var(--foreground); }
+  .ps-kv-tiles { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .ps-kv-tiles > div { padding: 18px 20px; border-radius: 18px; background: var(--canvas-hover); border: 1px solid var(--canvas-line); }
+  .ps-kv-tiles dt { font-size: 13px; color: var(--muted-foreground); }
+  .ps-kv-tiles dd { margin: 4px 0 0; font-size: 19px; font-weight: 700; letter-spacing: -.02em; color: var(--foreground); }
+  @media (max-width: 760px) { .ps-kv-tiles { grid-template-columns: 1fr; } }
+
+  /* ---- RoleCard and ShareCard: beside a role's text ---- */
+  .ps-card { border-radius: 24px; background: var(--card); border: 1px solid var(--canvas-line); box-shadow: var(--canvas-shadow); overflow: hidden; }
+  .ps-card-head { padding: 24px 24px 4px; }
+  .ps-card-head h2 { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+  .ps-card-kv { padding: 6px 24px 16px; }
+  .ps-card-act { padding: 20px 24px 24px; background: var(--canvas-hover); border-top: 1px solid var(--canvas-line); display: flex; flex-direction: column; gap: 12px; }
+  .ps-card-act > p { margin: 0; text-align: center; font-size: 14px; color: var(--muted-foreground); }
+  .ps-closing { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--eyebrow); }
+  .ps-share { margin-top: 16px; padding: 20px 24px; border-radius: 24px; border: 1px dashed var(--canvas-line-strong); display: flex; flex-direction: column; gap: 12px; }
+  .ps-share h3 { margin: 0; font-size: 17px; }
+  .ps-share p { margin: 0; font-size: 14.5px; color: var(--muted-foreground); }
+  @media (max-width: 1040px) { .ps-share { display: none; } }
+  @media (max-width: 760px) { .ps-card-act { display: none; } }
+
+  /* ---- PublicPage bar: the phone's action bar, fixed at the foot ---- */
+  .ps-bar { display: none; }
+  @media (max-width: 760px) {
+    .ps-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px calc(20px + env(safe-area-inset-bottom));
+      background: var(--canvas-glass);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid var(--canvas-line);
+    }
+    .ps-bar > p { margin: 0; flex: 1; font-size: 14px; line-height: 1.35; color: var(--muted-foreground); }
+  }
+
+  /* ---- Countdown ring and QuestionMap: the assessment's clock and its questions ---- */
+  .ps-ring { position: relative; width: 176px; height: 176px; margin: 20px 0 0; }
+  .ps-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ps-ring-track { stroke: var(--canvas-line); }
+  .ps-ring-arc { stroke: var(--accent-foreground); transition: stroke-dashoffset 1s linear; }
+  .ps-ring[data-low] .ps-ring-arc { stroke: var(--destructive); }
+  .ps-ring-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ps-ring-in b { font-size: 38px; line-height: 1; letter-spacing: -.03em; color: var(--foreground); font-variant-numeric: tabular-nums; }
+  .ps-ring-in span { margin-top: 6px; font-size: 14px; color: var(--muted-foreground); }
+  .ps-qmap { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .ps-qmap button { width: 44px; height: 44px; border-radius: 12px; border: 2px solid var(--canvas-line-strong); background: transparent; color: var(--muted-foreground); font: 600 15px var(--face-body); cursor: pointer; transition: all .2s; }
+  .ps-qmap button[data-answered] { border-color: var(--success); color: var(--success); background: var(--success-soft); }
+  .ps-qmap button[aria-current="step"] { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+  @media (max-height: 720px) {
+    .ps-ring { width: 140px; height: 140px; }
+    .ps-ring-in b { font-size: 30px; }
+  }
+
+  /* ---- SignatureField look pad: the box to sign in, Clear inside it once drawn ---- */
+  .ps-pad { position: relative; height: 200px; overflow: hidden; border-radius: 20px; border: 2px dashed var(--canvas-line-strong); background: var(--canvas-hover); touch-action: none; transition: border-color .2s; }
+  .ps-pad[data-state="bad"] { border-color: var(--destructive); }
+  .ps-pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; background: transparent; color: var(--foreground); }
+  .ps-pad-line { position: absolute; left: 32px; right: 32px; bottom: 56px; border-top: 1.5px solid var(--canvas-line-strong); pointer-events: none; }
+  .ps-pad-x { position: absolute; left: 32px; bottom: 62px; font-size: 22px; line-height: 1; color: var(--muted-foreground); pointer-events: none; }
+  .ps-pad-hint { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; color: var(--muted-foreground); pointer-events: none; transition: opacity .3s; }
+  .ps-pad[data-inked] .ps-pad-hint { opacity: 0; }
+  .ps-pad-clear {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--canvas-line-strong);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font: 600 14px var(--face-body);
+    cursor: pointer;
+    transition: color .2s;
+  }
+  .ps-pad-clear:hover { color: var(--foreground); }
+  @media (max-width: 760px) { .ps-pad-clear { min-height: 44px; } }
+
+  /* ---- Letter: a document as it will print, white in both themes ---- */
+  .ps-letter { position: relative; overflow: hidden; border-radius: 20px; background: var(--paper); color: var(--paper-foreground); border: 1px solid var(--canvas-line); box-shadow: var(--canvas-shadow); padding: 44px 52px; }
+  .ps-letter::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: linear-gradient(90deg, var(--paper-brand), var(--deep) 60%, var(--paper-gold)); }
+  .ps-lh { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-bottom: 28px; margin-bottom: 32px; border-bottom: 1px solid var(--paper-line); }
+  .ps-lh-brand { display: flex; align-items: center; gap: 12px; }
+  .ps-lh-brand b { font-size: 19px; letter-spacing: -.02em; color: var(--deep); }
+  .ps-lh small { display: block; font-size: 13px; line-height: 1.6; text-align: right; color: var(--paper-muted); }
+  .ps-letter h2 { margin: 0 0 20px; font-size: 23px; letter-spacing: -.02em; color: var(--deep); }
+  .ps-letter p { margin: 0 0 16px; font-size: 16px; line-height: 1.8; }
+  .ps-letter .ps-sig-from { margin-top: 32px; font-weight: 600; }
+  @media (max-width: 760px) {
+    .ps-letter { padding: 40px 24px; }
+    .ps-lh { flex-direction: column; }
+    .ps-lh small { text-align: left; }
+  }
+
+  /* ---- VerifyCard: a document's record and its two verdicts ---- */
+  .ps-result { min-height: 420px; display: flex; flex-direction: column; overflow: hidden; border-radius: 28px; background: var(--card); border: 1px solid var(--canvas-line); box-shadow: var(--canvas-shadow); }
+  .ps-result-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 48px; text-align: center; color: var(--muted-foreground); background: radial-gradient(70% 60% at 50% 40%, var(--canvas-hover), transparent); }
+  .ps-result-empty b { font-size: 21px; color: var(--foreground); }
+  .ps-shield { width: 104px; height: 104px; border-radius: 30px; display: grid; place-items: center; background: var(--deep); color: var(--primary); box-shadow: 0 20px 40px color-mix(in srgb, var(--deep) 25%, transparent); }
+  .ps-shield > svg { width: 56px; height: 56px; stroke-width: 1.6; }
+  .ps-verdict { display: flex; align-items: center; gap: 16px; padding: 26px 30px; }
+  .ps-verdict-ic { width: 56px; height: 56px; flex: none; border-radius: 18px; display: grid; place-items: center; color: var(--on-deep); }
+  .ps-verdict-ic > svg { width: 30px; height: 30px; stroke-width: 2.6; }
+  .ps-verdict h2 { margin: 0; font-size: 23px; letter-spacing: -.02em; }
+  .ps-verdict p { margin: 4px 0 0; font-size: 15px; color: var(--canvas-soft); }
+  .ps-result[data-tone="ok"] .ps-verdict { background: color-mix(in srgb, var(--success) 12%, var(--card)); }
+  .ps-result[data-tone="ok"] .ps-verdict-ic { background: var(--success); }
+  .ps-result[data-tone="warn"] .ps-verdict { background: color-mix(in srgb, var(--warning) 12%, var(--card)); }
+  .ps-result[data-tone="warn"] .ps-verdict-ic { background: var(--warning); }
+  .ps-result[data-tone="err"] .ps-verdict { background: color-mix(in srgb, var(--destructive) 12%, var(--card)); }
+  .ps-result[data-tone="err"] .ps-verdict-ic { background: var(--destructive); }
+  .ps-result-kv { padding: 10px 30px 24px; }
+  .ps-result-note { margin: 0 30px 32px; font-size: 16px; color: var(--muted-foreground); }
+  .ps-qrdoc { margin: 0 30px 28px; padding: 20px 22px; border-radius: 18px; background: var(--canvas-hover); border: 1px solid var(--canvas-line); font-size: 15px; }
+  .ps-qrdoc p { margin: 6px 0 0; color: var(--canvas-soft); }
+  .ps-qrdoc-h { font-size: 12px; font-weight: 600; letter-spacing: .24em; text-transform: uppercase; color: var(--muted-foreground); }
+  .ps-qrdoc-act { margin-top: 14px; }
+  .ps-match { display: inline-flex; align-items: center; gap: 6px; }
+  .ps-match[data-match="matches"] { color: var(--success); }
+  .ps-match[data-match="differs"] { color: var(--destructive); }
+  .ps-match > svg { width: 16px; height: 16px; stroke-width: 2.6; }
+  @media (max-width: 760px) {
+    .ps-verdict { padding: 22px 20px; }
+    .ps-result-kv { padding: 10px 20px 20px; }
+    .ps-result-note, .ps-qrdoc { margin-left: 20px; margin-right: 20px; }
+  }
+
+  /* ---- UploadField look zone and FileRow ---- */
+  .ps-drop-zone { display: flex; width: 100%; align-items: center; gap: 16px; padding: 20px; border-radius: 18px; border: 2px dashed var(--canvas-line-strong); background: var(--canvas-hover); color: var(--foreground); text-align: left; cursor: pointer; transition: border-color .2s, background .2s; }
+  .ps-drop-zone:hover, .ps-drop-zone[data-over] { border-color: var(--accent-foreground); }
+  .ps-drop-ic { width: 48px; height: 48px; flex: none; border-radius: 14px; background: var(--deep); color: var(--primary); display: grid; place-items: center; }
+  .ps-drop-ic > svg { width: 26px; height: 26px; }
+  .ps-drop-zone b { display: block; font-size: 16px; }
+  .ps-drop-zone span span { font-size: 14px; color: var(--muted-foreground); }
+  .ps-file { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 16px; border: 1.5px solid var(--canvas-line-strong); background: var(--card); }
+  .ps-file-ic { width: 44px; height: 44px; flex: none; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--success) 14%, var(--card)); color: var(--success); }
+  .ps-file-ic > svg { width: 22px; height: 22px; }
+  .ps-file > div { flex: 1; min-width: 0; }
+  .ps-file b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15.5px; }
+  .ps-file div > span { font-size: 14px; color: var(--muted-foreground); }
+}
+@keyframes ps-pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/*
+ * The form system on the site's Panel, as the design draws it: labels in the body ink at 14.5 px and
+ * controls with 14 px corners. Outside the layers on purpose: the form's own size and ink are
+ * utilities, which a layered rule cannot outrank; nothing else is touched (a field's mark stays its own).
+ */
+.ps-site .field-head { font-size: 14.5px; color: var(--foreground); }
+.ps-site .ps-panel .rounded-ctl { border-radius: 14px; }

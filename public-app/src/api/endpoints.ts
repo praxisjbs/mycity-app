@@ -3,11 +3,13 @@ import type { Endpoints as Contract } from "@mycity/contract/contract.gen.ts";
 /**
  * The endpoint map the client is typed against: "METHOD /path" → its shapes.
  *
- * M4's routes come from the generated contract (packages/contract/contract.gen.ts, F15), picked
+ * Every route comes from the generated contract (packages/contract/contract.gen.ts, F15), picked
  * by name so the public client can only reach the public surface: Careers, a Vacancy, Apply and
- * an Assessment, with their request parts as the API accepts them and their responses as it sends
- * them. A page whose routes are not in the contract yet (M5's Sign Offer and Verify) adds its
- * INTERIM routes here by declaration merging, from `types/public.ts`:
+ * an Assessment (M4), Sign Offer and Verify Document (M5, the signatures routes), a Proposal (M7)
+ * and Help (the User Guide's chapter for people outside MyCity), with their request parts as the API
+ * accepts them and their responses as it sends them, and the index's figures (`/jobs/summary`). A
+ * page whose routes are not in the contract yet adds its INTERIM
+ * routes here by declaration merging, from a `types/<page>.ts` of its own:
  *
  *   declare module "@/api/endpoints" {
  *     interface Endpoints {
@@ -19,6 +21,7 @@ import type { Endpoints as Contract } from "@mycity/contract/contract.gen.ts";
  */
 type ContractRoute =
   | "GET /api/public/v1/jobs"
+  | "GET /api/public/v1/jobs/summary"
   | "GET /api/public/v1/jobs/:slug"
   | "POST /api/public/v1/jobs/:slug/apply"
   | "GET /api/public/v1/apply/:token"
@@ -28,7 +31,17 @@ type ContractRoute =
   | "POST /api/public/v1/assess/:token/start"
   | "PUT /api/public/v1/assess/:token/answers/:question_id"
   | "POST /api/public/v1/assess/:token/answers/:question_id/file"
-  | "POST /api/public/v1/assess/:token/submit";
+  | "POST /api/public/v1/assess/:token/submit"
+  | "GET /api/public/v1/sign/:token"
+  | "POST /api/public/v1/sign/:token/code"
+  | "POST /api/public/v1/sign/:token/code/verify"
+  | "POST /api/public/v1/sign/:token/sign"
+  | "POST /api/public/v1/sign/:token/decline"
+  | "GET /api/public/v1/verify/:ref"
+  | "GET /api/public/v1/verify/t/:token"
+  | "GET /api/public/v1/help"
+  | "GET /api/public/v1/proposals/:token"
+  | "GET /api/public/v1/proposals/:token/pdf";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Endpoints extends Pick<Contract, ContractRoute> {}

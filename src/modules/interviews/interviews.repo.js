@@ -55,7 +55,16 @@ function visible(scope, params) {
   return `AND (x.hiring_manager_id = ANY($${params.length}::uuid[]) OR x.on_panel)`;
 }
 
-const SORTS = { scheduled_start: "x.scheduled_start" };
+/**
+ * The default order (no `sort`): the interviews still to end, soonest first, then those past, latest
+ * first. It is not a key a caller can ask for (the contract offers `scheduled_start`), so no direction
+ * is ever added to it.
+ */
+const SORTS = {
+  soonest:
+    "(x.scheduled_end < now()), CASE WHEN x.scheduled_end >= now() THEN x.scheduled_start END, CASE WHEN x.scheduled_end < now() THEN x.scheduled_start END DESC",
+  scheduled_start: "x.scheduled_start",
+};
 
 /** One page of interviews the reader may see. */
 function list(db, query, scope, employeeId) {
@@ -148,6 +157,36 @@ async function panel(db, interviewId, employeeId) {
   return rows;
 }
 
+/**
+ * Round Activity: the interview's own events (`keys`), newest first, the first page of 25. Who acted,
+ * and for a reminder the panelist it went to; the payload is read for nothing else (it carries no
+ * rating, decision or note: interviews.events.js).
+ */
+function activity(db, interviewId, keys) {
+  const name = (a) => `CASE WHEN ${a}.employee_id IS NULL THEN NULL ELSE btrim(${a}.first_name || ' ' || ${a}.last_name) END`;
+  return pageQuery(
+    db,
+    `SELECT l.event_id, l.event_key, l.occurred_at, ${name("ae")} AS actor_name,
+            CASE WHEN l.event_key = 'interview.feedback_due' THEN ${name("se")} END AS panelist_name,
+            ${TOTAL_COL}
+       FROM event_log l
+       LEFT JOIN app_user au ON au.user_id = l.actor_user_id
+       LEFT JOIN employee ae ON ae.employee_id = au.employee_id
+       LEFT JOIN employee se ON se.employee_id::text = l.payload ->> 'subject_employee_id'
+      WHERE l.entity_type = 'interview' AND l.entity_id = $1::text AND l.event_key = ANY($2::text[])
+        -- A run twice in a day logs a reminder twice but sends it once (its dedup key): keep the first.
+        AND NOT (l.event_key = 'interview.feedback_due' AND EXISTS (
+              SELECT 1 FROM event_log o
+               WHERE o.entity_type = 'interview' AND o.entity_id = l.entity_id AND o.event_key = l.event_key
+                 AND o.payload ->> 'subject_employee_id' = l.payload ->> 'subject_employee_id'
+                 AND (o.occurred_at AT TIME ZONE 'Africa/Lagos')::date = (l.occurred_at AT TIME ZONE 'Africa/Lagos')::date
+                 AND (o.occurred_at, o.event_id) < (l.occurred_at, l.event_id)))
+      ORDER BY l.occurred_at DESC, l.event_id`,
+    [interviewId, keys],
+    { page: 1 },
+  );
+}
+
 /** The reader's own seat and card, with their private notes; null when they are not on the panel. */
 async function myFeedback(db, interviewId, employeeId) {
   if (!employeeId) return null;
@@ -166,16 +205,19 @@ async function myFeedback(db, interviewId, employeeId) {
 }
 
 /**
- * Employee `e` may sit on a panel: active, with an active login that holds `recruitment` view (or the
- * CEO). One predicate for the picker (panelists) and the check on a save (eligible).
+ * The employee aliased `e` may sit on a panel: active, with an active login that holds `recruitment`
+ * view (or the CEO). One predicate for the picker (panelists) and the check on a save (eligible), and
+ * for who may be a vacancy's hiring manager (decision 5; vacancies.repo hiringManagers).
+ * @param {string} e  the employee table's alias in the query
  */
-const MAY_SIT = `e.status = 'active' AND EXISTS (
+const maySit = (e) => `${e}.status = 'active' AND EXISTS (
     SELECT 1 FROM app_user u
-     WHERE u.employee_id = e.employee_id AND u.status = 'active'
+     WHERE u.employee_id = ${e}.employee_id AND u.status = 'active'
        AND (u.is_ceo = true OR EXISTS (
              SELECT 1 FROM user_role ur JOIN permission p ON p.role_id = ur.role_id
               WHERE ur.user_id = u.user_id AND p.module_key = 'recruitment' AND p.can_view = true
                 AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE))))`;
+const MAY_SIT = maySit("e");
 
 /** Employees who may sit on a panel, of those named. */
 async function eligible(db, employeeIds) {
@@ -459,11 +501,13 @@ async function actorOf(db, userId) {
 
 module.exports = {
   BLIND,
+  maySit,
   list,
   get,
   scheduledFor,
   panel,
   myFeedback,
+  activity,
   eligible,
   panelists,
   namesOf,

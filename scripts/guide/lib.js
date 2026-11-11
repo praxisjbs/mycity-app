@@ -49,6 +49,7 @@ const moduleOfOpen = (open) => {
 
 /** A public address's page files (public-app/src/pages, one file a screen): "/jobs/<slug>" is the Vacancy. */
 function publicPagesOf(open) {
+  if (String(open || "") === "/") return ["public-app/src/pages/Home.tsx", "public-app/src/pages/shared.tsx", "public-app/src/shell"];
   const m = /^\/([a-z]+)(\/[^/?]+)?/.exec(String(open || ""));
   if (!m) return [];
   const page = { apply: "Apply", assess: "Assessment", sign: "SignOffer", verify: "Verify" }[m[1]] ?? (m[2] ? "Vacancy" : "Careers");

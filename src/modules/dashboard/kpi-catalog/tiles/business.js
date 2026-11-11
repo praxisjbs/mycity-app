@@ -2,8 +2,8 @@
 /**
  * Business cards: the partnership pipeline, active and quiet partners, value signed this
  * year and proposals out. Every one reads through the partners source adapter (M7), whose
- * header says what each word means until M7 settles its vocabularies, in the reader's
- * scope on `partnerships` (a partner, an opportunity or an agreement is its owner's).
+ * header says what each word means, in the reader's scope on `partnerships` (a deal is its
+ * owner's and its team's, a partner its owner's and its deals' readers', partnerships.md §6.1).
  */
 const partners = require("../../sources/partners.source");
 const { cell, linkTo, plural, record, records } = require("../shared");
@@ -105,15 +105,15 @@ const ENTRIES = [
     value: (client, g, ctx) =>
       g.money(async () => {
         const v = await partners.signedValue(client, { today: ctx.today }, scopeOf(ctx));
-        return { amount: v.amount, agreements: v.n };
+        return { amount: v.amount, deals: v.n };
       }),
-    caption: (f) => plural(f.agreements, "agreement"),
+    caption: (f) => plural(f.deals, "deal"),
     detail: {
       title: "Signed This Year",
       columns: [
-        { key: "agreement", label: "Agreement" },
+        { key: "deal", label: "Deal" },
         { key: "partner", label: "Partner", phone: true },
-        { key: "starts_on", label: "Starts" },
+        { key: "signed", label: "Signed" },
         { key: "value", label: "Value", numeric: true, phone: true },
         { key: "owner", label: "Owner" },
       ],
@@ -121,15 +121,15 @@ const ENTRIES = [
       list: async (client, query, ctx) =>
         records(await partners.signedPage(client, { today: ctx.today }, scopeOf(ctx), query), (r) =>
           record(
-            r.partnership_agreement_id,
+            r.partnership_opportunity_id,
             {
-              agreement: cell.text(r.title || r.number),
+              deal: cell.text(r.title || r.number),
               partner: cell.text(r.partner),
-              starts_on: cell.date(r.starts_on),
+              signed: cell.time(r.signed_at),
               value: cell.money(r.value, r.currency),
               owner: cell.person(r.owner),
             },
-            linkTo("agreement", r.partnership_agreement_id),
+            linkTo("partner_deal", r.partnership_opportunity_id),
           ),
         ),
     },
@@ -185,6 +185,9 @@ const ENTRIES = [
         { key: "opportunity", label: "Opportunity" },
         { key: "partner", label: "Partner", phone: true },
         { key: "sent", label: "Sent", phone: true },
+        // The views the public link recorded (partnerships.md §6.10): when it was last opened, how often.
+        { key: "viewed", label: "Last Viewed" },
+        { key: "views", label: "Views", numeric: true },
         { key: "value", label: "Value", numeric: true },
       ],
       groups: [],
@@ -197,6 +200,8 @@ const ENTRIES = [
               opportunity: cell.text(r.opportunity),
               partner: cell.text(r.partner),
               sent: cell.time(r.sent_at),
+              viewed: r.last_viewed_at ? cell.time(r.last_viewed_at) : cell.pill("neutral", "Not Yet"),
+              views: cell.number(r.view_count || 0),
               value: cell.money(r.value, r.currency),
             },
             linkTo("proposal", r.partnership_proposal_id),

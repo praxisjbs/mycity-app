@@ -315,6 +315,13 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
   User Guide's Guide Search (Embeddings), Guide Answer (Fast, JBS Praxis's choice over the
   recommended Default) and Guide Voice Search (Transcription), all personal data, JP, 25/10/2026
   (`user-guide.md` §6.1 decisions 9 to 11, §6.8 to §6.10). Guide Answer is the first action on Fast.
+- M7's Proposal Studio (`partnerships.md` §6.10, §9), all personal data, so DeepSeek is never in
+  their chains: Proposal Questions (`proposal-questions`), Write Proposal (`proposal-draft`) and
+  Rewrite Section (`proposal-rewrite`) on Top Tier, JP, 05/11/2026, with the reason "long drafting from
+  many sources" and their own chain in code, Anthropic Sonnet first, then Gemini Pro (Gemini Pro
+  answers while MyCity's Anthropic key is missing or failing); Proposal Message (`proposal-message`,
+  Write With AI in Send Proposal) on Default, TB, 07/11/2026, since a person reads it as a draft.
+  Tidy Agreement (`template-tidy`, Default, personal data, JP, 06/11/2026) is Categories' Tidy With AI.
 - `redact.js` `shield()` swaps what the external redaction would mask for tokens (`KEPT001`) and
   hands back a `restore()` that puts the real values into the answer, for a feature whose answer
   must carry them (a mail draft) without the model ever seeing them (`mailbox.md` §6).
@@ -444,6 +451,8 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 
 ## 14 · Change log
 
+- 08/11/2026 · JP · §6.5: the Proposal Studio's four registered (`partnerships.md` §6.10, §9): `proposal-questions`, `proposal-draft` and `proposal-rewrite` on Top Tier (JP, 05/11/2026, with their reason and their own chain, Anthropic Sonnet then Gemini Pro) and `proposal-message` on Default (TB, 07/11/2026; Fast is not for a draft a person reads), all personal data, so DeepSeek is never in their chains.
+- 06/11/2026 · JP · §13: Tidy With AI on Partnerships' agreement templates registered, `template-tidy` (Default), personal data, chosen by JP (`partnerships.md` §6.8, §9).
 - 05/11/2026 · AJ · Files (M8 audit F9, F19): a turn with files goes to Gemini through its native `generateContent`, each file as `inline_data` (the system prompt as `systemInstruction`, JSON by `responseMimeType`), since its OpenAI-compatible endpoint may refuse a PDF data URL; a turn without files stays on the compatible endpoint. Only an Image Reading action that declares `personal_data: true` may send files (a file is never redacted, so it never reaches DeepSeek); any other is refused before a call.
 - 05/11/2026 · AJ · §13: Expenses' three registered, `expense-invoice-read` (Image Reading), `expense-duplicate-check` and `expense-category-suggest` (Default), personal data, chosen by AJ (`expenses.md` §9). `complete()` takes `files` for an Image Reading action: each a picture or a PDF (PNG, JPEG, WebP, PDF, 10 MB at most), sent beside the input as a data URL in the person's turn, never redacted (the picture is the question); `vendors/anthropic.js` turns them into image and document blocks. Any other action given a file is refused before a call.
 

@@ -360,9 +360,9 @@ describeDb("Home · Overview against the real migrations", () => {
         [userIdOf("ops"), employeeOf("staff"), at("2026-10-15", "17:00")],
       );
 
-      // Partnerships (M7), owned by Chinyere: a signed agreement in March, one in dollars,
-      // one in draft, one signed that starts in December; an open opportunity; an active
-      // partner nobody has contacted.
+      // Partnerships (M7), owned by Chinyere: two deals signed in March, one in dollars, one
+      // lost unsigned, one dated December; an open opportunity; an active partner nobody has
+      // contacted.
       const { partner_id: partner } = await one(
         `INSERT INTO partner (number, name, status, owner_id, created_at)
          VALUES ('PAR-0001', 'Lagos Arts Council', 'active', $1, $2) RETURNING partner_id`,
@@ -373,17 +373,18 @@ describeDb("Home · Overview against the real migrations", () => {
          VALUES ('POP-0001', $1, 'Festival Sponsorship', 'proposal', 'open', $2, 5000.00, 'NGN')`,
         [partner, employeeOf("hod")],
       );
-      const agreement = (number, status, startsOn, value, currency) =>
+      // Signed Value counts the deals signed in the year, at their signed value (partnerships.md §6.6, §6.17).
+      const signed = (number, status, signedOn, value, currency) =>
         q(
-          `INSERT INTO partnership_agreement (partner_id, number, title, status, starts_on, value, currency, owner_id)
-           VALUES ($1, $2, 'Sponsorship', $3, $4, $5, $6, $7)`,
-          [partner, number, status, startsOn, value, currency, employeeOf("hod")],
+          `INSERT INTO partnership_opportunity (number, partner_id, title, stage, status, owner_id, estimated_value, currency, signed_at)
+           VALUES ($1, $2, 'Sponsorship', 'active', $3, $4, $5, $6, $7)`,
+          [number, partner, status, employeeOf("hod"), value, currency, signedOn ? `${signedOn}T10:00:00+01:00` : null],
         );
-      await agreement("AGR-0001", "signed", "2026-03-01", "5000.00", "NGN");
-      await agreement("AGR-0002", "active", "2026-03-20", "250.50", "NGN");
-      await agreement("AGR-0003", "signed", "2026-06-01", "1000.00", "USD");
-      await agreement("AGR-0004", "draft", "2026-05-01", "700.00", "NGN");
-      await agreement("AGR-0005", "signed", "2026-12-01", "2000000.00", "NGN");
+      await signed("DEAL-2026-0101", "live", "2026-03-01", "5000.00", "NGN");
+      await signed("DEAL-2026-0102", "live", "2026-03-20", "250.50", "NGN");
+      await signed("DEAL-2026-0103", "live", "2026-06-01", "1000.00", "USD");
+      await signed("DEAL-2026-0104", "lost", null, "700.00", "NGN");
+      await signed("DEAL-2026-0105", "live", "2026-12-01", "2000000.00", "NGN");
     });
 
     const at14 = (who) => service.overview({ ...users[who], session_id: null }, { now: NOW }).then(wire);
@@ -458,9 +459,9 @@ describeDb("Home · Overview against the real migrations", () => {
       ]);
     });
 
-    test("Partnerships: the Naira signed each month this year, the agreements the Signed Value card counts", async () => {
+    test("Partnerships: the Naira signed each month this year, the deals the Signed Value card counts", async () => {
       const o = d.HomeOverview.parse(await at14("hod"));
-      // The year is read whole, as the card reads it: to December, where the last agreement starts.
+      // The year is read whole, as the card reads it: to December, where the last deal is dated.
       expect(o.chart.months).toHaveLength(12);
       expect(o.chart.months[0]).toEqual({ month: "2026-01", amount: "0.00" });
       expect(o.chart.months[2]).toEqual({ month: "2026-03", amount: "5250.50" });
@@ -807,7 +808,7 @@ describeDb("Home · Overview against the real migrations", () => {
       expect(o.picker_source).toBe("user");
     });
 
-    test("refused: a card they may not see, one never offered, a hidden one, more than four, one twice", async () => {
+    test("refused: a card they may not see, one never offered, more than four, one twice", async () => {
       for (const ids of [["headcount"], ["team_present"], ["payroll_run_state"], ["not_a_card"]]) {
         const res = await picks("staff", ids);
         expect([ids[0], res.status]).toEqual([ids[0], 422]);

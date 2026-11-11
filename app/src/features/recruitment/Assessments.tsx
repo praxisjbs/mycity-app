@@ -32,6 +32,7 @@ import {
   Grid,
   HelpTerm,
   KeyValue,
+  ListDetail,
   LoadingRows,
   NumberField,
   PageHeader,
@@ -63,8 +64,17 @@ export function Assessments() {
   const summary = useApi("GET /api/v1/recruitment/assessments/summary");
   const library = usePaged("GET /api/v1/recruitment/assessments");
   const sittings = usePaged("GET /api/v1/recruitment/assessments/sittings", { filters: marking ? { marking: "true" } : {} });
-  const openAssessment = (id: string, title = "Assessment") => modal.open({ title, wide: true, body: (close) => <AssessmentSheet id={id} close={close} /> });
-  const openSittingId = (id: string, title = "Sitting") => modal.open({ title, wide: true, body: (close) => <SittingSheet id={id} close={close} /> });
+  // A pressed assessment or sitting opens in the wide dialog on desktop and a sheet on a phone
+  // (ListDetail `modal`, F31 as amended 11/11/2026); nothing opens unasked.
+  const [picked, setPicked] = useState<{ kind: "library" | "sittings"; id: string; title: string } | null>(null);
+  const openAssessment = (id: string, title = "Assessment") => {
+    modal.close();
+    setPicked({ kind: "library", id, title });
+  };
+  const openSittingId = (id: string, title = "Sitting") => {
+    modal.close();
+    setPicked({ kind: "sittings", id, title });
+  };
   const openSitting = (s: Sitting) => openSittingId(s.application_assessment_id, s.candidate_name);
   const importOne = () => modal.open({ title: "Import Assessment", body: (close) => <ImportForm close={close} onImported={(a) => openAssessment(a.assessment_definition_id, a.name)} /> });
   const create = () => modal.open({ title: "New Assessment", body: (close) => <AssessmentForm close={close} onSaved={(a) => openAssessment(a.assessment_definition_id, a.name)} /> });
@@ -125,43 +135,59 @@ export function Assessments() {
         <SegmentedControl label="Which List" value={view} onChange={setView} options={[["library", "Assessments"], ["sittings", "Sittings"]]} />
         {view === "sittings" && <SegmentedControl label="Which Sittings" value={marking ? "mark" : "all"} onChange={(v) => setMarking(v === "mark")} options={[["all", "All"], ["mark", "To Mark"]]} small />}
       </Toolbar>
-      {view === "library" ? (
-        <PagedTable<Assessment>
-          title="Assessments"
-          list={library}
-          search="Search assessments"
-          rowKey={(a) => a.assessment_definition_id}
-          noun="assessment"
-          onRowClick={(a) => openAssessment(a.assessment_definition_id, a.name)}
-          empty={{ title: "No Assessments Yet" }}
-          columns={[
-            { key: "name", label: "Assessment", render: (a) => <span className="font-semibold">{a.name}</span> },
-            { key: "type", label: "Type", render: (a) => ASSESSMENT_TYPE[a.assessment_type] },
-            { key: "minutes", label: "Minutes", align: "n", render: (a) => a.duration_minutes ?? "Untimed", desktop: true },
-            { key: "questions", label: "Questions", align: "n", render: (a) => a.question_count, desktop: true },
-            { key: "sent", label: "Sent", align: "n", render: (a) => a.sent, desktop: true },
-            { key: "avg", label: "Average", align: "n", render: (a) => (a.average_score === null ? "–" : Math.round(a.average_score)) },
-            { key: "status", label: "Status", render: (a) => (a.active ? pill(["ok", "Active"]) : pill(["neutral", "Off"])) },
-          ]}
-        />
-      ) : (
-        <PagedTable<Sitting>
-          title="Sittings"
-          list={sittings}
-          search="Search candidates"
-          rowKey={(x) => x.application_assessment_id}
-          noun="sitting"
-          onRowClick={openSitting}
-          empty={{ title: marking ? "Nothing to Mark" : "None Sent Yet" }}
-          columns={[
-            { key: "who", label: "Candidate", render: (x) => <span className="font-semibold">{x.candidate_name}</span> },
-            { key: "what", label: "Assessment", render: (x) => x.assessment_name },
-            { key: "role", label: "Role", render: (x) => x.vacancy_title, desktop: true },
-            { key: "state", label: "State", render: (x) => pill(SITTING_STATUS[x.status]) },
-            { key: "score", label: "Score", align: "n", render: (x) => (x.score === null ? (x.to_mark ? `${x.to_mark} to mark` : "–") : Math.round(x.score)) },
-          ]}
-        />
-      )}
+      <ListDetail
+        layout="modal"
+        size="wide"
+        open={picked !== null}
+        onClose={() => setPicked(null)}
+        title={picked?.title ?? (view === "library" ? "Assessment" : "Sitting")}
+        list={
+          view === "library" ? (
+            <PagedTable<Assessment>
+              title="Assessments"
+              list={library}
+              search="Search assessments"
+              rowKey={(a) => a.assessment_definition_id}
+              noun="assessment"
+              onRowClick={(a) => openAssessment(a.assessment_definition_id, a.name)}
+              empty={{ title: "No Assessments Yet" }}
+              columns={[
+                { key: "name", label: "Assessment", render: (a) => <span className="font-semibold">{a.name}</span> },
+                { key: "type", label: "Type", render: (a) => ASSESSMENT_TYPE[a.assessment_type] },
+                { key: "minutes", label: "Minutes", align: "n", render: (a) => a.duration_minutes ?? "Untimed", desktop: true },
+                { key: "questions", label: "Questions", align: "n", render: (a) => a.question_count, desktop: true },
+                { key: "sent", label: "Sent", align: "n", render: (a) => a.sent, desktop: true },
+                { key: "avg", label: "Average", align: "n", render: (a) => (a.average_score === null ? "–" : Math.round(a.average_score)) },
+                { key: "status", label: "Status", badge: true, render: (a) => (a.active ? pill(["ok", "Active"]) : pill(["neutral", "Off"])) },
+              ]}
+            />
+          ) : (
+            <PagedTable<Sitting>
+              title="Sittings"
+              list={sittings}
+              search="Search candidates"
+              rowKey={(x) => x.application_assessment_id}
+              noun="sitting"
+              onRowClick={openSitting}
+              empty={{ title: marking ? "Nothing to Mark" : "None Sent Yet" }}
+              columns={[
+                { key: "who", label: "Candidate", render: (x) => <span className="font-semibold">{x.candidate_name}</span> },
+                { key: "what", label: "Assessment", render: (x) => x.assessment_name },
+                { key: "role", label: "Role", render: (x) => x.vacancy_title, desktop: true },
+                { key: "state", label: "State", badge: true, render: (x) => pill(SITTING_STATUS[x.status]) },
+                { key: "score", label: "Score", align: "n", render: (x) => (x.score === null ? (x.to_mark ? `${x.to_mark} to mark` : "–") : Math.round(x.score)) },
+              ]}
+            />
+          )
+        }
+        detail={
+          picked === null ? null : picked.kind === "library" ? (
+            <AssessmentSheet key={picked.id} id={picked.id} close={() => setPicked(null)} />
+          ) : (
+            <SittingSheet key={picked.id} id={picked.id} close={() => setPicked(null)} />
+          )
+        }
+      />
     </>
   );
 }
@@ -182,8 +208,8 @@ function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
     read.reload();
     invalidate("/api/v1/recruitment/assessments");
   };
-  // A form opened from here goes back to the sheet when it closes (the app holds one dialog at a time).
-  const back = () => modal.open({ title: a.name, wide: true, body: (done) => <AssessmentSheet id={id} close={done} /> });
+  // A form opened from here sits over the assessment's dialog, which is still open when the form closes.
+  const back = () => modal.close();
   /** The assessment as a file another MyCity hub can take (`mycity-assessment-1`). */
   const exportIt = async () => {
     try {
@@ -220,12 +246,12 @@ function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
       />
       {a.instructions && (
         <Card className="mt-3" data-copy="content">
-          <CardHeader title="Instructions" />
+          <CardHeader title="Instructions" level={3} />
           <p className="text-sm whitespace-pre-line">{a.instructions}</p>
         </Card>
       )}
       <Card className="mt-3">
-        <CardHeader title="Questions" />
+        <CardHeader title="Questions" level={3} />
         {a.questions.length ? (
           <ol className="list-decimal space-y-2 pl-5 text-sm" data-copy="content">
             {a.questions.map((q) => (
@@ -487,7 +513,7 @@ function Marking({ sitting, mayMark, onSaved, close }: { sitting: SittingDetail;
         {sitting.answers.map((a, i) => (
           <li key={a.assessment_question_id}>
             <Card>
-              <CardHeader title={`Question ${i + 1}`} right={<span className="text-sm text-subtle-foreground">{`Up to ${a.max_score}`}</span>} />
+              <CardHeader level={3} title={`Question ${i + 1}`} right={<span className="text-sm text-subtle-foreground">{`Up to ${a.max_score}`}</span>} />
               <p className="mb-2 text-sm" data-copy="content">{a.prompt}</p>
               {a.question_type === "choice" ? (
                 <p className="text-sm">{a.options?.find((o) => o.id === a.response)?.text ?? "Not answered"} <b>{` · ${a.awarded_score ?? 0} points`}</b></p>

@@ -5,12 +5,12 @@
 | Owner | TB |
 | Milestone | M1 |
 | Backend modules | `organisation` |
-| Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram and Departments tabs), `app/src/features/ess/` (Org Chart tab), `app/src/features/shared/ReportingForm.tsx` (Change Manager, shared with the employee record) |
+| Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram and Departments tabs), `app/src/features/ess/index.tsx` (the Org Chart tab's case), `app/src/features/shared/ReportingForm.tsx` (Change Manager, shared with the employee record) |
 | Permission key(s) | `people` (builder, departments, manage), `org_chart` (viewer, read for all staff) |
 | Capabilities | none; the builder and People · Departments are the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026), #103 People · Departments (JBS Praxis, 27/10/2026) |
 | Status | Built |
-| Last changed | 05/11/2026 |
+| Last changed | 11/11/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -161,8 +161,17 @@ stays off the table until MyCity is near that size.
   first person above it answers for its reports: their leave, expenses and tasks go to that person
   for approval, and they are in that person's team scope. Only a seat with nobody above it leaves
   them to the CEO (TB, 19/10/2026; `employee_effective_manager`, §4).
+- A vacant seat is **filled** by a hire (`organisation.fillSeat`, called by Recruitment's
+  `vacancies.hiredIn` when M5's onboarding completes for a vacancy made from the seat;
+  `recruitment.md` §6.1, Q-TB8, 06/11/2026). In the caller's transaction: the seat is marked filled by
+  the person from today (`status` filled, `filled_by_employee_id`, `filled_on`) and leaves the chart,
+  where the person stands in its place; the person moves to the seat's department and reports where the
+  seat reported; everyone whose solid or dotted line pointed at the seat, and every open role under it,
+  now reports to the person; a head seat's department is then headed through its person
+  (`syncHeadRoles`). Each line moves through the reporting write, so it is audited and team scope
+  follows. Only a vacant seat is filled (`SEAT_NOT_VACANT`, 409, otherwise).
 - The viewer shows the **whole company**. The builder shows the whole company with edit affordances.
-- Restricted fields (`bank_name`, `account_number`, `gross_monthly`, per BACKEND_STRUCTURE §9.4)
+- Restricted fields (`bank_name`, `account_number`, `gross_monthly`, the tax and pension numbers, per BACKEND_STRUCTURE §9.4)
   and phone are never rendered on any organogram card, in either page, in a person's sheet or in
   the PDF.
 - **Team size.** A card with reports says how many report to it directly and in all, every place
@@ -267,6 +276,7 @@ merge, retire or delete.
 | `department.people_moved` | Add People, Move To, Move To Department (one per press: who, from where) | the audit line; each person's own `employee.updated` and line change are written too |
 | `department.merged`, `department.deleted` | Merge Department (the department and where it went), Delete Department | the audit line |
 | `access.roles_set` | the Head of Department role given or taken with a head (§6.1) | as for Save Roles: the grants cache of that login is cleared in the same write |
+| `org_seat.filled` | a hire fills a vacant seat (§6) | outbox: team scope caches are refreshed; the lines it moves are each `employee.reporting_line_changed` |
 | `vacancy.suggested_from_seat` | when HR sends a vacant seat to Recruitment | outbox: creates a suggested-vacancy entry on Recruitment · Vacancies |
 | `org_chart.export_requested` | Download PDF | the audit line, written with the PDF's document in the request: the tree read and laid out (§6) and queued through `documents.generate` as doc type `org_chart` (template `templates/documents/org-chart.html`, no number); `document.render_requested` sends it to the pdf-render job |
 | `document.generated`, `document.render_failed`, doc type `org_chart` | the PDF is drawn, or the render job gave up | no handler: the screen waiting on `GET /exports/:id` reads it done and downloads it, or reads it failed and says so; nothing is emailed and nobody is notified |
@@ -494,6 +504,15 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · Frontend paths: ESS's Org Chart tab is one case in `app/src/features/ess/index.tsx`,
+  so this guide claims that file rather than the whole ESS folder, whose other tabs are other guides'
+  (My Training is `knowledge.md`'s, built in M10 PR 5). Nothing on the Org Chart changed.
+- 11/11/2026 · TB · ESS's screen switch (`app/src/features/ess/index.tsx`) gains My Training (`knowledge.md`); ESS · Org Chart is unchanged.
+- 11/11/2026 · JP · Create Vacancy on a vacant seat fills in its line manager as the hiring manager only when they may be one (active, holding Recruitment, in the writer's scope); otherwise New Vacancy leaves Hiring Manager to pick (`recruitment.md` §6.1, fault #3 of the 11/11 staging brief).
+- 10/11/2026 · JP · The employee record gains the tax and pension numbers payroll's statutory report reads (`tax_id`, `pension_pin`, `pension_administrator`, `nhf_number`; migration `6020`, `docs/guides/payroll.md` §4.1): `PATCH /employees/:id` takes them and the 360 returns them, masked as `employee.statutory`. Like the other restricted fields they are never rendered on an organogram card, a person's sheet or the PDF (§6). No screen asks for them yet.
+- 06/11/2026 · GE · A hire fills its vacant seat: `organisation.fillSeat` (§6) for Recruitment's
+  `vacancies.hiredIn`, with `org_seat.filled` (§7). The person takes the seat's department and line,
+  and the seat's reports and open roles report to them.
 - 06/11/2026 · GE · Create Vacancy on a vacant seat: New Vacancy now looks the seat up
   (`GET /recruitment/vacancies/suggested?org_seat_id=`) and opens with its title, department, reporting
   line and line manager (as the hiring manager) filled in; the department is no longer left to pick

@@ -37,6 +37,7 @@ import { refresh, say, useLiveTasks } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
 import { TaskForm } from "./TaskForms";
 import { TaskBoard, usePaused } from "./TaskBoard";
+import { filterOf, linkBody, linkEdit, linkOf, linkProblem, NO_LINK, PartnerFilter, PartnerLinkFields, useMayConnect, type PartnerLinkValue } from "./PartnerLink";
 
 type Status = Project["status"];
 
@@ -50,7 +51,10 @@ export function Projects({ openId = null }: { openId?: string | null }) {
 function ProjectList({ onOpen }: { onOpen: (id: string) => void }) {
   const modal = useModal();
   const [status, setStatus] = useState<Status>("active");
-  const list = usePaged("GET /api/v1/projects", { filters: { status } });
+  // The Partner filter (workspace.md §10.1), for a reader who may view Partnerships.
+  const [partner, setPartner] = useState<PartnerLinkValue>(NO_LINK);
+  const mayConnect = useMayConnect();
+  const list = usePaged("GET /api/v1/projects", { filters: { status, ...filterOf(partner) } });
   const add = () => modal.open({ title: "New Project", body: (close) => <ProjectForm close={close} onSaved={(p) => onOpen(p.project_id)} /> });
   useScreenAction({ label: "New Project", onSelect: add });
   // ⌘K's New Project (`action=new`) and Praxis AI's "start a project" (`new=1`, ProjectPrefill).
@@ -67,6 +71,11 @@ function ProjectList({ onOpen }: { onOpen: (id: string) => void }) {
           </>
         }
       />
+      {mayConnect && (
+        <Toolbar>
+          <PartnerFilter value={partner} onChange={setPartner} />
+        </Toolbar>
+      )}
       <DataView<Project>
         list={list}
         rowKey={(p) => p.project_id}
@@ -134,6 +143,7 @@ function ProjectPage({ id, back }: { id: string; back: () => void }) {
         }
       >
         {p.status === "completed" && <Pill tone="ok">Completed</Pill>}
+        {p.partner_link && <Pill>{p.partner_link.name ?? "A Partner You Cannot See"}</Pill>}
       </PageHeader>
       <Toolbar>
         <SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-64" />
@@ -144,8 +154,11 @@ function ProjectPage({ id, back }: { id: string; back: () => void }) {
   );
 }
 
-/** New Project and Edit Project. A new one is the reader's; the address may fill it (ProjectPrefill). */
-function ProjectForm({ close, project, onSaved }: { close: () => void; project?: Project; onSaved?: (p: Project) => void }) {
+/**
+ * New Project and Edit Project. A new one is the reader's; the address may fill it (ProjectPrefill), and
+ * from a Partner 360 or a Lead 360 it opens already connected (`link`, partnerships.md §6.16).
+ */
+export function ProjectForm({ close, project, onSaved, link: inLink }: { close: () => void; project?: Project; onSaved?: (p: Project) => void; link?: PartnerLinkValue }) {
   const filled = useAddressPrefill(projects.ProjectPrefill, !project);
   const initial = {
     name: project?.name ?? filled.name ?? "",
@@ -155,21 +168,26 @@ function ProjectForm({ close, project, onSaved }: { close: () => void; project?:
   const f = useContractForm(initial, project ? projects.ProjectEdit : projects.ProjectCreate);
   const create = useMutation("POST /api/v1/projects");
   const save = useMutation("PATCH /api/v1/projects/:id");
+  const [link, setLink] = useState<PartnerLinkValue>(project ? linkOf(project.partner_link) : (inLink ?? NO_LINK));
+  const [linkMark, setLinkMark] = useState<{ record?: string; deal?: string } | null>(null);
   const submit = async () => {
     if (!f.check()) return;
     const v = f.values;
     try {
       if (project) {
-        await save.run({ params: { id: project.project_id }, body: { name: v.name, description: v.description || null, due_on: v.due_on || null } });
+        await save.run({ params: { id: project.project_id }, body: { name: v.name, description: v.description || null, due_on: v.due_on || null, ...linkEdit(linkOf(project.partner_link), link) } });
         toast("Project saved");
       } else {
-        const made = await create.run({ body: { name: v.name, ...(v.description && { description: v.description }), ...(v.due_on && { due_on: v.due_on }) } });
+        const made = await create.run({ body: { name: v.name, ...(v.description && { description: v.description }), ...(v.due_on && { due_on: v.due_on }), ...linkBody(link) } });
         toast(`${made.number} started`);
         onSaved?.(made);
       }
       refresh();
       close();
     } catch (e) {
+      const onLink = linkProblem(e);
+      setLinkMark(onLink);
+      if (onLink) return;
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
     }
@@ -179,6 +197,15 @@ function ProjectForm({ close, project, onSaved }: { close: () => void; project?:
       <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Lekki Launch" /></Field>
       <Field label="Notes" optional {...f.field("description")}><TextAreaField {...f.field("description")} /></Field>
       <Field label="Due" optional {...f.field("due_on")}><DateField {...f.field("due_on")} /></Field>
+      <PartnerLinkFields
+        value={link}
+        onChange={(v) => {
+          setLink(v);
+          setLinkMark(null);
+        }}
+        view={project?.partner_link}
+        problem={linkMark}
+      />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>{project ? "Save Project" : "Create Project"}</Button>

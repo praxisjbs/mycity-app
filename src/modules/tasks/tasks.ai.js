@@ -15,6 +15,10 @@ const { defineManifest } = require("../../shared/ai/manifest");
 const routeMap = require("../../shared/route-map");
 const service = require("./tasks.service");
 const reasons = require("./tasks.reasons");
+// Connect to Partner on the card (M7, workspace.md §9): Partnerships names and finds the partner, lead and deal.
+const partnerCard = require("../partners/partners.work").card;
+/** The card's people, departments and project, and its partner and deal, each by name. */
+const namesWithPartner = async (values, actor, db) => (db ? [...(await service.cardNames(db, values)), ...(await partnerCard.names(values, actor, db))] : []);
 
 const taskLink = (id) => (routeMap.linkFor("task", id) || {}).path || null;
 
@@ -76,22 +80,22 @@ module.exports = defineManifest({
       risk: "standard",
       suggest: true,
       // New Task's own fields (decision 31): commitments, repeats, Counts Towards and a record stay on the form.
-      fields: ["title", "description", "primary_assignee_id", "member_ids", "department_id", "watcher_ids", "watcher_department_id", "due_on", "priority", "cadence", "project_id"],
-      picks: { primary_assignee_id: "task_assignee", member_ids: "task_member", department_id: "department", watcher_ids: "colleague", watcher_department_id: "department", project_id: "project" },
-      // Nothing is acted on but the task it makes; the people, departments and project on it are named.
-      names: (values, _actor, db) => (db ? service.cardNames(db, values) : []),
+      fields: ["title", "description", "primary_assignee_id", "member_ids", "department_id", "watcher_ids", "watcher_department_id", "due_on", "priority", "cadence", "project_id", ...partnerCard.fields],
+      picks: { primary_assignee_id: "task_assignee", member_ids: "task_member", department_id: "department", watcher_ids: "colleague", watcher_department_id: "department", project_id: "project", ...partnerCard.picks },
+      // Nothing is acted on but the task it makes; the people, departments, project and partner on it are named.
+      names: namesWithPartner,
       asks: [
         { field: "title", question: "What is the task?" },
         whoLeads,
         { field: "due_on", question: "When is it due?", choices: dueChoices, none: true },
         { field: "priority", question: "How urgent is it?", choices: ["Low", "Normal", "High", "Urgent"] },
       ],
-      // The lead may be written by name (decision 34): New Task's own list of whom the person may set it for.
-      resolve: { primary_assignee_id: leadByName },
+      // The lead may be written by name (decision 34): New Task's own list of whom the person may set it for; a partner, lead or deal among those the person sees.
+      resolve: { primary_assignee_id: leadByName, ...partnerCard.resolve },
       // The same function the screen's Create Task calls, with the scope the grant gives (§6).
       run: (values, actor) => service.create(actor, actor.scope, values),
       readback: (task) => [{ type: "task", id: task.task_id, label: `${task.number} ${task.title}`, status: "created", link: taskLink(task.task_id) }],
-      labels: { title: "Title", description: "Notes", priority: "Priority", cadence: "Cadence", due_on: "Due Day", primary_assignee_id: "For", member_ids: "Shared With", department_id: "Department", watcher_ids: "Watchers", watcher_department_id: "Watching Department", project_id: "Project" },
+      labels: { title: "Title", description: "Notes", priority: "Priority", cadence: "Cadence", due_on: "Due Day", primary_assignee_id: "For", member_ids: "Shared With", department_id: "Department", watcher_ids: "Watchers", watcher_department_id: "Watching Department", project_id: "Project", ...partnerCard.labels },
     },
     {
       key: "tasks.complete",
@@ -133,17 +137,17 @@ module.exports = defineManifest({
       key: "tasks.edit",
       label: "Save Task",
       matrix: probe,
-      description: "Change a task I can see: its title, notes, due day, priority, cadence, whom it is for, who shares it or its project; only what changes",
+      description: "Change a task I can see: its title, notes, due day, priority, cadence, whom it is for, who shares it, its project or the partner and deal it is for; only what changes",
       input: c.tasks.TaskChange,
       permission: ["workspace", "edit"],
       risk: "standard",
       form: "none: Edit Task's form changes the task open on its panel and never names it; the card must",
       // Edit Task's own fields (decision 31): a commitment, a repeat, Counts Towards and a record stay on the panel.
-      fields: ["task_id", "title", "description", "due_on", "priority", "cadence", "primary_assignee_id", "member_ids", "department_id", "project_id"],
-      picks: { primary_assignee_id: "task_assignee", member_ids: "task_member", department_id: "department", project_id: "project" },
+      fields: ["task_id", "title", "description", "due_on", "priority", "cadence", "primary_assignee_id", "member_ids", "department_id", "project_id", ...partnerCard.fields],
+      picks: { primary_assignee_id: "task_assignee", member_ids: "task_member", department_id: "department", project_id: "project", ...partnerCard.picks },
       asks: [whichTask("Which task is it?"), whoLeads],
-      resolve: { primary_assignee_id: leadByName },
-      names: (values, _actor, db) => (db ? service.cardNames(db, values) : []),
+      resolve: { primary_assignee_id: leadByName, ...partnerCard.resolve },
+      names: namesWithPartner,
       records: theTask,
       check: (client, values, actor) => service.assertCardTasks(client, [values.task_id], actor.scope),
       // The same function Save Task calls: the setter's fields refused to the people sharing it, as on the panel (§6).
@@ -152,7 +156,7 @@ module.exports = defineManifest({
         return service.edit(actor, actor.scope, id, changes);
       },
       readback: taskLine("saved"),
-      labels: { task_id: "Task", title: "Title", description: "Notes", due_on: "Due Day", priority: "Priority", cadence: "Cadence", primary_assignee_id: "For", member_ids: "Shared With", department_id: "Department", project_id: "Project" },
+      labels: { task_id: "Task", title: "Title", description: "Notes", due_on: "Due Day", priority: "Priority", cadence: "Cadence", primary_assignee_id: "For", member_ids: "Shared With", department_id: "Department", project_id: "Project", ...partnerCard.labels },
     },
     {
       key: "tasks.add_step",

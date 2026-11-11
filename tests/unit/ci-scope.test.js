@@ -12,8 +12,15 @@ const {
   READ_BY_CODE,
   TREE_ARTIFACT,
   TREE_FILE,
+  SETS,
+  JEST_SHARDS,
+  FE_SHARDS,
+  SCREEN_SHARDS,
   isDocument,
   scopeOfFiles,
+  setsOfFile,
+  setsOfFiles,
+  plan,
   testedRun,
   passedRun,
   decide,
@@ -80,7 +87,7 @@ describe("decide", () => {
   test("a push to main whose tree a pull request's run passed is tested, and says which", () => {
     const tested = jest.fn(() => ({ runId: "39200314369", pull: "71" }));
     const out = decide({ event: "push", files: files("src/app.js"), repo: "o/r", sha: "abc", tree: "def", tested });
-    expect(out).toEqual({ scope: "tested", reason: "pull request #71 passed this tree in CI run 39200314369" });
+    expect(out).toEqual({ scope: "tested", reason: "pull request #71 passed this tree in CI run 39200314369", sets: [] });
     expect(tested).toHaveBeenCalledWith({ repo: "o/r", sha: "abc", tree: "def" });
   });
 
@@ -91,7 +98,7 @@ describe("decide", () => {
   test("an edit to a description whose tree a full run on that head passed runs the document gates, and says which", () => {
     const passed = jest.fn(() => "40485988816");
     const out = decide({ event: "pull_request", action: "edited", files: files("src/app.js"), repo: "o/r", head: "h", tree: "t", passed });
-    expect(out).toEqual({ scope: "tested", reason: "the description changed, and CI run 40485988816 passed this tree" });
+    expect(out).toEqual({ scope: "tested", reason: "the description changed, and CI run 40485988816 passed this tree", sets: [] });
     expect(passed).toHaveBeenCalledWith({ repo: "o/r", head: "h", tree: "t" });
   });
 
@@ -169,15 +176,229 @@ describe("names the workflow and the build share with the scope", () => {
     expect(yml).toContain("CI_SCOPE: ${{ needs.scope.outputs.scope }}");
   });
 
-  test("ci.yml runs every group of gates in its own job, and a job named ci waits for them all", () => {
+  test("ci.yml runs every group of gates, every set in a job, and a job named ci waits for them all", () => {
     const yml = read(".github/workflows/ci.yml");
     const groups = [...read("scripts/ci-local.js").matchAll(/const GROUPS = \[([^\]]+)\]/g)][0][1].match(/"([a-z]+)"/g).map((g) => g.slice(1, -1));
     expect(groups).toEqual(["backend", "frontend", "screens", "checks"]);
-    for (const g of groups) {
-      expect(yml).toContain(`npm run ci -- --group=${g}`);
-      expect(yml).toMatch(new RegExp(`\\n  ${g}:\\n    name: ${g}\\n`));
+    // backend and screens arrive through their matrices (plan() below); the others are in the file.
+    for (const g of ["frontend", "checks"]) expect(yml).toContain(`npm run ci -- --group=${g}`);
+    expect(yml).toContain("npm run ci -- --group=frontend --except=fe-test");
+    expect(yml).toContain("npm run ci -- --only=fe-test");
+    expect(yml).toContain("npm run ci -- ${{ matrix.gates }}");
+    for (const v of [
+      "MYCITY_JEST_SHARD: ${{ matrix.shard }}",
+      "MYCITY_FE_TESTS: ${{ matrix.tests }}",
+      "MYCITY_SCREEN_TARGETS: ${{ matrix.targets }}",
+      "MYCITY_A11Y_TARGETS: ${{ matrix.a11y }}",
+      "MYCITY_A11Y_SHARD: ${{ matrix.a11y_shard }}",
+      "MYCITY_SCREEN_SHARD: ${{ matrix.screen_shard }}",
+    ])
+      expect(yml).toContain(v);
+    // Each of plan()'s outputs is handed from the scope job and gates its job.
+    for (const k of Object.keys(plan(SETS))) expect(yml).toContain(`${k}: \${{ steps.scope.outputs.${k} }}`);
+    for (const k of ["backend", "frontend_tests", "screens"]) {
+      expect(yml).toContain(`if: needs.scope.outputs.${k} != '[]'`);
+      expect(yml).toContain(`include: \${{ fromJSON(needs.scope.outputs.${k}) }}`);
     }
+    expect(yml).toContain("if: needs.scope.outputs.backend_unit == 'true'");
+    expect(yml).toContain("if: needs.scope.outputs.frontend == 'true'");
     // Branch protection requires the check called "ci": it must wait for every job.
-    expect(yml).toContain("  ci:\n    name: ci\n    needs: [scope, backend, frontend, screens, checks]");
+    expect(yml).toContain("  ci:\n    name: ci\n    needs: [scope, backend, backend-unit, frontend, frontend-tests, screens, checks]");
+    expect(yml).toContain("needs.scope.outputs.all == 'true'");
+  });
+});
+
+describe("sets: a pull request runs what its files can affect", () => {
+  const ALL = [...SETS];
+  test("documents affect nothing; the documents code reads affect what reads the plan, not packages/ui", () => {
+    expect(setsOfFile("docs/guides/home.md")).toEqual([]);
+    expect(setsOfFile("docs/PROGRESS.md")).toEqual(["backend", "frontend", "app", "public-app", "screens-app"]);
+    expect(setsOfFile("docs/MyCity-ERP-Documents/MILESTONES.md")).toEqual(setsOfFile("docs/PROGRESS.md"));
+  });
+
+  test("app/ alone: its tests, the frontend gates, the app's screens and jest's unit files; not ui, public-app or the gallery", () => {
+    expect(setsOfFiles(files("app/src/features/home/index.tsx"))).toEqual(["backend-unit", "frontend", "app", "screens-app"]);
+  });
+
+  test("public-app/ alone: its tests, the frontend gates, the app's screens job (it reads public-app's source) and jest's unit files", () => {
+    expect(setsOfFiles(files("public-app/src/main.tsx"))).toEqual(["backend-unit", "frontend", "public-app", "screens-app"]);
+  });
+
+  test("the backend alone skips every frontend job", () => {
+    for (const f of ["src/modules/people/people.service.js", "migrations/0700_x.sql", "seeds/reference/x.js", "templates/mail/x.html", "tests/integration/x.test.js"])
+      expect(setsOfFiles(files(f))).toEqual(["backend"]);
+  });
+
+  test("packages/, scripts/, root config, the lockfile, .github/, ops/ and pages under docs/ run everything", () => {
+    for (const f of [
+      "packages/ui/src/Button.tsx",
+      "packages/contract/schemas/people.js",
+      "scripts/check/a11y.js",
+      "scripts/ci-local.js",
+      "package.json",
+      "package-lock.json",
+      "jest.config.js",
+      ".nvmrc",
+      ".github/workflows/ci.yml",
+      "ops/nginx/hub.conf",
+      "docs/MyCity-ERP-Documents/demo.html",
+    ])
+      expect(setsOfFile(f)).toEqual(ALL);
+  });
+
+  test("sets add up, in one order, and the full backend takes in its unit files", () => {
+    expect(setsOfFiles(files("app/a.tsx", "src/b.js"))).toEqual(["backend", "frontend", "app", "screens-app"]);
+    expect(setsOfFiles(files("app/a.tsx", "public-app/b.tsx", "README.MD"))).toEqual(["backend-unit", "frontend", "app", "public-app", "screens-app"]);
+    expect(setsOfFiles(files("app/a.tsx", "package-lock.json"))).toEqual(ALL.filter((s) => s !== "backend-unit"));
+  });
+
+  test("decide: a pull request's sets come from its files; a push, a run by hand or a full edit run them all; docs and tested none", () => {
+    const never = () => null;
+    expect(decide({ event: "pull_request", files: files("app/a.tsx"), tested: never }).sets).toEqual(["backend-unit", "frontend", "app", "screens-app"]);
+    const everything = ALL.filter((s) => s !== "backend-unit");
+    expect(decide({ event: "push", files: files("app/a.tsx"), repo: "o/r", sha: "s", tree: "t", tested: never }).sets).toEqual(everything);
+    expect(decide({ event: "workflow_dispatch", files: files("app/a.tsx") }).sets).toEqual(everything);
+    expect(decide({ event: "pull_request", files: files("docs/guides/home.md") }).sets).toEqual([]);
+    expect(decide({ event: "push", files: files("src/a.js"), repo: "o/r", sha: "s", tree: "t", tested: () => ({ runId: "1", pull: "2" }) }).sets).toEqual([]);
+  });
+});
+
+describe("plan: the jobs a run starts", () => {
+  const everything = SETS.filter((s) => s !== "backend-unit");
+
+  test("a full run: every jest shard once, the schema gates once, every workspace's every shard once, both screen targets", () => {
+    const p = plan(everything);
+    expect(p.backend.map((j) => j.shard)).toEqual(Array.from({ length: JEST_SHARDS }, (_, i) => `${i + 1}/${JEST_SHARDS}`));
+    expect(p.backend.filter((j) => j.gates === "--group=backend")).toHaveLength(1);
+    expect(p.backend.filter((j) => j.gates === "--only=test")).toHaveLength(JEST_SHARDS - 1);
+    const pieces = p.frontend_tests.flatMap((j) => j.tests.split(" "));
+    const want = Object.entries(FE_SHARDS).flatMap(([ws, n]) => (n === 1 ? [ws] : Array.from({ length: n }, (_, i) => `${ws}:${i + 1}/${n}`)));
+    expect([...pieces].sort()).toEqual([...want].sort());
+    // The gallery crawled once, whole; the app's crawl and every target's axe pages dealt out once.
+    const gallery = p.screens.filter((j) => j.a11y === "gallery");
+    const app = p.screens.filter((j) => j.a11y === "app");
+    const shares = (n) => (n === 1 ? [""] : Array.from({ length: n }, (_, i) => `${i + 1}/${n}`));
+    expect(gallery.filter((j) => j.gates === "--group=screens").map((j) => j.targets)).toEqual(["gallery,demo"]);
+    expect(gallery.filter((j) => j.gates !== "--group=screens").every((j) => j.gates === "--only=a11y")).toBe(true);
+    expect(gallery.map((j) => j.a11y_shard)).toEqual(shares(SCREEN_SHARDS.gallery));
+    expect(gallery.every((j) => j.screen_shard === "")).toBe(true);
+    expect(app.every((j) => j.gates === "--group=screens" && j.targets === "app" && j.screen_shard === j.a11y_shard)).toBe(true);
+    expect(app.map((j) => j.screen_shard)).toEqual(shares(SCREEN_SHARDS.app));
+    expect(p.frontend).toBe(true);
+    expect(p.backend_unit).toBe(false);
+    expect(p.all).toBe(true);
+  });
+
+  test("names are unique, so each job is its own check", () => {
+    const p = plan(everything);
+    const names = [...p.backend, ...p.frontend_tests, ...p.screens].map((j) => j.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  test("public-app's shards ride one to a job with app's (or ui's), or run alone when nothing else does", () => {
+    const n = FE_SHARDS["public-app"];
+    const own = plan(["public-app"]).frontend_tests.map((j) => j.tests);
+    expect(own).toEqual(n === 1 ? ["public-app"] : Array.from({ length: n }, (_, i) => `public-app:${i + 1}/${n}`));
+    const withApp = plan(["app", "public-app"]).frontend_tests.map((j) => j.tests.split(" "));
+    expect(withApp).toHaveLength(FE_SHARDS.app);
+    for (const job of withApp) expect(job.filter((p) => p.startsWith("public-app")).length).toBeLessThanOrEqual(Math.ceil(n / FE_SHARDS.app));
+    expect(withApp.flat().filter((p) => p.startsWith("public-app"))).toHaveLength(n);
+  });
+
+  test("no sets, no jobs: the document gates alone", () => {
+    expect(plan([])).toEqual({ backend: [], backend_unit: false, frontend: false, frontend_tests: [], screens: [], all: false });
+  });
+
+  test("a narrowed run is not all, so main runs everything after its merge", () => {
+    expect(plan(["backend-unit", "frontend", "app", "screens-app"]).all).toBe(false);
+  });
+});
+
+describe("the facts the narrow sets stand on", () => {
+  const walk = (dir, out = []) => {
+    for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name === "dist") continue;
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) walk(rel, out);
+      else out.push(rel);
+    }
+    return out;
+  };
+
+  test("no frontend source imports the backend (src/, migrations/, seeds/, templates/), so the backend alone skips the frontend", () => {
+    const backend = /^(src|migrations|seeds|templates)\//;
+    const bad = [];
+    for (const f of ["app", "public-app", "packages/ui"].flatMap((d) => walk(d)).filter((x) => /\.(ts|tsx|js|mjs|cjs)$/.test(x))) {
+      for (const m of read(f).matchAll(/(?:from\s+|require\(|import\()\s*["'](\.{1,2}\/[^"']+)["']/g)) {
+        const target = path.relative(ROOT, path.resolve(ROOT, path.dirname(f), m[1])).split(path.sep).join("/");
+        if (backend.test(target)) bad.push(`${f} -> ${m[1]}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  test("no integration file names frontend source, so a frontend change needs jest's unit files only", () => {
+    const bad = walk("tests/integration").filter((f) => /(^|["'`/\s])(app|public-app|packages\/ui)\/(src|dist|gallery|vite|index|package)/.test(read(f)));
+    expect(bad).toEqual([]);
+  });
+
+  test("packages/ui's tests and gallery never read the delivery plan, so PROGRESS.md skips them", () => {
+    for (const f of walk("packages/ui/gallery").filter((x) => /config\.(ts|js)$/.test(x)).concat("packages/ui/vitest.config.ts"))
+      expect(read(f)).not.toMatch(/deliveryPlan|readPlan|PROGRESS/);
+  });
+});
+
+describe("tests/shard-sequencer.js: jest's backend shards", () => {
+  const { cost } = require("../shard-sequencer");
+  const { deal } = require("../../scripts/lib/deal");
+
+  test("every file goes to exactly one shard, the same deal every time", () => {
+    const paths = Array.from({ length: 40 }, (_, i) => `/r/tests/integration/f${i}.test.js`);
+    const costOf = (p) => 1000 + Number(/f(\d+)/.exec(p)[1]) * 37;
+    const a = deal(paths, 5, costOf);
+    const b = deal([...paths].reverse(), 5, costOf);
+    expect([...a.owner.keys()].sort()).toEqual([...paths].sort());
+    for (const p of paths) expect(a.owner.get(p)).toBe(b.owner.get(p));
+    expect(new Set(a.owner.values())).toEqual(new Set([0, 1, 2, 3, 4]));
+  });
+
+  test("the shards come out level: none carries more than its share and the longest file", () => {
+    const paths = Array.from({ length: 90 }, (_, i) => `/r/tests/integration/f${i}.test.js`);
+    const costOf = (p) => 3000 + ((Number(/f(\d+)/.exec(p)[1]) * 7919) % 20000);
+    const { loads } = deal(paths, 5, costOf);
+    const total = loads.reduce((x, y) => x + y, 0);
+    const longest = Math.max(...paths.map(costOf));
+    for (const l of loads) expect(l).toBeLessThanOrEqual(total / 5 + longest);
+  });
+
+  test("an integration file costs more than a unit file of the same size", () => {
+    const file = path.join(ROOT, "tests", "unit", "ci-scope.test.js");
+    const asIntegration = path.join(ROOT, "tests", "integration", "x.test.js");
+    expect(cost(asIntegration)).toBeGreaterThan(cost(file));
+  });
+
+  test("jest uses it, and only --shard calls into it", () => {
+    expect(read("jest.config.js")).toContain('testSequencer: "<rootDir>/tests/shard-sequencer.js"');
+    const Seq = require("../shard-sequencer");
+    expect(Object.getOwnPropertyNames(Seq.prototype)).toEqual(["constructor", "shard"]);
+  });
+});
+
+describe("a11y.js shards", () => {
+  const { shardOf } = require("../../scripts/check/a11y");
+  test("n shards take every page once between them; unset takes all", () => {
+    const pages = Array.from({ length: 11 }, (_, i) => `P${i}`);
+    const got = [1, 2, 3].flatMap((i) => shardOf(pages, { i, n: 3 }));
+    expect(got.sort()).toEqual([...pages].sort());
+    expect(shardOf(pages, null)).toEqual(pages);
+  });
+});
+
+describe("lib/screens.js shards", () => {
+  const { screenShard } = require("../../scripts/check/lib/screens");
+  test("i/n, or none when unset; anything else is refused", () => {
+    expect(screenShard({})).toBeNull();
+    expect(screenShard({ MYCITY_SCREEN_SHARD: "2/4" })).toEqual({ i: 2, n: 4 });
+    expect(() => screenShard({ MYCITY_SCREEN_SHARD: "5/4" })).toThrow(/i\/n/);
   });
 });

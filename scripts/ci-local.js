@@ -8,8 +8,8 @@
  * same thing. It does not stop at the first failure (unless --fast): five
  * unrelated breakages are five lines in one report, not five round trips.
  *
- * PARALLEL. The gates fall in four groups (GROUPS below), which CI runs as four
- * jobs at once. Locally the groups run at the same time too, each one's gates
+ * PARALLEL. The gates fall in four groups (GROUPS below). Locally the groups run
+ * at the same time, each one's gates
  * in order, so a full run takes as long as its slowest group (the backend's
  * tests), not the sum of all four. Each gate's line prints when it ends, with
  * its group. --serial runs every gate one after another, in GATES order; --fast
@@ -33,6 +33,7 @@
  *   node scripts/ci-local.js --strict   NOT BUILT counts as a failure
  *   node scripts/ci-local.js --list     print the gates and exit
  *   node scripts/ci-local.js --only=progress,guides   run just these (by id)
+ *   node scripts/ci-local.js --except=fe-test         run all but these (with --group: a job's share)
  *   node scripts/ci-local.js --group=backend          run one CI job's gates (backend, frontend,
  *                                                     screens or checks; GROUPS below)
  *   node scripts/ci-local.js --groups                 print each group's gates as JSON
@@ -43,6 +44,16 @@
  * gate; `docs` (a change to documents only) and `tested` (a push to main whose
  * tree a pull request's run already passed) run only the gates that read
  * documents, and report the rest as skipped. Unset, or on a laptop, it is full.
+ *
+ * SHARDS, CI ONLY. On GitHub a group is split further, so a run takes about six
+ * minutes rather than twenty (GE, 06/11/2026): jest in JEST_SHARDS jobs, each
+ * with its own database (MYCITY_JEST_SHARD=i/n, read below), each workspace's
+ * vitest files in shards (MYCITY_FE_TESTS, scripts/fe-test.js), the screen gates
+ * once on the gallery and once on the app (MYCITY_SCREEN_TARGETS,
+ * MYCITY_A11Y_TARGETS), and a pull request runs only the sets its files can
+ * affect. The jobs pick their gates with --group, --only and --except; scope.js
+ * plan() says which job runs what. None of those variables is set on a laptop,
+ * so `npm run ci` there still runs every gate, whole, as before.
  */
 const { spawn } = require("node:child_process");
 const net = require("node:net");
@@ -57,6 +68,14 @@ const onlyArg = argv.find((a) => a.startsWith("--only="));
 const ONLY = onlyArg ? new Set(onlyArg.slice(7).split(",")) : null;
 const groupArg = argv.find((a) => a.startsWith("--group="));
 const GROUP = groupArg ? groupArg.slice(8) : null;
+const exceptArg = argv.find((a) => a.startsWith("--except="));
+const EXCEPT = new Set(exceptArg ? exceptArg.slice(9).split(",") : []);
+/** CI only: this job's slice of jest, "i/n" (scope.js plan()). */
+const JEST_SHARD = process.env.MYCITY_JEST_SHARD || null;
+if (JEST_SHARD && !/^[1-9]\d*\/[1-9]\d*$/.test(JEST_SHARD)) {
+  console.error(`MYCITY_JEST_SHARD is "${JEST_SHARD}": it must be i/n, e.g. 2/5`);
+  process.exit(2);
+}
 const FAST = has("fast");
 const SERIAL = has("serial") || FAST;
 const STRICT = has("strict") || process.env.CI_STRICT === "1";
@@ -151,6 +170,7 @@ const GATES = [
   { id: "fe-build", label: "Frontend build (gallery, app, public site)", npm: "fe:build", group: "frontend" },
   { id: "mock-free", label: "Release builds carry no mock", script: "scripts/check/mock-free.js", group: "frontend" },
   { id: "a11y", label: "Accessibility (axe on the gallery and the app)", script: "scripts/check/a11y.js", group: "screens" },
+  { id: "proposal-kit", label: "Proposal kit drawn at 16:9 (docs/guides/partnerships.md §6.11)", script: "scripts/check/proposal-kit.js", group: "screens" },
   // Process: the work is recorded where the team reads it
   { id: "progress", label: "PROGRESS.md updated and well formed", script: "scripts/check/progress.js" },
   { id: "guides", label: "Feature guides followed and complete", script: "scripts/check/guides.js" },
@@ -192,7 +212,9 @@ function command(gate) {
     const [pkg, rel] = gate.tool;
     const file = bin(pkg, rel);
     if (!fs.existsSync(file)) return { missing: `${pkg} is not installed; run npm ci` };
-    return { argv: [file, ...(gate.args || [])] };
+    // A jest shard runs its slice of the files (tests/shard-sequencer.js balances them).
+    const shard = gate.id === "test" && JEST_SHARD ? [`--shard=${JEST_SHARD}`] : [];
+    return { argv: [file, ...(gate.args || []), ...shard] };
   }
   if (isEmpty(gate.script)) return { notBuilt: true };
   return { argv: [path.join(ROOT, gate.script), ...(gate.args || [])] };
@@ -277,7 +299,7 @@ async function main() {
   fs.mkdirSync(path.dirname(RUNNING), { recursive: true });
   fs.writeFileSync(RUNNING, String(process.pid));
   process.on("exit", () => fs.rmSync(RUNNING, { force: true }));
-  const chosen = GATES.filter((g) => (!ONLY || ONLY.has(g.id)) && (!GROUP || groupOf(g) === GROUP));
+  const chosen = GATES.filter((g) => (!ONLY || ONLY.has(g.id)) && !EXCEPT.has(g.id) && (!GROUP || groupOf(g) === GROUP));
   /*
    * With RUN_DB_TESTS=1 the backend group needs PostgreSQL and Redis. One that had stopped cost a
    * ten-minute run that failed every integration file (27/10/2026): say so before starting.

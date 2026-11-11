@@ -1,55 +1,92 @@
+import type { PartnerRow } from "@mycity/contract/contract.gen.ts";
 import { useState } from "react";
+import { api } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { useApi, usePaged } from "@/api/hooks";
-import "@/api/types/partnerships";
-import type { PartnerRow } from "@/api/types/partnerships";
-import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportAction, PagedTable } from "@/features/shared/sections";
-import { Button, Card, Chips, formatMoneyShort, Grid, LoadingRows, PageHeader, StatusPill, useModal, Who } from "@mycity/ui";
+import { PagedTable } from "@/features/shared/sections";
+import { useRouter } from "@/lib/router";
+import { useNewLink, useScreenAction } from "@/shell/screen-action";
+import { Button, Chips, DesktopOnly, ExportButton, formatMoneyShort, formatWhen, ListDetail, PageHeader, StatusPill, useIsPhone, useModal, useSideBySide, Who } from "@mycity/ui";
+import { filterQuery, NO_FILTERS, RecordFilters, type RecordFilterValue } from "./filters";
+import { Partner360 } from "./Partner360";
 import { PartnerForm } from "./forms/PartnerForm";
-import { short } from "./lib";
+import { healthPill, partnerPill, useMay } from "./lib";
 
-/** Partnerships · Partners (#51), on the mock until M7 PR 3 (docs/guides/partnerships.md §2, §10). */
-export function Partners() {
+type View = "all" | "active" | "dormant" | "quiet" | "closed";
+
+/**
+ * Partnerships · Partners (#51, docs/guides/partnerships.md §2, §10): the partner list beside the
+ * Partner 360 (`?id=`), side by side on a wide desktop and in a full sheet on a phone (F31).
+ */
+export function Partners({ id }: { id: string | null }) {
   const modal = useModal();
+  const phone = useIsPhone();
+  const beside = useSideBySide();
   const { navigate } = useRouter();
-  const [view, setView] = useState<"all" | "quiet">("all");
+  const mayCreate = useMay("create");
+  const mayExport = useMay("export");
+  const [view, setView] = useState<View>("all");
+  const [filter, setFilter] = useState<RecordFilterValue>(NO_FILTERS);
   const s = useApi("GET /api/v1/partnerships/partners/summary");
-  const list = usePaged("GET /api/v1/partnerships/partners", { filters: view === "quiet" ? { quiet: true } : {} });
+  const filters = { ...filterQuery(filter), ...(view === "quiet" ? { quiet: "true" as const } : view === "all" ? {} : { status: view }) };
+  const list = usePaged("GET /api/v1/partnerships/partners", { filters, sort: "name" });
+  const openPartner = (pid: string) => navigate(`/partnerships?tab=partners&id=${pid}`);
+  const newPartner = () => modal.open({ title: "New Partner", wide: true, body: (close) => <PartnerForm close={close} onCreated={openPartner} /> });
+  useScreenAction(mayCreate ? { label: "New Partner", onSelect: newPartner } : null);
+  useNewLink(mayCreate ? newPartner : null);
+  const shown = id ?? (beside ? (list.rows[0]?.partner_id ?? null) : null);
   return (
     <>
-      <PageHeader
-        title="Partners"
-        sub="The 360 opens from any row"
-        actions={
+      <PageHeader title="Partners" sub="Every signed partner and its 360" actions={
           <>
-            <ExportAction source="partnerships.partners" />
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Partner", wide: true, body: (close) => <PartnerForm close={close} /> })}>New Partner</Button>
+            {mayExport && (
+              <DesktopOnly>
+                <ExportButton onExport={() => saveExport(api.call("POST /api/v1/partnerships/exports", { body: { source: "partnerships.partners", filters: { ...filters, ...(list.q ? { q: list.q } : {}) } } }))} />
+              </DesktopOnly>
+            )}
+            {mayCreate && <Button variant="primary" icon="plus" onClick={newPartner}>New Partner</Button>}
           </>
+        } />
+      {s.data && (
+        <KpiTiles
+          mobileCols={2}
+          items={[
+            { label: "Active", value: String(s.data.active), tone: "ok" },
+            { label: "Quiet", value: String(s.data.quiet), tone: s.data.quiet ? "err" : undefined, help: `Active partners with no contact in ${s.data.quiet_days} days.` },
+            ...(phone ? [] : [{ label: "Live Deals", value: String(s.data.live_deals) }, { label: "Signed Value", value: formatMoneyShort(s.data.signed_value) }]),
+          ]}
+        />
+      )}
+      <Chips label="Partners" value={view} onChange={setView} options={[["all", "All"], ["active", "Active"], ["dormant", "Dormant"], ["quiet", "Quiet"], ["closed", "Closed"]]} className="mt-3" />
+      <RecordFilters value={filter} onChange={setFilter} kind="partner" />
+      <ListDetail
+        open={Boolean(id)}
+        onClose={() => navigate("/partnerships?tab=partners")}
+        title="Partner"
+        cols="1/1.5"
+        full
+        list={
+          <PagedTable<PartnerRow>
+            title="Partners"
+            list={list}
+            search="Search partners"
+            rowKey={(p) => p.partner_id}
+            noun="partner"
+            onRowClick={(p) => openPartner(p.partner_id)}
+            empty={{ title: "No Partners Yet", text: "Signed leads become partners here." }}
+            columns={[
+              { key: "n", label: "Partner", render: (p) => <Who name={p.name} sub={p.category ?? undefined} /> },
+              { key: "r", label: "Region", render: (p) => p.region ?? "None", desktop: true },
+              { key: "s", label: "Stage", render: (p) => p.stage_label ?? <StatusPill status={partnerPill(p.status)} /> },
+              { key: "h", label: "Health", render: (p) => <StatusPill status={healthPill(p.health)} />, desktop: true },
+              { key: "o", label: "Owner", render: (p) => p.owner?.display_name ?? "No Owner", desktop: true },
+              { key: "c", label: "Last Contact", render: (p) => (p.last_contact_at ? formatWhen(p.last_contact_at) : "Never") },
+            ]}
+          />
         }
+        detail={shown && <Partner360 key={shown} id={shown} />}
       />
-      {s.data && <KpiTiles items={[{ label: "Active", value: String(s.data.active) }, { label: "Total Value", value: formatMoneyShort(s.data.total_value) }, { label: "Renewals, 180 Days", value: String(s.data.renewals_180), tone: s.data.renewals_180 ? "warn" : undefined }, { label: "Quiet Over 30 Days", value: String(s.data.quiet_30), tone: s.data.quiet_30 ? "err" : "ok" }]} />}
-      <Chips value={view} onChange={setView} options={[["all", "All Partners"], ["quiet", "Quiet Over 30 Days"]]} />
-      <PagedTable<PartnerRow>
-        title="All Partners"
-        list={list}
-        search="Search partners"
-        rowKey={(p) => p.partner_id}
-        noun="partner"
-        onRowClick={(p) => navigate(`/partnerships?tab=partners&id=${p.partner_id}`)}
-        wide
-        columns={[
-          { key: "p", label: "Partner", render: (p) => <Who name={p.name} sub={p.industry} /> },
-          { key: "t", label: "Type", render: (p) => p.type, desktop: true },
-          { key: "s", label: "Stage", render: (p) => <StatusPill s={p.stage_status} /> },
-          { key: "o", label: "Owner", render: (p) => short(p.owner), desktop: true },
-          { key: "v", label: "Value", align: "n", render: (p) => formatMoneyShort(p.value) },
-          { key: "l", label: "Last Contact", render: (p) => (p.last_contact_days === 0 ? "Today" : `${p.last_contact_days} days ago`) },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Value by Partnership Type" rows={s.data.by_type} /> : <Card><LoadingRows /></Card>}
-      </Grid>
     </>
   );
 }

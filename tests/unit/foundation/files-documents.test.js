@@ -13,8 +13,8 @@ const { sha256, sameHash } = require("../../../src/shared/files/hash");
 const storage = require("../../../src/services/storage/storage.service");
 const images = require("../../../src/services/media/image-pipeline");
 const scan = require("../../../src/services/media/scan");
-const { markdownToHtml, markdownToText, stripTrailingAcceptanceBlock } = require("../../../src/shared/documents/markdown");
-const { render, parse, variablesOf } = require("../../../src/shared/documents/render");
+const { markdownToHtml, markdownToText, markdownToBlocks, stripTrailingAcceptanceBlock } = require("../../../src/shared/documents/markdown");
+const { render, renderMarkdown, fillMarkdown, parse, variablesOf } = require("../../../src/shared/documents/render");
 const canonical = require("../../../src/shared/documents/canonical");
 const vault = require("../../../src/shared/documents/vault");
 const variables = require("../../../src/shared/templates/variables");
@@ -235,6 +235,42 @@ describe("markdown and the template language", () => {
     expect(stripTrailingAcceptanceBlock("No block here.")).toBe("No block here.");
   });
 
+  test("markdown as blocks keeps a table, its rows fitted to its header (an agreement's options)", () => {
+    const blocks = markdownToBlocks("## Financials\n\n|  | Regular | VIP |\n| --- | --- | --- |\n| Deal Price | **₦10,800.00** | ₦27,000.00 | extra |\n| Discount | 10% |\n\n1. Check-in on MyCityApp");
+    expect(blocks.map((b) => b.kind)).toEqual(["heading", "table", "numbered"]);
+    const t = blocks[1];
+    const words = (cell) => cell.map((x) => x.text).join("");
+    expect(t.head.map(words)).toEqual(["", "Regular", "VIP"]);
+    expect(t.rows.map((r) => r.map(words))).toEqual([["Deal Price", "₦10,800.00", "₦27,000.00"], ["Discount", "10%", ""]]);
+    expect(t.rows[0][1][0].bold).toBe(true);
+    // A pipe line with no rule under it is a paragraph, not a table.
+    expect(markdownToBlocks("| a | b |\nplain").map((b) => b.kind)).toEqual(["paragraph", "paragraph"]);
+  });
+
+  test("block values: a grid as a table, a list as numbered clauses, a stamped signature as its image or typed name", () => {
+    const grid = { head: ["", "Regular"], rows: [["Deal Price", "₦10,800.00"], ["<b>x</b>", "| pipe"]] };
+    const md = renderMarkdown("{{ grid }}\n\n{{ items }}\n\nSigned: {{ sig }}", { grid, items: ["One", "Two"], sig: { signature: "data:image/png;base64,iVBORw0KGgo=", typed: null, name: "Ngozi" } });
+    expect(md).toContain("<table><tr><th></th><th>Regular</th></tr><tr><td>Deal Price</td><td>₦10,800.00</td></tr><tr><td>&lt;b&gt;x&lt;/b&gt;</td><td>| pipe</td></tr></table>");
+    expect(md).toContain("<ol><li>One</li><li>Two</li></ol>");
+    expect(md).toContain('<img class="doc-signature" src="data:image/png;base64,iVBORw0KGgo=" alt="Signature of Ngozi">');
+    expect(renderMarkdown("{{ sig }}", { sig: { signature: "javascript:alert(1)", typed: "Ngozi A", name: "Ngozi" } })).toContain('<span class="doc-signature-typed">Ngozi A</span>');
+    expect(render("{{ sig }}", { sig: { signature: "https://evil/x.png", typed: null, name: "N" } })).toBe("");
+  });
+
+  test("fillMarkdown fills a Draft: values as written, signer kept, an empty field kept as its chip, no value opens a name", () => {
+    const t = "Business: {{ partner.name }}\nEvent: {{ deal.event_title }}\nValid: {{ longdate deal.valid_until }}\nSigner: {{ signer.name }}\n{{ deal.options }}";
+    const out = fillMarkdown(t, { partner: { name: "Harbour {{ x }} *Lights*" }, deal: { event_title: "", valid_until: "2026-11-26", options: { head: ["", "VIP"], rows: [["Deal Price", "₦27,000.00"]] } } }, { keep: ["signer"], keepEmpty: true });
+    expect(out).toContain("Business: Harbour { { x } } *Lights*");
+    expect(out).toContain("Event: {{ deal.event_title }}");
+    expect(out).toContain("Valid: 26 November 2026");
+    expect(out).toContain("Signer: {{ signer.name }}");
+    expect(out).toContain("| Deal Price | ₦27,000.00 |");
+    // Without keepEmpty an empty value is simply empty.
+    expect(fillMarkdown("Event: {{ deal.event_title }}", { deal: {} })).toBe("Event: ");
+    // The filled wording parses again with only the names it kept.
+    expect([...variablesOf(parse(out))].sort()).toEqual(["deal.event_title", "signer.name"]);
+  });
+
   test("values are escaped; house formats; if, else, each", () => {
     const out = render(
       "{{ name }}|{{ money amt }}|{{ date d }}|{{ longdate d }}|{{#if flag}}Y{{else}}N{{/if}}|{{#each items}}{{ @number }}.{{ label }}={{ money amount }};{{/each}}",
@@ -326,6 +362,77 @@ describe("markdown and the template language", () => {
     expect(canonical.hash("POLICY_VERSION", reordered)).toBe(canonical.hash("POLICY_VERSION", version));
     expect(canonical.hash("POLICY_VERSION", { ...version, rules: { ...version.rules, grace_minutes: 10 } }))
       .not.toBe(canonical.hash("POLICY_VERSION", version));
+  });
+
+  test("an SOP version's payload is pinned, and a changed step, screen or file changes it", () => {
+    const sop = {
+      number: "SOP-0001",
+      department_id: "8b1f6a40-0000-4000-8000-000000000001",
+      version: 2,
+      title: "Campaign Launch",
+      purpose: "How Marketing launches a campaign.",
+      scope: null,
+      roles: ["Campaign Lead", "Designer"],
+      steps: [
+        { text: "Write the **brief**.", who: "Campaign Lead", screen_key: null, document_id: null },
+        { text: "Book the launch post.", who: null, screen_key: "community/announcements", document_id: "8b1f6a40-0000-4000-8000-000000000002" },
+      ],
+    };
+    // Pinned: a change to this builder must bump its version, never alter v1 (canonical.js header).
+    expect(canonical.hash("SOP_VERSION", sop)).toBe("929011f9306ca86f3e89c88ed102f79676f26e4ddaf67c14ffdfdbb510d011d4");
+    expect(canonical.hash("SOP_VERSION", { ...sop, scope: "" })).toBe(canonical.hash("SOP_VERSION", sop));
+    const moved = { ...sop, steps: [sop.steps[0], { ...sop.steps[1], screen_key: "people/employees" }] };
+    expect(canonical.hash("SOP_VERSION", moved)).not.toBe(canonical.hash("SOP_VERSION", sop));
+    expect(canonical.hash("SOP_VERSION", { ...sop, steps: [...sop.steps].reverse() })).not.toBe(canonical.hash("SOP_VERSION", sop));
+    expect(canonical.hash("SOP_VERSION", { ...sop, version: 3 })).not.toBe(canonical.hash("SOP_VERSION", sop));
+  });
+
+  test("the offer letter's payload: pinned, money normalised, a changed pay line or term changes it", () => {
+    const offer = {
+      number: "OFF-0018", candidate: "Chiamaka Eze", job_title: "Head of PR, Marketing & Brand Strategy",
+      department: "Marketing", reports_to: "Chief Executive Officer", role_function: "Leadership", role_scope: "Company-wide",
+      start_date: "2026-12-01", employment_type: "full_time", work_pattern: "hybrid", office_days: 2, probation_months: 3,
+      annual_leave_days: 15, working_hours: "Monday to Friday, 9:00 to 17:00", currency: "NGN",
+      pay_lines: [
+        { name: "Basic Salary", monthly_amount: "600000" },
+        { name: "Internet & Recharge Allowance", monthly_amount: "50000.00" },
+        { name: "Transportation Allowance", monthly_amount: "100000" },
+      ],
+      monthly_total: "750000", incentives: "Under the Incentive Policy", additional_terms: "", job_description: "## Role Summary", terms_version: 0,
+    };
+    // Pinned: a change to this builder must bump its version, never alter v1 (canonical.js header).
+    expect(canonical.hash("OFFER_LETTER", offer)).toBe("7fc8bed3a93ae8da0e9af549e9cde91dafa4609e48e19c9f2e63f530d8ed5502");
+    expect(canonical.hash("OFFER_LETTER", { ...offer, monthly_total: "750000.00" })).toBe(canonical.hash("OFFER_LETTER", offer));
+    const raised = { ...offer, pay_lines: [{ name: "Basic Salary", monthly_amount: "650000" }, ...offer.pay_lines.slice(1)] };
+    expect(canonical.hash("OFFER_LETTER", raised)).not.toBe(canonical.hash("OFFER_LETTER", offer));
+    expect(canonical.hash("OFFER_LETTER", { ...offer, additional_terms: "On call for media." })).not.toBe(canonical.hash("OFFER_LETTER", offer));
+    expect(canonical.isSignable("OFFER_LETTER")).toBe(true);
+  });
+
+  test("a partnership agreement's payload: pinned, money normalised, edited wording or term changes it", () => {
+    const agreement = {
+      number: "AGR-2026-0001", title: "Deal Merchant Agreement: Harbour Lights Festival", kind: "deal_merchant",
+      body_markdown: "# Deal Merchant Agreement\n\n1. MyCity lists the event.\n\nName of Representative: {{ signer.name }}",
+      starts_on: "2026-12-01", ends_on: "2027-11-30", currency: "NGN", value: "2500000",
+      template_key: "events-deal-merchant-agreement", template_version: 3,
+    };
+    // Pinned: a change to this builder must bump its version, never alter v1 (canonical.js header).
+    expect(canonical.hash("PARTNERSHIP_AGREEMENT", agreement)).toBe("fbb83ba45248ad0e72b58ad087fc0975bdbdae929c76be55025a3ce64a1cee38");
+    expect(canonical.hash("PARTNERSHIP_AGREEMENT", { ...agreement, value: "2500000.00" })).toBe(canonical.hash("PARTNERSHIP_AGREEMENT", agreement));
+    expect(canonical.hash("PARTNERSHIP_AGREEMENT", { ...agreement, body_markdown: `${agreement.body_markdown} ` })).not.toBe(canonical.hash("PARTNERSHIP_AGREEMENT", agreement));
+    expect(canonical.hash("PARTNERSHIP_AGREEMENT", { ...agreement, ends_on: "2028-11-30" })).not.toBe(canonical.hash("PARTNERSHIP_AGREEMENT", agreement));
+    expect(canonical.isSignable("PARTNERSHIP_AGREEMENT")).toBe(true);
+  });
+
+  test("a training certificate's payload: pinned, and a renamed holder or another date changes it", () => {
+    const cert = {
+      number: "CERT-2026-0001", holder_name: "Femi Ola", course_number: "TRN-0001", course_title: "Data Protection Basics",
+      completed_on: "2026-11-11", publisher_name: "Ngozi Eze", publisher_title: "People Lead",
+    };
+    // Pinned: a change to this builder must bump its version, never alter v1 (canonical.js header).
+    expect(canonical.hash("TRAINING_CERTIFICATE", cert)).toBe("c27d7d143f2ad5b234ff35ed50e3ca30df59dfa06944b6aaa91d872e748dc192");
+    expect(canonical.hash("TRAINING_CERTIFICATE", { ...cert, holder_name: "Femi Olawale" })).not.toBe(canonical.hash("TRAINING_CERTIFICATE", cert));
+    expect(canonical.hash("TRAINING_CERTIFICATE", { ...cert, completed_on: "2026-11-12" })).not.toBe(canonical.hash("TRAINING_CERTIFICATE", cert));
   });
 });
 

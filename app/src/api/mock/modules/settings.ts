@@ -297,7 +297,7 @@ const MODULE_LIST: Array<[string, string, string, string]> = [
   ["community", "Staff Community", "work", "Channels, direct messages and announcements"], ["mailbox", "Mailbox", "work", "Your work email"], ["people", "People", "people", "Employees, attendance, leave, devices and worksites"],
   ["performance", "Performance", "people", "Goals, targets, KPIs and reviews"], ["queries", "Queries & Sanctions", "people", "Queries, rules, sanctions and letter templates"], ["recruitment", "Recruitment", "people", "Vacancies through to onboarding"],
   ["payroll", "Payroll", "people", "Payroll runs, payslips, salary structure and statutory"], ["partnerships", "Partnerships", "business", "Pipeline, partners, leads, proposals and contracts"], ["expenses", "Expenses", "business", "Requests, approvals, requisitions, disbursements and budgets"],
-  ["knowledge", "Knowledge Hub", "system", "Policies, SOPs, FAQs and training"], ["praxis_ai", "Praxis AI", "system", "The assistant, and AI controls"], ["settings", "Settings", "system", "Organisation, users, roles, approvals and system settings"],
+  ["knowledge", "Knowledge Hub", "system", "Policies, SOPs, training and the User Guide"], ["praxis_ai", "Praxis AI", "system", "The assistant, and AI controls"], ["settings", "Settings", "system", "Organisation, users, roles, approvals and system settings"],
 ];
 const FIELDS = [["employee.salary", "Salary and pay"], ["employee.bank", "Bank details"], ["employee.personal", "Personal details"], ["employee.statutory", "Tax and pension numbers"]] as const;
 const CATALOGUE: AccessCatalogue = {
@@ -450,6 +450,7 @@ const LABELS: Array<[NumberingScheme["doc_type"], string, string, number, string
   ["payroll_run", "Payroll Run", "PAY", 0, "-", "monthly", 1], ["payslip", "Payslip", "PAY", 4, "-", "monthly", 18], ["proposal", "Proposal", "PRO", 4, "-", "never", 30],
   ["partner", "Partner", "PAR", 4, "-", "never", 33], ["lead", "Lead", "LED", 4, "-", "never", 46], ["deal", "Deal", "DEAL", 4, "-", "yearly", 79],
   ["agreement", "Agreement", "AGR", 4, "-", "yearly", 11], ["expense", "Expense Request", "EXP", 4, "-", "never", 122], ["requisition", "Requisition", "REQ", 4, "-", "never", 42], ["disbursement", "Disbursement", "DSB", 4, "-", "never", 37],
+  ["sop", "SOP", "SOP", 4, "-", "never", 0], ["training_course", "Training Course", "TRN", 4, "-", "never", 0], ["training_certificate", "Training Certificate", "CERT", 4, "-", "yearly", 0],
 ];
 const period = (reset: NumberingScheme["reset"]) => {
   const d = isoDaysAgo(0);

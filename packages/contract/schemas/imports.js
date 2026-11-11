@@ -71,6 +71,8 @@ const ImporterField = z
     masked: z.boolean(),
     example: z.string().nullable(),
     hint: z.string().nullable(),
+    /** Map Values: its distinct values are mapped one by one, to a list value, a person or a place. */
+    map_values: z.enum(["list", "person", "place"]).nullable(),
   })
   .strict();
 
@@ -105,8 +107,27 @@ const ImportMappingColumn = z
   })
   .strict();
 
+/**
+ * What Map Values chose for one value: `to` a list value, a person's id or a place's token (null:
+ * left empty), or `create` (a value created when the import commits, as ticking it does).
+ */
+const ImportValueTarget = z
+  .object({
+    to: z.string().trim().min(1).max(4000).nullable().optional(),
+    create: z.literal(true).optional(),
+  })
+  .strict()
+  .refine((v) => (v.to !== undefined) !== Boolean(v.create), { message: "Pick a value, create it or leave it empty" });
+
+/** Each Map Values field's choices, by the value as the file spells it. */
+const ImportValueMap = z.record(z.record(ImportValueTarget));
+
 const ImportMapping = z
-  .object({ columns: z.array(ImportMappingColumn) })
+  .object({
+    columns: z.array(ImportMappingColumn),
+    /** Map Values' choices, keyed by the field and the value as the engine compares it. */
+    values: ImportValueMap.optional(),
+  })
   .strict();
 
 /** The counts a preview or a commit produced. */
@@ -129,6 +150,8 @@ const ImportStats = z
     valid_only: z.boolean().optional(),
     /** The import was started and left, and the cleanup closed it. */
     expired: z.boolean().optional(),
+    /** What an importer reading a whole workbook noted about it (rows skipped, columns it keeps out). */
+    notes: z.array(z.string()).optional(),
   })
   .strict();
 
@@ -180,6 +203,48 @@ const ImportMappingSet = z
         z.string().regex(/^[a-z][a-z0-9_]*$/).nullable(),
       )
       .optional(),
+    save_profile: z.boolean().optional(),
+    profile_name: optionalText(120),
+  })
+  .strict();
+
+/** One distinct value of a Map Values column. */
+const ImportValue = z
+  .object({
+    /** As the file first spells it. */
+    value: z.string(),
+    /** The rows that hold it. */
+    rows: z.number().int().min(1),
+    /** What was chosen for it; null when nothing was, and the importer's own matching applies. */
+    target: z.object({ to: z.string().nullable().optional(), create: z.literal(true).optional() }).strict().nullable(),
+    target_label: z.string().nullable(),
+    /** What it gets unchosen: the option it reads as, the record it matches, or the place found. */
+    suggested: z.string().nullable(),
+    suggested_label: z.string().nullable(),
+  })
+  .strict();
+
+/** One Map Values field: its distinct values and what they may map to. */
+const ImportValueField = z
+  .object({
+    field: z.string(),
+    label: z.string(),
+    kind: z.enum(["list", "person", "place"]),
+    /** A value may be created when the import commits. */
+    create_missing: z.boolean(),
+    /** A list field's values; a person or a place is searched instead. */
+    choices: z.array(z.object({ value: z.string(), label: z.string() }).strict()),
+    values: z.array(ImportValue),
+  })
+  .strict();
+
+/** GET /imports/:id/values: Map Values, every distinct value of each list, person or place column. */
+const ImportValueList = z.object({ fields: z.array(ImportValueField) }).strict();
+
+/** PUT /imports/:id/values: what each value maps to, kept on the batch and, asked, its profile. */
+const ImportValuesSet = z
+  .object({
+    values: z.record(z.string().regex(/^[a-z][a-z0-9_]*$/), z.record(z.string().max(500), ImportValueTarget)),
     save_profile: z.boolean().optional(),
     profile_name: optionalText(120),
   })
@@ -267,6 +332,11 @@ const TABLES = {
     reason: "one entry of import_batch.mapping jsonb",
   },
   ImportMapping: { table: null, reason: "import_batch.mapping jsonb" },
+  ImportValueTarget: { table: null, reason: "one value's choice in import_batch.mapping jsonb's values" },
+  ImportValue: { table: null, reason: "one distinct value of a column of the batch's file, counted from the file" },
+  ImportValueField: { table: null, reason: "a Map Values field of the importer, with the file's distinct values" },
+  ImportValueList: { table: null, reason: "Map Values: the file's distinct values, never more than its rows" },
+  ImportValuesSet: { table: null, reason: "Map Values' choices, kept in import_batch.mapping jsonb and its profile" },
   ImportStats: { table: null, reason: "import_batch.stats jsonb" },
   ImportBatch: {
     table: "import_batch",
@@ -317,6 +387,12 @@ module.exports = {
   ImporterKeyParams,
   ImportMappingColumn,
   ImportMapping,
+  ImportValueTarget,
+  ImportValueMap,
+  ImportValue,
+  ImportValueField,
+  ImportValueList,
+  ImportValuesSet,
   ImportStats,
   ImportBatch,
   ImportCreate,

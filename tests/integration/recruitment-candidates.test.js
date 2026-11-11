@@ -130,7 +130,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     const tok = await startApply();
     const link = await pub().get(`/apply/${tok}`);
     expect(link.status).toBe(200);
-    expect(link.body.vacancy_title).toBe("Content Producer");
+    expect(link.body).toMatchObject({ vacancy_title: "Content Producer", vacancy_department: "Operations", vacancy_location: "Yaba, Lagos" });
     expect(link.body.questions.map((x) => [x.question_type, x.required])).toEqual([
       ["yes_no", true],
       ["text", false],
@@ -151,7 +151,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
       .post(`/apply/${tok}`)
       .send(form({ cv_document_id: cv.body.document_id, answers: { [weekendsId]: "Yes", [linkId]: "https://example.test/reel" } }));
     expect(sent.status).toBe(201);
-    expect(sent.body).toEqual({ reference: "APP-0001", submitted_at: expect.any(String) });
+    expect(sent.body).toEqual({ reference: "APP-0001", submitted_at: expect.any(String), already_applied: false });
     // Spent: the same link is the same 404 as any bad one.
     expect((await pub().get(`/apply/${tok}`)).status).toBe(404);
     // A second press of the same form (its answer lost on the way) gets the same receipt.
@@ -175,7 +175,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     if (notice) expect(notice.n).toBeGreaterThanOrEqual(1);
   });
 
-  test("applying twice makes nothing new, and a CV sent on another link is refused", async () => {
+  test("applying twice makes nothing new and tells the applicant, and a CV sent on another link is refused", async () => {
     const again = await startApply();
     const other = await startApply();
     const cv = await sendCv(other);
@@ -186,9 +186,9 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     const own = await sendCv(again);
     const twice = await pub().post(`/apply/${again}`).send(form({ email: "KEMI.BELLO@example.test", cv_document_id: own.body.document_id, answers: { [weekendsId]: "yes" } }));
     expect(twice.status).toBe(201);
-    expect(twice.body.reference).toBe("APP-0001");
-    // Answered as now, like any submission: the first application's date is not given away.
-    expect(Date.now() - Date.parse(twice.body.submitted_at)).toBeLessThan(60_000);
+    // The applicant is told they had applied: the first application's reference and date (GE, 08/11/2026).
+    const first = await one("SELECT applied_at FROM application WHERE number = 'APP-0001'");
+    expect(twice.body).toEqual({ reference: "APP-0001", submitted_at: new Date(first.applied_at).toISOString(), already_applied: true });
     expect(await one("SELECT count(*)::int AS n FROM application")).toEqual({ n: 1 });
     // A spent link never says whether an email applied (guide §6.2): only the form that spent it, sent
     // again with the CV it attached, is answered. Kemi has applied, nobody has; both meet the same 404
@@ -297,7 +297,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     expect((await h.as("ops").post("/recruitment/candidates/invitations").send({ first_name: "Tobi", last_name: "Lawal", email: "tobi.lawal@example.test", vacancy_id: vacancyId })).status).toBe(422);
   });
 
-  test("Candidate Emails: five, each saved as the next version and checked against its variables; Restore Default keeps the history", async () => {
+  test("Candidate Emails: eight (M4's five and M5's three), each saved as the next version and checked against its variables; Restore Default keeps the history", async () => {
     const list = await h.as("ops").get("/recruitment/candidates/emails");
     expect(list.body.data.every((e) => e.can_edit === true)).toBe(true);
     expect(list.body.data.map((e) => [e.key, e.version, e.is_default])).toEqual([
@@ -306,6 +306,9 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
       ["assessment-invite", 0, true],
       ["interview-invite", 0, true],
       ["candidate-not-progressed", 0, true],
+      ["offer-sent", 0, true],
+      ["offer-signed", 0, true],
+      ["onboarding-documents", 0, true],
     ]);
     const typo = await h.as("ops").put("/recruitment/candidates/emails/application-received").send({ subject: "We have your application", body: "Thank you. Your reference is {{ referance }}." });
     expect(typo.status).toBe(422);

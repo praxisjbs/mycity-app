@@ -2,6 +2,17 @@
   "about": "The AI manifests as the build declares them (docs/guides/praxis-ai.md §6.15). Rewrite with npm run gen:ai-catalogue; never by hand.",
   "entries": [
     {
+      "key": "advances.record",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.create",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "deductions.AdvanceRecord",
+      "schema_sha": "3275ba48fdfff9e7",
+      "screen": null
+    },
+    {
       "key": "alert_rules.create",
       "kind": "action",
       "module_key": "home",
@@ -104,7 +115,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "calendar.CalendarEventCreate",
-      "schema_sha": "a1b44f32963ed280",
+      "schema_sha": "42e4eaf0ea455dd3",
       "screen": null
     },
     {
@@ -115,7 +126,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "calendar.CalendarEventChange",
-      "schema_sha": "b7dd14dc6346a129",
+      "schema_sha": "5bf73146c3770618",
       "screen": null
     },
     {
@@ -228,6 +239,106 @@
       "bulk": 1,
       "schema": "community.WishSend",
       "schema_sha": "c0dd782e2b3f6a41",
+      "screen": null
+    },
+    {
+      "key": "contacts.create",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.ContactCreate",
+      "schema_sha": "48c557c390393dca",
+      "screen": null
+    },
+    {
+      "key": "contacts.update",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.ContactChange",
+      "schema_sha": "4bf8da0df01a706c",
+      "screen": null
+    },
+    {
+      "key": "deal_returns.save",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "money",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealReturnChange",
+      "schema_sha": "97f3e8991231c427",
+      "screen": null,
+      "capability": "partnerships.money"
+    },
+    {
+      "key": "deals.create",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealAdd",
+      "schema_sha": "6b60119d7401ada6",
+      "screen": null
+    },
+    {
+      "key": "deals.move_stage",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealStageChange",
+      "schema_sha": "9a4115f085d0cca4",
+      "screen": null
+    },
+    {
+      "key": "deals.set_health",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealHealthChange",
+      "schema_sha": "a8278643b6b607c9",
+      "screen": null
+    },
+    {
+      "key": "deals.update",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partner_pipeline.DealChange",
+      "schema_sha": "78acbdb5fdb43fd8",
+      "screen": null
+    },
+    {
+      "key": "deductions.accept",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.edit",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "deductions.FineAccept",
+      "schema_sha": "58e20a47f8a7e360",
+      "screen": null
+    },
+    {
+      "key": "deductions.waive",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.edit",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "deductions.FineWaive",
+      "schema_sha": "0f8bc8276bb3871e",
       "screen": null
     },
     {
@@ -425,6 +536,17 @@
       "screen": null
     },
     {
+      "key": "interactions.log",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "interactions.InteractionCreate",
+      "schema_sha": "6917df65ce8d1361",
+      "screen": null
+    },
+    {
       "key": "key_results.create",
       "kind": "action",
       "module_key": "performance",
@@ -497,6 +619,39 @@
       "schema_sha": "6bdee254c260e062",
       "screen": null,
       "capability": "workspace.late_reasons"
+    },
+    {
+      "key": "leads.create",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "leads.LeadAdd",
+      "schema_sha": "e4f6f0a5c45c1519",
+      "screen": null
+    },
+    {
+      "key": "leads.lose",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "leads.LeadClose",
+      "schema_sha": "fc5fd106400da469",
+      "screen": null
+    },
+    {
+      "key": "leads.update",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "leads.LeadChange",
+      "schema_sha": "d67d743aacb94e3e",
+      "screen": null
     },
     {
       "key": "leave_types.add",
@@ -706,7 +861,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "settings.NumberingSchemeChange",
-      "schema_sha": "33cf200824778762",
+      "schema_sha": "8a8ca346ce9172ff",
       "screen": null
     },
     {
@@ -752,6 +907,17 @@
       "capability": "goals.company"
     },
     {
+      "key": "offers.create",
+      "kind": "action",
+      "module_key": "recruitment",
+      "permission": "recruitment.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "offers.OfferCard",
+      "schema_sha": "3468c73acb8be089",
+      "screen": null
+    },
+    {
       "key": "organisation.edit",
       "kind": "action",
       "module_key": "settings",
@@ -771,6 +937,61 @@
       "bulk": 1,
       "schema": "attendance.OvertimePreApprovalCreate",
       "schema_sha": "3f38e2d89a1bf8fa",
+      "screen": null
+    },
+    {
+      "key": "partners.create",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.PartnerAdd",
+      "schema_sha": "4271c6c0101ddcff",
+      "screen": null
+    },
+    {
+      "key": "partners.update",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.PartnerChange",
+      "schema_sha": "ae6677ae6d905c12",
+      "screen": null
+    },
+    {
+      "key": "payroll_adjustments.add",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.edit",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "payroll.PayrollRunAdjust",
+      "schema_sha": "db1b534542c4cfd3",
+      "screen": null
+    },
+    {
+      "key": "payroll_runs.create",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.create",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "payroll.PayrollRunCreate",
+      "schema_sha": "06af322723da8649",
+      "screen": null
+    },
+    {
+      "key": "payroll_runs.submit",
+      "kind": "action",
+      "module_key": "payroll",
+      "permission": "payroll.edit",
+      "risk": "payroll",
+      "bulk": 1,
+      "schema": "payroll.PayrollRunSubmission",
+      "schema_sha": "f43fe3842cfc4c4a",
       "screen": null
     },
     {
@@ -844,7 +1065,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "projects.ProjectCreate",
-      "schema_sha": "85b29429e9515f5e",
+      "schema_sha": "82bf7627fcbcf3d6",
       "screen": null
     },
     {
@@ -855,7 +1076,18 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "projects.ProjectChange",
-      "schema_sha": "d303b1595834209f",
+      "schema_sha": "4951b2c8c23b9aa3",
+      "screen": null
+    },
+    {
+      "key": "proposals.start",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "proposals.ProposalBriefAdd",
+      "schema_sha": "647c6a7f7fb5d46c",
       "screen": null
     },
     {
@@ -1129,7 +1361,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "tasks.TaskCreate",
-      "schema_sha": "b3dbd57183abcb9e",
+      "schema_sha": "912bfcfc83f03e01",
       "screen": null
     },
     {
@@ -1140,7 +1372,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "tasks.TaskChange",
-      "schema_sha": "3d22d47b2634a7b2",
+      "schema_sha": "25e7fd1c093599ae",
       "screen": null
     },
     {
@@ -1251,6 +1483,28 @@
       "bulk": null,
       "schema": "dashboard.HomeActivityQuery",
       "schema_sha": "cc05eaf495ef150c",
+      "screen": null
+    },
+    {
+      "key": "agreements.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "agreements.AgreementListQuery",
+      "schema_sha": "9f87a20111fd770c",
+      "screen": null
+    },
+    {
+      "key": "agreements.renewals",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "agreements.RenewalQuery",
+      "schema_sha": "4c6b8d294ce83781",
       "screen": null
     },
     {
@@ -1441,6 +1695,17 @@
       "screen": null
     },
     {
+      "key": "categories.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partner_pipeline.CategoryListQuery",
+      "schema_sha": "7d89061a9ab84adf",
+      "screen": null
+    },
+    {
       "key": "channels.list",
       "kind": "read",
       "module_key": "community",
@@ -1471,6 +1736,50 @@
       "bulk": null,
       "schema": "targets.CommitmentListQuery",
       "schema_sha": "9d407b52eab925fc",
+      "screen": null
+    },
+    {
+      "key": "deals.get",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "deals.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partner_pipeline.DealListQuery",
+      "schema_sha": "38ed60dff143fdf3",
+      "screen": null
+    },
+    {
+      "key": "deductions.list",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "deductions.DeductionListQuery",
+      "schema_sha": "a94c4bedb9c46c38",
+      "screen": null
+    },
+    {
+      "key": "deductions.mine",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.PageQuery",
+      "schema_sha": "463693b1b2726c8c",
       "screen": null
     },
     {
@@ -1525,7 +1834,7 @@
       "risk": null,
       "bulk": null,
       "schema": "organisation.EmployeeListQuery",
-      "schema_sha": "dfcf3c65b0a27544",
+      "schema_sha": "6189341a0eea358a",
       "screen": null
     },
     {
@@ -1639,6 +1948,17 @@
       "screen": null
     },
     {
+      "key": "interactions.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "interactions.InteractionListQuery",
+      "schema_sha": "897d58ffdc4d066a",
+      "screen": null
+    },
+    {
       "key": "interviews.list",
       "kind": "read",
       "module_key": "recruitment",
@@ -1658,6 +1978,28 @@
       "bulk": null,
       "schema": "kpis.KpiListQuery",
       "schema_sha": "50148826c2b69825",
+      "screen": null
+    },
+    {
+      "key": "leads.get",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "leads.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "leads.LeadListQuery",
+      "schema_sha": "85294e8f5f7ee9ca",
       "screen": null
     },
     {
@@ -1727,6 +2069,17 @@
       "screen": null
     },
     {
+      "key": "offers.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "offers.OfferListQuery",
+      "schema_sha": "1ef2069374a40ace",
+      "screen": null
+    },
+    {
       "key": "organisation.get",
       "kind": "read",
       "module_key": "settings",
@@ -1735,6 +2088,61 @@
       "bulk": null,
       "schema": "common.EmptyBody",
       "schema_sha": "32062bdb9024160d",
+      "screen": null
+    },
+    {
+      "key": "partners.get",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "partners.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partners.PartnerListQuery",
+      "schema_sha": "ffe2bf894a6f1134",
+      "screen": null
+    },
+    {
+      "key": "payroll.runs",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payroll.PayrollRunListQuery",
+      "schema_sha": "e0a1e3678758cbce",
+      "screen": null
+    },
+    {
+      "key": "payslips.list",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payslips.PayslipListQuery",
+      "schema_sha": "fea82298cf644b4f",
+      "screen": null
+    },
+    {
+      "key": "payslips.mine",
+      "kind": "read",
+      "module_key": "payroll",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payslips.EssPayslipQuery",
+      "schema_sha": "7574dc91de985edc",
       "screen": null
     },
     {
@@ -1778,7 +2186,18 @@
       "risk": null,
       "bulk": null,
       "schema": "projects.ProjectListQuery",
-      "schema_sha": "8008489de893e83c",
+      "schema_sha": "7b679d616863a888",
+      "screen": null
+    },
+    {
+      "key": "proposals.list",
+      "kind": "read",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "proposals.ProposalListQuery",
+      "schema_sha": "a9535cfd812e2930",
       "screen": null
     },
     {
@@ -1914,6 +2333,28 @@
       "screen": null
     },
     {
+      "key": "sops.list",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "knowledge.SopListQuery",
+      "schema_sha": "6eee225e9fc20931",
+      "screen": null
+    },
+    {
+      "key": "sops.read",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.IdParams",
+      "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
       "key": "talent_pool.list",
       "kind": "read",
       "module_key": "recruitment",
@@ -1943,7 +2384,7 @@
       "risk": null,
       "bulk": null,
       "schema": "tasks.TaskListQuery",
-      "schema_sha": "94baf39feea179dd",
+      "schema_sha": "f0e4156454d0c367",
       "screen": null
     },
     {
@@ -1958,6 +2399,50 @@
       "screen": null
     },
     {
+      "key": "training.library",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "training.MyTrainingQuery",
+      "schema_sha": "707307568ddee42c",
+      "screen": null
+    },
+    {
+      "key": "training.mine",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "training.MyTrainingQuery",
+      "schema_sha": "707307568ddee42c",
+      "screen": null
+    },
+    {
+      "key": "training.overdue",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.PageQuery",
+      "schema_sha": "463693b1b2726c8c",
+      "screen": null
+    },
+    {
+      "key": "training.progress",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "training.CourseListQuery",
+      "schema_sha": "dad77c04b79f7946",
+      "screen": null
+    },
+    {
       "key": "vacancies.get",
       "kind": "read",
       "module_key": "recruitment",
@@ -1966,6 +2451,17 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
+      "screen": null
+    },
+    {
+      "key": "vacancies.hiring_managers",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "vacancies.HiringManagerListQuery",
+      "schema_sha": "463693b1b2726c8c",
       "screen": null
     },
     {
@@ -2332,6 +2828,17 @@
       "screen": "ess.policy-updates"
     },
     {
+      "key": "knowledge.route.build_or_assign_a_training_course",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.training"
+    },
+    {
       "key": "knowledge.route.change_the_attendance_policy",
       "kind": "route",
       "module_key": "knowledge",
@@ -2341,6 +2848,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "knowledge.policies"
+    },
+    {
+      "key": "knowledge.route.read_a_department_s_procedure_sop_",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.sops"
     },
     {
       "key": "knowledge.route.read_how_to_use_a_screen_in_the_user_guide",
@@ -2365,6 +2883,50 @@
       "screen": "ess.policy-updates"
     },
     {
+      "key": "knowledge.route.remind_people_overdue_on_a_course",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.training"
+    },
+    {
+      "key": "knowledge.route.start_a_new_sop",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.sops"
+    },
+    {
+      "key": "knowledge.route.take_a_course_or_see_my_certificates",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "ess.my-training"
+    },
+    {
+      "key": "knowledge.route.write_change_or_publish_an_sop",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.sops"
+    },
+    {
       "key": "knowledge.route.write_or_publish_a_policy",
       "kind": "route",
       "module_key": "knowledge",
@@ -2374,6 +2936,193 @@
       "schema": null,
       "schema_sha": null,
       "screen": "knowledge.policies"
+    },
+    {
+      "key": "partnerships.route.add_a_partner_already_signed",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.partners"
+    },
+    {
+      "key": "partnerships.route.add_a_partnership_lead_or_prospect",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.leads"
+    },
+    {
+      "key": "partnerships.route.generate_send_or_renew_an_agreement",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.contracts-and-mous"
+    },
+    {
+      "key": "partnerships.route.log_a_call_or_meeting_with_a_partner",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.partners"
+    },
+    {
+      "key": "partnerships.route.move_a_deal_or_set_its_health",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.pipeline"
+    },
+    {
+      "key": "partnerships.route.see_agreements_mous_and_contracts_or_which_renewals_are_due",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.contracts-and-mous"
+    },
+    {
+      "key": "partnerships.route.see_partnership_analytics_each_lead_owner_s_prospects_meetings_proposals_and_signings",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.analytics"
+    },
+    {
+      "key": "partnerships.route.see_proposals_sent_viewed_accepted_or_declined",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.proposals"
+    },
+    {
+      "key": "partnerships.route.see_the_leads_and_their_status",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.leads"
+    },
+    {
+      "key": "partnerships.route.see_the_partners_and_their_360",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.partners"
+    },
+    {
+      "key": "partnerships.route.see_the_partnership_pipeline_stalled_deals_and_what_has_waited_longest",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.pipeline"
+    },
+    {
+      "key": "partnerships.route.set_up_a_category",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.categories"
+    },
+    {
+      "key": "partnerships.route.write_a_proposal_for_a_partner_or_lead",
+      "kind": "route",
+      "module_key": "partnerships",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "partnerships.proposals"
+    },
+    {
+      "key": "payroll.route.my_payslip",
+      "kind": "route",
+      "module_key": "payroll",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "ess.my-payslips"
+    },
+    {
+      "key": "payroll.route.record_a_salary_advance",
+      "kind": "route",
+      "module_key": "payroll",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "payroll.deductions"
+    },
+    {
+      "key": "payroll.route.run_payroll",
+      "kind": "route",
+      "module_key": "payroll",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "payroll.payroll-runs"
+    },
+    {
+      "key": "payroll.route.turn_on_advanced_payroll",
+      "kind": "route",
+      "module_key": "payroll",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "payroll.configurations"
     },
     {
       "key": "people.route.add_a_department",
@@ -2860,6 +3609,17 @@
       "screen": "recruitment.vacancies"
     },
     {
+      "key": "recruitment.route.change_who_signs_offers_for_the_company",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
+    },
+    {
       "key": "recruitment.route.fill_in_my_interview_card",
       "kind": "route",
       "module_key": "recruitment",
@@ -2893,6 +3653,17 @@
       "screen": "recruitment.candidates"
     },
     {
+      "key": "recruitment.route.make_an_offer_to_a_candidate",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
+    },
+    {
       "key": "recruitment.route.mark_the_answers_of_finished_assessments",
       "kind": "route",
       "module_key": "recruitment",
@@ -2924,6 +3695,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.candidates"
+    },
+    {
+      "key": "recruitment.route.see_offers_waiting_to_be_sent",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.offers"
     },
     {
       "key": "recruitment.route.send_an_assessment_to_the_candidates_of_a_role",
@@ -3176,6 +3958,39 @@
       "bulk": null,
       "schema": "leave.LeaveSummaryQuery",
       "schema_sha": "69b79fd857991372",
+      "screen": null
+    },
+    {
+      "key": "partnership_returns.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partnership_analytics.ReturnsSummaryQuery",
+      "schema_sha": "b84e01db0752ef79",
+      "screen": null
+    },
+    {
+      "key": "partnerships.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partnership_analytics.PartnershipSummaryQuery",
+      "schema_sha": "a8a9d28b3fbc7b38",
+      "screen": null
+    },
+    {
+      "key": "payroll.month",
+      "kind": "summary",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payroll.PayrollMonthQuery",
+      "schema_sha": "de1924c7adf48630",
       "screen": null
     },
     {

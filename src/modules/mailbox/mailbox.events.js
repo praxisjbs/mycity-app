@@ -53,6 +53,13 @@ const EVENTS = defineEvents("mailbox", {
   "mail_thread.summarised": {
     summary: "Summarise Thread kept a fresh summary of a conversation",
   },
+  // Link to Partner and Unlink (docs/guides/partnerships.md §6.15; mailbox/binding/).
+  "mailbox.thread_bound": {
+    summary: "A conversation was linked to a lead or partner in Partnerships",
+  },
+  "mailbox.thread_unbound": {
+    summary: "A conversation was unlinked from its lead or partner",
+  },
 });
 
 defineDocumentType("mail_attachment", {

@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 03/11/2026 |
+| Last changed | 11/11/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -194,7 +194,10 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 
 - One path: `queries.service.raise()` for the form, a rule, the AI's route and a script.
 - Subject 4 to 150 characters, details 20 to 4,000. The employee must be active and must not be the
-  person raising it.
+  person raising it. Raise a Query's Employee picker offers only those: it asks `GET /employees` for
+  `status=active` and `exclude_self=true`, so the raiser and a leaver are never offered and
+  `QUERY_SELF` or `EMPLOYEE_NOT_ACTIVE` is met only by a call that bypasses the screen (fault #9 of
+  the 11/11 brief).
 - `response_due_at` is raised-at plus the response window, **24 hours** (MyCity's handbook §4.7.1:
   "not later than 24 hours after receipt"; AJ, 27/10/2026), a constant (`RESPONSE_HOURS`) until a
   setting is asked for. After it passes without a response the query still waits, and a decision may
@@ -314,7 +317,9 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
 - A fine is never a rung: it attaches to any sanction (property damage, deducted from salary).
 - Amount `numeric(18,2)` in Naira, a string on the wire, above 0.00.
 - It is `pending` once the sanction is issued, and reaches the payroll run only when M6 accepts it
-  (`sanctions.fines.accept`) or is waived with a reason. It is never automatic.
+  (`sanctions.fines.accept`) or is waived with a reason. It is never automatic. Payroll may give an accepted
+  fine back (`sanctions.fines.release`, accepted to pending) while none of its instalments is in a run, and settles
+  it (`settle`) when the last instalment is applied by an approved run.
 - **Salary Deduction letter.** A sanction issued with a fine sends a second letter beside its rung's:
   `salary-deduction-letter`, the one shipped template of purpose `fine`, quoting the amount through
   `shared/money` (`{{ money fine_amount }}`). It is generated, numbered and filed in the same
@@ -413,7 +418,7 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | `sanction.proposed` | A sanction is proposed from a query's decision | Opens `queries.consequence`; the engine tells the first approvers, who decide on the query's card |
 | `query_rule.fired` | A rule raised a query | Recent Firings refresh |
 | `query_rule.saved`, `query_rule.activated`, `query_rule.paused` | Rules writes | Audit |
-| `sanction.issued` | `queries.consequence` approved | Numbered; letter generated, filed, emailed with the PDF once rendered (`templates/email/sanction-issued.html`); fine pending; query resolved; notification to the employee |
+| `sanction.issued` | `queries.consequence` approved | Numbered; letter generated, filed, emailed with the PDF once rendered (`templates/email/sanction-issued.html`); fine pending; query resolved; notification to the employee; and, when it carries a fine, payroll edit holders are told "Fine Waiting for Payroll" after commit (an outbox handler of `deductions.events.js`, M6 PR 3) |
 | `sanction.rejected` | The approval rejected it | Query back under review; the proposer is told |
 | `sanction.withdrawn` | The approval was withdrawn | Query back under review |
 | `consequence_step.saved` | Chain Settings writes | Audit |
@@ -595,6 +600,10 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 11/11/2026 · JP · Fault #9 of the 11/11 staging brief (`QUERY_SELF: employee_id` at `POST /queries`): Raise a Query's Employee picker offered the raiser and anyone archived or suspended, and only the server refused them. It now asks for active people with the new `exclude_self` filter on `GET /employees` (`foundation.md` §5), so neither is offered (§6.2).
+- 09/11/2026 · JP · M6 PR 3 (`payroll.md` §6.6, §7): a sanction issued with a fine now tells the holders of `payroll` edit "Fine Waiting for Payroll", from an outbox handler of `deductions.events.js` on `sanction.issued` (§7); the fine's events `sanction_fine.accepted`, `.waived` and `.released` are written by `sanctions.fines` when Payroll · Deductions accepts, waives or releases it. Nothing in the sanctions module changed.
+- 09/11/2026 · JP · M6 PR 2 (`payroll.md` §6.6 rule 5): `sanctions.fines.release(client, id, actor, reason)` returns a fine payroll had accepted to `pending`, so it can be accepted again or waived (§6.6); it writes `sanction_fine.released` and refuses a fine not accepted (409 `FINE_NOT_MOVABLE`). That no instalment is yet in a run is payroll's rule to hold, not the fine's. The run's lock settles a fine whose last instalment applied through the existing `settle`.
+- 06/11/2026 · JP · The `templates` module gains `templates.agreements`, the wording of Partnerships' agreement templates on the same `template_version` store (`docs/guides/partnerships.md` §6.8, M7 PR 2). Letter templates, their routes, variables and screen are unchanged.
 - 04/11/2026 · GE · (Ose) A letter template edited in Settings (Markdown) and its preview escape each name once
   (`renderMarkdown`): a name such as O'Brien prints as written, never "O&#39;Brien", and a value can never
   become Markdown in the letter. Found by the M4 audit of the candidate emails, which share the renderer.

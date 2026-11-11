@@ -36,8 +36,8 @@ import { FooterContext, HostContext, IN_FOOTER, OverlayContext, escapeClosesList
 /** Content, or a function of `close` so a form can close its own modal after saving. */
 export type ModalContent = ReactNode | ((close: () => void) => ReactNode);
 
-const WIDTH = { sm: "max-w-sm", md: "max-w-lg", wide: "max-w-3xl" } as const;
-const SIDE_WIDTH = { sm: "max-w-sm", md: "max-w-md", wide: "max-w-2xl" } as const;
+const WIDTH = { sm: "max-w-sm", md: "max-w-lg", wide: "max-w-3xl", xl: "max-w-6xl" } as const;
+const SIDE_WIDTH = { sm: "max-w-sm", md: "max-w-md", wide: "max-w-2xl", xl: "max-w-3xl" } as const;
 
 export interface ModalProps {
   /** Whether it is showing. */
@@ -54,8 +54,8 @@ export interface ModalProps {
   footer?: ModalContent;
   /** The wider desktop dialog (tables, documents). Same as size="wide". */
   wide?: boolean;
-  /** Desktop width: `sm` a confirmation, `md` a form (the default), `wide` a table or document. */
-  size?: "sm" | "md" | "wide";
+  /** Desktop width: `sm` a confirmation, `md` a form (the default), `wide` a table or document, `xl` a record whose cards sit side by side (an interview, an offer). */
+  size?: "sm" | "md" | "wide" | "xl";
   /** A full-screen sheet on a phone (a composer, a long form, a reader). No change on desktop. */
   full?: boolean;
   /** A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. */

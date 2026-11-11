@@ -6,10 +6,14 @@ const { readUpload } = require("../../middleware/upload");
 const service = require("./mailbox.service");
 const assist = require("./mailbox.assist");
 const signatures = require("./signature/signature.service");
+const mailContext = require("./binding/mail-context.service");
 
 const id = (req) => req.validated.params.id;
 
 module.exports = {
+  partnerContext: async (req, res) => ok(res, await mailContext.get(id(req), req.user)),
+  linkPartner: async (req, res) => ok(res, await mailContext.bind(id(req), req.validated.body, req.user)),
+  unlinkPartner: async (req, res) => ok(res, await mailContext.unbind(id(req), req.user)),
   connection: async (req, res) =>
     ok(res, await service.getConnection(req.user)),
   connect: async (req, res) =>

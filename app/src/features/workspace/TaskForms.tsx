@@ -11,6 +11,7 @@ import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
 import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatMonth, Grid, LoadingRows, Pill, RecordPicker, SelectField, shortMessage, TextAreaField, TextField, TimeField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { LABEL, refresh, refreshed, say, STATUS_TONE, useLateOptions, useSetsForOthers, type BoardStatus, type LateReason, type Status } from "./shared";
+import { linkBody, linkEdit, linkOf, linkProblem, NO_LINK, PartnerLinkFields, type PartnerLinkValue } from "./PartnerLink";
 
 /** A 422's field marks on the form; anything else as a toast. */
 /** The most people a shared task takes besides its lead (tasks.service: "At most 25 people"). */
@@ -85,6 +86,7 @@ export function TaskForm({
   commitment = false,
   dueOn,
   project: inProject,
+  link: inLink,
 }: {
   close: () => void;
   task?: TaskDetail;
@@ -92,6 +94,8 @@ export function TaskForm({
   dueOn?: string;
   /** New Task on a project's page: the task joins it unless changed. */
   project?: ProjectChoice;
+  /** New Task from a Partner 360 or a Lead 360: already connected (partnerships.md §6.16). */
+  link?: PartnerLinkValue;
 }) {
   const me = useMe();
   const months = commitmentMonths();
@@ -156,6 +160,9 @@ export function TaskForm({
     return now !== (task?.project?.project_id ?? null) ? { project_id: now } : {};
   };
   const canAssign = !task || task.can_reassign;
+  // Connect to Partner (workspace.md §6): the task's own, the 360 it was opened from, or none.
+  const [link, setLink] = useState<PartnerLinkValue>(task ? linkOf(task.partner_link) : (inLink ?? NO_LINK));
+  const [linkMark, setLinkMark] = useState<{ record?: string; deal?: string } | null>(null);
   // An approved commitment keeps its person, mark, month and criteria; its date may still move.
   const fixed = Boolean(task?.is_commitment && task.original_due_at);
   // A commitment is its lead's: the people sharing a task leave the mark to the lead and whoever manages it.
@@ -236,7 +243,7 @@ export function TaskForm({
     try {
       if (task) {
         const { title, cadence, due_on, priority, description } = editFields(v);
-        const managed = task.can_reassign ? { title, cadence, due_on, ...leading(), ...sharing(), ...pointer(), ...moved() } : {};
+        const managed = task.can_reassign ? { title, cadence, due_on, ...leading(), ...sharing(), ...pointer(), ...moved(), ...linkEdit(linkOf(task.partner_link), link) } : {};
         const body = { priority, description, ...managed, ...commitmentBody(v) };
         await editTask.run({ params: { id: task.task_id }, body: body as never });
         toast("Task saved");
@@ -250,6 +257,7 @@ export function TaskForm({
             ...(v.due_on && { due_on: v.due_on }),
             ...(v.description && { description: v.description }),
             ...(project[0] && { project_id: project[0].project_id }),
+            ...linkBody(link),
             ...leading(),
             ...sharing(),
             ...(watchers.length > 0 && { watcher_ids: watchers.map((p) => p.employee_id) }),
@@ -264,6 +272,10 @@ export function TaskForm({
       refresh();
       close();
     } catch (e) {
+      // A refusal of the partner or the deal is marked on its field.
+      const onLink = linkProblem(e);
+      setLinkMark(onLink);
+      if (onLink) return;
       const raw = e instanceof ApiError ? (e.fields.member_ids ?? e.fields.department_id)?.[0] : undefined;
       const mark = raw ? shortMessage({ type: "custom", message: raw }) : undefined;
       const onLead = e instanceof ApiError ? e.fields.primary_assignee_id?.[0] : undefined;
@@ -393,6 +405,17 @@ export function TaskForm({
         <Field label="Project" optional>
           <ProjectPicker value={project} onChange={setProject} />
         </Field>
+      )}
+      {canAssign && (
+        <PartnerLinkFields
+          value={link}
+          onChange={(v) => {
+            setLink(v);
+            setLinkMark(null);
+          }}
+          view={task?.partner_link}
+          problem={linkMark}
+        />
       )}
       {canAssign && (
         <Field label="Cadence" optional help="Daily is due by the end of the day. Weekly is due by the end of the week.">

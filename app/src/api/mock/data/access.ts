@@ -17,9 +17,14 @@ export const CAPABILITIES = [
   { code: "home.reports", name: "Run Reports", description: "Build, schedule and run reports on Home, and receive them." },
   { code: "home.team", name: "View Team", description: "Open the Team tab on Home: who is in today and the team's figures." },
   { code: "mailbox.signature", name: "Configure Signature", description: "Set the company's signature links and what shows on everyone's email signature." },
+  { code: "partnerships.configure", name: "Configure Partnerships", description: "Set up the partnership categories with their agreement templates, delivery checklists and custom fields, the pipeline's stages and lists, the proof points and the saved proposal templates." },
+  { code: "partnerships.money", name: "See Commission and Returns", description: "See and enter commission, the merchant's take and returns, and import returns." },
+  { code: "payroll.configure", name: "Configure Payroll", description: "Switch the advanced option on or off, set the pay day and the bank rule, and enter the statutory rates, bands, salary grades and pay components." },
   { code: "performance.manage", name: "Run Performance", description: "Run the cycle: quarters and their rules, rounds, reviewer changes, conduct, improvement plans, probation outcomes and imports." },
   { code: "policies.manage", name: "Manage Policies", description: "Write, publish, withdraw and archive company policies, and see who has acknowledged them." },
   { code: "queries.configure", name: "Configure Queries", description: "Write the query rules, the consequence chain and the letter templates." },
+  { code: "sops.manage", name: "Manage SOPs", description: "Write, publish and archive any department's SOPs." },
+  { code: "training.manage", name: "Manage Training", description: "Build, publish, assign and archive courses, and see everyone's progress and certificates." },
   { code: "workspace.late_reasons", name: "Manage Late Reasons", description: "Add the reasons Why Late offers on a late task, and switch them off or on." },
 ];
 
@@ -30,8 +35,8 @@ const MANAGES = ["alerts.clear", "home.reports", "home.team"];
 /** Role code → the capabilities it holds by default. */
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
   implementation: EVERY,
-  operations_people: [...HOME, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
-  management: [...HOME, "goals.company", "goals.function", "goals.view_all", "workspace.late_reasons"],
+  operations_people: [...HOME, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "partnerships.configure", "partnerships.money", "payroll.configure", "performance.manage", "policies.manage", "queries.configure", "sops.manage", "training.manage", "workspace.late_reasons"],
+  management: [...HOME, "goals.company", "goals.function", "goals.view_all", "partnerships.money", "workspace.late_reasons"],
   head_of_department: [...MANAGES, "goals.function"],
   manager: MANAGES,
   administrator: ["mailbox.signature"],
@@ -39,11 +44,11 @@ export const ROLE_CAPABILITIES: Record<string, string[]> = {
 };
 
 /** What everyone in General Management, the CEO's department, holds without a role (the API's GENERAL_MANAGEMENT_CAPABILITIES). */
-export const GENERAL_MANAGEMENT_CAPABILITIES = ["goals.company", "goals.organisation", "goals.view_all"];
+export const GENERAL_MANAGEMENT_CAPABILITIES = ["goals.company", "goals.organisation", "goals.view_all", "partnerships.money"];
 
 /**
  * What a person holds: every capability for the CEO, else the union of their roles' and, for whoever sits in
- * General Management, the plan's three.
+ * General Management, the plan's three and partnerships' money.
  */
 export function capabilitiesOf(roleCodes: string[], isCeo: boolean, inGeneralManagement = false): string[] {
   if (isCeo) return [...EVERY];

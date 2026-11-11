@@ -12,6 +12,8 @@ import type { ApplicationStage, CandidateDetail } from "@mycity/contract/contrac
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import { saveFile } from "@/api/download";
 import { useAuth } from "@/auth/AuthProvider";
+import { useScreenState } from "@/lib/plan";
+import { useRouter } from "@/lib/router";
 import { paging } from "@/features/shared/wire";
 import {
   Button,
@@ -28,6 +30,9 @@ import {
   HelpTerm,
   KeyValue,
   LoadingRows,
+  Menu,
+  type MenuItem,
+  type IconName,
   NumberField,
   Pill,
   SelectField,
@@ -61,6 +66,9 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
   const score = useMutation("POST /api/v1/recruitment/candidates/:id/score");
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
   const reopen = useMutation("POST /api/v1/recruitment/candidates/:id/reopen");
+  // M5's Offers screen, once it opens in this build (F14): a shortlisted card makes an offer, one at Offer or after opens it.
+  const offers = useScreenState("recruitment", "offers").open;
+  const { navigate } = useRouter();
   const c = read.data;
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!c) return <LoadingRows count={8} />;
@@ -78,9 +86,39 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
     }
   };
   const live = c.status === "active";
-  // A form opened from here goes back to the sheet when it closes (the app holds one dialog at a time).
-  const back = () => modal.open({ title: c.name, wide: true, body: (done) => <CandidateSheet id={id} close={done} /> });
+  // A form opened from here sits over the candidate's dialog, which is still open when the form closes.
+  const back = () => modal.close();
   const mayScore = c.can_edit && ai.data?.available && c.cv_state === "clean" && c.screening_score === null;
+  type Act = { label: string; icon?: IconName; danger?: boolean; onSelect: () => unknown };
+  const editing = c.can_edit && live;
+  const ahead = editing ? nextAhead(c) : undefined;
+  const moveTo = (stage: string): Act => ({ label: `Move to ${words(stage)}`, onSelect: act(() => move.run({ params: { id }, body: { stage: stage as "application" } }), `Moved to ${words(stage)}`) });
+  // The one button in view, in this order: the next stage ahead, Make Offer, Reopen, Open Offer.
+  const offerStage = offers && STAGE_ORDER.indexOf(c.stage) >= STAGE_ORDER.indexOf("offer");
+  const makeOffer = offers && mayAdd && live && c.stage === "shortlist";
+  const mayReopen = mayEdit && c.status === "not_progressed" && role.data && role.data.status !== "closed";
+  const choices: Array<Act | false | undefined | null> = [
+    ahead ? moveTo(ahead) : null,
+    makeOffer && { label: "Make Offer", icon: "send", onSelect: () => (close(), navigate(`/recruitment?tab=offers&new=1&application=${c.application_id}`)) },
+    mayReopen && { label: "Reopen", icon: "refresh", onSelect: act(() => reopen.run({ params: { id }, body: {} }), `${c.name} reopened`) },
+    offerStage && { label: "Open Offer", icon: "doc", onSelect: () => (close(), navigate(`/recruitment?tab=offers&application=${c.application_id}`)) },
+  ];
+  const main = choices.find((x): x is Act => Boolean(x)) ?? null;
+  const rest: Act[] = [
+    ...choices.filter((x): x is Act => Boolean(x) && x !== main),
+    ...(editing && mayScore ? [{ label: "Score With AI", icon: "spark" as IconName, onSelect: act(() => score.run({ params: { id }, body: {} }), "CV read") }] : []),
+    ...(editing
+      ? [
+          { label: "Send Assessment", icon: "send" as IconName, onSelect: () => modal.open({ title: "Send Assessment", body: () => <SendForm candidate={c} close={back} onSent={reload} /> }) },
+          { label: "Schedule Interview", icon: "calendar" as IconName, onSelect: () => modal.open({ title: "Schedule Interview", wide: true, body: () => <ScheduleForm applicationId={c.application_id} close={back} onSaved={reload} /> }) },
+          ...c.next_stages.filter((s) => s !== ahead).map(moveTo),
+        ]
+      : []),
+    ...(mayAdd ? [{ label: "Add to Pool", icon: "star" as IconName, onSelect: () => modal.open({ title: "Add to Pool", body: () => <PoolForm candidate={c} close={back} /> }) }] : []),
+  ];
+  // Not Progressing on a closed role too, so the people left in it can be told; red, and last.
+  const stop: Act | null = c.can_not_progress ? { label: "Not Progressing", danger: true, onSelect: () => modal.open({ title: "Not Progressing", body: () => <NotProgressingForm candidate={c} close={back} onSaved={reload} /> }) } : null;
+  const more: MenuItem[] = [...rest, ...(stop ? (["sep", stop] as MenuItem[]) : [])];
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -110,7 +148,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
       />
       <Grid cols={2} className="mt-3">
         <Card>
-          <CardHeader title="Screening" />
+          <CardHeader title="Screening" level={3} />
           <KeyValue
             items={[
               [
@@ -130,7 +168,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
           {c.screening_summary && <p className="mt-2 text-sm" data-copy="content">{c.screening_summary}</p>}
         </Card>
         <Card>
-          <CardHeader title={<HelpTerm help={WEIGHTED_HELP}>Weighted Total</HelpTerm>} right={<span className="text-sm text-subtle-foreground">{`${c.parts_scored} of ${c.parts_active} parts`}</span>} />
+          <CardHeader level={3} title={<HelpTerm help={WEIGHTED_HELP}>Weighted Total</HelpTerm>} right={<span className="text-sm text-subtle-foreground">{`${c.parts_scored} of ${c.parts_active} parts`}</span>} />
           <p className="mb-2 text-2xl font-semibold tabular-nums">{c.weighted_total === null ? "–" : c.weighted_total.toFixed(1)}</p>
           <KeyValue
             items={c.scorecard
@@ -141,7 +179,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
       </Grid>
       {(c.answers.length > 0 || c.cover_letter) && (
         <Card className="mt-3" data-copy="content">
-          <CardHeader title="Application" />
+          <CardHeader title="Application" level={3} />
           {c.cover_letter && <p className="mb-2 text-sm whitespace-pre-line">{c.cover_letter}</p>}
           <KeyValue items={c.answers.map((a) => [a.prompt, a.answer === "yes" ? "Yes" : a.answer === "no" ? "No" : (a.answer ?? "–")])} layout="stacked" />
         </Card>
@@ -174,7 +212,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
         />
       )}
       <Card className="mt-3">
-        <CardHeader title="Stage History" />
+        <CardHeader title="Stage History" level={3} />
         <Timeline
           items={[...c.history].reverse().map((h, i) => ({
             title: words(h.to_state),
@@ -184,23 +222,14 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
           }))}
         />
       </Card>
+      {/* One button in view, the next step; the rest wait behind More Actions. */}
       <FormFooter>
-        <Button onClick={close}>Close</Button>
-        {c.can_edit && live && (
-          <>
-            {mayScore && <Button icon="spark" onClick={act(() => score.run({ params: { id }, body: {} }), "CV read")}>Score With AI</Button>}
-            <Button onClick={() => modal.open({ title: "Send Assessment", body: () => <SendForm candidate={c} close={back} onSent={reload} /> })}>Send Assessment</Button>
-            <Button onClick={() => modal.open({ title: "Schedule Interview", wide: true, body: () => <ScheduleForm applicationId={c.application_id} close={back} onSaved={reload} /> })}>Schedule Interview</Button>
-            {/* One filled button: the next stage ahead; the others (further on, or one back) stay outlined. */}
-            {c.next_stages.map((s) => (
-              <Button key={s} variant={s === nextAhead(c) ? "primary" : undefined} onClick={act(() => move.run({ params: { id }, body: { stage: s as "application" } }), `Moved to ${words(s)}`)}>{`Move to ${words(s)}`}</Button>
-            ))}
-          </>
+        {more.length > 0 && <Menu label="Candidate Actions" trigger={(p) => <Button {...p} icon="dots">More Actions</Button>} items={more} />}
+        {main && (
+          <Button variant="primary" icon={main.icon} onClick={main.onSelect}>
+            {main.label}
+          </Button>
         )}
-        {/* Not Progressing on a closed role too, so the people left in it can be told. */}
-        {c.can_not_progress && <Button variant="danger" onClick={() => modal.open({ title: "Not Progressing", body: () => <NotProgressingForm candidate={c} close={back} onSaved={reload} /> })}>Not Progressing</Button>}
-        {mayAdd && <Button onClick={() => modal.open({ title: "Add to Pool", body: () => <PoolForm candidate={c} close={back} /> })}>Add to Pool</Button>}
-        {mayEdit && c.status === "not_progressed" && role.data && role.data.status !== "closed" && <Button variant="primary" onClick={act(() => reopen.run({ params: { id }, body: {} }), `${c.name} reopened`)}>Reopen</Button>}
       </FormFooter>
     </>
   );

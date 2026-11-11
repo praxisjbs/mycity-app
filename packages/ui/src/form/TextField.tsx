@@ -110,6 +110,8 @@ export interface NumberFieldProps extends BoundProps, NativeInput {
   decimal?: boolean;
   /** Allow a minus before the figure (a fall, a loss). Off: zero and above only. */
   signed?: boolean;
+  /** A whole number between min and max with a minus and a plus either side, the figure centred (the public site's Years of Experience). Typing still works. */
+  stepper?: { min: number; max: number };
 }
 
 /**
@@ -117,12 +119,45 @@ export interface NumberFieldProps extends BoundProps, NativeInput {
  * any other sign never gets in, so "64,000" arrives as 64000; signed keeps a leading minus, the
  * screen's own "−" included.
  */
-export function NumberField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, decimal, signed, className, id, ...rest }: NumberFieldProps) {
+export function NumberField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, decimal, signed, stepper, className, id, ...rest }: NumberFieldProps) {
   const a = useFieldControl({ id, state });
   const clean = (s: string) => {
     const digits = decimal ? s.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1") : s.replace(/\D/g, "");
     return signed && /^\s*[-−]/.test(s) ? `-${digits}` : digits;
   };
+  if (stepper) {
+    const n = value === "" || value == null ? null : Number(value);
+    const step = (by: number) => {
+      const next = Math.min(stepper.max, Math.max(stepper.min, (n ?? (by > 0 ? stepper.min - 1 : stepper.min + 1)) + by));
+      onChange(String(next));
+    };
+    const side = "grid w-12.5 flex-none place-items-center text-foreground transition-colors hover:bg-canvas-hover disabled:opacity-40";
+    return (
+      <span
+        className={cn(
+          "flex h-control items-stretch overflow-hidden rounded-ctl border bg-background focus-within:border-ring phone:h-12",
+          a.state === "bad" ? "border-destructive" : a.state === "good" ? "border-success" : "border-input",
+          className,
+        )}
+      >
+        <button type="button" className={side} aria-label="One Fewer" disabled={n !== null && n <= stepper.min} onClick={() => step(-1)} onBlur={onBlur}>
+          <Icon name="minus" size="m" />
+        </button>
+        <input
+          {...rest}
+          {...a}
+          inputMode="numeric"
+          className="w-full min-w-0 border-0 bg-transparent text-center text-lg font-semibold tabular-nums outline-none"
+          value={value ?? ""}
+          onChange={(e) => onChange(clean(e.target.value))}
+          onBlur={onBlur}
+        />
+        <button type="button" className={side} aria-label="One More" disabled={n !== null && n >= stepper.max} onClick={() => step(1)} onBlur={onBlur}>
+          <Icon name="plus" size="m" />
+        </button>
+      </span>
+    );
+  }
   return (
     <span className="relative flex items-center">
       <input

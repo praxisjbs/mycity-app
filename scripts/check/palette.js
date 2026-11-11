@@ -44,6 +44,10 @@ const HEX_ALLOWED = [
   { file: "app/public/favicon-staging.svg", why: "the staging tab icon, drawn the same way" },
   { file: "public-app/public/favicon.svg", why: "the tab icon: the browser draws it outside the page, without the page's CSS" },
   { file: "public-app/public/favicon-staging.svg", why: "the staging tab icon, drawn the same way" },
+  {
+    file: "packages/ui/src/documents/proposal-kit.sample.html",
+    why: "the proposal kit's gallery page, a document the server draws into a sealed frame that cannot read the page's variables; its colours are tokens.css's, written by scripts/gen/proposal-kit.js",
+  },
 ];
 
 /** Where frontend source lives: folders walked whole, and the apps' root files. */

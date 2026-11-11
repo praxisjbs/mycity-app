@@ -3,12 +3,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { SEATS, VACANCIES } from "@/api/mock/data/recruitment";
-import { copyProblems, dialog, openAs, openRow, press, settled, type } from "./testKit";
+import { copyProblems, dialog, moreActions, openAs, openRow, press, settled, type } from "./testKit";
 
 /**
  * Recruitment · Vacancies on the in-browser mock (docs/guides/recruitment.md §6.1, §10): the four
  * figures and the list; a role's sheet with MyCity's ten interview traits and its lifecycle; New
- * Vacancy through its four steps to a published role; Pause asks nothing more and is undone by Resume.
+ * Vacancy from a seat (its interview) and through its editor to a published role; Pause asks nothing more and is undone by Resume.
  */
 
 vi.mock("@/api/mock/core", async (importOriginal) => {
@@ -49,7 +49,10 @@ describe("Recruitment · Vacancies", () => {
     expect(within(sheet).getByText("Appearance and Grooming")).toBeTruthy();
     expect(within(sheet).getByText("Future Growth Potential in Career")).toBeTruthy();
     expect(within(sheet).getByText(/go\.mycityapp\.io\/jobs\//)).toBeTruthy();
-    for (const name of ["Edit", "Questions", "Scorecard", "Pause", "See Candidates"]) expect(within(sheet).getByRole("button", { name })).toBeTruthy();
+    // One button in view, the lifecycle's next step; the rest behind More Actions, Close Vacancy last.
+    expect(within(sheet).getByRole("button", { name: "Pause" })).toBeTruthy();
+    expect(within(sheet).queryByRole("button", { name: "Edit Vacancy" })).toBeNull();
+    expect(await moreActions(sheet)).toEqual(["See Candidates", "Edit Vacancy", "Questions", "Scorecard", "Close Vacancy"]);
     // The description is drawn from its blocks: real headings and lists, never the Markdown's marks.
     expect(within(sheet).getByRole("heading", { name: "Key Responsibilities" })).toBeTruthy();
     expect(within(sheet).getAllByRole("listitem").length).toBeGreaterThan(3);
@@ -58,12 +61,29 @@ describe("Recruitment · Vacancies", () => {
     expect(copyProblems()).toEqual([]);
   }, 60000);
 
-  it("Create Vacancy from the Organogram opens New Vacancy with the seat's department, line and manager", async () => {
+  it("View Empty Seats lists the seats with no vacancy, and Create Vacancy starts New Vacancy from one", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
+    // The seats wait behind their button; the page holds the list alone.
+    expect(screen.queryByText("Finance Officer")).toBeNull();
+    expect(screen.queryByText("Funnel, All Roles")).toBeNull();
+    await press(document.body, "View Empty Seats");
+    const seats = dialog();
+    expect(within(seats).getByText("Finance Officer")).toBeTruthy();
+    expect(within(seats).getByText("City Editor, Abuja")).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+    expect(await axe(document.body)).toHaveNoViolations();
+    await press(within(seats).getByText("Finance Officer").closest("tr")!, "Create Vacancy");
+    const form = dialog();
+    expect((within(form).getByLabelText("Job Title") as HTMLInputElement).value).toBe("Finance Officer");
+  }, 60000);
+
+  it("Create Vacancy from the Organogram opens New Vacancy's interview with the seat's role, department and manager answered", async () => {
     await openAs("cynthia@mycityapp.io", `/recruitment?tab=vacancies&new=1&title=City+Editor%2C+Abuja&org_seat_id=${SEATS[1]!.org_seat_id}`);
     await settled();
-    const form = dialog();
+    let form = dialog();
     expect((within(form).getByLabelText("Job Title") as HTMLInputElement).value).toBe("City Editor, Abuja");
-    await settled();
+    await press(form, "Next");
+    form = dialog();
     expect(within(form).getByLabelText("Department").textContent).toContain("Content");
     expect(within(form).getByText(/Cynthia/)).toBeTruthy();
   }, 60000);
@@ -77,10 +97,11 @@ describe("Recruitment · Vacancies", () => {
     expect(byTitle("Graphics and Motion Designer").status).toBe("open");
   }, 60000);
 
-  it("New Vacancy: three steps, each checked before the next, to a published remote role", async () => {
+  it("New Vacancy's editor (Use Blank Form): three steps, each checked before the next, to a published remote role", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
     fireEvent.click(screen.getAllByRole("button", { name: /New Vacancy/ })[0]!);
     await settled();
+    await press(dialog(), "Use Blank Form");
     let form = dialog();
     expect(copyProblems()).toEqual([]);
 
@@ -115,7 +136,7 @@ describe("Recruitment · Vacancies", () => {
     setViewport(390);
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
     const sheet = await openRow("Head, Sales & Revenue");
-    expect(within(sheet).getByRole("button", { name: "See Candidates" })).toBeTruthy();
+    expect(await moreActions(sheet)).toContain("See Candidates");
     expect(copyProblems()).toEqual([]);
   }, 60000);
 });

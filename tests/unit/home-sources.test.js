@@ -12,8 +12,7 @@
  *    what a later milestone must keep true (each function is run against a client that
  *    records its SQL, and the SQL is checked by the schema gate's own rules against a
  *    schema in which a declared table has only its declared columns);
- *  - a sum of money counts Naira only;
- *  - payroll, with no table yet, declares and runs nothing.
+ *  - a sum of money counts Naira only.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -58,7 +57,7 @@ const CALLS = {
     reviewerDuePage: [{ today: TODAY, employee_id: ID }, QUERY],
   },
   vacancies: { openCount: [TEAM], openPage: [TEAM, QUERY], stalledBatch: [{ before: NOW, after: ID, size: 100 }] },
-  payroll: {},
+  payroll: { inProgressCount: [TEAM], inProgressPage: [TEAM, QUERY] },
   partners: {
     pipelineCount: [TEAM],
     pipelinePage: [TEAM, QUERY],
@@ -173,11 +172,6 @@ describe("money and the adapters", () => {
       expect(sql).toMatch(/currency = 'NGN'/);
     },
   );
-
-  test("payroll declares no table and runs no query until M6 builds one", () => {
-    expect(adapters.payroll.tables).toEqual({});
-    expect(queryFunctions(adapters.payroll)).toEqual([]);
-  });
 
   test("the schema check used here does catch a column an adapter did not declare", () => {
     const narrowed = declaredOnly({ tables: { task: ["task_id"] } });

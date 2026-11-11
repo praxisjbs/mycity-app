@@ -51,6 +51,25 @@ describe("SignatureField", () => {
     expect(pad.className).toContain("text-paper-heading");
   });
 
+  it("pad: the box with its line and hint, Clear inside it only once something is drawn, and the PNG on paper", async () => {
+    const onChange = vi.fn();
+    const ref = createRef<SignatureFieldHandle>();
+    render(<SignatureField ref={ref} look="pad" hint="Draw your signature here" label="Signature box" onChange={onChange} />);
+    const canvas = screen.getByRole("img", { name: "Signature box" });
+    const box = canvas.parentElement!;
+    expect(box).toHaveClass("ps-pad");
+    expect(box).toHaveAttribute("data-pull", "off");
+    expect(screen.getByText("Draw your signature here")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+    await sign(canvas);
+    expect(onChange).toHaveBeenLastCalledWith(true);
+    expect(box).toHaveAttribute("data-inked");
+    expect(ref.current?.toPng()).toMatch(/^data:image\/png/);
+    await userEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(onChange).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  });
+
   it("says the moment the first stroke lands", async () => {
     const onChange = vi.fn();
     render(<SignatureField label="Your Signature" onChange={onChange} />);

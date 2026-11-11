@@ -26,6 +26,24 @@ describe("StickyColumns", () => {
     expect(a!.className).toContain("lg:sticky-col");
   });
 
+  it("lays the public site's aside and side columns from 1041 px", () => {
+    const { container, rerender } = render(
+      <StickyColumns layout="aside">
+        <aside>Teams</aside>
+        <div>Roles</div>
+      </StickyColumns>,
+    );
+    expect(container.firstElementChild!.className).toContain("lg:cols-aside");
+    rerender(
+      <StickyColumns layout="side" phoneFirst={1}>
+        <article>Role Overview</article>
+        <aside>The Role</aside>
+      </StickyColumns>,
+    );
+    expect(container.firstElementChild!.className).toContain("lg:cols-side");
+    expect(container.firstElementChild!.children[1]!.className).toContain("max-lg:order-first");
+  });
+
   it("sticks a column that fits at the top, and rests a taller one on its foot", () => {
     vi.spyOn(window, "innerHeight", "get").mockReturnValue(900);
     heights({ Pane: 600, Form: 2000 });

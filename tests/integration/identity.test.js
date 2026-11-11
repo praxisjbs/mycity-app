@@ -597,6 +597,8 @@ describeDb("identity against the real migrations", () => {
         /* 1180: a birthday known only as a day and month, filled by the staff loader. */
         "birth_day",
         "birth_month",
+        /* 5040: the BVN, entered by a new hire on the onboarding upload page (M5). */
+        "bvn",
         "dotted_manager_id",
         "dotted_manager_seat_id",
         /* F27: picked on My Profile after sign-in; a terminal cannot pick an address. */
@@ -604,8 +606,13 @@ describeDb("identity against the real migrations", () => {
         "left_on",
         "line_manager_id",
         "line_manager_seat_id",
+        /* 6020: the tax and pension numbers payroll's statutory report reads, entered on the record when known. */
+        "nhf_number",
+        "pension_administrator",
+        "pension_pin",
         /* 1170: no photo until the person adds one on My Profile. */
         "photo_document_id",
+        "tax_id",
         "worksite_id",
       ]);
       const row = await one(

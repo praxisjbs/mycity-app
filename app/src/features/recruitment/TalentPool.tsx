@@ -15,6 +15,8 @@ import { PagedTable } from "@/features/shared/sections";
 import { useSearchParams } from "@/lib/router";
 import {
   Button,
+  Card,
+  CardHeader,
   ExportButton,
   Field,
   FilterSelect,
@@ -23,6 +25,7 @@ import {
   FormFooter,
   HelpTerm,
   KeyValue,
+  ListDetail,
   PageHeader,
   Pill,
   SelectField,
@@ -31,6 +34,7 @@ import {
   useConfirm,
   useContractForm,
   useModal,
+  useSideBySide,
 } from "@mycity/ui";
 import { say, sayRefusal, ScoreText, useVacancyOptions } from "./shared";
 
@@ -47,8 +51,18 @@ export function TalentPool() {
   const [invited, setInvited] = useState("");
   const summary = useApi("GET /api/v1/recruitment/pool/summary");
   const list = usePaged("GET /api/v1/recruitment/pool", { filters: invited ? { invited: invited as "true" } : {} });
-  const open = (p: PoolEntry) =>
-    modal.open({ title: p.name, body: (close) => <PoolSheet entry={p} close={close} mayInvite={can("recruitment", "edit")} mayRemove={can("recruitment", "delete")} /> });
+  const mayInvite = can("recruitment", "edit");
+  const mayRemove = can("recruitment", "delete");
+  // On a wide desktop a person sits beside the list (F31), the first one until another is pressed;
+  // on a phone, and where two columns do not fit, they open in the sheet or dialog.
+  const beside = useSideBySide();
+  const [picked, setPicked] = useState<PoolEntry | null>(null);
+  const shown = (picked && list.rows.find((p) => p.talent_pool_entry_id === picked.talent_pool_entry_id)) ?? picked ?? (beside ? (list.rows[0] ?? null) : null);
+  const open = (p: PoolEntry) => {
+    if (!beside) return modal.open({ title: p.name, body: (close) => <PoolSheet entry={p} close={close} mayInvite={mayInvite} mayRemove={mayRemove} /> });
+    modal.close();
+    setPicked(p);
+  };
 
   const [params, setParams] = useSearchParams();
   const linked = params.get("id");
@@ -80,43 +94,59 @@ export function TalentPool() {
         items={[
           { label: "In the Pool", value: counted(s?.in_pool) },
           { label: "Invited Back", value: counted(s?.invited_back) },
-          { label: "Hired From the Pool", value: counted(s?.hired_from_pool), tone: "ok" },
+          { label: "Hired From the Pool", value: counted(s?.hired_from_pool), tone: s?.hired_from_pool ? "ok" : undefined },
           { label: "Average Score", value: counted(s?.average_score) },
         ]}
       />
       <Toolbar>
         <FilterSelect label="Invited" value={invited} onChange={setInvited} options={INVITED} />
       </Toolbar>
-      <PagedTable<PoolEntry>
-        title="Talent Pool"
-        list={list}
-        search="Search the pool"
-        rowKey={(p) => p.talent_pool_entry_id}
-        noun="person"
-        nounPlural="people"
-        onRowClick={open}
-        empty={{ title: "Nobody in the Pool" }}
-        columns={[
-          { key: "who", label: "Candidate", render: (p) => <span className="font-semibold">{p.name}</span> },
-          { key: "for", label: "Applied For", render: (p) => p.applied_for?.title ?? "–" },
-          { key: "score", label: "Score", render: (p) => <ScoreText score={p.score} provisional={p.score_provisional} /> },
-          { key: "added", label: "Added", render: (p) => formatDate(p.created_at), desktop: true },
-          { key: "reason", label: "Reason", render: (p) => p.reason, desktop: true },
-          { key: "kept", label: <HelpTerm help={KEPT_HELP}>Kept Until</HelpTerm>, render: (p) => formatDate(p.expires_at) },
-          { key: "invite", label: "Invited", render: (p) => (p.invited_at ? <Pill tone="info">Invited</Pill> : "–") },
-        ]}
+      <ListDetail
+        open={false}
+        onClose={() => setPicked(null)}
+        title="Candidate"
+        list={
+          <PagedTable<PoolEntry>
+            title="Talent Pool"
+            list={list}
+            search="Search the pool"
+            rowKey={(p) => p.talent_pool_entry_id}
+            noun="person"
+            nounPlural="people"
+            onRowClick={open}
+            selectedKey={beside ? shown?.talent_pool_entry_id : undefined}
+            empty={{ title: "Nobody in the Pool" }}
+            columns={[
+              { key: "who", label: "Candidate", render: (p) => <span className="font-semibold">{p.name}</span> },
+              { key: "for", label: "Applied For", render: (p) => p.applied_for?.title ?? "–" },
+              { key: "score", label: "Score", align: "n", render: (p) => <ScoreText score={p.score} provisional={p.score_provisional} /> },
+              { key: "added", label: "Added", render: (p) => formatDate(p.created_at), desktop: true },
+              { key: "reason", label: "Reason", render: (p) => p.reason, desktop: true },
+              { key: "kept", label: <HelpTerm help={KEPT_HELP}>Kept Until</HelpTerm>, render: (p) => formatDate(p.expires_at) },
+              { key: "invite", label: "Invited", render: (p) => (p.invited_at ? <Pill tone="info">Invited</Pill> : "–") },
+            ]}
+          />
+        }
+        detail={
+          beside && shown ? (
+            <Card>
+              <PoolSheet key={shown.talent_pool_entry_id} entry={shown} close={() => setPicked(null)} mayInvite={mayInvite} mayRemove={mayRemove} inline />
+            </Card>
+          ) : null
+        }
       />
     </>
   );
 }
 
-function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; close: () => void; mayInvite: boolean; mayRemove: boolean }) {
+function PoolSheet({ entry, close, mayInvite, mayRemove, inline = false }: { entry: PoolEntry; close: () => void; mayInvite: boolean; mayRemove: boolean; inline?: boolean }) {
   const modal = useModal();
   const confirm = useConfirm();
   const remove = useMutation("POST /api/v1/recruitment/pool/:id/remove");
-  // A form opened from here goes back to the sheet on Cancel (the app holds one dialog at a time).
+  // A form opened from here goes back to the person on Cancel: beside the list they are still there;
+  // in the dialog the sheet opens again (the app holds one dialog at a time).
   const back = () =>
-    modal.open({ title: entry.name, body: (done) => <PoolSheet entry={entry} close={done} mayInvite={mayInvite} mayRemove={mayRemove} /> });
+    inline ? modal.close() : modal.open({ title: entry.name, body: (done) => <PoolSheet entry={entry} close={done} mayInvite={mayInvite} mayRemove={mayRemove} /> });
   const out = async () => {
     const yes = await confirm({ title: "Remove From Pool", body: `${entry.name} leaves the pool now.`, confirmLabel: "Remove", destructive: true });
     if (!yes) return;
@@ -131,6 +161,7 @@ function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; c
   };
   return (
     <>
+      {inline && <CardHeader title={entry.name} />}
       <KeyValue
         items={[
           ["Email", entry.email],
@@ -154,6 +185,8 @@ function PoolSheet({ entry, close, mayInvite, mayRemove }: { entry: PoolEntry; c
 /** Cancel goes back to the person's sheet; only a sent invitation closes it all. */
 function InviteForm({ entry, back, close }: { entry: PoolEntry; back: () => void; close: () => void }) {
   const roles = useVacancyOptions("open");
+  // The role they applied for is not offered: they cannot be invited to it again.
+  const offered = roles.options.filter(([id]) => id !== entry.applied_for?.vacancy_id);
   const f = useContractForm({ vacancy_id: "" }, poolSchemas.PoolInvite);
   const send = useMutation("POST /api/v1/recruitment/pool/:id/invite");
   const [problem, setProblem] = useState<string | null>(null);
@@ -172,7 +205,7 @@ function InviteForm({ entry, back, close }: { entry: PoolEntry; back: () => void
   return (
     <>
       <Field label="Vacancy" {...f.status("vacancy_id")}>
-        <SelectField options={roles.options} placeholder="Pick a role" more={roles.more} onMore={roles.onMore} {...f.field("vacancy_id")} />
+        <SelectField options={offered} placeholder="Pick a role" more={roles.more} onMore={roles.onMore} {...f.field("vacancy_id")} />
       </Field>
       <FormError>{problem}</FormError>
       <FormFooter>

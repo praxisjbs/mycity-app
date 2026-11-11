@@ -2,15 +2,18 @@
  * @component Wizard
  * @group Forms
  * @summary A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result.
- * @use More than six fields or more than one topic (FRONTEND_GUIDE §8.1): a vacancy, an employee, a policy.
+ * @use More than six fields or more than one topic (FRONTEND_GUIDE §8.1): a vacancy, an employee, a policy. `look="panel"` is the public site's: the steps on one Panel, a yellow bar and Step n of m over the step's title, Back and Next (solid) in its foot, the last button yellow (Apply).
  * @avoid Six fields or fewer (one modal form); steps that are not topics.
- * @phone Opens in a full-screen sheet; the indicator shows the step number and title; Next is full width at the bottom.
+ * @phone Opens in a full-screen sheet; the indicator shows the step number and title; Next is full width at the bottom. `look="panel"`: the Panel's own phone layout, Back and Next on one line in its foot.
  * @a11y The current step is announced; the indicator marks it with aria-current; focus moves to the step's heading when it changes. A new step slides in from the side it was reached from, still under reduced motion.
  * @status stable
  * @example <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
+ * @example <Wizard look="panel" level={2} steps={steps} finish="Submit Application" onFinish={send} />
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ActionGroup } from "../actions/ActionGroup";
 import { Button } from "../actions/Button";
+import { Panel } from "../layout/Panel";
 import { cn } from "../lib/cn";
 import { FormError } from "./Field";
 import { FormFooter } from "./Form";
@@ -50,9 +53,11 @@ export interface WizardProps {
   error?: ReactNode;
   /** The step heading's level: h3 under a modal's title (the default), h2 straight under a page's own h1. */
   level?: 2 | 3;
+  /** `panel`: the public site's, the steps on one Panel (its bar, Step n of m, the title as its h2, Back and Next in its foot). */
+  look?: "default" | "panel";
 }
 
-export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 0, onStepChange, step: controlled, error, level = 3 }: WizardProps) {
+export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 0, onStepChange, step: controlled, error, level = 3, look = "default" }: WizardProps) {
   const clamp = (i: number) => Math.min(Math.max(i, 0), steps.length - 1);
   const [own, setOwn] = useState(clamp(initialStep));
   const at = controlled === undefined ? own : clamp(controlled);
@@ -84,16 +89,52 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
     setAt(at + 1);
   };
 
+  const body = (
+    <>
+      <div key={at} className={cn(moved.dir === 1 && "animate-step-next", moved.dir === -1 && "animate-step-back")}>
+        {step.body}
+      </div>
+      {error ? <div className="mt-3"><FormError>{error}</FormError></div> : null}
+    </>
+  );
+
+  if (look === "panel")
+    return (
+      <Panel
+        eyebrow={`Step ${at + 1} of ${steps.length}`}
+        progress={{ value: at + 1, max: steps.length }}
+        title={step.title}
+        titleRef={heading}
+        foot={
+          <ActionGroup>
+            {at > 0 ? (
+              <Button variant="line" size="lg" onClick={() => setAt(at - 1)}>
+                Back
+              </Button>
+            ) : (
+              onCancel && (
+                <Button variant="line" size="lg" onClick={onCancel}>
+                  Cancel
+                </Button>
+              )
+            )}
+            <Button variant={last ? "primary" : "solid"} size="lg" busy={last && busy} onClick={next}>
+              {last ? finish : "Next"}
+            </Button>
+          </ActionGroup>
+        }
+      >
+        {body}
+      </Panel>
+    );
+
   return (
     <div>
       <StepBar steps={steps.map((s) => s.title)} at={at} />
       <Heading ref={heading} tabIndex={-1} data-ui="title" className="mb-3 text-lg font-semibold outline-none">
         {step.title}
       </Heading>
-      <div key={at} className={cn(moved.dir === 1 && "animate-step-next", moved.dir === -1 && "animate-step-back")}>
-        {step.body}
-      </div>
-      {error ? <div className="mt-3"><FormError>{error}</FormError></div> : null}
+      {body}
       <FormFooter>
         {at > 0 ? (
           <Button onClick={() => setAt(at - 1)}>Back</Button>

@@ -22,13 +22,13 @@ const SHOT_ID = SLUG;
 const SCREEN = /^([a-z_]+)\/([a-z0-9-]+)$/;
 const DEVICES = ["desktop", "phone"];
 /** A public site address (public-app/src/lib/router.tsx): a page, and its slug, token or number. */
-const PUBLIC_OPEN = /^\/(jobs|apply|assess|sign|verify)(\/[A-Za-z0-9._-]+)?$/;
+const PUBLIC_OPEN = /^\/((jobs|apply|assess|sign|verify|proposal)(\/[A-Za-z0-9._-]+)?)?$/;
 
 /** The demo accounts a picture is taken as; `guest` is nobody signed in (the sign-in screen, a link). */
 const ACCOUNTS = ["operations", "ceo", "manager", "staff", "admin", "guest"];
 /** Why the lock screen shows (app/src/auth/LockSheet.tsx): Session Locked, Session Ended, Signed Out. */
 const LOCKS = ["idle", "time", "ended"];
-const ROLES = ["Everyone", "Line Managers", "People & HR", "Administrators"];
+const ROLES = ["Everyone", "Line Managers", "People & HR", "Administrators", "Lead Owners"];
 const NOTE_TONES = { "Tip:": "tip", "Important:": "important" };
 const FRONT_KEYS = ["title", "module", "order", "milestones", "summary", "covers", "kind", "icon"];
 const SECTION_KEYS = ["screen", "needs", "role", "icon"];
@@ -302,7 +302,7 @@ function parseShot(id, lines, at) {
     // Nobody signs in on the public site; its addresses are a page and a slug, token or number.
     if (spec.as !== "operations" && spec.as !== "guest") problems.push(`shot ${id}: a public page is taken signed out; leave out as`);
     spec.as = "guest";
-    if (!spec.open || !PUBLIC_OPEN.test(spec.open)) problems.push(`shot ${id}: open is a public address, like /jobs, /jobs/<slug>, /apply/<token> or /assess/<token>`);
+    if (!spec.open || !PUBLIC_OPEN.test(spec.open)) problems.push(`shot ${id}: open is a public address, like /, /jobs, /jobs/<slug>, /apply/<token>, /assess/<token>, /sign/<token>, /verify/<reference> or /proposal/<token>`);
   } else if (!spec.open || !/^\/([a-z-]+)?(\?\S*)?$/.test(spec.open)) problems.push(`shot ${id}: open is the screen's address, like /people?tab=employees (or / for the sign-in screen)`);
   const ns = spec.marks.map((m) => m.n);
   if (ns.some((n, i) => n !== i + 1)) problems.push(`shot ${id}: marks are numbered 1, 2, 3 in order`);
@@ -345,7 +345,9 @@ function parseChapter(text, file) {
   if (!front.title) problems.push(`${file}: front matter needs a title`);
   if (front.module && !/^[a-z_]+$/.test(front.module)) problems.push(`${file}: module is a module key, like people`);
   const kind = front.kind || "chapter";
-  if (!["chapter", "quick-start"].includes(kind)) problems.push(`${file}: kind is chapter or quick-start`);
+  // public-help: a chapter for people outside MyCity, served on the public site's Help page and not
+  // in the hub's User Guide (docs/guides/user-guide.md §6.11).
+  if (!["chapter", "quick-start", "public-help"].includes(kind)) problems.push(`${file}: kind is chapter, quick-start or public-help`);
   const milestones = splitList(front.milestones);
   for (const m of milestones) if (!/^M\d{1,2}$/.test(m)) problems.push(`${file}: milestone "${m}" reads like M0, M1`);
 

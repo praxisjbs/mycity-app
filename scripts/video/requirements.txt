@@ -1,0 +1,7 @@
+# The narration's Python (scripts/video/narrate.py; docs/runbooks/training-videos.md section 1).
+# Python 3.12: spaCy, which Kokoro needs, does not build on 3.13.
+#   uv venv -p 3.12 ~/.video-venv && . ~/.video-venv/bin/activate && uv pip install -r scripts/video/requirements.txt
+kokoro==0.9.4
+misaki==0.9.4
+soundfile==0.14.0
+numpy==2.5.4

@@ -56,6 +56,7 @@ const SCREENS = Object.freeze({
     "policy-updates",
     "my-security",
     "org-chart",
+    "my-training",
   ],
   community: ["channels", "direct-messages", "announcements"],
   mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash", "signature"],
@@ -70,14 +71,11 @@ const SCREENS = Object.freeze({
     "offers",
     "onboarding",
     "talent-pool",
+    "analytics",
   ],
-  payroll: [
-    "payroll-runs",
-    "payslips",
-    "salary-structure",
-    "deductions",
-    "statutory",
-  ],
+  // Salary Structure and Statutory folded into Configurations; their slugs are retired, not renamed
+  // (docs/guides/payroll.md §2, §13.1 item 1).
+  payroll: ["payroll-runs", "payslips", "deductions", "configurations"],
   partnerships: [
     "pipeline",
     "categories",
@@ -95,7 +93,7 @@ const SCREENS = Object.freeze({
     "budgets",
     "categories",
   ],
-  knowledge: ["policies", "sops", "faqs", "training", "user-guide"],
+  knowledge: ["policies", "sops", "training", "user-guide"],
   praxis_ai: ["ask", "history"],
   ai_control: ["actions", "models", "spend"],
   settings: [
@@ -350,7 +348,7 @@ const ENTITY_ROUTES = Object.freeze({
   // A sitting and its file answers belong to Recruitment (the vault's moduleFor); it opens on Assessments · Sittings.
   application_assessment: { ...screen("recruitment", "assessments"), param: "sitting" }, // search:none a sitting is found through its candidate (src/modules/candidates/candidates.search.js)
   interview: screen("recruitment", "interviews"),
-  offer: screen("recruitment", "offers"), // search:none not built yet (src/modules/offers)
+  offer: screen("recruitment", "offers"),
   // search:none not built yet (src/modules/onboarding)
   onboarding: {
     ...screen("recruitment", "onboarding"),
@@ -359,24 +357,36 @@ const ENTITY_ROUTES = Object.freeze({
   talent_pool_entry: screen("recruitment", "talent-pool"),
 
   // Payroll
-  payroll_run: screen("payroll", "payroll-runs"), // search:none not built yet (src/modules/payroll)
-  // search:none not built yet (src/modules/payslips)
+  payroll_run: screen("payroll", "payroll-runs"),
   payslip: {
     ...screen("payroll", "payslips"),
     self: screen("ess", "my-payslips"),
   },
-  salary_structure: screen("payroll", "salary-structure"), // search:none not built yet (src/modules/salary_structure)
-  deduction: screen("payroll", "deductions"), // search:none not built yet (src/modules/deductions)
-  statutory_return: screen("payroll", "statutory"), // search:none not built yet (src/modules/statutory)
+  // A person told that a fine is scheduled or waived, or an advance recorded, reads it on their own payslips.
+  deduction: { ...screen("payroll", "deductions"), self: screen("ess", "my-payslips") },
+  // The asking person's own payslip and instalment, as the assistant cites them and ⌘K finds the payslip (payslips.search.js,
+  // payslips.ai.js, deductions.ai.js): they open My Payslips, which a Payroll · Payslips link would not for someone without `payroll`.
+  payroll_own_payslip: screen("ess", "my-payslips"),
+  payroll_own_deduction: screen("ess", "my-payslips"), // search:none an instalment is found with its payslip on My Payslips, and as the deduction Payroll readers search
+  // Grades, pay splits, statutory rates and the payroll setting are configuration, not records: each opens
+  // Configurations, which ⌘K finds as a screen (docs/guides/payroll.md §9).
+  salary_structure: screen("payroll", "configurations"), // search:none configuration, found as the Configurations screen
+  statutory_return: screen("payroll", "configurations"), // search:none configuration, found as the Configurations screen
+  payroll_setting: screen("payroll", "configurations"), // search:none configuration, found as the Configurations screen
 
   // Partnerships
-  partner: screen("partnerships", "partners"), // search:none not built yet (src/modules/partners)
-  partner_deal: screen("partnerships", "pipeline"), // search:none not built yet (src/modules/partner_pipeline)
-  lead: screen("partnerships", "leads"), // search:none not built yet (src/modules/leads)
-  proposal: screen("partnerships", "proposals"), // search:none not built yet (src/modules/proposals)
-  contract: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
-  mou: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
-  agreement: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
+  // A partner and a lead open their 360 beside their list; a deal opens on Pipeline, which opens
+  // the 360 of the lead or partner it is on (docs/guides/partnerships.md §6.2).
+  partner_category: screen("partnerships", "categories"),
+  partner: screen("partnerships", "partners"),
+  partner_deal: screen("partnerships", "pipeline"),
+  lead: screen("partnerships", "leads"),
+  proposal: screen("partnerships", "proposals"),
+  // search:none the same record as proposal, found under that type (proposals.search.js); its events and notices name it this way
+  partnership_proposal: screen("partnerships", "proposals"),
+  contract: screen("partnerships", "contracts-and-mous"),
+  mou: screen("partnerships", "contracts-and-mous"),
+  agreement: screen("partnerships", "contracts-and-mous"),
 
   // Expenses
   // A request opens on Approvals for whoever decides it, on My Requests for its requester.
@@ -392,9 +402,10 @@ const ENTITY_ROUTES = Object.freeze({
   // Knowledge Hub
   // A section or task of the User Guide, by its slug: the guide opens at it (user_guide.search.js).
   guide_section: screen("knowledge", "user-guide"),
-  sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge)
-  faq: screen("knowledge", "faqs"), // search:none not built yet (src/modules/knowledge)
-  training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/knowledge)
+  sop: screen("knowledge", "sops"),
+  training_course: screen("knowledge", "training"),
+  // A person's place on a course opens it on their own My Training (docs/guides/knowledge.md §9).
+  training_enrolment: screen("ess", "my-training"),
 
   // Praxis AI
   // A conversation opens on Ask, where it can be read and continued (docs/guides/praxis-ai.md §9).

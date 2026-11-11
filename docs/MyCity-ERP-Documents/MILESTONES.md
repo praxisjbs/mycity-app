@@ -131,15 +131,18 @@ imported into a public page by accident.
 Public addresses are short, because a stranger reads them:
 
 ```
+go.mycityapp.io/                               the index (Home), indexable
 go.mycityapp.io/jobs                           careers list, indexable
 go.mycityapp.io/jobs/partnerships-associate    one vacancy, readable slug, shareable
 go.mycityapp.io/apply/<token>                  opaque, one person, not indexable
 go.mycityapp.io/assess/<token>                 opaque
 go.mycityapp.io/sign/<token>                   opaque
 go.mycityapp.io/verify/OFF-0018                a reference, not a secret
+go.mycityapp.io/verify/t/<token>               the QR code on a sealed document, opaque
+go.mycityapp.io/help                           how the site works, indexable
 ```
 
-Only the careers list and an open vacancy carry readable addresses, because a careers page exists
+Only the index, the careers list, an open vacancy and Help carry readable addresses, because a careers page exists
 to be found and shared. Everything a single person is invited to is reached by an opaque token that
 cannot be enumerated.
 
@@ -245,7 +248,7 @@ start and still land on 18 December.
 | 3 | Queries & Consequence Management | 5% | 26–30 Oct | Fri 30 Oct | **GE** |
 | 4 | Recruitment End to End | 13% | 2–13 Nov | Fri 13 Nov | **GE** |
 | 5 | Offers, Documentation & Onboarding | 11% | 16–20 Nov | Fri 20 Nov | **AJ** · GE |
-| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **TB** · AJ |
+| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **TB** · LA |
 | 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **LA** · GE |
 | 8 | Expenses & Budget Control | 8% | 7–11 Dec | Fri 11 Dec | **AJ** |
 | 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **TB** |
@@ -920,11 +923,36 @@ public URL with a data-privacy acknowledgement; verification status tracks each.
 automatically at each phase from an editable template. Onboarding does not open until documentation
 completes.
 
+
+**Decided 06/11/2026 (AJ, who owns M5; with GE on #79; `docs/guides/offers.md`,
+`docs/handoff/m5-offers-onboarding.md` §2).** From the internal Modules Review of 04/11/2026:
+
+- **Offers are approved before they are sent**, on a `recruitment.offer` flow in Settings · Approvals
+  (A11); an offer keeps the flow active when it was created.
+- **The offer letter is the template plus the offer's fields** (salary, start date, working hours,
+  probation, the final job description copied from the vacancy). No AI drafts it.
+- **On acceptance the employment contract is generated** from the offer, the job description, the
+  vacancy and the hire's details, and **the hire signs it too**, on its own signing link.
+- **The employee is created at acceptance**, without a login until onboarding completes; the hire's
+  documents sit on the Employee 360's Documents tab from then. M4's `hireIn` moves the application
+  to Hired and fills the Organogram seat; the vacancy closes as filled when its openings are hired.
+- **The checklist is MyCity's New Joiner list** (entered on screen, A26): proof of address, a valid
+  ID, certificates with NYSC, evidence of separation, birth certificate, the Employee Data Form, the
+  MyLagosApp Wallet ID, a passport photograph and the bank Account Opening Form, with the signed
+  offer and the contract added by the system; **two guarantors**, each reference-checked; the BVN as
+  a restricted number on the employee record. The hire uploads through a public link with the
+  privacy acknowledgement.
+- **Pay is monthly, line by line**, and the company signs the offer when it is approved, before the
+  candidate.
+- **Onboarding works through a department plan**: steps with an owner and a due date, linked to the
+  department's SOPs.
+- **The signing service is built in M5 and shared with M7** (`docs/guides/partnerships.md` §6.9).
+
 ---
 
 ## 11 · M6 — Payroll & Notifications · 11%
 
-**Owner TB** with **AJ** (from 05/11/2026; first planned as LA). **23–27 Nov. Demo Fri 27 Nov.**
+**Owner TB** with **LA** for the screens (JBS Praxis, 09/11/2026; AJ from 05/11/2026, first planned as LA). **23–27 Nov. Demo Fri 27 Nov.**
 
 ### Jurisdiction decides the donor
 
@@ -987,6 +1015,38 @@ for confirmation, a daily digest and each person's quiet hours, on one reminder 
 tasks and calendars use (`docs/handoff/notifications-everywhere.md`). Due invoices join the
 reminders with the module that owns them. M6 keeps payroll's own notices and the definition of
 done below.
+
+### Amended 08/11/2026 (JBS Praxis)
+
+The Modules Review of 4 November and JBS Praxis's answers of 08/11/2026 settle how M6 meets this
+section; where they differ from it, they win, and `docs/guides/payroll.md` (its §13.1) is the full
+record and M6's only source of truth.
+
+- **Four tabs.** Payroll Runs, Payslips, Deductions and Configurations. Salary Structure and Statutory fold
+  into Configurations (their slugs are retired). §18's Payroll row was changed by PR 1 (09/11/2026).
+- **Simple by default.** No statutory deduction and no statutory word on any screen or payslip until the
+  advanced option is switched on. The advanced option (PAYE, pension, NHF, ITF, NSITF and salary grades) is
+  built and shipped off: the engine, the report and the rate tables exist behind the Configurations switch,
+  and rates are entered only once MyCity's accountant confirms them. The definition of done's statutory
+  clause is met when the switch computes against rates entered there, not before.
+- **Payslips** are designed PDFs that open in a modal, with Download PDF, Email All and Download All.
+- **Deductions** come from consequence management (fines) and attendance, and a person with payroll rights
+  accepts a fine for this month, spreads it over months or waives it. **Salary advances** are recorded by
+  Operations & People and recovered as instalments; there is no employee request flow.
+- **No salary grading in simple mode:** salaries are negotiated.
+- **The CEO approves the run** (the open CEO-or-COO question, answered 08/11/2026). The seeded stage is the
+  CEO alone; MyCity can add a stage or a role (a COO) on Settings · Approvals without code.
+- **A leaver's final run takes every outstanding instalment, and a negative net blocks Submit.** Simple mode
+  has one monthly gross plus one-off adjustments and no recurring allowances. Both payslips (Payroll ·
+  Payslips and ESS · My Payslips) open in a modal. Staging demos use test people, because staging sends
+  real mail (A4).
+- **Configuration, entered by MyCity in the app (09/11/2026):** the statutory rates and bands, the accountant's
+  conventions (PAYE basis, whether pension and NHF reduce taxable pay), the pay day (the 30th unless changed, 1 to 31, a
+  day past a month's end falling on its last day) and a Bank Details Required
+  switch live on Configurations, and every person's salary and bank details on People · Employees or the staff
+  import. None is seeded (A26) and none blocks the build.
+- **LA builds the screens** (Payroll Runs, Payslips, Deductions, Configurations and ESS · My Payslips); TB owns the
+  milestone and its backend.
 
 ### Definition of done
 
@@ -1301,6 +1361,20 @@ enforced permission keys, checked by a gate.
 `praxis-ls/src/modules/hr/sop_onboarding/` (783); `house-rules.tsx` (617). Company announcements, HR
 policies, SOPs, training resources, searchable FAQ. Articles are versioned and permission-filtered.
 
+*Amended 11 November 2026 (TB; the Modules Review of 4 November 2026; `docs/guides/knowledge.md` §1.1).*
+**FAQs are removed**: the User Guide and Praxis AI answer questions. **Announcements were removed** on
+29/10/2026: Staff Community keeps them. **SOPs are each department's own procedures**, independent of the
+system (how to use a screen is the User Guide's): structured (Purpose, Scope, Roles Involved, numbered Steps
+each with who, the screen it happens on and a file), versioned, written by the department's head or the new
+capability `sops.manage`, read by everyone, and listed under Procedures on the screens their steps name.
+**Training is a small learning system**: a course of files, video links, outside course links and written
+lessons, assigned to everyone, departments, roles or people with a due date and a task in My Workspace, or
+open to anyone in the Library; staff take it on a new tab, **ESS · My Training**, mark each item done, add
+proof where the course asks for it, and receive a **MyCity certificate of completion** (an A4 landscape PDF
+with the course publisher's signature, a number and a QR verified on `go.mycityapp.io`), issued
+automatically. Draft With AI (SOPs) and Draft Lesson (training) run on the Default job. Courses and the
+certificate are new; nothing is taken from a donor for them.
+
 ### AI assistant
 
 **Narrowed on 10 October (A23): the assistant reads, it never writes.** Cynthia and Tom-Blake
@@ -1349,7 +1423,9 @@ budget versus actual this month.
 
 ### Definition of done
 
-Policies, SOPs, announcements, training resources and FAQs are searchable and permission-filtered.
+Policies, SOPs and training are searchable and permission-filtered (FAQs and announcements removed, amended
+11/11/2026). A department head publishes an SOP that appears under Procedures on the screen it names; a course
+is assigned, taken on a phone and completed with a certificate whose QR verifies on `go.mycityapp.io`.
 ⌘K finds every page, tab and record the user may open, and nothing they may not. The assistant
 answers each of the six target questions with data-backed, auditable answers citing their records.
 A user without expense permission asks about expenses and is told it is not available to them.
@@ -1495,26 +1571,69 @@ Applied to the tables below, `scripts/check/progress.js`, `src/shared/route-map.
 `src/shared/search/screens.js`, the app's catalogue, the public site's routes and `docs/PROGRESS.md`
 (rows #104 and #105). Their engineering shape is in `docs/guides/partnerships.md`.
 
+**Ratified 06/11/2026 (GE).** One screen joins the inventory, taking the inventory to 104 and the
+public site to eight pages: **Public · Home** (`go.mycityapp.io/`), the site's index, M4. It
+introduces MyCityApp to a stranger or a partner before the roles: the hero with Search Roles and
+the open roles, teams and cities, What We Build, the roles closing soon, How We Hire, and Know
+Someone Great? and Verify a Document. `/` no longer redirects to `/jobs`. It is indexable, holds no
+personal data and reads only the careers summary (`GET /api/public/v1/jobs/summary`). The site's one
+header links Careers, Vacancy, Apply, Assessment, Sign Offer and Verify Document; opened from the
+header without a personal link, Vacancy, Apply, Assessment and Sign Offer show a short screen saying
+where to start, not an error. Verify Document also opens from the QR code on a sealed document's
+pages (`go.mycityapp.io/verify/t/<token>`, `docs/guides/partnerships.md` §6.9). Applied to the table
+below, the public site's routes and `docs/PROGRESS.md` (row #107). The design is
+`docs/MyCity-ERP-Documents/public-site-demo.html`; its engineering shape is in
+`docs/guides/recruitment.md` §10.
+
+**Ratified 08/11/2026 (GE).** One screen joins the inventory, taking it to 106 and the public site to
+nine pages: **Public · Help** (`go.mycityapp.io/help`), M4. It is how the site works for a candidate
+or anyone outside MyCity: the User Guide's public chapter (`docs/manual/public-site.md`), moved out
+of the hub's User Guide, which keeps one link to it (**Public Site Help**). It is indexable, holds no
+personal data and reads only the chapter and its pictures (`GET /api/public/v1/help`). Help is the
+sixth link in the site's header, after Verify Document. Applied to the table below,
+`scripts/check/progress.js`, the public site's routes and `docs/PROGRESS.md` (row #108). Its
+engineering shape is in `docs/guides/user-guide.md` §6.11.
+
+**Amended 09/11/2026 (JBS Praxis, M6 PR 1).** Payroll has four tabs, taking the inventory to 105 and the admin
+surface to 96: **Payroll · Configurations** (`configurations`, M6) joins, and **Payroll · Salary Structure**
+(`salary-structure`) and **Payroll · Statutory** (`statutory`) are dropped, folded into it (the 4 November
+Modules Review; `docs/guides/payroll.md` §13.1 item 1). Their slugs are retired, not renamed: both were Coming Soon, so no
+link in the wild breaks. Configurations holds the pay day, the Bank Details Required choice and the Advanced
+Payroll switch, and, once the option is on, the statutory items, the PAYE bands, the salary structure and the pay
+components. It reuses the `payroll` permission key, its writes behind the new capability `payroll.configure`.
+Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js`,
+the app's catalogue and `docs/PROGRESS.md` (rows #47 and #49 Dropped, #109 added).
+
+**Amended 11/11/2026 (TB, M10 PR 0).** The inventory stays at 105 and the admin surface at 96: **Knowledge
+Hub · FAQs** (`faqs`) is dropped (the 4 November Modules Review: the User Guide and Praxis AI answer
+questions), and **Employee Self-Service · My Training** (`my-training`, M10) joins, where staff take their
+assigned and Library courses and keep their certificates. Knowledge Hub keeps four tabs: Policies, SOPs,
+Training and the User Guide. My Training reuses the `knowledge` permission key (own only); courses are built
+behind the new capability `training.manage`, and SOPs written by a department's head or `sops.manage`.
+Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.js`,
+`src/shared/search/screens.js`, the app's catalogue and `docs/PROGRESS.md` (row #64 Dropped, #110 added). Its
+engineering shape is in `docs/guides/knowledge.md`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
-application, its own build, its own origin, listed below only because it carries seven of the
-screens (six of the 92 approved, and Proposal, ratified 05/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
+application, its own build, its own origin, listed below only because it carries eight of the
+screens (six of the 92 approved, Proposal, ratified 05/11/2026, and Home, ratified 06/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
 staff never navigates to it to do their job.
 
 | Area | Module | Tabs | Screens | Built in |
 |---|---|---|---|---|
 | (ungrouped) | **Home** | 4 | Overview · Team · Alerts · Reports | M1 |
 | (ungrouped) | **My Workspace** | 5 | Today · Tasks · Projects · Calendar · Analytics | M2 |
-| (ungrouped) | **Employee Self-Service** | 12 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · Org Chart · My Security | M1 |
+| (ungrouped) | **Employee Self-Service** | 13 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · My Training · Org Chart · My Security | M1, M10 (My Training, 11/11/2026) |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
 | People | **People** | 7 | Employees · Organogram · Departments · Attendance · Leave · Devices · Worksites | M1, M2 (Departments) |
 | People | **Performance** | 5 | Goals · Scorecards · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
-| People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |
-| People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |
+| People | **Recruitment** | 8 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool · Analytics | M4, M5 |
+| People | **Payroll** | 4 | Payroll Runs · Payslips · Deductions · Configurations | M6 (Salary Structure and Statutory folded into Configurations, 09/11/2026) |
 | Business | **Partnerships** | 7 | Pipeline · Categories · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 (Categories ratified 05/11/2026) |
 | Business | **Expenses** | 7 | My Requests (shown in ESS) · Requisitions · Approvals · Disbursements · Projects · Budgets · Categories | M8 (Projects added 04/11/2026, AJ; its tab and PROGRESS row in M8 PR 7) |
-| System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · User Guide | M1 (Policies), M10, M0 (User Guide) |
+| System | **Knowledge Hub** | 4 | Policies · SOPs · Training · User Guide | M1 (Policies), M10, M0 (User Guide); FAQs dropped 11/11/2026 |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
 | System | **Settings** | 13 | Organisation · Status · Performance · Faults · Users · Roles & Permissions · Approvals · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
 
@@ -1522,11 +1641,11 @@ staff never navigates to it to do their job.
 
 | | Site | Pages | Screens | Built in |
 |---|---|---|---|---|
-| Public | **Public site** | 7 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026) |
+| Public | **Public site** | 9 | Home · Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Help · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026; Home ratified 06/11/2026; Help ratified 08/11/2026) |
 
-Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
-(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Careers, Vacancy, Apply and
-Assessment in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
+Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026) and its FAQs tab (TB, 11/11/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
+(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), Analytics in M4 too (GE, 11/11/2026: the funnel and the screening scores on a tab of their own), and Offers and Onboarding in M5. The **public site** gets Home, Careers, Vacancy, Apply,
+Assessment and Help in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
 M0 by TB on 19/10/2026).
 

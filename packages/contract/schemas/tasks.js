@@ -41,6 +41,7 @@ const {
 const { PersonRef } = require("./organisation");
 const { MonthStart } = require("./kpis");
 const { ProjectRef } = require("./projects");
+const { partnerLinkFields, partnerLinkEditFields, linkRules, linkEditRules, PartnerLinkView } = require("./partners");
 
 const TaskStatus = z.enum(["todo", "in_progress", "in_review", "done", "cancelled"]);
 /** The four columns a card can be dragged between. */
@@ -52,7 +53,18 @@ const TaskCadence = z.enum(["daily", "weekly"]);
  * Records a task may point at in M2; each is a key of shared/route-map ENTITY_ROUTES. `task`: a
  * Recovery task points at the missed commitment it recovers (migration 2400).
  */
-const TaskEntityType = z.enum(["partner", "vacancy", "goal", "key_result", "scorecard", "performance_review", "improvement_plan", "task"]);
+const TaskEntityType = z.enum([
+  "partner",
+  "vacancy",
+  "goal",
+  "key_result",
+  "scorecard",
+  "performance_review",
+  "improvement_plan",
+  "task",
+  // A course a person was assigned: closed by the system when they complete it (docs/guides/knowledge.md §6.7).
+  "training_enrolment",
+]);
 /** `mine`: tasks the caller is assigned, set or shares. `team`: everyone in their workspace scope. */
 const TaskScope = z.enum(["mine", "team"]);
 /**
@@ -215,6 +227,8 @@ const Task = z
     late_reason_label: z.string().nullable(),
     counts_towards: CountsTowards.nullable(),
     project: ProjectRef.nullable(),
+    /** The partner or lead and deal it is for (Connect to Partner, M7), named only for a reader who sees them. */
+    partner_link: PartnerLinkView.nullable(),
     /** Its lead's employee record is left or archived: the Left pill. */
     assignee_left: z.boolean(),
     entity_type: TaskEntityType.nullable(),
@@ -345,6 +359,9 @@ const TaskListQuery = listQuery(
     is_commitment: z.enum(["true", "false"]).optional(),
     commitment_month: MonthStart.optional(),
     project_id: uuid.optional(),
+    /** The Partner filter (M7): the tasks connected to this partner or lead. */
+    partner_id: uuid.optional(),
+    lead_id: uuid.optional(),
   },
   ["sort_order", "due_at", "priority", "created_at"],
 );
@@ -413,8 +430,8 @@ function commitmentProblems(v, ctx) {
  * `watcher_department_id` name who watches it: they may open it and hear when it moves, and it is
  * never on their board (JBS Praxis, 01/11/2026).
  */
-const TaskCreate = z
-  .object({
+const TaskCreate = linkRules(
+  z.object({
     title: text(200),
     description: optionalText(5000),
     priority: TaskPriority.default("normal"),
@@ -433,8 +450,10 @@ const TaskCreate = z
     is_commitment: z.boolean().default(false),
     acceptance_criteria: optionalText(1000),
     commitment_month: blank(MonthStart),
+    ...partnerLinkFields,
   })
-  .strict()
+  .strict(),
+)
   .refine(pointerPair, POINTER)
   .refine(oneShare, ONE_SHARE)
   .superRefine(commitmentProblems);
@@ -481,12 +500,13 @@ const TaskEditFields = z
     is_commitment: z.boolean().optional(),
     acceptance_criteria: z.string().trim().max(1000).nullable().optional(),
     commitment_month: MonthStart.nullable().optional(),
+    ...partnerLinkEditFields,
   })
   .strict();
 
 /** What an edit of a task holds to beside its fields, on Edit Task's body and the chat's card alike. */
 const taskEditRules = (schema) =>
-  schema
+  linkEditRules(schema)
     .refine((v) => !("entity_type" in v || "entity_id" in v) || pointerPair(v), POINTER)
     .refine(oneShare, ONE_SHARE)
     .superRefine((v, ctx) => {
@@ -693,6 +713,7 @@ const TABLES = {
       overdue: "worked out: open and task.due_at before now",
       counts_towards: "task.employee_target_id, or a key_result pointer, with its title and link",
       link: "linkFor(task.entity_type, task.entity_id), never stored",
+      partner_link: "task.partner_id, lead_id and deal_id, named from partner, lead and partnership_opportunity for a reader who sees them",
       comment_count: "count of task_comment not deleted",
       steps_total: "count of task_step",
       steps_done: "count of task_step with done_at",
@@ -712,6 +733,7 @@ const TABLES = {
       overdue: "worked out: open and task.due_at before now",
       counts_towards: "task.employee_target_id, or a key_result pointer, with its title and link",
       link: "linkFor(task.entity_type, task.entity_id), never stored",
+      partner_link: "task.partner_id, lead_id and deal_id, named from partner, lead and partnership_opportunity for a reader who sees them",
       comment_count: "count of task_comment not deleted",
       steps_total: "count of task_step",
       steps_done: "count of task_step with done_at",

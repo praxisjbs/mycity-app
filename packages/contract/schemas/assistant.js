@@ -241,7 +241,7 @@ const AiCardRecord = z
  * its token and reads it by its line), and who Add Work Site may put on a site, the person
  * included (`site_member`).
  */
-const AiCardPicks = z.enum(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task", "employee", "worksite", "policy", "place", "site_member"]);
+const AiCardPicks = z.enum(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task", "employee", "worksite", "policy", "place", "site_member", "partner", "lead", "partner_deal", "hiring_manager"]);
 
 /** One field of a card, as the action's schema takes it; the screen draws it with the form system. */
 const AiCardField = z

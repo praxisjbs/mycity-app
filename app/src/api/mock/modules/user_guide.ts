@@ -36,7 +36,8 @@ function load(): Promise<Parsed> {
       if (!text.startsWith("---")) continue;
       const { chapter } = guide.parseChapter(text, name);
       if (chapter.kind === "quick-start") quick = chapter;
-      else chapters.push(chapter);
+      // The public site's Help (docs/guides/user-guide.md §6.11): read on go.mycityapp.io/help, not here.
+      else if (chapter.kind !== "public-help") chapters.push(chapter);
     }
     const rail = MODULES.map((m) => m.key as string);
     const key = (c: ParsedChapter) => (c.module && rail.includes(c.module) ? 1000 + rail.indexOf(c.module) : (c.order ?? 999));
@@ -95,6 +96,7 @@ route("GET /api/v1/user-guide", async (req) => {
     // The demo answers and hears, as staging does with its AI set up.
     answers: true,
     voice: true,
+    public_help_url: "https://go.mycityapp.io/help",
   };
   return ok(contents);
 });

@@ -42,7 +42,7 @@ const read = (f) => fs.readFileSync(path.join(tmp, f), "utf8");
 describe("new:screen", () => {
   test("adds the tab, the slug, the screen, its case, Coming Soon, the PROGRESS row, note and counts", () => {
     const p = ns.plan(args({ module: "people", tab: "Work Patterns", m: "M1", owner: "LA" }), tmp);
-    expect(p).toMatchObject({ slug: "work-patterns", name: "WorkPatterns", folder: "people", n: 107 });
+    expect(p).toMatchObject({ slug: "work-patterns", name: "WorkPatterns", folder: "people", n: 112 });
     write(p);
     expect(read("app/src/shell/catalogue.ts")).toContain('t("Worksites", "worksites"), t("Work Patterns", "work-patterns")]');
     expect(read("src/shared/route-map.js")).toContain('"departments", "work-patterns"]');
@@ -51,20 +51,20 @@ describe("new:screen", () => {
     expect(read("app/src/features/people/index.tsx")).toMatch(/import \{ WorkPatterns \} from "\.\/WorkPatterns";[\s\S]*case "work-patterns":\n\s+return <WorkPatterns \/>;\n\s+default:/);
     expect(read("app/src/shell/coming-soon.ts")).toContain('"people/work-patterns": [],');
     const progress = read("docs/PROGRESS.md");
-    expect(progress).toContain("| 107 | Work Patterns | `work-patterns` | M1 | LA | ☐ | ☐ | ☐ | Not started | |");
+    expect(progress).toContain("| 112 | Work Patterns | `work-patterns` | M1 | LA | ☐ | ☐ | ☐ | Not started | |");
     expect(progress).toMatch(/- \d{2}\/\d{2}\/\d{4} · LA · Work Patterns added with npm run new:screen/);
-    expect(progress).toContain("105 screens (98 in the staff app");
+    expect(progress).toContain("107 screens (98 in the staff app");
     // The total and its Not started count each go up by one, whatever the tracker held before.
     const [, screens, notStarted] = /\| \*\*Total\*\* \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \|/.exec(fs.readFileSync(path.join(ROOT, "docs/PROGRESS.md"), "utf8"));
     expect(progress).toContain(`| **Total** | **${Number(screens) + 1}** | **${Number(notStarted) + 1}** |`);
-    expect(read("scripts/check/progress.js")).toContain("const SCREENS = 107;");
+    expect(read("scripts/check/progress.js")).toContain("const SCREENS = 112;");
     expect(read("tests/unit/foundation/events-workflow.test.js")).toContain(".toHaveLength(98)");
   });
 
   test("keeps a multi-line list multi-line", () => {
-    write(ns.plan(args({ module: "ess", tab: "My Training", m: "M2", owner: "AJ" }), tmp));
-    expect(read("src/shared/route-map.js")).toMatch(/"org-chart",\n {4}"my-training",\n {2}\]/);
-    expect(read("app/src/features/ess/index.tsx")).toContain('case "my-training":');
+    write(ns.plan(args({ module: "ess", tab: "My Mentoring", m: "M2", owner: "AJ" }), tmp));
+    expect(read("src/shared/route-map.js")).toMatch(/"my-training",\n {4}"my-mentoring",\n {2}\]/);
+    expect(read("app/src/features/ess/index.tsx")).toContain('case "my-mentoring":');
   });
 
   test("refuses what the screen rules refuse", () => {

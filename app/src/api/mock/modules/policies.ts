@@ -91,7 +91,9 @@ const htmlOf = (blocks: RichTextBlock[]) =>
         ? `<h${b.level}>${b.spans.map(spanHtml).join("")}</h${b.level}>`
         : b.kind === "paragraph"
           ? `<p>${b.spans.map(spanHtml).join("")}</p>`
-          : `<${b.kind === "numbered" ? "ol" : "ul"}>${b.items.map((i) => `<li>${i.map(spanHtml).join("")}</li>`).join("")}</${b.kind === "numbered" ? "ol" : "ul"}>`,
+          : b.kind === "table"
+            ? ""
+            : `<${b.kind === "numbered" ? "ol" : "ul"}>${b.items.map((i) => `<li>${i.map(spanHtml).join("")}</li>`).join("")}</${b.kind === "numbered" ? "ol" : "ul"}>`,
     )
     .join("\n");
 const plain = (text: string): RichTextSpan[] => [{ text, bold: false, italic: false, href: null }];
@@ -99,7 +101,7 @@ const P = (text: string): RichTextBlock => ({ kind: "paragraph", spans: plain(te
 const H = (text: string, level = 2): RichTextBlock => ({ kind: "heading", level, spans: plain(text) });
 const L = (numbered: boolean, ...items: string[]): RichTextBlock => ({ kind: numbered ? "numbered" : "bullets", items: items.map(plain) });
 const wordsOf = (blocks: RichTextBlock[]) =>
-  blocks.flatMap((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.flat() : b.spans)).map((s) => s.text).join(" ");
+  blocks.flatMap((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.flat() : b.kind === "table" ? [...b.head, ...b.rows.flat()].flat() : b.spans)).map((s) => s.text).join(" ");
 
 /* ------------------------------------------------------------------ *
  * The Attendance policy's rules, as staff read them (word for word the server's

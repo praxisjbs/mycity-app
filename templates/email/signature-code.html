@@ -1,0 +1,14 @@
+---
+subject: "Your signing code: {{ code }}"
+title: Your Signing Code
+format: markdown
+---
+{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}
+
+Your code to sign {{ title }} is:
+
+**{{ code }}**
+
+It works for {{ minutes }} minutes. Enter it on the signing page to continue.
+
+If you did not ask for this code, you can ignore this email. Nobody can sign for you without it.

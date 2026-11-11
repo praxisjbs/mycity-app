@@ -50,6 +50,13 @@ const BULLET = /^\s*[-*]\s+/;
 const NUMBERED = /^\s*\d+\.\s+/;
 const TABLE_ROW = /^\|(.+)\|\s*$/;
 const TABLE_RULE = /^\|[\s:|-]+\|\s*$/;
+/** A pipe row's cells, trimmed: "| a | b |" → ["a", "b"]. */
+const cellsOf = (row) =>
+  String(row)
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split("|")
+    .map((c) => c.trim());
 
 /** Markdown to safe HTML. */
 function markdownToHtml(md) {
@@ -89,17 +96,11 @@ function markdownToHtml(md) {
     }
     if (TABLE_ROW.test(line) && TABLE_RULE.test((lines[i + 1] || "").trim())) {
       flush();
-      const cells = (r) =>
-        r
-          .trim()
-          .replace(/^\||\|$/g, "")
-          .split("|")
-          .map((c) => c.trim());
-      const header = cells(line);
+      const header = cellsOf(line);
       i += 2;
       const body = [];
       while (i < lines.length && TABLE_ROW.test(lines[i].trim())) {
-        body.push(cells(lines[i].trim()));
+        body.push(cellsOf(lines[i]));
         i += 1;
       }
       const thead = `<tr>${header.map((c) => `<th>${inline(esc(c))}</th>`).join("")}</tr>`;
@@ -199,8 +200,9 @@ function spansOf(raw) {
 
 /**
  * Markdown to blocks (contract policies.RichTextBlock): the forms markdownToHtml draws, for a
- * screen that renders text as elements rather than HTML. A table's rows become paragraphs, its cells
- * joined; a rule is dropped.
+ * screen that renders text as elements rather than HTML. A table is a table block (a header and its
+ * rows, as markdownToHtml draws it); a pipe row with no rule under its first row is a paragraph, its
+ * cells joined; a rule is dropped.
  */
 function markdownToBlocks(md) {
   const lines = String(md || "").replace(/\r\n/g, "\n").split("\n");
@@ -225,10 +227,25 @@ function markdownToBlocks(md) {
       i += 1;
       continue;
     }
+    if (TABLE_ROW.test(line) && TABLE_RULE.test((lines[i + 1] || "").trim())) {
+      flush();
+      // A table as markdownToHtml draws one: its header, the rule under it, then its rows, each cut
+      // or padded to the header's width (an agreement's Financials grid).
+      const head = cellsOf(line);
+      const width = Math.min(head.length, 12);
+      const fit = (row) => Array.from({ length: width }, (_, k) => spansOf(row[k] || ""));
+      const rows = [];
+      i += 2;
+      while (i < lines.length && TABLE_ROW.test(lines[i].trim())) {
+        if (rows.length < 100) rows.push(fit(cellsOf(lines[i])));
+        i += 1;
+      }
+      out.push({ kind: "table", head: fit(head), rows });
+      continue;
+    }
     if (TABLE_ROW.test(line)) {
       flush();
-      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()).filter(Boolean);
-      out.push({ kind: "paragraph", spans: spansOf(cells.join(" · ")) });
+      out.push({ kind: "paragraph", spans: spansOf(cellsOf(line).filter(Boolean).join(" · ")) });
       i += 1;
       continue;
     }
@@ -265,8 +282,12 @@ const SKIP_TAGS = new Set(["script", "style", "head", "title", "noscript", "temp
  * *italic* and links with a safe target; everything else becomes its text (a table's cells joined
  * on one line, an image dropped). Nothing from the input reaches the output as markup, so the result
  * is safe whatever was pasted.
+ *
+ * `tables: true` keeps a table as the pipe table markdownToHtml reads (its first row the header, a
+ * cell's line breaks and pipes made spaces and slashes), for the one editor that draws tables: an
+ * agreement template's (docs/guides/partnerships.md §6.8). Every other caller flattens as before.
  */
-function htmlToMarkdown(html) {
+function htmlToMarkdown(html, { tables = false } = {}) {
   const { Parser } = require("htmlparser2");
   const blocks = [];
   let buf = "";
@@ -276,6 +297,13 @@ function htmlToMarkdown(html) {
   let skip = 0;
   const marks = [];
   let link = null;
+  let table = null;
+  const cellText = () => buf.replace(/\s+/g, " ").replace(/\|/g, "/").trim();
+  const tableMarkdown = (rows) => {
+    const width = Math.max(...rows.map((r) => r.length));
+    const line = (r) => `| ${Array.from({ length: width }, (_, i) => r[i] || " ").join(" | ")} |`;
+    return [line(rows[0]), `| ${Array.from({ length: width }, () => "---").join(" | ")} |`, ...rows.slice(1).map(line)].join("\n");
+  };
   const end = () => {
     const text = buf.replace(/\s+/g, " ").trim();
     buf = "";
@@ -295,6 +323,24 @@ function htmlToMarkdown(html) {
       onopentag(name, attrs) {
         if (SKIP_TAGS.has(name)) skip += 1;
         if (skip) return;
+        if (tables && name === "table") {
+          end();
+          table = { rows: [], row: null };
+          return;
+        }
+        if (table) {
+          if (name === "tr") table.row = [];
+          else if (name === "td" || name === "th") buf = "";
+          else if (name === "br" || BLOCK_TAGS.has(name)) buf += " ";
+          else if (name === "strong" || name === "b") {
+            marks.push("**");
+            buf += "**";
+          } else if (name === "em" || name === "i") {
+            marks.push("*");
+            buf += "*";
+          }
+          return;
+        }
         if (name === "ul" || name === "ol") {
           end();
           lists.push({ tag: name, n: 0, serial: lists.length ? lists[0].serial : (listCount += 1) });
@@ -326,6 +372,24 @@ function htmlToMarkdown(html) {
           return;
         }
         if (skip) return;
+        if (table) {
+          if (name === "td" || name === "th") {
+            if (table.row) table.row.push(cellText());
+            buf = "";
+          } else if (name === "tr") {
+            if (table.row && table.row.length) table.rows.push(table.row);
+            table.row = null;
+          } else if (name === "table") {
+            if (table.rows.length) blocks.push({ text: tableMarkdown(table.rows) });
+            table = null;
+            buf = "";
+            kind = lists.length ? "li" : "p";
+          } else if ((name === "strong" || name === "b" || name === "em" || name === "i") && marks.length) {
+            const mark = marks.pop();
+            buf = buf.endsWith(mark) ? buf.slice(0, -mark.length) : `${buf}${mark}`;
+          }
+          return;
+        }
         if (name === "ul" || name === "ol") {
           end();
           lists.pop();
