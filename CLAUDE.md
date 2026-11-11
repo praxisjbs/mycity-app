@@ -258,6 +258,22 @@ stands. Bugs found while filming are fixed in the same branch and logged there (
   here and in an agent. A background agent or a Workflow is for work long enough that waiting would
   block the person; say so when you start one. Slower in the foreground is fine; work lost with a
   session that ends is not.
+- **Plan first, then one chat a PR** (TB, 11/11/2026). A milestone, or any change cut into more
+  than one PR, is planned in its own planning chat on the most capable model available, at high
+  effort: never on a lighter model. The plan lives in the module's guide (its build plan appendix)
+  and names, for each PR, its scope and size, the model and effort to build it on, which PRs can
+  run in parallel and the order they merge in (for example "merge PR 3 before PR 5"), so parallel
+  work never conflicts. Each PR is then built in a **fresh chat** from the start prompt the
+  planning chat gives for it, so it carries only what that PR needs; the planning chat is asked
+  for the next prompt when a PR merges. A chat whose context is filling up (past about three
+  quarters) is closed and its next step started fresh from the guide and the handoff.
+- **Research has sources** (TB, 11/11/2026). A figure taken from law or from outside the
+  repository (a tax band, a statutory rate, a legal threshold) is researched in a session whose
+  environment allows network access (switched off again afterwards), from the primary text, and
+  is written down with its source (the instrument, the section, a link or the document, the date
+  checked). Nothing comes from memory or a model's guess. A figure with no legal source says so
+  in plain words ("no legal source: a company rule"). A source that changes is entered again by a
+  person; nothing updates a legal figure by itself.
 
 Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M4, community and mailbox) · TB Tom-Blake
 Asaah (Home, M6, M9, M10, M11) · LA Love Adeola (migrations and data, attendance, M7) · AJ Adole

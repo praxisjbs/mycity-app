@@ -576,7 +576,7 @@ Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Template
 (`offer-sent`, `offer-signed`, `onboarding-documents`: their wording and variables are M4's, built and
 edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4's, built).
 
-### 5.9 M6 · Payroll & Notifications · TB, AJ · 23 to 27 Nov
+### 5.9 M6 · Payroll & Notifications · TB, LA · 23 to 27 Nov
 
 | Module | Files beyond the template |
 |---|---|

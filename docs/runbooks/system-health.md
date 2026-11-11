@@ -103,7 +103,7 @@ Confirm mail is answering without sending anything:
 curl -s localhost:7000/api/health/ready | jq '.checks.mail'
 ```
 
-`"status": "up"` is what you want.
+`"status": "up"` is what you want. While IT has paused mail on Settings · Integrations it reads `degraded` with `paused`: only invitations and password resets go, payslip and notification mail waits or is dropped (`docs/guides/integrations.md` §6.15); Resume Mail ends it.
 
 **WhatsApp is not used by this module, and nothing about it changes.** `ALERT_WHATSAPP_URLS` stays
 exactly as it is for the infrastructure alerts that have nothing to do with the app's own engine:
@@ -122,7 +122,7 @@ list; these are the ones that reach somebody's phone.
 | Database | `systemctl status postgresql` | `docs/runbooks/backup-restore.md` if it will not start |
 | Cache and Sessions | `systemctl status redis-server` | Sessions and queued jobs are down until it is back |
 | Worker | `systemctl status mycity-worker-prod` | `journalctl -u mycity-worker-prod -n 100`. Mail, PDFs and notifications are waiting, not lost |
-| Events | `curl -s localhost:7000/api/health/ready \| jq '.checks.outbox'` | A backlog that keeps growing with a healthy worker means a handler is failing: `journalctl -u mycity-worker-prod \| grep outbox` |
+| Events | `curl -s localhost:7000/api/health/ready \| jq '.checks.outbox'` | Degraded when any outbox row has **failed** for good, or the backlog passes 500. "0 waiting" and degraded means failed rows: read them in the Status brief (§7.1) and fix their handler; they are not pruned and stay until retried (no route or script retries them yet: `outbox.retryFailed` in code only). A backlog that keeps growing with a healthy worker means a handler is failing: `journalctl -u mycity-worker-prod \| grep outbox` |
 | File Storage | `ls -ld /srv/mycity/prod/media` | It must be writable by the service user |
 | Upload Scanning | `systemctl status clamav-daemon` | Uploads are refused while it is down. Degraded, never fatal |
 | Disk Space | `df -h /` | Amber under 10% free, red under 5%. Old releases and dumps are pruned; media and logs grow |

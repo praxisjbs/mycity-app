@@ -41,7 +41,7 @@ track who has read them.
 | #announcements channel | Staff app, inside Channels | Every employee, read only | Published announcements, newest last, Urgent ones red and Important ones amber | Read; acknowledge an Urgent one; only People and the CEO post |
 | Notification bell and web push | Staff app, phone | Recipients | New announcement, direct message, mention | Open the message |
 | People · Employees (employee record) | Staff app | People | `date_of_birth`, `start_date`, avatar | Source of the birthday and anniversary posts. Nothing is entered in Community for them |
-| Settings · Notifications (M6) | Staff app | Every employee | "Community messages" category | Choose in-app, push or email |
+| Settings · Notifications (M0, brought forward 19/10/2026) | Staff app | Every employee | "Community messages" category | Choose in-app, push or email |
 | Mobile bottom bar "Community" | Staff app, phone | Every employee | Opens Staff Community | |
 
 ## 3 · How the screens relate
@@ -552,7 +552,7 @@ received, not interface copy; the copy rules apply to the chrome around them.
 | Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub (M10): the same announcement records, read only | The M10 guide | The M10 guide. That it reads the same records, no second copy: §2 |
 | Notification bell and web push | Owned by the frontend foundation (FRONTEND_GUIDE §9.6): the sender and first line; a tap opens the conversation | None | Fan-out, muting and who is notified: §3 step 1, §7 |
 | People · Employees (employee record) | Owned by People: that module's guide | That module's guide | How birthdays and anniversaries become posts: §3 step 3, §6 |
-| Settings · Notifications (M6) | Owned by Settings (M6): the Community Messages category with in-app, push and email | The M6 guide | The M6 guide |
+| Settings · Notifications (M0) | Owned by Settings (M0): the Community Messages category with in-app, push and email | `docs/guides/notifications.md` | `docs/guides/notifications.md` |
 | Mobile bottom bar "Community" | The Community icon and word; it opens Staff Community | None | FRONTEND_GUIDE §7 |
 
 ### 10.2 Phone layout
@@ -566,7 +566,7 @@ received, not interface copy; the copy rules apply to the chrome around them.
 | Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub | The M10 guide | The M10 guide | The M10 guide |
 | Notification bell and web push | The bell in the top bar; push on the phone | None | A tap opens the conversation full screen | The top bar |
 | People · Employees (employee record) | Owned by People | That module's guide | That module's guide | That module's guide |
-| Settings · Notifications (M6) | Owned by Settings | The M6 guide | The M6 guide | The M6 guide |
+| Settings · Notifications (M0) | Owned by Settings | `docs/guides/notifications.md` | `docs/guides/notifications.md` | `docs/guides/notifications.md` |
 | Mobile bottom bar "Community" | Community, third of the five bottom bar items (F16), with the unread count | The desktop rail | Tap: Staff Community opens on Channels | The bottom bar (FRONTEND_GUIDE §7) |
 
 Every modal opens as a bottom sheet on a phone (FRONTEND_GUIDE §7); a form's errors sit on its
