@@ -230,7 +230,7 @@ table frozen · `1425` a day judged once: on `attendance_day` its `early_minutes
 policy's five consequence rules, unique on the person, the rule and its last counted day; the Home
 alert it raised; `employee_query_id`, keyed to the query by M3's `3040`) · `1435` `attendance_pay_item` (one pending
 deduction or overtime per person, day and kind, its amount `numeric(18,2)` masked as the salary is;
-`payroll_run_id` for M6, no key yet) and `attendance_overtime_approval` (overtime approved for a day
+`payroll_run_id` for M6, keyed by `6010`) and `attendance_overtime_approval` (overtime approved for a day
 beforehand, one per person and day) · `1440` reminders to clock out: `attendance_clock_reminder`'s
 `kind` widened to `clock_out_due`, a `slot` and `due_at`, unique per person, day, kind and slot ·
 `1445` Home's `late_arrivals` and `missing_clock_out` rules switched off and their open alerts
@@ -267,9 +267,8 @@ use M10's `knowledge_article` tables, and nor do SOPs or training (M10 below).
 
 **Owes:**
 - Attendance (attendance.md §4, §13): the redesign's tables above are built (PR 2's in `1380` and
-  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign key of
-  `attendance_pay_item.payroll_run_id` (M6) once its table exists (the breach's query key is M3's
-  `3040`); dropping `attendance_location_request` and the field assignment tables once no
+  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`)(the breach's query key is M3's `3040`; the foreign key of `attendance_pay_item.payroll_run_id` was
+  added by M6's `6010`); dropping `attendance_location_request` and the field assignment tables once no
   request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
   (MIGRATIONS §8); dropping
   `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
@@ -484,6 +483,7 @@ as that section says (08/11/2026, amended by its Change log):
 | `6010_payroll_deductions.sql` | `payroll_deduction`, `payroll_deduction_instalment` | A fine accepted or an advance recorded, and one month's share of each. One live deduction a fine (a unique index leaving out the cancelled), so a released fine can be accepted again. Adds `attendance_pay_item_payroll_run_fk` (`ON DELETE SET NULL`) and its index: the key owed since `1435` |
 | `6020_payroll_advanced.sql` | `salary_grade`, `employee_salary_grade`, `employee_pay_component`, `statutory_rate`; `payslip_line.base_amount`; `employee.tax_id`, `pension_pin`, `pension_administrator`, `nhf_number` | Built in PR 5 (10/11/2026) and off by default. Each table is effective-dated: one version of a key starting on a given day and at most one open version (two unique indexes; no `btree_gist` exclusion, the extension is not provisioned), written through `shared/db/effective-dated`, which ends the open version the day before the next. A statutory row's kind is held to its item and only a PAYE row is a band (`position`, `band_from`); `rate numeric(9,6)` is a percent, 0 to 100. A placement names any version of its grade and is read against the grade's band in force that day. `base_amount` is what a statutory line's rate was applied to, for the report. The four employee columns are masked as `employee.statutory`, written by the organisation service. No rate, band, relief or grade in any seed |
 | `6030_leave_unpaid.sql` | `leave_type.unpaid` | `boolean NOT NULL DEFAULT false` |
+| `6040_statutory_sources.sql` (owed, M6 PR 10) | `statutory_rate` source columns | Not built. Every statutory version carries its legal source (`source_title`, `source_section`, `source_url`, `source_document_id`, `source_checked_on`) or `no_legal_source` with a reason (TB, 11/11/2026; `docs/guides/payroll.md` §4.2, §6.16). `payroll_setting.paye_basis` leaves the screen (every deduction is monthly) and is fixed by PR 11 |
 | `seeds/reference/6099_seed_payroll.sql` | Reference data only (A26) | The `payroll.run` approval (version 1, the CEO, 72 hours, context `{ net_total: "money" }`), the `payroll.configure` capability held by Operations & People and the Implementation Team, and the Unpaid leave type flagged unpaid. No setting row, rate, band, grade, run or pay day |
 
 Every table has its own `<table>_set_updated_at` trigger, an index on every foreign key and an `ON DELETE`

@@ -353,7 +353,7 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   in a phone's page. A record with its own screen (an `id` route) and a reader that fills the
   screen (`SplitPanes`) keep their own shapes. Expenses (ESS · My Requests and the Expenses tabs)
   opens its records in the centred dialog on desktop at every width too: `ListDetail`'s modal
-  layout (F31 amended 04/11/2026, AJ). So does Recruitment, every tab but Talent Pool: Vacancies,
+  layout (F31 amended 04/11/2026, AJ). So does Recruitment, every tab but Talent Pool and Vacancies (a vacancy is a page of its own):
   Candidates, Assessments, Interviews, Offers and, once built, Onboarding (F31 amended 08/11/2026 and
   11/11/2026, GE). So do both payslips, Payroll · Payslips and ESS · My Payslips: the centred dialog
   at every desktop width and a full sheet on a phone (F31 amended 11/11/2026, JBS Praxis;

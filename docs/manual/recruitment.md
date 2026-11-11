@@ -34,8 +34,8 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
 3. The list shows each role with its department, openings, location, applicants, closing day and
    status.
    A role's applicants are counted the same way, so the tile is the open and paused roles' added up.
-4. Press a vacancy. On a computer it opens in a window over the list; on a phone it opens in a sheet.
-   ![A vacancy's sheet](shot:recruitment-vacancy-sheet)
+4. Press a vacancy. It opens as its own page. Press **Back to Vacancies** to return to the list.
+   ![A vacancy's page](shot:recruitment-vacancy-sheet)
 5. The sheet shows the role's details and its public link. Press **Copy Link** to share it. Its
    description, required experience and what we look for read with their headings and lists, as
    the careers page shows them.
