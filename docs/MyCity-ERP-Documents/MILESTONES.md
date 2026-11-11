@@ -1629,7 +1629,7 @@ staff never navigates to it to do their job.
 | People | **People** | 7 | Employees · Organogram · Departments · Attendance · Leave · Devices · Worksites | M1, M2 (Departments) |
 | People | **Performance** | 5 | Goals · Scorecards · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
-| People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |
+| People | **Recruitment** | 8 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool · Analytics | M4, M5 |
 | People | **Payroll** | 4 | Payroll Runs · Payslips · Deductions · Configurations | M6 (Salary Structure and Statutory folded into Configurations, 09/11/2026) |
 | Business | **Partnerships** | 7 | Pipeline · Categories · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 (Categories ratified 05/11/2026) |
 | Business | **Expenses** | 7 | My Requests (shown in ESS) · Requisitions · Approvals · Disbursements · Projects · Budgets · Categories | M8 (Projects added 04/11/2026, AJ; its tab and PROGRESS row in M8 PR 7) |
@@ -1644,7 +1644,7 @@ staff never navigates to it to do their job.
 | Public | **Public site** | 9 | Home · Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document · Help · Proposal | M4, M5, M7 (Proposal ratified 05/11/2026; Home ratified 06/11/2026; Help ratified 08/11/2026) |
 
 Four of the above span a milestone boundary. **People** gets Departments in M2 (ratified 27/10/2026), after its M1 tabs. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs and Training in M10; its Announcements tab is dropped (GE, 29/10/2026) and its FAQs tab (TB, 11/11/2026): announcements are kept and read on Staff Community · Announcements and #announcements. **Recruitment** gets Vacancies through Interviews and the Talent Pool in M4
-(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), and Offers and Onboarding in M5. The **public site** gets Home, Careers, Vacancy, Apply,
+(the Talent Pool moved from M5: decided by TB, owned by GE, 04/11/2026), Analytics in M4 too (GE, 11/11/2026: the funnel and the screening scores on a tab of their own), and Offers and Onboarding in M5. The **public site** gets Home, Careers, Vacancy, Apply,
 Assessment and Help in M4, Sign Offer and Verify Document in M5, and Proposal in M7. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
 M0 by TB on 19/10/2026).

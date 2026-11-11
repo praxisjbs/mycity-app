@@ -47,7 +47,6 @@ import {
   useContractForm,
   UploadField,
   useModal,
-  useSideBySide,
 } from "@mycity/ui";
 import { AssessmentQuestions } from "./AssessmentQuestions";
 import { ASSESSMENT_TYPE, bodySchema, pill, say, sayRefusal, SITTING_STATUS, STAGE_LABEL, useVacancyOptions } from "./shared";
@@ -65,24 +64,15 @@ export function Assessments() {
   const summary = useApi("GET /api/v1/recruitment/assessments/summary");
   const library = usePaged("GET /api/v1/recruitment/assessments");
   const sittings = usePaged("GET /api/v1/recruitment/assessments/sittings", { filters: marking ? { marking: "true" } : {} });
-  // On a wide desktop an assessment or a sitting sits beside its list (F31), the first one until another
-  // is pressed; on a phone, and where two columns do not fit, it opens in the sheet or dialog.
-  const beside = useSideBySide();
+  // A pressed assessment or sitting opens in the wide dialog on desktop and a sheet on a phone
+  // (ListDetail `modal`, F31 as amended 11/11/2026); nothing opens unasked.
   const [picked, setPicked] = useState<{ kind: "library" | "sittings"; id: string; title: string } | null>(null);
-  const first = view === "library"
-    ? library.rows[0] && { kind: "library" as const, id: library.rows[0].assessment_definition_id, title: library.rows[0].name }
-    : sittings.rows[0] && { kind: "sittings" as const, id: sittings.rows[0].application_assessment_id, title: sittings.rows[0].candidate_name };
-  const shown = (picked?.kind === view ? picked : null) ?? (beside ? (first ?? null) : null);
   const openAssessment = (id: string, title = "Assessment") => {
-    if (!beside) return modal.open({ title, wide: true, body: (close) => <AssessmentSheet id={id} close={close} /> });
     modal.close();
-    setView("library");
     setPicked({ kind: "library", id, title });
   };
   const openSittingId = (id: string, title = "Sitting") => {
-    if (!beside) return modal.open({ title, wide: true, body: (close) => <SittingSheet id={id} close={close} /> });
     modal.close();
-    setView("sittings");
     setPicked({ kind: "sittings", id, title });
   };
   const openSitting = (s: Sitting) => openSittingId(s.application_assessment_id, s.candidate_name);
@@ -146,9 +136,11 @@ export function Assessments() {
         {view === "sittings" && <SegmentedControl label="Which Sittings" value={marking ? "mark" : "all"} onChange={(v) => setMarking(v === "mark")} options={[["all", "All"], ["mark", "To Mark"]]} small />}
       </Toolbar>
       <ListDetail
-        open={false}
+        layout="modal"
+        size="wide"
+        open={picked !== null}
         onClose={() => setPicked(null)}
-        title={view === "library" ? "Assessment" : "Sitting"}
+        title={picked?.title ?? (view === "library" ? "Assessment" : "Sitting")}
         list={
           view === "library" ? (
             <PagedTable<Assessment>
@@ -158,7 +150,6 @@ export function Assessments() {
               rowKey={(a) => a.assessment_definition_id}
               noun="assessment"
               onRowClick={(a) => openAssessment(a.assessment_definition_id, a.name)}
-              selectedKey={beside && shown?.kind === "library" ? shown.id : undefined}
               empty={{ title: "No Assessments Yet" }}
               columns={[
                 { key: "name", label: "Assessment", render: (a) => <span className="font-semibold">{a.name}</span> },
@@ -178,7 +169,6 @@ export function Assessments() {
               rowKey={(x) => x.application_assessment_id}
               noun="sitting"
               onRowClick={openSitting}
-              selectedKey={beside && shown?.kind === "sittings" ? shown.id : undefined}
               empty={{ title: marking ? "Nothing to Mark" : "None Sent Yet" }}
               columns={[
                 { key: "who", label: "Candidate", render: (x) => <span className="font-semibold">{x.candidate_name}</span> },
@@ -191,15 +181,11 @@ export function Assessments() {
           )
         }
         detail={
-          beside && shown ? (
-            <Card>
-              {shown.kind === "library" ? (
-                <AssessmentSheet key={shown.id} id={shown.id} close={() => setPicked(null)} inline />
-              ) : (
-                <SittingSheet key={shown.id} id={shown.id} title={shown.title} close={() => setPicked(null)} inline />
-              )}
-            </Card>
-          ) : null
+          picked === null ? null : picked.kind === "library" ? (
+            <AssessmentSheet key={picked.id} id={picked.id} close={() => setPicked(null)} />
+          ) : (
+            <SittingSheet key={picked.id} id={picked.id} close={() => setPicked(null)} />
+          )
         }
       />
     </>
@@ -207,7 +193,7 @@ export function Assessments() {
 }
 
 /** An assessment: its settings, its questions with their points, and what the library does with it. */
-function AssessmentSheet({ id, close, inline = false }: { id: string; close: () => void; inline?: boolean }) {
+function AssessmentSheet({ id, close }: { id: string; close: () => void }) {
   const modal = useModal();
   const { can } = useAuth();
   const mayEdit = can("recruitment", "edit");
@@ -222,9 +208,8 @@ function AssessmentSheet({ id, close, inline = false }: { id: string; close: () 
     read.reload();
     invalidate("/api/v1/recruitment/assessments");
   };
-  // A form opened from here goes back to the assessment when it closes: beside the list it is still
-  // there; in the dialog it opens again (the app holds one dialog at a time).
-  const back = () => (inline ? modal.close() : modal.open({ title: a.name, wide: true, body: (done) => <AssessmentSheet id={id} close={done} /> }));
+  // A form opened from here sits over the assessment's dialog, which is still open when the form closes.
+  const back = () => modal.close();
   /** The assessment as a file another MyCity hub can take (`mycity-assessment-1`). */
   const exportIt = async () => {
     try {
@@ -245,9 +230,6 @@ function AssessmentSheet({ id, close, inline = false }: { id: string; close: () 
   };
   return (
     <>
-      {/* A card title keeps to four words (gate 8): beside the list the name leads the card instead. */}
-      {inline && <CardHeader title="Assessment" />}
-      {inline && <p className="mb-2 font-semibold">{a.name}</p>}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {a.active ? pill(["ok", "Active"]) : pill(["neutral", "Off"])}
         <Pill dot={false}>{a.code}</Pill>
@@ -450,7 +432,7 @@ function BulkSendForm({ assessment, close }: { assessment: AssessmentDetail; clo
 }
 
 /** A sitting: when it was sent and taken, each answer, and Mark Answers for what is marked by hand. */
-function SittingSheet({ id, close, title, inline = false }: { id: string; close: () => void; title?: string; inline?: boolean }) {
+function SittingSheet({ id, close }: { id: string; close: () => void }) {
   const mayEdit = useAuth().can("recruitment", "edit");
   const read = useApi("GET /api/v1/recruitment/assessments/sittings/:id", { params: { id } });
   const cancel = useMutation("POST /api/v1/recruitment/assessments/sittings/:id/cancel");
@@ -472,7 +454,6 @@ function SittingSheet({ id, close, title, inline = false }: { id: string; close:
   };
   return (
     <>
-      {inline && <CardHeader title={title ?? s.assessment_name} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {pill(SITTING_STATUS[s.status])}
         <span className="text-sm text-subtle-foreground">{`${s.assessment_name} · ${s.vacancy_title}`}</span>
