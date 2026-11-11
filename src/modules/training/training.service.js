@@ -104,7 +104,7 @@ function toItem(row) {
     document_id: row.document_id || null,
     document_name: row.document_id ? row.document_name || null : null,
     document_type: row.document_id ? row.document_type || null : null,
-    lesson_markdown: lesson,
+    lesson_html: lesson === null ? null : md.markdownToHtml(lesson),
     lesson: lesson === null ? null : md.markdownToBlocks(lesson),
     minutes: row.minutes === null || row.minutes === undefined ? null : Number(row.minutes),
   };
@@ -248,9 +248,24 @@ async function update(user, id, body) {
   return get(id);
 }
 
+/** The longest lesson kept, in Markdown (§6.5). */
+const LESSON_MAX = 20_000;
+
+/**
+ * A lesson from the editor's HTML, kept as Markdown through the one converter (as Policies keep
+ * their text): 20 to 20,000 characters of it, or a 422 on the editor's field.
+ */
+function lessonOf(html) {
+  const markdown = md.htmlToMarkdown(html || "").trim();
+  const words = md.markdownToText(markdown).trim();
+  if (words.length < 20) throw new AppError("VALIDATION_FAILED", "The lesson needs at least 20 characters", 422, { lesson_html: ["At least 20 characters"] });
+  if (markdown.length > LESSON_MAX) throw new AppError("VALIDATION_FAILED", "The lesson is too long", 422, { lesson_html: ["At most 20,000 characters"] });
+  return markdown;
+}
+
 /**
  * An item's content as stored, checked for its kind: a file is an upload claimed into the vault
- * for the course (A13), a link an https URL, a lesson Markdown.
+ * for the course (A13), a link an https URL, a lesson Markdown from the editor's HTML.
  */
 async function itemContent(client, user, courseId, body) {
   const base = { kind: body.kind, title: body.title.trim(), url: null, document_id: null, lesson_markdown: null, minutes: body.minutes ?? null };
@@ -263,7 +278,7 @@ async function itemContent(client, user, courseId, body) {
     });
     return { ...base, document_id: body.document_id };
   }
-  if (body.kind === "lesson") return { ...base, lesson_markdown: body.lesson_markdown };
+  if (body.kind === "lesson") return { ...base, lesson_markdown: lessonOf(body.lesson_html) };
   return { ...base, url: body.url };
 }
 

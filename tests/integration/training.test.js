@@ -50,6 +50,8 @@ const day = (n) => lagos.addDays(TODAY, n);
 const YEAR = TODAY.slice(0, 4);
 const pdf = () => Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
 const LESSON = "## Why it matters\n\nPersonal data is anything that names a person. Keep it locked.\n\n- Lock your screen";
+/** The same lesson as the editor sends it. */
+const LESSON_HTML = "<h2>Why it matters</h2><p>Personal data is anything that names a person. Keep it <b>locked</b>.</p><ul><li>Lock your screen</li></ul>";
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -145,7 +147,7 @@ describeDb("training against the real migrations", () => {
       { kind: "file", title: "The Handbook", document_id: staged.body.document_id, minutes: 20 },
       { kind: "video", title: "Watch the Briefing", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", minutes: 5 },
       { kind: "link", title: "Outside Course", url: "https://learn.example.org/course/42" },
-      { kind: "lesson", title: "Key Rules", lesson_markdown: LESSON, minutes: 10 },
+      { kind: "lesson", title: "Key Rules", lesson_html: LESSON_HTML, minutes: 10 },
     ])
       expect((await as("ops").post(`/training/courses/${id}/items`, item)).status).toBe(201);
     if (Object.keys(settings).length) expect((await as("ops").patch(`/training/courses/${id}`, settings)).status).toBe(200);
@@ -223,9 +225,17 @@ describeDb("training against the real migrations", () => {
     const video = await as("ops").post(`/training/courses/${ids.draft}/items`, { kind: "video", title: "Briefing", url: "https://youtu.be/dQw4w9WgXcQ" });
     expect(video.body.items[1]).toMatchObject({ kind: "video", youtube_id: "dQw4w9WgXcQ" });
     expect((await as("ops").post(`/training/courses/${ids.draft}/items`, { kind: "video", title: "Plain", url: "http://youtu.be/x" })).status).toBe(422);
-    const lesson = await as("ops").post(`/training/courses/${ids.draft}/items`, { kind: "lesson", title: "Rules", lesson_markdown: LESSON, minutes: 10 });
+    const lesson = await as("ops").post(`/training/courses/${ids.draft}/items`, { kind: "lesson", title: "Rules", lesson_html: LESSON_HTML, minutes: 10 });
     const rules = lesson.body.items[2];
     expect(rules.lesson[0]).toMatchObject({ kind: "heading" });
+    // Kept as Markdown through the one converter, and given back as the editor loads it.
+    expect((await one("SELECT lesson_markdown FROM training_item WHERE training_item_id = $1", [rules.training_item_id])).lesson_markdown).toBe(LESSON.replace("Keep it locked", "Keep it **locked**"));
+    expect(rules.lesson_html).toContain("<h2>Why it matters</h2>");
+    const short = await as("ops").post(`/training/courses/${ids.draft}/items`, { kind: "lesson", title: "Short", lesson_html: "<p>Twenty letters <b></b><i></i>here</p>" });
+    expect(short.status).toBe(422);
+    const tooLong = await as("ops").post(`/training/courses/${ids.draft}/items`, { kind: "lesson", title: "Long", lesson_html: `<p>${"word ".repeat(4_100)}</p>` });
+    expect(tooLong.status).toBe(422);
+    expect(tooLong.body.error.fields.lesson_html).toEqual(["At most 20,000 characters"]);
     expect(lesson.body.minutes).toBe(30);
 
     // The whole item again: a video can become a course link.
@@ -598,7 +608,7 @@ describeDb("training against the real migrations", () => {
       text: "Personal data is anything that names a person. Staff lock their screens and never share passwords with anyone.",
     });
     expect(res.status).toBe(200);
-    expect(res.body.lesson_markdown.length).toBeGreaterThan(20);
+    expect(res.body.lesson_html.length).toBeGreaterThan(20);
     expect((await one("SELECT count(*)::int AS n FROM training_item")).n).toBe(before);
     const run = await one("SELECT purpose, module_key FROM ai_run ORDER BY created_at DESC LIMIT 1");
     expect(run).toEqual({ purpose: "training-lesson-draft", module_key: "knowledge" });

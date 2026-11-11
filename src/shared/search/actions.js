@@ -198,6 +198,13 @@ const ACTIONS = Object.freeze([
     capability: "policies.manage",
     words: ["policy", "write a policy", "company policy", "handbook", "attendance policy"],
   }),
+  a("new_course", "New Course", {
+    screen: "knowledge.training",
+    params: { action: "new" },
+    need: ["knowledge", "create"],
+    capability: "training.manage",
+    words: ["course", "build a course", "create a course", "new lesson"],
+  }),
   a("raise_query", "Raise a Query", {
     screen: "queries.queries",
     params: { action: "new" },

@@ -12,6 +12,7 @@
 const { pool } = require("../../config/db");
 const { AppError } = require("../../shared/errors");
 const vault = require("../../shared/documents/vault");
+const md = require("../../shared/documents/markdown");
 const ai = require("../../services/ai/llm.service");
 const drafts = require("../../services/ai/drafts");
 const redact = require("../../services/ai/redact");
@@ -48,7 +49,7 @@ const unfence = (s) => String(s || "").replace(/^```(?:markdown|md)?\s*/i, "").r
  * POST /training/lesson-with-ai
  * @param {object} user
  * @param {{title: string, text?: string, document_id?: string}} body  LessonWithAi
- * @returns {Promise<{lesson_markdown: string}>}
+ * @returns {Promise<{lesson_html: string}>}  the model's Markdown, as the editor loads it
  */
 async function suggest(user, body) {
   const source = body.text ? String(body.text).trim() : await textOfDocument(user, body.document_id);
@@ -71,7 +72,7 @@ async function suggest(user, body) {
   }
   const lesson = s.restore(unfence(run && run.text)).slice(0, MAX_CHARS).trim();
   if (lesson.length < 20) throw unavailable();
-  return { lesson_markdown: lesson };
+  return { lesson_html: md.markdownToHtml(lesson) };
 }
 
 module.exports = { suggest, unfence };

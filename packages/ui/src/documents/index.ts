@@ -21,3 +21,4 @@ export * from "./IssuedLetter";
 export * from "./MediaViewer";
 export * from "./PdfViewer";
 export * from "./RichText";
+export * from "./VideoPlayer";

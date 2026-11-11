@@ -12,7 +12,7 @@ line to §3.
 | Owner | TB (Tom-Blake Asaah) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 18 Dec 2026 (MILESTONES §15) |
-| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 praxisjbs/mycity-app#113; PR 3 praxisjbs/mycity-app#115; PR 4 praxisjbs/mycity-app#117 |
+| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 praxisjbs/mycity-app#113; PR 3 praxisjbs/mycity-app#115; PR 4 praxisjbs/mycity-app#117; PR 5 praxisjbs/mycity-app#118 |
 
 Praxis AI and AI Control, M10's other half, were brought forward and are built (`praxis-ai.md`,
 `ai-control.md`); this tracker is the Knowledge Hub's only.
@@ -33,9 +33,9 @@ and Announcements, and gains department SOPs (structured, versioned, written by 
 `sops.manage`, read by everyone, linked from the screens their steps name) and Training (courses of files,
 video links, course links and lessons; assigned with a due date and a task, or open in the Library; Mark
 Done, optional proof, and a MyCity certificate issued on completion with the publisher's signature and a QR
-verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `knowledge` file and the
-`knowledge.js` contract are empty, there is no `training` module, and the screens in
-`app/src/features/knowledge/index.tsx` run on INTERIM shapes and the browser mock.
+verified on `go.mycityapp.io`). As of 11/11/2026 the contracts, the data and the `training` module are
+built (PR 1, PR 3), and Knowledge Hub · Training and ESS · My Training run on the contract (PR 5); the
+SOPs tab in `app/src/features/knowledge/index.tsx` runs on INTERIM shapes and the browser mock until PR 2.
 
 **Things every session needs:**
 
@@ -84,8 +84,10 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 - [x] `npm run ci` green; the PR marked ready (#117, 11/11/2026)
 
 ### PR 5 · Training screens
-- [ ] Knowledge Hub · Training and ESS · My Training on the contract, desktop and phone
-- [ ] YouTube player (CSP `frame-src`), viewer, proof; INTERIM types and the old mock deleted
+- [x] Knowledge Hub · Training and ESS · My Training on the contract, desktop and phone (11/11/2026)
+- [x] YouTube player (CSP `frame-src`), viewer, proof; INTERIM types and the old mock deleted (11/11/2026)
+- [x] The Training tab's `training.manage` rule in both mirrors; ⌘K's New Course (11/11/2026)
+- [x] Download Certificate on My Training and Training · People, on PR 4's two routes (11/11/2026)
 - [ ] Screen gates at 390 and 1440 px; PROGRESS #65, #110; the PR body's Native app feel section
 
 ### PR 6 · Staging seed, User Guide, release
@@ -95,6 +97,7 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 
 ## 3 · Log
 
+- 11/11/2026 · TB · PR 5 built on PR 3: Knowledge Hub · Training (courses with state chips; a course beside the list, a full sheet on a phone, with Items in order, People, Assignments and Settings; Add Item for the four kinds with Draft Lesson; Publish Course signed; Assign Training; Withdraw; Remind Overdue; Archive Course) and ESS · My Training (To Do, In Progress, Completed, Library; an item opened in place with Mark Done, Mark Not Done and Next Item; Start Course; Add Proof), both on the contract and walked on the live API, desktop and phone. New in `packages/ui`: `OrderList` (drag on desktop, Move Up and Move Down in each row's menu) and `VideoPlayer` (YouTube through youtube-nocookie.com, or an uploaded MP4, nothing loaded until Play Video). The training mock rewritten in the contract's shapes (`app/src/api/mock/modules/training.ts`, every answer parsed by its schema in its test); the INTERIM training types and the old mock deleted. The Training tab follows `training.manage` in both mirrors; ⌘K's New Course; the staff host's CSP frames `youtube-nocookie.com`. Found on the way: `RichTextField` speaks HTML while the contract carried a lesson as Markdown, so a lesson now crosses as `lesson_html`, kept as Markdown by the server's converter as Policies' text is (guide §5, §6.5, §14). Tests: the two screens (16), the mock against the contract (4), `OrderList` (8), `VideoPlayer` (5), the mirrors, the CSP; `training.test.js` unit and integration updated. Download Certificate wired after PR 4 merged (main merged in), on My Training and Training · People, and walked on the live API to the PDF (CERT-2026-0002). Next: PR 6.
 - 11/11/2026 · TB · PR 4 built on PR 3, after Cynthia approved the certificate sample as drawn (guide §13 item 4): `templates/documents/training-certificate.html` and `training.certificate.js` (the page drawn from the sample, one A4 landscape page, Cormorant Garamond embedded from `templates/documents/fonts/` with its licence and the proposal kit's Geist; rosette, seal and QR drawn on the server), `training.issue_certificate` and "Certificate ready", Download Certificate's two routes (202, waiting on `GET /exports/:id`), and Verify a Document for `CERT-` numbers with both verdicts, on go.mycityapp.io too (Awarded To, Course, Completed, Published By; the public-site chapter's new section and pictures). Migration `10430` keeps the holder's name and course title as issued. Tests: the training integration file renders a real PDF with Chromium (one page, its words read back, both verdicts, a rename, the facts and the file each altered), the drawing's unit tests, the Verify page's. Next: PR 5 (screens; it can wire Download Certificate now), PR 6.
 - 11/11/2026 · TB · PR 3 built on PR 1: the `training` module (every `/training` route of the guide's §5 but Download Certificate's two, which PR 4 builds with the PDF), Draft Lesson (`training-lesson-draft`, Default, chosen by TB 11/11/2026), the `training_due` reminder and Remind Overdue, joiners (`training.enrol_joiners`, the `training-joiners` job at 06:00 Lagos) and leavers, ⌘K and four AI reads; `tasks.service.completeForRecord`; migration `10420` (a task may name a `training_enrolment`); the `TRAINING_CERTIFICATE` canonical payload. `tests/integration/training.test.js` (14, 300 people assigned at once among them) and the module's unit tests (26) pass. Found on the way: the guide named `user.roles_changed`, which no module emits (roles change on `access.roles_set`), and closed leavers on `employee.updated`, where `employee.archived` is the leaving; it said a reload would complete someone after an item was removed, now done in the removal's transaction (guide §14). Left for PR 5: the Training tab's `training.manage` rule in both mirrors (`app/src/shell/access.ts`, `src/shared/search/screens.js`) and ⌘K's New Course, with the screen. Next: PR 4 (certificates) and PR 5 (screens).
 - 11/11/2026 · TB · PR 1 built on top of PR 0: contracts `knowledge.js` and `training.js`, migrations `10400` and `10410`, seed `10490`, the capabilities, schemes, labels and record types; `tests/integration/knowledge-schema.test.js` (16) passes, and so do `settings.test.js` and `home-schema.test.js` with their lists updated. Found on the way: a `published` SOP version with no number passed its CHECK (NULL > 0 is unknown), fixed before merge; Settings · Documents & Numbering answered 500 for the new types until the contract's `DOC_TYPES` listed them. Next: PR 2 (SOPs) and PR 3 (training) can run in parallel once PR 1 merges.

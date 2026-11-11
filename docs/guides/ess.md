@@ -445,6 +445,10 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · ESS · My Training (#110) built on the contract (M10 PR 5, `knowledge.md` §10): To Do,
+  In Progress, Completed and Library, a course beside the list (a sheet on a phone) with its items
+  opened in place, Mark Done, Start Course and Add Proof. `?id=` opens a course by its id or the
+  person's enrolment's, so ESS's screen switch now passes the record id to My Training.
 - 11/11/2026 · JP · M6 PR 7 rebuilt My Payslips on the contract (`app/src/features/ess/Payslips.tsx`, on `features/payroll/parts.tsx`; `docs/guides/payroll.md` Appendix A): a month opens its payslip in the shared Modal at every desktop width and as a full sheet on a phone (F31 as amended for payslips), its PDF once rendered, with Download PDF and Email a Copy; Download All of the year in the header; the year switch runs from the person's start year; In the run is a month approved and not yet paid (JBS Praxis, 11/11/2026; payroll §13.1 item 28), so the open question is closed. §2, §6, §10.1, §10.2 and §11 match. Email a Copy moved from the header to the payslip, beside Download PDF, since it is one payslip's.
 - 11/11/2026 · TB · ESS gains My Training (`my-training`, #110, M10), added with `npm run new:screen` as an empty screen: staff take their assigned and Library courses there, mark items done, add proof and download their certificates. Its rules, API and §10 rows are `docs/guides/knowledge.md`'s.
 - 09/11/2026 · JP · M6 PR 4 built My Payslips' API in `ess.earnings.js` (`docs/guides/payroll.md` Appendix A): §5's seven routes (the list, the summary, one payslip, its PDF, Email a Copy, Download All and Deductions) are built over `payslips.service` with the caller's own employee id, and this module still reads none of payroll's tables. A person's figures are never masked from them. §4's `payslip` row is read through the payslips service, not directly. No screen changed (PR 7); the open question of what In the run means is `docs/guides/payroll.md` §13.3 item 2.
