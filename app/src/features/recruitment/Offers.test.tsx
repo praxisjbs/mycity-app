@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { sid } from "@/api/mock/core";
-import { copyProblems, dialog, openAs, openRow, press, settled } from "./testKit";
+import { choose, copyProblems, dialog, openAs, openRow, press, settled } from "./testKit";
 
 /**
  * Recruitment · Offers on the in-browser mock (docs/guides/offers.md §3, §10): the list with its
@@ -58,8 +58,10 @@ describe("Recruitment · Offers", () => {
     expect(within(r).getByText("Monthly Total")).toBeTruthy();
     expect(within(r).getAllByText("Accepted").length).toBeGreaterThan(0);
     expect(within(r).getByText("Accepted and signed")).toBeTruthy();
-    expect(within(r).getByRole("button", { name: "Download PDF" })).toBeTruthy();
-    expect(within(r).getByText(/We are pleased to offer you employment/)).toBeTruthy();
+    // The letter waits behind View Letter, in a window of its own.
+    expect(within(r).queryByText(/We are pleased to offer you employment/)).toBeNull();
+    await press(r, "View Letter");
+    expect(within(dialog()).getByText(/We are pleased to offer you employment/)).toBeTruthy();
     expect(within(r).queryByRole("button", { name: "Send Offer" })).toBeNull();
     expect(copyProblems()).toEqual([]);
     expect(await axe(r)).toHaveNoViolations();
@@ -152,8 +154,7 @@ describe("Recruitment · Offers", () => {
     // The candidate opens beside the board (F31); the reason is asked in a dialog.
     fireEvent.click((await screen.findAllByText("Kunle Afolabi", undefined, { timeout: 8000 }))[0]!);
     await settled();
-    fireEvent.click(await screen.findByRole("button", { name: "Not Progressing" }));
-    await settled();
+    await choose(dialog(), "Not Progressing");
     fireEvent.change(within(dialog()).getByLabelText("Reason"), { target: { value: "The role went to someone with more experience" } });
     await press(dialog(), "Not Progressing");
     cleanup();

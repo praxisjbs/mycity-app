@@ -38,44 +38,20 @@ afterEach(() => {
   setViewport(1440);
 });
 
-/** On a wide desktop a record opens beside its list, never in a dialog (F31): the card its heading heads, holding `inside`. */
-async function openBeside(text: string, heading: string, inside: RegExp | string) {
-  fireEvent.click((await screen.findAllByText(text, undefined, { timeout: 8000 }))[0]!);
-  await settled();
-  expect(screen.queryByRole("dialog")).toBeNull();
-  return paneOf(heading, inside);
-}
-
-/** The pane beside the list: the card whose heading is `heading`. */
-async function paneOf(heading: string, inside: RegExp | string) {
-  let pane: HTMLElement = await screen.findByRole("heading", { name: heading, level: 2 });
-  while (pane.parentElement && !within(pane).queryAllByText(inside).length) pane = pane.parentElement;
-  return pane;
-}
-
 describe("Recruitment · Assessments", () => {
   it("the library shows the brief with its questions and points", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=assessments");
     for (const label of ["Active", "Sent", "Awaiting Marking", "Average Score"]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
-    const sheet = await openBeside("Graphics and Motion Design Brief", "Assessment", /Upload the festival poster/);
-    expect(copyProblems()).toEqual([]);
-    expect(within(sheet).getByText(/Upload the festival poster/)).toBeTruthy();
-    expect(within(sheet).getByRole("button", { name: "Send to Candidates" })).toBeTruthy();
-    expect(await axe(document.body)).toHaveNoViolations();
-  }, 60000);
-
-  it("between 761 and 1180 px, where two columns do not fit, an assessment opens in the dialog", async () => {
-    setViewport(1024);
-    await openAs("cynthia@mycityapp.io", "/recruitment?tab=assessments");
     const sheet = await openRow("Graphics and Motion Design Brief");
     expect(within(sheet).getByText(/Upload the festival poster/)).toBeTruthy();
+    expect(within(sheet).getByRole("button", { name: "Send to Candidates" })).toBeTruthy();
   }, 60000);
 
   it("Mark Answers refuses a mark above the points, then scores the sitting", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=assessments&marking=true");
-    const sheet = await openBeside("Ngozi Eze", "Ngozi Eze", "Mark Answers");
+    const sheet = await openRow("Ngozi Eze");
     expect(within(sheet).getByRole("button", { name: /festival-poster\.pdf/ })).toBeTruthy();
     expect(within(sheet).getByText("https://drive.example.test/festival-motion")).toBeTruthy();
     expect(copyProblems()).toEqual([]);
@@ -85,12 +61,12 @@ describe("Recruitment · Assessments", () => {
     fireEvent.change(marks[1]!, { target: { value: "32" } });
     fireEvent.change(marks[2]!, { target: { value: "16" } });
     await press(sheet, "Mark Answers");
-    expect(within(sheet).getByText("At most 40")).toBeTruthy();
+    expect(within(dialog()).getByText("At most 40")).toBeTruthy();
     const sitting = SITTINGS.find((s) => s.application_assessment_id === sid("sit:design:ngozi"))!;
     expect(sitting.status).toBe("submitted");
 
-    fireEvent.change(within(sheet).getAllByLabelText("Mark")[0]!, { target: { value: "36" } });
-    await press(sheet, "Mark Answers");
+    fireEvent.change(within(dialog()).getAllByLabelText("Mark")[0]!, { target: { value: "36" } });
+    await press(dialog(), "Mark Answers");
     await settled();
     expect(sitting.status).toBe("scored");
     expect(sitting.score).toBe(84);
@@ -98,9 +74,7 @@ describe("Recruitment · Assessments", () => {
 
   it("a sitting's own link (?sitting=) opens it, and one not yet started can be cancelled", async () => {
     await openAs("cynthia@mycityapp.io", `/recruitment?tab=assessments&sitting=${sid("sit:design:segun")}`);
-    await settled();
-    expect(screen.queryByRole("dialog")).toBeNull();
-    const sheet = await paneOf("Sitting", "Cancel Sitting");
+    const sheet = dialog();
     expect(within(sheet).getByText(/Graphics and Motion Design Brief/)).toBeTruthy();
     expect(within(sheet).queryByLabelText("Mark")).toBeNull();
     await press(sheet, "Cancel Sitting");

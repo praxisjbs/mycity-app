@@ -438,10 +438,11 @@ jobs:
       # the others stop their own install the moment it is there (they look every 3 seconds) and
       # use it, so one slow or failing mirror connection no longer holds a job or fails it
       # (06/11/2026, 07/11/2026). scripts/ci-chromium-libs.sh.
+      # The script starts its last resort by minute 7 and gives it up to six; 14 leaves room to tidy up.
       - name: Chromium's system libraries
         id: chromium-libs
         if: steps.chromium.outputs.cache-hit == 'true'
-        timeout-minutes: 12
+        timeout-minutes: 14
         env:
           GH_TOKEN: ${{ github.token }}
           SHARED: chromium-debs-${{ steps.image.outputs.id }}-${{ steps.playwright.outputs.version }}

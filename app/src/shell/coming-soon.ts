@@ -76,6 +76,7 @@ export const COMING: Record<string, string[]> = {
   "recruitment/offers": ["Offer letters generated from the role and the candidate", "Sent by mail and signed on a phone", "Signed offers lock and can be verified"],
   "recruitment/onboarding": ["Documents first, then pre-onboarding, then onboarding", "A checklist per hire, with what is outstanding", "Onboarding opens only when documentation is complete"],
   "recruitment/talent-pool": ["Strong candidates kept for future roles", "Why each was not hired this time", "Invite them to apply when a role opens"],
+  "recruitment/analytics": ["Candidates at each stage across every role", "Screening scores in bands", "Read within your own scope"],
 
   /* Payroll */
   "payroll/payroll-runs": ["Run payroll for the month, previewed before it is approved", "Operations prepare each run and the CEO approves it", "Payslips publish to each person on approval"],
