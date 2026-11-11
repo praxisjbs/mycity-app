@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 105 screens (96 in the staff app, 9 on the public site) plus
+**The single record of what is built.** 106 screens (97 in the staff app, 9 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -46,14 +46,14 @@ saying who agreed and when.
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 0 | 0 | 5 | 0 | 0 |
-| M4 Recruitment End to End | 11 | 0 | 0 | 11 | 0 | 0 |
+| M4 Recruitment End to End | 12 | 0 | 0 | 12 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 4 | 1 | 0 | 3 | 0 | 0 |
 | M6 Payroll & Notifications | 5 | 0 | 0 | 5 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 8 | 0 | 0 | 8 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 0 | 0 | 8 | 0 | 0 |
-| **Total** | **105** | **1** | **0** | **104** | **0** | **0** |
+| **Total** | **106** | **1** | **0** | **105** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Five ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8),
@@ -1225,15 +1225,18 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 38 | Vacancies | `vacancies` | M4 | GE | ☑ | ☑ | ☑ | Built | 11/11/2026 |
-| 39 | Candidates | `candidates` | M4 | GE | ☑ | ☑ | ☑ | Built | 10/11/2026 |
-| 40 | Assessments | `assessments` | M4 | GE | ☑ | ☑ | ☑ | Built | 10/11/2026 |
+| 39 | Candidates | `candidates` | M4 | GE | ☑ | ☑ | ☑ | Built | 11/11/2026 |
+| 40 | Assessments | `assessments` | M4 | GE | ☑ | ☑ | ☑ | Built | 11/11/2026 |
 | 41 | Interviews | `interviews` | M4 | GE | ☑ | ☑ | ☑ | Built | 08/11/2026 |
-| 42 | Offers | `offers` | M5 | AJ | ☑ | ☑ | ☑ | Built | 08/11/2026 |
+| 42 | Offers | `offers` | M5 | AJ | ☑ | ☑ | ☑ | Built | 11/11/2026 |
 | 43 | Onboarding | `onboarding` | M5 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 44 | Talent Pool | `talent-pool` | M4 | GE | ☑ | ☑ | ☑ | Built | 10/11/2026 |
+| 111 | Analytics | `analytics` | M4 | GE | ☑ | ☑ | ☑ | Built | 11/11/2026 |
 
 **Notes**
 
+- 11/11/2026 · GE · Fewer buttons at once (GE): a vacancy's (#38) and a candidate's (#39) foot hold one button, the next step (Publish, Pause or Resume; the next stage ahead, else Make Offer, Reopen or Open Offer), and More Actions (the shared `Menu`, an action sheet on a phone) for the rest, Close Vacancy and Not Progressing red and last; Edit is Edit Vacancy there. Offers (#42): the letter left the offer's dialog; View Letter, beside Withdraw Offer, opens it in its own, the PDF with Open in Tab and Download PDF once made (as M3's letters), the wording on paper before. Tests follow (`choose` and `moreActions` in `testKit.tsx`); the chapter's steps say More Actions and View Letter, its pictures retaken. Left: nothing.
+- 11/11/2026 · GE · Recruitment's desktop put back as GE left it: Vacancies (#38), Candidates (#39) and Assessments (#40, the library and Sittings) open a record in the wide dialog again, the list or board keeping the page's width (`ListDetail` `modal`, F31 amended 11/11/2026, which also names Offers and, once built, Onboarding); #109 and #110 had put them beside the list. Vacancies' Suggested From Organogram moved behind View Empty Seats, beside the status filter. New tab Analytics (#111), kept light (GE): four figures, then Funnel, All Roles (from Vacancies), Screening Scores (from Candidates), Assessment Averages and Offers and Pool, from the summaries the tabs already read; no API changed. Candidates no longer uses `ListDetail` `fillUntilPicked` (Knowledge Hub · Training and ESS · My Training still do). Tests: Vacancies (View Empty Seats), Candidates and Assessments as before #110, Analytics (3), ListDetail. The guide's §2, §10 and §14, the Recruitment chapter (seven tabs, Analytics, View Empty Seats, the window) and its pictures follow. Left: the M4 training videos show the side-by-side layout and the funnel on Vacancies, so they no longer match these tabs (`docs/runbooks/training-videos.md` §7).
 - 11/11/2026 · JP · Vacancies (#38), fault #3 of the 11/11 staging brief (`VALIDATION_FAILED: hiring_manager_id`): `GET /recruitment/vacancies/hiring-managers` lists who the save takes (holding Recruitment, in the writer's scope, the panel's own predicate); New Vacancy's interview, Edit Vacancy and the New Vacancy card pick from it, and a seat fills in its line manager only when eligible (`docs/guides/recruitment.md` §5, §6.1, §9). Fault #4 (Invite to Apply's `vacancy_id`) was already fixed by #79. Nothing left.
 - 10/11/2026 · TB · Found while filming the two M4 videos (`docs/runbooks/training-videos.md` §7) and fixed: New Vacancy (#38) refused a salary typed as people write it (`350,000`) with "Check the format", so its salary question could not be passed; the questions, the draft request and the editor now send it with two places (`toMoneyString`). Candidates (#39), Assessments (#40, the library and Sittings) and Talent Pool (#44) opened a record in a dialog on desktop: on a wide desktop it now sits beside the list (F31), the first one until another is pressed, and beside the board with the board keeping its full width until a card is pressed (`ListDetail` `fillUntilPicked`, new); forms return to the record in place; the dialog stays on a phone and where two columns do not fit. Tests (`VacancyInterview`, `Candidates`, `Assessments`, `TalentPool`, `Offers`, `ListDetail`), the guide's §10 and the Recruitment chapter follow. Left: nothing.
 - 10/11/2026 · TB · Found while filming the M4 video (`docs/runbooks/training-videos.md` §7): Vacancies (#38) opened a role in a dialog at every desktop width, not beside the list (F31, the User Guide). On a wide desktop it is now `ListDetail`: the first role beside the list until another is pressed, Edit, Questions, Scorecard and Close Vacancy returning to it in place; the dialog stays on a phone and where two columns do not fit. Its section headings go one level down (axe heading-order) and its two small cards stack in the pane. `PagedTable` takes `selectedKey`. Tests (`Vacancies.test.tsx`), the guide's §10 and the Recruitment chapter's pictures follow. Left: nothing.

@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { SEATS, VACANCIES } from "@/api/mock/data/recruitment";
-import { copyProblems, dialog, openAs, openRow, press, settled, type } from "./testKit";
+import { copyProblems, dialog, moreActions, openAs, openRow, press, settled, type } from "./testKit";
 
 /**
  * Recruitment · Vacancies on the in-browser mock (docs/guides/recruitment.md §6.1, §10): the four
@@ -38,35 +38,43 @@ afterEach(() => {
 
 const byTitle = (title: string) => VACANCIES.find((v) => v.title === title)!;
 
-/** On a wide desktop a role opens beside the list, never in a dialog (F31): the card its heading heads. */
-async function openBeside(title: string) {
-  fireEvent.click((await screen.findAllByText(title, undefined, { timeout: 8000 }))[0]!);
-  await settled();
-  expect(screen.queryByRole("dialog")).toBeNull();
-  const heading = await screen.findByRole("heading", { name: title, level: 2 });
-  let pane: HTMLElement = heading;
-  while (pane.parentElement && !within(pane).queryByRole("button", { name: "See Candidates" })) pane = pane.parentElement;
-  return pane;
-}
-
 describe("Recruitment · Vacancies", () => {
-  it("shows the four figures and the roles, and a role opens beside the list with its traits and public link", async () => {
+  it("shows the four figures and the roles, and a role opens with its traits and public link", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
     for (const label of ["Open Vacancies", "Applicants", "In Interview", "Past Closing Date"]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
 
-    const sheet = await openBeside("Head, Sales & Revenue");
+    const sheet = await openRow("Head, Sales & Revenue");
     expect(within(sheet).getByText("Appearance and Grooming")).toBeTruthy();
     expect(within(sheet).getByText("Future Growth Potential in Career")).toBeTruthy();
     expect(within(sheet).getByText(/go\.mycityapp\.io\/jobs\//)).toBeTruthy();
-    for (const name of ["Edit", "Questions", "Scorecard", "Pause", "See Candidates"]) expect(within(sheet).getByRole("button", { name })).toBeTruthy();
+    // One button in view, the lifecycle's next step; the rest behind More Actions, Close Vacancy last.
+    expect(within(sheet).getByRole("button", { name: "Pause" })).toBeTruthy();
+    expect(within(sheet).queryByRole("button", { name: "Edit Vacancy" })).toBeNull();
+    expect(await moreActions(sheet)).toEqual(["See Candidates", "Edit Vacancy", "Questions", "Scorecard", "Close Vacancy"]);
     // The description is drawn from its blocks: real headings and lists, never the Markdown's marks.
     expect(within(sheet).getByRole("heading", { name: "Key Responsibilities" })).toBeTruthy();
     expect(within(sheet).getAllByRole("listitem").length).toBeGreaterThan(3);
     expect(within(sheet).queryByText(/^##|\n- /)).toBeNull();
     expect(sheet.textContent).not.toContain("## ");
     expect(copyProblems()).toEqual([]);
+  }, 60000);
+
+  it("View Empty Seats lists the seats with no vacancy, and Create Vacancy starts New Vacancy from one", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
+    // The seats wait behind their button; the page holds the list alone.
+    expect(screen.queryByText("Finance Officer")).toBeNull();
+    expect(screen.queryByText("Funnel, All Roles")).toBeNull();
+    await press(document.body, "View Empty Seats");
+    const seats = dialog();
+    expect(within(seats).getByText("Finance Officer")).toBeTruthy();
+    expect(within(seats).getByText("City Editor, Abuja")).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+    expect(await axe(document.body)).toHaveNoViolations();
+    await press(within(seats).getByText("Finance Officer").closest("tr")!, "Create Vacancy");
+    const form = dialog();
+    expect((within(form).getByLabelText("Job Title") as HTMLInputElement).value).toBe("Finance Officer");
   }, 60000);
 
   it("Create Vacancy from the Organogram opens New Vacancy's interview with the seat's role, department and manager answered", async () => {
@@ -82,10 +90,10 @@ describe("Recruitment · Vacancies", () => {
 
   it("Pause and Resume a role", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
-    const sheet = await openBeside("Graphics and Motion Designer");
+    const sheet = await openRow("Graphics and Motion Designer");
     await press(sheet, "Pause");
     expect(byTitle("Graphics and Motion Designer").status).toBe("paused");
-    await press(await openBeside("Graphics and Motion Designer"), "Resume");
+    await press(dialog(), "Resume");
     expect(byTitle("Graphics and Motion Designer").status).toBe("open");
   }, 60000);
 
@@ -128,7 +136,7 @@ describe("Recruitment · Vacancies", () => {
     setViewport(390);
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
     const sheet = await openRow("Head, Sales & Revenue");
-    expect(within(sheet).getByRole("button", { name: "See Candidates" })).toBeTruthy();
+    expect(await moreActions(sheet)).toContain("See Candidates");
     expect(copyProblems()).toEqual([]);
   }, 60000);
 });

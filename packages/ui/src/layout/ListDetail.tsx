@@ -4,7 +4,7 @@
  * @summary A list and the record a row opens: side by side on a wide desktop, and on a phone the list alone with the opened record in a bottom sheet, never below the list (F31).
  * @use Any list whose row opens a record on the same screen: leave requests, payslips, proposals, offers, letter templates. DetailPane is the same rule for a record the desktop layout places elsewhere on the page (under the list beside a chart, above the list). `useSideBySide()` says when a first pick may show unasked.
  * @avoid A record with its own screen (navigate to its `id`); a reader read one at a time that fills the screen (SplitPanes: the mailbox, chat); a form (Modal); a record shown below its list on a phone, in any shape.
- * @phone No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `fillUntilPicked` (Candidates' board) gives the list the full width on desktop until a record is picked. `layout="modal"` (Expenses, F31 as amended 04/11/2026; Recruitment's Interviews and Offers, amended 08/11/2026, with `size="xl"` and `closeButton`, a Close button at the dialog's foot on desktop) opens the record in the centred dialog at every desktop width too, and the list takes the full width.
+ * @phone No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. `fillUntilPicked` (Knowledge Hub · Training, ESS · My Training) gives the list the full width on desktop until a record is picked. `layout="modal"` (Expenses, F31 as amended 04/11/2026; Recruitment's Interviews and Offers, amended 08/11/2026, with `size="xl"` and `closeButton`, a Close button at the dialog's foot on desktop; its Vacancies, Candidates and Assessments, amended 11/11/2026, with `size="wide"`) opens the record in the centred dialog at every desktop width too, and the list takes the full width.
  * @a11y The sheet is the shared Modal: titled by `title`, focus moves in and returns to the row on close, Esc and the phone's Back close it (F29). Side by side, the record is a plain column after the list in reading order.
  * @status stable
  * @exports DetailPane
@@ -84,7 +84,7 @@ export interface ListDetailProps {
   size?: "md" | "wide" | "xl";
   /** A Close button in the dialog's footer on desktop, for a long record read top to bottom (`layout="modal"`: Interviews and Offers). A phone's sheet drags down instead. */
   closeButton?: boolean;
-  /** Side by side, the list keeps the full width until a record is picked, then makes room for it: a board, whose columns have no first record to show (Recruitment's Candidates). */
+  /** Side by side, the list keeps the full width until a record is picked, then makes room for it: a list with no first record worth showing unasked (Knowledge Hub · Training, ESS · My Training). */
   fillUntilPicked?: boolean;
 }
 

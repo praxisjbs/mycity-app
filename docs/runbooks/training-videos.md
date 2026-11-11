@@ -248,6 +248,12 @@ listed here and in `docs/PROGRESS.md`.
 
 ## 8 · Where the work stands
 
+**11/11/2026 · GE.** Recruitment's desktop was put back as GE left it (Vacancies, Candidates and
+Assessments open a record in the wide dialog; Suggested From Organogram behind View Empty Seats; the
+funnel and Screening Scores on a new Analytics tab). The two M4 videos were filmed on the side-by-side
+layout of 10/11, so their shots of those tabs no longer match the hub. GE decided not to refilm
+(the videos were already with the client).
+
 **10/11/2026, later · TB (with Claude).** Both M4 videos written, filmed and assembled on a
 development database: part 1 9:07 in 12 chapters, part 2 6:54 in 11 (shorter than planned: what it
 shows takes less telling). Bisi Adewale, an invented candidate, applies on camera in part 1 and is

@@ -19,11 +19,7 @@ import { useSearchParams } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import { useScreenState } from "@/lib/plan";
 import {
-  Bars,
   Button,
-  Card,
-  CardHeader,
-  DesktopOnly,
   EmptyState,
   ErrorState,
   Field,
@@ -31,7 +27,6 @@ import {
   FormError,
   FormFooter,
   Grid,
-  HelpTerm,
   Kanban,
   ListDetail,
   LoadingRows,
@@ -43,7 +38,6 @@ import {
   Toolbar,
   useContractForm,
   useModal,
-  useSideBySide,
 } from "@mycity/ui";
 import { CandidateSheet } from "./CandidateSheet";
 import { say, sayRefusal, ScoreText, STAGE_LABEL, useVacancyOptions } from "./shared";
@@ -100,14 +94,12 @@ export function Candidates() {
   const columns = offers ? BOARD : BOARD.filter(([s]) => s !== "offer");
   const board = role.data && vacancy ? columns.filter(([s]) => role.data!.board_stages.includes(s)) : columns;
 
-  // On a wide desktop a pressed card opens beside the board (F31), the board keeping the full width
-  // until then; on a phone, and where two columns do not fit, it opens in the sheet or dialog.
-  const beside = useSideBySide();
-  const [picked, setPicked] = useState<string | null>(null);
+  // A pressed card opens in the wide dialog on desktop and a sheet on a phone, the board keeping
+  // the page's full width (ListDetail `modal`, F31 as amended 11/11/2026).
+  const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
   const open = (id: string, title = "Candidate") => {
-    if (!beside) return modal.open({ title, wide: true, body: (close) => <CandidateSheet id={id} close={close} /> });
     modal.close();
-    setPicked(id);
+    setPicked({ id, title });
   };
   const invite = () => modal.open({ title: "Invite to Apply", body: (close) => <InviteForm close={close} vacancyId={vacancy} /> });
   const screen = () => modal.open({ title: "Screen With AI", body: (close) => <ScreenForm close={close} vacancyId={vacancy} /> });
@@ -147,7 +139,6 @@ export function Candidates() {
   const s = summary.data;
   const counted = (n: number | undefined) => (n === undefined ? "–" : String(n));
   const failed = lists.find((c) => c.error)?.error ?? null;
-  const total = s?.distribution.reduce((n, b) => n + b.count, 0) ?? 0;
   return (
     <>
       <PageHeader
@@ -174,10 +165,11 @@ export function Candidates() {
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
       </Toolbar>
       <ListDetail
-        fillUntilPicked
-        open={false}
+        layout="modal"
+        size="wide"
+        open={picked !== null}
         onClose={() => setPicked(null)}
-        title="Candidate"
+        title={picked?.title ?? "Candidate"}
         list={
           failed ? (
             <ErrorState error={failed} onRetry={() => Promise.all(lists.map((c) => c.reload()))} />
@@ -213,22 +205,8 @@ export function Candidates() {
             />
           )
         }
-        detail={
-          beside && picked ? (
-            <Card>
-              <CandidateSheet key={picked} id={picked} close={() => setPicked(null)} inline />
-            </Card>
-          ) : null
-        }
+        detail={picked ? <CandidateSheet key={picked.id} id={picked.id} close={() => setPicked(null)} /> : null}
       />
-      <DesktopOnly unmount>
-        <Grid cols={2} className="mt-3">
-          <Card>
-            <CardHeader title={<HelpTerm help="Each candidate's screening score: the AI read of the CV when there is one, otherwise the estimate from the form.">Screening Scores</HelpTerm>} />
-            {s ? <Bars rows={s.distribution.map((b) => ({ label: b.label, percent: total ? Math.round((b.count * 100) / total) : 0, value: String(b.count) }))} /> : <LoadingRows />}
-          </Card>
-        </Grid>
-      </DesktopOnly>
     </>
   );
 }
