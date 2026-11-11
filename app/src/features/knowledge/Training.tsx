@@ -410,7 +410,7 @@ function Items({ c }: { c: Course }) {
             : undefined,
         }))}
         onMove={editable ? move : undefined}
-        empty={<EmptyState bare icon="book" title="No Items Yet" text="Add a file, a video, a link or a lesson." />}
+        empty={<EmptyState bare icon="book" title="No Items Yet" text="Add a file, video, link or lesson." />}
       />
     </Card>
   );
@@ -715,6 +715,22 @@ const assignBody = (v: AssignValues) => ({
   keep_assigning: v.keep,
 });
 const ASSIGN_FIELDS: Record<string, string> = { everyone: "who", department_ids: "departments", role_ids: "roles", employee_ids: "people", due_within_days: "due", keep_assigning: "keep" };
+/** The roles an assignment may name, searched on the server; mounted only for Settings' readers. */
+function AudienceRolePicker({ value, onChange }: { value: RoleOption[]; onChange: (v: RoleOption[]) => void }) {
+  const roles = usePaged("GET /api/v1/access/roles");
+  return (
+    <RecordPicker<RoleOption>
+      list={{ rows: roles.rows, page: roles.page, loading: roles.loading, error: roles.error, q: roles.q, setQ: roles.setQ }}
+      value={value}
+      onChange={onChange}
+      id={(r) => r.role_id}
+      title={(r) => r.name}
+      multiple
+      placeholder="Search roles"
+    />
+  );
+}
+
 const assignSchema: ContractSchema = {
   safeParse: (v: unknown) => {
     const r = training.AssignmentCreate.safeParse(assignBody(v as AssignValues));
@@ -724,8 +740,11 @@ const assignSchema: ContractSchema = {
 };
 
 function AssignForm({ c, close }: { c: Course; close: () => void }) {
+  const { can } = useAuth();
   const assign = useMutation("POST /api/v1/training/courses/:id/assignments");
-  const roles = usePaged("GET /api/v1/access/roles");
+  // Each picker reads a list its own grant opens: departments and people People's, roles Settings'.
+  const people = can("people", "view");
+  const settings = can("settings", "view");
   const f = useContractForm<AssignValues>({ who: "everyone", departments: [], roles: [], people: [], due: "30", keep: true }, assignSchema);
   const send = async () => {
     if (!f.check()) return;
@@ -746,23 +765,21 @@ function AssignForm({ c, close }: { c: Course; close: () => void }) {
       </Field>
       {pick && (
         <>
-          <Field label="Departments" optional {...f.status("departments")}>
-            <DepartmentPicker multiple value={f.values.departments} onChange={(v) => f.set("departments", v)} />
-          </Field>
-          <Field label="Roles" optional {...f.status("roles")}>
-            <RecordPicker<RoleOption>
-              list={{ rows: roles.rows, page: roles.page, loading: roles.loading, error: roles.error, q: roles.q, setQ: roles.setQ }}
-              value={f.values.roles}
-              onChange={(v) => f.set("roles", v)}
-              id={(r) => r.role_id}
-              title={(r) => r.name}
-              multiple
-              placeholder="Search roles"
-            />
-          </Field>
-          <Field label="People" optional {...f.status("people")}>
-            <EmployeePicker multiple value={f.values.people} onChange={(v) => f.set("people", v)} filters={{ status: "active" }} />
-          </Field>
+          {people && (
+            <Field label="Departments" optional {...f.status("departments")}>
+              <DepartmentPicker multiple value={f.values.departments} onChange={(v) => f.set("departments", v)} />
+            </Field>
+          )}
+          {settings && (
+            <Field label="Roles" optional {...f.status("roles")}>
+              <AudienceRolePicker value={f.values.roles} onChange={(v) => f.set("roles", v)} />
+            </Field>
+          )}
+          {people && (
+            <Field label="People" optional {...f.status("people")}>
+              <EmployeePicker multiple value={f.values.people} onChange={(v) => f.set("people", v)} filters={{ status: "active" }} />
+            </Field>
+          )}
         </>
       )}
       <Field label="Due Within (Days)" optional {...f.status("due")}>
