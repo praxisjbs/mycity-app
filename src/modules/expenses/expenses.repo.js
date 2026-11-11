@@ -508,13 +508,15 @@ async function projectName(db, id) {
 function banks(db, query, common) {
   return pageQuery(
     db,
-    `SELECT min(b.name) AS bank_name, sum(b.used)::int AS uses, ${TOTAL_COL}
-       FROM (SELECT btrim(n) AS name, 0 AS used FROM unnest($2::text[]) n
-             UNION ALL SELECT btrim(bank_name), 1 FROM expense_request WHERE bank_name IS NOT NULL) b
+    // A common bank keeps its own spelling ("GTBank", not a request's "gtbank"); any other name
+    // reads as its first spelling byte by byte, so the answer never turns on the database's collation.
+    `SELECT (array_agg(b.name ORDER BY b.common DESC, b.name COLLATE "C"))[1] AS bank_name, sum(b.used)::int AS uses, ${TOTAL_COL}
+       FROM (SELECT btrim(n) AS name, 0 AS used, true AS common FROM unnest($2::text[]) n
+             UNION ALL SELECT btrim(bank_name), 1, false FROM expense_request WHERE bank_name IS NOT NULL) b
       WHERE b.name <> ''
         AND ($1::text IS NULL OR strpos(search_fold(b.name), search_fold($1)) > 0)
       GROUP BY lower(b.name)
-      ORDER BY sum(b.used) DESC, min(b.name)`,
+      ORDER BY sum(b.used) DESC, lower(b.name) COLLATE "C"`,
     [query.q || null, common],
     query,
   );
