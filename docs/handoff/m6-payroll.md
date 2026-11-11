@@ -122,7 +122,7 @@ exists, and the payslip template is empty.
 - [x] Reads, summary, cards and routes; search providers; route-map notes removed; `gen:ai-catalogue` (10/11/2026)
 - [x] A test and an evaluation case per action; the Submit notices checked in-app, push and email (10/11/2026)
 - [x] Gates 9, 10, 19 and 23 green; no M6 form on `ai-forms-gaps.json` (10/11/2026)
-- [x] `npm run ci` green locally on Node 20, all 52 gates (10/11/2026): a first run of the lint gate alone found one error (a name in `payroll.service.js` shadowing the module's `run`), fixed, and the full run then passed all 52 in 26 min 45 s
+- [x] `npm run ci` green locally on Node 20, all 52 gates (10/11/2026): a first run of the lint gate alone found one error (a name in `payroll.service.js` shadowing the module's `run`), fixed, and the full run then passed all 52 in 26 min 45 s; `main` then moved (M10 PR 0 and 1, M7 PR 9, two M4 videos, the 11/11 staging faults), so it was merged into the branch (the two generated contract files regenerated, not merged by hand, the AI catalogue unchanged) and the full run passed all 52 again in 27 min 46 s on `f397ac2`
 - [ ] The PR marked ready (it opens as a draft and stays one until JBS Praxis says so)
 
 ### PR 7 · Frontend (LA)
