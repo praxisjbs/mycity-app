@@ -20,6 +20,7 @@
  *   POST   /assignments/:id/withdraw    Withdraw Assignment (edit)
  *   GET    /courses/:id/people          everyone on it and where they stand (view)
  *   POST   /courses/:id/remind          Remind Overdue (edit)
+ *   POST   /enrolments/:id/certificate  Download Certificate: anyone's PDF (view; 202)
  *
  * The person's own, `self` (ESS · My Training):
  *   GET    /me                          To Do, In Progress, Completed or Library
@@ -28,9 +29,7 @@
  *   POST   /me/items/:id/done           Mark Done
  *   POST   /me/items/:id/undone         Undone, until completion
  *   POST   /me/courses/:id/proof        Add Proof
- *
- * Download Certificate (POST /me/courses/:id/certificate and /enrolments/:id/certificate, 202)
- * arrives with the certificate itself (M10 PR 4).
+ *   POST   /me/courses/:id/certificate  Download Certificate: my PDF (202, pending while it renders)
  */
 const router = require("express").Router();
 const c = require("@mycity/contract");
@@ -64,6 +63,16 @@ route(router, "post", "/me/items/:id/undone",
 route(router, "post", "/me/courses/:id/proof",
   { params: IdParams, body: t.ProofAdd, response: t.MyCourse, self: true, summary: "Add proof, completing the course" },
   controller.proof);
+
+route(router, "post", "/me/courses/:id/certificate",
+  { params: IdParams, body: c.common.EmptyBody, response: c.documents.ExportFile, self: true,
+    summary: "My certificate of completion, as a PDF" },
+  controller.myCertificate);
+
+route(router, "post", "/enrolments/:id/certificate",
+  { params: IdParams, body: c.common.EmptyBody, response: c.documents.ExportFile,
+    summary: "Someone's certificate of completion, as a PDF" },
+  requirePermission("knowledge", "view"), requireCapability("training.manage"), controller.certificate);
 
 route(router, "get", "/courses",
   { query: t.CourseListQuery, response: t.CoursePage, summary: "Every course" },

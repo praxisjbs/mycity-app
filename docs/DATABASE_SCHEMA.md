@@ -708,6 +708,12 @@ and a question asked before a card keeps what it asked for in the answer's `meta
 - `10420` a task's record may be a `training_enrolment` (`task_entity_check` widened, as `2400` did for
   `task`): each assigned person's "Complete <course>" task points at their place on the course.
 
+**Built 11/11/2026, M10 PR 4** (`docs/guides/knowledge.md` §6.9, §6.10):
+- `10430` `training_enrolment.certificate_holder_name` and `certificate_course_title`: the name and title a
+  certificate states, kept at completion beside its number and hash, so a rename leaves it as issued and
+  Verify a Document recomputes its hash from them. Filled for any completion before the file; a CHECK
+  keeps the two with the number.
+
 ### M11 Handover · 11000 to 11999 · TB
 
 No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `restore-drill.js`).

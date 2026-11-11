@@ -55,7 +55,7 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 - [x] FAQs removed from the code (tab, mock, INTERIM types, route map, ⌘K, Coming Soon, record type, category,
       catalogue description); My Training added with `npm run new:screen` as an empty screen (11/11/2026)
 - [x] Guides index row, the guide's CODEOWNERS line, DATABASE_SCHEMA M10 pointer (11/11/2026)
-- [ ] TB shows MyCity the certificate sample and records the answers (guide §13 item 4)
+- [x] TB shows MyCity the certificate sample and records the answers (guide §13 item 4): Cynthia approved it as drawn (11/11/2026)
 - [ ] Written ticked for `knowledge.md` in `docs/guides/README.md` once PR 0 merges
 
 ### PR 1 · Contract, data and scaffolding
@@ -79,8 +79,9 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 - [x] `npm run ci` green; the PR marked ready (#115, 11/11/2026)
 
 ### PR 4 · Certificates
-- [ ] `training-certificate.html` from the signed-off sample, embedded fonts
-- [ ] `training.issue_certificate`, verification on `go.mycityapp.io`; tests rendering real PDFs
+- [x] `training-certificate.html` from the signed-off sample, embedded fonts (11/11/2026)
+- [x] `training.issue_certificate`, verification on `go.mycityapp.io`; tests rendering real PDFs (11/11/2026)
+- [ ] `npm run ci` green; the PR marked ready
 
 ### PR 5 · Training screens
 - [ ] Knowledge Hub · Training and ESS · My Training on the contract, desktop and phone
@@ -94,6 +95,7 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 
 ## 3 · Log
 
+- 11/11/2026 · TB · PR 4 built on PR 3, after Cynthia approved the certificate sample as drawn (guide §13 item 4): `templates/documents/training-certificate.html` and `training.certificate.js` (the page drawn from the sample, one A4 landscape page, Cormorant Garamond embedded from `templates/documents/fonts/` with its licence and the proposal kit's Geist; rosette, seal and QR drawn on the server), `training.issue_certificate` and "Certificate ready", Download Certificate's two routes (202, waiting on `GET /exports/:id`), and Verify a Document for `CERT-` numbers with both verdicts, on go.mycityapp.io too (Awarded To, Course, Completed, Published By; the public-site chapter's new section and pictures). Migration `10430` keeps the holder's name and course title as issued. Tests: the training integration file renders a real PDF with Chromium (one page, its words read back, both verdicts, a rename, the facts and the file each altered), the drawing's unit tests, the Verify page's. Next: PR 5 (screens; it can wire Download Certificate now), PR 6.
 - 11/11/2026 · TB · PR 3 built on PR 1: the `training` module (every `/training` route of the guide's §5 but Download Certificate's two, which PR 4 builds with the PDF), Draft Lesson (`training-lesson-draft`, Default, chosen by TB 11/11/2026), the `training_due` reminder and Remind Overdue, joiners (`training.enrol_joiners`, the `training-joiners` job at 06:00 Lagos) and leavers, ⌘K and four AI reads; `tasks.service.completeForRecord`; migration `10420` (a task may name a `training_enrolment`); the `TRAINING_CERTIFICATE` canonical payload. `tests/integration/training.test.js` (14, 300 people assigned at once among them) and the module's unit tests (26) pass. Found on the way: the guide named `user.roles_changed`, which no module emits (roles change on `access.roles_set`), and closed leavers on `employee.updated`, where `employee.archived` is the leaving; it said a reload would complete someone after an item was removed, now done in the removal's transaction (guide §14). Left for PR 5: the Training tab's `training.manage` rule in both mirrors (`app/src/shell/access.ts`, `src/shared/search/screens.js`) and ⌘K's New Course, with the screen. Next: PR 4 (certificates) and PR 5 (screens).
 - 11/11/2026 · TB · PR 1 built on top of PR 0: contracts `knowledge.js` and `training.js`, migrations `10400` and `10410`, seed `10490`, the capabilities, schemes, labels and record types; `tests/integration/knowledge-schema.test.js` (16) passes, and so do `settings.test.js` and `home-schema.test.js` with their lists updated. Found on the way: a `published` SOP version with no number passed its CHECK (NULL > 0 is unknown), fixed before merge; Settings · Documents & Numbering answered 500 for the new types until the contract's `DOC_TYPES` listed them. Next: PR 2 (SOPs) and PR 3 (training) can run in parallel once PR 1 merges.
 - 11/11/2026 · TB · PR 0: the guide written from TB's eight answers of 11/11/2026 and the Modules Review of 4

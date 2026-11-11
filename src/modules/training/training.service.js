@@ -534,18 +534,41 @@ async function remind(user, courseId) {
  * ------------------------------------------------------------------ */
 
 /**
+ * The canonical hash of what a certificate states (§6.9): its number, the holder, the course's
+ * number and title, the completion date and the publisher. Verify a Document recomputes it with
+ * this same function (training.certificate.js).
+ */
+function certificateHash(f) {
+  return canonical.hash("TRAINING_CERTIFICATE", {
+    number: f.number,
+    holder_name: f.holder_name,
+    course_number: f.course_number,
+    course_title: f.course_title,
+    completed_on: f.completed_on,
+    publisher_name: f.publisher_name,
+    publisher_title: f.publisher_title,
+  });
+}
+
+/**
  * Complete a locked place now: completed_at, and with Issue Certificate on, the certificate's
  * number (`training_certificate`) and the canonical hash of what it states, in this transaction.
  */
 async function completeNow(client, enrolment, course, actor) {
-  let number = null;
-  let hash = null;
+  const at = new Date();
+  let issued = { number: null, hash: null, holderName: null, courseTitle: null };
   if (course.issue_certificate) {
-    ({ number } = await numbering.allocate(client, "training_certificate"));
+    const { number } = await numbering.allocate(client, "training_certificate");
     const facts = await repo.certificateFacts(client, enrolment.training_enrolment_id);
-    hash = canonical.hash("TRAINING_CERTIFICATE", { ...facts, number, completed_on: lagos.today() });
+    issued = {
+      number,
+      hash: certificateHash({ ...facts, number, completed_on: lagos.dateOf(at) }),
+      holderName: facts.holder_name,
+      courseTitle: facts.course_title,
+    };
   }
-  await repo.complete(client, enrolment.training_enrolment_id, { number, hash });
+  const { number, hash } = issued;
+  await repo.complete(client, enrolment.training_enrolment_id, { at, ...issued });
   await emit(client, {
     key: EVENTS.TRAINING_COMPLETED,
     entity: { type: ENROLMENT_ENTITY, id: enrolment.training_enrolment_id },
@@ -661,7 +684,7 @@ async function myCourse(user, id, db = pool) {
     proof_url: enrolment ? enrolment.proof_url : null,
     proof_document_name: proofName,
     certificate_number: enrolment && enrolment.certificate_number ? String(enrolment.certificate_number) : null,
-    certificate_ready: Boolean(enrolment && enrolment.certificate_document_id),
+    certificate_ready: Boolean(enrolment && enrolment.certificate_ready),
   };
 }
 
@@ -981,6 +1004,8 @@ async function overdue(query) {
 }
 
 module.exports = {
+  certificateHash,
+  openable,
   youtubeIdOf,
   toItem,
   audienceText,
