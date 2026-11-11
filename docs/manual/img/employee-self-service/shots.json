@@ -132,6 +132,38 @@
       "phone"
     ]
   },
+  "ess-training": {
+    "spec": "a462ea654b735064",
+    "source": "d101be4bffb558de",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-training-completed": {
+    "spec": "d6d80b3541d437c9",
+    "source": "d101be4bffb558de",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-training-course": {
+    "spec": "44261271fed7e329",
+    "source": "d101be4bffb558de",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-training-item": {
+    "spec": "561f779531098518",
+    "source": "d101be4bffb558de",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "ess-work-location": {
     "spec": "84a4b6ec1786e07a",
     "source": "4840a3adf582ad7d",

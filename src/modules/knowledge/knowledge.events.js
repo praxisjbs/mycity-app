@@ -7,7 +7,8 @@
  *   sop.draft_saved,      a draft saved or discarded: the audit line with before and after;
  *   sop.draft_discarded   nobody is told
  *   sop.published         a draft became Version N: the department's members are told ("New SOP"
- *                         or "SOP updated"), as their Knowledge Hub preference allows
+ *                         or "SOP updated"), as their Knowledge Hub preference allows; nobody when
+ *                         it was published quietly (the staging seed, `quiet` in the payload)
  *   sop.archived          an SOP left the hub; its versions are kept
  *
  * Payloads carry ids, the number, the department, the title and the version: never a step's text.
@@ -44,7 +45,7 @@ vault.defineAccess(SOP_ENTITY, async (_client, user) => Boolean(await require(".
  * when a notice is written: the worker loads this file first.
  */
 defineNotification(EVENTS.SOP_PUBLISHED, {
-  to: [{ users: (event, client) => require("./knowledge.repo").departmentUsers(client || pool, event.payload.department_id) }],
+  to: [{ users: (event, client) => (event.payload.quiet ? [] : require("./knowledge.repo").departmentUsers(client || pool, event.payload.department_id)) }],
   who: "The SOP's department",
   title: (e) => (e.payload.version > 1 ? "SOP updated" : "New SOP"),
   body: (e) => `${e.payload.title}, Version ${e.payload.version}.`,
