@@ -6,7 +6,7 @@ fictional figures; nothing here is real pay data, and this repository is public,
 
 | Sample | Becomes | Needed by |
 |---|---|---|
-| [payslip-sample.html](payslip-sample.html) | `templates/documents/payslip.html`, the payslip PDF (`docs/guides/payroll.md` §6.10) | PR 4, once MyCity signs it off |
+| [payslip-sample.html](payslip-sample.html) | `templates/documents/payslip.html`, the payslip PDF (`docs/guides/payroll.md` §6.10) | PR 4 built the template from this draft; MyCity's sign-off is still open (guide §13.3 item 1) |
 
 Open `payslip-sample.html` in any browser; print it to PDF to see the A4 page. It is the simple payroll's
 payslip: one Monthly Pay line, no tax or pension wording (staff are contractors and consultants who handle their

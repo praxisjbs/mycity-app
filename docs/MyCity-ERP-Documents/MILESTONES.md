@@ -952,7 +952,7 @@ completes.
 
 ## 11 · M6 — Payroll & Notifications · 11%
 
-**Owner TB** with **LA** for the screens (JBS Praxis, 09/11/2026; AJ from 05/11/2026, first planned as LA). **23–27 Nov. Demo Fri 27 Nov.**
+**Owner TB** with **LA** for the screens (JBS Praxis, 09/11/2026; LA was first planned, AJ named on 05/11/2026, LA again from 09/11/2026). **23–27 Nov. Demo Fri 27 Nov.**
 
 ### Jurisdiction decides the donor
 
@@ -975,8 +975,8 @@ The Nigerian donor is `pixie-girl-hub/src/shared/hr_payroll/`:
 
 **Simple by default, statutory behind a toggle.** Because the engine is already config-driven, this
 is a **config row set, not a second engine**. Default mode: gross, attendance and query deductions,
-net. Advanced mode adds PAYE, pension (employee and employer), NHF, ITF and NSITF. ITF (1%) and
-NSITF (1%) are **employer** charges and are the only two not already modelled — two rate rows and
+net. Advanced mode adds PAYE, pension (employee and employer), NHF, ITF and NSITF. ITF and
+NSITF (each reported as 1%, unverified: no source on file, see the 11/11/2026 amendment) are **employer** charges and are the only two not already modelled — two rate rows and
 two postings. Nothing statutory appears at first glance. Confirmed with Cynthia on 10 October.
 
 **The donor's rates are not seeded.** PAYE bands, reliefs and statutory rates are loaded as
@@ -984,8 +984,8 @@ effective-dated configuration from current Nigerian law, confirmed before M6 is 
 Pixie defaults and any band table shown in the prototype are not a source.
 
 Approved consequences from M3 arrive as pending deductions and must be explicitly accepted into a
-run; a run is previewed, validated, then locked. **A run is submitted for approval to the CEO or
-the COO** — which of the two is the one open question on this milestone.
+run; a run is previewed, validated, then locked. ~~A run is submitted for approval to the CEO or
+the COO~~: answered 08/11/2026, the CEO alone (below).
 
 **The daily rate divisor reads the per-day working week (A22), not a hard-coded five.** With
 Saturday working, a month has roughly 26 working days rather than 22, which changes every
@@ -1041,18 +1041,38 @@ record and M6's only source of truth.
   Payslips and ESS · My Payslips) open in a modal. Staging demos use test people, because staging sends
   real mail (A4).
 - **Configuration, entered by MyCity in the app (09/11/2026):** the statutory rates and bands, the accountant's
-  conventions (PAYE basis, whether pension and NHF reduce taxable pay), the pay day (the 30th unless changed, 1 to 31, a
+  conventions (whether pension and NHF reduce taxable pay; PAYE basis withdrawn 11/11/2026, every deduction is monthly), the pay day (the 30th unless changed, 1 to 31, a
   day past a month's end falling on its last day) and a Bank Details Required
   switch live on Configurations, and every person's salary and bank details on People · Employees or the staff
   import. None is seeded (A26) and none blocks the build.
 - **LA builds the screens** (Payroll Runs, Payslips, Deductions, Configurations and ESS · My Payslips); TB owns the
   milestone and its backend.
 
+### Amended 11/11/2026 (TB, the Milestones Review)
+
+`docs/guides/payroll.md` §13.1 items 29 to 37 and §6.16 record these; where they differ from the lines above, they win.
+
+- **The pay day is one exact day for every month** (Operations & People set it); a short month pays on its last day,
+  and Last Day of Month is a choice. Confirmed in code and test.
+- **Every statutory deduction, pension included, is monthly.** No setting offers an annual deduction; the PAYE Basis
+  convention leaves the screen.
+- **Every statutory rate carries a verifiable legal source** (the instrument, the section, the document, the day
+  checked); a figure with none says No Legal Source. The research is done from the primary texts with network access
+  and confirmed by MyCity's accountant before any rate is entered. Every figure above in this section (ITF 1%, NSITF 1%)
+  is unverified until then.
+- **Statutory figures are entered by people, never updated automatically.**
+- **A saved band or change that has not started can be removed** (Remove Change).
+- **The relief is to be checked against the Nigeria Tax Act 2025**, which public summaries say abolished the
+  Consolidated Relief Allowance from 1 January 2026.
+- The remaining work is cut into PR 8 to PR 12 of the guide's Appendix A, planned on the most capable model at high
+  effort, each built in a fresh chat, with their merge order.
+
 ### Definition of done
 
 A payroll run computes from attendance, deductions and approved consequences; payslips generate and
 are visible in ESS; the run locks. The advanced toggle switches on and PAYE, pension, NHF, ITF and
-NSITF compute against effective-dated configuration, with the statutory report produced. Notification
+NSITF compute against effective-dated configuration whose every figure carries its legal source, with
+the statutory report produced. Notification
 preferences by category and transport; a pending approval produces in-app, push and email; the link
 in each opens the same screen.
 
