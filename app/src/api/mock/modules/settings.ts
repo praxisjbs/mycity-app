@@ -450,6 +450,7 @@ const LABELS: Array<[NumberingScheme["doc_type"], string, string, number, string
   ["payroll_run", "Payroll Run", "PAY", 0, "-", "monthly", 1], ["payslip", "Payslip", "PAY", 4, "-", "monthly", 18], ["proposal", "Proposal", "PRO", 4, "-", "never", 30],
   ["partner", "Partner", "PAR", 4, "-", "never", 33], ["lead", "Lead", "LED", 4, "-", "never", 46], ["deal", "Deal", "DEAL", 4, "-", "yearly", 79],
   ["agreement", "Agreement", "AGR", 4, "-", "yearly", 11], ["expense", "Expense Request", "EXP", 4, "-", "never", 122], ["requisition", "Requisition", "REQ", 4, "-", "never", 42], ["disbursement", "Disbursement", "DSB", 4, "-", "never", 37],
+  ["sop", "SOP", "SOP", 4, "-", "never", 0], ["training_course", "Training Course", "TRN", 4, "-", "never", 0], ["training_certificate", "Training Certificate", "CERT", 4, "-", "yearly", 0],
 ];
 const period = (reset: NumberingScheme["reset"]) => {
   const d = isoDaysAgo(0);

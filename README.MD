@@ -389,7 +389,7 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `payroll` | `payroll`, `payslips`, `salary_structure`, `deductions`, `statutory` |
 | `partnerships` | `partners`, `partner_pipeline`, `leads`, `interactions`, `proposals`, `agreements`, `partnership_analytics` |
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
-| `knowledge` | `knowledge`, `policies` (with the `policies.manage` capability for writing them); announcements are read here too |
+| `knowledge` | `knowledge` (SOPs; a department's head, or the `sops.manage` capability, writes them), `policies` (with the `policies.manage` capability for writing them), `training` (with the `training.manage` capability for building and assigning courses; ESS · My Training is the person's own) |
 | `praxis_ai` | `assistant` |
 | `ai_control` | `ai_governance` (AI Control: chains, prices, caps; `docs/guides/ai-control.md`) |
 | `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `templates`, `signatures`, `search`, `maps` |
@@ -442,6 +442,8 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `partnerships.money` | `partnerships` | See Commission and Returns: see and enter commission, the merchant's take and returns, and import returns | Implementation, Operations & People, Management; General Management through their department (in code) | `7190` |
 | `expenses.finance` | `expenses` | Run Expenses: group approved requests into requisitions, record disbursements, set budgets and manage the expense categories (`docs/guides/expenses.md`) | Implementation, Operations & People | `8100` |
 | `payroll.configure` | `payroll` | Configure Payroll: switch the advanced option on or off, set the pay day and the bank rule, and enter the statutory rates, bands, salary grades and pay components (`docs/guides/payroll.md` §8) | Implementation, Operations & People | `6099` |
+| `sops.manage` | `knowledge` | Manage SOPs: write, publish and archive any department's SOPs; a department's head writes its own without it (`docs/guides/knowledge.md` §6.2) | Implementation, Operations & People | `10490` |
+| `training.manage` | `knowledge` | Manage Training: build, publish, assign and archive courses, and see everyone's progress and certificates (`docs/guides/knowledge.md` §8) | Implementation, Operations & People | `10490` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -699,7 +701,8 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 
 | Module | Files beyond the template |
 |---|---|
-| `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
+| `knowledge` | SOPs (`docs/guides/knowledge.md`): `.versions` (an SOP's draft, versions and steps); `.embeddings` is not used in M10 and goes when the module is done (README §11.5) |
+| `training` | Training and ESS · My Training (`docs/guides/knowledge.md`): courses and their items, publishing with the publisher's signature, assignments and enrolments, progress and proof, reminders; `.certificate` (the certificate of completion's PDF, number and verification) |
 | `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, the card events, and the `ai_voice_question`, `ai_history_export` and `ai_answer_export` document types), `.cards` (a card's life: read, edited, pressed with the five-minute confirm for a sensitive class, cancelled; `docs/guides/praxis-ai.md` §6.11), `.reads` (a read of an answer run again, 25 a page, §6.12; the replay the export walks), `.export` (History's Export, and Download Excel on an answer's read through the one export path with About This File, §6.16); the service pushes `ai:progress` to the asker's realtime room before each read (§6.1.8). The adapter in `services/ai/assistant/{orchestrator, answer}.js` over the engine `services/ai/engine/`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read; the screens' views are the Assistant group of `packages/ui`, with `app/src/features/assistant/Card.tsx` wiring an answer's card (Edit, the press through Confirm It's You, Cancel, Draw It Again; `docs/guides/praxis-ai.md` §6.11); tested on the real migrations by `tests/integration/{ai-cards, ai-matrix, ai-summaries, ai-actions-workspace, ai-actions-leave, ai-actions-approvals, ai-actions-community, ai-actions-mailbox, ai-actions-people, ai-actions-queries, ai-actions-policies, ai-actions-performance, ai-attacks}.test.js` (the matrix with each scoped module's probes, the attack suite with the model scripted; `docs/guides/praxis-ai.md` §6.17), the action suites sharing `tests/integration/helpers/ai-actions.js` (people, scripted Gemini, the three ways to confirm); `tests/unit/foundation/ai-attacks.test.js` checks the attack suite's grading without a key |
 | `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 

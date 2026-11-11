@@ -692,7 +692,7 @@ records a press acts on, so an id reads as a name and a card's verb never counts
 it. An answer's Excel file (§6.16) is a `document` of type `ai_answer_export`, no table of its own,
 and a question asked before a card keeps what it asked for in the answer's `metadata.ask`.
 
-**Owes** (`docs/guides/knowledge.md` §4, decided 11/11/2026):
+**Built 11/11/2026, M10 PR 1** (`docs/guides/knowledge.md` §4):
 - `10400` SOPs: `sop`, `sop_version`, `sop_step` (a department's structured, versioned procedures).
 - `10410` Training: `training_course`, `training_item`, `training_assignment`,
   `training_assignment_audience`, `training_enrolment`, `training_item_progress` (courses, who must take
