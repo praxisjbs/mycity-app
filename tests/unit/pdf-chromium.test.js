@@ -51,3 +51,20 @@ test("twice out of time, or any other failure, is not tried again", async () => 
   await expect(chromium.browser()).rejects.toThrow(/Failed to launch/);
   expect(puppeteer.launch).toHaveBeenCalledTimes(1);
 });
+
+// A script run by hand as the environment's user keeps that user's home, which it may not
+// write (staging's seed, 11/11/2026): Chromium is given the temp folder instead.
+test("keeps a home it may write, and swaps one it may not for the temp folder", () => {
+  const os = require("node:os");
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const mine = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
+  expect(chromium.homeFor({ HOME: mine })).toEqual({});
+  const locked = path.join(mine, "locked");
+  fs.mkdirSync(locked, { mode: 0o500 });
+  const swapped = process.getuid && process.getuid() === 0 ? null : chromium.homeFor({ HOME: locked });
+  if (swapped) expect(swapped).toEqual({ HOME: os.tmpdir(), XDG_CONFIG_HOME: path.join(os.tmpdir(), ".config"), XDG_CACHE_HOME: path.join(os.tmpdir(), ".cache") });
+  expect(chromium.homeFor({ HOME: path.join(mine, "missing") }).HOME).toBe(os.tmpdir());
+  expect(chromium.homeFor({}).HOME).toBe(os.tmpdir());
+  fs.rmSync(mine, { recursive: true, force: true });
+});

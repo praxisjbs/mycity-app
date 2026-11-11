@@ -208,4 +208,38 @@ describeDb("The Knowledge Hub's staging seed against the real migrations", () =>
   test("a second run adds nothing", () => {
     expect(second).toEqual(first);
   });
+
+  // Staging's first run (11/11/2026) could not start Chromium, so both PDFs were left out of
+  // courses already published; the next run puts each back in its place.
+  test("a PDF a run could not print is added in its place by the next run", async () => {
+    const training = require("../../src/modules/training/training.service");
+    const pdf = require("../../src/services/pdf/pdf.service");
+    const grantsCache = require("../../src/shared/rbac/grants-cache");
+    const by = { ...(await grantsCache.getAuthUser(pool, staff.operations.user_id)), ip: null };
+    const { rows: courses } = await q("SELECT training_course_id, title FROM training_course ORDER BY title");
+    for (const course of courses) {
+      const file = (await training.get(course.training_course_id)).items.find((i) => i.kind === "file");
+      await training.removeItem(by, file.training_item_id);
+    }
+    const missed = [];
+    const spy = jest.spyOn(pdf, "render").mockRejectedValue(new Error("Failed to launch the browser process"));
+    await runFile(seed, missed);
+    spy.mockRestore();
+    expect(missed.filter((m) => m.includes("not printed, left out"))).toHaveLength(2);
+    for (const course of courses) expect((await training.get(course.training_course_id)).items.some((i) => i.kind === "file")).toBe(false);
+
+    const again = [];
+    await runFile(seed, again);
+    await settle();
+    expect(again).toEqual(expect.arrayContaining(["training: NDPA Data Protection Essentials: 1 missing item added", "training: Partner Outreach: 1 missing item added"]));
+    for (const plan of COURSES) {
+      const course = courses.find((r) => r.title === plan.title);
+      const items = (await training.get(course.training_course_id)).items;
+      expect(items.map((i) => [i.kind, i.title])).toEqual(plan.items.map((i) => [i.kind, i.title]));
+      expect(items.map((i) => i.position)).toEqual(plan.items.map((_, n) => n + 1));
+    }
+    const third = [];
+    await runFile(seed, third);
+    expect(third.filter((m) => m.startsWith("training:"))).toEqual([]);
+  });
 });
