@@ -104,8 +104,9 @@ are gone.
 6. **Assigning.** Assign Training opens a sheet: Everyone, or any mix of departments, roles and
    named people; Due Within (days) and Keep Assigning New Joiners. In one transaction the
    assignment is stored, every person it reaches now is enrolled with a due date, and
-   `training.assigned` is emitted; the outbox sets each person's task and notice. Someone who later
-   joins or moves into the audience is enrolled by the `training.enrol_joiners` handler.
+   `training.assigned` is emitted; the outbox sets each person's task and notice, one person at a
+   time (`training.enrolled`). Someone who later joins or moves into the audience is enrolled by the
+   `training.enrol_joiners` handler.
 7. **Taking a course** (ESS · My Training): the person opens it, works through the items and
    presses Mark Done on each. The last one completes the course, or, with Proof Required, Add Proof
    (a link or a file) completes it.
@@ -133,7 +134,8 @@ are gone.
 | `training_enrolment` (10410) | `training_course_id`, `employee_id`, `training_assignment_id` (null for a library start), `due_on`, `started_at`, `completed_at`, `proof_url`, `proof_document_id`, `certificate_number`, `certificate_document_id`, `certificate_hash`, `task_id`, `reminded_at`, `reminders_sent` | One per person and course (unique). `certificate_number` is unique |
 | `training_item_progress` (10410) | `training_enrolment_id`, `training_item_id`, `done_at` | One per item done (unique); deleting an item cascades |
 
-Schema migrations: `migrations/10400_sops.sql`, `migrations/10410_training.sql`. Reference data:
+Schema migrations: `migrations/10400_sops.sql`, `migrations/10410_training.sql`, and
+`migrations/10420_training_tasks.sql` (a task's record may be a `training_enrolment`, §6.7). Reference data:
 `seeds/reference/10490_seed_knowledge.sql`: the capabilities `sops.manage` and `training.manage`
 for Operations & People and Implementation (the CEO holds every capability); the numbering schemes
 `sop` (`SOP-0001`), `training_course` (`TRN-0001`) and `training_certificate` (`CERT-2026-0001`,
@@ -160,13 +162,13 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `GET /api/v1/knowledge/sops/versions/:id` | → `SopVersion` | `knowledge` view | no | A published version |
 | `GET /api/v1/knowledge/sops/for-screen` | `SopScreenQuery` (`screen_key`) → `SopPage` | `knowledge` view | yes, 25 | Published SOPs a step of whose version in force names the screen |
 | `POST /api/v1/knowledge/sops/draft-with-ai` | `SopDraftWithAi` (`text` or `document_id`, `department_id`) → `SopDraftSuggestion` | a writer of that department | no | A suggestion only; nothing saved. 503 `AI_UNAVAILABLE` |
-| `GET /api/v1/training/courses` | `CourseListQuery` (`state`, `q`, `sort`) → `CoursePage` | `knowledge` view, `training.manage` | yes, 25 | With Assigned, Completed and Overdue counts |
+| `GET /api/v1/training/courses` | `CourseListQuery` (`state`, `q`, `sort`) → `CoursePage` | `knowledge` view, `training.manage` | yes, 25 | With Assigned (everyone on the course, a Library start included), Completed and Overdue counts |
 | `POST /api/v1/training/courses` | `CourseCreate` (`title`, `summary`) → `Course` | `knowledge` create, `training.manage` | no | Numbered, `draft` |
 | `GET /api/v1/training/courses/:id` | → `Course` | `knowledge` view, `training.manage` | no | Items, settings, counts |
 | `PATCH /api/v1/training/courses/:id` | `CourseUpdate` (`title`, `summary`, `library`, `proof_required`, `proof_prompt`, `issue_certificate`) → `Course` | `knowledge` edit, `training.manage` | no | |
 | `POST /api/v1/training/courses/:id/items` | `ItemCreate` → `Course` | `knowledge` edit, `training.manage` | no | At most 40 |
 | `PATCH /api/v1/training/items/:id` | `ItemCreate` (the whole item) → `Course` | `knowledge` edit, `training.manage` | no | |
-| `DELETE /api/v1/training/items/:id` | → `Course` | `knowledge` edit, `training.manage` | no | §6.6 on a published course |
+| `DELETE /api/v1/training/items/:id` | → `Course` | `knowledge` edit, `training.manage` | no | §6.6 on a published course; an archived course's items are fixed (409 `COURSE_ARCHIVED`), as are its title and settings |
 | `PUT /api/v1/training/courses/:id/order` | `ItemOrder` (`item_ids`) → `Course` | `knowledge` edit, `training.manage` | no | |
 | `POST /api/v1/training/lesson-with-ai` | `LessonWithAi` (`text` or `document_id`, `title`) → `LessonSuggestion` | `knowledge` edit, `training.manage` | no | A suggestion only. 503 `AI_UNAVAILABLE` |
 | `POST /api/v1/training/courses/:id/publish` | `CoursePublish` (`signature`) → `Course` | `knowledge` edit, `training.manage` | no | §6.6 |
@@ -177,14 +179,14 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `GET /api/v1/training/courses/:id/people` | `EnrolmentListQuery` (`status`: `not_started`, `in_progress`, `completed`, `overdue`; `q`, `sort`) → `EnrolmentPage` | `knowledge` view, `training.manage` | yes, 25 | |
 | `POST /api/v1/training/courses/:id/remind` | `EmptyBody` → `{ reminded }` | `knowledge` edit, `training.manage` | no | Everyone overdue, once a day each |
 | `GET /api/v1/training/me` | `MyTrainingQuery` (`list`: `to_do`, `in_progress`, `completed`, `library`; `q`) → `MyCoursePage` | self, own | yes, 25 | `library`: published Library courses the person is not enrolled on |
-| `GET /api/v1/training/me/courses/:id` | → `MyCourse` | self, own | no | A course they are enrolled on, or a Library course |
+| `GET /api/v1/training/me/courses/:id` | → `MyCourse` | self, own | no | A course they are enrolled on, or a Library course. `:id` is the course's, or the person's own enrolment's (the link a task and a notice carry) |
 | `POST /api/v1/training/me/courses/:id/start` | `EmptyBody` → `MyCourse` | self, own | no | Library courses, or their own enrolment (sets `started_at`) |
-| `POST /api/v1/training/me/items/:id/done` | `EmptyBody` → `MyCourse` | self, own | no | May complete the course (§6.8) |
-| `POST /api/v1/training/me/items/:id/undone` | `EmptyBody` → `MyCourse` | self, own | no | Not after completion |
-| `POST /api/v1/training/me/courses/:id/proof` | `ProofAdd` (`url` or `document_id`) → `MyCourse` | self, own | no | Completes the course |
-| `POST /api/v1/training/me/courses/:id/certificate` | `EmptyBody` → `ExportFile` (202) | self, own | no | The stored PDF, downloaded on the device that asked |
-| `POST /api/v1/training/enrolments/:id/certificate` | `EmptyBody` → `ExportFile` (202) | `knowledge` view, `training.manage` | no | |
-| `GET /api/v1/public/verify/:number` | → `VerifyResult` | public | no | Extended for `CERT-` numbers (§6.10); no auth import |
+| `POST /api/v1/training/me/items/:id/done` | `EmptyBody` → `MyCourse` | self, own | no | May complete the course (§6.8). A Library course not started: 409 `NOT_STARTED` |
+| `POST /api/v1/training/me/items/:id/undone` | `EmptyBody` → `MyCourse` | self, own | no | Not after completion (409 `COURSE_COMPLETED`) |
+| `POST /api/v1/training/me/courses/:id/proof` | `ProofAdd` (`url` or `document_id`) → `MyCourse` | self, own | no | Completes the course. Every item done first (409 `ITEMS_LEFT`); only where it is asked (409 `PROOF_NOT_ASKED`) |
+| `POST /api/v1/training/me/courses/:id/certificate` | `EmptyBody` → `ExportFile` (202) | self, own | no | The stored PDF, downloaded on the device that asked; `pending` while the worker renders it, then the screen waits on `GET /exports/:id`. 409 `NO_CERTIFICATE` without one |
+| `POST /api/v1/training/enrolments/:id/certificate` | `EmptyBody` → `ExportFile` (202) | `knowledge` view, `training.manage` | no | Anyone's, as above |
+| `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | no | A `CERT-` number is answered by `training.certificate.js` (§6.10): `document_type` `training_certificate` and its `certificate` facts; no auth import |
 
 ## 6 · Rules and calculations
 
@@ -258,7 +260,13 @@ not use them; a later release drops them (MIGRATIONS §8), together with
   archived.
 - A published course stays editable (title, summary, settings, items). Adding an item does not
   reopen anyone's completion; a person in progress must also do the new item. Removing an item
-  removes its progress. Completed enrolments, their proof and their certificates never change.
+  removes its progress, and anyone who has now done every remaining item (with their proof, where
+  it is asked) completes in the same transaction; so does anyone who had done every item when Proof
+  Required is turned off. Completed enrolments, their proof and their certificates never change.
+- A file is staged through the upload engine (`POST /documents`) and claimed for the course as a
+  `training_material` document (read by everyone with `knowledge` view); the signature is a
+  `training_signature` document of the course; proof is a `training_proof` document, the person's
+  own (`subject_employee_id`), personal.
 - Archive Course (a reason): it leaves the Library and nobody can start it; open assignments are
   withdrawn (§6.7); enrolments in progress stay and may still be finished; certificates stay valid.
 
@@ -274,56 +282,82 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 - **Keep Assigning New Joiners** (on by default for everyone, departments and roles; ignored for
   named people): a person who later joins, or moves into a department or role it names, is enrolled
   from that day by `training.enrol_joiners` (on `employee.created`, `employee.updated` and
-  `user.roles_changed`, and a daily sweep at 06:00 Lagos as a backstop).
+  `access.roles_set`, the event a login's roles change on, and the `training-joiners` job at 06:00
+  Lagos as a backstop, which also sets any assigned place's task still missing). An assignment that
+  names only people is stored with Keep Assigning off.
 - **The task**: each assigned enrolment sets a task through `tasks.service.create`, its assignee the
   person, set by the assigner, titled "Complete <course>", due on the due date, linked to the
   enrolment (`entity_type` `training_enrolment`); it is completed by the system when the course
-  completes, and cancelled when the enrolment is removed.
+  completes (`tasks.service.completeForRecord`), and cancelled when the enrolment is removed. The
+  worker sets the tasks after commit, one place per transaction, read 50 at a time, and emits
+  `training.enrolled` for each, which tells the person; one place that fails does not hold up the
+  rest, and the next sweep picks it up. A person reached twice keeps one place and one task.
 - **Withdraw Assignment**: it stops enrolling joiners; enrolments from it that have not started are
-  removed with their tasks; started ones stay, without a due date.
+  removed with their tasks (one that another open assignment of the course still reaches moves onto
+  that one instead); started ones stay, without a due date.
 
 ### 6.8 Taking a course and completing it
 
 - A person may open a course they are enrolled on, or a published Library course (Start enrols them,
   `training_assignment_id` null). Anyone else's course is a 404.
 - Mark Done on an item records `training_item_progress`; the first one sets `started_at`. Items may
-  be done in any order. Undone is allowed until completion.
+  be done in any order. Undone is allowed until completion. A Library course is started (Start)
+  before its items are marked.
+- Add Proof is taken once every item is done, and only on a course that asks for it.
 - **Completion**, under the enrolment's lock: every item of the course as it stands is done, and,
   with Proof Required, proof is given (an `https` link or an uploaded file). Then `completed_at` is
   set and, with Issue Certificate on, the certificate number is allocated (`numbering.allocate`,
-  `training_certificate`) in the same transaction; `training.completed` is emitted.
+  `training_certificate`) and `certificate_hash` set (the `TRAINING_CERTIFICATE` canonical payload
+  of `shared/documents/canonical.js`, §6.9) in the same transaction; `training.completed` is emitted.
 - An archived course can still be completed by those already enrolled.
 
 ### 6.9 The certificate
 
 - Rendered by the outbox handler `training.issue_certificate` through `documents.generate` (doc type
-  `training_certificate`, template `templates/documents/training-certificate.html`, A4 landscape),
-  from the approved sample `docs/MyCity-ERP-Documents/training-samples/certificate-sample.html`. The
-  two faces are embedded files (`templates/documents/fonts/`), never fetched.
+  `training_certificate`, personal, one A4 landscape page it draws itself with no letterhead: the
+  `draw` of `training.certificate.js` over `templates/documents/training-certificate.html`, its
+  variables `CertificateDocumentVars`), from the sample MyCity approved as drawn (Cynthia,
+  11/11/2026; `docs/MyCity-ERP-Documents/training-samples/certificate-sample.html`). The two faces
+  are embedded files, never fetched: Cormorant Garamond (`templates/documents/fonts/`, its licence
+  beside it) and the proposal kit's Geist (`templates/proposals/fonts/`, one copy in the
+  repository). The rosette, the seal's petals and the QR are drawn on the server: the renderer runs
+  no script and refuses every request but a `data:` URL. Download Certificate issues it then if the
+  worker has not yet.
 - It prints the organisation's logo (Settings · Organisation; the wordmark when none), "Certificate
   of Completion", the person's full name as on their employee record, the course title, the number
   of items and the course's length (when minutes are set), the completion date (long, day first),
-  the publisher's signature, name and job title, the seal, the certificate number, the issue date
-  and the QR that opens `go.mycityapp.io/verify/t/<key>`.
+  the publisher's signature, name and job title, the seal (its ring the organisation's name), the
+  certificate number, the issue date (the completion date) and the QR that opens
+  `go.mycityapp.io/verify/<number>`: the number alone shows a certificate (§6.10), so it needs no key.
+- When the PDF is stored (`document.generated`), `training.certificate_ready` tells the person
+  "Certificate ready"; `certificate_ready` on My Training and Training · People means its PDF is
+  made. The certificate and the proof are the person's and `training.manage`'s only: the vault's
+  read rule for a `training_enrolment`'s files (`training.events.js`); the CEO holds every capability.
 - `certificate_hash` is the canonical hash of what it states (name, course number and title,
-  completion date, publisher, number); the artifact hash is the vault's over the PDF. The PDF is
-  stored once and never re-rendered; a renamed person or course keeps the certificate as issued.
+  completion date, publisher, number; `TRAINING_CERTIFICATE`); the artifact hash is the vault's over
+  the PDF. The PDF is stored once and never re-rendered; a renamed person or course keeps the
+  certificate as issued: the holder's name and the course title it states are kept on the enrolment
+  at completion (`certificate_holder_name`, `certificate_course_title`, migration `10430`).
 - On staging every certificate carries the STAGING mark, as every document does.
 
 ### 6.10 Verification
 
-- `GET /public/verify/:number` (and `/verify/t/<key>` from the QR) answers a `CERT-` number from the
-  training module's adapter: the holder's name, the course, the completion date, the publisher and
-  their title, and the two verdicts (the content hash recomputed from the enrolment, the artifact
-  hash from the stored bytes). A certificate states nothing private beyond what it prints, so the
-  number alone shows it; nothing else about the person is shown. An unknown number is the same 404
-  as for any document.
+- `GET /api/public/v1/verify/:ref` (which the QR opens, as `/verify/<number>` on the site) answers a
+  `CERT-` number, in any case, from `training.certificate.js`: the holder's name, the course, the
+  completion date, the publisher and their title, and the two verdicts (the content hash recomputed
+  from the facts kept on the enrolment, the artifact hash from the stored bytes). A certificate
+  states nothing private beyond what it prints, so the number alone shows it; nothing else about the
+  person is shown. An unknown number, or one whose PDF is not made yet, is the same 404 as for any
+  document. Verify a Document shows Awarded To, Course, Completed and Published By.
 
 ### 6.11 Reminders
 
 - From the reminder engine (`training_due`): 3 days before the due date, on the due date, then once
   a week while overdue, at most three times after the due date; 08:00 to 18:00 Lagos; never to
-  someone who has completed or left.
+  someone who has completed or left. Each step is an occurrence of its own (the due date and the
+  step), found once from 08:00 Lagos on its day, and dropped when the due date moves; a step from
+  before the person was assigned is never sent. The notice reads "Training due" or "Training
+  overdue", with the course and the due date.
 - Remind Overdue on a course reminds everyone overdue on it now, skipping anyone reminded that day.
 
 ## 7 · Events, jobs and notifications
@@ -334,12 +368,15 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `sop.published` | Publish SOP | Audit; outbox `knowledge.notify_sop` tells the department's members ("New SOP" or "SOP updated", its title and version; push as their Knowledge Hub preference allows); search index |
 | `training_course.created`, `.updated`, `.item_changed`, `.archived` | As named | Audit |
 | `training_course.published` | Publish Course | Audit; search index |
-| `training.assigned` | Assign Training | Audit; outbox `training.notify_assigned`: each person's task and notice ("Training assigned", the course, the due date) |
-| `training.assignment_withdrawn` | Withdraw Assignment | Audit; tasks of removed enrolments cancelled |
-| `training.enrol_joiners` | `employee.created`, `employee.updated`, `user.roles_changed`; daily 06:00 Lagos | Enrols new matches of open assignments, sets their tasks and notices |
-| `training.started`, `training.item_done` | As named | Audit (progress is not notified) |
-| `training.completed` | Completion | Audit; outbox `training.issue_certificate` (PDF, vault, then "Certificate ready" to the person) and `training.close_task` |
-| Reminder `training_due` | Every 5 minutes, 08:00 to 18:00 Lagos | §6.11 |
+| `training.assigned` | Assign Training | Audit; outbox `training.notify_assigned`: each new place's task, then `training.enrolled` |
+| `training.enrolled` | The worker set a place's task | Audit; tells the person ("Training assigned", the course, the due date) |
+| `training.assignment_withdrawn` | Withdraw Assignment | Audit; tasks of removed enrolments cancelled in the same transaction |
+| `training.enrol_joiners` | `employee.created`, `employee.updated`, `access.roles_set`; the `training-joiners` job daily at 06:00 Lagos | Enrols new matches of open assignments, sets their tasks and notices |
+| `training.close_leaver` | `employee.archived` | A leaver's open enrolments removed (`training.enrolment_closed`) and their tasks cancelled; completed ones stay |
+| `training.started`, `training.item_done`, `training.item_undone`, `training.proof_added` | As named | Audit (progress is not notified) |
+| `training.completed` | Completion | Audit; outbox `training.close_task` and `training.issue_certificate` (the certificate generated; the worker renders and stores its PDF) |
+| `training.certificate_ready` | Its PDF stored (`document.generated`) | Tells the person ("Certificate ready", the course and the number) |
+| `training.reminder_due` | Reminder `training_due`, every 5 minutes, 08:00 to 18:00 Lagos (§6.11); Remind Overdue | Tells the person ("Training due" or "Training overdue") |
 
 Notification category: `knowledge` (as Policies), so a person's Knowledge Hub preference governs
 push. Record types: `sop`, `training_course`, `training_enrolment` (route map, `categories.js`).
@@ -374,7 +411,9 @@ else's training in M10 (§13).
 - **Search** (`knowledge.search.js`, `training.search.js`): SOPs by number and title (`sop`, opening
   Knowledge Hub · SOPs `?id=`), for everyone; courses by number and title for `training.manage`
   (`training_course`), and the person's own courses and Library courses (`training_enrolment`,
-  opening ESS · My Training `?id=`). ⌘K's New SOP (writers) and New Course (`training.manage`). The
+  opening ESS · My Training `?id=`, which takes the course's id or the person's enrolment's). ⌘K's
+  New SOP (writers) and New Course (`training.manage`, with the Training tab's screen in PR 5, as is
+  the tab's `training.manage` rule in both mirrors, BACKEND_GUIDE §5). The
   screens: SOPs (sop, procedures, process, how we work), Training (courses, learning, lessons), My
   Training (my training, courses, certificate, learning).
 
@@ -407,11 +446,11 @@ else's training in M10 (§13).
 - A step's screen is removed from the route map in a later release: the step keeps its text and the
   link is dropped from the reader (the key no longer resolves); `UNKNOWN_SCREEN` on the next save.
 - An item deleted from a published course while someone is on it: their progress on it goes; if
-  every remaining item is done (and no proof is required), the next Mark Done or a reload completes
-  them through §6.8.
+  every remaining item is done (and no proof is required, or it is given), the deletion completes
+  them through §6.8 in its own transaction.
 - A course with Proof Required: the last Mark Done does not complete it; Add Proof does.
-- An assigned person leaves: their open enrolment and task are closed by `employee.updated`
-  (left); a certificate already issued stays valid.
+- An assigned person leaves: their open enrolment and task are closed when their record is archived
+  (`employee.archived`, `training.close_leaver`); a certificate already issued stays valid.
 - Assigned twice (two assignments reach one person): one enrolment, the earlier due date.
 - A Library starter who is then assigned: moved onto the assignment with its due date (§6.7).
 - The certificate PDF fails to render: the outbox retries; Download Certificate waits for it
@@ -420,8 +459,8 @@ else's training in M10 (§13).
 - Draft With AI or Draft Lesson with no AI connection: the button says it is unavailable; nothing
   changes.
 - A scanned PDF to Draft With AI: "No text in this file"; nothing is sent.
-- A huge audience (everyone, 300 people): one transaction enrols them; tasks and notices are outbox
-  work in batches.
+- A huge audience (everyone, 300 people): one transaction enrols them (three statements, whatever
+  the size); tasks and notices are outbox work, a place per transaction, read 50 at a time.
 
 ## 12 · Donor code
 
@@ -438,8 +477,10 @@ else's training in M10 (§13).
 2. Renewal (an annual refresher that falls due again a year after completion) is not in M10; asked
    of MyCity at the demo.
 3. Line managers seeing their team's training: not in M10 unless MyCity asks at the demo.
-4. MyCity signs off the certificate sample (`training-samples/README.md` lists what to confirm)
-   before PR 4 builds the template.
+4. ~~MyCity signs off the certificate sample~~ Answered 11/11/2026: Cynthia approved the sample as
+   drawn: the wording ("Certificate of Completion", "This is to certify that", "has successfully
+   completed the training", "Published this training"), "Learning & Development" under the wordmark,
+   the seal's ring "MyCity App Ltd · Certified Training", and one signature, the publisher's.
 
 ## Appendix A · Build plan
 
@@ -473,6 +514,26 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · PR 4 built: the certificate (§6.9, §6.10). Cynthia approved the sample as drawn
+  (§13 item 4). Decided on the way: the certificate draws its own page (`draw`, no letterhead) from
+  the template; the QR opens `/verify/<number>`, as the number alone shows a certificate; the holder's
+  name and course title it states are kept at completion (migration `10430`), so the content verdict
+  holds after a rename; a certificate is verifiable once its PDF exists; Download Certificate waits on
+  `GET /exports/:id`, which now answers for a generated document the caller may read (foundation.md
+  §6.12); "Certificate ready" on `document.generated`; the facts read "items", as §6.9 says, where
+  the sample read "lessons"; Verify a Document's `document_type` gains `training_certificate` and its
+  result a `certificate` part (offers.md).
+- 11/11/2026 · TB · PR 3 built: the `training` module (§5's routes for `/training` but Download
+  Certificate's two, which come with the certificate in PR 4), Draft Lesson, the reminder, joiners
+  and leavers, ⌘K and the AI reads. Decided on the way: a place's task and notice are set by the
+  worker one place per transaction (`training.enrolled` tells the person); roles change on
+  `access.roles_set`, not `user.roles_changed`, and a leaver is closed on `employee.archived`; an
+  item removed (or Proof Required turned off) completes, in the same transaction, anyone now done; a
+  task may name a `training_enrolment` (migration `10420`); the certificate's hash is the canonical
+  payload `TRAINING_CERTIFICATE`; My Training opens a course by its id or the person's enrolment's;
+  an assignment naming only people keeps Keep Assigning off; Assigned counts everyone on the course;
+  ⌘K's two course groups take the words course, courses, learning (and certificate), never "training",
+  which would turn a search for "Training Week" into a search of My Training.
 - 11/11/2026 · TB · PR 1 built: the contracts, migrations `10400` and `10410`, seed `10490`, the capabilities and schemes (§4, §8). Decided on the way: a published SOP version's CHECK spells out `version IS NOT NULL` (a CHECK lets NULL through); `training_item`'s position is unique at commit, so a reorder can swap two; a change to an item sends the whole item (`ItemCreate`, no second schema); My Training's lists are one query, `list` (`to_do`, `in_progress`, `completed`, `library`). Settings · Documents & Numbering lists the three new schemes (SOP, Training Course, Training Certificate).
 - 11/11/2026 · TB · Written from TB's eight answers of 11/11/2026 and the Modules Review of 4
   November 2026: FAQs leave the hub (Announcements left on 29/10/2026); SOPs are each department's

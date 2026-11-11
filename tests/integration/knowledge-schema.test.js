@@ -223,7 +223,7 @@ describeDb("M10 Knowledge Hub schema and reference data against the real migrati
       });
     });
 
-    test("one enrolment a person and course; proof is a link or a file; a certificate needs a completion", async () => {
+    test("one enrolment a person and course; proof is a link or a file; a certificate needs a completion and the facts it states", async () => {
       await rolledBack(async (cl) => {
         const t = await course(cl);
         const e = await enrolment(cl, t);
@@ -236,7 +236,11 @@ describeDb("M10 Knowledge Hub schema and reference data against the real migrati
         await refusedHere(cl, () => set({ proof_url: "http://certs.example/1" }), "23514", "training_enrolment_proof_url_check");
         await refusedHere(cl, () => set({ certificate_number: "CERT-2026-0001", certificate_hash: "h" }), "23514", "training_enrolment_certificate_check");
         await refusedHere(cl, () => set({ certificate_document_id: doc }), "23514", "training_enrolment_certificate_pdf_check");
-        await set({ completed_at: new Date(), certificate_number: "CERT-2026-0001", certificate_hash: "h", certificate_document_id: doc });
+        // The name and course title it states come with the number (10430).
+        const issued = { completed_at: new Date(), certificate_number: "CERT-2026-0001", certificate_hash: "h", certificate_document_id: doc };
+        await refusedHere(cl, () => set(issued), "23514", "training_enrolment_certificate_facts_check");
+        await refusedHere(cl, () => set({ ...issued, certificate_holder_name: "Ada Obi" }), "23514", "training_enrolment_certificate_facts_check");
+        await set({ ...issued, certificate_holder_name: "Ada Obi", certificate_course_title: "Fire Safety" });
       });
     });
 

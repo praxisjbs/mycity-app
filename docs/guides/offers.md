@@ -158,7 +158,7 @@ employee record (masked, never sent to an AI model).
 | `POST /api/public/v1/sign/:token/sign` | `SignSubmit` → `SigningView` | public token | | the code entered within 30 minutes; signers in order; a second press returns the signed state |
 | `POST /api/public/v1/sign/:token/decline` | `SignDecline` → `SigningView` | public token | | ends the request for every signer |
 | `GET /api/public/v1/sign/:token/document` | PDF | public token | | the sealed copy once there is one |
-| `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | | status, signers, the two verdicts; no content; only a sealed copy |
+| `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | | status, signers, the two verdicts; no content; only a sealed copy. A `CERT-` number is a training certificate, answered by the training module (`knowledge.md` §6.10); a signed document's `certificate` is null |
 | `GET /api/public/v1/verify/t/:token` | → `VerifyByToken` | the sealed copy's QR key | | the record and the document |
 | `GET /api/public/v1/verify/t/:token/document` | PDF | the QR key | | the sealed copy |
 | `GET/POST /api/public/v1/onboard/:token` | `UploadPack`, `UploadItem` | public token `onboarding.upload` | | privacy notice first |
@@ -282,6 +282,7 @@ Open:
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · M10 PR 4 (`knowledge.md` §6.10): Verify a Document also checks a training certificate by its number. `VerifyResult.document_type` is `VerifiedDocumentType` (the signed types and `training_certificate`; the signing page keeps `SignedDocumentType`), and the result gains `certificate` (holder, course, completion date), null for every signed document. The page shows a certificate's Awarded To, Course, Completed and Published By; offers and agreements read as before.
 - 06/11/2026 · AJ · First draft from the Modules Review of 04/11/2026, AJ's decisions on #79 (offer approval, the contract's own signature, the employee at acceptance, BVN, department plans, the seat on hire) and GE's answers (`advanceIn`, `hireIn`, the public pages on #82).
 - 06/11/2026 · AJ · The offer emails go in M4's Candidate Emails; New Offer is a chat card.
 - 06/11/2026 · AJ · From MyCity's sample offer letter and New Joiner list: monthly pay lines and the Offer Summary's fields on the offer, the company signing when the offer is approved, the New Joiner checklist, two guarantors with reference checks, BVN a number only (§3, §4, §6). PR 1's migrations named.

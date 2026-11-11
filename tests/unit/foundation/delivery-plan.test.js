@@ -83,7 +83,7 @@ describe("the API's answers", () => {
     expect(deliveryPlan.typeOpens("deduction")).toBe(true);
     expect(deliveryPlan.typeOpens("leave_request")).toBe(true);
     expect(deliveryPlan.typeOpens("not_a_route")).toBe(true);
-    expect(deliveryPlan.closedTypes()).toEqual(expect.arrayContaining(["sop", "training_course"]));
+    expect(deliveryPlan.closedTypes()).toContain("sop");
     expect(deliveryPlan.closedTypes()).not.toContain("payroll_run");
     expect(deliveryPlan.closedTypes()).not.toContain("salary_structure");
     expect(deliveryPlan.closedTypes()).not.toContain("leave_request");
@@ -131,8 +131,8 @@ describe("⌘K by the plan", () => {
     expect(screensOf()).toEqual(expect.arrayContaining(["/knowledge?tab=sops", "/ess?tab=my-leave"]));
     deliveryPlan.use({ plan: docs, rule: "staging" });
     expect(screensOf()).toEqual(expect.arrayContaining(["/ess?tab=my-leave", "/payroll?tab=payroll-runs", "/payroll?tab=payslips"]));
-    // Only the Knowledge Hub screens with their API ticked are offered: not SOPs or Training.
-    expect(screensOf().filter((link) => /knowledge\?tab=(sops|training)$/.test(link))).toEqual([]);
+    // Only the Knowledge Hub screens with their API ticked are offered: not SOPs.
+    expect(screensOf()).not.toContain("/knowledge?tab=sops");
     expect(actionEntries(reader).map((e) => e.hit.link).filter((link) => link && !deliveryPlan.linkOpens(link))).toEqual([]);
   });
 });

@@ -53,7 +53,18 @@ const TaskCadence = z.enum(["daily", "weekly"]);
  * Records a task may point at in M2; each is a key of shared/route-map ENTITY_ROUTES. `task`: a
  * Recovery task points at the missed commitment it recovers (migration 2400).
  */
-const TaskEntityType = z.enum(["partner", "vacancy", "goal", "key_result", "scorecard", "performance_review", "improvement_plan", "task"]);
+const TaskEntityType = z.enum([
+  "partner",
+  "vacancy",
+  "goal",
+  "key_result",
+  "scorecard",
+  "performance_review",
+  "improvement_plan",
+  "task",
+  // A course a person was assigned: closed by the system when they complete it (docs/guides/knowledge.md §6.7).
+  "training_enrolment",
+]);
 /** `mine`: tasks the caller is assigned, set or shares. `team`: everyone in their workspace scope. */
 const TaskScope = z.enum(["mine", "team"]);
 /**

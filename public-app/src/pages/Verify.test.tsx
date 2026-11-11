@@ -72,6 +72,18 @@ describe("Verify", () => {
     expect(within(doc).getByRole("link", { name: "Download PDF" }).getAttribute("download")).toBe("OFF-0017.pdf");
   });
 
+  it("a training certificate by its number: the holder, the course, when and who published it", async () => {
+    draw("CERT-2026-0019");
+    expect(await screen.findByRole("heading", { level: 2, name: "Document Verified" })).toBeTruthy();
+    expect(row("Document")).toBe("Certificate of completion");
+    expect(row("Certificate No.")).toBe("CERT-2026-0019");
+    expect(row("Awarded To")).toBe("Ifunanya Adaobi Bello");
+    expect(row("Course")).toBe("Data Protection and the NDPA");
+    expect(row("Completed")).toBe("30/11/2026");
+    expect(row("Published By")).toBe("Kelechi Nwosu, Head, Operations & People");
+    expect(screen.queryByText("Status", { selector: "dt" })).toBeNull();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = draw("OFF-0012");
     await screen.findByText("The stored file was altered.");
