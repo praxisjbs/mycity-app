@@ -364,6 +364,10 @@ const ENTITY_ROUTES = Object.freeze({
   },
   // A person told that a fine is scheduled or waived, or an advance recorded, reads it on their own payslips.
   deduction: { ...screen("payroll", "deductions"), self: screen("ess", "my-payslips") },
+  // The asking person's own payslip and instalment, as the assistant cites them and ⌘K finds the payslip (payslips.search.js,
+  // payslips.ai.js, deductions.ai.js): they open My Payslips, which a Payroll · Payslips link would not for someone without `payroll`.
+  payroll_own_payslip: screen("ess", "my-payslips"),
+  payroll_own_deduction: screen("ess", "my-payslips"), // search:none an instalment is found with its payslip on My Payslips, and as the deduction Payroll readers search
   // Grades, pay splits, statutory rates and the payroll setting are configuration, not records: each opens
   // Configurations, which ⌘K finds as a screen (docs/guides/payroll.md §9).
   salary_structure: screen("payroll", "configurations"), // search:none configuration, found as the Configurations screen
@@ -399,9 +403,9 @@ const ENTITY_ROUTES = Object.freeze({
   // A section or task of the User Guide, by its slug: the guide opens at it (user_guide.search.js).
   guide_section: screen("knowledge", "user-guide"),
   sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge, M10 PR 2)
-  training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/training, M10 PR 3)
+  training_course: screen("knowledge", "training"),
   // A person's place on a course opens it on their own My Training (docs/guides/knowledge.md §9).
-  training_enrolment: screen("ess", "my-training"), // search:none not built yet (src/modules/training, M10 PR 3)
+  training_enrolment: screen("ess", "my-training"),
 
   // Praxis AI
   // A conversation opens on Ask, where it can be read and continued (docs/guides/praxis-ai.md §9).

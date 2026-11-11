@@ -400,6 +400,17 @@ describe("markdown and the template language", () => {
     expect(canonical.hash("PARTNERSHIP_AGREEMENT", { ...agreement, ends_on: "2028-11-30" })).not.toBe(canonical.hash("PARTNERSHIP_AGREEMENT", agreement));
     expect(canonical.isSignable("PARTNERSHIP_AGREEMENT")).toBe(true);
   });
+
+  test("a training certificate's payload: pinned, and a renamed holder or another date changes it", () => {
+    const cert = {
+      number: "CERT-2026-0001", holder_name: "Femi Ola", course_number: "TRN-0001", course_title: "Data Protection Basics",
+      completed_on: "2026-11-11", publisher_name: "Ngozi Eze", publisher_title: "People Lead",
+    };
+    // Pinned: a change to this builder must bump its version, never alter v1 (canonical.js header).
+    expect(canonical.hash("TRAINING_CERTIFICATE", cert)).toBe("c27d7d143f2ad5b234ff35ed50e3ca30df59dfa06944b6aaa91d872e748dc192");
+    expect(canonical.hash("TRAINING_CERTIFICATE", { ...cert, holder_name: "Femi Olawale" })).not.toBe(canonical.hash("TRAINING_CERTIFICATE", cert));
+    expect(canonical.hash("TRAINING_CERTIFICATE", { ...cert, completed_on: "2026-11-12" })).not.toBe(canonical.hash("TRAINING_CERTIFICATE", cert));
+  });
 });
 
 describe("document types, served types, derived file names", () => {

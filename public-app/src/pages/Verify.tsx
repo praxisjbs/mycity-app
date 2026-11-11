@@ -14,6 +14,8 @@ import { useRouter } from "@/lib/router";
  * The signatures routes answer it (VerifyResult, VerifyByToken): the record's status (an agreement's
  * own too: active, expiring, expired), every signer and when they signed (a paper signature by its
  * day, "signed outside the hub"), and the two verdicts; from the QR, an agreement's whole text.
+ * A training certificate (CERT-2026-0019, its QR opens its number) shows its holder, the course, the
+ * day it was completed and who published the training (docs/guides/knowledge.md §6.10).
  */
 export function Verify({ number, qr }: { number: string | null; qr?: string }) {
   return (
@@ -57,14 +59,30 @@ function verdict(r: VerifyResult): { tone: "ok" | "warn"; title: string; text: s
   return { tone: "warn", title: "Not This Document", text: "The record and the stored file were altered." };
 }
 
-const TYPE: Record<VerifyResult["document_type"], string> = { offer_letter: "Offer of employment", employment_contract: "Employment contract", agreement: "Partnership agreement" };
+const TYPE: Record<VerifyResult["document_type"], string> = { offer_letter: "Offer of employment", employment_contract: "Employment contract", agreement: "Partnership agreement", training_certificate: "Certificate of completion" };
 const STATUS: Record<VerifyResult["status"], string> = { pending: "Awaiting signatures", completed: "Signed by everyone", declined: "Declined", expired: "Expired unsigned", revoked: "Withdrawn" };
 const when = (iso: string) => `${formatDate(iso)}, ${formatTime(iso)}`;
 /** An agreement's own state beyond signing (record_status): active, expiring, expired past its end, renewed, closed. */
 const RECORD: Record<string, string> = { signed: "Signed", active: "Active", expiring: "Expiring", expired: "Expired", renewed: "Renewed", closed: "Closed" };
 const signerLabel = (role: VerifyResult["signers"][number]["role"]) => (role === "mycity" ? "For the Company" : role === "partner" ? "For the Partner" : "Signed By");
 
-const rowsOf = (r: VerifyResult) => [
+/** A training certificate: the holder, the course, when it was completed and who published the training. */
+const certificateRows = (r: VerifyResult) => {
+  const c = r.certificate!;
+  return [
+    { label: "Document", value: TYPE[r.document_type] },
+    { label: "Certificate No.", value: r.reference },
+    { label: "Awarded To", value: c.holder_name },
+    { label: "Course", value: c.course_title },
+    { label: "Completed", value: formatDate(c.completed_on) },
+    ...r.signers.map((s, i) => ({ key: `signer-${i}`, label: "Published By", value: s.title ? `${s.name}, ${s.title}` : s.name })),
+    { label: "Issued By", value: r.issued_by },
+    { label: "Content Hash", value: <Match value={r.content} /> },
+    { label: "Artifact Hash", value: <Match value={r.artifact} /> },
+  ];
+};
+
+const documentRows = (r: VerifyResult) => [
   { label: "Document", value: TYPE[r.document_type] },
   { label: "Reference", value: r.reference },
   { label: "Status", value: r.signed_outside ? "Signed outside the hub" : STATUS[r.status] },
@@ -78,6 +96,8 @@ const rowsOf = (r: VerifyResult) => [
   { label: "Content Hash", value: <Match value={r.content} /> },
   { label: "Artifact Hash", value: <Match value={r.artifact} /> },
 ];
+
+const rowsOf = (r: VerifyResult) => (r.certificate ? certificateRows(r) : documentRows(r));
 
 function ByNumber({ number }: { number: string }) {
   const r = useApi("GET /api/public/v1/verify/:ref", { params: { ref: number } });

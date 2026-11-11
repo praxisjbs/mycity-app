@@ -10,7 +10,7 @@
 | Capabilities | `payroll.configure` (switch the advanced option on or off, set the pay day, enter statutory rates, bands, salary grades and pay components; the run itself needs only the `payroll` grant) |
 | Screens (PROGRESS.md rows) | #45 Payroll Runs, #46 Payslips, #48 Deductions, Configurations (new; PR 1 registers it in the next free row, #109 while free (#107 and #108 are the public site's), and marks #47 Salary Structure and #49 Statutory Dropped), #11 My Payslips; changes to Home (the Payroll In Progress card), Settings · Approvals (#72, the `payroll.run` flow), People · Attendance (#25, its Deductions and Overtime views gain a link to the run), Queries & Sanctions · Sanctions (a fine's Payroll state) and the Notification Settings (#74, the Payroll category) |
 | Status | Agreed |
-| Last changed | 10/11/2026 |
+| Last changed | 11/11/2026 |
 
 ---
 
@@ -149,8 +149,8 @@ next run as an adjustment).
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Payroll · Payroll Runs (`payroll-runs`, #45) | Staff app, People group | `payroll` view | The current run's figures and chain, its problems, the run history, the approval | New Run, Compute, Add Adjustment, Exclude, Submit for Approval, Approve, Send Back, Reject (the approver), Mark Paid, Email All Payslips, Download All, Statutory Report (advanced), Discard |
-| Payroll · Payslips (`payslips`, #46) | Staff app | `payroll` view; amounts need the salary grant | The month's payslips (Preview until approved, Published after), one opening in a modal with its lines | Open a payslip, Download PDF (`payroll` edit, a restricted file), search by person |
+| Payroll · Payroll Runs (`payroll-runs`, #45) | Staff app, People group | `payroll` view | The current run's figures and chain, its problems, its adjustments and the people left out, the run history, the approval | New Run, Compute, Add Adjustment, Exclude, Include, Submit for Approval, Approve, Send Back, Reject (the approver), Mark Paid, Email All Payslips, Download All, Statutory Report (advanced), Discard |
+| Payroll · Payslips (`payslips`, #46) | Staff app | `payroll` view; amounts need the salary grant | The month's payslips (Preview until approved, Published after), one opening in a modal with its lines, or its PDF once rendered | Pick the month, open a payslip, Download PDF (`payroll` edit, a restricted file), search by person; Email All Payslips and Download All once the run is approved |
 | Payroll · Deductions (`deductions`, #48) | Staff app | `payroll` view | Every deduction waiting or running: attendance items, fines, advances; the month's figures | Accept This Month, Spread Over Months, Waive (a fine); Record Advance, Cancel Advance; a link to People · Attendance to waive an attendance item |
 | Payroll · Configurations (`configurations`, new, #109 while free) | Staff app | `payroll` view; changes need `payroll.configure` | Pay Day, Bank Details Required, the Advanced Payroll switch, Statutory Items and PAYE Bands; when on or once it has been: the conventions, Salary Structure, Pay Components | Set Pay Day, Switch On or Off from a date, Save Rate, Save Grade, Place People, Set Pay Components |
 | ESS · My Payslips (`my-payslips`, #11) | Staff app | Every employee, own record | Gross, Net Received, Payslips, Deductions, Next Payday; the year's months; the month's payslip | Change year, open a month, Download PDF, Email a Copy, open Deductions, Download All |
@@ -476,7 +476,7 @@ checked). The run's screen offers them as buttons, as Expenses does.
 | `GET /payslips/:id` | → `PayslipDetail` (its earning and deduction lines; employer charges are never on the slip) | `payroll` view · all | no | 404 outside the run's scope; a reader's own payslip is never masked from them |
 | `GET /payslips/:id/lines/:line_id/items` | `PayslipLineParams`, `PageQuery` → `PayslipLineItemPage` | `payroll` view · all | yes, 25 | The pay items behind a grouped line (Lateness, Early Departure, Absence, Overtime): the run's own once Submit froze them, before that the pending ones the next Compute takes. An adjustment's line shows its reason, a fine's or an advance's its month and state, an unpaid leave's or suspension's the line as made; Monthly Pay and a statutory line stand on nothing and answer an empty page |
 | `GET /payslips/:id/pdf` | → the PDF, streamed from the vault | `payroll` edit · all | no | A restricted file (HANDOFF §5 item 7: the module's `edit` grant, not only `view`); 409 `NOT_APPROVED` for a draft, 409 `NOT_READY` while it renders; 403 `FIELD_RESTRICTED` for a reader whose role hides pay or bank details, unless it is their own |
-| `GET /ess/payslips` | `EssPayslipQuery` (`year`, this Lagos year when absent) → `PayslipPage` | `ess` · own | yes, 25 | Published payslips only, newest month first; each carries its run's status (`run_status`: `approved`, or `paid`) and `has_deduction`, which are what the month's status (Paid, Paid with a deduction, In the run) is read from (§13.3 item 2) |
+| `GET /ess/payslips` | `EssPayslipQuery` (`year`, this Lagos year when absent) → `PayslipPage` | `ess` · own | yes, 25 | Published payslips only, newest month first; each carries its run's status (`run_status`: `approved`, or `paid`) and `has_deduction`, which are what the month's status (Paid, Paid with a deduction, In the run) is read from (§13.1 item 28) |
 | `GET /ess/payslips/summary` | `EssPayslipQuery` → `EssPayslipSummary` | `ess` · own | no | Over the year's published payslips: Gross, Net Received, Payslips, Deductions; Next Payday is the first pay date on or after today whose month's run is not paid (§6.11 rule 1) |
 | `GET /ess/payslips/:id` | → `PayslipDetail` | `ess` · own | no | |
 | `GET /ess/payslips/:id/pdf` | → the PDF | `ess` · own | no | 409 `NOT_READY` while the PDF is still rendering |
@@ -957,6 +957,12 @@ email on and push off, each person's to change on Notification Settings):
 | `payroll_deduction.waived` | The person | "Fine Waived" |
 | The engine's own (`workflow.*`) | The approver on Submit; the submitter on a decision | "Approval needed", "Payroll approved" and the returned reasons, as the engine words them |
 
+**The Submit notice, checked (PR 6).** A submitted run tells the CEO ("Approval needed", the engine's own, category `approvals`) in the
+bell, by push and by email, and nobody else (the submitter is not asked to decide it); the bell, the push and the email each carry
+the link `shared/route-map.js` gives `payroll_run`, Payroll · Payroll Runs on the run (`tests/integration/ai-actions-payroll.test.js`). The
+approval's end tells each person "Your payslip is ready" (category `payroll`: bell and email, no push), opening My Payslips for
+someone who cannot open Payroll · Payslips.
+
 The bell's link opens the same screen as the email's: `shared/route-map.js` maps `payroll_run` to Payroll ·
 Payroll Runs, `payslip` to Payroll · Payslips (`self: true` to ESS · My Payslips), `deduction` to Payroll ·
 Deductions, and the retired `salary_structure` and `statutory_return` entries to Configurations.
@@ -1014,26 +1020,47 @@ ever wanted, the question CLAUDE.md requires ("which job does it use?", the owne
   | `deductions.list` | Pending, active and settled deductions, by person and source | `payroll` view |
   | `deductions.mine` | The asking person's own deductions and scheduled instalments | `ess` view · own |
 
-  A **summary** (figures, never rows): `payroll.month` (headcount, gross, deductions, net of a month).
+  A **summary** (figures, never rows): `payroll.month` (headcount, gross, deductions, net of a month; the month asked for,
+  else the run Payroll Runs shows first; `PayrollMonthQuery`). A summary is not masked on the way out as a read's rows are, so
+  `payroll.month` leaves the three amounts out for a reader whose role hides pay (`employee.salary`) and answers the headcount
+  alone, as the screen shows Restricted.
+
+  **A person's own pay is never masked from them** (§6.13 rule 3), but the assistant's engine masks the salary-derived names in
+  every row it reads and the Employee role hides salaries by default (`0449`), so a plain employee would be answered null about
+  their own payslip. `payslips.mine` and `deductions.mine` therefore read by the session's employee id and nobody else's and
+  carry the amounts under names the mask does not govern (`gross`, `net`, `deductions`, `amount`); the Payroll readers' reads
+  keep the masked names and are masked as the screen is. Their citations open My Payslips (route-map types `payroll_own_payslip`
+  and `payroll_own_deduction`), where a link to Payroll · Payslips would not open for someone without `payroll`.
 - **AI cards** (each runs the service function its screen's button calls; risk `payroll`, so Confirm It's You
   first, praxis-ai.md decision 11; form schema named so gate 23 is satisfied):
 
   | Action | Input schema | Runs |
   |---|---|---|
-  | `payroll_runs.create` (New Run) | `PayrollRunCreate` | `payroll.service.createRun` |
-  | `payroll_runs.submit` (Submit for Approval) | `PayrollRunSubmit` | `payroll.service.submitRun`; `form: "none: a button with no form"` |
-  | `payroll_adjustments.add` (Add Adjustment) | `PayrollAdjustmentAdd` | `payroll.service.addAdjustment` |
-  | `deductions.accept` (Accept Deduction) | `DeductionAccept` | `deductions.service.acceptFine` |
-  | `deductions.waive` (Waive Fine) | `DeductionWaive` | `deductions.service.waiveFine` |
+  | `payroll_runs.create` (New Run) | `PayrollRunCreate` | `payroll.service.createRun`; `form: "none"` (its modal is PR 7's) |
+  | `payroll_runs.submit` (Submit for Approval) | `PayrollRunSubmission` (`PayrollRunSubmit` with the run) | `payroll.service.submitRun`; `form: "none"` |
+  | `payroll_adjustments.add` (Add Adjustment) | `PayrollRunAdjust` (`PayrollAdjustmentAdd` with the run) | `payroll.service.addAdjustment`; `form: "none"` |
+  | `deductions.accept` (Accept Deduction) | `FineAccept` (`DeductionAccept` with the fine) | `deductions.service.acceptFine`; `form: "none"` |
+  | `deductions.waive` (Waive Fine) | `FineWaive` (`DeductionWaive` with the fine) | `deductions.service.waiveFine`; `form: "none"` |
   | `advances.record` (Record Advance) | `AdvanceRecord` | `deductions.service.recordAdvance` |
 
-  Approve and Reject are the approvals' own card (`approvals.decide`). The forms of rates, bands, grades,
-  placements, pay components and the advanced switch (`StatutoryRatesSave`, `SalaryGradeSave`,
-  `GradePlacementSave`, `PayComponentsSave`, `PayrollSettingsChange`) are each offered as an action or listed in
-  `not_offered` with a reason the gate accepts (praxis-ai.md §6.15); PR 6 decides each and nothing is added to
-  `scripts/check/ai-forms-gaps.json`. Each action key has an integration test and an evaluation case
+  Every card is risk `payroll`. A screen's button on a record never names it (it sits on the run or the fine that is open), so a
+  card whose form does not name its record takes a card schema: the form's own fields with the record beside them
+  (praxis-ai.md §6.11, "an edit form's card names its record"). Each is asked first for what it needs (decision 34: the run, among
+  those the card may act on, written by its month or number; the fine, among those waiting; the person, from People's register; the
+  start month, among the twelve from the open month, written as "October 2026"), is named by its chip (the run's number and month,
+  the fine's person and query, never an amount), and is held again at the press by its own `check`: Submit needs a computed run, Add
+  Adjustment a draft or computed one, Accept and Waive a fine still waiting that is not the asker's own, Record Advance a person who
+  is not the asker (403 `OWN_RECORD`, §6.6 rule 8). Submit's card carries the net pay the person saw (`expected_net_total`, from
+  `payroll.runs`), so a changed total is told first (409 `RUN_CHANGED`) and nothing is frozen.
+
+  Approve and Reject are the approvals' own card (`approvals.decide`). The forms of rates, bands, grades, placements and pay
+  components carry `ai:none design:` on their controllers (PR 5), and **the advanced switch, the pay day and the bank rule
+  (`PayrollSettingsChange`) are not a card** (§13.2 item 28): they are one version of the setting, saved from a date with the
+  rates in force and the accountant's three conventions in view, so the route "turn on advanced payroll" opens Configurations and
+  the person saves it there. Nothing is added to `scripts/check/ai-forms-gaps.json`. Each action key has an integration test
+  (`tests/integration/ai-actions-payroll.test.js`, and `payroll-run.test.js` for New Run) and an evaluation case
   (`scripts/ai/eval-assistant.js`); `npm run gen:ai-catalogue` is run and its diff reviewed.
-- **What PR 4 carries.** Gate 9 holds a filled controller to an AI manifest or a written `// ai:none <reason>`, and gate 10 to a search provider: `payslips.controller.js` says `ai:none` with the reason that PR 6 writes `payslips.mine` and `payslips.list` (and removes the line), and `payslips.search.js` answers for `payroll` readers. A payslip has no create or edit form, so gate 23 asks for no card.
+- **What PR 4 carries.** Gate 9 holds a filled controller to an AI manifest or a written `// ai:none <reason>`, and gate 10 to a search provider: `payslips.controller.js` said `ai:none` with the reason that PR 6 writes `payslips.mine` and `payslips.list` (PR 6 wrote them and removed the line), and `payslips.search.js` answered for `payroll` readers. A payslip has no create or edit form, so gate 23 asks for no card.
 - **What PR 2 carries.** Gates 9, 10, 19 and 23 hold a module to its AI manifest and its search provider from the day its controller is
   filled, which is PR 2, so PR 2 carries `payroll_runs.create` (New Run, with its integration test and evaluation case) and
   `payroll.search.js` for `payroll_run`; PR 6 adds the five other cards, the reads, the summary and the other providers. **What PR 3 carries** for the same gates: `deductions.ai.js` with the one route "record a salary advance" (Payroll · Deductions, `action=advance`) and `deductions.search.js` for an accepted fine or an advance (a fine still waiting is the sanction's, found with its query); the three cards and the reads of this section stay PR 6's.
@@ -1045,19 +1072,30 @@ ever wanted, the question CLAUDE.md requires ("which job does it use?", the owne
   `statutory_return` and the new `payroll_setting` open Configurations and carry the same reason. So
   `StatutoryRatesSave`, `SalaryGradeSave`, `GradePlacementSave` and `PayComponentsSave` are accounted for and nothing
   is added to `ai-forms-gaps.json`; `PayrollSettingsChange` (payroll's own manifest) and the route "turn on advanced
-  payroll" stay PR 6's to decide.
+  payroll" were PR 6's to decide, and PR 6 decided them (§13.2 item 28).
+- **What PR 6 built (10/11/2026, `m6/ai-search`).** `payroll.ai.js` (the read `payroll.runs`, the summary `payroll.month`, the cards
+  `payroll_runs.submit` and `payroll_adjustments.add` beside `payroll_runs.create`, the routes "run payroll" and "turn on advanced
+  payroll"), `payslips.ai.js` (`payslips.mine`, `payslips.list`, the route "my payslip"), `deductions.ai.js` (`deductions.list`,
+  `deductions.mine`, the cards `deductions.accept`, `deductions.waive` and `advances.record`, the route "record a salary
+  advance"); `payslips.search.js` gained the owner-pinned provider; ⌘K gained the New Run action; the contract gained
+  `PayrollMonthQuery`, `PayrollRunSubmission`, `PayrollRunAdjust`, `FineAccept` and `FineWaive` (Appendix C);
+  `scripts/ai/eval-assistant.js` has a case for each of the six cards, for the reads and the summary and for the two routes;
+  `npm run gen:ai-catalogue` added 13 entries and changed none. The route map had no "not built yet" note left on a Payroll
+  type (PR 2 to PR 5 removed them as they filled each provider). Home's Payroll In Progress card has been live since PR 2
+  (`payroll.source.js`, `OWES` empty) and counts a run until it is Paid; this pull request checks it still does (§3.8).
 - **AI routes** (intent to screen): "run payroll" to Payroll · Payroll Runs with `action=new`; "my payslip" to
   ESS · My Payslips; "record a salary advance" to Payroll · Deductions with `action=advance`; "turn on advanced
   payroll" to Payroll · Configurations.
 - **Search** (`payroll.search.js`, `payslips.search.js`, `deductions.search.js`, each a `recordProvider`):
   `payroll_run` (number, "October 2026 payroll", words payroll, run, salaries), `payslip` (number and the
   person's name; PR 4 carries the provider for `payroll` readers, within their scope, draft and published alike, never an amount; PR 6
-  adds the `owner`-pinned search so a person finds only their own, which needs a link that opens My Payslips; words payslip, pay slip, salary slip),
+  adds the `owner`-pinned provider, the route-map type `payroll_own_payslip` (module `ess`, group My Payslips, a result opens My
+  Payslips), which finds only the person's own published payslips by number or month, whatever their grant; words payslip, pay slip, salary slip),
   `deduction` (the person and reason; words deduction, fine, advance, loan). Screens in
   `src/shared/search/screens.js`: Payroll Runs, Payslips, Deductions and Configurations (words advanced payroll,
   statutory, paye, pension, grades, pay day, salary structure), replacing the Salary Structure and Statutory
-  entries; ⌘K actions New Run, Record Advance. The route-map entries that say "search:none not built yet" lose
-  that note in the PR that fills their provider.
+  entries; ⌘K actions New Run (`action=new` on Payroll Runs, answered by the screen's own New Run, as the route "run payroll" is) and
+  Record Advance. The route-map entries that say "search:none not built yet" lose that note in the PR that fills their provider.
 
 ---
 
@@ -1075,11 +1113,11 @@ Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Payroll · Payroll Runs | The month (desktop subtitle); Staff in Run, Gross, Deductions, Net; the chain Draft, Computed, Submitted, Approved, Paid with who has it now; the problem line "2 blocking, 3 warnings" with Open; Run History (Month, Staff, Gross, Net, Approved By, Status); New Run, Compute Run, Add Adjustment, Submit for Approval, Approve, Send Back, Reject (the approver), Mark Paid, Email All Payslips, Download All, Statutory Report (advanced), Discard | Help term on **Status**: what each status lets people do. On **Blocking**: what stops Submit. On **Adjustment**: a correction to a locked month goes into the next run. On **Send Back**: it releases everything frozen. Each at most 35 words | The freeze at Submit, the recompute and `RUN_CHANGED`, rounding, the working-days divisor, one run a month: §6.8, §6.9, the chapter |
-| Payroll · Payslips | Payslips, Gross, Deductions, Net, Visible to Staff (On approval, then Published); the month's payslips (Employee, Gross, Deductions, Net, Status); a payslip opens in the modal: its lines, Net Pay, Download PDF (`payroll` edit) | Help term on **Preview**: a payslip is a preview until the run is approved. On **Restricted**: the amount needs the salary grant | PDF generation, the restricted file rule, the breakdown's source: §6.10 |
+| Payroll · Payroll Runs | The month (desktop subtitle); the open run's card, titled by its month (October 2026 Run): Staff in Run, Gross, Deductions, Net; the chain Draft, Computed, Submitted, Approved, Paid; Number, Waiting On (who has it now), Submitted By, Approved By, Paid On and Sent Back (the reason) as they apply; the problem line "2 blocking, 3 warnings" with Open (Run Problems: Employee, Problem, Fix, Severity, with Exclude on a person); Adjustments (Employee, Label, Kind, Amount) with Add Adjustment; Left Out (Employee, Reason) with Include; Run History (Month, Staff, Gross, Net, Approved By, Status), a row putting its run in the card; Net Payroll by Month (desktop); New Run, Compute Run, Add Adjustment, Exclude, Submit for Approval, Approve, Send Back, Reject (the approver), Mark Paid, Email All Payslips, Download All, Statutory Report (advanced), Discard | Help term on **Status** (Run History's column): what each status lets people do. On the problem line (**Blocking**): what stops Submit. On **Adjustments**: a correction to a locked month goes into the next run. On Send Back's **Reason**: it releases everything frozen. Each at most 35 words | The freeze at Submit, the recompute and `RUN_CHANGED`, rounding, the working-days divisor, one run a month: §6.8, §6.9, the chapter |
+| Payroll · Payslips | The Month select (the runs, newest first; the open run's month to start); Payslips, Gross, Deductions, Net, Visible to Staff (On approval, then Published); the month's payslips, titled Preview or Published (Employee, Gross, Deductions, Net, Status: Preview, Published, Excluded); Email All Payslips and Download All once the run is approved; a payslip opens in the modal: its lines (its PDF once rendered, Preparing while it renders), Net Pay, Download PDF (`payroll` edit) | Help term on **Preview** (the list's title): a payslip is a preview until the run is approved. On **Restricted**: the amount needs the salary grant | PDF generation, the restricted file rule, the breakdown's source: §6.10 |
 | Payroll · Deductions | Pending Fines, Pending Attendance, Active, Recovered This Year (each opens its list in a pop-up, the ESS rule); the status chips (Pending, Active, Settled, Waived) and the source switch (All, Attendance, Fines, Advances); the list (Employee, Reason, Source, Amount, Month, Status); a row's sheet with Accept This Month, Spread Over Months (Months, Start Month), Waive, Release, Cancel Advance, and for an attendance row Open Attendance; Record Advance (Employee, Amount, Paid On, Months, Start Month, Reason) | Help term on the **Months** field of Spread Over Months and Record Advance: how many months, the first month, equal shares. On **Pending Attendance**: waive these on People · Attendance. On **Release**: only before any share is in a run | Instalment rounding, never your own, the fine and attendance lifecycles: §6.6, queries.md §6.6 |
 | Payroll · Configurations | Payroll Options: Pay Day (30 (default) until set, a change waiting with its day) with Set Pay Day, the Bank Details Required switch, the Advanced Payroll row with its state (On, Off, or On or Off from a day) and its switch; Statutory Items (Item, Type, Rate, Base, Status: In Force, From or Changes a day, Not Set), a row opening Save Rate; PAYE Bands (Band, From, To or No Limit, Rate, Status) with Set Bands, always; when on or once it has been: Conventions (PAYE Basis, Pension Reduces Taxable Pay, NHF Reduces Taxable Pay) with Set Conventions, Bands by Grade, Grades (Grade, Name, Minimum, Maximum, Staff, Outside Band, Status) with Add Grade and Save Grade, Pay Components (Employee, Grade, Monthly Gross, Pay Split, Position, with the chips All, Below Minimum, Above Maximum, Not Placed) whose person opens with their grade and split, Place Person and Set Pay Components | Help term on **Advanced Payroll**: from its date, later runs compute PAYE, pension, NHF, ITF and NSITF; locked runs never change. On **Bank Details Required**: a person with none blocks Submit. On **Pay Day**: 30 unless changed; a day past a month's end is its last day. On **PAYE Basis** (and the PAYE Bands title): annualised or monthly amounts. On **Monthly Gross** in Set Pay Components: the components add up to it. Effective From carries no help: the date field refuses a day before today itself | Why statutory is off by default, how a run picks its mode, the rates' sources, the formula: §6.11, §6.12 |
-| ESS · My Payslips | The year with its ‹ › switch; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; the year's months (Month, Net, Status: Paid, Paid with a deduction, In the run); the picked month's payslip, Download PDF, Email a Copy; Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries) | Help term on **In the run**: the month is waiting for approval | PDF rendering, that no statutory word appears in simple mode: §6.10, ess.md §6 |
+| ESS · My Payslips | The year with its ‹ › switch (from the person's start year to this one) and Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; the year's months (Month, Net, Status: Paid, Paid with a deduction, In the run); the picked month's payslip in the modal (its PDF once rendered, Preparing while it renders), Download PDF, Email a Copy; Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries) | Help term on **In the run**: approved, and the pay is not yet transferred (§13.1 item 28) | PDF rendering, that no statutory word appears in simple mode: §6.10, ess.md §6 |
 | Home · Payroll In Progress | A count of runs not paid, opening the run | Help term on the card's title (as every Home card) | The card's source and mask: home.md §4.1, §3.8 |
 
 ### 10.2 Phone layout
@@ -1090,7 +1128,7 @@ Both tables are read by `scripts/check/guides.js`.
 | Payroll · Payslips | Four figures two to a row, then payslip cards (person, net, status pill) | The Gross and Deductions columns | Download PDF, full width at the foot of a payslip's full sheet; Email All Payslips and Download All in the run's overflow | As above |
 | Payroll · Deductions | Four figures two to a row, then deduction cards (person, reason, amount, status pill) | The Source column, the subtitle | Accept This Month at the foot of a pending fine's sheet, Spread Over Months and Waive beside it | As above |
 | Payroll · Configurations | Pay Day, the Advanced Payroll row, Statutory Items and PAYE Bands as cards; when on, cards for the rest | The band chart, the subtitle, the Base, Minimum, Maximum, Monthly Gross and Pay Split columns | Switch On or Off, opening its date sheet; a person of Pay Components opens in a sheet with Place Person and Set Pay Components | As above |
-| ESS · My Payslips | The year switch (44 px targets), Email a Copy, Download All; the figures two to a row; the months as a list with a status pill | The subtitle; the payslip opens in a modal on desktop and as a full sheet on a phone (F31 as amended, §10.3) | Download PDF at the foot of the month's sheet | ESS tabs |
+| ESS · My Payslips | The year switch (44 px targets) and Download All; the figures two to a row; the months as a list with a status pill | The subtitle, the Gross figure; the payslip opens in a modal on desktop and as a full sheet on a phone (F31 as amended, §10.3) | Download PDF at the foot of the month's sheet, Email a Copy beside it | ESS tabs |
 | Home · Payroll In Progress | The card as every Home card | Nothing | Open the run | Bottom bar Home |
 
 ### 10.3 Components, and the amendments this guide asks for
@@ -1102,9 +1140,9 @@ is added there with `npm run new:component` (header, test and gallery page), nev
 |---|---|
 | The four tabs | The shell catalogue only (`app/src/shell/catalogue.ts`); the screen renders no `Tabs` of its own |
 | Run list, previous runs | `DataView` through `PagedTable` and `ExportAction` (`@/features/shared/sections`), with `StatusPill`, `Money`, `Who`; counts in `StatStrip` or `KpiGrid` and `KpiCard` (`KpiTiles`) |
-| The chain and the approval | `Chain` fed by the workflow instance (the `RouteCard` pattern in `features/expenses/parts.tsx`), `Banner` for the problem line, `ActionGroup` around Approve, Send Back and Reject, the reason through `workflow.ReasonBody`, `useConfirm` before an irreversible press |
-| New Run | `useModal`, `Form`, `Field`, `useContractForm(initial, payroll.PayrollRunCreate)`, `FormFooter`; **a month field is missing from `packages/ui`**: PR 7 adds `MonthField` (`npm run new:component -- --name MonthField --group Forms`) rather than reuse the unbound `features/shared/MonthPicker.tsx` |
-| The payslip | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable` (two columns), `PaperFoot` for the Payroll preview of an unpublished payslip; `DocumentPreview` with `useFileBlob` for a published one (the real PDF, ess.md §6); `ListDetail` with `layout="modal"` |
+| The chain and the approval | `Chain` of the run's five statuses (`stack` on a phone, added to `Chain` in PR 7), Waiting On from the run's own `chain` (the approval's route), `Banner` for the problem line, the run's buttons in its `FormFooter` (one group, so a press makes the others wait), the reason through `workflow.ReasonBody`, `useConfirm` before an irreversible press (Approve Run, Discard Run, Email Again) |
+| New Run | `useModal`, `Field`, `useContractForm(initial, payroll.PayrollRunCreate)`, `FormFooter`, and `MonthField` (Forms), added in PR 7 with `npm run new:component -- --name MonthField --group Forms` rather than reuse the unbound `features/shared/MonthPicker.tsx`: a year's twelve months under a year switch, a popover on desktop and a sheet on a phone, the value the month's first day; New Run caps it at this month |
+| The payslip | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable` (two columns), `PaperFoot` for the Payroll preview of an unpublished payslip, and for a published one until its PDF has loaded (and on the in-browser mock, which holds no file); `DocumentPreview` with `useFileBlob` for a published one (the real PDF, ess.md §6); `ListDetail` with `layout="modal"`, `size="wide"` and `full`; both screens share `features/payroll/parts.tsx` |
 | Email All, Download All | `Button` with `icon="mail"` handing back its work; `ExportAction` (`saveExport`) for Download All |
 | Deductions | `DataView` with `Chips`, `SegmentedControl` for the source, `StatStrip` for the figures (each opens its list in a pop-up), `ListDetail`, `SelectField` for the months and the start month (the months from the summary's `open_period`; twelve choices, so not `ChoiceField`), `EmployeePicker` for the person, `HelpTerm`; mirror `features/attendance/PayItems.tsx` |
 | Configurations | `ToggleRow` or `Switch`, `Card` and `CardHeader`, `KeyValue`, `DataView`, `BandChart`, `MoneyField`, `DateField min={todayIso()}`, `Banner`, `Details` or `HelpTerm` for support text |
@@ -1115,11 +1153,11 @@ is added there with `npm run new:component` (header, test and gallery page), nev
 1. **F31 for Payroll · Payslips and ESS · My Payslips.** A payslip opens in the shared Modal at every width (the
    centred dialog on desktop, a bottom sheet on a phone), as an Expenses record does, because TB asked for "a modal"
    (4 Nov) and JBS Praxis settled both screens on 08/11/2026 (§13.1 item 18). Both use `ListDetail` with
-   `layout="modal"`; ESS · My Payslips stops placing the payslip beside its list on wide screens. Record the amendment
-   where the Expenses one is recorded.
+   `layout="modal"`; ESS · My Payslips stops placing the payslip beside its list on wide screens. Recorded 11/11/2026
+   (PR 7) in FRONTEND_FOUNDATION F31, FRONTEND_GUIDE §7 and CLAUDE.md, beside the Expenses one.
 2. **The Advanced Payroll switch opens a form.** FRONTEND_GUIDE §8.1 says a setting that applies at once is a
    switch that saves on change; this one needs an effective date, so pressing it opens a small form with the
-   date and saves on Switch On.
+   date and saves on Switch On (built with Configurations in PR 5).
 
 **What the prototype taught.** Its explainer cards (`ChainCard note`, `KvCard` rows such as "Automatic? No"), the
 footnote under a payslip, `<Button disabled>`, a toast over eight words, a client-computed period
@@ -1128,19 +1166,23 @@ place in the agreed design are all rebuilt, not kept.
 
 ### 10.4 Words
 
-Titles: Payroll Runs, Payslips, Deductions, Configurations, My Payslips. Cards: Run History, This Run,
-Pending Deductions, Statutory Items, PAYE Bands, Conventions, Bands by Grade, Pay Components. Buttons: New Run, Compute Run,
-Add Adjustment, Exclude, Submit for Approval, Approve, Send Back, Reject, Mark Paid, Email All Payslips,
+Titles: Payroll Runs, Payslips, Deductions, Configurations, My Payslips. Cards: Run History, the open run's card by its
+month (October 2026 Run; This Run with no run open), Adjustments, Left Out, Run Problems (a pop-up), Preview and Published
+(the month's payslips), 2026 Payslips (My Payslips), Salary Deductions (a pop-up), Pending Deductions, Statutory Items, PAYE Bands, Conventions, Bands by Grade, Pay Components. Buttons: New Run, Open Run, Compute Run,
+Add Adjustment, Exclude, Exclude Person, Include, Submit for Approval, Approve, Approve Run, Send Back, Reject, Reject Run,
+Discard Run, Email Again, Remove Adjustment, Mark Paid, Email All Payslips,
 Download All, Download PDF, Email a Copy, Statutory Report, Accept This Month, Spread Over Months, Waive,
 Release, Record Advance, Cancel Advance, Switch On, Switch Off, Save Rate, Save Grade, Set Pay Day, Set Bands, Save Bands,
 Add Band, Remove Band, Set Conventions, Add Grade, Place Person, Set Pay Components, Save Components, Add Component, Remove
 Component. Cards on Configurations: Payroll Options, Statutory Items, PAYE Bands, Conventions, Bands by Grade, Grades, Pay
 Components. Chips and statuses:
-Draft, Computed, Submitted, Approved, Paid; Pending, Active, Settled, Waived; Preview, Published; In the run; In Force, Not
+Draft, Computed, Submitted, Approved, Paid; Pending, Active, Settled, Waived; Preview, Published, Excluded, Preparing; Paid, Paid
+with a deduction, In the run; Blocking, Warning; In Force, Not
 Set, Below Minimum, Within Band, Above Maximum, Not Placed.
 Field errors (at most 4 words): Pick a month, Enter an amount, Give a reason, Pick a start month, Date too early.
-Toasts (at most 8 words): "Run opened for October 2026", "Run computed", "Sent for approval", "Payslips are being
-emailed", "Deduction scheduled", "Advance recorded", "Pay day saved", "Rate saved", "PAYE bands saved", "Grade saved", "Person
+Toasts (at most 8 words): "Run opened for October 2026", "Run computed", "Sent for approval", "October 2026 approved", "Run
+sent back", "Run rejected", "Run marked paid", "Run discarded", "Adjustment added", "Adjustment removed", "Payslips are being
+emailed", "Payslips downloaded", "Sent to your work email", "Deduction scheduled", "Advance recorded", "Pay day saved", "Rate saved", "PAYE bands saved", "Grade saved", "Person
 placed", "Pay components saved". Money is `₦450,000.00` (`formatMoney`), a month "October
 2026" (`formatMonth`), a date "08/11/2026" (`formatDate`).
 
@@ -1169,8 +1211,11 @@ placed", "Pay components saved". Money is `₦450,000.00` (`formatMoney`), a mon
 - **A second run for a month** is a 409; a run for next month is a 422 until that month begins.
 - **A button pressed twice** is one request (F26). A repeated Mark Paid or Compute is idempotent or a 409, never a
   second effect; Email All twice sends nothing again unless Email Again was chosen.
-- **PDF not rendered yet.** ESS shows Preparing and disables Download PDF until `GET …/pdf` stops answering
-  `NOT_READY`; a failed render is retried by the document engine and shows in System Health.
+- **PDF not rendered yet.** Both payslip screens show Preparing, with no Download PDF, until the payslip's `pdf_ready` is
+  true (`GET …/pdf` stops answering `NOT_READY`); the slip is drawn from its lines meanwhile. A failed render is retried by
+  the document engine and shows in System Health.
+- **A decision lands after it commits.** Approve, Send Back and Reject reach the run through the approval's outbox
+  handlers (§7), so the screen waits, ten seconds at most, until the run has left Submitted before it reads it again.
 - **An employee who has left** cannot sign in, so reads their payslips through the HR document route, not ESS;
   their last run still publishes and emails to the work address while it exists.
 - **A fine accepted for a person who then leaves** is recovered in their final run (§6.6 rule 9); the part that
@@ -1292,6 +1337,10 @@ Binding; never re-opened. Timestamps are the meeting's transcript.
     second unpaid type.
 27. **My Payslips (#11) keeps its Owner, AJ** (JBS Praxis, 09/11/2026): LA builds the screen in PR 7 under AJ's review
     (item 22); the Owner column of the other Payroll rows is LA's.
+28. **My Payslips' In the run means approved, not yet paid** (JBS Praxis, 11/11/2026, answering §13.3's question 2 for
+    PR 7): the API keeps listing published payslips only (§5, §6.10 rule 3 unchanged), so a month still with the CEO has
+    no row; a published payslip whose run is `approved` and not `paid` reads In the run, its help "Approved. The pay is
+    not yet transferred." No contract or backend change.
 
 ### 13.2 Decided in writing this guide (change here if wrong)
 
@@ -1348,18 +1397,32 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
     is one version, never a refusal. The past is never rewritten: every change starts today or later.
 27. **The statutory report is of an approved or paid run** (the `published` guard): its figures are locked before they
     are reported.
+28. **The advanced switch, the pay day and the bank rule are not a card** (PR 6): `PayrollSettingsChange` is one version of the
+    setting, saved from a date with the statutory rates in force and the accountant's three conventions in view, so Praxis AI
+    opens Configurations (the route "turn on advanced payroll") and the person saves it there, as it does a role's grants
+    (praxis-ai.md decision 35). It is not a create or edit form by name, so gate 23 asks for no reason for it.
+29. **A card names the record it acts on** (PR 6): the screen's button on a run or a fine never names it, so Submit, Add
+    Adjustment, Accept and Waive take a card schema, the form's own fields with the record beside them (`PayrollRunSubmission`,
+    `PayrollRunAdjust`, `FineAccept`, `FineWaive`), as praxis-ai.md §6.11 asks of an edit form's card. The screens' own request
+    schemas are unchanged.
+30. **A person's own pay is never masked from them in the assistant** (PR 6, §9): `payslips.mine` and `deductions.mine` carry the
+    amounts under names the salary mask does not govern, because the engine masks every row it reads and the Employee role
+    hides salaries by default. `payroll.month`, a summary, leaves the amounts out for a reader whose role hides pay.
+31. **A person's own payslip is found in ⌘K through its own type** (PR 6): `payroll_own_payslip` (module `ess`, owner-pinned,
+    published only), beside `payslip` for Payroll readers, as My Temporary Sites sits beside Temporary Sites; the assistant cites an
+    own payslip and an own instalment with it and `payroll_own_deduction` so the link opens My Payslips.
 
 ### 13.3 Still open
 
 | # | Question | Decides | Needed before | Meanwhile |
 |---|---|---|---|---|
 | 1 | Sign-off of the payslip sample (§13.1 item 20) | TB shows Cynthia | PR 4 | The sample is the draft in `docs/MyCity-ERP-Documents/payroll-samples/`; PR 4 built `templates/documents/payslip.html` from it as drafted (the letterhead supplies the logo, the organisation's line and the date; the number, the month and the person's block are in the body) and it is changed when MyCity answers |
-| 2 | What My Payslips' **In the run** means (§5, §10.1; `docs/guides/ess.md` §6, §13) | TB with AJ and LA | PR 7 | §5 and §6.10 rule 3 say the person sees nothing before approval, so `GET /ess/payslips` lists published payslips only and a month still in the approval has no row; §10.1's help text and the ESS guide's edge case say In the run is "waiting for approval". PR 4 returns each payslip's run status (`approved`, `paid`) and `has_deduction`, so a published payslip whose run is `approved` and not yet `paid` can read In the run (the money not yet transferred); if the person should also see a month that is still in the approval, the API needs a row with no figures, which is a change to §6.10 rule 3 |
 
 Answered and moved to §13.1: the approver (item 7), a leaver's instalments and a negative net (16), recurring
 allowances (17), the ESS modal (18), staging mail (19), the statutory rates, the accountant's conventions, the pay day
 and every person's salary and bank details as configuration (21), who builds the screens (22), when Written is
-ticked (23), where the first statutory rates are entered (25), the unpaid flag on leave types (26) and #11's Owner (27).
+ticked (23), where the first statutory rates are entered (25), the unpaid flag on leave types (26), #11's Owner (27) and
+what My Payslips' In the run means (28).
 
 ---
 
@@ -1502,6 +1565,11 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
 - Verify the definition of done's notices: a submitted run produces in-app, push and email for the approver, and
   each link opens the same screen, with a test.
 - Done when: gates 9, 10, 19 and 23 pass with payroll's controller filled; no M6 form on `ai-forms-gaps.json`.
+- **Built 10/11/2026 (`m6/ai-search`), no screen.** The request that opened this pull request asked for the screens on desktop and
+  phone; Appendix A's PR 6 has none and PR 7 is LA's (§13.1 item 22), so the guide was followed, as PR 2 and PR 4 did. The
+  cards, the reads, the summary and the search results link to screens that exist (Payroll Runs, Payslips, Deductions,
+  Configurations, My Payslips); the New Run action and the route "run payroll" open Payroll Runs on `action=new`, which the
+  rebuilt screen answers in PR 7. §9 says what was built; §13.2 items 28 to 31 what was decided.
 
 ### PR 7 · Frontend (`m6/screens`) · LA
 
@@ -1512,6 +1580,26 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   form through `useContractForm` with its schema; the PR body's Native app feel section.
 - Gates: `npm run fe:typecheck`, `fe:lint`, `fe:test`, `fe:build`; the screen gates at 390 and 1440 px.
 - Done when: every screen of §2 works on the real API on both shells and the PROGRESS UI and Mobile columns are ticked.
+- **Built 11/11/2026 (`m6/screens`), no contract or backend change.** Every route the screens call was already built (PR 2
+  to PR 6), and JBS Praxis answered §13.3's question 2 without one (§13.1 item 28). `features/payroll/index.tsx` is the
+  switch over `PayRuns.tsx`, `PaySlips.tsx` and the `Deductions.tsx` and `Configurations.tsx` of PR 3 and PR 5;
+  `parts.tsx` holds what Payroll Runs, Payslips and My Payslips share (the status words, Restricted, the payslip drawn from
+  its lines or as its PDF); `ess/Payslips.tsx` is rebuilt on it. `MonthField` is in `packages/ui` (Forms) and `Chain`
+  gained `stack`. The mock (`api/mock/modules/payroll.ts`, `payslips.ts`) now holds runs, problems, adjustments, exclusions,
+  the CEO's decisions, publication and the ESS routes in the contract's shapes, with the API's refusals; Send Back reaches
+  it through the expenses mock's `request-changes`, the one such route the mock has. `app/src/api/types/payroll.ts` was
+  already retired in PR 5. Every form is `useContractForm` with the contract's schema (or that schema with the person
+  picker checked beside it). The screens open a record their link names (`id`): a run, a payslip; My Payslips opens a
+  linked payslip once it is the person's own and Salary Deductions for a deduction's or an instalment's link (the route
+  map's `deduction` and `payroll_own_deduction` carry those ids). Checked on the real API (a local database with the mock's
+  25 people, their pay set through the API, the worker rendering PDFs) on desktop and phone: New Run, Compute, Submit,
+  the CEO's Approve, publication with the PDFs, Email All, My Payslips' PDF, Download PDF and Email a Copy. That check found
+  two faults the mock could not show: a decision reaches the run after it commits, so Approve, Send Back and Reject now
+  wait for it (§11); and the money fields of Add Adjustment, Record Advance (PR 3) and Configurations' rate, PAYE band,
+  grade and pay split forms (PR 5) sent the amount as typed, which the contract's two-place amounts refuse ("50000" is
+  "Enter an amount"), so each now sends it through `toMoneyString`. Deductions and Configurations were also checked on the
+  real API (Record Advance, Set Pay Day). Tests: `features/payroll/Payroll.test.tsx` (10), `features/ess/Payslips.test.tsx`
+  (5), `form/MonthField.test.tsx` (7) and `display/Chain.test.tsx` (5).
 
 ### PR 8 · Staging seed, User Guide and release check (`m6/release`)
 
@@ -1561,7 +1649,9 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 - `payroll.js`: `PayrollRun`, `PayrollRunListQuery`, `PayrollRunPage`, `PayrollRunSummary`, `PayrollRunCreate`,
   `PayrollRunSubmit`, `PayrollRunPaid`, `PayrollRunExclude`, `PayrollRunInclude`, `PayrollProblem`, `PayrollProblemPage`,
   `PayrollAdjustment`, `PayrollAdjustmentPage`, `PayrollAdjustmentParams`, `PayrollAdjustmentAdd`, `PayrollSettings`, `PayrollSettingsChange`,
-  `PayslipEmailAll`; and the pieces they are made of: `RunStatus`, `AdjustmentKind`, `PayeBasis`,
+  `PayslipEmailAll`; the assistant's (PR 6): `PayrollMonthQuery` (the `payroll.month` summary's month), `PayrollRunSubmission` and
+  `PayrollRunAdjust` (the cards of Submit for Approval and Add Adjustment: the screen's request with the run beside it); and the
+  pieces they are made of: `RunStatus`, `AdjustmentKind`, `PayeBasis`,
   `ProblemSeverity`, `ProblemCode`, `PayrollRunCounts`, `PayrollTrendMonth`, `PayrollSettingsVersion`.
 - `payslips.js`: `Payslip`, `PayslipLine`, `PayslipDetail`, `PayslipListQuery`, `PayslipPage`, `PayslipVars`,
   `PayslipBatchVars`, `EssPayslipQuery`, `EssPayslipSummary`, `EssDeductionRow`, `EssDeductionPage`; and
@@ -1570,7 +1660,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   variables), `PayslipPrintedLine`,
   `PayslipStatus`, `PayslipLineKind`, `PayslipLineCode`, `EssDeductionSource`.
 - `deductions.js`: `DeductionRow`, `DeductionListQuery`, `DeductionPage`, `DeductionSummary`, `FineParams`, `DeductionAccept`,
-  `DeductionWaive`, `AdvanceRecord`, `AdvanceCancel`; and `DeductionFigure`, `DeductionSource`, `DeductionStatus`
+  `DeductionWaive`, `AdvanceRecord`, `AdvanceCancel`; the assistant's (PR 6): `FineAccept` and `FineWaive` (the cards of Accept
+  Deduction and Waive Fine: the sheet's request with the fine beside it); and `DeductionFigure`, `DeductionSource`, `DeductionStatus`
   (a row's status on the tab), `DeductionState` (a `payroll_deduction`'s own) and `InstalmentStatus`.
 - `salary_structure.js` (PR 5): `SalaryGrade`, `SalaryGradeListQuery`, `SalaryGradePage`, `SalaryGradeSave`,
   `GradePlacement`, `GradePlacementListQuery`, `GradePlacementPage`, `GradePlacementSave`, `PayComponent`,
@@ -1610,6 +1701,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 11/11/2026 · JP · PR 7 (the screens, `m6/screens`) rebuilt Payroll Runs and Payslips and ESS · My Payslips on the contract and the real API, with `MonthField` in `packages/ui`; the guide meets what was built. §13.3's question 2 answered by JBS Praxis and moved to §13.1 item 28 (In the run is approved, not yet paid; no API change), §5's pointer with it. §2: Payroll Runs lists Include, Payslips its Month select and the run's mail and download. §10.1 to §10.4: what each screen now shows (the open run's card by its month, Waiting On, Adjustments, Left Out, Run Problems; the Payslips list titled Preview or Published; My Payslips' year from the start year, Email a Copy with Download PDF in the payslip's modal), the components as built (`MonthField`, `Chain stack`, the slip drawn from its lines until its PDF loads) and the words added. F31's amendment for both payslips recorded in FRONTEND_FOUNDATION, FRONTEND_GUIDE §7 and CLAUDE.md (§10.3). §11: Preparing has no Download PDF; a decision lands after it commits and the screen waits for it. §9: New Run's `action=new` is answered. Every money field of the four tabs sends a two-place amount (`toMoneyString`), as the contract asks. Appendix A PR 7 says what was built.
+- 10/11/2026 · JP · PR 6 (AI, search, Home and notices, `m6/ai-search`) built `payroll.ai.js`, `payslips.ai.js`, `deductions.ai.js`, the owner-pinned payslip search and the New Run action; the guide meets what was built. Contract: `PayrollMonthQuery`, `PayrollRunSubmission`, `PayrollRunAdjust`, `FineAccept`, `FineWaive` (§9, Appendix C). §9: the reads, the summary and the six cards as built, each card risk `payroll`, asked first, named by its chip and held again at the press by its own `check`; the cards of Submit, Add Adjustment, Accept and Waive take a card schema because the screen's button never names the run or the fine (§13.2 item 29); Submit's card carries the net the person saw so `RUN_CHANGED` still guards the total; `payslips.mine` and `deductions.mine` carry the amounts under names the salary mask does not govern, because the engine masks every row it reads and the Employee role hides salaries by default (§13.2 item 30), while `payroll.month` leaves the amounts out for a reader whose role hides pay; the advanced switch, the pay day and the bank rule are not a card, the route "turn on advanced payroll" opens Configurations (§13.2 item 28); a person's own payslip is found in ⌘K as `payroll_own_payslip` and cited with `payroll_own_deduction`, both opening My Payslips (§13.2 item 31); ⌘K gained New Run. §7: the Submit notice is checked in the bell, by push and by email, each link opening Payroll Runs on the run. Home's Payroll In Progress card was live since PR 2 and its test still holds. No screen was built: Appendix A's PR 6 has none and PR 7 is LA's.
 - 10/11/2026 · JP · PR 5 (Configurations and the advanced option, `m6/advanced`) built `statutory` (`.rates`, `.report`, `.repo`, `.service`, `.controller`, `.routes`, `.events`) and `salary_structure` (`.repo`, `.service`, `.controller`, `.routes`, `.events`), `/payroll/settings`, `/payroll/runs/:id/statutory-report`, `payroll.calc.computeStatutory` and the pay split in Compute, migration `6020`, `templates/documents/statutory-report.html` and the Configurations screen; the guide meets what was built. Contract: `GET /statutory/items` (`StatutoryItems`, the seven items in brief) and the pieces listed in Appendix C (§5). Data (§4.1, §4.2): `payslip_line.base_amount`; versions never overlap through two unique indexes a key and the one write path, not an exclusion constraint (no `btree_gist`); `statutory_rate.rate` is `NOT NULL DEFAULT 0` and a row's kind and band are held to its item. `shared/db/effective-dated` gained `replace` (a change for a day that already has a version joins it) and `addVersionSet` (a version of several rows). Rules: §6.11 rule 6 (a split used only while it adds up to the gross; each component a Monthly Pay line), §6.12 rules 8 to 10 (the bases, PAYE's shape, what a run keeps), §6.15 (No Rates Set reads the snapshot, No Pay Split a Monthly Pay line with no component), §13.2 items 24 to 27. The report is of an approved or paid run and refused to a reader whose role hides pay or tax numbers (§5). Errors `EFFECTIVE_IN_THE_PAST`, `VERSION_EXISTS`, `SPLIT_NOT_GROSS`, `NO_SALARY`, `GRADE_NOT_IN_FORCE` (§5). Events `grade_placement.saved` and `payroll_run.statutory_report_requested` (§7). Gates 9, 10 and 23: the two controllers say `ai:none design:` and `search:none`, the route map's three configuration types open Configurations (§9). The salary mask names `band_minimum`, `band_maximum` and `band_position` (§6.13). The screen was built in this pull request at JBS Praxis's request (Appendix A, PR 5); §10.1, §10.2 and §10.4 say what it shows, and Effective From carries no help term (the date field refuses a past day itself). The employee's tax and pension numbers are on the API (`PATCH /employees/:id`, the 360) and not yet on People · Employees' form.
 - 09/11/2026 · JP · PR 4 (payslips, the PDF, email and ESS, `m6/payslips`) built `payslips.repo/.service/.breakdown/.pdf/.events/.controller/.routes/.search`, `ess.earnings.js` and the ESS routes, the pay-date helpers in `payroll.config.repo.js`, the two document templates and the mail; the guide meets what was built. Contract: `PayslipLineParams`, `PayslipEmailQueued`, `PayslipCopySent` and `PayslipReadyEmailVars` added (§5, Appendix C); the routes of Email All and Download All stay on the run (§5) and answer 202 with `PayslipEmailQueued` and `ExportFile`. New errors `EMAIL_TOO_SOON` (a copy within a minute of the last mail of a payslip, Email All counting) and `NO_PAYSLIPS` (§5). A sixth write guard `published` (an approved or paid run) is added to the lock, and the five writes that belong on a run that is out (Email All, a payslip's mail, its un-marking, a copy and Download All) are made with it and held by the enumerating test (§6.9 rule 4). The lock requests every payslip's PDF in its own transaction with no actor, so the approver is never the uploader of a person's payslip; 306 requested in 957 ms, so no render job of ours (§6.10 rule 4). Email All marks each payslip emailed in its own transaction and the `payslip.emailed` it records queues the mail (one path for both Email All and Email a Copy), so the handler of §7 marks and the mail is queued by `payslips.mail`; the new events are `payroll_run.email_requested`, `payroll_run.export_requested`, `payslip.emailed` and `payslip.export_requested` (§7). A payslip's PDF and Download All are refused to a reader whose role hides `employee.salary` or `employee.bank` unless the payslip is their own, since the document carries both (§6.10 rule 4, §6.13 rule 3). `GET /ess/payslips/summary` sums the year's published payslips and Next Payday is the first pay date on or after today whose month's run is not paid, with the pay day in force at that month's end (§5, §6.11 rule 1). Gates 9 and 10 hold a filled controller to an AI manifest and a search provider: `payslips.controller.js` carries `ai:none` until PR 6 writes the reads, and `payslips.search.js` answers for `payroll` readers (§9). §13.3 gains question 2: what My Payslips' In the run means, since §5 (published only) and §10.1 (waiting for approval) read differently. The staff app's typecheck refuses an INTERIM entry the contract also declares, so, as PR 2 did for Payroll Runs, the Payslips tab and My Payslips prototype screens and their mock now read the contract's shapes (`Payslip`, `PayslipDetail`, `EssPayslipSummary`, `EssDeductionRow`) and call `/payslips` and `/ess/payslips`; their layout, their placeholders for the PDF and Download All, and everything §10 asks for stay PR 7's, and the API row stays unticked in PROGRESS until PR 7 so the tabs do not open on staging as a half-built prototype.
 - 09/11/2026 · JP · PR 3 (deductions, `m6/deductions`) built `deductions.repo/.acceptance/.service/.controller/.routes/.events/.ai/.search`, the Deductions screen and its mock; the guide meets what was built. Contract: `DeductionRow.salary_set` (an attendance item priced for a person with no gross has a null amount that is not the mask's, so the screen says No Salary Set and never Restricted), `DeductionSummary.open_period` (the screen works out no month, §6.6 rule 2) and `FineParams` (the path of a fine's Accept and Waive), §5 and Appendix C. Rules: a start month is the open month or later and no month of a deduction may already have a run sent for approval (422 `START_NOT_ALLOWED`), and a total too small for a kobo a month is refused (422 `TOO_MANY_MONTHS`) (§6.6); a write takes the runs of the months it touches before its own rows, in the order a run's lock takes them, so a Compute or a Submit never reads between a write and its commit (`payroll.lock.lockMonths`); errors `NOT_A_FINE`, `NOT_AN_ADVANCE`, `NOT_ACTIVE` and `GRANTED_IN_THE_FUTURE` added to §5. The list opens pending first and then newest by a default sort the contract does not name. Events: an advance recorded is `payroll_deduction.accepted` with its source, a cancelled advance tells no one, the waiting notice has a `dedup_key` (§7); the route map's `deduction` opens ESS · My Payslips for the person told. Gates 9 and 10 carry `deductions.ai.js` (one route) and `deductions.search.js` from the day the controller is filled, as for PR 2 (§9). The screen was built in this pull request at JBS Praxis's request (Appendix A, PR 3); the rest of PR 7 is unchanged.

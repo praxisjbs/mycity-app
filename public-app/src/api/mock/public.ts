@@ -802,6 +802,7 @@ const record = (reference: string, title: string, people: SignerView[], content:
   signed_outside: false,
   content,
   artifact,
+  certificate: null,
   ...extra,
 });
 const VERIFY = new Map<string, VerifyResult>(
@@ -821,6 +822,15 @@ VERIFY.set(
 VERIFY.set(
   "AGR-2026-0002",
   record("AGR-2026-0002", "Memorandum of Understanding: Ibadan Book Fair", [{ name: "Funke Ade", title: "Chair", role: "partner", status: "signed", signed_at: "2026-08-02T11:00:00.000Z", method: "paper" }], "matches", "matches", "agreement", { record_status: "expiring", signed_outside: true }),
+);
+// A training certificate (docs/guides/knowledge.md §6.10): its number alone shows the holder, the
+// course and the publisher who signed it; an invented person.
+VERIFY.set(
+  "CERT-2026-0019",
+  record("CERT-2026-0019", "Data Protection and the NDPA", [{ name: "Kelechi Nwosu", title: "Head, Operations & People", role: "mycity", status: "signed", signed_at: null, method: null }], "matches", "matches", "training_certificate", {
+    issued_at: "2026-11-30T14:05:00.000Z",
+    certificate: { holder_name: "Ifunanya Adaobi Bello", course_number: "TRN-0004", course_title: "Data Protection and the NDPA", completed_on: "2026-11-30", items: 6, minutes: 120 },
+  }),
 );
 route("GET /api/public/v1/verify/:ref", (req) => {
   const r = VERIFY.get(req.params.ref.trim().toUpperCase());

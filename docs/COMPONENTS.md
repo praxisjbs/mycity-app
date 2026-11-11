@@ -122,6 +122,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped. | stable |
+| Forms | [MonthField](#monthfield) | `MonthField` | A month picked from a year's twelve, bound to a form: the field reads "October 2026" and the value is the month's first day for the wire. | beta |
 | Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
@@ -148,6 +149,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file and saves it on the device that pressed, once the worker has made it. | stable |
 | Data | [FormatButton](#formatbutton) | `FormatButton` | A button that makes one file in a format: the format straight away when there is one, a choice of formats when there are two or more. | stable |
 | Data | [Kanban](#kanban) | `Kanban`, `KanbanCardBody` | A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19). | stable |
+| Data | [OrderList](#orderlist) | `OrderList` | Rows a person keeps in an order they set: dragged by their handle on desktop, and moved with Move Up and Move Down in each row's menu on both shells. | beta |
 | Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
 | Charts | [AreaChart](#areachart) | `AreaChart` | A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter. | stable |
@@ -170,6 +172,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
 | Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, tables, bold, italic, links), drawn as elements, never as injected HTML. | beta |
+| Documents | [VideoPlayer](#videoplayer) | `VideoPlayer` | A video inside a page, nothing loaded until Play Video is pressed: a YouTube video through YouTube's privacy-enhanced domain, or an uploaded MP4 fetched with the session. | beta |
 | Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
 | Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
 | Maps | [PlaceSearch](#placesearch) | `PlaceSearch` | Finds an address through our own API and hands back the place with its coordinates. | stable |
@@ -939,7 +942,7 @@ An approval route: the steps already done, the one in hand, and what is still to
 |---|---|
 | Use | Above a record that waits on people (an expense claim, a leave request, a requisition, an offer). |
 | Avoid | What has already happened with dates (use Timeline); a progress figure (use ProgressBar or Meter); more than six steps. |
-| Phone | The steps wrap onto as many lines as they need; the arrows stay between them, never a sideways scroll. |
+| Phone | The steps wrap onto as many lines as they need; the arrows stay between them, never a sideways scroll. With `stack` they sit one under another, an arrow down between each (a payroll run's five statuses on a phone). |
 | Accessibility | An ordered list whose current step says so in words, so the state is never the colour of a pill alone. |
 | Status | stable |
 | Exports | `Chain` |
@@ -954,6 +957,7 @@ An approval route: the steps already done, the one in hand, and what is still to
 |---|---|---|---|
 | `steps` | `ChainStep[]` | yes | The steps, first to last. |
 | `label` | `string` |  | Names the route for screen readers; "Approval route" unless set. |
+| `stack` | `boolean` |  | The steps one under another, an arrow down between each, where a row would wrap: a phone's list of statuses. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3891,6 +3895,44 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 <MoneyField {...form.field("amount")} />
 ```
 
+### MonthField
+
+A month picked from a year's twelve, bound to a form: the field reads "October 2026" and the value is the month's first day for the wire.
+
+| | |
+|---|---|
+| Use | Every month a person enters in a form: a payroll run's month (New Run), a period that is a whole month. The contract's `monthStart` is the rule it meets. |
+| Avoid | A day (use DateField); a month stepped through on a screen that is not a form, such as a calendar's month (a screen's own switch); <input type="month"> (the browser draws it, gate 21). |
+| Phone | The months open in a bottom sheet titled by the field's label, three to a row, each a 44 px target; the year switch sits above them. |
+| Accessibility | The button is named by its Field's label and the month it holds, and says it opens a dialog. Each month is a button named by its month and year, pressed when it is the value; months outside min and max are disabled, and the year arrows stop at their years. |
+| Status | beta |
+| Exports | `MonthField` |
+| Import | `import { MonthField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/MonthField.tsx` |
+| Test | `packages/ui/src/form/MonthField.test.tsx` |
+| Gallery | `packages/ui/src/form/MonthField.gallery.tsx` (`npm run gallery`, `#/MonthField`) |
+
+**MonthField** props (`MonthFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The month as its first day, ISO (2026-10-01), or "" for none. |
+| `onChange` | `(iso: string) => void` | yes | Called with the first day of the month picked. |
+| `onBlur` | `() => void` |  | Called when the months close, so the form checks the field as it would on leaving an input. |
+| `min` | `string` |  | The earliest month that may be picked: any ISO date in it. |
+| `max` | `string` |  | The latest month that may be picked: any ISO date in it. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id; the Field supplies one otherwise. |
+| `name` | `string` |  | The field's name, so a failed submit can focus it. |
+| `placeholder` | `string` |  | What the button reads with no month: a format example, at most 3 words. |
+| `disabled` | `boolean` |  | Shown and not changed: the months do not open. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<Field label="Month" {...form.status("period")}><MonthField min="2024-01-01" max={todayIso()} {...form.field("period")} /></Field>
+```
+
 ### MoreFields
 
 The fields a form rarely needs, closed under one More row until the person opens it.
@@ -4952,6 +4994,37 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 <Kanban columns={stages} onMove={(card, from, to) => move(card, to)} onOpen={openRecord} empty={<EmptyState title="No Tasks Yet" />} />
 ```
 
+### OrderList
+
+Rows a person keeps in an order they set: dragged by their handle on desktop, and moved with Move Up and Move Down in each row's menu on both shells.
+
+| | |
+|---|---|
+| Use | A short ordered set a person arranges: a course's items, a form's steps, a route's stops (up to about 40 rows). |
+| Avoid | A server-paged list of records (DataView); stages a card moves between (Kanban); picking and ordering cards for a row (CardPicker); dragging as the only way to move a row. |
+| Phone | No dragging (F19): each row's menu opens as an action sheet with Move Up and Move Down beside the row's own actions; every menu button is a 44 px target. |
+| Accessibility | An ordered list named by `label`. Move Up and Move Down are real menu items named for their row, so a keyboard and a screen reader reorder without dragging; a polite status reads a row's new place. While a move is on its way the list says aria-busy and every menu stays focusable but does not open (F26). |
+| Status | beta |
+| Exports | `OrderList` |
+| Import | `import { OrderList } from "@mycity/ui";` |
+| File | `packages/ui/src/data/OrderList.tsx` |
+| Test | `packages/ui/src/data/OrderList.test.tsx` |
+| Gallery | `packages/ui/src/data/OrderList.gallery.tsx` (`npm run gallery`, `#/OrderList`) |
+
+**OrderList** props (`OrderListProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `OrderListItem[]` | yes | The rows, in their order. |
+| `label` | `string` | yes | Names the list for assistive technology ("Course Items"). |
+| `onMove` | `(key: string, to: number) => unknown` |  | Moves a row to a new place (0 is the top). Hand back the work (a promise) and the list waits until it settles. Without it the order is fixed and nothing drags. |
+| `empty` | `ReactNode` |  | What shows when there are no rows. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<OrderList label="Course Items" items={items.map((i) => ({ key: i.id, name: i.title, content: <ItemRow item={i} />, menu: [{ label: "Edit Item", icon: "edit", onSelect: () => edit(i) }] }))} onMove={(key, to) => reorder(key, to)} />
+```
+
 ### Pager
 
 Page controls under a list, showing the server's true total ("312 employees") and Previous and Next.
@@ -5734,6 +5807,36 @@ Formatted text the server sent as blocks (headings, paragraphs, lists, tables, b
 
 ```tsx
 <RichText blocks={version.body} top={3} />
+```
+
+### VideoPlayer
+
+A video inside a page, nothing loaded until Play Video is pressed: a YouTube video through YouTube's privacy-enhanced domain, or an uploaded MP4 fetched with the session.
+
+| | |
+|---|---|
+| Use | A course's video item (ESS · My Training), a short walkthrough a page plays in place. |
+| Avoid | A chat's or a document list's video opened full screen (MediaViewer); a video's first frame in a list (MediaTile); any site but YouTube in a frame (open it in a new tab). |
+| Phone | Full width at 16:9, with Play Video a 44 px target in the middle; the video's own controls play it, and full screen is the phone's. |
+| Accessibility | The player is named by `title`: Play Video's name carries it, and the frame and the video are labelled by it (no title tooltip). Nothing plays or loads by itself; while an MP4 arrives the box says aria-busy, and one that fails says so in words with Try Again. |
+| Status | beta |
+| Exports | `VideoPlayer` |
+| Import | `import { VideoPlayer } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/VideoPlayer.tsx` |
+| Test | `packages/ui/src/documents/VideoPlayer.test.tsx` |
+| Gallery | `packages/ui/src/documents/VideoPlayer.gallery.tsx` (`npm run gallery`, `#/VideoPlayer`) |
+
+**VideoPlayer** props (`VideoPlayerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | yes | The video's title: the player's accessible name, and the line over its Play button. |
+| `youtubeId` | `string \| null` |  | A YouTube video's id (the API reads it from the link): it plays from youtube-nocookie.com. |
+| `load` | `() => Promise<Blob>` |  | An uploaded video's bytes, fetched with the session only when Play Video is pressed (an MP4). Key the player by the video, so another one starts again from its poster. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<VideoPlayer key={item.id} title="Why Data Matters" youtubeId="dQw4w9WgXcQ" />
 ```
 
 ## Maps

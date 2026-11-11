@@ -355,7 +355,9 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   opens its records in the centred dialog on desktop at every width too: `ListDetail`'s modal
   layout (F31 amended 04/11/2026, AJ). So does Recruitment, every tab but Talent Pool: Vacancies,
   Candidates, Assessments, Interviews, Offers and, once built, Onboarding (F31 amended 08/11/2026 and
-  11/11/2026, GE).
+  11/11/2026, GE). So do both payslips, Payroll · Payslips and ESS · My Payslips: the centred dialog
+  at every desktop width and a full sheet on a phone (F31 amended 11/11/2026, JBS Praxis;
+  `docs/guides/payroll.md` §10.3).
 - **The main action within thumb reach**: at the bottom of the screen or the sheet, full width.
 - **Tap targets at least 44 × 44 px.** Inline help terms inside a sentence or heading are the only
   exception.

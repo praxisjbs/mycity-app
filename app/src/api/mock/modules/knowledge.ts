@@ -1,7 +1,7 @@
-import type { Article, Block, Overdue, Resource } from "@/api/types/knowledge";
+import type { Article, Block } from "@/api/types/knowledge";
 import type { Status } from "@/api/types/performance";
-import { created, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, fail } from "../core";
-import { refKey, SIGN_INS } from "../data/people";
+import { created, invalid, isoDaysAgo, notFound, ok, paged, route, sid, fail } from "../core";
+import { SIGN_INS } from "../data/people";
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const P = (text: string): Block => ({ type: "p", text });
@@ -68,33 +68,3 @@ route("POST /api/v1/knowledge/articles", (req) => {
   ART.push(a);
   return created(a);
 });
-
-
-const RES: Resource[] = [
-  ["Platform walkthrough", "A 12 minute tour of the modules you will use every day.", "Video", null, 25, 23],
-  ["NDPA data protection", "Annual refresher. Certificate issued on completion.", "Course", isoDaysAhead(46), 25, 19],
-  ["Partnership pipeline training", "For Marketing and Sales. How stages and lead owners work.", "Document", null, 6, 4],
-  ["Expense requests", "How to raise, what to attach, and how the chain works.", "Document", isoDaysAhead(16), 25, 9],
-].map((r, i) => ({ resource_id: sid(`res:${i}`), title: r[0] as string, description: r[1] as string, kind: r[2] as Resource["kind"], due: r[3] as string | null, assigned: r[4] as number, completed: r[5] as number }));
-const OVERDUE: Overdue[] = [["bashir", 1], ["emeka", 1], ["chidera", 1], ["tolu", 3], ["seyi", 3], ["ngozi", 3]].map(([u, r], i) => ({ key: `od:${i}`, person: refKey(u as string), resource: RES[r as number].title, due: RES[r as number].due! }));
-route("GET /api/v1/knowledge/training/summary", () => {
-  const a = RES.reduce((s, r) => s + r.assigned, 0);
-  const c = RES.reduce((s, r) => s + r.completed, 0);
-  return ok({ resources: RES.length, completion_pct: Math.round((c * 100) / Math.max(1, a)), overdue: OVERDUE.length, certificates: 19 });
-});
-route("GET /api/v1/knowledge/training", (req) => paged(RES, req, { search: (r) => [r.title, r.description] }));
-route("GET /api/v1/knowledge/training/overdue", (req) => paged(OVERDUE, req, { search: (o) => [o.person.display_name, o.resource] }));
-route("POST /api/v1/knowledge/training/overdue/remind", () => ok({ reminded: OVERDUE.length }));
-route("POST /api/v1/knowledge/training", (req) => {
-  if (!canWrite(req.user!)) return fail(403, "FORBIDDEN", "People and Operations assign training.");
-  const b = req.body as Record<string, string>;
-  const f: Record<string, string[]> = {};
-  if (!b.title?.trim()) f.title = ["Name the resource"];
-  if (!b.description || b.description.trim().length < 10) f.description = ["What it covers, in a sentence"];
-  if (b.audience === "department" && !b.department) f.department = ["Pick the department"];
-  if (Object.keys(f).length) return invalid(f);
-  const r: Resource = { resource_id: sid(`res:new:${RES.length}`), title: b.title.trim(), description: b.description.trim(), kind: (b.kind as Resource["kind"]) ?? "Document", due: b.due || null, assigned: b.audience === "department" ? 6 : 25, completed: 0 };
-  RES.push(r);
-  return created(r);
-});
-
