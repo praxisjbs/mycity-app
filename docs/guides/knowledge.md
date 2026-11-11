@@ -407,7 +407,9 @@ hub opens with real content (TB, 11/11/2026):
 - The two PDFs are printed by the PDF service from `seeds/staging/knowledge/*.html` with the logo
   every PDF carries, and uploaded through the upload engine as a builder's would be. A PDF that
   cannot be printed leaves its item out, and the seed carries on.
-- Idempotent: an SOP is found by its department and title, a course by its title.
+- Idempotent: an SOP is found by its department and title, a course by its title. Staging's
+  demonstration data is loaded by hand on the server (`docs/runbooks/deploy.md`); running the
+  staging seeds again after a release adds only this file's records.
 
 ## 7 · Events, jobs and notifications
 

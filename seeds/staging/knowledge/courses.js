@@ -150,7 +150,7 @@ const OUTREACH_FOLLOW_UP = `
 <li><strong>Ask for one thing</strong>: a fifteen-minute call or a visit, with two times to choose from.</li>
 </ul>
 <p>An example, in our own words:</p>
-<blockquote><p>Good afternoon, Mrs Adeyemi. Congratulations on opening your second branch in Yaba; the suya platter is already getting great reviews. I'm with MyCityApp, where people in Lagos discover where to eat and what to do. I'd love to show you how listing the new branch could bring in more weekday diners. Could I visit on Tuesday or Thursday afternoon for fifteen minutes?</p></blockquote>
+<p><em>Good afternoon, Mrs Adeyemi. Congratulations on opening your second branch in Yaba; the suya platter is already getting great reviews. I'm with MyCityApp, where people in Lagos discover where to eat and what to do. I'd love to show you how listing the new branch could bring in more weekday diners. Could I visit on Tuesday or Thursday afternoon for fifteen minutes?</em></p>
 <p>Pick the channel that suits the business: a personal email or a WhatsApp Business message for a note, a call to qualify quickly, a visit for a business that prefers to meet. Treat a manager or a front desk as an ally: be friendly, ask for the best time to reach the owner, and do not pitch to them.</p>
 
 <h2>Follow up with something new</h2>
