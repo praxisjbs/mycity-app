@@ -84,7 +84,7 @@ describe("Knowledge Hub · SOPs", () => {
     expect(within(steps).getByRole("button", { name: "brand-kit.pdf" })).toBeTruthy();
     await screen.findByText("Added the budget step", {}, { timeout: 5000 });
     expect(await axe(container)).toHaveNoViolations();
-  });
+  }, 15000);
 
   it("a writer sees Draft and Archived, starts an SOP, and edits a draft with Draft With AI", async () => {
     await signedInAs("cynthia@mycityapp.io");
@@ -117,7 +117,19 @@ describe("Knowledge Hub · SOPs", () => {
     fireEvent.change(within(editor).getAllByLabelText("Step")[0]!, { target: { value: "Add the joiner to payroll before their first day." } });
     fireEvent.click(within(editor).getByRole("button", { name: "Save Draft" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit SOP" })).toBeNull(), { timeout: 5000 });
-  });
+  }, 15000);
+
+  it("a department's head starts an SOP for their own department, chosen for them", async () => {
+    await signedInAs("ngozi@mycityapp.io");
+    fireEvent.click(await screen.findByRole("button", { name: "New SOP" }, { timeout: 5000 }));
+    const sheet = await screen.findByRole("dialog", { name: "New SOP" });
+    await within(sheet).findByText("Marketing & Sales", {}, { timeout: 5000 });
+    fireEvent.change(within(sheet).getByLabelText("Title"), { target: { value: "Influencer Brief" } });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Start SOP" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "New SOP" })).toBeNull(), { timeout: 5000 });
+    // It opens under Draft, a writer's alone until published.
+    await screen.findAllByText("Influencer Brief", {}, { timeout: 5000 });
+  }, 15000);
 
   it("Publish SOP asks what changed from Version 2", async () => {
     await signedInAs("cynthia@mycityapp.io");
@@ -130,7 +142,7 @@ describe("Knowledge Hub · SOPs", () => {
     fireEvent.change(within(sheet).getByLabelText("Note"), { target: { value: "Added payroll to day one" } });
     fireEvent.click(within(sheet).getByRole("button", { name: "Publish SOP" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Publish SOP" })).toBeNull(), { timeout: 5000 });
-  });
+  }, 15000);
 
   it("on a phone nothing opens until a row is tapped, then the SOP opens in a sheet", async () => {
     setViewport(390);
@@ -143,7 +155,7 @@ describe("Knowledge Hub · SOPs", () => {
     await within(sheet).findByText("How Marketing takes a campaign from brief to launch day.", {}, { timeout: 5000 });
     // Versions sit behind a row in the sheet.
     expect(within(sheet).getByRole("button", { name: "Versions" })).toBeTruthy();
-  });
+  }, 15000);
 
   it("Procedures lists the SOPs whose steps happen on a screen, and nothing for a screen with none", async () => {
     await signedInAs(

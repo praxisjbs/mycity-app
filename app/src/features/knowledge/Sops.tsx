@@ -1,6 +1,6 @@
 import knowledge from "@mycity/contract/schemas/knowledge.js";
 import type { Sop, SopDraftSave, SopDraftSuggestion, SopRow, SopStep, SopVersion, SopVersionRow } from "@mycity/contract/contract.gen.ts";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
@@ -168,15 +168,16 @@ function NewSopForm({ close, onStarted }: { close: () => void; onStarted: (sopId
   const only = departments.page?.total === 1 ? (departments.rows[0]?.department_id ?? "") : "";
   const f = useContractForm({ department_id: only, title: "" }, knowledge.SopCreate);
   const options = departments.rows.map((d) => [d.department_id, d.name] as [string, string]);
+  // A head writes for one department: it is chosen for them once the list has loaded.
+  const { set } = f;
+  const picked = f.values.department_id;
+  useEffect(() => {
+    if (only && !picked) set("department_id", only);
+  }, [only, picked, set]);
   const send = async () => {
-    const values = { ...f.values, department_id: f.values.department_id || only };
-    if (!values.department_id) {
-      f.set("department_id", "");
-      if (!f.check()) return;
-    }
     if (!f.check()) return;
     try {
-      const sop = await create.run({ body: { department_id: values.department_id, title: values.title.trim() } });
+      const sop = await create.run({ body: { department_id: f.values.department_id, title: f.values.title.trim() } });
       invalidate("/api/v1/knowledge/sops");
       close();
       toast("SOP started");
@@ -189,7 +190,7 @@ function NewSopForm({ close, onStarted }: { close: () => void; onStarted: (sopId
   return (
     <>
       <Field label="Department" {...f.status("department_id")}>
-        <SelectField {...f.field("department_id")} value={f.values.department_id || only} options={options} placeholder="Choose One" {...paging(departments)} />
+        <SelectField {...f.field("department_id")} options={options} placeholder="Choose One" {...paging(departments)} />
       </Field>
       <Field label="Title" {...f.status("title")}>
         <TextField {...f.field("title")} placeholder="Campaign Launch" />
