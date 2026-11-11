@@ -26,6 +26,8 @@ import {
   HelpTerm,
   KeyValue,
   ListDetail,
+  Menu,
+  type MenuItem,
   LoadingRows,
   PageHeader,
   Pill,
@@ -215,6 +217,20 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
   const live = v.status !== "closed";
   // A form opened from here sits over the vacancy's dialog, which is still open when the form closes.
   const back = () => modal.close();
+  const seeCandidates = () => (close(), navigate(hrefFor("recruitment", "candidates", { vacancy: v.vacancy_id })));
+  const editing = v.can_edit && live;
+  const more: MenuItem[] = [
+    { label: "See Candidates", icon: "users", onSelect: seeCandidates },
+    ...(editing
+      ? ([
+          { label: "Edit Vacancy", icon: "edit", onSelect: () => modal.open({ title: "Edit Vacancy", wide: true, body: () => <VacancyForm vacancy={v} close={back} onSaved={reload} /> }) },
+          { label: "Questions", icon: "list", onSelect: () => modal.open({ title: "Questions", wide: true, body: () => <QuestionsForm vacancy={v} close={back} onSaved={reload} /> }) },
+          { label: "Scorecard", icon: "target", onSelect: () => modal.open({ title: "Scorecard", body: () => <ScorecardForm vacancy={v} close={back} onSaved={reload} /> }) },
+          "sep",
+          { label: "Close Vacancy", icon: "x", danger: true, onSelect: () => modal.open({ title: "Close Vacancy", body: () => <CloseForm vacancy={v} close={back} onSaved={reload} /> }) },
+        ] as MenuItem[])
+      : []),
+  ];
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -294,19 +310,16 @@ export function VacancySheet({ id, close }: { id: string; close: () => void }) {
           </>
         )}
       </Card>
+      {/* One button in view, the lifecycle's next step; the rest wait behind More Actions. */}
       <FormFooter>
-        <Button onClick={() => (close(), navigate(hrefFor("recruitment", "candidates", { vacancy: v.vacancy_id })))}>See Candidates</Button>
-        {v.can_edit && live && (
-          <>
-            <Button onClick={() => modal.open({ title: "Edit Vacancy", wide: true, body: () => <VacancyForm vacancy={v} close={back} onSaved={reload} /> })}>Edit</Button>
-            <Button onClick={() => modal.open({ title: "Questions", wide: true, body: () => <QuestionsForm vacancy={v} close={back} onSaved={reload} /> })}>Questions</Button>
-            <Button onClick={() => modal.open({ title: "Scorecard", body: () => <ScorecardForm vacancy={v} close={back} onSaved={reload} /> })}>Scorecard</Button>
-            <Button onClick={() => modal.open({ title: "Close Vacancy", body: () => <CloseForm vacancy={v} close={back} onSaved={reload} /> })}>Close Vacancy</Button>
-            {v.status === "draft" && <Button variant="primary" onClick={step(publish.run, `${v.number} published`)}>Publish</Button>}
-            {v.status === "open" && <Button variant="primary" onClick={step(pause.run, `${v.number} paused`)}>Pause</Button>}
-            {v.status === "paused" && <Button variant="primary" onClick={step(resume.run, `${v.number} open again`)}>Resume</Button>}
-          </>
+        {more.length > 1 ? (
+          <Menu label="Vacancy Actions" trigger={(p) => <Button {...p} icon="dots">More Actions</Button>} items={more} />
+        ) : (
+          <Button onClick={seeCandidates}>See Candidates</Button>
         )}
+        {v.can_edit && live && v.status === "draft" && <Button variant="primary" onClick={step(publish.run, `${v.number} published`)}>Publish</Button>}
+        {v.can_edit && live && v.status === "open" && <Button variant="primary" onClick={step(pause.run, `${v.number} paused`)}>Pause</Button>}
+        {v.can_edit && live && v.status === "paused" && <Button variant="primary" onClick={step(resume.run, `${v.number} open again`)}>Resume</Button>}
       </FormFooter>
     </>
   );

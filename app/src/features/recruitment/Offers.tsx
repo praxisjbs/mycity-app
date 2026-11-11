@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import offerSchemas from "@mycity/contract/schemas/offers.js";
 import type { OfferDetail, OfferRow, OfferStatus } from "@mycity/contract/contract.gen.ts";
 import { api } from "@/api/client";
-import { saveFile } from "@/api/download";
+import { saveBlob, useFileBlob } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -30,6 +30,8 @@ import {
   Card,
   CardHeader,
   Chain,
+  DocumentPreview,
+  EmptyState,
   cn,
   ErrorState,
   FilterSelect,
@@ -45,6 +47,7 @@ import {
   LoadingRows,
   Money,
   PageHeader,
+  PdfViewer,
   Paper,
   PaperLogo,
   PaperTitle,
@@ -239,6 +242,7 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
   const edit = () => modal.open({ title: "Edit Offer", wide: true, full: true, body: (close) => <OfferForm offer={o} close={close} onSaved={(x) => (reload(), onPicked?.(x.offer_id))} /> });
   const withdraw = () => modal.open({ title: "Withdraw Offer", body: (close) => <WithdrawForm offer={o} close={close} onSaved={reload} /> });
   const sign = () => modal.open({ title: "Sign for the Company", wide: true, body: (close) => <SignForm offer={o} close={close} onSaved={reload} /> });
+  const viewLetter = () => modal.open({ title: `${o.number} · Offer Letter`, wide: true, body: <OfferLetter offer={o} /> });
   const changeEmail = () => modal.open({ title: "Change Email", body: (close) => <EmailForm offer={o} close={close} onSaved={reload} /> });
   const primary = "max-md:w-full";
   const signers =
@@ -286,7 +290,7 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
         )}
         <ActionGroup>
           <div className="mt-3 flex flex-wrap justify-end gap-2">
-            {o.document && <Button icon="download" onClick={() => saveFile(`/api/v1/recruitment/offers/${id}/document`, o.document!.file_name)}>Download PDF</Button>}
+            <Button icon="doc" onClick={viewLetter}>View Letter</Button>
             {o.can_withdraw && <Button variant="danger" onClick={withdraw}>Withdraw Offer</Button>}
             {o.can_edit && <Button icon="edit" onClick={edit}>Edit Offer</Button>}
             {o.can_change_email && <Button icon="mail" onClick={changeEmail}>Change Email</Button>}
@@ -318,16 +322,43 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
         <CardHeader title="History" />
         <Timeline label="History" items={historyOf(o)} />
       </Card>
-      <Paper>
-        <PaperLogo reference={o.number} />
-        <PaperTitle sub={`${o.candidate_name}, ${o.job_title}`}>Offer of Employment</PaperTitle>
-        <div data-copy="content">
-          {o.letter.slice(1).map((line, i) => (
-            <p key={i}>{line}</p>
-          ))}
-        </div>
-      </Paper>
     </Stack>
+  );
+}
+
+const MOCK = import.meta.env.VITE_API_MODE === "mock";
+
+/**
+ * View Letter: the offer's PDF as the candidate receives it, with Open in Tab and Download PDF, as a
+ * query's letter is shown (M3). Before the PDF is made (a draft), and on the mock, the letter's
+ * wording on paper.
+ */
+function OfferLetter({ offer: o }: { offer: OfferDetail }) {
+  const pdf = useFileBlob(o.document && !MOCK ? `/api/v1/recruitment/offers/${o.offer_id}/document` : null);
+  if (o.document && !MOCK) {
+    if (pdf.failed) return <EmptyState bare icon="doc" title="Letter Not Ready" text="It is still being made. Try again shortly." />;
+    if (!pdf.blob || !pdf.href) return <PdfViewer data={null} name={o.document.file_name} height="page" />;
+    return (
+      <DocumentPreview
+        name={o.document.file_name}
+        mime="application/pdf"
+        href={pdf.href}
+        file={pdf.blob}
+        height="page"
+        actions={<Button size="sm" icon="download" onClick={() => saveBlob(pdf.blob!, o.document!.file_name)}>Download PDF</Button>}
+      />
+    );
+  }
+  return (
+    <Paper>
+      <PaperLogo reference={o.number} />
+      <PaperTitle sub={`${o.candidate_name}, ${o.job_title}`}>Offer of Employment</PaperTitle>
+      <div data-copy="content">
+        {o.letter.slice(1).map((line, i) => (
+          <p key={i}>{line}</p>
+        ))}
+      </div>
+    </Paper>
   );
 }
 

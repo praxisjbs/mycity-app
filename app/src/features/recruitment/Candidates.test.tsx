@@ -4,7 +4,7 @@ import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { APPLICATIONS } from "@/api/mock/data/recruitment";
-import { copyProblems, dialog, openAs, openRow, press, type } from "./testKit";
+import { choose, copyProblems, dialog, moreActions, openAs, openRow, press, type } from "./testKit";
 
 /**
  * Recruitment · Candidates on the in-browser mock (docs/guides/recruitment.md §6.3 to §6.5, §10): the
@@ -63,10 +63,14 @@ describe("Recruitment · Candidates", () => {
   it("Move To, then Not Progressing with its reason, then Reopen", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
     let sheet = await openRow("Funke Bakare");
+    // One button in view, the next stage ahead; the rest behind More Actions, Not Progressing last.
+    expect(within(sheet).getByRole("button", { name: "Move to Assessment" })).toBeTruthy();
+    expect(within(sheet).queryByRole("button", { name: "Add to Pool" })).toBeNull();
+    expect((await moreActions(sheet)).at(-1)).toBe("Not Progressing");
     await press(sheet, "Move to Assessment");
     expect(app("Funke").stage).toBe("assessment");
 
-    await press(dialog(), "Not Progressing");
+    await choose(dialog(), "Not Progressing");
     let form = dialog();
     await press(form, "Not Progressing");
     expect(app("Funke").status).toBe("active");
@@ -78,7 +82,7 @@ describe("Recruitment · Candidates", () => {
     await press(sheet, "Reopen");
     expect(app("Funke").status).toBe("active");
     form = dialog();
-    expect(within(form).getAllByRole("button", { name: /^Move to/ }).length).toBeGreaterThan(0);
+    expect([...within(form).queryAllByRole("button", { name: /^Move to/ }).map((b) => b.textContent ?? ""), ...(await moreActions(form))].some((n) => n.startsWith("Move to"))).toBe(true);
   }, 60000);
 
   it("on a phone, the board shows one stage at a time and a card opens in a sheet", async () => {
@@ -86,7 +90,7 @@ describe("Recruitment · Candidates", () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
     expect(copyProblems()).toEqual([]);
     const sheet = await openRow("Chinedu Okafor");
-    expect(within(sheet).getByRole("button", { name: "Not Progressing" })).toBeTruthy();
+    expect(await moreActions(sheet)).toContain("Not Progressing");
   }, 60000);
 
   it("Move To on the board offers only the moves the server allows: ahead, or one back", async () => {

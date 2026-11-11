@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { SEATS, VACANCIES } from "@/api/mock/data/recruitment";
-import { copyProblems, dialog, openAs, openRow, press, settled, type } from "./testKit";
+import { copyProblems, dialog, moreActions, openAs, openRow, press, settled, type } from "./testKit";
 
 /**
  * Recruitment · Vacancies on the in-browser mock (docs/guides/recruitment.md §6.1, §10): the four
@@ -49,7 +49,10 @@ describe("Recruitment · Vacancies", () => {
     expect(within(sheet).getByText("Appearance and Grooming")).toBeTruthy();
     expect(within(sheet).getByText("Future Growth Potential in Career")).toBeTruthy();
     expect(within(sheet).getByText(/go\.mycityapp\.io\/jobs\//)).toBeTruthy();
-    for (const name of ["Edit", "Questions", "Scorecard", "Pause", "See Candidates"]) expect(within(sheet).getByRole("button", { name })).toBeTruthy();
+    // One button in view, the lifecycle's next step; the rest behind More Actions, Close Vacancy last.
+    expect(within(sheet).getByRole("button", { name: "Pause" })).toBeTruthy();
+    expect(within(sheet).queryByRole("button", { name: "Edit Vacancy" })).toBeNull();
+    expect(await moreActions(sheet)).toEqual(["See Candidates", "Edit Vacancy", "Questions", "Scorecard", "Close Vacancy"]);
     // The description is drawn from its blocks: real headings and lists, never the Markdown's marks.
     expect(within(sheet).getByRole("heading", { name: "Key Responsibilities" })).toBeTruthy();
     expect(within(sheet).getAllByRole("listitem").length).toBeGreaterThan(3);
@@ -133,7 +136,7 @@ describe("Recruitment · Vacancies", () => {
     setViewport(390);
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=vacancies");
     const sheet = await openRow("Head, Sales & Revenue");
-    expect(within(sheet).getByRole("button", { name: "See Candidates" })).toBeTruthy();
+    expect(await moreActions(sheet)).toContain("See Candidates");
     expect(copyProblems()).toEqual([]);
   }, 60000);
 });
