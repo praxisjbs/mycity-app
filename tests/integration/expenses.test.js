@@ -173,6 +173,21 @@ describeDb("expenses against the real migrations", () => {
     expect(cancelled.body).toMatchObject({ status: "cancelled", can_cancel: false, can_edit: false });
   });
 
+  test("banks: the common ones and every bank a request names, most used first, one row a name whatever its case", async () => {
+    // The draft above named GTBank; a bank no list knows is kept as typed and offered from then on.
+    await raise("other", { bank_name: "Coda Bank" }, false);
+    await raise("other", { bank_name: "gtbank" }, false);
+    const all = await h.as("staff").get("/expenses/banks");
+    expect(all.status).toBe(200);
+    expect(all.body.page.size).toBe(25);
+    expect(all.body.data[0]).toEqual({ bank_name: "GTBank", uses: 2 });
+    expect(all.body.data.filter((b) => b.bank_name.toLowerCase() === "gtbank")).toHaveLength(1);
+    expect(all.body.data).toContainEqual({ bank_name: "Coda Bank", uses: 1 });
+    expect(all.body.data).toContainEqual({ bank_name: "Access Bank", uses: 0 });
+    const zen = await h.as("staff").get("/expenses/banks?q=zen");
+    expect(zen.body.data).toEqual([{ bank_name: "Zenith Bank", uses: 0 }]);
+  });
+
   test("sent: the line manager, then Operations & People, each from Expenses · Approvals; nobody else decides it", async () => {
     const r = await raise("staff");
     expect(r).toMatchObject({ status: "submitted", waiting_on: "Line Manager", over_budget: true, can_edit: false, can_cancel: true });

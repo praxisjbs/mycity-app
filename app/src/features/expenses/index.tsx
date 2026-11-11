@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
+import { saveFile } from "@/api/download";
 import { PagedTable } from "@/features/shared/sections";
 import { paging } from "@/features/shared/wire";
 import type { ModuleScreenProps } from "@/shell/screens";
@@ -376,6 +377,7 @@ function PaidCard({ d, close }: { d: Disbursement; close: () => void }) {
           ["Bank Reference", d.payment_reference ?? "Missing"],
           ["Paid On", d.paid_on ? formatDate(d.paid_on) : "Not set"],
           ["Recorded By", d.processed_by ?? "Unknown"],
+          ["Receipt", d.receipt ? <Button key="rc" size="sm" icon="doc" onClick={() => saveFile(`/api/v1/documents/${d.receipt!.document_id}/content`, d.receipt!.file_name)}>Open Receipt</Button> : "None"],
         ]}
       />
       {d.reference_missing && (

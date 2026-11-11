@@ -157,6 +157,20 @@ const ExpenseListQuery = listQuery(
 );
 const ExpensePage = Paged(ExpenseRow);
 
+/**
+ * GET /expenses/banks: the Bank field's suggestions on New Request. The common banks, then every
+ * bank a request has named, most used first; a bank typed that is not there is kept as typed and
+ * offered from then on. A bank is not a record: it is the text a request was saved with.
+ */
+const ExpenseBankListQuery = listQuery();
+const ExpenseBank = z
+  .object({
+    bank_name: z.string(),
+    uses: z.number().int().min(0),
+  })
+  .strict();
+const ExpenseBankPage = Paged(ExpenseBank);
+
 /** The four cards above ESS · My Requests. */
 const ExpenseMineSummary = z
   .object({
@@ -251,6 +265,9 @@ const ExpenseLineAdd = z
   .strict();
 
 const TABLES = {
+  ExpenseBankListQuery: { table: null, reason: "list controls for the banks New Request suggests" },
+  ExpenseBank: { table: null, reason: "a bank New Request suggests: a common bank, or one a request named, and how many name it" },
+  ExpenseBankPage: { table: null, reason: "a page of the banks New Request suggests" },
   ExpenseLine: { table: "expense_request_line" },
   ExpenseRow: {
     table: "expense_request",
@@ -421,6 +438,9 @@ module.exports = {
   ExpenseRequest,
   ExpenseListQuery,
   ExpensePage,
+  ExpenseBankListQuery,
+  ExpenseBank,
+  ExpenseBankPage,
   ExpenseMineSummary,
   ExpenseApprovalsSummary,
   ExpenseLineInput,
