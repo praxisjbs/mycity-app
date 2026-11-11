@@ -101,6 +101,7 @@ async function claimSource(client, documentId, versionRowId, actor) {
     entity: { type: "statutory_return", id: versionRowId },
     actor,
     field: "source_document_id",
+    sensitivity: "restricted",
   });
 }
 

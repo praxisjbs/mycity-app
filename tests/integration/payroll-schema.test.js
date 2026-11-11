@@ -441,6 +441,80 @@ describeDb("M6 payroll schema and reference data against the real migrations", (
     });
   });
 
+  describe("6040, the legal source of a statutory version (PR 10)", () => {
+    const SOURCE = "'TEST SOURCE, not a law', 'Test section 1', '2026-11-01'";
+    const insertRate = (cl, { item = "nhf", kind = "employee", base = "basic", position = null, bandFrom = null, from, to = null, source = true }) =>
+      cl.query(
+        `INSERT INTO statutory_rate (item, kind, base, rate, position, band_from, effective_from, effective_to, ${
+          source ? "source_title, source_section, source_checked_on" : "no_legal_source, no_source_reason"
+        }) VALUES ($1, $2, $3, 1, $4, $5, $6, $7, ${source ? SOURCE : "true, 'Test rate, not a law'"})`,
+        [item, kind, base, position, bandFrom, from, to],
+      );
+
+    test("a row is held to a source or to No Legal Source with its reason, never both, never neither", async () => {
+      await rolledBack(async (cl) => {
+        await insertRate(cl, { from: "2026-12-01" });
+        await insertRate(cl, { item: "itf", kind: "employer", base: "annual_payroll", from: "2026-12-01", source: false });
+        const bare = () => cl.query(`INSERT INTO statutory_rate (item, kind, base, rate, effective_from) VALUES ('nsitf', 'employer', 'annual_payroll', 1, '2026-12-01')`);
+        await refusedHere(cl, bare, "23514", "statutory_rate_source_check");
+        const both = () =>
+          cl.query(`INSERT INTO statutory_rate (item, kind, base, rate, effective_from, source_title, source_section, source_checked_on, no_legal_source, no_source_reason)
+                    VALUES ('nsitf', 'employer', 'annual_payroll', 1, '2026-12-01', 'A', 'B', '2026-11-01', true, 'A reason here')`);
+        await refusedHere(cl, both, "23514", "statutory_rate_source_check");
+        const noSection = () =>
+          cl.query(`INSERT INTO statutory_rate (item, kind, base, rate, effective_from, source_title, source_checked_on) VALUES ('nsitf', 'employer', 'annual_payroll', 1, '2026-12-01', 'A', '2026-11-01')`);
+        await refusedHere(cl, noSection, "23514", "statutory_rate_source_check");
+      });
+    });
+
+    test("rows saved before it are marked No Legal Source on the way up, and it comes off and goes back", async () => {
+      await rolledBack(async (cl) => {
+        const file = FILES["6040_statutory_sources"];
+        await cl.query(file.down);
+        expect((await cl.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'statutory_rate' AND column_name LIKE '%source%'")).rows[0].n).toBe(0);
+        // A test PAYE band saved before sources were required, as staging held one.
+        await cl.query(`INSERT INTO statutory_rate (item, kind, base, rate, position, band_from, effective_from) VALUES ('paye', 'employee', 'taxable', 7, 1, 0, '2026-12-01')`);
+        await cl.query(file.up);
+        await cl.query(file.up); // idempotent
+        expect((await cl.query("SELECT no_legal_source, no_source_reason, source_title FROM statutory_rate")).rows).toEqual([
+          { no_legal_source: true, no_source_reason: "Entered before sources were required", source_title: null },
+        ]);
+        expect((await cl.query("SELECT count(*)::int AS n FROM pg_constraint WHERE conname = 'statutory_rate_source_check'")).rows[0].n).toBe(1);
+        expect((await cl.query("SELECT count(*)::int AS n FROM pg_indexes WHERE indexname = 'statutory_rate_source_document_fk_idx'")).rows[0].n).toBe(1);
+      });
+    });
+
+    test("removeVersion takes a whole version out and the version before runs on, on the real table", async () => {
+      await rolledBack(async (cl) => {
+        const band = (position, bandFrom, from, to) => insertRate(cl, { item: "paye", base: "taxable", position, bandFrom, from, to });
+        await band(1, 0, "2026-12-01", "2027-02-01");
+        await band(2, 1000, "2026-12-01", "2027-02-01");
+        await band(1, 0, "2027-02-01", "2027-03-01");
+        await band(2, 500, "2027-02-01", "2027-03-01");
+        await band(3, 2000, "2027-02-01", "2027-03-01");
+        await band(1, 0, "2027-03-01", null);
+        const versions = async () =>
+          (await cl.query("SELECT position, effective_from::text AS f, effective_to::text AS t FROM statutory_rate WHERE item = 'paye' ORDER BY effective_from, position")).rows;
+
+        const r = await effectiveDated.removeVersion(cl, { table: "statutory_rate", key: { item: "paye" }, from: "2027-02-01", today: "2026-12-15" });
+        expect([r.removed.length, r.reopened.length]).toEqual([3, 2]);
+        expect(await versions()).toEqual([
+          { position: 1, f: "2026-12-01", t: "2027-03-01" },
+          { position: 2, f: "2026-12-01", t: "2027-03-01" },
+          { position: 1, f: "2027-03-01", t: null },
+        ]);
+        await effectiveDated.removeVersion(cl, { table: "statutory_rate", key: { item: "paye" }, from: "2027-03-01", today: "2026-12-15" });
+        expect(await versions()).toEqual([
+          { position: 1, f: "2026-12-01", t: null },
+          { position: 2, f: "2026-12-01", t: null },
+        ]);
+        await expect(effectiveDated.removeVersion(cl, { table: "statutory_rate", key: { item: "paye" }, from: "2026-12-01", today: "2026-12-15" })).rejects.toMatchObject({
+          code: "VERSION_IN_FORCE",
+        });
+      });
+    });
+  });
+
   describe("undone and applied again", () => {
     test("6099, 6030, 6010 and 6000 come off in that order and go back, leaving the database as it was", async () => {
       await rolledBack(async (cl) => {

@@ -517,11 +517,14 @@ const STAGED_DOC_TYPE = "staged_upload";
  * names its invoice again without a second claim.
  * @param {import("pg").PoolClient} client  inside atomically()
  * @param {{document_id: string, doc_type: string, entity: {type: string, id: string},
- *          subject_employee_id?: string|null, actor: object, field?: string}} opts
- *   field  the request's field the id came in on, for the refusal
+ *          subject_employee_id?: string|null, actor: object, field?: string,
+ *          sensitivity?: "normal"|"personal"|"restricted"}} opts
+ *   field        the request's field the id came in on, for the refusal
+ *   sensitivity  the file's sensitivity from now on, when the record's own is stricter than a staged file's (a
+ *                statutory source is restricted); left as staged otherwise
  * @returns {Promise<object>} the document row
  */
-async function claim(client, { document_id: id, doc_type: docType, entity, subject_employee_id: subjectId = null, actor, field = "document_id" }) {
+async function claim(client, { document_id: id, doc_type: docType, entity, subject_employee_id: subjectId = null, actor, field = "document_id", sensitivity = null }) {
   if (!inTransaction(client)) throw new Error("vault.claim must run inside atomically()");
   docTypes.assertDocType(docType);
   const { rows } = await client.query(`SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`, [id]);
@@ -529,11 +532,13 @@ async function claim(client, { document_id: id, doc_type: docType, entity, subje
   if (doc && doc.doc_type === docType && doc.entity_type === entity.type && doc.entity_id === String(entity.id)) return doc;
   if (!doc || doc.doc_type !== STAGED_DOC_TYPE || !doc.is_current || !doc.uploaded_by || doc.uploaded_by !== actorId(actor))
     throw new AppError("DOCUMENT_NOT_STAGED", "Upload the file again", 422, { [field]: ["Upload it again"] });
+  if (sensitivity !== null && !SENSITIVITIES.has(sensitivity)) throw new Error(`vault.claim: unknown sensitivity ${sensitivity}`);
   const { rows: after } = await client.query(
-    `UPDATE document SET doc_type = $2, entity_type = $3, entity_id = $4, subject_employee_id = $5
+    `UPDATE document SET doc_type = $2, entity_type = $3, entity_id = $4, subject_employee_id = $5,
+            sensitivity = COALESCE($6, sensitivity)
       WHERE document_id = $1
       RETURNING ${COLUMNS}`,
-    [id, docType, entity.type, String(entity.id), subjectId],
+    [id, docType, entity.type, String(entity.id), subjectId, sensitivity],
   );
   await emit(client, {
     key: EVENTS.DOCUMENT_CLAIMED,
