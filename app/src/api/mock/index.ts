@@ -28,6 +28,7 @@ import "./modules/partnerships_categories";
 import "./modules/partnerships_work";
 import "./modules/expenses";
 import "./modules/knowledge";
+import "./modules/training";
 import "./modules/user_guide";
 import "./modules/assistant";
 import "./modules/policies";

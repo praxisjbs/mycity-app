@@ -1,4 +1,4 @@
-import type { IsoDate, Paged, PersonRef, Uuid } from "./common";
+import type { IsoDate, Paged, Uuid } from "./common";
 import type { Status } from "./performance";
 
 /** INTERIM Knowledge Hub shapes (owner AJ; MILESTONES §14). Praxis AI is on the contract (assistant). */
@@ -29,28 +29,6 @@ export interface ArticlesSummary {
   last_updated: IsoDate | null;
   first_id: Uuid | null;
 }
-export interface Resource {
-  resource_id: Uuid;
-  title: string;
-  description: string;
-  kind: "Video" | "Document" | "Course";
-  due: IsoDate | null;
-  assigned: number;
-  completed: number;
-}
-export interface TrainingSummary {
-  resources: number;
-  completion_pct: number;
-  overdue: number;
-  certificates: number;
-}
-export interface Overdue {
-  key: string;
-  person: PersonRef;
-  resource: string;
-  due: IsoDate;
-}
-
 type Q<T = object> = T & { page?: number; q?: string };
 declare module "@/api/endpoints" {
   interface Endpoints {
@@ -58,10 +36,5 @@ declare module "@/api/endpoints" {
     "GET /api/v1/knowledge/articles": { query: Q<{ kind: ArticleKind }>; body: never; params: never; response: Paged<ArticleRow> };
     "GET /api/v1/knowledge/articles/:id": { query: never; body: never; params: { id: string }; response: Article };
     "POST /api/v1/knowledge/articles": { query: never; body: { kind: ArticleKind; title: string; group: string; blocks: Block[] }; params: never; response: Article };
-    "GET /api/v1/knowledge/training/summary": { query: never; body: never; params: never; response: TrainingSummary };
-    "GET /api/v1/knowledge/training": { query: Q; body: never; params: never; response: Paged<Resource> };
-    "GET /api/v1/knowledge/training/overdue": { query: Q; body: never; params: never; response: Paged<Overdue> };
-    "POST /api/v1/knowledge/training": { query: never; body: { title: string; description: string; kind: Resource["kind"]; due?: IsoDate; audience: "everyone" | "department"; department?: string }; params: never; response: Resource };
-    "POST /api/v1/knowledge/training/overdue/remind": { query: never; body: Record<string, never>; params: never; response: { reminded: number } };
   }
 }
