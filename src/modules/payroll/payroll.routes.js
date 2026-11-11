@@ -23,6 +23,8 @@
  *   GET    /settings                    `payroll` view: the setting today, the version in force and the next one
  *   PATCH  /settings                    `payroll` edit and `payroll.configure`: a new version from today or later (the
  *                                       pay day, Bank Details Required, Switch On or Off, the conventions)
+ *   DELETE /settings/versions/:effective_from   `payroll` edit and `payroll.configure`: Remove Change, a version
+ *                                       still waiting for its day (204); the version before it runs on
  *
  * Email All and Download All are written in payslips.service (the `published` guard); their routes sit here because they
  * are the run's buttons. A run is approved, sent back or rejected in its approval (/workflow/instances/:id/approve, request-changes,
@@ -95,5 +97,8 @@ route(router, "get", "/settings", { response: p.PayrollSettings, summary: "The p
 
 route(router, "patch", "/settings", { body: p.PayrollSettingsChange, response: p.PayrollSettings, summary: "Change the payroll setting from a date" },
   requirePermission("payroll", "edit"), requireCapability("payroll.configure"), controller.changeSettings);
+
+route(router, "delete", "/settings/versions/:effective_from", { params: p.PayrollSettingsVersionParams, no_content: true, summary: "Remove a payroll setting change still waiting for its day" },
+  requirePermission("payroll", "edit"), requireCapability("payroll.configure"), controller.removeSettingsChange);
 
 module.exports = { basePath: "/payroll", surface: "staff", router };

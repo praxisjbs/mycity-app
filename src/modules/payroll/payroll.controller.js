@@ -65,6 +65,11 @@ module.exports = {
 
   changeSettings: async (req, res) => ok(res, await service.changeSettings(withActor(req), body(req))),
 
+  removeSettingsChange: async (req, res) => {
+    await service.removeSettingsChange(withActor(req), req.validated.params);
+    return noContent(res);
+  },
+
   discard: async (req, res) => {
     await service.discardRun(withActor(req), id(req));
     return noContent(res);

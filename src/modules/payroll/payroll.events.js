@@ -16,6 +16,8 @@
  *   payroll_deduction.settled   a fine or an advance was deducted in full (its last instalment applied)
  *   payroll_setting.changed  the advanced option, the pay day, Bank Details Required or a convention, from a date
  *                            (security: the access watchers are told)
+ *   payroll_setting.removed  Remove Change: a version of the setting still waiting for its day was taken back and the
+ *                            version before it runs on (security, as a change is)
  *
  * Events carry ids, the period, counts and statuses, never an amount (§6.13 rule 5): amounts live in the
  * tables and are masked on the way out, so an audit line never carries one either.
@@ -51,6 +53,7 @@ const EVENTS = defineEvents("payroll", {
   // Configurations: the advanced option, the pay day, Bank Details Required or a convention changed from a date.
   // Security: who may change how everyone is paid is watched as access changes are (§7).
   "payroll_setting.changed": { summary: "The payroll setting was changed from a date", security: true },
+  "payroll_setting.removed": { summary: "A payroll setting change still waiting for its day was removed", security: true },
 });
 
 /** The approval flow every run opens (seeded in 6099; DEFAULTS in shared/workflow/definitions.js). */

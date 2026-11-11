@@ -1,7 +1,7 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "ea8a5f01891e457212ec91a1cfce3f607fa4f08b390b5abea3fcbc879dd140a3",
-  "schemas": 2122,
+  "source_hash": "0ef2a5eee6f9fc1740e3ffbbaf6e7f5c07d2a1b8b50598ee5f15f42e599eee99",
+  "schemas": 2125,
   "endpoints": 974,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
@@ -48,7 +48,7 @@
     "packages/contract/schemas/partner_pipeline.js": "d05fdb4d19154d256b7328a0e58d0ffbea57ac83cd38dc74bf14e12aad55da96",
     "packages/contract/schemas/partners.js": "e5f3dd361b32b256600236d6c62baf0d85ff3d48f4a9c9882610d71376976d3d",
     "packages/contract/schemas/partnership_analytics.js": "eb19230f5db9c5e8ab71e858635906a56c69ad25de87474ee033aa605382972a",
-    "packages/contract/schemas/payroll.js": "d8a049dede9019ce89533a7bc638a8becff92cf0273ec92016a3870afe180123",
+    "packages/contract/schemas/payroll.js": "59221bd432efef7769c8449a40b72d7768188b7d5009099f204a5fd4ce7e34f0",
     "packages/contract/schemas/payslips.js": "7b8ad408d334ad01283800422ce40371d07dfb604623d116d1f2fb46452d1ea5",
     "packages/contract/schemas/policies.js": "069c09178e09da0d7dad8ffd0d6551d4108a4c0ab78a0c0c0dee4b0fa4ba4a3e",
     "packages/contract/schemas/projects.js": "1fe44c73b97a8f644737c144d909fc8cfdfe154428671b199e0bef6f025f7745",
@@ -65,7 +65,7 @@
     "packages/contract/schemas/security.js": "6cf6f6a58006e811045e71036358fd5a74aeccc27f82db0174acc5cfd4c329e0",
     "packages/contract/schemas/settings.js": "585ff4c92e603911b495007aac56bb801a97802945da09b964449815354be907",
     "packages/contract/schemas/signatures.js": "c5f5be7cd9f9d3b78823b9288653411548cff1432947e3d96d74cb4f80bb9f3c",
-    "packages/contract/schemas/statutory.js": "ec1a3edbadc0e5bbcc7e756e6eaa56ea99431a2146763222c9fbd3e483722c27",
+    "packages/contract/schemas/statutory.js": "aa253ffc5f6925ce6b5340c8e38126cab3fc0444c0e190e0d071327b94490cf3",
     "packages/contract/schemas/system_health.js": "b8f88ebb106feef46f22f1ddefceede5619593afccd7244f75d6b6db626378f7",
     "packages/contract/schemas/talent_pool.js": "0838168b19d903f183f38a489f4de88ad080f17145fed88da3e8043e66e7fe19",
     "packages/contract/schemas/targets.js": "eff6112a0f0268c5ec65807b359ceff164c6bfc3ddab0a4bde80dfa23962a869",

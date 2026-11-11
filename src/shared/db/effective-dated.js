@@ -44,10 +44,22 @@
  *                    (a PAYE table's bands, a person's pay components): every open
  *                    row of the key ends the day before, and the rows given start.
  *                    With `replace`, the rows already starting that day go first.
+ *
+ * And the one way a version is taken back (Remove Change, docs/guides/payroll.md §5):
+ *
+ *   removeVersion    the version of a key that starts on a day still to come is
+ *                    taken out (every row of it), and the version before it runs
+ *                    on again: its rows end where the removed one ended (the next
+ *                    version's first day, or never). A version in force today or
+ *                    before is history and is never taken out (409
+ *                    VERSION_IN_FORCE): a new version from a date replaces it
+ *                    instead. No module reopens a version by hand.
  */
 const { AppError } = require("../errors");
 const { ident, table, insertOne } = require("./query-helpers");
-const { assertDate } = require("../time/lagos");
+const lagos = require("../time/lagos");
+
+const { assertDate } = lagos;
 
 /**
  * SQL condition: the row of `alias` in force on the date bound at $paramIndex.
@@ -202,4 +214,45 @@ async function addVersionSet(
   return out;
 }
 
-module.exports = { asOf, versionOn, addVersion, addVersionSet };
+/**
+ * Take back the version of `key` that starts on `from`, a day after `today`, and let the version before it run on: its
+ * rows end where the taken version ended (the next version's first day, or null when it was the last). Inside the
+ * caller's transaction; the key's versions are locked first, so two changes cannot interleave.
+ * @param {import("pg").PoolClient} client
+ * @param {{table: string, key: object, from: string, today?: string}} q  `today` defaults to Lagos's
+ * @returns {Promise<{removed: object[], reopened: object[]}>} the rows taken out, and the rows of the version before
+ *   that run on (none when the taken version was the first)
+ */
+async function removeVersion(client, { table: tableName, key, from, today = lagos.today() }) {
+  assertDate(from, "from");
+  assertDate(today, "today");
+  const w = keyWhere(key);
+  const t = table(tableName);
+  const n = w.params.length + 1;
+  await client.query(`SELECT 1 FROM ${t} WHERE ${w.sql} FOR UPDATE`, w.params);
+  const { rows: starting } = await client.query(
+    `SELECT effective_from::text AS effective_from FROM ${t} WHERE ${w.sql} AND effective_from = $${n}::date LIMIT 1`,
+    [...w.params, from],
+  );
+  if (!starting.length) throw new AppError("NOT_FOUND", "No change starts on that day", 404);
+  if (from <= today)
+    throw new AppError("VERSION_IN_FORCE", "This change is in force. Save a new one from a later date instead.", 409, {
+      effective_from: ["Already in force"],
+    });
+  const { rows: next } = await client.query(
+    `SELECT min(effective_from)::text AS effective_from FROM ${t} WHERE ${w.sql} AND effective_from > $${n}::date`,
+    [...w.params, from],
+  );
+  const end = next[0] && next[0].effective_from ? next[0].effective_from : null;
+  const { rows: removed } = await client.query(
+    `DELETE FROM ${t} WHERE ${w.sql} AND effective_from = $${n}::date RETURNING *`,
+    [...w.params, from],
+  );
+  const { rows: reopened } = await client.query(
+    `UPDATE ${t} SET effective_to = $${n + 1}::date WHERE ${w.sql} AND effective_to = $${n}::date RETURNING *`,
+    [...w.params, from, end],
+  );
+  return { removed, reopened };
+}
+
+module.exports = { asOf, versionOn, addVersion, addVersionSet, removeVersion };

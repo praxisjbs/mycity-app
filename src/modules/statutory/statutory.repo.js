@@ -1,8 +1,8 @@
 "use strict";
 /**
  * Statutory rates' SQL (docs/guides/payroll.md §4.2, §6.12): read as of a day, listed 25 a page, and the rows a run
- * and the report read. Parameterised, no business rules, no events. A version is written by statutory.rates.js
- * through shared/db/effective-dated (addVersionSet), never here.
+ * and the report read, each with its legal source. Parameterised, no business rules, no events. A version is written
+ * and taken back by statutory.rates.js through shared/db/effective-dated (addVersionSet, removeVersion), never here.
  */
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { asOf } = require("../../shared/db/effective-dated");
@@ -13,6 +13,8 @@ const ITEM_ORDER = `array_position(ARRAY['paye', 'pension_employee', 'pension_em
 const ROW = `r.statutory_rate_id, r.item, r.kind, r.base, r.rate::text AS rate, r.band_from::text AS band_from,
   r.band_to::text AS band_to, r.flat_amount::text AS flat_amount, r.position, r.effective_from::text AS effective_from,
   r.effective_to::text AS effective_to, r.created_at,
+  r.source_title, r.source_section, r.source_url, r.source_document_id, r.source_checked_on::text AS source_checked_on,
+  r.no_legal_source, r.no_source_reason,
   CASE WHEN e.employee_id IS NULL THEN NULL ELSE btrim(e.first_name || ' ' || e.last_name) END AS created_by_name`;
 
 const JOINS = `LEFT JOIN app_user u ON u.user_id = r.created_by LEFT JOIN employee e ON e.employee_id = u.employee_id`;

@@ -148,6 +148,29 @@ async function lockMonths(client, periods) {
 }
 
 /* ------------------------------------------------------------------ *
+ * A configuration version a run has read (Remove Change, §5, §13.2 item 34)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Lock the run of the month a configuration version starts in, and refuse (409 VERSION_IN_FORCE) when that run is
+ * Submitted, Approved or Paid: it was computed with the version (a run reads the rates in force on its month's last day
+ * and the pay day at its end), so the version stays. Only that month can hold such a run: a version still to come
+ * starts after today, and no run is opened for a month after the current one. With `advancedOnly`, only an advanced run
+ * counts, since a simple run reads no statutory rate. The run is locked before the version's rows, the order Compute and
+ * Submit take them in.
+ * @param {import("pg").PoolClient} client
+ * @param {string} from  the version's first day
+ * @param {{advancedOnly?: boolean}} [opts]
+ */
+async function assertVersionUnread(client, from, { advancedOnly = false } = {}) {
+  const runs = await lockRunsOf(client, [lagos.monthBounds(from).first]);
+  if (runs.some((r) => CLOSED.includes(r.status) && (!advancedOnly || r.advanced === true)))
+    throw new AppError("VERSION_IN_FORCE", "A payroll run sent for approval was computed with this change", 409, {
+      effective_from: ["A run uses it"],
+    });
+}
+
+/* ------------------------------------------------------------------ *
  * The two ends of a submitted run
  * ------------------------------------------------------------------ */
 
@@ -242,4 +265,17 @@ const returnToDraft = defineWrite("returnToDraft", "submitted", async (client, r
   return { items: items.released, instalments };
 });
 
-module.exports = { EDITABLE, CLOSED, WRITES, assertEditable, defineWrite, defineCreate, openPeriod, lockRunsOf, lockMonths, applyApproval, returnToDraft };
+module.exports = {
+  EDITABLE,
+  CLOSED,
+  WRITES,
+  assertEditable,
+  defineWrite,
+  defineCreate,
+  openPeriod,
+  lockRunsOf,
+  lockMonths,
+  assertVersionUnread,
+  applyApproval,
+  returnToDraft,
+};

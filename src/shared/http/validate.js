@@ -10,7 +10,11 @@
  * could read the raw, unvalidated input by mistake. One place to read from.
  *
  * All three parts are checked before answering, so a form gets every problem
- * at once (gate 12: inline validation shows every field, not the first).
+ * at once (gate 12: inline validation shows every field, not the first). The
+ * answer is 422 VALIDATION_FAILED, unless every issue refused names one rule of
+ * the contract's (`params.code`, a custom issue): then that rule's code, so a
+ * refusal the form already shows as it is filled still reads as its rule
+ * (SOURCE_REQUIRED, docs/guides/payroll.md §13.2 item 35).
  *
  * Schemas come only from packages/contract (http/route.js enforces it). There is
  * no limit/offset query helper: lists use common.listQuery, 25 per page (§16).
@@ -41,12 +45,28 @@ function fieldsOf(zodError, prefix = "") {
 }
 
 /**
+ * The rule a contract's issue names, when it names one: a custom issue may carry `params: { code }` (statutory.js's
+ * SOURCE_REQUIRED), so a refusal the contract makes as the form is filled reads as the rule it is.
+ */
+const codeOf = (issue) =>
+  issue && issue.code === "custom" && issue.params && typeof issue.params.code === "string" && /^[A-Z][A-Z0-9_]*$/.test(issue.params.code)
+    ? issue.params.code
+    : null;
+
+/** The code a 422 is answered with: the one rule every refused issue names, else VALIDATION_FAILED. */
+function refusedAs(codes) {
+  const first = codes[0];
+  return first && codes.every((c) => c === first) ? first : "VALIDATION_FAILED";
+}
+
+/**
  * @param {{body?: import("zod").ZodTypeAny, query?: import("zod").ZodTypeAny, params?: import("zod").ZodTypeAny}} parts
  */
 function validator(parts) {
   return function validateRequest(req, _res, next) {
     const out = {};
     let fields = null;
+    const codes = [];
     for (const where of ["params", "query", "body"]) {
       const schema = parts[where];
       if (!schema) {
@@ -64,16 +84,18 @@ function validator(parts) {
         req[where] === undefined && where === "body" ? {} : req[where],
       );
       if (parsed.success) out[where] = parsed.data;
-      else
+      else {
         fields = {
           ...(fields || {}),
           ...fieldsOf(parsed.error, where === "body" ? "" : `${where}.`),
         };
+        codes.push(...parsed.error.issues.map(codeOf));
+      }
     }
     if (fields)
       return next(
         new AppError(
-          "VALIDATION_FAILED",
+          refusedAs(codes),
           "Check the highlighted fields",
           422,
           fields,
@@ -112,14 +134,14 @@ function idParamNames(path) {
  * A body parsed as a route's edge parses it, for code that is not a route: a Praxis AI card's run
  * sending the form's own request (docs/guides/praxis-ai.md §6.11), so a place's token becomes the
  * place and every default and rule applies as on the screen. The parsed body, or the same 422
- * VALIDATION_FAILED with the same per-field messages.
+ * (VALIDATION_FAILED, or the rule the contract named) with the same per-field messages.
  * @param {import("zod").ZodTypeAny} schema
  * @param {unknown} value
  */
 function parseBody(schema, value) {
   const parsed = schema.safeParse(value);
   if (parsed.success) return parsed.data;
-  throw new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, fieldsOf(parsed.error));
+  throw new AppError(refusedAs(parsed.error.issues.map(codeOf)), "Check the highlighted fields", 422, fieldsOf(parsed.error));
 }
 
-module.exports = { validator, uuidParams, idParamNames, fieldsOf, parseBody, UUID_RE };
+module.exports = { validator, uuidParams, idParamNames, fieldsOf, parseBody, refusedAs, codeOf, UUID_RE };
