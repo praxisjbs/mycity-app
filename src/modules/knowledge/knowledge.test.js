@@ -67,8 +67,8 @@ describe("steps and versions as staff read them", () => {
     expect(v.sameContent(a, b)).toBe(true);
     expect(v.sameContent(a, { ...b, steps: [...b.steps].reverse() })).toBe(false);
     expect(v.sameContent(a, { ...b, roles: ["Lead", "Designer"] })).toBe(false);
-    const draft = v.draftOut({ sop_version_id: DEPT, title: "Launch", purpose: "Why we launch.", scope: null, roles: ["Lead"], updated_at: "2026-11-11T09:00:00Z" }, [row], a);
-    expect(draft.has_changes).toBe(true);
+    const saved = v.draftOut({ sop_version_id: DEPT, title: "Launch", purpose: "Why we launch.", scope: null, roles: ["Lead"], updated_at: "2026-11-11T09:00:00Z" }, [row], a);
+    expect(saved.has_changes).toBe(true);
     expect(v.draftOut({ sop_version_id: DEPT, title: "Launch", roles: [] }, [], null).has_changes).toBe(true);
   });
 

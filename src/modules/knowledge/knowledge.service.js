@@ -99,19 +99,19 @@ async function get(user, id, db = pool) {
   const sop = await sopOf(db, id);
   const reach = await reachOf(db, user);
   const writer = mayWrite(reach, sop.department_id);
-  const inForce = await withSteps(db, await repo.inForceOf(db, sop.sop_id));
-  if (!writer && (sop.status !== "active" || !inForce.row)) throw notFound();
+  const current = await withSteps(db, await repo.inForceOf(db, sop.sop_id));
+  if (!writer && (sop.status !== "active" || !current.row)) throw notFound();
   const draft = writer ? await withSteps(db, await repo.draftOf(db, sop.sop_id)) : { row: null, steps: [] };
   const active = sop.status === "active";
-  const base = inForce.row ? v.contentOf(inForce.row, inForce.steps) : null;
+  const base = current.row ? v.contentOf(current.row, current.steps) : null;
   return {
     sop_id: sop.sop_id,
     number: sop.number,
     department_id: sop.department_id,
     department_name: sop.department_name,
     title: sop.title,
-    state: v.stateOf(sop.status, inForce.row && inForce.row.version),
-    in_force: inForce.row ? v.versionOut(sop, inForce.row, inForce.steps) : null,
+    state: v.stateOf(sop.status, current.row && current.row.version),
+    in_force: current.row ? v.versionOut(sop, current.row, current.steps) : null,
     draft: draft.row ? v.draftOut(draft.row, draft.steps, base) : null,
     archived_at: v.iso(sop.archived_at),
     archive_reason: sop.archive_reason || null,
