@@ -263,7 +263,7 @@ and schedules (`attendance_work_schedule`, `attendance_rule_breach`, `attendance
 locations and members, `attendance_check_in`, the `temporary_site` numbering scheme and the
 `attendance.temporary_site` workflow). `attendance_policy` and `attendance_policy_acknowledgement`
 are read by nothing after `1405` and are dropped by a later release (MIGRATIONS §8); policies do not
-use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
+use M10's `knowledge_article` tables, and nor do SOPs or training (M10 below).
 
 **Owes:**
 - Attendance (attendance.md §4, §13): the redesign's tables above are built (PR 2's in `1380` and
@@ -692,10 +692,17 @@ records a press acts on, so an id reads as a name and a card's verb never counts
 it. An answer's Excel file (§6.16) is a `document` of type `ai_answer_export`, no table of its own,
 and a question asked before a card keeps what it asked for in the answer's `metadata.ask`.
 
-**Owes:**
-- `updated_at` triggers for these seven tables (they came after `9095`).
-- Article audiences by role and department; MyCity's categories (SOPs, FAQs, Training).
-- The embedding dimension, fixed to the model `services/ai` uses, and its vector index.
+**Owes** (`docs/guides/knowledge.md` §4, decided 11/11/2026):
+- `10400` SOPs: `sop`, `sop_version`, `sop_step` (a department's structured, versioned procedures).
+- `10410` Training: `training_course`, `training_item`, `training_assignment`,
+  `training_assignment_audience`, `training_enrolment`, `training_item_progress` (courses, who must take
+  them, progress, proof and the certificate's number and PDF).
+- `10490` seed: the capabilities `sops.manage` and `training.manage`; the numbering schemes `sop`,
+  `training_course` and `training_certificate`. Nothing about a person, SOP or course (A26).
+- `10000`'s article tables (`knowledge_category`, `knowledge_article`, `knowledge_article_version`,
+  `knowledge_embedding`) are not used: SOPs need a department, drafts and steps, and FAQs are gone. A
+  later release drops them with `ai_message_citation.knowledge_article_version_id` (MIGRATIONS §8); until
+  then they keep the `updated_at` triggers and vector dimension they were owed only if something reads them.
 
 ### M11 Handover · 11000 to 11999 · TB
 

@@ -11,6 +11,7 @@ import { MyProfilePage } from "./Profile";
 import { MyQueriesPage } from "./Queries";
 import { MyRequestsPage } from "@/features/expenses/MyRequests";
 import { MySecurityPage } from "./Security";
+import { MyTraining } from "./MyTraining";
 
 export default function Ess({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -27,6 +28,8 @@ export default function Ess({ tab }: ModuleScreenProps) {
     case "my-documents": return <MyDocumentsPage />;
     case "org-chart": return <OrgTree mode="viewer" />;
     case "my-security": return <MySecurityPage />;
+    case "my-training":
+      return <MyTraining />;
     default: return null;
   }
 }
