@@ -122,6 +122,8 @@
 /packages/contract/schemas/integrations.js         @tomblakeasaah196 @swizfcodes
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
+/src/modules/training/                             @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/training.js             @tomblakeasaah196 @swizfcodes
 /src/modules/payroll/                              @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/payroll.js              @tomblakeasaah196 @swizfcodes
 /src/modules/payslips/                             @tomblakeasaah196 @swizfcodes

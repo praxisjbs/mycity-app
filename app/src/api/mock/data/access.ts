@@ -23,6 +23,8 @@ export const CAPABILITIES = [
   { code: "performance.manage", name: "Run Performance", description: "Run the cycle: quarters and their rules, rounds, reviewer changes, conduct, improvement plans, probation outcomes and imports." },
   { code: "policies.manage", name: "Manage Policies", description: "Write, publish, withdraw and archive company policies, and see who has acknowledged them." },
   { code: "queries.configure", name: "Configure Queries", description: "Write the query rules, the consequence chain and the letter templates." },
+  { code: "sops.manage", name: "Manage SOPs", description: "Write, publish and archive any department's SOPs." },
+  { code: "training.manage", name: "Manage Training", description: "Build, publish, assign and archive courses, and see everyone's progress and certificates." },
   { code: "workspace.late_reasons", name: "Manage Late Reasons", description: "Add the reasons Why Late offers on a late task, and switch them off or on." },
 ];
 
@@ -33,7 +35,7 @@ const MANAGES = ["alerts.clear", "home.reports", "home.team"];
 /** Role code → the capabilities it holds by default. */
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
   implementation: EVERY,
-  operations_people: [...HOME, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "partnerships.configure", "partnerships.money", "payroll.configure", "performance.manage", "policies.manage", "queries.configure", "workspace.late_reasons"],
+  operations_people: [...HOME, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "partnerships.configure", "partnerships.money", "payroll.configure", "performance.manage", "policies.manage", "queries.configure", "sops.manage", "training.manage", "workspace.late_reasons"],
   management: [...HOME, "goals.company", "goals.function", "goals.view_all", "partnerships.money", "workspace.late_reasons"],
   head_of_department: [...MANAGES, "goals.function"],
   manager: MANAGES,

@@ -165,7 +165,7 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `GET /api/v1/training/courses/:id` | → `Course` | `knowledge` view, `training.manage` | no | Items, settings, counts |
 | `PATCH /api/v1/training/courses/:id` | `CourseUpdate` (`title`, `summary`, `library`, `proof_required`, `proof_prompt`, `issue_certificate`) → `Course` | `knowledge` edit, `training.manage` | no | |
 | `POST /api/v1/training/courses/:id/items` | `ItemCreate` → `Course` | `knowledge` edit, `training.manage` | no | At most 40 |
-| `PATCH /api/v1/training/items/:id` | `ItemUpdate` → `Course` | `knowledge` edit, `training.manage` | no | |
+| `PATCH /api/v1/training/items/:id` | `ItemCreate` (the whole item) → `Course` | `knowledge` edit, `training.manage` | no | |
 | `DELETE /api/v1/training/items/:id` | → `Course` | `knowledge` edit, `training.manage` | no | §6.6 on a published course |
 | `PUT /api/v1/training/courses/:id/order` | `ItemOrder` (`item_ids`) → `Course` | `knowledge` edit, `training.manage` | no | |
 | `POST /api/v1/training/lesson-with-ai` | `LessonWithAi` (`text` or `document_id`, `title`) → `LessonSuggestion` | `knowledge` edit, `training.manage` | no | A suggestion only. 503 `AI_UNAVAILABLE` |
@@ -176,7 +176,7 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `POST /api/v1/training/assignments/:id/withdraw` | `EmptyBody` → `Assignment` | `knowledge` edit, `training.manage` | no | §6.7 |
 | `GET /api/v1/training/courses/:id/people` | `EnrolmentListQuery` (`status`: `not_started`, `in_progress`, `completed`, `overdue`; `q`, `sort`) → `EnrolmentPage` | `knowledge` view, `training.manage` | yes, 25 | |
 | `POST /api/v1/training/courses/:id/remind` | `EmptyBody` → `{ reminded }` | `knowledge` edit, `training.manage` | no | Everyone overdue, once a day each |
-| `GET /api/v1/training/me` | `MyTrainingQuery` (`state`: `to_do`, `in_progress`, `completed`, `library`; `q`) → `MyCoursePage` | self, own | yes, 25 | `library`: published Library courses the person is not enrolled on |
+| `GET /api/v1/training/me` | `MyTrainingQuery` (`list`: `to_do`, `in_progress`, `completed`, `library`; `q`) → `MyCoursePage` | self, own | yes, 25 | `library`: published Library courses the person is not enrolled on |
 | `GET /api/v1/training/me/courses/:id` | → `MyCourse` | self, own | no | A course they are enrolled on, or a Library course |
 | `POST /api/v1/training/me/courses/:id/start` | `EmptyBody` → `MyCourse` | self, own | no | Library courses, or their own enrolment (sets `started_at`) |
 | `POST /api/v1/training/me/items/:id/done` | `EmptyBody` → `MyCourse` | self, own | no | May complete the course (§6.8) |
@@ -473,6 +473,7 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · PR 1 built: the contracts, migrations `10400` and `10410`, seed `10490`, the capabilities and schemes (§4, §8). Decided on the way: a published SOP version's CHECK spells out `version IS NOT NULL` (a CHECK lets NULL through); `training_item`'s position is unique at commit, so a reorder can swap two; a change to an item sends the whole item (`ItemCreate`, no second schema); My Training's lists are one query, `list` (`to_do`, `in_progress`, `completed`, `library`). Settings · Documents & Numbering lists the three new schemes (SOP, Training Course, Training Certificate).
 - 11/11/2026 · TB · Written from TB's eight answers of 11/11/2026 and the Modules Review of 4
   November 2026: FAQs leave the hub (Announcements left on 29/10/2026); SOPs are each department's
   own structured, versioned procedures written by its head or `sops.manage`, read by everyone,

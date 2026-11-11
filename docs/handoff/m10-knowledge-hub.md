@@ -12,7 +12,7 @@ line to §3.
 | Owner | TB (Tom-Blake Asaah) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 18 Dec 2026 (MILESTONES §15) |
-| Pull requests | PR 0 (this documentation) on `claude/great-lovelace-c21qmp` |
+| Pull requests | PR 0 (this documentation) praxisjbs/mycity-app#112; PR 1 on `claude/great-lovelace-c21qmp` once #112 merges |
 
 Praxis AI and AI Control, M10's other half, were brought forward and are built (`praxis-ai.md`,
 `ai-control.md`); this tracker is the Knowledge Hub's only.
@@ -59,11 +59,12 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 - [ ] Written ticked for `knowledge.md` in `docs/guides/README.md` once PR 0 merges
 
 ### PR 1 · Contract, data and scaffolding
-- [ ] `knowledge.js` and `training.js` contracts, `gen:contract`
-- [ ] Migrations `10400`, `10410`; seed `10490` (capabilities, numbering schemes)
-- [ ] `sops.manage`, `training.manage` in `access.catalog.js`; the schemes in `schemes.js`
-- [ ] The `training` module folder and CODEOWNERS line; record types `sop`, `training_course`, `training_enrolment`
-- [ ] DATABASE_SCHEMA M10 as built; `npm run ci` green
+- [x] `knowledge.js` and `training.js` contracts, `gen:contract` (11/11/2026)
+- [x] Migrations `10400`, `10410`; seed `10490` (capabilities, numbering schemes) (11/11/2026)
+- [x] `sops.manage`, `training.manage` in `access.catalog.js`; the schemes in `schemes.js`, Settings' labels and the contract's document types (11/11/2026)
+- [x] The `training` module folder and CODEOWNERS line; record types `sop`, `training_course`, `training_enrolment` (11/11/2026)
+- [x] DATABASE_SCHEMA M10 as built (11/11/2026)
+- [ ] `npm run ci` green; the PR marked ready
 
 ### PR 2 · SOPs
 - [ ] Backend: repo, service (the writer rule, §6.2), controller, routes, events, search, AI reads, `sop-draft`
@@ -92,6 +93,7 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 
 ## 3 · Log
 
+- 11/11/2026 · TB · PR 1 built on top of PR 0: contracts `knowledge.js` and `training.js`, migrations `10400` and `10410`, seed `10490`, the capabilities, schemes, labels and record types; `tests/integration/knowledge-schema.test.js` (16) passes, and so do `settings.test.js` and `home-schema.test.js` with their lists updated. Found on the way: a `published` SOP version with no number passed its CHECK (NULL > 0 is unknown), fixed before merge; Settings · Documents & Numbering answered 500 for the new types until the contract's `DOC_TYPES` listed them. Next: PR 2 (SOPs) and PR 3 (training) can run in parallel once PR 1 merges.
 - 11/11/2026 · TB · PR 0: the guide written from TB's eight answers of 11/11/2026 and the Modules Review of 4
   November (FAQs and Announcements out; SOPs kept as department procedures; Training as a course of items with
   Mark Done, proof and a signed certificate; assignments with due dates and tasks, and a Library; Draft With AI

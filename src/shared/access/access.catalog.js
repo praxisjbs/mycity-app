@@ -235,6 +235,18 @@ const CAPABILITY_CATALOG = [
     description: "Write, publish, withdraw and archive company policies, and see who has acknowledged them.",
   },
   {
+    code: "sops.manage",
+    module: "knowledge",
+    label: "Manage SOPs",
+    description: "Write, publish and archive any department's SOPs.",
+  },
+  {
+    code: "training.manage",
+    module: "knowledge",
+    label: "Manage Training",
+    description: "Build, publish, assign and archive courses, and see everyone's progress and certificates.",
+  },
+  {
     code: "mailbox.signature",
     module: "mailbox",
     label: "Configure Signature",
