@@ -42,6 +42,8 @@ export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
      */
     /* Knowledge Hub · Policies is where policies are written (docs/guides/policies.md §8); staff read theirs on Policy Updates. */
     if (mod.key === "knowledge" && t.slug === "policies") return hasCapability(me, "policies.manage");
+    /* Knowledge Hub · Training is where courses are built and assigned (docs/guides/knowledge.md §8); staff take theirs on ESS · My Training. */
+    if (mod.key === "knowledge" && t.slug === "training") return hasCapability(me, "training.manage");
     if (mod.key === "settings" && SYSTEM_HEALTH_TABS.includes(t.slug)) return healthView(me);
     if (mod.key === "settings" && t.slug === "integrations") return integrationsView(me);
     if (mod.key === "settings") return !!FULL(me);

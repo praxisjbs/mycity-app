@@ -13,7 +13,7 @@ import { MyRequestsPage } from "@/features/expenses/MyRequests";
 import { MySecurityPage } from "./Security";
 import { MyTraining } from "./MyTraining";
 
-export default function Ess({ tab }: ModuleScreenProps) {
+export default function Ess({ tab, id }: ModuleScreenProps) {
   switch (tab) {
     case "my-profile": return <MyProfilePage />;
     case "my-attendance": return <MyAttendancePage />;
@@ -21,7 +21,7 @@ export default function Ess({ tab }: ModuleScreenProps) {
     case "my-devices": return <MyDevicesPage />;
     case "policy-updates": return <PolicyUpdatesPage />;
     case "my-performance": return <MyPerformancePage />;
-    case "my-payslips": return <MyPayslipsPage />;
+    case "my-payslips": return <MyPayslipsPage id={id} />;
     case "my-leave": return <MyLeavePage />;
     case "my-requests": return <MyRequestsPage />;
     case "my-queries": return <MyQueriesPage />;
@@ -29,7 +29,7 @@ export default function Ess({ tab }: ModuleScreenProps) {
     case "org-chart": return <OrgTree mode="viewer" />;
     case "my-security": return <MySecurityPage />;
     case "my-training":
-      return <MyTraining />;
+      return <MyTraining id={id} />;
     default: return null;
   }
 }

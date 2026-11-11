@@ -17,7 +17,7 @@
  *   signature  pending, signed, declined, expired
  */
 const { z } = require("zod");
-const { text, optionalText, isoDateTime } = require("./common");
+const { text, optionalText, isoDate, isoDateTime } = require("./common");
 const { RichTextBlock } = require("./policies");
 
 const SignatureRequestStatus = z.enum(["pending", "completed", "declined", "expired", "revoked"]);
@@ -33,6 +33,8 @@ const SignatureMethod = z.enum(["draw", "type", "paper"]);
 const SignatoryRole = z.enum(["candidate", "employee", "partner", "mycity"]);
 /** What was signed, as the verification page names it. */
 const SignedDocumentType = z.enum(["offer_letter", "employment_contract", "agreement"]);
+/** What Verify a Document can check: a signed document, or a training certificate (docs/guides/knowledge.md §6.10). */
+const VerifiedDocumentType = z.enum([...SignedDocumentType.options, "training_certificate"]);
 /** A verdict of the two checks (A12). */
 const Verdict = z.enum(["matches", "differs"]);
 
@@ -132,10 +134,25 @@ const SignerView = z
 /** By reference: OFF-0018, CON-0004, AGR-2026-0001. A reference is not a secret, so it reveals no content. */
 const VerifyRefParams = z.object({ ref: z.string().trim().min(3).max(60) }).strict();
 
+/**
+ * A training certificate as it was issued (docs/guides/knowledge.md §6.10): the holder, the course,
+ * the completion date. Its number alone shows it; nothing else about the person is shown.
+ */
+const CertificateFacts = z
+  .object({
+    holder_name: z.string(),
+    course_number: z.string(),
+    course_title: z.string(),
+    completed_on: isoDate,
+    items: z.number().int().min(0),
+    minutes: z.number().int().min(1).nullable(),
+  })
+  .strict();
+
 const VerifyResult = z
   .object({
     reference: z.string(),
-    document_type: SignedDocumentType,
+    document_type: VerifiedDocumentType,
     title: z.string(),
     issued_by: z.string(),
     issued_at: isoDateTime,
@@ -148,6 +165,8 @@ const VerifyResult = z
     /** The two checks (A12): the content matches what was signed; the stored file is the one sealed. */
     content: Verdict,
     artifact: Verdict,
+    /** A training certificate's facts; null for a signed document. */
+    certificate: CertificateFacts.nullable(),
   })
   .strict();
 
@@ -192,6 +211,7 @@ const TABLES = {
   SignatureCodeEmailVars: { table: null, reason: "the variables of templates/email/signature-code.html" },
   SignatureCompletedEmailVars: { table: null, reason: "the variables of templates/email/signature-completed.html" },
   VerifyRefParams: { table: null, reason: "a document's reference" },
+  CertificateFacts: { table: null, reason: "a training certificate as issued, kept on training_enrolment" },
   VerifyResult: { table: null, reason: "what verification shows: status, signers and the two verdicts" },
   VerifyByToken: { table: null, reason: "verification from the QR: the record and its document" },
 };
@@ -204,6 +224,7 @@ module.exports = {
   SignatureMethod,
   SignatoryRole,
   SignedDocumentType,
+  VerifiedDocumentType,
   Verdict,
   SignTokenParams,
   SignCodeVerify,
@@ -217,6 +238,7 @@ module.exports = {
   SignatureCompletedEmailVars,
   SignerView,
   VerifyRefParams,
+  CertificateFacts,
   VerifyResult,
   VerifyByToken,
 };

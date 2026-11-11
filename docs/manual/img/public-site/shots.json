@@ -129,7 +129,7 @@
   },
   "public-verify": {
     "spec": "bdadc6d729a58dae",
-    "source": "b805629109f2f321",
+    "source": "ddd32f07e982c923",
     "devices": [
       "desktop",
       "phone"
@@ -137,7 +137,15 @@
   },
   "public-verify-agreement": {
     "spec": "674cb11364f1e7be",
-    "source": "b805629109f2f321",
+    "source": "ddd32f07e982c923",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "public-verify-certificate": {
+    "spec": "e9c161869823d53c",
+    "source": "ddd32f07e982c923",
     "devices": [
       "desktop",
       "phone"

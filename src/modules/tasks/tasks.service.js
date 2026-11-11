@@ -1137,6 +1137,35 @@ async function cancelForRecord(client, actor, { entity_type: entityType, entity_
   }
 }
 
+/**
+ * A record that tasks carry out is done (a course its person completed, docs/guides/knowledge.md
+ * §6.7): its open tasks move to Done with it, in the caller's transaction, as the system's work.
+ * Nothing waits on such a task, so no one waiting is told.
+ */
+async function completeForRecord(client, actor, { entity_type: entityType, entity_id: entityId }) {
+  for (const t of await repo.openForRecord(client, entityType, entityId)) {
+    const now = new Date();
+    await repo.update(client, t.task_id, { status: "done", completed_at: now });
+    await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id: t.task_id } });
+    await repo.addActivity(client, {
+      task_id: t.task_id,
+      actor_user_id: actor ? actor.user_id : null,
+      kind: "status_changed",
+      from_status: t.status,
+      to_status: "done",
+    });
+    const after = await repo.get(client, t.task_id);
+    await emit(client, {
+      key: EVENTS.TASK_COMPLETED,
+      entity: { type: "task", id: t.task_id },
+      actor,
+      before: { status: t.status },
+      after: { status: "done" },
+      payload: payloadOf(after, { from_status: t.status, month: `${lagos.dateOf(now).slice(0, 7)}-01` }),
+    });
+  }
+}
+
 /** A comment, by anyone who may open the task, its watchers included (workspace.md §6). */
 async function comment(actor, scope, id, { body }) {
   return tx(async (client) => {
@@ -1599,6 +1628,7 @@ module.exports = {
   askRescope,
   settleRescope,
   cancelForRecord,
+  completeForRecord,
   toTask,
   toRef,
   readable,

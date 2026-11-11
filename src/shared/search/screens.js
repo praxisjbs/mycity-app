@@ -179,6 +179,8 @@ function tabVisible(screen, reader) {
   if (module === "home" && tab === "reports") return hasCapability(reader, "home.reports");
   // Knowledge Hub · Policies is for those who write policies; everyone reads theirs on Policy Updates.
   if (module === "knowledge" && tab === "policies") return hasCapability(reader, "policies.manage");
+  // Knowledge Hub · Training is for those who build and assign courses; everyone takes theirs on My Training.
+  if (module === "knowledge" && tab === "training") return hasCapability(reader, "training.manage");
   // A line manager decides their team's leave on People · Leave (docs/guides/ess.md §2).
   if (module === "people" && !full) return tab === "attendance" || tab === "organogram" || (tab === "leave" && reader.manages_people);
   // Announcements is for those who post them (`announcements.post`, as every route asks).

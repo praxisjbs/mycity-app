@@ -1361,7 +1361,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "tasks.TaskCreate",
-      "schema_sha": "d1d898d1fbebb669",
+      "schema_sha": "912bfcfc83f03e01",
       "screen": null
     },
     {
@@ -1372,7 +1372,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "tasks.TaskChange",
-      "schema_sha": "a516f20e7e5bacf6",
+      "schema_sha": "25e7fd1c093599ae",
       "screen": null
     },
     {
@@ -2399,6 +2399,50 @@
       "screen": null
     },
     {
+      "key": "training.library",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "training.MyTrainingQuery",
+      "schema_sha": "707307568ddee42c",
+      "screen": null
+    },
+    {
+      "key": "training.mine",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "training.MyTrainingQuery",
+      "schema_sha": "707307568ddee42c",
+      "screen": null
+    },
+    {
+      "key": "training.overdue",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "common.PageQuery",
+      "schema_sha": "463693b1b2726c8c",
+      "screen": null
+    },
+    {
+      "key": "training.progress",
+      "kind": "read",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "training.CourseListQuery",
+      "schema_sha": "dad77c04b79f7946",
+      "screen": null
+    },
+    {
       "key": "vacancies.get",
       "kind": "read",
       "module_key": "recruitment",
@@ -2784,6 +2828,17 @@
       "screen": "ess.policy-updates"
     },
     {
+      "key": "knowledge.route.build_or_assign_a_training_course",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.training"
+    },
+    {
       "key": "knowledge.route.change_the_attendance_policy",
       "kind": "route",
       "module_key": "knowledge",
@@ -2828,6 +2883,17 @@
       "screen": "ess.policy-updates"
     },
     {
+      "key": "knowledge.route.remind_people_overdue_on_a_course",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "knowledge.training"
+    },
+    {
       "key": "knowledge.route.start_a_new_sop",
       "kind": "route",
       "module_key": "knowledge",
@@ -2837,6 +2903,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "knowledge.sops"
+    },
+    {
+      "key": "knowledge.route.take_a_course_or_see_my_certificates",
+      "kind": "route",
+      "module_key": "knowledge",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "ess.my-training"
     },
     {
       "key": "knowledge.route.write_change_or_publish_an_sop",

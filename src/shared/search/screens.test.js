@@ -35,3 +35,13 @@ describe("Staff Community's Announcements", () => {
     expect(tabVisible(announcements, reader({ community: ["view"] }, { is_ceo: true }))).toBe(true);
   });
 });
+
+describe("Knowledge Hub · Training", () => {
+  const training = { module: "knowledge", tab: "training" };
+  test("follows training.manage, as every course route asks; staff find My Training instead", () => {
+    expect(tabVisible(training, reader({ knowledge: ["view"] }, { capabilities: ["training.manage"] }))).toBe(true);
+    expect(tabVisible(training, reader({ knowledge: ["view", "create", "edit", "delete"] }))).toBe(false);
+    expect(tabVisible(training, reader({ knowledge: ["view"] }, { is_ceo: true }))).toBe(true);
+    expect(tabVisible({ module: "ess", tab: "my-training" }, reader({ ess: ["view"] }))).toBe(true);
+  });
+});

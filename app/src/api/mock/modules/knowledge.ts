@@ -1,17 +1,14 @@
 import type { RichTextBlock, RichTextSpan, Sop, SopDraft, SopDraftSuggestion, SopRow, SopStep, SopVersion, SopVersionRow } from "@mycity/contract/contract.gen.ts";
 import knowledge from "@mycity/contract/schemas/knowledge.js";
-import type { Overdue, Resource } from "@/api/types/knowledge";
 import { MODULES } from "@/shell/catalogue";
-import { at, created, fail, invalid, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
-import { byKey, refKey, SIGN_INS } from "../data/people";
+import { at, created, fail, invalid, notFound, ok, paged, route, sid, type Req } from "../core";
+import { byKey, SIGN_INS } from "../data/people";
 
 /**
  * Knowledge Hub · SOPs on the mock, in the contract's shapes (docs/guides/knowledge.md §4 to §6):
  * five departments' procedures with their versions, a draft being written, one still a draft and
  * one archived; who writes is the server's rule (§6.2): Operations and the CEO hold Manage SOPs,
  * and Ngozi heads Marketing & Sales. Steps are Markdown, drawn as the API draws them.
- *
- * Training below stays on its INTERIM shapes until its screens move to the contract (PR 5).
  */
 
 /* ------------------------------------------------------------------ *
@@ -423,37 +420,3 @@ route("GET /api/v1/knowledge/sops/:id/versions", (req) => {
   const rows: SopVersionRow[] = [...s.versions].reverse().map((v) => ({ sop_version_id: v.sop_version_id, version: v.version, title: v.title, note: v.note, published_at: v.published_at, published_by_name: nameOf(v.published_by) }));
   return paged(rows, req);
 });
-
-/* ------------------------------------------------------------------ *
- * Training (INTERIM until PR 5)
- * ------------------------------------------------------------------ */
-const canWrite = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
-
-const RES: Resource[] = [
-  ["Platform walkthrough", "A 12 minute tour of the modules you will use every day.", "Video", null, 25, 23],
-  ["NDPA data protection", "Annual refresher. Certificate issued on completion.", "Course", isoDaysAhead(46), 25, 19],
-  ["Partnership pipeline training", "For Marketing and Sales. How stages and lead owners work.", "Document", null, 6, 4],
-  ["Expense requests", "How to raise, what to attach, and how the chain works.", "Document", isoDaysAhead(16), 25, 9],
-].map((r, i) => ({ resource_id: sid(`res:${i}`), title: r[0] as string, description: r[1] as string, kind: r[2] as Resource["kind"], due: r[3] as string | null, assigned: r[4] as number, completed: r[5] as number }));
-const OVERDUE: Overdue[] = [["bashir", 1], ["emeka", 1], ["chidera", 1], ["tolu", 3], ["seyi", 3], ["ngozi", 3]].map(([u, r], i) => ({ key: `od:${i}`, person: refKey(u as string), resource: RES[r as number].title, due: RES[r as number].due! }));
-route("GET /api/v1/knowledge/training/summary", () => {
-  const a = RES.reduce((s, r) => s + r.assigned, 0);
-  const c = RES.reduce((s, r) => s + r.completed, 0);
-  return ok({ resources: RES.length, completion_pct: Math.round((c * 100) / Math.max(1, a)), overdue: OVERDUE.length, certificates: 19 });
-});
-route("GET /api/v1/knowledge/training", (req) => paged(RES, req, { search: (r) => [r.title, r.description] }));
-route("GET /api/v1/knowledge/training/overdue", (req) => paged(OVERDUE, req, { search: (o) => [o.person.display_name, o.resource] }));
-route("POST /api/v1/knowledge/training/overdue/remind", () => ok({ reminded: OVERDUE.length }));
-route("POST /api/v1/knowledge/training", (req) => {
-  if (!canWrite(req.user!)) return fail(403, "FORBIDDEN", "People and Operations assign training.");
-  const b = req.body as Record<string, string>;
-  const f: Record<string, string[]> = {};
-  if (!b.title?.trim()) f.title = ["Name the resource"];
-  if (!b.description || b.description.trim().length < 10) f.description = ["What it covers, in a sentence"];
-  if (b.audience === "department" && !b.department) f.department = ["Pick the department"];
-  if (Object.keys(f).length) return invalid(f);
-  const r: Resource = { resource_id: sid(`res:new:${RES.length}`), title: b.title.trim(), description: b.description.trim(), kind: (b.kind as Resource["kind"]) ?? "Document", due: b.due || null, assigned: b.audience === "department" ? 6 : 25, completed: 0 };
-  RES.push(r);
-  return created(r);
-});
-

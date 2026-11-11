@@ -39,6 +39,13 @@ describe("each host gets its own build", () => {
     expect(res.headers["content-security-policy"]).toMatch(/default-src 'self'/);
   });
 
+  test("only the staff app may frame a course's YouTube video, through YouTube's privacy-enhanced domain", async () => {
+    expect((await hub("/knowledge?tab=training")).headers["content-security-policy"]).toMatch(/frame-src 'self' https:\/\/www\.youtube-nocookie\.com(;|$)/);
+    const pub = (await go("/")).headers["content-security-policy"];
+    expect(pub).toMatch(/frame-src 'self' ?(;|$)/);
+    expect(pub).not.toContain("youtube");
+  });
+
   test("hashed assets are cached for a year; the service worker is always revalidated", async () => {
     expect((await hub("/assets/app.3f9c.js")).headers["cache-control"]).toMatch(/max-age=31536000, immutable/);
     expect((await hub("/sw.js")).headers["cache-control"]).toBe("no-cache");

@@ -208,6 +208,13 @@ const ACTIONS = Object.freeze([
     orHead: true,
     words: ["sop", "write an sop", "procedure", "standard operating procedure", "department procedure"],
   }),
+  a("new_course", "New Course", {
+    screen: "knowledge.training",
+    params: { action: "new" },
+    need: ["knowledge", "create"],
+    capability: "training.manage",
+    words: ["course", "build a course", "create a course", "new lesson"],
+  }),
   a("raise_query", "Raise a Query", {
     screen: "queries.queries",
     params: { action: "new" },
@@ -230,7 +237,7 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["task", "add task", "create task", "to do", "todo", "set a task", "assign work"],
   }),
-  // Payroll Runs opens its New Run on `action=new` (docs/guides/payroll.md §9; the rebuilt screen, PR 7).
+  // Payroll Runs opens its New Run on `action=new`, the screen's own New action (docs/guides/payroll.md §9, §10).
   a("new_run", "New Run", {
     screen: "payroll.payroll-runs",
     params: { action: "new" },
