@@ -35,11 +35,13 @@ afterEach(() => {
 });
 
 describe("Recruitment · Analytics", () => {
-  it("shows the funnel across every role and the screening scores", async () => {
+  it("shows four figures, the funnel, the screening scores, the assessments' averages, and the offers and pool", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=analytics");
     expect(await screen.findByText("Funnel, All Roles", undefined, { timeout: 8000 })).toBeTruthy();
     expect(screen.getByText("Screening Scores")).toBeTruthy();
     await settled();
+    // Four figures, then the assessments' averages and where offers and the pool stand.
+    for (const label of ["Open Vacancies", "Candidates", "Shortlisted", "Assessment Averages", "Offers and Pool", "In the Pool"]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     // Each stage of the funnel has its bar.
     for (const stage of ["Applied", "Screening", "Interview", "Shortlist"]) expect(screen.getAllByText(stage).length).toBeGreaterThan(0);
     expect(copyProblems()).toEqual([]);

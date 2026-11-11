@@ -886,18 +886,24 @@ Only you, and the CEO, can open the file it makes.
 
 ## Analytics {#recruitment-analytics screen=recruitment/analytics icon=chart}
 
-Analytics holds Recruitment's charts, across every role you may see.
+Analytics holds Recruitment's figures and charts, across every role you may see.
 
 ![The Analytics screen](shot:recruitment-analytics)
 
 ### Read the charts {#recruitment-analytics-read}
 
 1. Open [Recruitment · Analytics](/recruitment?tab=analytics).
-2. **Funnel, All Roles** shows how many candidates stand at each stage now, from **Applied** to
+2. Along the top, the tiles count the **Open Vacancies**, the **Candidates**, those **Shortlisted** and
+   the offers **Accepted This Month**.
+3. **Funnel, All Roles** shows how many candidates stand at each stage now, from **Applied** to
    **Shortlist**.
-3. **Screening Scores** shows how many candidates fall in each band of screening score: the AI's read
+4. **Screening Scores** shows how many candidates fall in each band of screening score: the AI's read
    of the CV when there is one, otherwise the estimate from the form.
-4. On a phone the two charts sit one under the other.
+5. **Assessment Averages** shows each assessment's average score. Beside its title, how many
+   answers wait to be marked.
+6. **Offers and Pool** shows the offers **With Approval**, **To Send** and **With Candidates**, and who
+   is **In the Pool**, **Invited Back** and **Hired From the Pool**.
+7. On a phone the tiles come two a row and the cards sit one under the other.
 
 ```shot recruitment-vacancies
 open: /recruitment?tab=vacancies
