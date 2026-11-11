@@ -1807,6 +1807,10 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   version; the run's snapshot and the report carry each rate's source; `NO_CONVENTIONS` counts two conventions. The
   Configurations screen: the Source column on Statutory Items and PAYE Bands, the source fields and No Legal Source in Save
   Rate and Set Bands, Remove Change, PAYE Basis gone, Last Day of Month. A convention's source stays PR 11's (§6.12 rule 12).
+  Checked on the real API (a local database with the mock's 25 people, the API, the worker and the app in live mode) at
+  1440 and 390 px: an empty Save Rate marks the missing source on its fields, a rate saved with its source and an uploaded
+  instrument reads its Source in the row, a rate from tomorrow taken back with Remove Change, Last Day of Month saved and
+  read on the card, Switch On asking for two conventions and no PAYE Basis, and No Legal Source with its Reason on a phone.
 
 ### PR 11 · The statutory engine to the research (`m6/statutory-law`)
 
@@ -1874,7 +1878,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `PayrollRunSubmit`, `PayrollRunPaid`, `PayrollRunExclude`, `PayrollRunInclude`, `PayrollProblem`, `PayrollProblemPage`,
   `PayrollAdjustment`, `PayrollAdjustmentPage`, `PayrollAdjustmentParams`, `PayrollAdjustmentAdd`, `PayrollSettings`, `PayrollSettingsChange`,
   `PayslipEmailAll`; the assistant's (PR 6): `PayrollMonthQuery` (the `payroll.month` summary's month), `PayrollRunSubmission` and
-  `PayrollRunAdjust` (the cards of Submit for Approval and Add Adjustment: the screen's request with the run beside it); and the
+  `PayrollRunAdjust` (the cards of Submit for Approval and Add Adjustment: the screen's request with the run beside it);
+  `PayrollSettingsVersionParams` (PR 10, the path of the setting's Remove Change); and the
   pieces they are made of: `RunStatus`, `AdjustmentKind`, `PayeBasis`,
   `ProblemSeverity`, `ProblemCode`, `PayrollRunCounts`, `PayrollTrendMonth`, `PayrollSettingsVersion`.
 - `payslips.js`: `Payslip`, `PayslipLine`, `PayslipDetail`, `PayslipListQuery`, `PayslipPage`, `PayslipVars`,
@@ -1894,7 +1899,9 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 - `statutory.js` (PR 5): `StatutoryRate`, `StatutoryRateListQuery`, `StatutoryRatePage`, `StatutoryRatesSave`,
   `StatutoryReportVars`; and `StatutoryItem`, `StatutoryKind`, `StatutoryBase`, `StatutoryBand`, `StatutoryVersionBrief`,
   `StatutoryItemState`, `StatutoryItems` (`GET /statutory/items`), `StatutoryReportRow`, `StatutoryReportItem`, and the
-  code lists `ITEM_KIND` and `ITEM_BASES`.
+  code lists `ITEM_KIND` and `ITEM_BASES`; PR 10 added `StatutorySource` (a version's legal source as it is read back),
+  `StatutoryVersionParams` (the path of a rate's Remove Change), `SOURCE_KEYS` and `SOURCE_REQUIRED` (the code a missing
+  source is refused with).
 - Shared from `common.js`: `EmptyBody`, `PageQuery`, `money`, `isoDate`, `uuid`, `text`, and, added in PR 1,
   `positiveMoney` (an amount above zero, the field error "Enter an amount") and `monthStart` (a month's first day).
   `ExportFile` is `documents.js`'s.
@@ -1911,7 +1918,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `ess` (the routes, in `ess.earnings.js`, `ess.controller.js`, `ess.routes.js`), `dashboard/sources/payroll.source.js`, `settings.service.js`, `shared/access/access.catalog.js`,
   `shared/rbac/field-mask.js`, `shared/workflow/definitions.js`, `shared/route-map.js`, `shared/search/screens.js`.
 - **Schema:** `migrations/6000_payroll.sql`, `6010_payroll_deductions.sql`, `6020_payroll_advanced.sql`,
-  `6030_leave_unpaid.sql`; `seeds/reference/6099_seed_payroll.sql`; `seeds/staging/NN_payroll.js`.
+  `6030_leave_unpaid.sql`, `6040_statutory_sources.sql`; `seeds/reference/6099_seed_payroll.sql`; `seeds/staging/NN_payroll.js`.
 - **Templates:** `templates/documents/payslip.html`, `payslip-batch.html`, `statutory-report.html`;
   `templates/email/payslip-ready.html`.
 - **Frontend:** `app/src/features/payroll/` (the files of PR 7; `Deductions.tsx` came with PR 3 and `Configurations.tsx`
