@@ -23,7 +23,8 @@
  * Run only by `scripts/db/seed.js --staging` (which refuses production three ways), after
  * 10_staff.js. Idempotent: an SOP is found by its department and title, a course by its title, and
  * a second run adds nothing. A part that fails is logged and the rest carry on, so a demonstration
- * gap never stops a deploy; a PDF that cannot be printed leaves its item out.
+ * gap never stops a deploy; a PDF that cannot be printed leaves its item out, and the next run
+ * adds it to the course in its place (an item is found by its kind and title).
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -174,6 +175,41 @@ async function itemOf(pool, plan, by, log) {
   }
 }
 
+/** The ids of a course's items in the plan's order, then any item the plan does not name. */
+function orderOf(items, plan) {
+  const key = (i) => `${i.kind}|${i.title}`;
+  const planned = plan.items.map((p) => items.find((i) => key(i) === key(p))).filter(Boolean);
+  const rest = items.filter((i) => !planned.includes(i));
+  return [...planned, ...rest].map((i) => i.training_item_id);
+}
+
+/**
+ * An existing course gets the plan's items it lacks (a PDF a first run could not print), each
+ * put back in the plan's order. An archived course is left as it is.
+ * @returns {Promise<number>} how many items were added
+ */
+async function completeCourse(pool, by, id, plan, log) {
+  const training = src("modules/training/training.service");
+  const course = await training.get(id);
+  if (course.state === "archived") return 0;
+  const has = new Set(course.items.map((i) => `${i.kind}|${i.title}`));
+  let added = 0;
+  for (const p of plan.items) {
+    if (has.has(`${p.kind}|${p.title}`)) continue;
+    const item = await itemOf(pool, p, by, log);
+    if (!item) continue;
+    await training.addItem(by, id, item);
+    added += 1;
+  }
+  if (added) {
+    const now = await training.get(id);
+    const order = orderOf(now.items, plan);
+    if (order.some((itemId, i) => now.items[i].training_item_id !== itemId))
+      await training.reorder(by, id, c.training.ItemOrder.parse({ item_ids: order }));
+  }
+  return added;
+}
+
 async function seedCourses(pool, staff, log) {
   const training = src("modules/training/training.service");
   const builder = await builderOf(pool, staff);
@@ -185,13 +221,24 @@ async function seedCourses(pool, staff, log) {
   const { rows: dept } = await pool.query("SELECT department_id FROM department WHERE name = $1 AND active", [AUDIENCE]);
   for (const plan of COURSES) {
     const { rows: had } = await pool.query("SELECT training_course_id FROM training_course WHERE title = $1", [plan.title]);
-    if (had.length) continue;
+    if (had.length) {
+      try {
+        const added = await completeCourse(pool, by, had[0].training_course_id, plan, log);
+        if (added) log(`training: ${plan.title}: ${added} missing item${added === 1 ? "" : "s"} added`);
+      } catch (err) {
+        log(`training: ${plan.title} stopped: ${err.message}`);
+      }
+      continue;
+    }
     try {
       const course = await training.create(by, c.training.CourseCreate.parse({ title: plan.title, summary: plan.summary }));
       const id = course.training_course_id;
+      let items = 0;
       for (const p of plan.items) {
         const item = await itemOf(pool, p, by, log);
-        if (item) await training.addItem(by, id, item);
+        if (!item) continue;
+        await training.addItem(by, id, item);
+        items += 1;
       }
       await training.update(
         by,
@@ -208,7 +255,7 @@ async function seedCourses(pool, staff, log) {
         );
         to = `the Library and ${AUDIENCE}, due in ${plan.assign.due_within_days} days`;
       }
-      log(`training: ${plan.title} published with ${plan.items.length} items, for ${to}`);
+      log(`training: ${plan.title} published with ${items} of its ${plan.items.length} items, for ${to}`);
     } catch (err) {
       log(`training: ${plan.title} stopped: ${err.message}`);
     }
