@@ -197,6 +197,7 @@ async function list(db, query, scope) {
     query.employment_type ?? null,
     query.line_manager_id ?? null,
     query.contract === "ending" ? lagos.today() : null,
+    query.exclude_self === "true" && scope && scope.employee_id ? scope.employee_id : null,
   ];
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
   const page = await pageQuery(
@@ -217,6 +218,7 @@ async function list(db, query, scope) {
         AND ($5::text IS NULL OR e.employment_type = $5)
         AND ($6::uuid IS NULL OR e.line_manager_id = $6)
         AND ($7::date IS NULL OR (e.status = 'active' AND e.contract_ends_on IS NOT NULL AND e.contract_ends_on <= $7::date + 30))
+        AND ($8::uuid IS NULL OR e.employee_id <> $8)
         ${s.and}
       ORDER BY ${orderBy(query, EMPLOYEE_SORTS, "e.employee_id")}`,
     params,

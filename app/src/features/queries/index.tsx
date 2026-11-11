@@ -202,6 +202,9 @@ function QueryCard({ id }: { id: string }) {
 
 type RaiseValues = { subject: string; details: string; policy_id: string; policy_clause: string; signature: string };
 
+/** Who a query may be raised on: someone who works here now, never the raiser (QUERY_SELF, EMPLOYEE_NOT_ACTIVE). */
+const RAISE_ON = { status: "active", exclude_self: "true" } as const;
+
 function RaiseQuery({ close }: { close: () => void }) {
   const [who, setWho] = useState<PickedPerson[]>([]);
   const [policy, setPolicy] = useState<PolicyChoice[]>([]);
@@ -272,7 +275,7 @@ function RaiseQuery({ close }: { close: () => void }) {
       )}
       <div className={step.open ? "hidden" : undefined}>
       <WriteWithAiButton status={ai.data} open={() => setStep({ mounted: true, open: true })} />
-      <Field label="Employee" state={tried && !employee ? "bad" : undefined} message={tried && !employee ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
+      <Field label="Employee" state={tried && !employee ? "bad" : undefined} message={tried && !employee ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} filters={RAISE_ON} /></Field>
       <Field label="Subject" {...f.status("subject")}><TextField {...f.field("subject")} placeholder="Late weekly report" /></Field>
       <Field label="What Happened" {...f.status("details")}><TextAreaField {...f.field("details")} placeholder="Report due 14/10, sent 16/10" /></Field>
       <Field label="Policy" optional {...f.status("policy_id")}>

@@ -62,7 +62,8 @@ what a useful answer gives.
 2. Press **New Vacancy** at the top right. On a phone it is in **Quick Actions**.
    ![New Vacancy](shot:recruitment-vacancy-new)
 3. Type the **Job Title** and press **Next**.
-4. Pick the **Department** and the **Hiring Manager**. Press **Next**.
+4. Pick the **Department** and the **Hiring Manager**. Only people with access to Recruitment, in
+   your reach, are offered as **Hiring Manager**. Press **Next**.
 5. Type how many **Positions** you are hiring and pick the **Employment** type. Press **Next**.
 6. Pick the **Arrangement**, such as hybrid. You may add an **Arrangement Note**, such as
    `2 days in office, 3 from home`, and the **Working Days**. Press **Next**.
@@ -131,7 +132,8 @@ description again, or for a vacancy you opened with **Edit**:
 2. Find the seat under **Suggested From Organogram**. It shows 25 seats a page; page on below it.
 3. Press **Create Vacancy** beside it.
 4. **New Vacancy** opens with the seat's title, department and reporting line already answered, and
-   the seat's manager as the **Hiring Manager**. Change any of them if they do not fit.
+   the seat's manager as the **Hiring Manager** when they have access to Recruitment (otherwise pick
+   one). Change any of them if they do not fit.
 5. Follow [Write a new vacancy](#recruitment-vacancies-new) from step 3. Nothing is made until you
    save.
 6. {needs="people edit"} You can also press **Create Vacancy** on a vacant seat on

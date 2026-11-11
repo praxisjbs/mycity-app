@@ -278,6 +278,18 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     const noGrant = await h.as("ops").post("/recruitment/vacancies").send(salesRole({ title: "Field Officer Lead", hiring_manager_id: h.people.staff.employee_id }));
     expect(noGrant.status).toBe(422);
     expect(noGrant.body.error.fields).toEqual({ hiring_manager_id: ["No Recruitment access"] });
+    // The picker offers only who the save takes (fault #3 of 11/11): holding Recruitment, in the writer's scope.
+    const offered = async (who) => {
+      const res = await h.as(who).get("/recruitment/vacancies/hiring-managers");
+      expect(res.status).toBe(200);
+      expect(c.vacancies.HiringManagerPage.safeParse(res.body).success).toBe(true);
+      return res.body.data.map((p) => p.employee_id);
+    };
+    const forOps = await offered("ops");
+    expect(forOps).toEqual(expect.arrayContaining([h.people.ops.employee_id, h.people.hod.employee_id]));
+    expect(forOps).not.toContain(h.people.staff.employee_id);
+    // The Head leads the staff member, who holds no Recruitment: only the Head is offered.
+    expect(await offered("hod")).toEqual([h.people.hod.employee_id]);
 
     const list = await h.as("hod").get("/recruitment/vacancies");
     expect(list.body.data.map((v) => v.title)).toEqual(["Field Coordinator"]);
@@ -312,6 +324,10 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     ]);
     const other = await h.as("ops").get(`/recruitment/vacancies/suggested?org_seat_id=${dept}`);
     expect(other.body.data).toEqual([]);
+    // A line manager without Recruitment is not filled in as the hiring manager: the save would refuse them.
+    await q("UPDATE org_seat SET line_manager_id = $1 WHERE org_seat_id = $2", [h.people.staff.employee_id, seat.org_seat_id]);
+    const unfit = await h.as("ops").get(`/recruitment/vacancies/suggested?org_seat_id=${seat.org_seat_id}`);
+    expect(unfit.body.data).toEqual([expect.objectContaining({ org_seat_id: seat.org_seat_id, line_manager: null })]);
     await q("UPDATE org_seat SET line_manager_id = NULL WHERE org_seat_id = $1", [seat.org_seat_id]);
     // A Head of Department sees only the seats of people they lead.
     expect((await h.as("hod").get("/recruitment/vacancies/suggested")).body.data).toEqual([]);
@@ -353,7 +369,8 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
           values: {
             title: "Content Producer",
             department_id: "Operations",
-            hiring_manager_id: h.people.ops.employee_id,
+            // Written by name: matched among who may be a hiring manager (vacancies.hiring_managers).
+            hiring_manager_id: "Ada Obi",
             employment_type: "full_time",
             work_pattern: "hybrid",
             location: "Yaba",
@@ -371,6 +388,9 @@ describeDb("Recruitment · Vacancies against the real migrations", () => {
     const card = asked.body.card;
     expect(card).toMatchObject({ action_key: "vacancies.create", label: "New Vacancy", schema: "vacancies.VacancyAdd", problems: {} });
     expect(card.names).toEqual(expect.arrayContaining([expect.objectContaining({ type: "department", label: "Operations" }), expect.objectContaining({ type: "place", label: "Yaba, Lagos" })]));
+    expect(card.values.hiring_manager_id).toBe(h.people.ops.employee_id);
+    // Edit picks the hiring manager from the same list as New Vacancy's own picker.
+    expect(card.fields.find((f) => f.name === "hiring_manager_id")).toMatchObject({ picks: "hiring_manager" });
     const pressed = await h.press("ops", card.ai_action_draft_id);
     expect(pressed.status).toBe(200);
     const made = await one("SELECT vacancy_id, number::text AS number, status, location FROM vacancy WHERE title = 'Content Producer'");
