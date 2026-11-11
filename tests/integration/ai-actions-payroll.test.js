@@ -6,7 +6,8 @@
  * them) and the summary `payroll.month`; the six cards, each through the service function its screen's button calls and
  * each a risk the person confirms (New Run, Submit for Approval, Add Adjustment, Accept Deduction, Waive Fine, Record
  * Advance); ⌘K finding a payslip (a person only their own), a deduction and the New Run action; and a submitted run telling
- * the CEO by the bell, by push and by email, each link opening the same screen.
+ * the CEO by the bell, by push and by email, each link opening the same screen; and each person's payslip and deduction
+ * notices emailing the link their bell gives them (My Payslips without `payroll`, Payroll · Payslips with it).
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/ai-actions-payroll
  *
@@ -81,6 +82,32 @@ describeDb("Praxis AI and ⌘K for payroll against the real migrations", () => {
 
   /** The role of a person, for the mask the tests switch on and off. */
   const roleOf = async (who) => (await one("SELECT role_id FROM role WHERE code = $1", [who]));
+
+  /** A person's one notice of this event, as the fan-out wrote it. */
+  const noticeOf = async (who, eventKey) => {
+    const rows = (await q("SELECT * FROM notification WHERE user_id = $1 AND event_key = $2 ORDER BY created_at DESC", [h.people[who].user_id, eventKey])).rows;
+    expect([eventKey, rows.length]).toEqual([eventKey, 1]);
+    return rows[0];
+  };
+  /** The notice's link in that person's bell. */
+  const bellLinkOf = async (who, notice) =>
+    (await h.as(who).get("/notifications")).body.data.find((n) => n.notification_id === notice.notification_id).link;
+  /** The address the notice's email opens (Open in MyCity App), sent through the delivery job itself; null for none. */
+  async function emailLinkOf(notice) {
+    const deliver = require("../../src/jobs/handlers/notification-deliver");
+    systemMail.__reset();
+    const out = await deliver({ data: { event: { key: notice.event_key }, notifications: [notice], push: null }, updateData: async () => undefined });
+    expect(out).toMatchObject({ email: 1 });
+    const mail = systemMail.capturedMail().find((m) => m.template === "notification");
+    const button = /<a href="([^"]+)"[^>]*>Open in MyCity App<\/a>/.exec(mail.html || "");
+    return button ? button[1].replace(/&amp;/g, "&") : null;
+  }
+  /** The email opens the screen the bell does, for the same person: one link on every channel (notifications.md §6). */
+  async function expectEmailOpensBellScreen(who, notice, screen) {
+    const bell = await bellLinkOf(who, notice);
+    expect(bell).toMatchObject(screen);
+    expect(await emailLinkOf(notice)).toBe(new URL(bell.path, config.STAFF_ORIGIN).href);
+  }
 
   beforeAll(async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
@@ -321,6 +348,15 @@ describeDb("Praxis AI and ⌘K for payroll against the real migrations", () => {
     expect((await read("staff", "payslips.mine", { year: 2030 })).data).toEqual([]);
   });
 
+  test("each payslip notice's email opens the screen its bell does: My Payslips without payroll, Payroll · Payslips for a Payroll reader", async () => {
+    const staffs = await noticeOf("staff", "payslip.published");
+    expect(staffs.channels).toContain("email");
+    expect(routeMap.linkFor("payslip", staffs.entity_id)).toMatchObject({ module: "payroll", tab: "payslips" });
+    await expectEmailOpensBellScreen("staff", staffs, { module: "ess", tab: "my-payslips", path: `/ess?tab=my-payslips&id=${staffs.entity_id}` });
+    const ops = await noticeOf("ops", "payslip.published");
+    await expectEmailOpensBellScreen("ops", ops, { module: "payroll", tab: "payslips", path: `/payroll?tab=payslips&id=${ops.entity_id}` });
+  });
+
   test("payslips.list: Payroll readers read a month's payslips as Payroll · Payslips lists them, masked for a role that hides pay", async () => {
     const list = await read("ops", "payslips.list", { run_id: run });
     expect(list.page.total).toBe(4);
@@ -401,6 +437,15 @@ describeDb("Praxis AI and ⌘K for payroll against the real migrations", () => {
     const ownAccept = await card("ops", "deductions.accept", { sanction_fine_id: made.own.id, months: 1, start_period: (await deductionsService.startMonthChoices(pool))[0] });
     expect((await h.press("ops", ownAccept.ai_action_draft_id)).body.error.code).toBe("OWN_RECORD");
     expect((await one("SELECT settlement_status FROM sanction_fine WHERE sanction_fine_id = $1", [made.own.id])).settlement_status).toBe("pending");
+  });
+
+  test("Deduction Scheduled and Fine Waived email a person without payroll a link to My Payslips, as their bell does, never to Payroll · Deductions", async () => {
+    for (const key of ["payroll_deduction.accepted", "payroll_deduction.waived"]) {
+      const notice = await noticeOf("staff", key);
+      expect(notice).toMatchObject({ entity_type: "deduction" });
+      expect(notice.channels).toContain("email");
+      await expectEmailOpensBellScreen("staff", notice, { module: "ess", tab: "my-payslips", path: `/ess?tab=my-payslips&id=${notice.entity_id}` });
+    }
   });
 
   test("advances.record: an advance paid outside the system is recorded over two months, through Record Advance's own service; never the asker's own", async () => {

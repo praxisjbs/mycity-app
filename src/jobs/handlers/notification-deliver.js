@@ -8,10 +8,12 @@
  *
  * Channels, per row (`channels` from the person's preferences):
  *   in_app  pushed to the person's sockets as `notification` (the contract's Notification,
- *           its link only when they may open the record's module), so the bell updates and
+ *           its link the email's, notifications.readerLink), so the bell updates and
  *           the open app shows the banner. Best effort: the inbox is the record.
- *   email   system mail with templates/email/notification.html, linking to the record
- *           (shared/route-map). Sent only to active users.
+ *   email   system mail with templates/email/notification.html, linking to the record on the
+ *           screen the bell and the push give the same person (notifications.readerLink: the
+ *           route map's `self` for one who cannot open the staff screen; no link when they may
+ *           open neither). Sent only to active users.
  *   push    one `notification-push` job per row (jobs/handlers/notification-push.js), at once:
  *           every device of the person, whether or not they are in the app (TB, 19/10/2026);
  *           held until their quiet hours end when they turned them on, unless the notice is
@@ -34,7 +36,6 @@ const { config } = require("../../config/env");
 const { logger } = require("../../config/logger");
 const { pool } = require("../../config/db");
 const c = require("@mycity/contract");
-const routeMap = require("../../shared/route-map");
 const variables = require("../../shared/templates/variables");
 const systemMail = require("../../services/mail/system-mail.service");
 const pace = require("../../services/mail/pace");
@@ -54,8 +55,13 @@ variables.defineVariables(
   c.notifications.NotificationEmailVars,
 );
 
-function linkOf(row) {
-  const link = routeMap.linkFor(row.entity_type, row.entity_id);
+/**
+ * The email's link: the screen the bell and the push give the same person (readerLink, the
+ * route map's `self` included), as a full address on the staff app; none when they may open
+ * neither screen.
+ */
+async function linkOf(row) {
+  const link = await notifications.readerLink(row);
   return link ? new URL(link.path, config.STAFF_ORIGIN).href : null;
 }
 
@@ -133,7 +139,7 @@ module.exports = async function notificationDeliver(job, token) {
           email: person.email,
         },
         template: TEMPLATE,
-        data: { title: row.title, body: row.body || "", link_url: linkOf(row) },
+        data: { title: row.title, body: row.body || "", link_url: await linkOf(row) },
       });
       done.add(String(row.notification_id));
       out.email += 1;
