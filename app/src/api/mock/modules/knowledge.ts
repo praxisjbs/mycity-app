@@ -1,4 +1,4 @@
-import type { Article, Block, Faq, Overdue, Resource } from "@/api/types/knowledge";
+import type { Article, Block, Overdue, Resource } from "@/api/types/knowledge";
 import type { Status } from "@/api/types/performance";
 import { created, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, fail } from "../core";
 import { refKey, SIGN_INS } from "../data/people";
@@ -69,38 +69,6 @@ route("POST /api/v1/knowledge/articles", (req) => {
   return created(a);
 });
 
-const FAQS: Faq[] = [
-  ["Why was I marked late when I clocked in a few minutes after nine?", "Check the grace window in the attendance policy, and which worksite you were inside. Raise it with Operations and it can be waived.", "Attendance"],
-  ["Do Saturdays count towards lateness?", "Yes. Saturday hours are 09:00 to 15:00 and the same grace window applies.", "Attendance"],
-  ["When do I get my payslip?", "Payslips appear in Employee Self-Service once the run is approved and locked, normally on the 27th.", "Payroll"],
-  ["Who can see a query raised against me?", "You, whoever raised it, People, and the CEO. Other managers cannot see it.", "Queries"],
-  ["Can I change my bank details myself?", "Yes, in My Profile. Changes are logged and People are notified.", "Payroll"],
-  ["What happens to my tasks when I go on leave?", "They stay with you. Your line manager can reassign them from the team board.", "Tasks"],
-  ["Why is there no tax on my payslip?", "Advanced payroll is switched off. MyCity runs simple payroll: gross, deductions, net.", "Payroll"],
-  ["Can I clock in from a new phone?", "Yes. The punch is accepted and the device is flagged for review, not blocked.", "Attendance"],
-  ["Who approves my leave?", "Your line manager, in one step. The calendar shows clashes before you submit.", "Leave"],
-  ["Can I carry leave into next year?", null, "Leave"],
-  ["Can a query be withdrawn?", null, "Queries"],
-  ["What is Praxis AI allowed to do?", "Read, within your permissions. It never writes a record.", "Attendance"],
-].map((q, i) => ({ faq_id: sid(`faq:${i}`), question: q[0] as string, answer: q[1] as string | null, topic: q[2] as string }));
-route("GET /api/v1/knowledge/faqs/summary", () => {
-  const topics = [...new Set(FAQS.map((f) => f.topic))].map((topic) => ({ topic, count: FAQS.filter((f) => f.topic === topic).length })).sort((a, b) => b.count - a.count);
-  return ok({ questions: FAQS.length, asked_this_month: 84, most_asked: "Lateness", unanswered: FAQS.filter((f) => !f.answer).length, from_ai: 31, topics });
-});
-route("GET /api/v1/knowledge/faqs", (req) => paged(FAQS, req, { search: (f) => [f.question, f.answer], filters: { topic: (f, v) => f.topic === v } }));
-route("POST /api/v1/knowledge/faqs", (req) => {
-  if (!canWrite(req.user!)) return fail(403, "FORBIDDEN", "People and Operations write FAQs.");
-  const b = req.body as Record<string, string>;
-  const f: Record<string, string[]> = {};
-  if (!b.question || b.question.trim().length < 8) f.question = ["Write the question as staff ask it"];
-  if (!b.answer || b.answer.trim().length < 8) f.answer = ["A sentence or two"];
-  else if (b.answer.length > 400) f.answer = ["Longer than two sentences. Make it a policy or an SOP"];
-  if (!b.topic) f.topic = ["Pick the topic"];
-  if (Object.keys(f).length) return invalid(f);
-  const x: Faq = { faq_id: sid(`faq:new:${FAQS.length}`), question: b.question.trim(), answer: b.answer.trim(), topic: b.topic };
-  FAQS.unshift(x);
-  return created(x);
-});
 
 const RES: Resource[] = [
   ["Platform walkthrough", "A 12 minute tour of the modules you will use every day.", "Video", null, 25, 23],

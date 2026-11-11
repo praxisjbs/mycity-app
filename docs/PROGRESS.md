@@ -55,8 +55,9 @@ saying who agreed and when.
 | M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
 | **Total** | **105** | **4** | **5** | **96** | **0** | **0** |
 
-M1 counts Employees with People although its API is M0 work. Four ESS tabs are counted with the
-milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8). Policy
+M1 counts Employees with People although its API is M0 work. Five ESS tabs are counted with the
+milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8),
+My Training (M10). Policy
 Updates and Knowledge Hub · Policies are M1: policies were brought forward from M10 and Settings ·
 Attendance Policy (#73) dropped, its row kept as Dropped and counted nowhere (TB, 20/10/2026). M4 and M5 include their public-site
 pages. Settings → Notifications was brought forward to M0 by TB on 19/10/2026 and is counted with
@@ -846,8 +847,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
+| 110 | My Training | `my-training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
+
+- 11/11/2026 · TB · My Training (#110) added for M10 (`docs/guides/knowledge.md`; MILESTONES §18 amended 11/11/2026): where staff take their assigned and Library courses, mark items done, add proof and download their certificates. Added with `npm run new:screen` (catalogue, route map, ⌘K, Coming Soon, an empty screen); FAQs (#64) dropped in the same change, so the staff app stays at 96 screens. Built in M10 PR 5 on the API of PR 3 and PR 4. Left: the screen.
 
 - 27/10/2026 · JP · Org Chart (#91): each department's head carries a Head mark, and Acting Head marks whoever acts for an open head role, as on People · Organogram (#92, People's notes); a person's sheet gains Head Of · nothing left
 - 26/10/2026 · JP · Where it waits, inside a tab: #89 Policy Updates' To Acknowledge, All Policies and Waiting On You carry the unread notices about the versions in each, and the screen opens where they wait · nothing left
@@ -1351,12 +1355,14 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 |---|---|---|---|---|---|---|---|---|---|
 | 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
-| 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Dropped | 11/11/2026 |
 | 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 66 | Announcements | `announcements` | M10 | TB | ☐ | ☐ | ☐ | Dropped | 29/10/2026 |
 | 102 | User Guide | `user-guide` | M0 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 
 **Notes**
+
+- 11/11/2026 · TB · M10 Knowledge Hub planned (`docs/guides/knowledge.md`, tracker `docs/handoff/m10-knowledge-hub.md`), from TB's eight answers of 11/11/2026 and the Modules Review of 4 November: FAQs (#64) dropped (the User Guide and Praxis AI answer questions), so Knowledge Hub keeps Policies, SOPs, Training and the User Guide; SOPs (#63) are each department's own structured, versioned procedures written by its head or `sops.manage`, read by everyone and listed under Procedures on the screens their steps name; Training (#65) is a course of files, video links, course links and lessons, assigned with a due date and a task or open in the Library, completed by Mark Done with optional proof and a signed certificate verified on `go.mycityapp.io`; ESS · My Training (#110) added. M10 stays 8 screens. The certificate sample drawn (`docs/MyCity-ERP-Documents/training-samples/`). Left: MyCity signs off the sample; PR 1 to PR 6 (the guide's Appendix A).
 
 - 29/10/2026 · GE · Announcements (#66) dropped by GE, 29/10/2026: Knowledge Hub keeps Policies, SOPs, FAQs, Training and the User Guide. Announcements are published and kept on Staff Community · Announcements (#17) and read in #announcements, so the archive tab only repeated them. Removed: the tab, its interim page, its ⌘K screen and the `knowledge_announcement` record type (route map, notification category); MILESTONES' screen table says five tabs. Counted nowhere now (M10 8 screens). TB to note for M10. Left: nothing.
 - 26/10/2026 · JP · Where it waits, inside a tab: #62 Policies' State chips carry the unread notices about the policies under each state · nothing left

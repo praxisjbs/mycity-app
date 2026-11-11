@@ -100,7 +100,6 @@ const SCREENS = Object.freeze([
 
   s("knowledge", "policies", "Policies", ["policy", "handbook", "rules", "attendance policy", "grace period", "lateness policy", "clock in rules"]),
   s("knowledge", "sops", "SOPs", ["sop", "procedures", "processes", "how to"]),
-  s("knowledge", "faqs", "FAQs", ["faq", "questions", "help"]),
   s("knowledge", "training", "Training", ["courses", "learning", "lessons"]),
 
   s("praxis_ai", "ask", "Ask", ["ai", "assistant", "chat", "question"]),
@@ -130,10 +129,11 @@ const SCREENS = Object.freeze([
   s("settings", "security", "Security", ["password rules", "sessions", "two step", "failed sign ins"]),
   s("settings", "audit-log", "Audit Log", ["audit", "history", "who changed", "activity log"]),
   s("settings", "imports", "Imports", ["import", "upload", "spreadsheet", "import history"]),
-  s("knowledge", "user-guide", "User Guide", ["help", "manual", "how to", "guide", "instructions", "tutorial", "quick start", "getting started"]),
+  s("knowledge", "user-guide", "User Guide", ["help", "faq", "faqs", "questions", "manual", "how to", "guide", "instructions", "tutorial", "quick start", "getting started"]),
   s("people", "departments", "Departments", ["department", "function", "functions", "team", "teams", "unit", "head of department", "department head", "move people", "merge department"]),
   s("ess", "my-requests", "My Requests", ["expense", "expenses", "claim", "reimbursement", "my expenses", "raise an expense"]),
   s("expenses", "projects", "Projects", ["project spend", "project budget", "spend per project"]),
+  s("ess", "my-training", "My Training", ["my training", "my courses", "courses", "learning", "certificate", "certificates", "lessons"]),
   // new:screen adds screens above this line
 ]);
 

@@ -33,7 +33,7 @@ export const MODULES: ModuleDef[] = [
       t("My Profile", "my-profile"), t("My Attendance", "my-attendance"), t("Work Location Requests", "work-location-requests"),
       t("My Devices", "my-devices"), t("Policy Updates", "policy-updates"), t("My Performance", "my-performance"),
       t("My Payslips", "my-payslips"), t("My Leave", "my-leave"), t("My Requests", "my-requests"), t("My Queries", "my-queries"), t("My Documents", "my-documents"),
-      t("Org Chart", "org-chart"), t("My Security", "my-security"),
+      t("Org Chart", "org-chart"), t("My Security", "my-security"), t("My Training", "my-training"),
     ],
   },
   { key: "community", label: "Staff Community", short: "Community", icon: "msg", area: "Work", tabs: [t("Channels", "channels"), t("Direct Messages", "direct-messages"), t("Announcements", "announcements")] },
@@ -57,7 +57,7 @@ export const MODULES: ModuleDef[] = [
     key: "expenses", label: "Expenses", short: "Expenses", icon: "wallet", area: "Business",
     tabs: [t("Requisitions", "requisitions"), t("Approvals", "approvals"), t("Disbursements", "disbursements"), t("Projects", "projects"), t("Budgets", "budgets"), t("Categories", "categories")],
   },
-  { key: "knowledge", label: "Knowledge Hub", short: "Knowledge", icon: "book", area: "System", tabs: [t("Policies", "policies"), t("SOPs", "sops"), t("FAQs", "faqs"), t("Training", "training"), t("User Guide", "user-guide")] },
+  { key: "knowledge", label: "Knowledge Hub", short: "Knowledge", icon: "book", area: "System", tabs: [t("Policies", "policies"), t("SOPs", "sops"), t("Training", "training"), t("User Guide", "user-guide")] },
   { key: "praxis_ai", label: "Praxis AI", short: "Assistant", icon: "spark", area: "System", tabs: [t("Ask", "ask"), t("History", "history")] },
   { key: "ai_control", label: "AI Control", short: "AI Control", icon: "shield", area: "System", tabs: [t("Actions", "actions"), t("Models", "models"), t("Spend", "spend")] },
   {

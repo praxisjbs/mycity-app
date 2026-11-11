@@ -29,20 +29,6 @@ export interface ArticlesSummary {
   last_updated: IsoDate | null;
   first_id: Uuid | null;
 }
-export interface Faq {
-  faq_id: Uuid;
-  question: string;
-  answer: string | null;
-  topic: string;
-}
-export interface FaqsSummary {
-  questions: number;
-  asked_this_month: number;
-  most_asked: string;
-  unanswered: number;
-  from_ai: number;
-  topics: Array<{ topic: string; count: number }>;
-}
 export interface Resource {
   resource_id: Uuid;
   title: string;
@@ -72,9 +58,6 @@ declare module "@/api/endpoints" {
     "GET /api/v1/knowledge/articles": { query: Q<{ kind: ArticleKind }>; body: never; params: never; response: Paged<ArticleRow> };
     "GET /api/v1/knowledge/articles/:id": { query: never; body: never; params: { id: string }; response: Article };
     "POST /api/v1/knowledge/articles": { query: never; body: { kind: ArticleKind; title: string; group: string; blocks: Block[] }; params: never; response: Article };
-    "GET /api/v1/knowledge/faqs/summary": { query: never; body: never; params: never; response: FaqsSummary };
-    "GET /api/v1/knowledge/faqs": { query: Q<{ topic?: string }>; body: never; params: never; response: Paged<Faq> };
-    "POST /api/v1/knowledge/faqs": { query: never; body: { question: string; answer: string; topic: string }; params: never; response: Faq };
     "GET /api/v1/knowledge/training/summary": { query: never; body: never; params: never; response: TrainingSummary };
     "GET /api/v1/knowledge/training": { query: Q; body: never; params: never; response: Paged<Resource> };
     "GET /api/v1/knowledge/training/overdue": { query: Q; body: never; params: never; response: Paged<Overdue> };

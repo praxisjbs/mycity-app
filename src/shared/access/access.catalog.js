@@ -103,7 +103,7 @@ const MODULE_CATALOG = [
     key: "knowledge",
     area: "system",
     label: "Knowledge Hub",
-    description: "Policies, SOPs, FAQs, training and announcements",
+    description: "Policies, SOPs, training and the User Guide",
   },
   {
     key: "praxis_ai",

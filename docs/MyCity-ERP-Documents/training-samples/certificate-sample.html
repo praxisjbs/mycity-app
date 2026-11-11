@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certificate of Completion · Sample</title>
+<!-- The sample loads its two faces from Google Fonts; the real template embeds them as files
+     (templates/documents/fonts/), as the proposal template embeds Geist, so the PDF never reaches out. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Great+Vibes&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  :root {
+    --ink: #01221D;          /* brand ink, the text */
+    --green: #014339;        /* paper brand */
+    --green-2: #0B5A4D;      /* the guilloche's lighter strands */
+    --yellow: #FFDF55;       /* brand yellow, on green only */
+    --gold: #9C7A12;         /* the yellow's print shade, for rules and small caps on paper */
+    --paper: #FCFBF7;
+    --muted: #5B6662;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #E9ECEA; }
+  body { font-family: "Geist", "Helvetica Neue", Arial, sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @media screen { body { padding: 24px 0; } .sheet { margin: 0 auto; box-shadow: 0 1px 2px rgba(1,34,29,.08), 0 12px 40px rgba(1,34,29,.14); } }
+  @media print { html, body { background: none; } }
+
+  .sheet { position: relative; width: 297mm; height: 210mm; overflow: hidden; background: var(--paper); }
+
+  /* The frame: a green band carrying a fine guilloche, a yellow rule inside it, a green hairline inside that. */
+  .band { position: absolute; inset: 7mm; background: var(--green); }
+  .band svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .field { position: absolute; inset: 13mm; background: var(--paper); }
+  .field::before { content: ""; position: absolute; inset: 0; border: 0.7mm solid var(--yellow); }
+  .field::after { content: ""; position: absolute; inset: 2.2mm; border: 0.2mm solid var(--green); }
+  .paper-grain { position: absolute; inset: 0; background:
+      radial-gradient(120mm 80mm at 50% 42%, rgba(255,223,85,.10), transparent 70%),
+      radial-gradient(160mm 120mm at 50% 120%, rgba(1,67,57,.05), transparent 70%); }
+
+  /* Corner ornaments, one per corner of the field, drawn once and turned. */
+  .corner { position: absolute; width: 16mm; height: 16mm; }
+  .corner.tl { top: 3.6mm; left: 3.6mm; }
+  .corner.tr { top: 3.6mm; right: 3.6mm; transform: scaleX(-1); }
+  .corner.bl { bottom: 3.6mm; left: 3.6mm; transform: scaleY(-1); }
+  .corner.br { bottom: 3.6mm; right: 3.6mm; transform: scale(-1, -1); }
+
+  /* A faint rosette behind the words. */
+  .watermark { position: absolute; left: 50%; top: 50%; width: 132mm; height: 132mm; transform: translate(-50%, -50%); opacity: .085; }
+
+  .content { position: absolute; inset: 13mm; padding: 13mm 24mm 11mm; display: flex; flex-direction: column; align-items: center; text-align: center; }
+
+  .brand { display: flex; flex-direction: column; align-items: center; gap: 1.2mm; }
+  .brand-mark { display: flex; align-items: center; gap: 2.2mm; font-weight: 700; font-size: 15pt; letter-spacing: -0.2px; color: var(--green); }
+  .brand-mark i { display: inline-block; width: 5.2mm; height: 5.2mm; border-radius: 1.4mm; background: var(--green); position: relative; }
+  .brand-mark i::after { content: ""; position: absolute; right: -0.9mm; top: -0.9mm; width: 2.4mm; height: 2.4mm; border-radius: 50%; background: var(--yellow); border: 0.5mm solid var(--paper); }
+  .brand-line { font-size: 6.6pt; letter-spacing: .32em; text-transform: uppercase; color: var(--muted); }
+
+  .title { margin-top: 6.5mm; font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-size: 40pt; line-height: 1; letter-spacing: .3em; padding-left: .3em; color: var(--green); text-transform: uppercase; }
+  .subtitle { margin-top: 1.4mm; font-family: "Cormorant Garamond", Georgia, serif; font-style: italic; font-weight: 500; font-size: 19pt; color: var(--gold); }
+
+  .rule { display: flex; align-items: center; gap: 3mm; margin: 4.5mm 0 4mm; color: var(--gold); }
+  .rule span { width: 34mm; height: 0.25mm; background: linear-gradient(90deg, transparent, currentColor); }
+  .rule span + svg + span { background: linear-gradient(270deg, transparent, currentColor); }
+
+  .lead { font-size: 8.4pt; letter-spacing: .26em; text-transform: uppercase; color: var(--muted); }
+  .name { margin-top: 3mm; font-family: "Cormorant Garamond", Georgia, serif; font-weight: 500; font-size: 46pt; line-height: 1.05; color: var(--ink); }
+  .name-rule { width: 128mm; height: 0.25mm; margin-top: 2.6mm; background: linear-gradient(90deg, transparent, var(--gold) 18%, var(--gold) 82%, transparent); }
+
+  .for { margin-top: 5mm; font-size: 10pt; color: var(--muted); }
+  .course { margin-top: 1.8mm; font-size: 19pt; font-weight: 600; letter-spacing: -0.2px; color: var(--green); }
+  .facts { margin-top: 3.2mm; display: flex; align-items: center; gap: 3.4mm; font-size: 8.8pt; color: var(--muted); }
+  .facts b { color: var(--ink); font-weight: 600; }
+  .facts i { width: 1.1mm; height: 1.1mm; border-radius: 50%; background: var(--gold); display: inline-block; }
+
+  .foot { margin-top: auto; width: 100%; display: grid; grid-template-columns: 1fr 44mm 1fr; align-items: end; gap: 8mm; }
+
+  .sign { text-align: left; }
+  .sign-mark { font-family: "Great Vibes", "Brush Script MT", cursive; font-size: 30pt; line-height: 1; color: #0E2A4A; padding-left: 2mm; transform: rotate(-3deg); transform-origin: left bottom; }
+  .sign-line { width: 66mm; border-top: 0.25mm solid var(--ink); margin-top: 0.6mm; padding-top: 1.6mm; }
+  .sign-name { font-size: 10pt; font-weight: 600; }
+  .sign-role { font-size: 8.2pt; color: var(--muted); margin-top: 0.4mm; }
+  .sign-tag { font-size: 6.6pt; letter-spacing: .24em; text-transform: uppercase; color: var(--gold); margin-top: 1.6mm; }
+
+  .seal { display: flex; justify-content: center; }
+  .seal svg { width: 38mm; height: 38mm; filter: drop-shadow(0 0.6mm 0.8mm rgba(1,34,29,.18)); }
+
+  .verify { display: flex; justify-content: flex-end; align-items: end; gap: 4mm; text-align: right; }
+  .verify-text { font-size: 8.2pt; color: var(--muted); line-height: 1.5; }
+  .verify-text .k { font-size: 6.6pt; letter-spacing: .24em; text-transform: uppercase; color: var(--gold); }
+  .verify-text .no { font-size: 11pt; font-weight: 600; color: var(--ink); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  .qr { width: 23mm; height: 23mm; padding: 1.4mm; background: #fff; border: 0.25mm solid #D8DEDB; border-radius: 1.2mm; }
+  .qr svg { display: block; width: 100%; height: 100%; }
+
+
+  .sample { position: absolute; top: 9.6mm; right: 15mm; font-size: 6.4pt; letter-spacing: .3em; text-transform: uppercase; color: var(--yellow); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- The band and its guilloche: three families of fine waves, out of phase, on the brand green. -->
+  <div class="band">
+    <svg viewBox="0 0 283 196" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <pattern id="g" width="12" height="6" patternUnits="userSpaceOnUse">
+          <path d="M0 3 C3 0, 9 6, 12 3" fill="none" stroke="#2E7A6B" stroke-width=".22"/>
+          <path d="M0 3 C3 6, 9 0, 12 3" fill="none" stroke="#2E7A6B" stroke-width=".22"/>
+          <path d="M0 1.2 C3 -1.8, 9 4.2, 12 1.2" fill="none" stroke="#FFDF55" stroke-opacity=".28" stroke-width=".16"/>
+          <path d="M0 4.8 C3 7.8, 9 1.8, 12 4.8" fill="none" stroke="#FFDF55" stroke-opacity=".28" stroke-width=".16"/>
+        </pattern>
+      </defs>
+      <rect width="283" height="196" fill="url(#g)"/>
+    </svg>
+  </div>
+  <div class="sample">Sample</div>
+
+  <div class="field">
+    <div class="paper-grain"></div>
+
+    <svg class="corner tl" viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M2 26 V2 H26" fill="none" stroke="#014339" stroke-width="1.1"/>
+      <path d="M7 20 V7 H20" fill="none" stroke="#9C7A12" stroke-width=".6"/>
+      <rect x="10" y="10" width="5" height="5" transform="rotate(45 12.5 12.5)" fill="#FFDF55" stroke="#9C7A12" stroke-width=".5"/>
+    </svg>
+    <svg class="corner tr" viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M2 26 V2 H26" fill="none" stroke="#014339" stroke-width="1.1"/>
+      <path d="M7 20 V7 H20" fill="none" stroke="#9C7A12" stroke-width=".6"/>
+      <rect x="10" y="10" width="5" height="5" transform="rotate(45 12.5 12.5)" fill="#FFDF55" stroke="#9C7A12" stroke-width=".5"/>
+    </svg>
+    <svg class="corner bl" viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M2 26 V2 H26" fill="none" stroke="#014339" stroke-width="1.1"/>
+      <path d="M7 20 V7 H20" fill="none" stroke="#9C7A12" stroke-width=".6"/>
+      <rect x="10" y="10" width="5" height="5" transform="rotate(45 12.5 12.5)" fill="#FFDF55" stroke="#9C7A12" stroke-width=".5"/>
+    </svg>
+    <svg class="corner br" viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M2 26 V2 H26" fill="none" stroke="#014339" stroke-width="1.1"/>
+      <path d="M7 20 V7 H20" fill="none" stroke="#9C7A12" stroke-width=".6"/>
+      <rect x="10" y="10" width="5" height="5" transform="rotate(45 12.5 12.5)" fill="#FFDF55" stroke="#9C7A12" stroke-width=".5"/>
+    </svg>
+
+    <!-- The watermark: a guilloche rosette, as on a banknote, barely there. -->
+    <svg class="watermark" viewBox="-100 -100 200 200" aria-hidden="true">
+      <g id="rosette" fill="none" stroke="#014339" stroke-width=".16"></g>
+    </svg>
+  </div>
+
+  <div class="content">
+    <div class="brand">
+      <!-- The real certificate prints the logo from Settings · Organisation here, and this wordmark only when none is set. -->
+      <div class="brand-mark"><i></i>MyCity App</div>
+      <div class="brand-line">Learning &amp; Development</div>
+    </div>
+
+    <div class="title">Certificate</div>
+    <div class="subtitle">of Completion</div>
+
+    <div class="rule" aria-hidden="true">
+      <span></span>
+      <svg width="12" height="12" viewBox="0 0 12 12"><rect x="3" y="3" width="6" height="6" transform="rotate(45 6 6)" fill="#FFDF55" stroke="#9C7A12" stroke-width=".7"/></svg>
+      <span></span>
+    </div>
+
+    <div class="lead">This is to certify that</div>
+    <div class="name">Ifunanya Adaobi Bello</div>
+    <div class="name-rule"></div>
+
+    <div class="for">has successfully completed the training</div>
+    <div class="course">Data Protection and the NDPA</div>
+    <div class="facts">
+      <span><b>6</b> lessons</span><i></i>
+      <span>About <b>2 hours</b></span><i></i>
+      <span>Completed <b>30 November 2026</b></span>
+    </div>
+
+    <div class="foot">
+      <div class="sign">
+        <!-- The publisher's signature, drawn or typed once when the training was published, printed on every certificate. -->
+        <div class="sign-mark">Kelechi Nwosu</div>
+        <div class="sign-line">
+          <div class="sign-name">Kelechi Nwosu</div>
+          <div class="sign-role">Head, Operations &amp; People</div>
+          <div class="sign-tag">Published this training</div>
+        </div>
+      </div>
+
+      <div class="seal">
+        <svg viewBox="-100 -100 200 200" aria-hidden="true">
+          <defs>
+            <path id="ring" d="M 0,66 a 66,66 0 1,1 0,-132 a 66,66 0 1,1 0,132"/>
+          </defs>
+          <g fill="#014339" id="seal-petals"></g>
+          <circle r="80" fill="#014339"/>
+          <circle r="76" fill="none" stroke="#FFDF55" stroke-width="1.6"/>
+          <circle r="54" fill="none" stroke="#FFDF55" stroke-width=".9"/>
+          <text font-family="Geist, Arial, sans-serif" font-size="12.2" font-weight="600" letter-spacing="3.1" fill="#FFDF55">
+            <textPath href="#ring" startOffset="50%" text-anchor="middle">· MYCITY APP LTD · CERTIFIED TRAINING ·</textPath>
+          </text>
+          <circle r="50" fill="#FFDF55"/>
+          <text y="-14" text-anchor="middle" font-family="Geist, Arial, sans-serif" font-size="9" font-weight="600" letter-spacing="2.4" fill="#014339">COMPLETED</text>
+          <path d="M-15 2 L-4 13 L17 -10" fill="none" stroke="#014339" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+          <text y="32" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="17" font-weight="600" fill="#014339">2026</text>
+        </svg>
+      </div>
+
+      <div class="verify">
+        <div class="verify-text">
+          <div class="k">Certificate No.</div>
+          <div class="no">CERT-2026-0019</div>
+          <div>Issued 30/11/2026</div>
+          <div>Verify at go.mycityapp.io/verify</div>
+        </div>
+        <!-- The real QR opens this certificate's verification page; the sample's pattern is drawn, not scannable. -->
+        <div class="qr"><svg id="qr" viewBox="0 0 29 29" shape-rendering="crispEdges" aria-hidden="true"></svg></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* Petals for the seal and the watermark: 24 rounded lobes around a circle. */
+  function petals(id, r, lobe) {
+    const g = document.getElementById(id);
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", (Math.cos(a) * r).toFixed(2));
+      c.setAttribute("cy", (Math.sin(a) * r).toFixed(2));
+      c.setAttribute("r", lobe);
+      g.appendChild(c);
+    }
+  }
+  petals("seal-petals", 84, 12);
+
+  /* The watermark's rosette: four hypotrochoid rings, each a few hundred points of one thin line. */
+  (function () {
+    const g = document.getElementById("rosette"), ns = "http://www.w3.org/2000/svg";
+    const ring = (R, r, d, scale, turn, steps) => {
+      let path = "";
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * Math.PI * 2 * r / gcd(R, r);
+        const x = (R - r) * Math.cos(t) + d * Math.cos(((R - r) / r) * t);
+        const y = (R - r) * Math.sin(t) - d * Math.sin(((R - r) / r) * t);
+        const a = turn, cx = x * Math.cos(a) - y * Math.sin(a), cy = x * Math.sin(a) + y * Math.cos(a);
+        path += (i ? "L" : "M") + (cx * scale).toFixed(2) + " " + (cy * scale).toFixed(2);
+      }
+      const p = document.createElementNS(ns, "path"); p.setAttribute("d", path); g.appendChild(p);
+    };
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    ring(96, 41, 60, 0.92, 0, 7000);
+    ring(77, 29, 24, 0.80, 0, 5200);
+    ring(53, 17, 26, 0.70, 0, 3600);
+  })();
+
+  /* A QR-shaped pattern for the sample: three finder squares and a fixed scatter of modules. */
+  (function () {
+    const svg = document.getElementById("qr"), n = 29, ns = "http://www.w3.org/2000/svg";
+    const on = (x, y) => { const r = document.createElementNS(ns, "rect"); r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1); r.setAttribute("height", 1); r.setAttribute("fill", "#01221D"); svg.appendChild(r); };
+    const finder = (fx, fy) => { for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) { const edge = x === 0 || y === 0 || x === 6 || y === 6, core = x > 1 && x < 5 && y > 1 && y < 5; if (edge || core) on(fx + x, fy + y); } };
+    const inFinder = (x, y) => (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9);
+    let s = 20261130;
+    const rand = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (!inFinder(x, y) && rand() > 0.52) on(x, y);
+    finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+    for (let y = 20; y < 25; y++) for (let x = 20; x < 25; x++) { const edge = x === 20 || y === 20 || x === 24 || y === 24; if (edge || (x === 22 && y === 22)) on(x, y); }
+  })();
+</script>
+</body>
+</html>
