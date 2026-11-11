@@ -2,13 +2,15 @@
 title: Knowledge Hub
 module: knowledge
 milestones: M1
-summary: MyCity's policies: writing them, publishing new versions, and seeing who has acknowledged them.
+summary: MyCity's policies and each department's SOPs: writing them, publishing new versions, and reading them.
 icon: book
 ---
 
-The Knowledge Hub holds what MyCity knows: its policies, and this User Guide. Everyone reads the
-policies that apply to them on [Policy Updates](/ess?tab=policy-updates) in Employee
-Self-Service. This chapter is for the people who write them.
+The Knowledge Hub holds what MyCity knows: its policies, each department's SOPs, and this User
+Guide. Everyone reads the policies that apply to them on
+[Policy Updates](/ess?tab=policy-updates) in Employee Self-Service, and every published SOP on
+[Knowledge Hub · SOPs](/knowledge?tab=sops). This chapter is for the people who read SOPs and the
+people who write policies and SOPs.
 
 ## Policies {#knowledge-policies screen=knowledge/policies icon=book}
 
@@ -261,6 +263,153 @@ An archived policy cannot be changed or brought back. Its versions and PDFs can 
 | **There is no draft** | Someone discarded or published the draft first | Look at the policy again |
 | A button you expected is not there | Your role may read policies but not do this: starting a policy needs create, saving and sending need edit, archiving needs delete | Ask People to change your role on Settings · Roles & Permissions |
 
+## SOPs {#knowledge-sops screen=knowledge/sops icon=list}
+
+Each department's own standard operating procedures: how Marketing launches a campaign, how
+Operations onboards a partner. Everyone reads every published SOP. A department's head writes and
+publishes that department's SOPs. People who hold **Manage SOPs** may write any department's:
+Operations and People, Implementation and the CEO, unless your roles were changed. Anyone else reads
+them and does not see **New SOP** or **Edit SOP**.
+
+![SOPs](shot:knowledge-sops)
+
+### Find and read an SOP {#knowledge-sops-read}
+
+1. Open [Knowledge Hub · SOPs](/knowledge?tab=sops).
+2. Press a department's chip to see only its SOPs. **All** shows every department.
+3. Type in **Search SOPs** to find one by its title or number, such as `SOP-0001`.
+4. Each row shows the **SOP**, its **Department**, its **Version** and when it was **Updated**. On a
+   phone each SOP is a card. **Updated** shows on a computer only.
+5. Press an SOP to read it. On a computer it opens beside the list. On a phone it opens in a sheet:
+   drag it down to close it.
+   ![An SOP, open](shot:knowledge-sop)
+6. Read its **Purpose**, **Scope**, **Roles Involved** and numbered **Steps**. A step shows who does
+   it. **Open Screen** opens the screen the step happens on. A file's name opens its file.
+7. **Versions** lists every version, newest first, with what changed. On a phone, press **Versions**
+   under the SOP. Press a version to read it as it was published.
+
+> **Tip:** Search finds an SOP from anywhere: type its title or number.
+
+### Find the procedures for a screen {#knowledge-sops-procedures}
+
+1. Open the help for the screen you are on: on a phone press **Quick Actions**, then **Help**. On a
+   computer, press your name at the foot of the menu, then **User Guide**.
+2. Under the screen's section, **Procedures** lists the SOPs whose steps happen on that screen, each
+   with its department.
+3. Press one to read it on [Knowledge Hub · SOPs](/knowledge?tab=sops).
+
+A screen whose steps no SOP names shows no **Procedures**.
+
+### Start a new SOP {#knowledge-sops-new}
+
+1. Press **New SOP** at the top right. On a phone it is under the title, or press
+   **Quick Actions**, then **New SOP**. From anywhere, open search and type `new sop`.
+   ![New SOP](shot:knowledge-new-sop)
+2. Choose the **Department**. A head is offered their own department only.
+3. Type its **Title**, such as `Campaign Launch`, and press **Start SOP**. The message **SOP started**
+   confirms it. It opens under the **Draft** chip, ready to write.
+
+An SOP stays with its department for good. To move one, start it again in the other department.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **Required** under **Department** or **Title** | It is empty | Choose the department, or type a title |
+| **At least 4 characters** | The title is too short | Type a longer title |
+| **You may not write this department's SOPs** | You are not its head and do not hold **Manage SOPs** | Ask the department's head |
+
+### Write the draft {#knowledge-sops-edit}
+
+1. Open the SOP and press **Edit SOP**. On a computer it opens at the side. On a phone it fills the
+   screen.
+   ![Edit SOP](shot:knowledge-sop-edit)
+2. Type the **Title** and the **Purpose**: what the procedure is for, at least 10 characters.
+3. Type the **Scope** if it covers only some work. Under **Roles Involved**, type each role on a line
+   of its own, up to 10.
+4. Under **Steps**, write each step in **Step**, in your department's own words. Wrap a word in two
+   stars for bold, such as `**brief**`.
+5. Type **Who** does it, such as `Campaign Lead`.
+6. Choose the **Screen** the step happens on, if it happens in the hub. The SOP then shows under
+   **Procedures** in that screen's help.
+7. Add a **File** the step needs, such as a template. **Remove File** takes it off.
+8. Press **Add Step** for the next step. A step's menu holds **Move Up**, **Move Down** and
+   **Remove Step**.
+9. Press **Save Draft**. The message **Draft saved** confirms it. Nobody is told yet.
+
+The SOP shows a bar: *Draft saved, not published.* Everyone else still reads the version in force.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **At least 10 characters** under **Purpose** | The purpose is too short | Say what the procedure is for |
+| **Write the step** | A step is empty or too short | Write the step, or remove it |
+| **Pick a screen** | That screen is no longer in the hub | Choose another screen, or **None** |
+| **Upload it again** | The file was not one you added | Press **Remove File**, then add the file again |
+| **This SOP is archived** | Someone archived it while you wrote | Nothing more can be saved |
+
+### Draft With AI {#knowledge-sops-ai}
+
+When your department already has the procedure in a document, the assistant can lay it out as
+steps for you. It keeps your words and never adds a step.
+
+1. In **Edit SOP**, press **Draft With AI**.
+2. Under **From**, choose **Pasted Text** and paste the procedure into **Procedure**. Or choose
+   **PDF File** and add the PDF.
+3. Press **Draft With AI**. **Drafted** shows beside **Yours**.
+   ![Draft With AI](shot:knowledge-sop-ai)
+4. Press **Use This Draft** to put it in the form, or **Keep Mine** to leave yours.
+5. Choose each step's **Screen** and **File** yourself: the draft never suggests them.
+6. Press **Save Draft**. Nothing is kept until you do.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **Paste the procedure** | Too little text was pasted | Paste the whole procedure |
+| **Pick a PDF** | No file was added, or it is not a PDF | Add a PDF, or paste the text |
+| **No text in this file** | The PDF is a scan, a picture of the pages | Paste the text instead |
+| **Draft With AI is unavailable right now.** | The assistant is off, or not set up | Write the steps yourself |
+| **This month's AI spending limit has been reached.** | MyCity's AI budget for the month is spent | Write the steps yourself, or ask an administrator |
+| **The AI service is not answering. Try again in a few minutes.** | The assistant did not answer | Wait a few minutes and press again |
+| **No steps found. Try again or write it by hand.** | The answer held no steps | Press **Draft With AI** again, or write it |
+
+### Publish an SOP {#knowledge-sops-publish}
+
+1. Open the SOP with its draft saved.
+2. Press **Publish SOP** in the bar.
+   ![Publish SOP](shot:knowledge-sop-publish)
+3. Type a **Note** saying what changed, such as `Added the budget step`. The first version needs
+   none.
+4. Press **Publish SOP**. The message *Version 2 published* confirms it, naming the new version.
+
+Everyone in the department is told: **New SOP**, or **SOP updated** for a later version. Everyone
+can read it from then on.
+
+To throw a draft away, press **Discard Changes** in the bar. The message **Draft discarded** confirms
+it. The version in force is untouched.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **Required** under **Note** | Version 2 and later need a note | Say what changed |
+| **At least 10 characters** | The note is too short | Write a little more |
+| **Write the purpose first** | The draft has no purpose | Press **Edit SOP**, write the **Purpose**, save |
+| **Add a step first** | The draft has no steps | Press **Edit SOP**, add a step, save |
+| **The draft changes nothing** | The draft says what the version in force says | Change it and save, or discard it |
+| **Save the changes as a draft first** | Someone published or discarded the draft first | Look at the SOP again |
+| **Pick a screen the hub has** | A step's screen is no longer in the hub | Press **Edit SOP** and choose another screen |
+
+### Archive an SOP {#knowledge-sops-archive}
+
+The department's head may archive its SOPs, and so may someone with **Manage SOPs** whose role may
+delete in the Knowledge Hub.
+
+1. Open the SOP and press **Archive SOP**.
+2. Type the **Reason**, at least 10 characters, such as `Process replaced`.
+3. Press **Archive SOP**. The message **SOP archived** confirms it.
+
+It leaves the list, search and **Procedures**. Its writers still find it under the **Archived** chip,
+with its versions. An archived SOP cannot be changed or brought back.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **This SOP is already archived** | Someone archived it first | Nothing more to do |
+
 ```shot knowledge-policies
 open: /knowledge?tab=policies
 as: operations
@@ -341,4 +490,94 @@ marks:
   1: label "First Day" | When it starts
   2: label "Note" | What changed
   3: label "Your Signature" | Sign here
+```
+
+```shot knowledge-sops
+open: /knowledge?tab=sops
+as: operations
+sources:
+  - app/src/features/knowledge/Sops.tsx
+marks:
+  1: button "New SOP" | Write an SOP
+  2: role group "Department" | One department's
+  3: searchbox | Find an SOP
+```
+
+```shot knowledge-sop
+open: /knowledge?tab=sops
+as: staff
+sources:
+  - app/src/features/knowledge/Sops.tsx
+do:
+  - phone click: css [data-ui=page] ul[data-copy=content] > li:has-text("Campaign Launch")
+  - wait: heading "Steps"
+crop: viewport
+marks:
+  1: heading "Purpose" | What it is for
+  2: heading "Steps" | Who does what
+```
+
+```shot knowledge-new-sop
+open: /knowledge?tab=sops
+as: operations
+sources:
+  - app/src/features/knowledge/Sops.tsx
+do:
+  - click: button "New SOP"
+  - wait: button "Start SOP"
+crop: modal
+marks:
+  1: label "Department" | Whose procedure
+  2: label "Title" | Its name
+```
+
+```shot knowledge-sop-edit
+open: /knowledge?tab=sops
+as: operations
+sources:
+  - app/src/features/knowledge/Sops.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("New Joiner Setup"), [data-ui=page] ul[data-copy=content] > li:has-text("New Joiner Setup")
+  - wait: button "Edit SOP"
+  - click: button "Edit SOP"
+  - wait: button "Draft With AI"
+crop: modal
+marks:
+  1: button "Draft With AI" | From a document
+  2: label "Roles Involved" | One role a line
+```
+
+```shot knowledge-sop-ai
+open: /knowledge?tab=sops
+as: operations
+sources:
+  - app/src/features/knowledge/Sops.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("New Joiner Setup"), [data-ui=page] ul[data-copy=content] > li:has-text("New Joiner Setup")
+  - wait: button "Edit SOP"
+  - click: button "Edit SOP"
+  - wait: button "Draft With AI"
+  - click: button "Draft With AI"
+  - fill: label "Procedure" = Add the joiner to payroll. Send the welcome email. Book the induction for their first week.
+  - click: button "Draft With AI"
+  - wait: text "Drafted"
+crop: modal
+marks:
+  1: text "Drafted" | The suggestion
+  2: button "Use This Draft" | Put it in the form
+```
+
+```shot knowledge-sop-publish
+open: /knowledge?tab=sops
+as: operations
+sources:
+  - app/src/features/knowledge/Sops.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("New Joiner Setup"), [data-ui=page] ul[data-copy=content] > li:has-text("New Joiner Setup")
+  - wait: button "Publish SOP"
+  - click: button "Publish SOP"
+  - wait: label "Note"
+crop: modal
+marks:
+  1: label "Note" | What changed
 ```

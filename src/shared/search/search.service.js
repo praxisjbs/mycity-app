@@ -289,7 +289,20 @@ async function readerOf(db, user) {
     capabilities: await grantsCache.getCapabilities(db, user.user_id),
     is_ceo: user.is_ceo === true,
     manages_people: managesPeople,
+    heads_department: await headsDepartment(db, user.employee_id),
   };
+}
+
+/** Whether the person heads a department now: as its head, or in its filled head seat (knowledge.md §6.2). */
+async function headsDepartment(db, employeeId) {
+  if (!employeeId) return false;
+  const { rows } = await db.query(
+    `SELECT EXISTS (SELECT 1 FROM department d LEFT JOIN org_seat s ON s.org_seat_id = d.head_seat_id
+                     WHERE d.head_employee_id = $1
+                        OR (d.head_employee_id IS NULL AND s.status = 'filled' AND s.filled_by_employee_id = $1)) AS heads`,
+    [employeeId],
+  );
+  return Boolean(rows[0] && rows[0].heads);
 }
 
 const tabLabel = (module, tab) => {
@@ -328,7 +341,7 @@ function actionEntries(reader) {
   return ACTIONS.filter(
     (x) =>
       (!x.need || can(x.need)) &&
-      (!x.capability || holds(x.capability)) &&
+      (!x.capability || holds(x.capability) || (x.orHead && reader.heads_department === true)) &&
       (!x.module || tabVisible({ module: x.module, tab: x.tab }, reader)) &&
       deliveryPlan.linkOpens(linkOf(x)),
   ).map((x) => {

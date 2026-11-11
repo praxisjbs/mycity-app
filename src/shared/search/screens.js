@@ -99,7 +99,7 @@ const SCREENS = Object.freeze([
   s("expenses", "categories", "Categories", ["expense categories", "expense types"]),
 
   s("knowledge", "policies", "Policies", ["policy", "handbook", "rules", "attendance policy", "grace period", "lateness policy", "clock in rules"]),
-  s("knowledge", "sops", "SOPs", ["sop", "procedures", "processes", "how to"]),
+  s("knowledge", "sops", "SOPs", ["sop", "procedures", "process", "processes", "how we work", "standard operating procedure"]),
   s("knowledge", "training", "Training", ["courses", "learning", "lessons"]),
 
   s("praxis_ai", "ask", "Ask", ["ai", "assistant", "chat", "question"]),
@@ -138,7 +138,7 @@ const SCREENS = Object.freeze([
 ]);
 
 /**
- * @typedef {{grants: Record<string, string[]>, capabilities: string[], is_ceo: boolean, manages_people: boolean}} Reader
+ * @typedef {{grants: Record<string, string[]>, capabilities: string[], is_ceo: boolean, manages_people: boolean, heads_department?: boolean}} Reader
  */
 
 /**

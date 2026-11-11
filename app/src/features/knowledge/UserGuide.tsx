@@ -28,6 +28,7 @@ import {
 } from "@mycity/ui";
 import { clearGuideReturn, setGuideReturn } from "./guide/return";
 import { GuideSearch } from "./guide/GuideSearch";
+import { Procedures } from "./Procedures";
 
 /**
  * Knowledge Hub · User Guide (`user-guide`, M0; docs/guides/user-guide.md). Two views of the same
@@ -42,6 +43,9 @@ import { GuideSearch } from "./guide/GuideSearch";
  *
  * Above both, the guide's search (guide/GuideSearch.tsx): its results take the guide's place while
  * a search is typed, and a result opens the Full Guide at its section or task, at the step.
+ *
+ * Under a section about a screen, Procedures lists the department SOPs whose steps happen there
+ * (Procedures.tsx; docs/guides/knowledge.md §3 step 3).
  */
 const MOCK = import.meta.env.VITE_API_MODE === "mock";
 
@@ -251,6 +255,8 @@ function FullGuide({ contents, id, screen, step }: { contents: GuideContents; id
               <GuideBody blocks={t.blocks as GuideBlock[]} anchor={t.slug} picture={picture} fetchImage={fetchImage} onLink={follow} onZoom={zoom} highlight={id === t.slug ? step : null} />
             </section>
           ))}
+          {/* The department procedures whose steps happen on this screen (docs/guides/knowledge.md §3 step 3). */}
+          {section.screen && <Procedures screen={section.screen} />}
         </div>
       )}
     </Reader>
