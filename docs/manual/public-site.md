@@ -351,7 +351,7 @@ A link past its day says *This Link Has Expired*, and one MyCity took back says
 ## Verify a Document {#public-verify icon=shield}
 
 Anyone can check a document MyCity signed and sealed, such as an offer letter or an agreement, on this page. It shows
-whether it is genuine and unchanged, never what it says.
+whether it is genuine and unchanged, never what it says. A training certificate shows who earned it.
 
 ### Check a reference {#public-verify-reference}
 
@@ -376,6 +376,15 @@ A reference nobody issued shows *Not Found*.
    Company and for the Partner, with the day and time.
 4. **Agreement** shows where it stands now: *Active*, *Expiring*, *Expired*, *Renewed* or *Closed*.
 5. An agreement signed on paper reads *Signed outside the hub* as its **Status**.
+
+### Check a training certificate {#public-verify-certificate}
+
+1. Open [Verify a Document](https://go.mycityapp.io/verify) and type the number printed on the
+   certificate, such as `CERT-2026-0019`, and press **Verify**. Its QR code opens the same check.
+   ![A verified certificate](shot:public-verify-certificate)
+2. *Document Verified* means it is genuine and unchanged.
+3. The record shows the **Document** as a certificate of completion, who it was **Awarded To**, the
+   **Course**, the day it was **Completed** and who it was **Published By**.
 
 ### Scan the QR code {#public-verify-qr}
 
@@ -573,4 +582,13 @@ do:
   - wait: text "Document Verified"
 marks:
   1: text "Status" | Where it stands
+```
+
+```shot public-verify-certificate
+site: public
+open: /verify/CERT-2026-0019
+do:
+  - wait: text "Document Verified"
+marks:
+  1: text "Awarded To" | Who earned it
 ```

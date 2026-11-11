@@ -7,6 +7,7 @@ const { sendPaged } = require("../../shared/http/paged");
 const { withActor } = require("../../shared/events/emit");
 const service = require("./training.service");
 const lesson = require("./training.lesson");
+const certificate = require("./training.certificate");
 
 const id = (req) => req.validated.params.id;
 const q = (req) => req.validated.query;
@@ -29,6 +30,7 @@ module.exports = {
   withdraw: async (req, res) => ok(res, await service.withdraw(withActor(req), id(req))),
   people: async (req, res) => sendPaged(res, await service.people(id(req), q(req))),
   remind: async (req, res) => ok(res, await service.remind(withActor(req), id(req))),
+  certificate: async (req, res) => res.status(202).json(await certificate.forPlace(withActor(req), id(req))),
 
   mine: async (req, res) => sendPaged(res, await service.mine(req.user, q(req))),
   myCourse: async (req, res) => ok(res, await service.myCourse(req.user, id(req))),
@@ -36,4 +38,5 @@ module.exports = {
   done: async (req, res) => ok(res, await service.done(withActor(req), id(req))),
   undone: async (req, res) => ok(res, await service.undone(withActor(req), id(req))),
   proof: async (req, res) => ok(res, await service.proof(withActor(req), id(req), body(req))),
+  myCertificate: async (req, res) => res.status(202).json(await certificate.mine(req.user, id(req))),
 };

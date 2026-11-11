@@ -1,167 +1,179 @@
-import { useState } from "react";
+import type { EssDeductionRow, Payslip } from "@mycity/contract/contract.gen.ts";
+import { useEffect, useRef, useState } from "react";
+import { api } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
-import type { Payslip, PayslipDetail } from "@mycity/contract/contract.gen.ts";
-import { Button, Card, DataView, DesktopOnly, ErrorState, formatDate, formatMoney, formatMonth, InlineSelect, ListDetail, LoadingRows, Money, PageHeader, Pager, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, PhoneOnly, Pill, TapList, toast, todayIso, useModal, useSideBySide } from "@mycity/ui";
+import { amount, downloadSlip, failed, PayslipBody } from "@/features/payroll/parts";
+import { PagedTable } from "@/features/shared/sections";
 import { hrefFor, useRouter } from "@/lib/router";
+import { Button, DataView, ErrorState, ExportButton, formatDate, formatMonth, FormFooter, HelpTerm, IconButton, ListDetail, LoadingRows, Money, PageHeader, Pill, StatStrip, toast, todayIso, useModal } from "@mycity/ui";
 
-/** A published payslip's month: paid, paid with a deduction, or still in the run (approved, the money not yet transferred). */
-const statusPill = (r: Payslip) => (r.run_status !== "paid" ? <Pill tone="warn">In the run</Pill> : r.has_deduction ? <Pill tone="warn">Paid, deduction</Pill> : <Pill tone="ok">Paid</Pill>);
+/**
+ * ESS · My Payslips (docs/guides/payroll.md §2, §3.7, §10; docs/guides/ess.md §10): a person's own published payslips, a
+ * year at a time, with the year's figures and Next Payday. A month opens its payslip in the shared Modal at every width,
+ * the centred dialog on desktop and a full sheet on a phone (F31 as amended for payslips), with Download PDF and Email a
+ * Copy; Deductions opens every month that carried one. A month whose run is approved and not yet paid reads In the run
+ * (§13.3 item 2, JBS Praxis 11/11/2026); nothing shows before the CEO approves it.
+ */
 
-const THIS_YEAR = () => Number(todayIso().slice(0, 4));
+const IN_THE_RUN_HELP = "Approved. The pay is not yet transferred.";
+/** The first year the contract reads (EssPayslipQuery). */
+const FIRST_YEAR = 2020;
+const thisYear = () => Number(todayIso().slice(0, 4));
 
-export function MyPayslipsPage() {
-  const [year, setYear] = useState<string | undefined>(undefined);
-  const summary = useApi("GET /api/v1/ess/payslips/summary", { query: year ? { year: Number(year) } : {} });
-  const y = summary.data?.year ? String(summary.data.year) : year;
-  const list = usePaged("GET /api/v1/ess/payslips", { filters: y ? { year: Number(y) } : {}, enabled: !!y });
-  const [selId, setSelId] = useState<string | null>(null);
-  const beside = useSideBySide();
-  const picked = list.rows.find((r) => r.payslip_id === selId) ?? null;
-  const sel = picked ?? list.rows[0];
-  // The latest payslip shows unasked only beside the list; elsewhere a month opens when it is pressed (F31).
-  const shown = beside ? sel : picked;
+/** A month's status: Paid, Paid with a deduction, or In the run (approved, the money not yet sent). */
+function monthPill(r: Payslip) {
+  if (r.run_status !== "paid")
+    return (
+      <HelpTerm help={IN_THE_RUN_HELP}>
+        <Pill tone="warn">In the run</Pill>
+      </HelpTerm>
+    );
+  return r.has_deduction ? <Pill tone="warn">Paid with a deduction</Pill> : <Pill tone="ok">Paid</Pill>;
+}
+
+export function MyPayslipsPage({ id = null }: { id?: string | null }) {
   const modal = useModal();
-  const email = useMutation("POST /api/v1/ess/payslips/:id/email");
+  const profile = useApi("GET /api/v1/ess/profile");
+  const [year, setYear] = useState(thisYear);
+  const summary = useApi("GET /api/v1/ess/payslips/summary", { query: { year } });
+  const list = usePaged("GET /api/v1/ess/payslips", { filters: { year } });
+  const [pick, setPick] = useState<string | null>(null);
   const s = summary.data;
+  // The years run from the person's start (or the first the contract reads) to this one.
+  const first = Math.max(FIRST_YEAR, Number(profile.data?.start_date?.slice(0, 4) ?? FIRST_YEAR));
+  const openDeductions = () => modal.open({ title: "Salary Deductions", wide: true, body: () => <Deductions /> });
+  // A link names a payslip (the bell's "Your payslip is ready", ⌘K) or a deduction or instalment (a deduction's notice,
+  // the assistant's citation): the payslip opens once it is found as the person's own, anything else opens Deductions.
+  const linked = useApi("GET /api/v1/ess/payslips/:id", { params: { id: id ?? "" }, enabled: !!id });
+  const handled = useRef<string | null>(null);
+  const toDeductions = useRef(openDeductions);
+  toDeductions.current = openDeductions;
+  useEffect(() => {
+    if (!id || handled.current === id || (!linked.data && !linked.error)) return;
+    handled.current = id;
+    if (linked.data) setPick(id);
+    else toDeductions.current();
+  }, [id, linked.data, linked.error]);
   if (summary.error) return <ErrorState error={summary.error} onRetry={summary.reload} />;
-  // The years a person can read run from the first the contract allows to this one; a year with no payslip says so.
-  const now = THIS_YEAR();
-  const years = Array.from({ length: now - 2020 + 1 }, (_, i) => now - i);
-  const idx = years.indexOf(Number(y));
-  const yearPicker = s && (
-    <span className="inline-flex h-8.5 max-md:h-11.5 items-center overflow-hidden rounded-full border border-input bg-background">
-      <button type="button" aria-label="Previous year" disabled={idx >= years.length - 1} onClick={() => setYear(String(years[idx + 1]))} className="h-full px-3 text-xs font-semibold text-muted-foreground disabled:opacity-35 max-md:min-w-11">‹</button>
-      <InlineSelect aria-label="Year" value={y ?? ""} onChange={setYear} options={years.map(String)} className="h-full border-x border-border bg-background px-2.5 text-xs font-strong" />
-      <button type="button" aria-label="Next year" disabled={idx <= 0} onClick={() => setYear(String(years[idx - 1]))} className="h-full px-3 text-xs font-semibold text-muted-foreground disabled:opacity-35 max-md:min-w-11">›</button>
-    </span>
-  );
-  const openSlip = (r: Payslip) => modal.open({ title: `Payslip, ${formatMonth(r.period)}`, wide: true, full: true, body: <SlipPaper id={r.payslip_id} own /> });
   return (
     <>
       <PageHeader
         title="My Payslips"
-        sub={s ? `${s.year}, year to date` : " "}
+        sub={`${year}, year to date`}
         actions={
           <>
-            {yearPicker}
-            <Button onClick={() => sel && email.run({ params: { id: sel.payslip_id }, body: {} }).then(() => toast("Sent to your work email"))}>Email a Copy</Button>
-            <Button variant="primary" onClick={() => toast(`Zipping ${s?.year} payslips. They arrive in Mailbox.`)}>Download All</Button>
+            <span className="flex items-center gap-1" role="group" aria-label="Year">
+              <IconButton icon="left" label="Previous Year" disabled={year <= first} onClick={() => setYear(year - 1)} />
+              <b className="min-w-12 text-center text-sm tabular-nums" aria-live="polite">
+                {year}
+              </b>
+              <IconButton icon="right" label="Next Year" disabled={year >= thisYear()} onClick={() => setYear(year + 1)} />
+            </span>
+            <ExportButton message="Payslips downloaded" onExport={() => saveExport(api.call("POST /api/v1/ess/payslips/export", { body: { year } }))}>
+              Download All
+            </ExportButton>
           </>
         }
       />
-      {s && (
-        <div className="mb-3 flex flex-wrap overflow-hidden rounded-card border border-border bg-card">
-          {[["Gross", <Money value={s.gross_pay} />], ["Net received", <Money value={s.net_pay} />], ["Payslips", String(s.payslips)]].map(([l, v]) => (
-            <div key={l as string} className="min-w-32 flex-1 border-r border-border px-3.5 py-3 max-md:min-w-1/2 max-md:border-b">
-              <span className="text-2xs font-semibold tracking-caps text-subtle-foreground uppercase">{l}</span>
-              <b className="mt-0.5 block text-lg font-bold tracking-tight">{v}</b>
-            </div>
-          ))}
-          <button type="button" onClick={() => modal.open({ title: "Salary Deductions", sub: "Every month that carried a deduction, and the query behind it", wide: true, body: <Deductions /> })} className="min-w-32 flex-1 border-r border-border px-3.5 py-3 text-left last:border-r-0 hover:bg-accent max-md:min-w-1/2 max-md:border-b">
-            <span className="text-2xs font-semibold tracking-caps text-subtle-foreground uppercase">Deductions</span>
-            <b className={`mt-0.5 block text-lg font-bold tracking-tight ${s.total_deductions === "0.00" ? "text-success" : "text-warning"}`}>{formatMoney(s.total_deductions ?? "0.00")}</b>
-            <span className="mt-0.5 block text-2xs font-semibold text-accent-foreground">View Details</span>
-          </button>
-          {s.next_payday && (
-            <div className="min-w-32 flex-1 px-3.5 py-3 max-md:min-w-1/2">
-              <span className="text-2xs font-semibold tracking-caps text-subtle-foreground uppercase">Next payday</span>
-              <b className="mt-0.5 block text-lg font-bold tracking-tight">{formatDate(s.next_payday)}</b>
-            </div>
-          )}
-        </div>
-      )}
-      <PhoneOnly>
-        <TapList items={list.rows.map((r) => ({ key: r.payslip_id, title: formatMonth(r.period), sub: `Net ${formatMoney(r.net_pay ?? "0.00")}`, end: statusPill(r), onSelect: () => openSlip(r) }))} />
-        <Pager page={list.page} onPage={list.setPage} noun="payslip" className="px-0" />
-      </PhoneOnly>
-      <DesktopOnly>
-        <ListDetail
-          cols="1/1.5"
-          open={picked !== null}
-          onClose={() => setSelId(null)}
-          title={picked ? `Payslip, ${formatMonth(picked.period)}` : "Payslip"}
-          list={
-            <DataView
-              title={`Payslips, ${y ?? ""}`}
-              rows={list.rows}
-              rowKey={(r) => r.payslip_id}
-              loading={list.loading}
-              selectedKey={sel?.payslip_id}
-              onRowClick={(r) => setSelId(r.payslip_id)}
-              columns={[
-                { key: "m", label: "Month", render: (r) => formatMonth(r.period) },
-                { key: "n", label: "Net", align: "n", render: (r) => <Money value={r.net_pay} /> },
-                { key: "s", label: "Status", render: statusPill },
-                { key: "x", label: "", render: (r) => <Button size="sm" icon="doc" onClick={(e) => (e.stopPropagation(), toast(`${r.number}.pdf downloading`))}>PDF</Button> },
-              ]}
-              footer={<Pager page={list.page} onPage={list.setPage} noun="payslip" />}
-            />
-          }
-          detail={shown ? <SlipPaper id={shown.payslip_id} own /> : <Card><LoadingRows /></Card>}
-        />
-      </DesktopOnly>
+      <StatStrip
+        label="Payslip figures"
+        items={[
+          { label: "Gross", value: s ? <Money value={s.gross_pay} /> : "", desktop: true },
+          { label: "Net Received", value: s ? <Money value={s.net_pay} /> : "", tone: "ok" },
+          { label: "Payslips", value: s ? s.payslips : "" },
+          { label: "Deductions", value: s ? <Money value={s.total_deductions ?? "0.00"} /> : "", tone: s && s.total_deductions !== "0.00" ? "warn" : undefined, onOpen: openDeductions, action: "View Details" },
+          { label: "Next Payday", value: s?.next_payday ? formatDate(s.next_payday) : "" },
+        ]}
+      />
+      <ListDetail
+        layout="modal"
+        size="wide"
+        full
+        open={pick !== null}
+        onClose={() => setPick(null)}
+        title="Payslip"
+        list={
+          <PagedTable<Payslip>
+            title={`${year} Payslips`}
+            list={list}
+            rowKey={(r) => r.payslip_id}
+            onRowClick={(r) => setPick(r.payslip_id)}
+            noun="payslip"
+            empty={{ title: "No Payslips", text: "Nothing was paid in this year." }}
+            columns={[
+              { key: "m", label: "Month", render: (r) => <span className="font-semibold">{formatMonth(r.period)}</span> },
+              { key: "n", label: "Net", align: "n", render: (r) => amount(r.net_pay) },
+              { key: "s", label: "Status", badge: true, render: monthPill },
+            ]}
+          />
+        }
+        detail={pick && <OwnPayslip id={pick} />}
+      />
     </>
   );
 }
 
-/** A payslip as Paper, from its own (`own`, My Payslips) or a Payroll reader's route: the same shape either way. */
-export function SlipPaper({ id, own = false }: { id: string; own?: boolean }) {
-  return own ? <OwnSlip id={id} /> : <StaffSlip id={id} />;
-}
-
-function OwnSlip({ id }: { id: string }) {
-  const { data: s } = useApi("GET /api/v1/ess/payslips/:id", { params: { id } });
-  return s ? <SlipView s={s} /> : <Card><LoadingRows /></Card>;
-}
-
-function StaffSlip({ id }: { id: string }) {
-  const { data: s } = useApi("GET /api/v1/payslips/:id", { params: { id } });
-  return s ? <SlipView s={s} /> : <Card><LoadingRows /></Card>;
-}
-
-function SlipView({ s }: { s: PayslipDetail }) {
-  const earnings = s.lines.filter((l) => l.kind === "earning");
-  const deductions = s.lines.filter((l) => l.kind === "deduction");
+/** The person's own payslip, with Download PDF and Email a Copy once its PDF has rendered. */
+function OwnPayslip({ id }: { id: string }) {
+  const d = useApi("GET /api/v1/ess/payslips/:id", { params: { id } });
+  const email = useMutation("POST /api/v1/ess/payslips/:id/email");
+  if (d.error) return <ErrorState error={d.error} onRetry={d.reload} />;
+  if (!d.data) return <LoadingRows />;
+  const s = d.data;
+  const copy = async () => {
+    try {
+      await email.run({ params: { id }, body: {} });
+      toast("Sent to your work email");
+    } catch (e) {
+      failed(e, "Copy not sent");
+    }
+  };
   return (
-    <Paper note="This is the document the engine produces. Downloads as PDF.">
-      <PaperLogo reference={`PAYSLIP · ${formatMonth(s.period).slice(0, 3).toUpperCase()}-${s.period.slice(0, 4)}`} />
-      <PaperTitle sub={`${s.employee.display_name}${s.employee.job_title ? ` · ${s.employee.job_title}` : ""} · ${s.status === "published" ? `Pay date ${formatDate(s.pay_date)}` : "Preview"}`}>Payslip, {formatMonth(s.period)}</PaperTitle>
-      <PaperTable head={["Earnings", "Amount"]} rows={earnings.map((e) => [e.label, e.pay_amount === null ? "Restricted" : formatMoney(e.pay_amount)])} totals={[["Gross pay", s.gross_pay === null ? "Restricted" : formatMoney(s.gross_pay)]]} />
-      <div className="mt-3.5">
-        <PaperTable head={["Deductions", "Amount"]} rows={deductions.map((d) => [`${d.label}${d.detail ? ` (${d.detail})` : ""}`, d.pay_amount === null ? "Restricted" : formatMoney(d.pay_amount)])} totals={[["Net pay", s.net_pay === null ? "Restricted" : formatMoney(s.net_pay)]]} />
-      </div>
-      {s.bank_name && <p className="!mt-3.5 text-2xs text-paper-faint">Paid to {s.bank_name}, account ending {s.account_last4}.</p>}
-      <PaperFoot>
-        <span>{s.status === "published" ? "Published" : "Awaiting Approval"}</span>
-        <span className="ml-auto">{s.number}</span>
-      </PaperFoot>
-    </Paper>
+    <>
+      {!s.pdf_ready && <Pill tone="info" className="mb-2">Preparing</Pill>}
+      <PayslipBody s={s} own />
+      {s.pdf_ready && (
+        <FormFooter>
+          <Button icon="mail" onClick={copy}>
+            Email a Copy
+          </Button>
+          <Button variant="primary" icon="download" onClick={() => downloadSlip(s, true)}>
+            Download PDF
+          </Button>
+        </FormFooter>
+      )}
+    </>
   );
 }
 
 /** What became of an instalment, in the words My Payslips uses. */
-const OUTCOME: Record<string, string> = { scheduled: "Scheduled", in_run: "In the run", applied: "Deducted", cancelled: "Cancelled" };
+const OUTCOME: Record<EssDeductionRow["status"], string> = { scheduled: "Scheduled", in_run: "In the run", applied: "Deducted", cancelled: "Cancelled" };
 
+/** Every month that carried a deduction, and each instalment still to come, with its query. */
 function Deductions() {
   const list = usePaged("GET /api/v1/ess/deductions");
   const { navigate } = useRouter();
   return (
     <>
       <DataView
-        rows={list.rows}
+        bare
+        caption="Salary Deductions"
+        list={list}
         rowKey={(r) => r.payroll_deduction_instalment_id}
-        loading={list.loading}
-        empty={{ title: "No Deductions", text: "Nothing has ever been deducted from your pay." }}
+        noun="deduction"
+        empty={{ title: "No Deductions", text: "Nothing has been deducted from your pay." }}
         columns={[
-          { key: "m", label: "Month", render: (r) => formatMonth(r.period) },
-          { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.pay_amount} /> },
-          { key: "r", label: "Reason", render: (r) => r.reason },
-          { key: "q", label: "Query", render: (r) => r.query_number ?? "None" },
-          { key: "o", label: "Outcome", render: (r) => <Pill tone={r.status === "applied" ? "neutral" : "warn"}>{OUTCOME[r.status]}</Pill> },
+          { key: "m", label: "Month", render: (r: EssDeductionRow) => formatMonth(r.period) },
+          { key: "a", label: "Amount", align: "n", render: (r: EssDeductionRow) => <Money value={r.pay_amount} /> },
+          { key: "r", label: "Reason", render: (r: EssDeductionRow) => <span data-copy="content">{r.instalments > 1 ? `${r.reason}, ${r.instalment} of ${r.instalments}` : r.reason}</span> },
+          { key: "q", label: "Query", render: (r: EssDeductionRow) => r.query_number ?? "None" },
+          { key: "o", label: "Outcome", badge: true, render: (r: EssDeductionRow) => <Pill tone={r.status === "applied" ? "neutral" : "warn"}>{OUTCOME[r.status]}</Pill> },
         ]}
-        footer={<Pager page={list.page} onPage={list.setPage} noun="deduction" />}
       />
-      <Button className="mt-3" onClick={() => navigate(hrefFor("ess", "my-queries"))}>Open My Queries</Button>
+      <FormFooter>
+        <Button onClick={() => navigate(hrefFor("ess", "my-queries"))}>Open My Queries</Button>
+      </FormFooter>
     </>
   );
 }

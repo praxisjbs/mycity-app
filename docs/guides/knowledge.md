@@ -184,9 +184,9 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `POST /api/v1/training/me/items/:id/done` | `EmptyBody` → `MyCourse` | self, own | no | May complete the course (§6.8). A Library course not started: 409 `NOT_STARTED` |
 | `POST /api/v1/training/me/items/:id/undone` | `EmptyBody` → `MyCourse` | self, own | no | Not after completion (409 `COURSE_COMPLETED`) |
 | `POST /api/v1/training/me/courses/:id/proof` | `ProofAdd` (`url` or `document_id`) → `MyCourse` | self, own | no | Completes the course. Every item done first (409 `ITEMS_LEFT`); only where it is asked (409 `PROOF_NOT_ASKED`) |
-| `POST /api/v1/training/me/courses/:id/certificate` | `EmptyBody` → `ExportFile` (202) | self, own | no | The stored PDF, downloaded on the device that asked. Built with the certificate (PR 4) |
-| `POST /api/v1/training/enrolments/:id/certificate` | `EmptyBody` → `ExportFile` (202) | `knowledge` view, `training.manage` | no | Built with the certificate (PR 4) |
-| `GET /api/v1/public/verify/:number` | → `VerifyResult` | public | no | Extended for `CERT-` numbers (§6.10); no auth import |
+| `POST /api/v1/training/me/courses/:id/certificate` | `EmptyBody` → `ExportFile` (202) | self, own | no | The stored PDF, downloaded on the device that asked; `pending` while the worker renders it, then the screen waits on `GET /exports/:id`. 409 `NO_CERTIFICATE` without one |
+| `POST /api/v1/training/enrolments/:id/certificate` | `EmptyBody` → `ExportFile` (202) | `knowledge` view, `training.manage` | no | Anyone's, as above |
+| `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | no | A `CERT-` number is answered by `training.certificate.js` (§6.10): `document_type` `training_certificate` and its `certificate` facts; no auth import |
 
 ## 6 · Rules and calculations
 
@@ -319,27 +319,41 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 ### 6.9 The certificate
 
 - Rendered by the outbox handler `training.issue_certificate` through `documents.generate` (doc type
-  `training_certificate`, template `templates/documents/training-certificate.html`, A4 landscape),
-  from the approved sample `docs/MyCity-ERP-Documents/training-samples/certificate-sample.html`. The
-  two faces are embedded files (`templates/documents/fonts/`), never fetched.
+  `training_certificate`, personal, one A4 landscape page it draws itself with no letterhead: the
+  `draw` of `training.certificate.js` over `templates/documents/training-certificate.html`, its
+  variables `CertificateDocumentVars`), from the sample MyCity approved as drawn (Cynthia,
+  11/11/2026; `docs/MyCity-ERP-Documents/training-samples/certificate-sample.html`). The two faces
+  are embedded files, never fetched: Cormorant Garamond (`templates/documents/fonts/`, its licence
+  beside it) and the proposal kit's Geist (`templates/proposals/fonts/`, one copy in the
+  repository). The rosette, the seal's petals and the QR are drawn on the server: the renderer runs
+  no script and refuses every request but a `data:` URL. Download Certificate issues it then if the
+  worker has not yet.
 - It prints the organisation's logo (Settings · Organisation; the wordmark when none), "Certificate
   of Completion", the person's full name as on their employee record, the course title, the number
   of items and the course's length (when minutes are set), the completion date (long, day first),
-  the publisher's signature, name and job title, the seal, the certificate number, the issue date
-  and the QR that opens `go.mycityapp.io/verify/t/<key>`.
+  the publisher's signature, name and job title, the seal (its ring the organisation's name), the
+  certificate number, the issue date (the completion date) and the QR that opens
+  `go.mycityapp.io/verify/<number>`: the number alone shows a certificate (§6.10), so it needs no key.
+- When the PDF is stored (`document.generated`), `training.certificate_ready` tells the person
+  "Certificate ready"; `certificate_ready` on My Training and Training · People means its PDF is
+  made. The certificate and the proof are the person's and `training.manage`'s only: the vault's
+  read rule for a `training_enrolment`'s files (`training.events.js`); the CEO holds every capability.
 - `certificate_hash` is the canonical hash of what it states (name, course number and title,
-  completion date, publisher, number); the artifact hash is the vault's over the PDF. The PDF is
-  stored once and never re-rendered; a renamed person or course keeps the certificate as issued.
+  completion date, publisher, number; `TRAINING_CERTIFICATE`); the artifact hash is the vault's over
+  the PDF. The PDF is stored once and never re-rendered; a renamed person or course keeps the
+  certificate as issued: the holder's name and the course title it states are kept on the enrolment
+  at completion (`certificate_holder_name`, `certificate_course_title`, migration `10430`).
 - On staging every certificate carries the STAGING mark, as every document does.
 
 ### 6.10 Verification
 
-- `GET /public/verify/:number` (and `/verify/t/<key>` from the QR) answers a `CERT-` number from the
-  training module's adapter: the holder's name, the course, the completion date, the publisher and
-  their title, and the two verdicts (the content hash recomputed from the enrolment, the artifact
-  hash from the stored bytes). A certificate states nothing private beyond what it prints, so the
-  number alone shows it; nothing else about the person is shown. An unknown number is the same 404
-  as for any document.
+- `GET /api/public/v1/verify/:ref` (which the QR opens, as `/verify/<number>` on the site) answers a
+  `CERT-` number, in any case, from `training.certificate.js`: the holder's name, the course, the
+  completion date, the publisher and their title, and the two verdicts (the content hash recomputed
+  from the facts kept on the enrolment, the artifact hash from the stored bytes). A certificate
+  states nothing private beyond what it prints, so the number alone shows it; nothing else about the
+  person is shown. An unknown number, or one whose PDF is not made yet, is the same 404 as for any
+  document. Verify a Document shows Awarded To, Course, Completed and Published By.
 
 ### 6.11 Reminders
 
@@ -365,7 +379,8 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `training.enrol_joiners` | `employee.created`, `employee.updated`, `access.roles_set`; the `training-joiners` job daily at 06:00 Lagos | Enrols new matches of open assignments, sets their tasks and notices |
 | `training.close_leaver` | `employee.archived` | A leaver's open enrolments removed (`training.enrolment_closed`) and their tasks cancelled; completed ones stay |
 | `training.started`, `training.item_done`, `training.item_undone`, `training.proof_added` | As named | Audit (progress is not notified) |
-| `training.completed` | Completion | Audit; outbox `training.close_task`; `training.issue_certificate` (PDF, vault, then "Certificate ready" to the person) with PR 4 |
+| `training.completed` | Completion | Audit; outbox `training.close_task` and `training.issue_certificate` (the certificate generated; the worker renders and stores its PDF) |
+| `training.certificate_ready` | Its PDF stored (`document.generated`) | Tells the person ("Certificate ready", the course and the number) |
 | `training.reminder_due` | Reminder `training_due`, every 5 minutes, 08:00 to 18:00 Lagos (§6.11); Remind Overdue | Tells the person ("Training due" or "Training overdue") |
 
 Notification category: `knowledge` (as Policies), so a person's Knowledge Hub preference governs
@@ -467,8 +482,10 @@ else's training in M10 (§13).
 2. Renewal (an annual refresher that falls due again a year after completion) is not in M10; asked
    of MyCity at the demo.
 3. Line managers seeing their team's training: not in M10 unless MyCity asks at the demo.
-4. MyCity signs off the certificate sample (`training-samples/README.md` lists what to confirm)
-   before PR 4 builds the template.
+4. ~~MyCity signs off the certificate sample~~ Answered 11/11/2026: Cynthia approved the sample as
+   drawn: the wording ("Certificate of Completion", "This is to certify that", "has successfully
+   completed the training", "Published this training"), "Learning & Development" under the wordmark,
+   the seal's ring "MyCity App Ltd · Certified Training", and one signature, the publisher's.
 
 ## Appendix A · Build plan
 
@@ -516,7 +533,15 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
   sheet; Undone reads Mark Not Done (a button is Verb Noun); a course's title and summary are changed
   in Settings' Course Details. Left: Download Certificate on My Training and Training · People, once
   PR 4's two routes are in the contract.
-
+- 11/11/2026 · TB · PR 4 built: the certificate (§6.9, §6.10). Cynthia approved the sample as drawn
+  (§13 item 4). Decided on the way: the certificate draws its own page (`draw`, no letterhead) from
+  the template; the QR opens `/verify/<number>`, as the number alone shows a certificate; the holder's
+  name and course title it states are kept at completion (migration `10430`), so the content verdict
+  holds after a rename; a certificate is verifiable once its PDF exists; Download Certificate waits on
+  `GET /exports/:id`, which now answers for a generated document the caller may read (foundation.md
+  §6.12); "Certificate ready" on `document.generated`; the facts read "items", as §6.9 says, where
+  the sample read "lessons"; Verify a Document's `document_type` gains `training_certificate` and its
+  result a `certificate` part (offers.md).
 - 11/11/2026 · TB · PR 3 built: the `training` module (§5's routes for `/training` but Download
   Certificate's two, which come with the certificate in PR 4), Draft Lesson, the reminder, joiners
   and leavers, ⌘K and the AI reads. Decided on the way: a place's task and notice are set by the

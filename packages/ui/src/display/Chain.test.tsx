@@ -27,8 +27,19 @@ describe("Chain", () => {
     expect(screen.getByText("Finance").closest("span")!.className).toContain("text-subtle-foreground");
   });
 
-  it("has no accessibility violations", async () => {
-    const { container } = render(<Chain steps={STEPS} />);
+  it("stacks its steps one under another, an arrow down between each", () => {
+    render(<Chain steps={STEPS} stack />);
+    expect(screen.getByRole("list").className).toContain("flex-col");
+    expect(screen.getAllByRole("listitem")[1]!.className).toContain("flex-col");
+  });
+
+  it("has no accessibility violations, in a row and stacked", async () => {
+    const { container } = render(
+      <>
+        <Chain steps={STEPS} />
+        <Chain steps={STEPS} stack label="Run Route" />
+      </>,
+    );
     expect(await axe(container)).toHaveNoViolations();
   });
 });

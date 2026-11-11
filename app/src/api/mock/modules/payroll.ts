@@ -4,6 +4,9 @@ import type {
   DeductionSummary,
   GradePlacement,
   PayComponentSet,
+  PayrollAdjustment,
+  PayrollAdjustmentAdd,
+  PayrollProblem,
   PayrollRun,
   PayrollRunSummary,
   PayrollSettings,
@@ -18,104 +21,224 @@ import salarySchemas from "@mycity/contract/schemas/salary_structure.js";
 import statutorySchemas from "@mycity/contract/schemas/statutory.js";
 import { todayIso } from "@mycity/ui";
 import type { RawResponse } from "../../client";
-import { created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
+import { created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, ref, refKey, SIGN_INS } from "../data/people";
-import { kobo, money, SLIPS } from "../data/payroll";
+import { kobo, money, payDateOf, SLIPS, type MockSlip } from "../data/payroll";
+import { exportFile } from "./shared";
 
 const canRun = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
 const isCeo = (u: string) => SIGN_INS[u]?.view === "ceo";
-const thisPeriod = () => new Date().toISOString().slice(0, 7);
+const thisPeriod = () => todayIso().slice(0, 7);
 const now = () => new Date().toISOString();
 const operator = () => Object.keys(SIGN_INS).find((k) => SIGN_INS[k].view === "operations") ?? "";
+const nameOf = (key: string | null) => (key ? (byKey(key)?.display_name ?? null) : null);
 
 /*
- * Payroll runs in the contract's shapes (packages/contract/schemas/payroll.js): the months before this one are
- * paid, this month's run is waiting on the CEO, and every move the screen makes is the API's own, down to its
- * refusals. The CEO decides it through the approval's routes (POST /workflow/instances/:id/approve), which reach
- * here through organisation.ts's decide chain.
+ * Payroll runs in the contract's shapes (packages/contract/schemas/payroll.js), held in memory: every month
+ * before this one is paid, and this month's run is computed and waiting to be sent. Every move the screen
+ * makes is the API's own, down to its refusals (docs/guides/payroll.md §5, §6.9): one run a month, never a
+ * month still to come; Compute and Submit only while the run may change; an adjustment or an exclusion sends a
+ * Computed run back to Draft; Submit refuses a blocking problem and a changed total; the CEO decides it through
+ * the approval's routes (POST /workflow/instances/:id/approve, /reject, /request-changes), which reach here
+ * through organisation.ts's and expenses.ts's chains; Approve publishes the month's payslips; Mark Paid ends it.
  */
 type Status6 = PayrollRun["status"];
-const RUN = {
-  period: thisPeriod(),
-  status: "submitted" as Status6,
-  submitted_at: now(),
-  submitted_by: operator(),
-  approved_at: null as string | null,
-  approved_by: null as string | null,
-  paid_on: null as string | null,
-};
-const WID = sid("wf:payroll_run");
+interface RunRow {
+  period: string;
+  status: Status6;
+  created_at: string;
+  computed_at: string | null;
+  submitted_at: string | null;
+  submitted_by: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  paid_on: string | null;
+  payment_reference: string | null;
+  paid_by: string | null;
+  returned_reason: string | null;
+}
+interface AdjustmentRow {
+  payroll_adjustment_id: string;
+  period: string;
+  employee_id: string;
+  kind: PayrollAdjustment["kind"];
+  label: string;
+  amount: number;
+  reason: string;
+  created_by: string;
+  created_at: string;
+}
+
 const first = (period: string) => `${period}-01`;
 const numberOf = (period: string) => `PAY-${period}`;
 export const runId = (period: string) => sid(`run:${period}`);
-/** A month's run status: this month's is the open run's, every earlier month is paid. */
-export const runStatusOf = (period: string): Status6 => (period === RUN.period ? RUN.status : "paid");
-const periods = () => [...new Set(SLIPS.map((x) => x.period))].sort().reverse();
+const wfOf = (period: string) => sid(`wf:payroll_run:${period}`);
+const blank = (period: string): RunRow => ({
+  period,
+  status: "draft",
+  created_at: now(),
+  computed_at: null,
+  submitted_at: null,
+  submitted_by: null,
+  approved_at: null,
+  approved_by: null,
+  paid_on: null,
+  payment_reference: null,
+  paid_by: null,
+  returned_reason: null,
+});
+
+const RUNS = new Map<string, RunRow>();
+for (const period of [...new Set(SLIPS.map((x) => x.period))]) {
+  if (period === thisPeriod()) RUNS.set(period, { ...blank(period), status: "computed", computed_at: now() });
+  else {
+    const day = `${first(period)}T09:00:00.000Z`;
+    RUNS.set(period, { ...blank(period), status: "paid", created_at: day, computed_at: day, submitted_at: day, submitted_by: operator(), approved_at: day, approved_by: "ifeoma", paid_on: payDateOf(period), paid_by: operator() });
+  }
+}
+/** The months left out of a run, by person, with the reason. */
+const EXCLUDED = new Map<string, Map<string, string>>();
+const ADJUSTMENTS: AdjustmentRow[] = [];
+/** Payslips already emailed, so Email All sends only to the rest unless Email Again is chosen. */
+export const EMAILED = new Map<string, string>();
+
+const periods = () => [...RUNS.keys()].sort().reverse();
+const runByWid = (wid: string) => [...RUNS.values()].find((r) => wfOf(r.period) === wid && r.status !== "draft" && r.status !== "computed");
+/** A month's run status, or null for a month with no run. */
+export const runStatusOf = (period: string): Status6 | null => RUNS.get(period)?.status ?? null;
+const isOpen = (r: RunRow) => r.status === "draft" || r.status === "computed";
+const lastDay = (period: string) => payDateOf(period, 31);
+
+/** The month's payslips: the demonstration ones, or, for a month first opened here, one for each person who had started. */
+function slipsOf(period: string): MockSlip[] {
+  const held = SLIPS.filter((x) => x.period === period);
+  if (held.length || !RUNS.has(period)) return held;
+  PEOPLE.filter((p) => p.start_date <= lastDay(period)).forEach((p, i) =>
+    SLIPS.push({
+      payslip_id: sid(`slip:${p.user_key}:${period}`),
+      number: `PAY-${period}-${String(i + 1).padStart(4, "0")}`,
+      person: p,
+      period,
+      gross: kobo(p.gross_monthly),
+      ded: 0,
+      status: "in_run",
+      paid_on: null,
+      ded_reason: null,
+      ded_query: null,
+    }),
+  );
+  return SLIPS.filter((x) => x.period === period);
+}
+
+/** What a payslip comes to: its gross and deductions with the run's adjustments, nothing for a person left out. */
+export function slipFigures(x: MockSlip) {
+  const reason = EXCLUDED.get(x.period)?.get(x.person.employee_id) ?? null;
+  const adjustments = ADJUSTMENTS.filter((a) => a.period === x.period && a.employee_id === x.person.employee_id);
+  const plus = adjustments.filter((a) => a.kind === "earning").reduce((s, a) => s + a.amount, 0);
+  const minus = adjustments.filter((a) => a.kind === "deduction").reduce((s, a) => s + a.amount, 0);
+  return { excluded: reason, earnings: reason ? 0 : x.gross + plus, deductions: reason ? 0 : x.ded + minus, adjustments: reason ? [] : adjustments };
+}
 
 function totals(period: string) {
-  const list = SLIPS.filter((x) => x.period === period);
-  const gross = list.reduce((a, x) => a + x.gross, 0);
-  const ded = list.reduce((a, x) => a + x.ded, 0);
-  return { headcount: list.length, gross, ded };
+  const paid = slipsOf(period).filter((x) => !slipFigures(x).excluded);
+  const gross = paid.reduce((a, x) => a + slipFigures(x).earnings, 0);
+  const ded = paid.reduce((a, x) => a + slipFigures(x).deductions, 0);
+  return { headcount: paid.length, gross, ded };
+}
+
+/** The person whose overtime waits on their line manager in the open month (a warning, never blocking). */
+const OVERTIME_WAITING = "tobi";
+
+/** A run's problems (§6.15), blocking first; only while it is a Draft or Computed one. */
+function problemsOf(period: string): PayrollProblem[] {
+  const r = RUNS.get(period);
+  if (!r || !isOpen(r)) return [];
+  const out: PayrollProblem[] = [];
+  for (const x of slipsOf(period)) {
+    const f = slipFigures(x);
+    if (f.excluded) continue;
+    const who = ref(x.person)!;
+    if (f.earnings - f.deductions < 0)
+      out.push({ code: "NEGATIVE_NET", severity: "blocking", employee: who, payslip_id: x.payslip_id, message: `${who.display_name} would be paid less than nothing`, action: "Spread a deduction, add an adjustment or exclude them" });
+    if (x.person.user_key === OVERTIME_WAITING && period === thisPeriod())
+      out.push({ code: "OVERTIME_WAITING", severity: "warning", employee: who, payslip_id: x.payslip_id, message: `2 overtime items wait for a decision for ${who.display_name}`, action: "Ask the line manager to decide" });
+    const fines = DEDS.filter((d) => d.source === "fine" && d.status === "pending" && d.employee.employee_id === x.person.employee_id).length;
+    if (fines)
+      out.push({ code: "FINE_WAITING", severity: "warning", employee: who, payslip_id: x.payslip_id, message: `${fines} ${fines === 1 ? "fine waits" : "fines wait"} for payroll for ${who.display_name}`, action: "Accept, spread or waive it on Deductions" });
+  }
+  return out.sort((a, b) => Number(a.severity === "warning") - Number(b.severity === "warning"));
 }
 
 /** The approval's route as the screen reads it: one stage, the CEO. */
-function route1(): NonNullable<PayrollRun["chain"]> {
-  const pending = RUN.status === "submitted";
-  return [{ key: "ceo", name: "CEO", state: pending ? "now" : "done", approvers: [{ type: "ceo", value: null, label: "CEO" }] }] as PayrollRun["chain"];
+function chainOf(r: RunRow): PayrollRun["chain"] {
+  if (isOpen(r)) return [];
+  return [{ key: "ceo", name: "CEO", state: r.status === "submitted" ? "now" : "done", approvers: [{ type: "ceo", value: null, label: "CEO" }] }] as PayrollRun["chain"];
 }
 
 function runOf(period: string, user: string, withChain = false): PayrollRun {
+  const r = RUNS.get(period)!;
   const t = totals(period);
-  const current = period === RUN.period;
-  const status: Status6 = current ? RUN.status : "paid";
   const edit = canRun(user);
-  const open = status === "draft" || status === "computed";
+  const open = isOpen(r);
+  const problems = problemsOf(period);
   return {
     payroll_run_id: runId(period),
     number: numberOf(period),
     period: first(period),
-    status,
+    status: r.status,
     advanced: false,
     headcount: t.headcount,
     gross_pay: money(t.gross),
     total_deductions: money(t.ded),
     net_pay: money(t.gross - t.ded),
     employer_cost: "0.00",
-    computed_at: now(),
-    submitted_at: current && status !== "computed" ? RUN.submitted_at : null,
-    submitted_by_name: current && status !== "computed" ? (byKey(RUN.submitted_by)?.display_name ?? null) : null,
-    approved_at: current ? RUN.approved_at : null,
-    approved_by_name: current ? (RUN.approved_by ? (byKey(RUN.approved_by)?.display_name ?? null) : null) : "Ifeoma Chukwu",
-    paid_on: current ? RUN.paid_on : `${period}-27`,
-    payment_reference: null,
-    paid_by_name: null,
-    returned_reason: null,
-    workflow_instance_id: current && status !== "computed" && status !== "draft" ? WID : null,
-    chain: withChain && current && status !== "computed" && status !== "draft" ? route1() : [],
-    blocking_problems: 0,
-    warnings: 0,
+    computed_at: r.computed_at,
+    submitted_at: r.submitted_at,
+    submitted_by_name: nameOf(r.submitted_by),
+    approved_at: r.approved_at,
+    approved_by_name: nameOf(r.approved_by),
+    paid_on: r.paid_on,
+    payment_reference: r.payment_reference,
+    paid_by_name: nameOf(r.paid_by),
+    returned_reason: r.returned_reason,
+    workflow_instance_id: open ? null : wfOf(period),
+    chain: withChain ? chainOf(r) : [],
+    blocking_problems: problems.filter((p) => p.severity === "blocking").length,
+    warnings: problems.filter((p) => p.severity === "warning").length,
     can_compute: open && edit,
-    can_submit: status === "computed" && edit,
-    can_decide: current && status === "submitted" && isCeo(user),
-    can_pay: current && status === "approved" && edit,
+    can_submit: r.status === "computed" && edit,
+    can_decide: r.status === "submitted" && isCeo(user) && r.submitted_by !== user,
+    can_pay: r.status === "approved" && edit,
     can_discard: open && edit,
-    created_at: now(),
-  } as PayrollRun;
+    created_at: r.created_at,
+  };
 }
 
 const forbidden = () => fail(403, "FORBIDDEN", "Payroll is for Operations and the CEO.");
-const guard = (id: string) => (runId(RUN.period) === id ? null : notFound());
+const notEditable = () => fail(409, "RUN_NOT_EDITABLE", "This run can no longer be changed");
+const notApproved = () => fail(409, "NOT_APPROVED", "Only an approved run");
+const periodOfId = (id: string) => periods().find((p) => runId(p) === id) ?? null;
+
+/** The run a route names, for a reader who may open Payroll: the period, or the refusal. */
+function theRun(req: { params: Record<string, string>; user: string | null }): { period: string; run: RunRow } | RawResponse {
+  if (!canRun(req.user!)) return forbidden();
+  const period = periodOfId(req.params.id);
+  return period ? { period, run: RUNS.get(period)! } : fail(404, "NOT_FOUND", "That payroll run does not exist");
+}
+const refused = (x: { period: string; run: RunRow } | RawResponse): x is RawResponse => "status" in x && "body" in x;
+
+/** The newest run not yet paid, else the latest: the one Payroll Runs shows first. */
+const currentPeriod = () => periods().find((p) => RUNS.get(p)!.status !== "paid") ?? periods()[0] ?? null;
 
 route("GET /api/v1/payroll/runs/summary", (req) => {
   if (!canRun(req.user!)) return forbidden();
   const counts = { draft: 0, computed: 0, submitted: 0, approved: 0, paid: 0 };
-  for (const p of periods()) counts[runOf(p, req.user!).status] += 1;
-  const last = periods().slice(0, 12).reverse();
+  for (const p of periods()) counts[RUNS.get(p)!.status] += 1;
+  const c = currentPeriod();
   const body: PayrollRunSummary = {
-    current: runOf(RUN.period, req.user!, true),
+    current: c ? runOf(c, req.user!, true) : null,
     counts,
-    trend: last.map((p) => ({ period: first(p), net_pay: runOf(p, req.user!).net_pay })),
+    trend: periods().slice(0, 12).reverse().map((p) => ({ period: first(p), net_pay: runOf(p, req.user!).net_pay })),
   };
   return ok(body);
 });
@@ -123,93 +246,218 @@ route("GET /api/v1/payroll/runs", (req) =>
   canRun(req.user!)
     ? paged(periods().map((p) => runOf(p, req.user!)), req, {
         filters: { status: (r, v) => r.status === v, year: (r, v) => r.period.startsWith(v) },
+        sort: {
+          newest: (a, b) => b.period.localeCompare(a.period),
+          period: (a, b) => a.period.localeCompare(b.period),
+          status: (a, b) => a.status.localeCompare(b.status),
+        },
       })
     : forbidden(),
 );
 route("POST /api/v1/payroll/runs", (req) => {
   if (!canRun(req.user!)) return forbidden();
-  const period = String((req.body as { period?: string }).period ?? "").slice(0, 7);
-  if (periods().includes(period)) return fail(409, "RUN_EXISTS", "This month already has a run", { period: ["Already has a run"] });
-  return fail(422, "PERIOD_NOT_ALLOWED", "Pick a month from the first start to this month", { period: ["Pick another month"] });
+  return checked<{ period: string }>(payrollSchemas.PayrollRunCreate, req.body, (b) => {
+    const period = b.period.slice(0, 7);
+    if (RUNS.has(period)) return fail(409, "RUN_EXISTS", "This month already has a run", { period: ["Already has a run"] });
+    const earliest = PEOPLE.map((p) => p.start_date.slice(0, 7)).sort()[0];
+    if (period > thisPeriod() || period < earliest) return fail(422, "PERIOD_NOT_ALLOWED", "Pick a month from the first start to this month", { period: ["Pick another month"] });
+    RUNS.set(period, blank(period));
+    slipsOf(period);
+    return created(runOf(period, req.user!, true));
+  });
 });
-route("GET /api/v1/payroll/runs/:id", (req) => guard(req.params.id) ?? (canRun(req.user!) ? ok(runOf(RUN.period, req.user!, true)) : forbidden()));
+route("GET /api/v1/payroll/runs/:id", (req) => {
+  const x = theRun(req);
+  return refused(x) ? x : ok(runOf(x.period, req.user!, true));
+});
 route("POST /api/v1/payroll/runs/:id/compute", (req) => {
-  const g = guard(req.params.id);
-  if (g) return g;
-  if (!canRun(req.user!)) return forbidden();
-  if (RUN.status !== "draft" && RUN.status !== "computed") return fail(409, "RUN_NOT_EDITABLE", "This run can no longer be changed");
-  RUN.status = "computed";
-  return ok(runOf(RUN.period, req.user!, true));
+  const x = theRun(req);
+  if (refused(x)) return x;
+  if (!isOpen(x.run)) return notEditable();
+  Object.assign(x.run, { status: "computed", computed_at: now() });
+  return ok(runOf(x.period, req.user!, true));
+});
+route("GET /api/v1/payroll/runs/:id/problems", (req) => {
+  const x = theRun(req);
+  return refused(x) ? x : paged(problemsOf(x.period), req);
 });
 route("POST /api/v1/payroll/runs/:id/submit", (req) => {
-  const g = guard(req.params.id);
-  if (g) return g;
-  if (!canRun(req.user!)) return forbidden();
-  if (RUN.status !== "computed") return fail(409, RUN.status === "draft" ? "RUN_NOT_COMPUTED" : "RUN_NOT_EDITABLE", RUN.status === "draft" ? "Compute the run first" : "This run can no longer be changed");
-  RUN.status = "submitted";
-  RUN.submitted_at = now();
-  RUN.submitted_by = req.user!;
-  return ok(runOf(RUN.period, req.user!, true));
+  const x = theRun(req);
+  if (refused(x)) return x;
+  if (x.run.status === "draft") return fail(409, "RUN_NOT_COMPUTED", "Compute the run first");
+  if (x.run.status !== "computed") return notEditable();
+  const t = totals(x.period);
+  if (!t.headcount) return fail(422, "NO_ONE_TO_PAY", "No one to pay this month");
+  const blocking = problemsOf(x.period).filter((p) => p.severity === "blocking").length;
+  if (blocking) return fail(422, "RUN_HAS_PROBLEMS", "Fix the blocking problems first", { problems: [`${blocking} blocking`] });
+  const expected = (req.body as { expected_net_total?: string }).expected_net_total;
+  if (expected !== undefined && kobo(expected) !== t.gross - t.ded)
+    return fail(409, "RUN_CHANGED", "The totals changed. Check them and send again", { gross_pay: [money(t.gross)], total_deductions: [money(t.ded)], net_pay: [money(t.gross - t.ded)] });
+  Object.assign(x.run, { status: "submitted", submitted_at: now(), submitted_by: req.user!, returned_reason: null });
+  return ok(runOf(x.period, req.user!, true));
 });
 route("POST /api/v1/payroll/runs/:id/mark-paid", (req) => {
-  const g = guard(req.params.id);
-  if (g) return g;
-  if (!canRun(req.user!)) return forbidden();
-  if (RUN.status !== "approved") return fail(409, "NOT_APPROVED", "Only an approved run is marked paid");
-  RUN.status = "paid";
-  RUN.paid_on = String((req.body as { paid_on?: string }).paid_on ?? isoDaysAgo(0));
-  return ok(runOf(RUN.period, req.user!, true));
+  const x = theRun(req);
+  if (refused(x)) return x;
+  return checked<{ paid_on: string; payment_reference?: string | null }>(payrollSchemas.PayrollRunPaid, req.body, (b) => {
+    if (x.run.status !== "approved") return notApproved();
+    if (b.paid_on > todayIso()) return fail(422, "PAID_IN_THE_FUTURE", "The payment date cannot be in the future", { paid_on: ["Date too late"] });
+    Object.assign(x.run, { status: "paid", paid_on: b.paid_on, payment_reference: b.payment_reference ?? null, paid_by: req.user! });
+    return ok(runOf(x.period, req.user!, true));
+  });
 });
-route("POST /api/v1/payroll/runs/:id/email-payslips", (req) =>
-  guard(req.params.id) ??
-  (RUN.status === "computed" || RUN.status === "submitted"
-    ? fail(409, "NOT_APPROVED", "Payslips go to staff once the run is approved.")
-    : { status: 202, body: { queued: totals(RUN.period).headcount } }),
-);
 
-/** POST /workflow/instances/:id/approve|reject for the month's run: the CEO decides it; null for any other id. */
-export function decidePayrollRun(user: string, wid: string, approve: boolean, reason?: string | null) {
-  if (wid !== WID) return null;
-  if (RUN.status !== "submitted" || !isCeo(user)) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
-  if (!approve && !String(reason ?? "").trim()) return invalid({ reason: ["is required"] });
-  if (approve) {
-    RUN.status = "approved";
-    RUN.approved_at = now();
-    RUN.approved_by = user;
-  } else RUN.status = "draft";
-  return ok({ workflow_instance_id: WID, state: approve ? "approved" : "rejected", stage_name: null });
+const inRun = (period: string, employeeId: string) => slipsOf(period).find((s) => s.person.employee_id === employeeId) ?? null;
+
+route("POST /api/v1/payroll/runs/:id/exclude", (req) => {
+  const x = theRun(req);
+  if (refused(x)) return x;
+  return checked<{ employee_id: string; reason: string }>(payrollSchemas.PayrollRunExclude, req.body, (b) => {
+    if (!isOpen(x.run)) return notEditable();
+    if (!inRun(x.period, b.employee_id)) return fail(422, "NOT_IN_RUN", "This person is not paid in this month", { employee_id: ["Not paid this month"] });
+    if (!EXCLUDED.has(x.period)) EXCLUDED.set(x.period, new Map());
+    EXCLUDED.get(x.period)!.set(b.employee_id, b.reason);
+    x.run.status = "draft";
+    return ok(runOf(x.period, req.user!, true));
+  });
+});
+route("POST /api/v1/payroll/runs/:id/include", (req) => {
+  const x = theRun(req);
+  if (refused(x)) return x;
+  return checked<{ employee_id: string }>(payrollSchemas.PayrollRunInclude, req.body, (b) => {
+    if (!isOpen(x.run)) return notEditable();
+    if (!EXCLUDED.get(x.period)?.delete(b.employee_id)) return fail(404, "NOT_EXCLUDED", "This person is not left out of the run");
+    x.run.status = "draft";
+    return ok(runOf(x.period, req.user!, true));
+  });
+});
+
+function adjustmentOf(a: AdjustmentRow): PayrollAdjustment {
+  return {
+    payroll_adjustment_id: a.payroll_adjustment_id,
+    payroll_run_id: runId(a.period),
+    employee: ref(byId(a.employee_id))!,
+    kind: a.kind,
+    label: a.label,
+    pay_amount: money(a.amount),
+    reason: a.reason,
+    created_by_name: nameOf(a.created_by),
+    created_at: a.created_at,
+  };
 }
 
-/** GET /workflow/instances/:id for the month's run; null for any other id. */
+route("GET /api/v1/payroll/runs/:id/adjustments", (req) => {
+  const x = theRun(req);
+  return refused(x) ? x : paged(ADJUSTMENTS.filter((a) => a.period === x.period).map(adjustmentOf), req);
+});
+route("POST /api/v1/payroll/runs/:id/adjustments", (req) => {
+  const x = theRun(req);
+  if (refused(x)) return x;
+  return checked<PayrollAdjustmentAdd>(payrollSchemas.PayrollAdjustmentAdd, req.body, (b) => {
+    if (!isOpen(x.run)) return notEditable();
+    if (!inRun(x.period, b.employee_id)) return fail(422, "NOT_IN_RUN", "This person is not paid in this month", { employee_id: ["Not paid this month"] });
+    if (EXCLUDED.get(x.period)?.has(b.employee_id)) return fail(422, "NOT_IN_RUN", "This person is left out of the run", { employee_id: ["Left out of this run"] });
+    const a: AdjustmentRow = { payroll_adjustment_id: sid(`adjustment:${x.period}:${ADJUSTMENTS.length}:${now()}`), period: x.period, employee_id: b.employee_id, kind: b.kind, label: b.label, amount: kobo(b.amount), reason: b.reason, created_by: req.user!, created_at: now() };
+    ADJUSTMENTS.push(a);
+    x.run.status = "draft";
+    return created(adjustmentOf(a));
+  });
+});
+route("DELETE /api/v1/payroll/runs/:id/adjustments/:adjustment_id", (req) => {
+  const x = theRun(req);
+  if (refused(x)) return x;
+  if (!isOpen(x.run)) return notEditable();
+  const at = ADJUSTMENTS.findIndex((a) => a.period === x.period && a.payroll_adjustment_id === req.params.adjustment_id);
+  if (at < 0) return fail(404, "NOT_FOUND", "That adjustment does not exist");
+  ADJUSTMENTS.splice(at, 1);
+  x.run.status = "draft";
+  return noContent();
+});
+route("DELETE /api/v1/payroll/runs/:id", (req) => {
+  const x = theRun(req);
+  if (refused(x)) return x;
+  if (!isOpen(x.run)) return notEditable();
+  RUNS.delete(x.period);
+  EXCLUDED.delete(x.period);
+  for (let i = ADJUSTMENTS.length - 1; i >= 0; i -= 1) if (ADJUSTMENTS[i].period === x.period) ADJUSTMENTS.splice(i, 1);
+  return noContent();
+});
+
+/** The month's published payslips: every one not left out, once the run is approved. */
+export const publishedOf = (period: string) => (["approved", "paid"].includes(runStatusOf(period) ?? "") ? slipsOf(period).filter((x) => !slipFigures(x).excluded) : []);
+
+route("POST /api/v1/payroll/runs/:id/email-payslips", (req) => {
+  const x = theRun(req);
+  if (refused(x)) return x;
+  if (x.run.status !== "approved" && x.run.status !== "paid") return fail(409, "NOT_APPROVED", "Payslips go to staff once the run is approved");
+  const resend = (req.body as { resend?: boolean }).resend === true;
+  const going = publishedOf(x.period).filter((s) => resend || !EMAILED.has(s.payslip_id));
+  for (const s of going) EMAILED.set(s.payslip_id, now());
+  return { status: 202, body: { queued: going.length } };
+});
+route("POST /api/v1/payroll/runs/:id/payslips-export", (req) => {
+  const x = theRun(req);
+  if (refused(x)) return x;
+  if (x.run.status !== "approved" && x.run.status !== "paid") return fail(409, "NOT_APPROVED", "Payslips download once the run is approved");
+  return exportFile(req.user!, `payslips-${numberOf(x.period).toLowerCase()}`, "pdf");
+});
+route("POST /api/v1/payroll/runs/:id/statutory-report", (req) => {
+  const x = theRun(req);
+  return refused(x) ? x : fail(409, "ADVANCED_OFF", "This run was computed without statutory items");
+});
+
+/** POST /workflow/instances/:id/approve|reject for a month's run: the CEO decides it; null for any other id. */
+export function decidePayrollRun(user: string, wid: string, approve: boolean, reason?: string | null) {
+  const r = runByWid(wid);
+  if (!r) return null;
+  if (r.status !== "submitted" || !isCeo(user) || r.submitted_by === user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  if (!approve && !String(reason ?? "").trim()) return invalid({ reason: ["is required"] });
+  if (approve) Object.assign(r, { status: "approved", approved_at: now(), approved_by: user });
+  else Object.assign(r, { status: "draft", returned_reason: String(reason).trim(), submitted_at: null, submitted_by: null });
+  return ok({ workflow_instance_id: wid, state: approve ? "approved" : "rejected", stage_name: null });
+}
+
+/** POST /workflow/instances/:id/request-changes for a month's run: Send Back, to Draft with the reason; null for any other id. */
+export function sendBackPayrollRun(user: string, wid: string, reason?: string | null) {
+  const r = runByWid(wid);
+  if (!r) return null;
+  if (r.status !== "submitted" || !isCeo(user) || r.submitted_by === user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  if (!String(reason ?? "").trim()) return invalid({ reason: ["is required"] });
+  Object.assign(r, { status: "draft", returned_reason: String(reason).trim(), submitted_at: null, submitted_by: null });
+  return ok({ workflow_instance_id: wid, state: "cancelled", stage_name: null });
+}
+
+/** GET /workflow/instances/:id for a month's run; null for any other id. */
 export function payrollRunInstance(user: string, wid: string): ApprovalInstance | null {
-  if (wid !== WID || !canRun(user)) return null;
-  const pending = RUN.status === "submitted";
+  const r = runByWid(wid);
+  if (!r || !canRun(user)) return null;
+  const pending = r.status === "submitted";
   return {
-    workflow_instance_id: WID,
+    workflow_instance_id: wid,
     definition_key: "payroll.run",
     definition_name: "Payroll Run",
     version: 1,
     module_key: "payroll",
     entity_type: "payroll_run",
-    entity_id: runId(RUN.period),
+    entity_id: runId(r.period),
     subject_employee_id: null,
     subject_name: null,
     state: pending ? "pending" : "approved",
     current_stage: pending ? "ceo" : null,
     stage_name: pending ? "CEO" : null,
     context: {},
-    stage_entered_at: RUN.submitted_at,
-    stage_due_at: pending ? new Date(Date.parse(RUN.submitted_at) + 72 * 3600000).toISOString() : null,
+    stage_entered_at: r.submitted_at ?? now(),
+    stage_due_at: pending && r.submitted_at ? new Date(Date.parse(r.submitted_at) + 72 * 3600000).toISOString() : null,
     opened_by: null,
-    opened_by_name: byKey(RUN.submitted_by)?.display_name ?? null,
-    opened_at: RUN.submitted_at,
-    completed_at: pending ? null : (RUN.approved_at ?? now()),
-    route: route1(),
+    opened_by_name: nameOf(r.submitted_by),
+    opened_at: r.submitted_at ?? now(),
+    completed_at: pending ? null : (r.approved_at ?? now()),
+    route: chainOf(r),
     decisions: [],
-    can_decide: pending && isCeo(user),
+    can_decide: pending && isCeo(user) && r.submitted_by !== user,
     can_withdraw: false,
     can_reassign: false,
-    link: "/payroll?tab=payroll-runs",
+    link: `/payroll?tab=payroll-runs&id=${runId(r.period)}`,
   } as ApprovalInstance;
 }
 

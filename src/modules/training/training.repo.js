@@ -45,6 +45,9 @@ const STATUS = (te, day) => `CASE WHEN ${te}.completed_at IS NOT NULL THEN 'comp
 const NAME_OF = (userCol) => `(SELECT btrim(ne.first_name || ' ' || ne.last_name) FROM app_user nu
    JOIN employee ne ON ne.employee_id = nu.employee_id WHERE nu.user_id = ${userCol})`;
 
+/** The certificate's PDF is made (rendered and stored): Download Certificate offers it. */
+const READY = (te) => `EXISTS (SELECT 1 FROM document cd WHERE cd.document_id = ${te}.certificate_document_id AND cd.render_status = 'done')`;
+
 /** A course's items, counted, and their minutes summed (null when none is set). */
 const ITEM_COUNT = (c) => `(SELECT count(*)::int FROM training_item ti WHERE ti.training_course_id = ${c}.training_course_id)`;
 const MINUTES = (c) => `(SELECT sum(ti.minutes)::int FROM training_item ti WHERE ti.training_course_id = ${c}.training_course_id)`;
@@ -398,8 +401,9 @@ async function releaseAssignment(client, id, today) {
 
 const ENROLMENT = `te.training_enrolment_id, te.training_course_id, te.employee_id, te.training_assignment_id,
        te.due_on::text AS due_on, te.started_at, te.completed_at, te.proof_url, te.proof_document_id,
-       te.certificate_number, te.certificate_document_id, te.certificate_hash, te.task_id, te.reminded_at,
-       te.reminders_sent, te.created_at`;
+       te.certificate_number, te.certificate_document_id, te.certificate_hash, te.certificate_holder_name,
+       te.certificate_course_title, te.task_id, te.reminded_at, te.reminders_sent, te.created_at,
+       ${READY("te")} AS certificate_ready`;
 
 /** A person's place on a course, locked for the change (§6.8). */
 const lockEnrolment = (client, id) =>
@@ -456,14 +460,40 @@ async function setProof(client, id, { url, document_id: documentId }) {
   );
 }
 
-async function complete(client, id, { number, hash }) {
+/** Completion, with the certificate's number, hash and facts as issued (all null without one). */
+async function complete(client, id, { at, number, hash, holderName, courseTitle }) {
   await client.query(
     `UPDATE training_enrolment
-        SET completed_at = now(), started_at = COALESCE(started_at, now()), certificate_number = $2, certificate_hash = $3
+        SET completed_at = $2, started_at = COALESCE(started_at, $2), certificate_number = $3, certificate_hash = $4,
+            certificate_holder_name = $5, certificate_course_title = $6
       WHERE training_enrolment_id = $1`,
-    [id, number, hash],
+    [id, at, number, hash, holderName, courseTitle],
   );
 }
+
+/**
+ * A completed place's certificate as it was issued, with what it prints beside the facts: the
+ * course's number, its items and length, and the publisher's signature (K7).
+ */
+const certificateOf = (db, enrolmentId) =>
+  one(
+    db,
+    `SELECT te.training_enrolment_id, te.employee_id, te.training_course_id, te.completed_at,
+            te.certificate_number::text AS certificate_number, te.certificate_hash, te.certificate_holder_name,
+            te.certificate_course_title, te.certificate_document_id, c.number AS course_number, c.signer_name,
+            c.signer_title, c.signature_document_id, ${ITEM_COUNT("c")} AS items, ${MINUTES("c")} AS minutes
+       FROM training_enrolment te
+       JOIN training_course c ON c.training_course_id = te.training_course_id
+      WHERE te.training_enrolment_id = $1`,
+    [enrolmentId],
+  );
+
+/** The place a certificate number names (any case: a number is typed). */
+const byCertificateNumber = (db, number) =>
+  one(db, "SELECT training_enrolment_id FROM training_enrolment WHERE certificate_number = $1::citext", [number]);
+
+const setCertificateDocument = (client, id, documentId) =>
+  client.query("UPDATE training_enrolment SET certificate_document_id = $2 WHERE training_enrolment_id = $1", [id, documentId]);
 
 /** The next open places on a course after `afterId`, checked for completion a batch at a time. */
 async function openPlaces(db, courseId, afterId) {
@@ -523,7 +553,7 @@ function people(db, courseId, query, today) {
             (te.training_assignment_id IS NOT NULL) AS assigned, te.due_on::text AS due_on, te.started_at,
             te.completed_at, ${DONE_COUNT("te")} AS items_done, ${ITEM_COUNT("te")} AS items_total, te.proof_url,
             te.proof_document_id, te.certificate_number::text AS certificate_number,
-            (te.certificate_document_id IS NOT NULL) AS certificate_ready, ${TOTAL_COL}
+            ${READY("te")} AS certificate_ready, ${TOTAL_COL}
        FROM training_enrolment te
        JOIN employee e ON e.employee_id = te.employee_id
        LEFT JOIN department d ON d.department_id = e.department_id
@@ -617,7 +647,7 @@ const MY_COURSE = (day) => `c.training_course_id, c.number, c.title, c.summary, 
        ${ITEM_COUNT("c")} AS items_total, CASE WHEN te.training_enrolment_id IS NULL THEN 0 ELSE ${DONE_COUNT("te")} END AS items_done,
        CASE WHEN te.training_enrolment_id IS NULL THEN NULL ELSE ${STATUS("te", day)} END AS status,
        te.due_on::text AS due_on, te.completed_at, te.certificate_number::text AS certificate_number,
-       (te.certificate_document_id IS NOT NULL) AS certificate_ready`;
+       ${READY("te")} AS certificate_ready`;
 
 /** Each list's own order (they take no sort). */
 const MY_ORDER = {
@@ -740,6 +770,9 @@ module.exports = {
   progressOf,
   setProof,
   complete,
+  certificateOf,
+  byCertificateNumber,
+  setCertificateDocument,
   openPlaces,
   setTask,
   awaitingTasks,

@@ -20,8 +20,9 @@
  *   training.item_undone           notified
  *   training.proof_added           Add Proof: a link or a file, completing the course
  *   training.completed             completion (§6.8), its certificate number allocated in the same
- *                                  transaction: `training.close_task` closes the task. The
- *                                  certificate PDF and "Certificate ready" follow it (M10 PR 4)
+ *                                  transaction: `training.close_task` closes the task and
+ *                                  `training.issue_certificate` generates the certificate (§6.9)
+ *   training.certificate_ready     its PDF is stored: the person is told "Certificate ready"
  *   training.enrolment_closed      a leaver's open enrolment removed and its task cancelled
  *   training.reminder_due          the reminder engine's `training_due`, or Remind Overdue
  *
@@ -33,6 +34,11 @@ const { defineEvents } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
 const { defineNotification } = require("../../shared/notifications/fanout");
 const { defineDocumentType } = require("../../shared/documents/types");
+const { defineDocType } = require("../../shared/documents/generate");
+const { defineVariables } = require("../../shared/templates/variables");
+const vault = require("../../shared/documents/vault");
+const grantsCache = require("../../shared/rbac/grants-cache");
+const c = require("@mycity/contract");
 const reminders = require("../notifications/notifications.reminders");
 const { formatDate } = require("../../shared/time/day-first");
 
@@ -50,6 +56,7 @@ const EVENTS = defineEvents("knowledge", {
   "training.item_undone": { summary: "Someone marked a course's item not done" },
   "training.proof_added": { summary: "Someone added proof to a course" },
   "training.completed": { summary: "Someone completed a course" },
+  "training.certificate_ready": { summary: "A certificate of completion was issued" },
   "training.enrolment_closed": { summary: "A leaver's course was closed" },
   "training.reminder_due": { summary: "Someone was reminded of a course" },
 });
@@ -59,6 +66,8 @@ const ENROLMENT_ENTITY = "training_enrolment";
 const COURSE_ENTITY = "training_course";
 /** The reminder engine's key (§6.11). */
 const REMINDER_KEY = "training_due";
+/** The certificate of completion's PDF (§6.9). */
+const CERTIFICATE_DOC_TYPE = "training_certificate";
 
 /** An item's file: read by everyone who may take the course (the `knowledge` grant). */
 defineDocumentType("training_material", { label: "Training material", module: "knowledge", sensitivity: "normal" });
@@ -66,6 +75,39 @@ defineDocumentType("training_material", { label: "Training material", module: "k
 defineDocumentType("training_signature", { label: "Training signature", module: "knowledge", sensitivity: "normal" });
 /** A person's proof of an outside course: theirs and `training.manage`'s. */
 defineDocumentType("training_proof", { label: "Training proof", module: "knowledge", sensitivity: "personal" });
+
+/*
+ * The certificate: one A4 landscape page it draws itself (training.certificate.js), its number the
+ * enrolment's (allocated at completion), personal, stored once and locked.
+ */
+defineDocType(CERTIFICATE_DOC_TYPE, {
+  label: "Training certificate",
+  module: "knowledge",
+  template: "training-certificate",
+  numbering: null,
+  sensitivity: "personal",
+  landscape: true,
+  title: (data) => data.number,
+  draw: (data, context) => require("./training.certificate").draw(data, context),
+});
+defineVariables("document", "training-certificate", c.training.CertificateDocumentVars);
+
+/**
+ * A training enrolment's files (its proof, its certificate) are the person's and `training.manage`'s
+ * only (§8); the CEO holds every capability.
+ */
+vault.defineAccess(ENROLMENT_ENTITY, async (client, user, doc) => {
+  if (!user) return false;
+  if (user.is_ceo === true) return true;
+  if (doc.subject_employee_id && user.employee_id && doc.subject_employee_id === user.employee_id) return true;
+  return (await grantsCache.getCapabilities(client, user.user_id)).includes("training.manage");
+});
+
+defineNotification(EVENTS.TRAINING_CERTIFICATE_READY, {
+  to: [{ subject: true }],
+  title: "Certificate ready",
+  body: (e) => `${e.payload.title}, ${e.payload.certificate_number}.`,
+});
 
 defineNotification(EVENTS.TRAINING_ENROLLED, {
   to: [{ subject: true }],
@@ -98,6 +140,16 @@ outbox.register(EVENTS.TRAINING_ASSIGNED, "training.notify_assigned", (event) =>
   service().settleEnrolments(event.payload.training_course_id),
 );
 
+/** The certificate is generated after the completion commits; its PDF follows in the worker (§6.9). */
+outbox.register(EVENTS.TRAINING_COMPLETED, "training.issue_certificate", (event) =>
+  require("./training.certificate").issue(event.payload.training_enrolment_id),
+);
+
+/** Its PDF stored: "Certificate ready" to the person. */
+outbox.register(vault.EVENTS.DOCUMENT_GENERATED, "training.certificate_ready", (event) =>
+  event.payload && event.payload.doc_type === CERTIFICATE_DOC_TYPE ? require("./training.certificate").ready(event.payload.document_id) : null,
+);
+
 /** The task closes itself when the course completes (§6.7). */
 outbox.register(EVENTS.TRAINING_COMPLETED, "training.close_task", (event) =>
   service().closeTask(event.payload.training_enrolment_id, event.actor_user_id || null),
@@ -118,4 +170,4 @@ outbox.register("employee.archived", "training.close_leaver", (event) =>
   service().closeLeaver((event.payload && event.payload.employee_id) || event.entity.id),
 );
 
-module.exports = { EVENTS, ENROLMENT_ENTITY, COURSE_ENTITY, REMINDER_KEY };
+module.exports = { EVENTS, ENROLMENT_ENTITY, COURSE_ENTITY, REMINDER_KEY, CERTIFICATE_DOC_TYPE };

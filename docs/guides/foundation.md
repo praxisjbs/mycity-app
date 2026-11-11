@@ -231,7 +231,7 @@ are drawn in the app by PDF.js (FRONTEND_FOUNDATION §5, PR 3 question 4).
 | `GET /settings/security/failed-logins` (days; sort), `/security/sessions` (search; sort), `POST /settings/security/sessions/:id/end` | `settings` view, edit |
 | `GET /audit` (module, action, actor, record, dates; search; sort), `/audit/summary` | `settings` view with scope all, or the CEO |
 | `POST /audit/exports` (the same filters; 202 with the workbook's file pending, downloaded where it was asked for, §6.12) | `settings` export with scope all, or the CEO |
-| `GET /exports/:id` (an export's file while its screen waits: pending, done or failed, §6.12) | the person who asked, nobody else (`self`) |
+| `GET /exports/:id` (an export's file while its screen waits: pending, done or failed, §6.12) | the person who asked, nobody else (`self`); or a generated document kept for good that the caller may read (a training certificate, `knowledge.md` §6.9) |
 | `POST /auth/two-step/setup`, `POST /auth/two-step/enrol` (anonymous, the set-up ticket) | none; `identity.md` §5 |
 
 `PUT /settings/roles/:id` replaces a role's grants, visible fields and capabilities together, so the
@@ -1186,6 +1186,7 @@ screen.
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · `GET /exports/:id` also answers for a generated document that is not an export when the vault lets the caller read it, so a Download button can wait on a PDF kept for good while the worker renders it (Download Certificate, `knowledge.md` §6.9). An export stays its asker's alone.
 - 11/11/2026 · TB · Settings · Documents & Numbering lists M10's three schemes, SOP (`SOP-0001`), Training Course (`TRN-0001`) and Training Certificate (`CERT-2026-0001`, by year), seeded in `10490`; the contract's `DOC_TYPES` and the screen's labels name them (`docs/guides/knowledge.md` §4).
 - 11/11/2026 · JP · `GET /employees` takes `exclude_self` (§5): `true` leaves the caller out of the page, in SQL, so Raise a Query never offers the raiser (`queries.md` §6.2, fault #9 of the 11/11 staging brief).
 - 10/11/2026 · JP · `shared/db/effective-dated` gains `replace` (a change for a day that already has a version joins it, updated in place, rather than being refused) and `addVersionSet` (a version made of several rows that start and end together: a PAYE table, a person's pay split), for M6 PR 5's Configurations (`docs/guides/payroll.md` §4.2, §13.2 item 26). The employee record gains the four tax and pension numbers the `employee.statutory` mask already named, written through the organisation service. Nothing else changes for an existing caller.

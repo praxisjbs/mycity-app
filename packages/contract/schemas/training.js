@@ -300,7 +300,36 @@ const ProofAdd = z
   .strict()
   .refine((v) => (v.url ? 1 : 0) + (v.document_id ? 1 : 0) === 1, { message: "Paste a link or pick a file", path: ["url"] });
 
+/* ------------------------------------------------------------------ *
+ * The certificate of completion (templates/documents/training-certificate.html, §6.9)
+ * ------------------------------------------------------------------ */
+
+const dataUrl = (type) => z.string().regex(new RegExp(`^data:${type};base64,[A-Za-z0-9+/]+=*$`));
+
+/** What the certificate prints: the facts as issued, the publisher's signature and the QR. */
+const CertificateDocumentVars = z
+  .object({
+    number: z.string(),
+    holder_name: z.string(),
+    course_title: z.string(),
+    items: z.number().int().min(1),
+    items_word: z.enum(["item", "items"]),
+    /** The course's length in words ("2 hours", "45 minutes"); null when no item has minutes. */
+    length: z.string().nullable(),
+    completed_on: isoDate,
+    issued_on: isoDate,
+    year: z.string().regex(/^\d{4}$/),
+    signer_name: z.string(),
+    signer_title: z.string().nullable(),
+    signature: dataUrl("image/png"),
+    qr: dataUrl("image/png"),
+    /** Where the QR leads, for those who type it: go.mycityapp.io/verify. */
+    verify_at: z.string(),
+  })
+  .strict();
+
 const TABLES = {
+  CertificateDocumentVars: { table: null, reason: "the variables of templates/documents/training-certificate.html" },
   TrainingItem: {
     table: "training_item",
     virtual: {
@@ -369,7 +398,7 @@ const TABLES = {
       assigned: "training_assignment_id is set",
       items_done: "counted from training_item_progress",
       items_total: "the course's items, counted",
-      certificate_ready: "certificate_document_id is set",
+      certificate_ready: "the certificate's PDF is made",
     },
   },
   EnrolmentPage: { table: null, reason: "a page of a course's people" },
@@ -453,4 +482,5 @@ module.exports = {
   MyItem,
   MyCourse,
   ProofAdd,
+  CertificateDocumentVars,
 };
