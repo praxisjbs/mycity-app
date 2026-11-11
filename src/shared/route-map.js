@@ -71,6 +71,7 @@ const SCREENS = Object.freeze({
     "offers",
     "onboarding",
     "talent-pool",
+    "analytics",
   ],
   // Salary Structure and Statutory folded into Configurations; their slugs are retired, not renamed
   // (docs/guides/payroll.md §2, §13.1 item 1).

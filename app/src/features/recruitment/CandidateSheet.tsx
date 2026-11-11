@@ -51,7 +51,7 @@ const CV_STATE: Record<string, string> = { none: "None sent", checking: "Being c
 const WEIGHTED_HELP = "From the parts scored so far, with this role's weights.";
 const words = (s: string) => STAGE_LABEL[s as ApplicationStage] ?? (s === "not_progressed" ? "Not Progressing" : s);
 
-export function CandidateSheet({ id, close, inline = false }: { id: string; close: () => void; inline?: boolean }) {
+export function CandidateSheet({ id, close }: { id: string; close: () => void }) {
   const modal = useModal();
   const { can } = useAuth();
   const mayEdit = can("recruitment", "edit");
@@ -83,13 +83,11 @@ export function CandidateSheet({ id, close, inline = false }: { id: string; clos
     }
   };
   const live = c.status === "active";
-  // A form opened from here goes back to the candidate when it closes: beside the board it is still
-  // there; in the dialog it opens again (the app holds one dialog at a time).
-  const back = () => (inline ? modal.close() : modal.open({ title: c.name, wide: true, body: (done) => <CandidateSheet id={id} close={done} /> }));
+  // A form opened from here sits over the candidate's dialog, which is still open when the form closes.
+  const back = () => modal.close();
   const mayScore = c.can_edit && ai.data?.available && c.cv_state === "clean" && c.screening_score === null;
   return (
     <>
-      {inline && <CardHeader title={c.name} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Pill dot={false}>{c.number}</Pill>
         <Pill tone={live ? "info" : "neutral"}>{live ? STAGE_LABEL[c.stage] : words(c.status)}</Pill>
@@ -115,8 +113,7 @@ export function CandidateSheet({ id, close, inline = false }: { id: string; clos
           ...(c.rejection_reason ? [["Reason", c.rejection_reason] as [string, string]] : []),
         ]}
       />
-      {/* Beside the board the pane is too narrow for two cards in a row: they stack. */}
-      <Grid cols={inline ? 1 : 2} className="mt-3">
+      <Grid cols={2} className="mt-3">
         <Card>
           <CardHeader title="Screening" level={3} />
           <KeyValue

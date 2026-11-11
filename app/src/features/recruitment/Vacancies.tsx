@@ -1,9 +1,9 @@
 /**
- * Recruitment · Vacancies (docs/guides/recruitment.md §6.1, §10): the roles MyCity is hiring for,
- * their lifecycle (draft, open, paused, closed), the seats the organogram leaves empty, and the
- * funnel across every role. A vacancy opens in its sheet with its public link, Edit, the lifecycle,
- * Questions, Scorecard and See Candidates. Careers Settings and Candidate Emails open from here
- * (`?panel=settings`, `?panel=emails`).
+ * Recruitment · Vacancies (docs/guides/recruitment.md §6.1, §10): the roles MyCity is hiring for and
+ * their lifecycle (draft, open, paused, closed). A vacancy opens in the wide dialog on desktop and a
+ * sheet on a phone (ListDetail `modal`, F31 as amended 11/11/2026), with its public link, Edit, the
+ * lifecycle, Questions, Scorecard and See Candidates. View Empty Seats lists the seats the organogram
+ * leaves empty. Careers Settings and Candidate Emails open from here (`?panel=settings`, `?panel=emails`).
  */
 import { useEffect, useRef, useState } from "react";
 import type { SeatSuggestion, Vacancy, VacancyDetail } from "@mycity/contract/contract.gen.ts";
@@ -14,12 +14,10 @@ import { useAuth } from "@/auth/AuthProvider";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
-  Bars,
   Button,
   Card,
   CardHeader,
   CheckboxField,
-  DesktopOnly,
   ErrorState,
   FilterSelect,
   formatDate,
@@ -37,16 +35,12 @@ import {
   toast,
   Toolbar,
   useModal,
-  useSideBySide,
 } from "@mycity/ui";
 import { CandidateEmails } from "./CandidateEmails";
 import { CareersSettings } from "./CareersSettings";
 import { QuestionsForm, ScorecardForm } from "./VacancyQuestions";
 import { VacancyForm } from "./VacancyForm";
 import { EMPLOYMENT, PATTERN_LABEL, pill, say, STAGE_LABEL, VACANCY_STATUS } from "./shared";
-
-/** Each stage holds the candidates at it now (not a cumulative funnel), so bars scale to the largest stage. */
-const funnelTop = (funnel: ReadonlyArray<{ count: number }>) => Math.max(0, ...funnel.map((x) => x.count));
 
 const STATUSES: Array<[string, string]> = [
   ["", "All Statuses"],
@@ -68,22 +62,18 @@ export function Vacancies() {
   const [status, setStatus] = useState("");
   const summary = useApi("GET /api/v1/recruitment/vacancies/summary");
   const list = usePaged("GET /api/v1/recruitment/vacancies", { filters: status ? { status: status as Vacancy["status"] } : {} });
-  const seats = usePaged("GET /api/v1/recruitment/vacancies/suggested");
   const { can } = useAuth();
   const mayCreate = can("recruitment", "create");
-  // On a wide desktop a vacancy sits beside the list (F31), the first one until another is pressed;
-  // on a phone, and where two columns do not fit, it opens in the sheet or dialog.
-  const beside = useSideBySide();
-  const [picked, setPicked] = useState<string | null>(null);
-  const shown = picked ?? (beside ? (list.rows[0]?.vacancy_id ?? null) : null);
+  // A pressed vacancy opens in the wide dialog on desktop and a sheet on a phone; nothing opens unasked.
+  const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
 
   const newVacancy = (seat?: SeatSuggestion) =>
     modal.open({ title: "New Vacancy", wide: true, body: (close) => <VacancyForm close={close} seat={seat} onSaved={(v) => openVacancy(v.vacancy_id, v.title)} /> });
   const openVacancy = (id: string, title = "Vacancy") => {
-    if (!beside) return modal.open({ title, wide: true, body: (close) => <VacancySheet id={id} close={close} /> });
     modal.close();
-    setPicked(id);
+    setPicked({ id, title });
   };
+  const emptySeats = () => modal.open({ title: "Suggested From Organogram", wide: true, body: () => <EmptySeats mayCreate={mayCreate} onCreate={newVacancy} /> });
   const settings = () => modal.open({ title: "Careers Settings", wide: true, body: (close) => <CareersSettings close={close} /> });
   const emails = () => modal.open({ title: "Candidate Emails", wide: true, body: (close) => <CandidateEmails close={close} /> });
 
@@ -135,11 +125,14 @@ export function Vacancies() {
       />
       <Toolbar>
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUSES} />
+        <Button icon="users" onClick={emptySeats}>View Empty Seats</Button>
       </Toolbar>
       <ListDetail
-        open={false}
+        layout="modal"
+        size="wide"
+        open={picked !== null}
         onClose={() => setPicked(null)}
-        title="Vacancy"
+        title={picked?.title ?? "Vacancy"}
         list={
           <PagedTable<Vacancy>
             title="Vacancies"
@@ -149,7 +142,6 @@ export function Vacancies() {
             noun="vacancy"
             nounPlural="vacancies"
             onRowClick={(v) => openVacancy(v.vacancy_id, v.title)}
-            selectedKey={beside ? (shown ?? undefined) : undefined}
             empty={{ title: "No Vacancies Yet" }}
             columns={[
               { key: "role", label: "Role", render: (v) => <span className="font-semibold">{v.title}</span> },
@@ -162,45 +154,32 @@ export function Vacancies() {
             ]}
           />
         }
-        detail={
-          shown ? (
-            <Card>
-              <VacancySheet key={shown} id={shown} close={() => setPicked(null)} inline />
-            </Card>
-          ) : null
-        }
+        detail={picked ? <VacancySheet key={picked.id} id={picked.id} close={() => setPicked(null)} /> : null}
       />
-      <Grid cols={2} className="mt-3">
-        <PagedTable<SeatSuggestion>
-          title="Suggested From Organogram"
-          list={seats}
-          rowKey={(x) => x.org_seat_id}
-          noun="seat"
-          nounPlural="seats"
-          empty={{ title: "No Empty Seats" }}
-          columns={[
-            { key: "title", label: "Seat", render: (x) => <span className="font-semibold">{x.title}</span> },
-            { key: "dept", label: "Department", render: (x) => x.department },
-            ...(mayCreate ? [{ key: "go", label: "", align: "n" as const, render: (x: SeatSuggestion) => <Button size="sm" onClick={() => newVacancy(x)}>Create Vacancy</Button> }] : []),
-          ]}
-        />
-        <DesktopOnly unmount>
-          <Card>
-            <CardHeader title="Funnel, All Roles" />
-            {s ? (
-              <Bars rows={s.funnel.map((x) => ({ label: STAGE_LABEL[x.stage], percent: funnelTop(s.funnel) ? Math.round((x.count * 100) / funnelTop(s.funnel)) : 0, value: String(x.count) }))} />
-            ) : (
-              <LoadingRows />
-            )}
-          </Card>
-        </DesktopOnly>
-      </Grid>
     </>
   );
 }
 
-/** A vacancy: its details and public link, the lifecycle, Questions, Scorecard and See Candidates. */
-export function VacancySheet({ id, close, inline = false }: { id: string; close: () => void; inline?: boolean }) {
+/** The seats the organogram leaves empty, 25 a page, each with Create Vacancy (guide §3 step 1). */
+function EmptySeats({ mayCreate, onCreate }: { mayCreate: boolean; onCreate: (seat: SeatSuggestion) => void }) {
+  const seats = usePaged("GET /api/v1/recruitment/vacancies/suggested");
+  return (
+    <PagedTable<SeatSuggestion>
+      list={seats}
+      rowKey={(x) => x.org_seat_id}
+      noun="seat"
+      nounPlural="seats"
+      empty={{ title: "No Empty Seats" }}
+      columns={[
+        { key: "title", label: "Seat", render: (x) => <span className="font-semibold">{x.title}</span> },
+        { key: "dept", label: "Department", render: (x) => x.department },
+        ...(mayCreate ? [{ key: "go", label: "", align: "n" as const, render: (x: SeatSuggestion) => <Button size="sm" onClick={() => onCreate(x)}>Create Vacancy</Button> }] : []),
+      ]}
+    />
+  );
+}
+
+export function VacancySheet({ id, close }: { id: string; close: () => void }) {
   const modal = useModal();
   const { navigate } = useRouter();
   const read = useApi("GET /api/v1/recruitment/vacancies/:id", { params: { id } });
@@ -234,12 +213,10 @@ export function VacancySheet({ id, close, inline = false }: { id: string; close:
   const traits = v.questions.filter((q) => q.active && q.purpose === "interview");
   const asks = v.questions.filter((q) => q.active && q.purpose === "application");
   const live = v.status !== "closed";
-  // A form opened from here goes back to the vacancy when it closes: beside the list it is still
-  // there; in the dialog it opens again (the app holds one dialog at a time).
-  const back = () => (inline ? modal.close() : modal.open({ title: v.title, wide: true, body: (done) => <VacancySheet id={id} close={done} /> }));
+  // A form opened from here sits over the vacancy's dialog, which is still open when the form closes.
+  const back = () => modal.close();
   return (
     <>
-      {inline && <CardHeader title={v.title} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {statusOf(v)}
         <Pill dot={false}>{v.number}</Pill>
@@ -269,8 +246,7 @@ export function VacancySheet({ id, close, inline = false }: { id: string; close:
           ],
         ]}
       />
-      {/* Beside the list the pane is too narrow for two cards in a row: they stack. */}
-      <Grid cols={inline ? 1 : 2} className="mt-3">
+      <Grid cols={2} className="mt-3">
         <Card>
           <CardHeader title={<HelpTerm help={SCORECARD_HELP}>Scorecard Weights</HelpTerm>} level={3} />
           <KeyValue items={v.scorecard.map((p) => [p.name, p.active ? `${p.weight}%` : "Off"])} />

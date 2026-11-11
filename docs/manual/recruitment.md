@@ -11,8 +11,8 @@ page. Anyone can apply there with a CV. You screen the applications, send tests,
 and keep good people for later.
 
 Open it from **Recruitment** in the menu on a computer. On a phone, press **More** in the bar at the
-bottom, then **Recruitment**. This chapter covers six tabs along the top: **Vacancies**,
-**Candidates**, **Assessments**, **Interviews**, **Offers** and **Talent Pool**. What candidates see
+bottom, then **Recruitment**. This chapter covers seven tabs along the top: **Vacancies**,
+**Candidates**, **Assessments**, **Interviews**, **Offers**, **Talent Pool** and **Analytics**. What candidates see
 is in [The Public Site](#public-careers).
 
 > **Important:** Operations & People, Management, Implementation and the CEO see every vacancy. A
@@ -34,14 +34,13 @@ Vacancies lists each role MyCity is hiring for, and the seats on the organogram 
 3. The list shows each role with its department, openings, location, applicants, closing day and
    status.
    A role's applicants are counted the same way, so the tile is the open and paused roles' added up.
-4. On a computer, the funnel shows how many candidates stand at each stage.
-5. Press a vacancy. On a computer it opens beside the list; on a phone it opens in a sheet.
+4. Press a vacancy. On a computer it opens in a window over the list; on a phone it opens in a sheet.
    ![A vacancy's sheet](shot:recruitment-vacancy-sheet)
-6. The sheet shows the role's details and its public link. Press **Copy Link** to share it. Its
+5. The sheet shows the role's details and its public link. Press **Copy Link** to share it. Its
    description, required experience and what we look for read with their headings and lists, as
    the careers page shows them.
-7. Press **See Candidates** to open its candidates on the board.
-8. Press **Careers Page** at the top to open the public website as a candidate sees it.
+6. Press **See Candidates** to open its candidates on the board.
+7. Press **Careers Page** at the top to open the public website as a candidate sees it.
 
 | Status | What it means |
 |---|---|
@@ -126,10 +125,11 @@ description again, or for a vacancy you opened with **Edit**:
 
 ### Start from an empty seat {#recruitment-vacancies-suggested needs="recruitment create"}
 
-**Suggested From Organogram** lists the vacant seats on the organogram that have no vacancy yet.
+**View Empty Seats** lists the vacant seats on the organogram that have no vacancy yet.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
-2. Find the seat under **Suggested From Organogram**. It shows 25 seats a page; page on below it.
+2. Press **View Empty Seats** beside the status filter, and find the seat. It shows 25 seats a page;
+   page on below it.
 3. Press **Create Vacancy** beside it.
 4. **New Vacancy** opens with the seat's title, department and reporting line already answered, and
    the seat's manager as the **Hiring Manager** when they have access to Recruitment (otherwise pick
@@ -269,8 +269,7 @@ The best weighted total comes first. A score never moves, rejects or hides anyon
 ### Open a candidate {#recruitment-candidates-sheet}
 
 1. Press a card on [Recruitment · Candidates](/recruitment?tab=candidates). On a computer it opens
-   beside the board, which makes room for it; on a phone it opens in a sheet. **Close** at its foot
-   gives the board its width back.
+   in a window over the board; on a phone it opens in a sheet.
    ![A candidate's sheet](shot:recruitment-candidate-sheet)
 2. The sheet shows their details, their CV, their answers and their assessments and interviews.
 3. **Screening** shows the score, **Provisional** while it is the estimate, and the AI's summary.
@@ -413,7 +412,7 @@ Assessments holds MyCity's tests and take-home briefs, and every sitting a candi
 4. Each assessment shows its name, type, minutes, questions, how many were sent, the average and its
    status.
 5. Press an assessment to see its questions, and the **Points** each option scores. On a computer it
-   opens beside the list, the first one until you press another; on a phone it opens in a sheet.
+   opens in a window over the list; on a phone it opens in a sheet.
 
 An assessment is timed, with minutes and a clock, or untimed: a take-home brief due by a day.
 
@@ -508,7 +507,7 @@ an earlier stage move to **Assessment**.
 2. Each sitting shows the candidate, the assessment, where it stands and the score.
 3. Press **To Mark** to see only those waiting for marks. **Awaiting Marking**, at the top, counts them.
 4. Press a sitting to read each answer. Open a file, or the link they gave. On a computer it opens
-   beside the list; on a phone it opens in a sheet.
+   in a window over the list; on a phone it opens in a sheet.
 
 | Where it stands | What it means |
 |---|---|
@@ -879,6 +878,21 @@ Their row then shows **Invited**. When they apply, their application comes from 
 
 Only you, and the CEO, can open the file it makes.
 
+## Analytics {#recruitment-analytics screen=recruitment/analytics icon=chart}
+
+Analytics holds Recruitment's charts, across every role you may see.
+
+![The Analytics screen](shot:recruitment-analytics)
+
+### Read the charts {#recruitment-analytics-read}
+
+1. Open [Recruitment · Analytics](/recruitment?tab=analytics).
+2. **Funnel, All Roles** shows how many candidates stand at each stage now, from **Applied** to
+   **Shortlist**.
+3. **Screening Scores** shows how many candidates fall in each band of screening score: the AI's read
+   of the CV when there is one, otherwise the estimate from the form.
+4. On a phone the two charts sit one under the other.
+
 ```shot recruitment-vacancies
 open: /recruitment?tab=vacancies
 as: operations
@@ -1034,6 +1048,14 @@ open: /recruitment?tab=talent-pool
 as: operations
 marks:
   1: row 1 | A person kept for later
+```
+
+```shot recruitment-analytics
+open: /recruitment?tab=analytics
+as: operations
+marks:
+  1: text "Funnel, All Roles" | Candidates at each stage now
+  2: text "Screening Scores" | Candidates by screening score
 ```
 
 ```shot recruitment-offers

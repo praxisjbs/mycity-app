@@ -78,6 +78,7 @@ const SCREENS = Object.freeze([
   s("recruitment", "offers", "Offers", ["offer letter", "offer"]),
   s("recruitment", "onboarding", "Onboarding", ["new joiners", "induction", "onboard"]),
   s("recruitment", "talent-pool", "Talent Pool", ["pipeline of candidates", "future candidates"]),
+  s("recruitment", "analytics", "Analytics", ["recruitment analytics", "hiring funnel", "screening scores"]),
 
   s("payroll", "payroll-runs", "Payroll Runs", ["payroll", "run payroll", "salaries"]),
   s("payroll", "payslips", "Payslips", ["payslip", "pay slip", "salary slip"]),
