@@ -52,8 +52,8 @@ saying who agreed and when.
 | M7 Partnerships, CRM & Trackers | 8 | 0 | 0 | 8 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
-| M10 Staff Knowledge Hub & AI Assistance | 8 | 3 | 0 | 5 | 0 | 0 |
-| **Total** | **105** | **4** | **5** | **96** | **0** | **0** |
+| M10 Staff Knowledge Hub & AI Assistance | 8 | 2 | 0 | 6 | 0 | 0 |
+| **Total** | **105** | **3** | **5** | **97** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Five ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8),
@@ -1354,7 +1354,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| 63 | SOPs | `sops` | M10 | TB | ☑ | ☑ | ☑ | Built | 11/11/2026 |
 | 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Dropped | 11/11/2026 |
 | 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 66 | Announcements | `announcements` | M10 | TB | ☐ | ☐ | ☐ | Dropped | 29/10/2026 |
@@ -1362,6 +1362,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 11/11/2026 · TB · M10 PR 2, SOPs (#63; `docs/guides/knowledge.md` Appendix A): the `knowledge` module (repo, service with the writer rule of §6.2: the department's head by the post or its filled seat, or `sops.manage`; the CEO holds every capability), every `/knowledge/sops` route of §5 and `GET /knowledge/sops/departments` (the chips and New SOP's Department, added to the guide), `sop.*` events with "New SOP" or "SOP updated" to the department, ⌘K (SOPs, and New SOP for `sops.manage` and heads), Praxis AI's `sops.list` and `sops.read`, Draft With AI (`sop-draft`, Default, personal data, chosen by TB 11/11/2026), the `SOP_VERSION` content hash; Knowledge Hub · SOPs on the contract, desktop and phone (`ListDetail`, the draft's editor, Publish SOP, Archive SOP, Versions), Procedures under a screen's section of the User Guide; the "How do I ..." mock and its INTERIM types gone. Tests: `tests/integration/knowledge-sops.test.js` (10), `knowledge.test.js` (15), `Sops.test.tsx` (5), the hash pinned. User Guide: the Knowledge Hub chapter's SOPs section and pictures. Left: the staging seed's SOPs (PR 6); Training (PR 3 to PR 5).
 - 11/11/2026 · TB · M10 PR 1, contract and data (`docs/guides/knowledge.md` Appendix A): contracts `knowledge.js` (SOPs) and `training.js` (courses, items, assignments, enrolments, My Training), migrations `10400` (`sop`, `sop_version`, `sop_step`) and `10410` (`training_course`, `training_item`, `training_assignment`, `training_assignment_audience`, `training_enrolment`, `training_item_progress`), seed `10490` (`sops.manage` and `training.manage` for Operations & People and Implementation; the `sop`, `training_course` and `training_certificate` numbering schemes), the capabilities catalogued, the schemes in `schemes.js`, Settings' labels and the contract's document types, the `training` module's folder, the `training_enrolment` record type. Tests: `tests/integration/knowledge-schema.test.js` (16); the capability and numbering lists in `settings.test.js` and `home-schema.test.js`; the mock's. No screen and no route yet. Left: PR 2 (SOPs) and PR 3 (training) in parallel, then PR 4 to PR 6.
 - 11/11/2026 · TB · M10 Knowledge Hub planned (`docs/guides/knowledge.md`, tracker `docs/handoff/m10-knowledge-hub.md`), from TB's eight answers of 11/11/2026 and the Modules Review of 4 November: FAQs (#64) dropped (the User Guide and Praxis AI answer questions), so Knowledge Hub keeps Policies, SOPs, Training and the User Guide; SOPs (#63) are each department's own structured, versioned procedures written by its head or `sops.manage`, read by everyone and listed under Procedures on the screens their steps name; Training (#65) is a course of files, video links, course links and lessons, assigned with a due date and a task or open in the Library, completed by Mark Done with optional proof and a signed certificate verified on `go.mycityapp.io`; ESS · My Training (#110) added. M10 stays 8 screens. The certificate sample drawn (`docs/MyCity-ERP-Documents/training-samples/`). Left: MyCity signs off the sample; PR 1 to PR 6 (the guide's Appendix A).
 

@@ -159,6 +159,7 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `GET /api/v1/knowledge/sops/:id/versions` | `PageQuery` → `SopVersionPage` | `knowledge` view | yes, 25 | Newest first |
 | `GET /api/v1/knowledge/sops/versions/:id` | → `SopVersion` | `knowledge` view | no | A published version |
 | `GET /api/v1/knowledge/sops/for-screen` | `SopScreenQuery` (`screen_key`) → `SopPage` | `knowledge` view | yes, 25 | Published SOPs a step of whose version in force names the screen |
+| `GET /api/v1/knowledge/sops/departments` | `SopDepartmentQuery` (`writable`, `q`) → `SopDepartmentPage` | `knowledge` view | yes, 25 | The departments with an SOP the reader may read (the chips); with `writable=true`, the active departments they may write for (New SOP's Department; empty for a reader who writes for none, so the screen shows no writer's controls). Most staff hold no `people` view, so `/departments` is not theirs to read |
 | `POST /api/v1/knowledge/sops/draft-with-ai` | `SopDraftWithAi` (`text` or `document_id`, `department_id`) → `SopDraftSuggestion` | a writer of that department | no | A suggestion only; nothing saved. 503 `AI_UNAVAILABLE` |
 | `GET /api/v1/training/courses` | `CourseListQuery` (`state`, `q`, `sort`) → `CoursePage` | `knowledge` view, `training.manage` | yes, 25 | With Assigned, Completed and Overdue counts |
 | `POST /api/v1/training/courses` | `CourseCreate` (`title`, `summary`) → `Course` | `knowledge` create, `training.manage` | no | Numbered, `draft` |
@@ -205,6 +206,9 @@ not use them; a later release drops them (MIGRATIONS §8), together with
   who leaves the post loses it at once.
 - Archiving needs `knowledge` delete with `sops.manage`, or the head.
 - Everyone with `knowledge` view (every role by default) reads every published SOP.
+- Every SOP route asks the `knowledge` view grant and no capability; the service decides the rest. A
+  write by anyone else is 403 `NOT_SOP_WRITER` ("You may not write this department's SOPs"). A
+  draft-only or archived SOP, and its versions, are a writer's alone: anyone else is answered 404.
 
 ### 6.3 An SOP's draft, versions and publishing
 
@@ -212,8 +216,14 @@ not use them; a later release drops them (MIGRATIONS §8), together with
   Scope up to 600; Roles Involved up to 10 entries of up to 60 characters; Steps 1 to 50, each text
   3 to 1,000 characters (Markdown: bold, italic, links and lists), Who up to 80, a screen key the
   route map knows (422 `UNKNOWN_SCREEN`), a file that is an uploaded `document` (A13).
-- Publish SOP, under the SOP's lock: a draft (409 `NO_DRAFT`) that differs from the version in
-  force (409 `NO_CHANGES`), a note of 10 to 500 characters from Version 2 (optional on the first).
+- A step's file is claimed from the upload engine for the SOP when the draft is saved (doc type
+  `sop_file`, `vault.claim`; only the person who uploaded it may attach it, 422
+  `DOCUMENT_NOT_STAGED` otherwise) and is read by everyone with `knowledge` view. A step carried
+  from the version in force keeps its file without a second claim.
+- Publish SOP, under the SOP's lock: a draft (409 `NO_DRAFT`) with a purpose (422 `SOP_NO_PURPOSE`)
+  and at least one step (422 `SOP_NO_STEPS`), whose screens the route map still knows (422
+  `UNKNOWN_SCREEN`), that differs from the version in force (409 `NO_CHANGES`), a note of 10 to 500
+  characters from Version 2 (optional on the first; 422 on `note` when missing).
   The draft becomes Version N, the next number, never reused, in force at once. `content_hash` is
   the canonical hash of what staff read.
 - An archived SOP is listed only under Archived for writers and is gone from search, AI and the
@@ -229,7 +239,10 @@ not use them; a later release drops them (MIGRATIONS §8), together with
   file") is sent with the department's name; the model returns `SopDraftSuggestion` (title, purpose,
   scope, roles, steps with who), checked by the contract. It keeps the procedure's own wording and
   never invents a step; a screen key is never suggested. Shown beside the form; nothing is saved
-  until the writer saves (A23 as amended).
+  until the writer saves (A23 as amended). Contact details and identifiers are shielded on the way
+  out and put back in the answer; every field is cut to the form's limits. A file that is not a PDF
+  is 422 `NOT_A_PDF`; a PDF with no text (a scan) is 422 `NO_TEXT` and nothing is sent; with AI off,
+  no provider set up or the month's limit spent, 503 `AI_UNAVAILABLE` before any call.
 
 ### 6.5 A course and its items
 
@@ -374,7 +387,9 @@ else's training in M10 (§13).
 - **Search** (`knowledge.search.js`, `training.search.js`): SOPs by number and title (`sop`, opening
   Knowledge Hub · SOPs `?id=`), for everyone; courses by number and title for `training.manage`
   (`training_course`), and the person's own courses and Library courses (`training_enrolment`,
-  opening ESS · My Training `?id=`). ⌘K's New SOP (writers) and New Course (`training.manage`). The
+  opening ESS · My Training `?id=`). A writer also finds their departments' SOPs still being drafted;
+  an archived SOP is found by nobody. ⌘K's New SOP (writers: `sops.manage`, or anyone heading a
+  department, an action's `orHead`) and New Course (`training.manage`). The
   screens: SOPs (sop, procedures, process, how we work), Training (courses, learning, lessons), My
   Training (my training, courses, certificate, learning).
 
@@ -384,7 +399,7 @@ else's training in M10 (§13).
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Knowledge Hub · SOPs | Department chips, Search SOPs, the list (SOP, Department, Version, Updated); an SOP: title, number, department, version, updated, Purpose, Scope, Roles Involved, numbered Steps (text, Who, Open Screen, the file); Versions; a writer: New SOP, Edit SOP, Save Draft, Discard Changes, Draft With AI (Yours beside Drafted, Keep Mine, Use This Draft), Publish SOP (Note), Archive SOP, the State chips (Published, Draft, Archived) | Screen: the screen this step happens on, where the SOP is listed under Procedures; Draft With AI: wording kept, steps found | Why SOPs are not the User Guide, the writer rule, versions: §1.1, §6 here |
+| Knowledge Hub · SOPs | Department chips, Search SOPs, the list (SOP, Department, Version, Updated); an SOP: title, number, department, version, updated, Purpose, Scope, Roles Involved, numbered Steps (text, Who, Open Screen, the file); Versions; a writer: New SOP (Department, Title, Start SOP), Edit SOP (Title, Purpose, Scope, Roles Involved, each step's Step, Who, Screen and File; Add Step; Move Up, Move Down, Remove Step), Save Draft, the draft's bar (Draft saved, not published; Discard Changes, Publish SOP), Draft With AI (From: Pasted Text or PDF File; Yours beside Drafted, Keep Mine, Use This Draft), Publish SOP (Note), Archive SOP (Reason), the State chips (Published, Draft, Archived) | Screen: the screen this step happens on, where the SOP is listed under Procedures; Draft With AI's Procedure: wording kept, steps found; Roles Involved: one role a line; Note: what changed | Why SOPs are not the User Guide, the writer rule, versions: §1.1, §6 here |
 | Knowledge Hub · Training | State chips (All, Draft, Published, Archived), the list (Course, Items, Library, Assigned, Completed, Overdue); a course: Items (each: kind, title, minutes; Add Item, Upload File, Video Link, Course Link, Lesson, Draft Lesson; drag to order), People (Status chips: Not Started, In Progress, Completed, Overdue; Employee, Department, Due, Progress, Completed, Certificate; Remind Overdue), Assignments (Audience, Due Within, New Joiners, Assigned, Withdraw), Settings (Library, Proof Required, Proof Prompt, Issue Certificate); Publish Course (Your Signature), Assign Training, Archive Course | Library: anyone may take it; New Joiners: enrols those who join later; Proof Required: asked at the end | How enrolment, tasks and reminders work: §6.7, §6.11 |
 | ESS · My Training | To Do (course, due, Overdue), In Progress (progress), Completed (date, Download Certificate), Library (course, length, Start); a course: its items with Done marks, the open item (lesson, viewer, player, Open Link), Mark Done, Add Proof (Link or File), the completion with Download Certificate | Due: the date it was set for | How certificates are signed and verified: §6.9, the manual |
 | User Guide's help for a screen | Procedures: SOP titles with their department | Nothing | How the link is made: §3 step 3 |
@@ -393,7 +408,7 @@ else's training in M10 (§13).
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Knowledge Hub · SOPs | Department chips scrolling sideways, then SOP cards (title, department, version); an SOP opens in a bottom sheet (F31) with its steps as a numbered list | Updated column; Versions behind a row in the sheet | New SOP in the floating button (writers); Publish SOP at the foot of the draft's sheet | More, then Knowledge Hub |
+| Knowledge Hub · SOPs | Department chips scrolling sideways, then SOP cards (title, department, version); an SOP opens in a bottom sheet (F31) with its steps as a numbered list | Updated column; Versions behind a row in the sheet | New SOP in the floating button (writers); Edit SOP a full-screen sheet; Publish SOP in the draft's bar | More, then Knowledge Hub |
 | Knowledge Hub · Training | Course cards (title, completed of assigned, overdue pill); a course opens in a bottom sheet with Items, People and Settings as a segmented control | Assignments' table (a list of cards instead); the drag handle (Move Up and Move Down in each item's menu) | New Course in the floating button; Assign Training and Publish Course at the sheet's foot | More, then Knowledge Hub |
 | ESS · My Training | To Do cards first (title, due, a progress bar), then In Progress, Completed, Library as chips | Library's summaries (title and length only) | Mark Done full width at the foot of an item's sheet; Add Proof full width | ESS tabs |
 
@@ -473,6 +488,7 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · PR 2 built: the `knowledge` module (§5 to §9), Knowledge Hub · SOPs on the contract, desktop and phone, and Procedures under a screen's section of the User Guide. Decided on the way: `GET /knowledge/sops/departments` added (§5), because most staff hold no `people` view and so cannot read `/departments` for the chips, and a head's New SOP needs the departments they write for; a draft's Purpose, when given, is 10 characters or more at Save Draft too (the contract), and Publish asks for a purpose and a step (§6.3); a step's file is claimed for the SOP as `sop_file` and read by every `knowledge` viewer; the content hash is a new canonical payload, `SOP_VERSION` (`shared/documents/canonical.js`, pinned in its test); ⌘K's New SOP shows for heads too (`orHead`, `shared/search/actions.js`), and a writer finds their departments' drafts in ⌘K (§9). `knowledge.embeddings.js`, empty and unused, is deleted.
 - 11/11/2026 · TB · PR 1 built: the contracts, migrations `10400` and `10410`, seed `10490`, the capabilities and schemes (§4, §8). Decided on the way: a published SOP version's CHECK spells out `version IS NOT NULL` (a CHECK lets NULL through); `training_item`'s position is unique at commit, so a reorder can swap two; a change to an item sends the whole item (`ItemCreate`, no second schema); My Training's lists are one query, `list` (`to_do`, `in_progress`, `completed`, `library`). Settings · Documents & Numbering lists the three new schemes (SOP, Training Course, Training Certificate).
 - 11/11/2026 · TB · Written from TB's eight answers of 11/11/2026 and the Modules Review of 4
   November 2026: FAQs leave the hub (Announcements left on 29/10/2026); SOPs are each department's

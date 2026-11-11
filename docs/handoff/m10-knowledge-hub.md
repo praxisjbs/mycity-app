@@ -67,10 +67,12 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 - [x] `npm run ci` green; the PR marked ready: praxisjbs/mycity-app#113, merged (11/11/2026)
 
 ### PR 2 · SOPs
-- [ ] Backend: repo, service (the writer rule, §6.2), controller, routes, events, search, AI reads, `sop-draft`
-- [ ] `for-screen` and the Procedures list in the User Guide's help
-- [ ] The SOPs tab on the contract, desktop and phone, its mock in the contract's shapes
-- [ ] Tests; PROGRESS #63
+- [x] Backend: repo, service (the writer rule, §6.2), controller, routes, events, search, AI reads, `sop-draft` (11/11/2026)
+- [x] `for-screen` and the Procedures list in the User Guide's help (11/11/2026)
+- [x] The SOPs tab on the contract, desktop and phone, its mock in the contract's shapes (11/11/2026)
+- [x] Tests; PROGRESS #63 (11/11/2026)
+- [x] User Guide: the Knowledge Hub chapter's SOPs section, its pictures (11/11/2026)
+- [ ] `npm run ci` green; the PR marked ready
 
 ### PR 3 · Training backend
 - [ ] Courses, items, publish with signature, assignments, enrolments, tasks, progress, proof, completion
@@ -92,6 +94,8 @@ verified on `go.mycityapp.io`). As of 11/11/2026 only a mock exists: every `know
 - [ ] Empty stubs deleted and off `README.MD`; PROGRESS Status; Appendix B ticked on staging
 
 ## 3 · Log
+
+- 11/11/2026 · TB · PR 2 built on `m10/sops` from main after #113: the `knowledge` module (every `/knowledge/sops` route of guide §5, the writer rule of §6.2 checked in the service, so every route asks only `knowledge` view), `sop.published` telling the department, ⌘K with New SOP for heads too (`orHead` in `shared/search/actions.js`), Praxis AI's `sops.list` and `sops.read`, Draft With AI (`sop-draft`), the `SOP_VERSION` canonical hash; the SOPs tab (`app/src/features/knowledge/Sops.tsx`) and Procedures (`Procedures.tsx`) under a screen's guide section; the mock in the contract's shapes. Found on the way: most staff cannot read `/departments` (People's), so the chips and New SOP's Department come from a new `GET /knowledge/sops/departments` (guide §5 and change log); `pageQuery` refuses any `LIMIT`, even a subquery's, so the version in force is the newest published one by `NOT EXISTS`; a modal replaces another rather than stacking, so Draft With AI runs inside Edit SOP. Tests: integration 10, unit 15, screen 5. Next: PR 3 (another chat), then PR 4 to PR 6; PR 6 seeds SOPs for staging.
 
 - 11/11/2026 · TB · PR 1 built on top of PR 0: contracts `knowledge.js` and `training.js`, migrations `10400` and `10410`, seed `10490`, the capabilities, schemes, labels and record types; `tests/integration/knowledge-schema.test.js` (16) passes, and so do `settings.test.js` and `home-schema.test.js` with their lists updated. Found on the way: a `published` SOP version with no number passed its CHECK (NULL > 0 is unknown), fixed before merge; Settings · Documents & Numbering answered 500 for the new types until the contract's `DOC_TYPES` listed them. Next: PR 2 (SOPs) and PR 3 (training) can run in parallel once PR 1 merges.
 - 11/11/2026 · TB · PR 0: the guide written from TB's eight answers of 11/11/2026 and the Modules Review of 4

@@ -1,7 +1,7 @@
 {
   "knowledge-attendance": {
     "spec": "9e6b83868d0c44bb",
-    "source": "6e843c9b108e1922",
+    "source": "b086627731fde90d",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,15 @@
   },
   "knowledge-new-policy": {
     "spec": "b8f89fbf72f3a9d9",
-    "source": "669abc7a3d044c8c",
+    "source": "2896f652559ecd1d",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-new-sop": {
+    "spec": "8fb4cda0b82fe7ae",
+    "source": "bf679f7c6c6632d6",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +25,7 @@
   },
   "knowledge-policies": {
     "spec": "e3ce218b49bca9ae",
-    "source": "669abc7a3d044c8c",
+    "source": "2896f652559ecd1d",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +33,7 @@
   },
   "knowledge-policy": {
     "spec": "b4c482e6a048841c",
-    "source": "6e843c9b108e1922",
+    "source": "b086627731fde90d",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +41,47 @@
   },
   "knowledge-publish": {
     "spec": "505268b0b6c88bb3",
-    "source": "ef110872683578e6",
+    "source": "2d3160b1230811f5",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-sop": {
+    "spec": "6aa3576680374ae9",
+    "source": "bf679f7c6c6632d6",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-sop-ai": {
+    "spec": "51f2539eba69bf86",
+    "source": "bf679f7c6c6632d6",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-sop-edit": {
+    "spec": "c67603d6bc0215f6",
+    "source": "bf679f7c6c6632d6",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-sop-publish": {
+    "spec": "abab5bea8b4a3b6c",
+    "source": "bf679f7c6c6632d6",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-sops": {
+    "spec": "50e701365c2105b0",
+    "source": "bf679f7c6c6632d6",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +89,7 @@
   },
   "knowledge-version": {
     "spec": "bc65fb7a518ea746",
-    "source": "669abc7a3d044c8c",
+    "source": "2896f652559ecd1d",
     "devices": [
       "desktop",
       "phone"
