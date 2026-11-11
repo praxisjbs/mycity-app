@@ -42,6 +42,7 @@ import {
   TextField,
   toast,
   todayIso,
+  toMoneyString,
   useContractForm,
   useModal,
   useSideBySide,
@@ -437,7 +438,7 @@ function RateForm({ state: i, close }: { state: StatutoryItemState; close: () =>
     effective_from: v.effective_from,
     ...(v.base && v.base !== i.bases[0] && { base: v.base as Base }),
     ...(v.rate !== "" && { rate: v.rate }),
-    ...(i.item === "relief" && v.flat_amount !== "" && { flat_amount: v.flat_amount }),
+    ...(i.item === "relief" && v.flat_amount !== "" && { flat_amount: toMoneyString(v.flat_amount) }),
   });
   const f = useContractForm<RateValues>(
     { rate: latest?.rate && latest.rate !== "0" ? latest.rate : "", flat_amount: latest?.flat_amount ?? "", base: latest?.base ?? i.bases[0], effective_from: todayIso() },
@@ -492,8 +493,8 @@ function bandsBody(v: BandValues, count: number) {
     item: "paye" as const,
     effective_from: v.effective_from,
     bands: Array.from({ length: count }, (_, i) => ({
-      band_from: i === 0 ? "0.00" : v[`to_${i - 1}`] || "",
-      band_to: v[`to_${i}`] ? v[`to_${i}`] : null,
+      band_from: i === 0 ? "0.00" : toMoneyString(v[`to_${i - 1}`] ?? ""),
+      band_to: v[`to_${i}`] ? toMoneyString(v[`to_${i}`]) : null,
       rate: v[`rate_${i}`],
     })),
   };
@@ -745,18 +746,20 @@ function Structure({ may }: { may: boolean }) {
 }
 
 type GradeValues = { code: string; name: string; minimum: string; maximum: string; effective_from: string };
+/** A grade as the API takes it: the band's two ends as two-place amounts, whatever was typed. */
+const gradeBody = (v: GradeValues) => ({ ...v, minimum: toMoneyString(v.minimum), maximum: toMoneyString(v.maximum) });
 
 /** Add Grade, or a grade's band from a later day: Save Grade. */
 function GradeForm({ grade, close }: { grade?: SalaryGrade; close: () => void }) {
   const f = useContractForm<GradeValues>(
     { code: grade?.code ?? "", name: grade?.name ?? "", minimum: grade?.band_minimum ?? "", maximum: grade?.band_maximum ?? "", effective_from: todayIso() },
-    salary.SalaryGradeSave,
+    { safeParse: (v: GradeValues) => salary.SalaryGradeSave.safeParse(gradeBody(v)) },
   );
   const save = useMutation("POST /api/v1/salary-structure/grades");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: f.values });
+      await save.run({ body: gradeBody(f.values) });
       invalidate("/api/v1/salary-structure");
       close();
       toast("Grade saved");
@@ -877,7 +880,7 @@ function splitBody(v: SplitValues, count: number, pensionable: boolean[]) {
     components: Array.from({ length: count }, (_, i) => ({
       code: codeOf(v[`label_${i}`], i),
       label: v[`label_${i}`].trim(),
-      amount: v[`amount_${i}`],
+      amount: toMoneyString(v[`amount_${i}`] ?? ""),
       pensionable: pensionable[i] === true,
     })),
   };

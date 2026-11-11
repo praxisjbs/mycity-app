@@ -122,6 +122,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped. | stable |
+| Forms | [MonthField](#monthfield) | `MonthField` | A month picked from a year's twelve, bound to a form: the field reads "October 2026" and the value is the month's first day for the wire. | beta |
 | Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
@@ -940,7 +941,7 @@ An approval route: the steps already done, the one in hand, and what is still to
 |---|---|
 | Use | Above a record that waits on people (an expense claim, a leave request, a requisition, an offer). |
 | Avoid | What has already happened with dates (use Timeline); a progress figure (use ProgressBar or Meter); more than six steps. |
-| Phone | The steps wrap onto as many lines as they need; the arrows stay between them, never a sideways scroll. |
+| Phone | The steps wrap onto as many lines as they need; the arrows stay between them, never a sideways scroll. With `stack` they sit one under another, an arrow down between each (a payroll run's five statuses on a phone). |
 | Accessibility | An ordered list whose current step says so in words, so the state is never the colour of a pill alone. |
 | Status | stable |
 | Exports | `Chain` |
@@ -955,6 +956,7 @@ An approval route: the steps already done, the one in hand, and what is still to
 |---|---|---|---|
 | `steps` | `ChainStep[]` | yes | The steps, first to last. |
 | `label` | `string` |  | Names the route for screen readers; "Approval route" unless set. |
+| `stack` | `boolean` |  | The steps one under another, an arrow down between each, where a row would wrap: a phone's list of statuses. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3890,6 +3892,44 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 
 ```tsx
 <MoneyField {...form.field("amount")} />
+```
+
+### MonthField
+
+A month picked from a year's twelve, bound to a form: the field reads "October 2026" and the value is the month's first day for the wire.
+
+| | |
+|---|---|
+| Use | Every month a person enters in a form: a payroll run's month (New Run), a period that is a whole month. The contract's `monthStart` is the rule it meets. |
+| Avoid | A day (use DateField); a month stepped through on a screen that is not a form, such as a calendar's month (a screen's own switch); <input type="month"> (the browser draws it, gate 21). |
+| Phone | The months open in a bottom sheet titled by the field's label, three to a row, each a 44 px target; the year switch sits above them. |
+| Accessibility | The button is named by its Field's label and the month it holds, and says it opens a dialog. Each month is a button named by its month and year, pressed when it is the value; months outside min and max are disabled, and the year arrows stop at their years. |
+| Status | beta |
+| Exports | `MonthField` |
+| Import | `import { MonthField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/MonthField.tsx` |
+| Test | `packages/ui/src/form/MonthField.test.tsx` |
+| Gallery | `packages/ui/src/form/MonthField.gallery.tsx` (`npm run gallery`, `#/MonthField`) |
+
+**MonthField** props (`MonthFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The month as its first day, ISO (2026-10-01), or "" for none. |
+| `onChange` | `(iso: string) => void` | yes | Called with the first day of the month picked. |
+| `onBlur` | `() => void` |  | Called when the months close, so the form checks the field as it would on leaving an input. |
+| `min` | `string` |  | The earliest month that may be picked: any ISO date in it. |
+| `max` | `string` |  | The latest month that may be picked: any ISO date in it. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id; the Field supplies one otherwise. |
+| `name` | `string` |  | The field's name, so a failed submit can focus it. |
+| `placeholder` | `string` |  | What the button reads with no month: a format example, at most 3 words. |
+| `disabled` | `boolean` |  | Shown and not changed: the months do not open. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<Field label="Month" {...form.status("period")}><MonthField min="2024-01-01" max={todayIso()} {...form.field("period")} /></Field>
 ```
 
 ### MoreFields
