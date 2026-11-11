@@ -445,6 +445,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 11/11/2026 · TB · ESS · My Training (#110): a PDF grows to its pages, so the course scrolls through it to the item's actions and back; All Items at the item's foot too; an item, or the way back, starts at the course's top (`knowledge.md` §10, §14).
 - 11/11/2026 · TB · ESS · My Training (#110) built on the contract (M10 PR 5, `knowledge.md` §10): To Do,
   In Progress, Completed and Library, a course beside the list (a sheet on a phone) with its items
   opened in place, Mark Done, Start Course and Add Proof. `?id=` opens a course by its id or the
