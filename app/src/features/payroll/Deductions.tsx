@@ -8,7 +8,7 @@ import { RESTRICTED_HELP } from "@/features/people/status";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { hrefFor, useRouter } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chips, DataView, type DataViewColumn, DateField, Field, formatMoney, formatMonth, FormFooter, HelpTerm, KeyValue, ListDetail, Money, MoneyField, PageHeader, Pill, SegmentedControl, SelectField, StatStrip, TextAreaField, toast, todayIso, useContractForm, useModal, useSideBySide, Who } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, DataView, type DataViewColumn, DateField, Field, formatMoney, formatMonth, FormFooter, HelpTerm, KeyValue, ListDetail, Money, MoneyField, PageHeader, Pill, SegmentedControl, SelectField, StatStrip, TextAreaField, toast, todayIso, toMoneyString, useContractForm, useModal, useSideBySide, Who } from "@mycity/ui";
 
 /**
  * Payroll · Deductions (docs/guides/payroll.md §2, §3.3, §3.4, §6.6, §10): the money that comes off pay, in one
@@ -350,7 +350,7 @@ function AdvanceForm({ open, close }: { open: string; close: () => void }) {
   const [tried, setTried] = useState(false);
   const bodyOf = (v: AdvanceValues) => ({
     employee_id: who[0]?.employee_id ?? "",
-    amount: v.amount,
+    amount: toMoneyString(v.amount),
     granted_on: v.granted_on,
     months: Number(v.months),
     start_period: v.start_period,

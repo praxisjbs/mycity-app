@@ -23,6 +23,19 @@ export default {
         ]}
       />
     ),
+    Stacked: () => (
+      <Chain
+        stack
+        label="Run Route"
+        steps={[
+          { label: "Draft", state: "done" },
+          { label: "Computed", state: "done" },
+          { label: "Submitted", state: "now" },
+          { label: "Approved" },
+          { label: "Paid" },
+        ]}
+      />
+    ),
     "Not Started": () => <Chain steps={[{ label: "Submitted" }, { label: "Line Manager" }, { label: "Finance" }]} />,
   },
 } satisfies GalleryEntry;

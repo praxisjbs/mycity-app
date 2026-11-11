@@ -1,4 +1,4 @@
-import { isoDay, sid } from "../core";
+import { sid } from "../core";
 import { PEOPLE, type MockPerson } from "./people";
 
 /**
@@ -46,13 +46,13 @@ export const SLIPS: MockSlip[] = (() => {
       const gross = k(p.gross_monthly) - (off < -12 ? Math.round(k(p.gross_monthly) * 0.12) : 0);
       out.push({
         payslip_id: sid(`slip:${p.user_key}:${period}`),
-        number: `PAY-${period.replace("-", "-")}-${String(idx + 1).padStart(3, "0")}`,
+        number: `PAY-${period}-${String(idx + 1).padStart(4, "0")}`,
         person: p,
         period,
         gross,
         ded: ev?.amount ?? 0,
         status: off === 0 ? "in_run" : "paid",
-        paid_on: off === 0 ? null : `${period}-27`,
+        paid_on: off === 0 ? null : payDateOf(period),
         ded_reason: ev?.reason ?? null,
         ded_query: ev?.query ?? null,
       });
@@ -64,22 +64,12 @@ export const SLIPS: MockSlip[] = (() => {
 export const money = s;
 export const kobo = k;
 
-/** Earnings lines of a gross amount: basic 70, housing 15, transport 10, communication 5. */
-export function earnings(gross: number) {
-  const basic = Math.round(gross * 0.7);
-  const housing = Math.round(gross * 0.15);
-  const transport = Math.round(gross * 0.1);
-  return [
-    { label: "Basic Salary", amount: s(basic) },
-    { label: "Housing Allowance", amount: s(housing) },
-    { label: "Transport Allowance", amount: s(transport) },
-    { label: "Communication Allowance", amount: s(gross - basic - housing - transport) },
-  ];
+/**
+ * A month's pay date: the pay day (30 unless MyCity sets another), held to the month's last day, so 30
+ * pays on 28 or 29 February (docs/guides/payroll.md §6.11 rule 1). `period` is YYYY-MM.
+ */
+export function payDateOf(period: string, payDay = 30): string {
+  const [y, m] = period.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${period}-${String(Math.min(payDay, last)).padStart(2, "0")}`;
 }
-
-export const nextPayday = () => {
-  const d = new Date();
-  if (d.getUTCDate() > 27) d.setUTCMonth(d.getUTCMonth() + 1);
-  d.setUTCDate(27);
-  return isoDay(d);
-};
