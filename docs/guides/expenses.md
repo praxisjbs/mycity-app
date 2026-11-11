@@ -50,8 +50,10 @@ Projects).
    Project (optional, from the Workspace projects), Department (their own by default, picked from
    the org chart, never typed), one or more lines (Description, Quantity, Unit Price), the payee
    and the invoice. The payee is Staff, Vendor, Partner or Dedicated Task Team (DTT: the team MyCity pays by the day at activations). For Staff, Use My
-   Company Account fills the bank details from their employee profile; for the others the bank,
-   account name and account number are typed. Save Draft keeps it; Send Request submits it
+   Company Account fills the bank details from their employee profile; for the others the bank
+   (typed or picked from the banks suggested, §6.1 rule 7), account name and account number are
+   entered. Category is picked in a popover: filtered by type and searched by name, never a long
+   list to scroll. Save Draft keeps it; Send Request submits it
    (`expense_request.submitted`) and opens the `expenses.request` approval in the same transaction.
 2. **Line manager.** The approval reaches the requester's line manager, unless the requester
    manages people themselves, then it goes straight to Operations & People (the stage's condition,
@@ -114,6 +116,7 @@ Implementation Team's own accounts.
 |---|---|---|---|---|
 | `GET /api/v1/expenses/mine` | `ExpenseListQuery` → `ExpensePage` | self | yes, 25 | ESS · My Requests |
 | `GET /api/v1/expenses/mine/summary` | → `ExpenseMineSummary` | self | no | the four KPI cards |
+| `GET /api/v1/expenses/banks` | `ExpenseBankListQuery` → `ExpenseBankPage` | `expenses` create | yes, 25 | the Bank field's suggestions: the common banks, then every bank a request names, most used first; `q` narrows (§6.1 rule 7) |
 | `POST /api/v1/expenses/mine` | `ExpenseCreate` → `ExpenseRequest` | `expenses` create · own | | `submit: true` sends it at once |
 | `PATCH /api/v1/expenses/mine/:id` | `ExpenseUpdate` → `ExpenseRequest` | `expenses` edit · own | | draft or sent back only |
 | `POST /api/v1/expenses/mine/:id/submit` | `EmptyBody` → `ExpenseRequest` | `expenses` create · own | | Send Request, Send Again |
@@ -183,6 +186,12 @@ somebody else staged is refused, `invoice_document_id: Upload it again`.
    at that moment, starting again at the line manager. A request in flight still keeps the version
    it opened on; only a request sent again after a Send Back takes the current one. The earlier
    approval and its decisions stay on the request's history.
+7. **The bank is typed or picked, never a closed list** (TB, 11/11/2026). The Bank field suggests
+   the common banks (`COMMON_BANKS` in `expenses.service.js`) and every bank a request has named,
+   most used first, one row a name whatever its case; a bank it does not know is offered as Add
+   and kept as typed, so it is suggested to everyone from then on. Only bank names are read for
+   the suggestions, never an account, and no request is named. Not a table: a bank is the text a
+   request was saved with, as a KPI's unit is.
 
 ### 6.2 Statuses
 
@@ -408,10 +417,10 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. The form: Read Invoice once an invoice is attached, Suggest Category in its footer, each filling the form for the person to check; nothing is saved until they press | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." | the approval routing and the budget recount: §3, §6 here, the manual |
+| ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. Category opens a popover (Pick Category) with a Category Type filter (All, Operating, Capital) and a search over the categories, 25 a page; Bank suggests banks as typed and offers Add for one it does not know; Payee Name and Account Name show a person's name as their example, never the reader's own. The form: Read Invoice once an invoice is attached, Suggest Category in its footer, each filling the form for the person to check; nothing is saved until they press | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." | the approval routing and the budget recount: §3, §6 here, the manual |
 | Expenses · Requisitions | Approved Requests (tick boxes, Create Requisition), each opening its request in the modal with Withdraw (a reason, after a confirm); Requisitions (Reference, Requests, Total, Submitted, Status). The modal: its requests, each opening, Remove, Approve, Reject (the CEO) | help on Requisitions: "Approved requests grouped for the CEO." | why requests are batched: MILESTONES §13, the manual |
 | Expenses · Approvals | KPI cards With You, Total Value, Oldest, Approved This Month (opens the requests the reader approved since the 1st, `approved_by_me_from`); the list; the modal with lines, invoice (opens as a PDF), budget remaining (the line's, and the department's beside it), an Over Budget pill, a Possible Duplicate pill with Check Duplicate; Approve, Send Back, Reject | help on Over Budget: "More than the department has left for this category this year." Help on Possible Duplicate: "Same payee and amount within 30 days." | the chain's configuration: Settings · Approvals, this guide |
-| Expenses · Disbursements | KPI cards Waiting to Pay and Reference Missing, each opening its list; Waiting to Pay, a request opening in the modal with Record Disbursement and Withdraw; Paid; Record Disbursement (Bank Reference, Receipt, Paid On), No on Save Without Reference? back on Bank Reference; a Reference Missing pill and Add Reference. No chart (decision 7) | help on Bank Reference: "The bank's transaction ID for this transfer." | audit-anchor reasoning: §6.5 here |
+| Expenses · Disbursements | KPI cards Waiting to Pay and Reference Missing, each opening its list; Waiting to Pay, a request opening in the modal with Record Disbursement and Withdraw; Paid; Record Disbursement (Bank Reference, Receipt, Paid On), No on Save Without Reference? back on Bank Reference; a Reference Missing pill and Add Reference; a paid one's Receipt row with Open Receipt when one was uploaded (TB, 11/11/2026). No chart (decision 7) | help on Bank Reference: "The bank's transaction ID for this transfer." | audit-anchor reasoning: §6.5 here |
 | Expenses · Projects | projects with Budget, Committed, Spent, Remaining, to `expenses` view at scope all (a refused read is Not Open to You); a project's requests in its modal, each opening; New Request (the project filled), Set Budget (`expenses.finance`), Remove Budget after a confirm | help on Committed: "Approved but not yet paid." | how spend is counted: §6.6 |
 | Expenses · Budgets | Year picker; departments with Allocated, Committed, Spent, Remaining; a budget's lines by category; New Budget, Edit Budget, Budget History | help on Remaining: "Allocated less committed and spent." | the 90% warning rule: §6.6 |
 | Expenses · Categories | the list (Category, Type, This Month, Requests); New Category, Edit Category, Deactivate (after a confirm); Add Suggested Categories while empty | help on Type: "Capital is equipment kept for years." | A26 and where the defaults came from: §6.7, the handoff |
@@ -464,6 +473,8 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 None.
 
 ## 14 · Change log
+
+- 11/11/2026 · AJ · From the Milestones Review of 11/11/2026 (TB): Category on New Request is a popover with a type filter and a server search (§3, §10.1), not a dropdown, since thirty or forty categories are searched, not scrolled; Bank is typed or picked from `GET /expenses/banks` with Add for a bank it does not know (§3, §5, §6.1); Payee Name's example is a name, not the reader's own; a paid disbursement shows Open Receipt (§10.1). Staff asking from their own department only was checked at the review and holds (§8).
 
 - 06/11/2026 · TB · Merging M7 PR 2 (#80): Categories' New Category is New Expense Category in ⌘K and the phone's floating button (§9, §10.2), as Partnerships' is New Partner Category, since ⌘K holds each label once; the header button, the form and the User Guide's step are unchanged. A note for AJ is in `docs/handoff/m8-expenses.md` §6.
 - 05/11/2026 · AJ · The audit's F5 to F25 fixed (`docs/handoff/m8-expenses-audit.md` §4): Withdraw on every screen an `expenses.finance` holder opens an approved request (Requisitions, Disbursements, a project's or a requisition's request), Cancel Request until then, each after a confirm (§2, §10.1); Expenses · Projects gated on its read, Set Budget on `expenses.finance` (§2); the recount locks its lines first (§6.6 rule 3); one budget per department per year in migration 8020, its owner the head now, a line only uncounted requests name taken away (rule 5); the monthly report's budgets as `/budgets` reads them (rule 8); Possible Duplicates named only to a reader who may open them, the rest a count (§6.8, `possible_duplicates_hidden`, §5); `disbursed_from` and `approved_by_me_from` on `ExpenseListQuery` for the KPI cards (§5, §10.1); Read Invoice on Gemini through its native file reading, a refused file Unreadable (§9).

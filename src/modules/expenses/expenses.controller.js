@@ -20,6 +20,8 @@ const me = (req) => req.user.employee_id;
 module.exports = {
   mine: async (req, res) => sendPaged(res, await service.listMine(me(req), req.validated.query)),
 
+  banks: async (req, res) => sendPaged(res, await service.banks(req.validated.query)),
+
   mineSummary: async (req, res) => ok(res, await service.mineSummary(me(req))),
 
   create: async (req, res) => created(res, await service.create(withActor(req), body(req))),
