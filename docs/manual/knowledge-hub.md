@@ -1,16 +1,17 @@
 ---
 title: Knowledge Hub
 module: knowledge
-milestones: M1
-summary: MyCity's policies and each department's SOPs: writing them, publishing new versions, and reading them.
+milestones: M1, M10
+summary: MyCity's policies, each department's SOPs and its training courses: writing them, publishing new versions, and reading and taking them.
 icon: book
 ---
 
-The Knowledge Hub holds what MyCity knows: its policies, each department's SOPs, and this User
-Guide. Everyone reads the policies that apply to them on
-[Policy Updates](/ess?tab=policy-updates) in Employee Self-Service, and every published SOP on
-[Knowledge Hub · SOPs](/knowledge?tab=sops). This chapter is for the people who read SOPs and the
-people who write policies and SOPs.
+The Knowledge Hub holds what MyCity knows: its policies, each department's SOPs, its training
+courses, and this User Guide. Everyone reads the policies that apply to them on
+[Policy Updates](/ess?tab=policy-updates) in Employee Self-Service, every published SOP on
+[Knowledge Hub · SOPs](/knowledge?tab=sops), and takes their courses on
+[My Training](/ess?tab=my-training). This chapter is for the people who read SOPs and the people who
+write policies, SOPs and courses.
 
 ## Policies {#knowledge-policies screen=knowledge/policies icon=book}
 
@@ -410,6 +411,130 @@ with its versions. An archived SOP cannot be changed or brought back.
 |---|---|---|
 | **This SOP is already archived** | Someone archived it first | Nothing more to do |
 
+## Training {#knowledge-training screen=knowledge/training icon=book needs="cap training.manage"}
+
+Courses for MyCity's staff, built from files, videos, links to outside courses and lessons, in the
+order you set. Assign a course to everyone, to departments, roles or people with a due date, or put
+it in the Library for anyone to take. Whoever finishes gets a MyCity certificate carrying your
+signature. People who hold **Manage Training** see this tab: Operations and People, Implementation
+and the CEO, unless your roles were changed. Everyone takes their courses on
+[My Training](/ess?tab=my-training).
+
+![Training](shot:knowledge-training)
+
+### Find a course {#knowledge-training-find}
+
+1. Open [Knowledge Hub · Training](/knowledge?tab=training).
+2. Press **Draft**, **Published** or **Archived** to see courses in that state. **All** shows every
+   course.
+3. Read each row: the **Course**, its **State**, how many **Items** it holds, whether it is in the
+   **Library**, how many are **Assigned**, how many **Completed** it, and how many are **Overdue**.
+   On a phone each course is a card showing completed of assigned.
+4. Press a course to open it. On a computer it opens beside the list. On a phone it opens in a
+   sheet: drag it down to close it.
+   ![A course, open](shot:knowledge-course)
+5. Switch between **Items**, **People**, **Assignments** and **Settings** above the course.
+
+> **Tip:** Search finds a course from anywhere: type its title or number, such as `TRN-0001`.
+
+### Build a course {#knowledge-training-new needs="knowledge create"}
+
+1. Press **New Course** at the top right. On a phone, press **Quick Actions**, then **New Course**.
+   From anywhere, open search and type `new course`.
+2. Type its **Title**, such as `Fire Safety`, and a **Summary** if it helps.
+3. Press **Create Course**. The message **Course created** confirms it. It opens as a draft.
+4. Under **Items**, press **Add Item** and choose what to add:
+   - **Upload File**: a PDF, a picture, a video file or any other file people read or download.
+   - **Video Link**: a YouTube link plays inside the course. Any other video link opens in a new
+     tab.
+   - **Course Link**: a course on another website, such as a free certification. It opens in a new
+     tab.
+   - **Lesson**: text you write in the course itself.
+   ![Add Item](shot:knowledge-add-item)
+5. Type the item's **Title** and, if you know it, how many **Minutes** it takes.
+6. Press **Add Item**. Items show in the order people take them.
+7. To change the order on a computer, drag an item by its handle. On a phone, or from the keyboard,
+   open the item's menu and press **Move Up** or **Move Down**. The menu also holds **Edit Item**
+   and **Remove Item**.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **Name the item** | The title is empty or too short | Type a title |
+| **Use an https link** | The link does not start with `https://` | Copy the full link from the address bar |
+| **At least 20 characters** | The lesson is too short | Write a little more |
+| *A course holds at most 40 items* | It is full | Split it into two courses |
+
+### Draft a lesson with AI {#knowledge-training-lesson needs="knowledge create"}
+
+When the lesson already exists as text or a PDF, the assistant can lay it out for you.
+
+1. In **Add Item**, choose **Lesson** and type its **Title**.
+2. Press **Draft Lesson**.
+3. Paste the text into **Source Text**, or add a PDF under **Or a PDF**.
+4. Press **Draft Lesson**. **Drafted** shows beside **Yours**.
+5. Press **Use Lesson** to put it in the form, or **Keep Mine** to leave yours.
+6. Read it through, change what you need, then press **Add Item**. Nothing is kept until you do.
+
+### Choose the course's settings {#knowledge-training-settings needs="knowledge edit"}
+
+1. Open the course and press **Settings**.
+2. Switch on **Library** to let anyone take it, assigned or not.
+3. Switch on **Proof Required** to ask for proof at the end, such as an outside course's certificate.
+   Type what to send under **Proof Prompt**, such as `Link to your certificate`.
+4. **Issue Certificate** is on unless you switch it off.
+5. Change the **Title** or **Summary** under **Course Details** and press **Save Course**.
+
+The settings are fixed once the course is archived.
+
+### Publish a course {#knowledge-training-publish needs="knowledge edit"}
+
+1. Open the draft course with its items in place.
+2. Press **Publish Course**.
+3. Sign in **Your Signature** with your finger or the mouse. It is printed on every certificate of
+   this course.
+4. Press **Publish Course**. The message **Course published** confirms it.
+
+A Library course now shows in everyone's Library. Assign it to make it someone's task.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **Add an item first** | The course is empty | Add at least one item |
+| **This course is already published** | Someone published it first | Look at the course again |
+
+### Assign training {#knowledge-training-assign needs="knowledge edit"}
+
+1. Open the published course and press **Assign Training**.
+   ![Assign Training](shot:knowledge-assign)
+2. Under **Who Takes It**, choose **Everyone**, or **Pick Who** and choose any **Departments**,
+   **Roles** and **People**.
+3. Type **Due Within (Days)** for a due date, such as `30`. Leave it empty for none.
+4. Leave **Keep Assigning New Joiners** ticked to give the course to everyone who later joins those
+   departments or roles.
+5. Press **Assign Training**. Each person gets a task to complete the course, due on the due date,
+   and a notice.
+
+**Assignments** lists who each assignment reaches. Press **Withdraw** to take one back: people who
+have not started leave the course.
+
+### Follow who has finished {#knowledge-training-people}
+
+1. Open the course and press **People**.
+   ![People on a course](shot:knowledge-course-people)
+2. Press **Not Started**, **In Progress**, **Completed** or **Overdue** to narrow the list.
+   **Everyone** shows them all.
+3. Read each person's **Status**, **Due** date, **Progress**, **Completed** date and **Certificate**.
+4. When someone is overdue, press **Remind Overdue** to remind everyone past their due date. Each
+   is reminded once a day at most.
+5. Press **Download Certificate** beside someone who has finished to save their certificate.
+
+### Archive a course {#knowledge-training-archive needs="knowledge delete"}
+
+1. Open the course and press **Archive Course**.
+2. Type the **Reason**, such as `Replaced by 2027`.
+3. Press **Archive Course**. The message **Course archived** confirms it.
+
+Its assignments are withdrawn and it leaves the Library. People who finished keep their certificates.
+
 ```shot knowledge-policies
 open: /knowledge?tab=policies
 as: operations
@@ -580,4 +705,75 @@ do:
 crop: modal
 marks:
   1: label "Note" | What changed
+```
+
+```shot knowledge-training
+open: /knowledge?tab=training
+as: operations
+sources:
+  - app/src/features/knowledge/Training.tsx
+marks:
+  1: button "New Course" | Build a course
+  2: role group "State" | By state
+```
+
+```shot knowledge-course
+open: /knowledge?tab=training
+as: operations
+sources:
+  - app/src/features/knowledge/Training.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("Data Protection Essentials"), [data-ui=page] ul[data-copy=content] > li:has-text("Data Protection Essentials")
+  - wait: button "Assign Training"
+crop: viewport
+marks:
+  1: role radiogroup "Show" | Items, people, settings
+  2: button "Add Item" | Add to it
+```
+
+```shot knowledge-add-item
+open: /knowledge?tab=training
+as: operations
+device: desktop
+sources:
+  - app/src/features/knowledge/Training.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("Partnership Pipeline"), [data-ui=page] ul[data-copy=content] > li:has-text("Partnership Pipeline")
+  - wait: button "Publish Course"
+  - click: button "Add Item"
+  - click: css [role=menuitem]:has-text("Lesson"), button:has-text("Lesson")
+  - wait: button "Draft Lesson"
+crop: modal
+marks:
+  1: button "Draft Lesson" | From a text or a PDF
+```
+
+```shot knowledge-assign
+open: /knowledge?tab=training
+as: operations
+sources:
+  - app/src/features/knowledge/Training.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("Fire Safety at the Office"), [data-ui=page] ul[data-copy=content] > li:has-text("Fire Safety at the Office")
+  - wait: button "Assign Training"
+  - click: button "Assign Training"
+  - wait: label "Due Within (Days)"
+crop: modal
+marks:
+  1: label "Due Within (Days)" | The due date
+```
+
+```shot knowledge-course-people
+open: /knowledge?tab=training
+as: operations
+sources:
+  - app/src/features/knowledge/Training.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("Customer Service Basics"), [data-ui=page] ul[data-copy=content] > li:has-text("Customer Service Basics")
+  - wait: button "Assign Training"
+  - click: css [role=radio]:has-text("People")
+  - wait: button "Remind Overdue"
+crop: viewport
+marks:
+  1: button "Remind Overdue" | Nudge the late
 ```
