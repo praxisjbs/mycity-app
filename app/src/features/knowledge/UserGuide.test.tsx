@@ -109,6 +109,8 @@ vi.mock("@/api/hooks", () => ({
     error: null,
     reload: () => undefined,
   }),
+  // Procedures under a section (Procedures.tsx): none here.
+  useInfinite: () => ({ rows: [], page: undefined, loading: false, error: null }),
 }));
 vi.mock("@/lib/router", () => ({
   useRouter: () => ({ navigate: m.navigate, location: { path: "/knowledge", module: "knowledge", tab: "user-guide", id: null, params: m.params } }),

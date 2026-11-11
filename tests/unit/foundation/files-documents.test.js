@@ -364,6 +364,29 @@ describe("markdown and the template language", () => {
       .not.toBe(canonical.hash("POLICY_VERSION", version));
   });
 
+  test("an SOP version's payload is pinned, and a changed step, screen or file changes it", () => {
+    const sop = {
+      number: "SOP-0001",
+      department_id: "8b1f6a40-0000-4000-8000-000000000001",
+      version: 2,
+      title: "Campaign Launch",
+      purpose: "How Marketing launches a campaign.",
+      scope: null,
+      roles: ["Campaign Lead", "Designer"],
+      steps: [
+        { text: "Write the **brief**.", who: "Campaign Lead", screen_key: null, document_id: null },
+        { text: "Book the launch post.", who: null, screen_key: "community/announcements", document_id: "8b1f6a40-0000-4000-8000-000000000002" },
+      ],
+    };
+    // Pinned: a change to this builder must bump its version, never alter v1 (canonical.js header).
+    expect(canonical.hash("SOP_VERSION", sop)).toBe("929011f9306ca86f3e89c88ed102f79676f26e4ddaf67c14ffdfdbb510d011d4");
+    expect(canonical.hash("SOP_VERSION", { ...sop, scope: "" })).toBe(canonical.hash("SOP_VERSION", sop));
+    const moved = { ...sop, steps: [sop.steps[0], { ...sop.steps[1], screen_key: "people/employees" }] };
+    expect(canonical.hash("SOP_VERSION", moved)).not.toBe(canonical.hash("SOP_VERSION", sop));
+    expect(canonical.hash("SOP_VERSION", { ...sop, steps: [...sop.steps].reverse() })).not.toBe(canonical.hash("SOP_VERSION", sop));
+    expect(canonical.hash("SOP_VERSION", { ...sop, version: 3 })).not.toBe(canonical.hash("SOP_VERSION", sop));
+  });
+
   test("the offer letter's payload: pinned, money normalised, a changed pay line or term changes it", () => {
     const offer = {
       number: "OFF-0018", candidate: "Chiamaka Eze", job_title: "Head of PR, Marketing & Brand Strategy",

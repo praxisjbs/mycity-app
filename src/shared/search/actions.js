@@ -23,7 +23,8 @@
  * the bell is everyone's own. `capability` is the authority it needs on top (README §5.2),
  * where its screen opens to more people than may take it: the Alerts tab opens to whoever
  * may clear alerts, New Rule only to those who may manage the rules; New Report needs
- * `home.reports`, as its tab does.
+ * `home.reports`, as its tab does. `orHead` lets a department's head take it without the
+ * capability: New SOP is the head's for their own department (docs/guides/knowledge.md §6.2).
  */
 const routeMap = require("../route-map");
 const catalog = require("../access/access.catalog");
@@ -48,9 +49,9 @@ const RUNS = new Set([
  * @param {string} key  snake_case, unique
  * @param {string} label  Verb Noun, at most 3 words, as the screen's button reads
  * @param {{screen?: string, params?: Record<string, string>, run?: string, need?: [string, string]|null,
- *          capability?: string|null, words?: string[]}} opts
+ *          capability?: string|null, orHead?: boolean, words?: string[]}} opts
  */
-function a(key, label, { screen = null, params = {}, run = null, need, capability = null, words = [] }) {
+function a(key, label, { screen = null, params = {}, run = null, need, capability = null, orHead = false, words = [] }) {
   const [module, tab] = screen ? screen.split(".") : [null, null];
   return Object.freeze({
     key,
@@ -61,6 +62,7 @@ function a(key, label, { screen = null, params = {}, run = null, need, capabilit
     run,
     need: need === undefined ? (module ? [module, "view"] : null) : need,
     capability,
+    orHead,
     words: Object.freeze(words),
   });
 }
@@ -197,6 +199,14 @@ const ACTIONS = Object.freeze([
     need: ["knowledge", "create"],
     capability: "policies.manage",
     words: ["policy", "write a policy", "company policy", "handbook", "attendance policy"],
+  }),
+  a("new_sop", "New SOP", {
+    screen: "knowledge.sops",
+    params: { action: "new" },
+    need: ["knowledge", "view"],
+    capability: "sops.manage",
+    orHead: true,
+    words: ["sop", "write an sop", "procedure", "standard operating procedure", "department procedure"],
   }),
   a("new_course", "New Course", {
     screen: "knowledge.training",

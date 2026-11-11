@@ -21,8 +21,9 @@ describe("the plan, read from the docs", () => {
     // whose rows stay, Dropped.
     expect(docs.screens["Payroll|payroll-runs"]).toEqual({ m: "M6", api: true, delivered: true });
     expect(docs.screens["Payroll|configurations"]).toEqual({ m: "M6", api: true, delivered: true });
-    // Knowledge Hub's SOPs wait for their API (M10 PR 2).
-    expect(docs.screens["Knowledge Hub|sops"]).toEqual({ m: "M10", api: false, delivered: false });
+    // Knowledge Hub's SOPs are built (M10 PR 2); Recruitment's Onboarding waits for its API (M5).
+    expect(docs.screens["Knowledge Hub|sops"]).toEqual({ m: "M10", api: true, delivered: true });
+    expect(docs.screens["Recruitment|onboarding"]).toEqual({ m: "M5", api: false, delivered: false });
     expect(docs.screens["Employee Self-Service|my-leave"]).toMatchObject({ m: "M1", api: true, delivered: true });
     expect(docs.milestones.find((m) => m.key === "M8")).toMatchObject({ n: 8, demo: "2026-12-11" });
     // "with M1": the foundation takes the next milestone's demo day.
@@ -69,21 +70,25 @@ describe("the API's answers", () => {
     expect(["production", "staging", "development", "test"].map((env) => deliveryPlan.ruleFor(env))).toEqual(["production", "staging", "staging", "all"]);
   });
 
-  test("on staging, each Knowledge Hub screen is held back until its API is ticked (Policies has, SOPs not yet), and what has shipped opens", () => {
+  test("on staging, each screen is held back until its API is ticked (Recruitment's Offers has, Onboarding not yet), and what has shipped opens", () => {
     deliveryPlan.use({ plan: docs, rule: "staging" });
-    expect(deliveryPlan.screenOpen("knowledge", "sops")).toBe(false);
-    expect(deliveryPlan.screenOpen("knowledge", "policies")).toBe(true);
+    expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(false);
+    expect(deliveryPlan.screenOpen("recruitment", "offers")).toBe(true);
+    expect(deliveryPlan.screenOpen("knowledge", "sops")).toBe(true);
     expect(deliveryPlan.screenOpen("payroll", "payroll-runs")).toBe(true);
     expect(deliveryPlan.screenOpen("ess", "my-leave")).toBe(true);
-    expect(deliveryPlan.moduleOpen("knowledge")).toBe(true);
-    expect(deliveryPlan.linkOpens("/knowledge?tab=sops&id=1")).toBe(false);
+    expect(deliveryPlan.moduleOpen("recruitment")).toBe(true);
+    expect(deliveryPlan.linkOpens("/recruitment?tab=onboarding&id=1")).toBe(false);
+    expect(deliveryPlan.linkOpens("/knowledge?tab=sops&id=1")).toBe(true);
     expect(deliveryPlan.linkOpens("/payroll?tab=payroll-runs&id=1")).toBe(true);
-    expect(deliveryPlan.typeOpens("sop")).toBe(false);
+    expect(deliveryPlan.typeOpens("onboarding")).toBe(false);
+    expect(deliveryPlan.typeOpens("sop")).toBe(true);
     expect(deliveryPlan.typeOpens("payroll_run")).toBe(true);
     expect(deliveryPlan.typeOpens("deduction")).toBe(true);
     expect(deliveryPlan.typeOpens("leave_request")).toBe(true);
     expect(deliveryPlan.typeOpens("not_a_route")).toBe(true);
-    expect(deliveryPlan.closedTypes()).toContain("sop");
+    expect(deliveryPlan.closedTypes()).toContain("onboarding");
+    expect(deliveryPlan.closedTypes()).not.toContain("sop");
     expect(deliveryPlan.closedTypes()).not.toContain("payroll_run");
     expect(deliveryPlan.closedTypes()).not.toContain("salary_structure");
     expect(deliveryPlan.closedTypes()).not.toContain("leave_request");
@@ -91,10 +96,10 @@ describe("the API's answers", () => {
 
   test("a test, or a plan that cannot be read, holds nothing back", () => {
     deliveryPlan.use({ plan: docs, rule: "all" });
-    expect(deliveryPlan.screenOpen("knowledge", "sops")).toBe(true);
+    expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(true);
     expect(deliveryPlan.closedTypes()).toEqual([]);
     deliveryPlan.use({ plan: null, rule: "staging" });
-    expect(deliveryPlan.screenOpen("knowledge", "sops")).toBe(true);
+    expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(true);
   });
 });
 
@@ -109,8 +114,8 @@ describe("⌘K by the plan", () => {
       const provider = require("../../../src/shared/search/provider");
       const plan = require("../../../src/shared/delivery-plan");
       const staff = provider.recordProvider(spec);
-      const sops = provider.recordProvider({ ...spec, type: "sop", module: "knowledge", label: "SOPs" });
-      jest.spyOn(reg, "providers").mockReturnValue([staff, sops]);
+      const onboarding = provider.recordProvider({ ...spec, type: "onboarding", module: "recruitment", label: "Onboarding" });
+      jest.spyOn(reg, "providers").mockReturnValue([staff, onboarding]);
       const rows = [{ id: "r-1", title: "Ada Obi", _total: 1 }];
       const client = { query: async (sql) => ({ rows: /\bLIMIT\b/.test(sql) ? rows : [] }), release() {} };
       const db = { connect: async () => client };
@@ -118,21 +123,21 @@ describe("⌘K by the plan", () => {
       plan.use({ plan: docs, rule: "staging" });
       expect((await service.search(db, user, { q: "ada" })).groups.map((g) => g.type)).toEqual(["employee"]);
       plan.use({ plan: docs, rule: "all" });
-      expect((await service.search(db, user, { q: "ada" })).groups.map((g) => g.type)).toEqual(["employee", "sop"]);
+      expect((await service.search(db, user, { q: "ada" })).groups.map((g) => g.type)).toEqual(["employee", "onboarding"]);
     });
   });
 
   test("a screen or an action that would open Coming Soon is never offered", () => {
     const { screenEntries, actionEntries } = require("../../../src/shared/search/search.service");
-    // A Knowledge Hub reader sees every tab of the module, SOPs among them.
-    const reader = { grants: { knowledge: ["view", "create", "edit"], payroll: ["view"], ess: ["view", "create"], settings: ["view"] }, capabilities: [], is_ceo: false, manages_people: true };
+    // A Recruitment reader sees every tab of the module, Onboarding among them.
+    const reader = { grants: { recruitment: ["view", "create", "edit"], knowledge: ["view"], payroll: ["view"], ess: ["view", "create"], settings: ["view"] }, capabilities: [], is_ceo: false, manages_people: true };
     const screensOf = () => screenEntries(reader).map((e) => e.hit.link);
     deliveryPlan.use({ plan: docs, rule: "all" });
-    expect(screensOf()).toEqual(expect.arrayContaining(["/knowledge?tab=sops", "/ess?tab=my-leave"]));
+    expect(screensOf()).toEqual(expect.arrayContaining(["/recruitment?tab=onboarding", "/ess?tab=my-leave"]));
     deliveryPlan.use({ plan: docs, rule: "staging" });
-    expect(screensOf()).toEqual(expect.arrayContaining(["/ess?tab=my-leave", "/payroll?tab=payroll-runs", "/payroll?tab=payslips"]));
-    // Only the Knowledge Hub screens with their API ticked are offered: not SOPs.
-    expect(screensOf()).not.toContain("/knowledge?tab=sops");
+    expect(screensOf()).toEqual(expect.arrayContaining(["/ess?tab=my-leave", "/payroll?tab=payroll-runs", "/payroll?tab=payslips", "/knowledge?tab=sops"]));
+    // Only the screens with their API ticked are offered: not Onboarding.
+    expect(screensOf()).not.toContain("/recruitment?tab=onboarding");
     expect(actionEntries(reader).map((e) => e.hit.link).filter((link) => link && !deliveryPlan.linkOpens(link))).toEqual([]);
   });
 });

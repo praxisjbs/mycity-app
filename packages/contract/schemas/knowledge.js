@@ -128,6 +128,15 @@ const SopListQuery = listQuery(
 /** The SOPs a step of whose version in force names this screen. */
 const SopScreenQuery = listQuery({ screen_key: ScreenKey });
 
+/**
+ * A department on Knowledge Hub · SOPs: a chip over the list (one with an SOP the reader may read),
+ * or, with `writable`, one the reader may write SOPs for (New SOP's Department; none for a reader
+ * who writes for no department).
+ */
+const SopDepartment = z.object({ department_id: uuid, name: z.string() }).strict();
+const SopDepartmentPage = Paged(SopDepartment);
+const SopDepartmentQuery = listQuery({ writable: z.enum(["true", "false"]).optional() });
+
 /** One row of an SOP's version history. */
 const SopVersionRow = z
   .object({
@@ -170,7 +179,7 @@ const SopStepInput = z
 const SopDraftSave = z
   .object({
     title: text(120).refine(longEnough(4), "At least 4 characters"),
-    purpose: optionalText(600),
+    purpose: optionalText(600).refine((v) => v === undefined || v.length >= 10, "At least 10 characters"),
     scope: optionalText(600),
     roles: z.array(text(60)).max(10, "Ten roles at most"),
     steps: z.array(SopStepInput).max(50, "Fifty steps at most"),
@@ -258,6 +267,9 @@ const TABLES = {
   SopPage: { table: null, reason: "a page of SOPs" },
   SopListQuery: { table: null, reason: "list controls, not a row" },
   SopScreenQuery: { table: null, reason: "list controls, not a row" },
+  SopDepartment: { table: "department" },
+  SopDepartmentPage: { table: null, reason: "a page of departments" },
+  SopDepartmentQuery: { table: null, reason: "list controls, not a row" },
   SopVersionRow: { table: "sop_version", virtual: { published_by_name: "the publisher's name" } },
   SopVersionPage: { table: null, reason: "a page of an SOP's versions" },
   SopCreate: { table: "sop" },
@@ -281,6 +293,9 @@ module.exports = {
   SopPage,
   SopListQuery,
   SopScreenQuery,
+  SopDepartment,
+  SopDepartmentPage,
+  SopDepartmentQuery,
   SopVersionRow,
   SopVersionPage,
   SopCreate,
