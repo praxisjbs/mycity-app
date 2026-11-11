@@ -216,6 +216,50 @@ async function ownDeductions(employeeId, query) {
   };
 }
 
+/**
+ * The assistant's reads of the person's own pay (`payslips.mine`, `deductions.mine`, guide §9). A person's own pay is
+ * never masked from them (§6.13 rule 3), yet the assistant's engine masks the salary-derived names in every row it reads
+ * and the Employee role hides salaries by default (0449), so an ordinary employee would be answered null about their own
+ * payslip. The amounts therefore travel under names the mask does not govern (`gross`, `net`, `deductions`, `amount`), on
+ * rows that are the asker's own alone: `ownList` and `ownDeductions` read by the session's employee id and nobody else's.
+ */
+async function ownPayslipsForAssistant(employeeId, query) {
+  const page = await ownList(employeeId, query);
+  return {
+    ...page,
+    data: page.data.map((p) => ({
+      payslip_id: p.payslip_id,
+      number: p.number,
+      month: formatMonth(p.period),
+      period: p.period,
+      status: p.run_status === "paid" ? "Paid" : "Approved",
+      gross: p.gross_pay,
+      net: p.net_pay,
+      deductions: p.total_deductions,
+      has_deduction: p.has_deduction,
+    })),
+  };
+}
+
+/** The person's own instalments for the assistant, under the same names (above): the month, the reason, "1 of 3", the amount. */
+async function ownDeductionsForAssistant(employeeId, query) {
+  const page = await ownDeductions(employeeId, query);
+  return {
+    ...page,
+    data: page.data.map((r) => ({
+      payroll_deduction_instalment_id: r.payroll_deduction_instalment_id,
+      source: r.source,
+      month: formatMonth(r.period),
+      period: r.period,
+      reason: r.reason,
+      instalment: `${r.instalment} of ${r.instalments}`,
+      amount: r.pay_amount,
+      status: r.status,
+      query_number: r.query_number,
+    })),
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * What mails and downloads do
  * ------------------------------------------------------------------ */
@@ -414,6 +458,8 @@ module.exports = {
   ownGet,
   ownPdf,
   ownDeductions,
+  ownPayslipsForAssistant,
+  ownDeductionsForAssistant,
   requestEmailAll,
   requestRunExport,
   emailOwnCopy,

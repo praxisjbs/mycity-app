@@ -231,6 +231,29 @@ const PayrollAdjustmentAdd = z
   .strict();
 
 /* ------------------------------------------------------------------ *
+ * What the assistant asks of payroll (guide §9)
+ * ------------------------------------------------------------------ */
+
+/**
+ * `payroll.month`, the assistant's month summary: a month's first day, the newest run's month when it is
+ * left out. Figures, never a row.
+ */
+const PayrollMonthQuery = z.object({ period: monthStart("Pick a month").optional() }).strict();
+
+/**
+ * Submit for Approval as a card names it: the run, and the net the person saw (`PayrollRunSubmit`'s own
+ * field), so a changed total is told first. The screen's button sits on the run it is open on and never names
+ * it; a card must, so this is the screen's request with the run beside it.
+ */
+const PayrollRunSubmission = z.object({ payroll_run_id: uuid, expected_net_total: money.optional() }).strict();
+
+/**
+ * Add Adjustment as a card names it: the run, then the form's own fields (`PayrollAdjustmentAdd`). The run
+ * is the screen's own path parameter, which a card carries as a field.
+ */
+const PayrollRunAdjust = PayrollAdjustmentAdd.extend({ payroll_run_id: uuid }).strict();
+
+/* ------------------------------------------------------------------ *
  * Settings (Configurations)
  * ------------------------------------------------------------------ */
 
@@ -354,6 +377,12 @@ const TABLES = {
   },
   PayrollAdjustmentPage: { table: null, reason: "a page of a run's adjustments" },
   PayrollAdjustmentAdd: { table: "payroll_adjustment" },
+  PayrollMonthQuery: { table: null, reason: "which month the assistant's payroll summary covers; figures, never a row" },
+  PayrollRunSubmission: {
+    table: "payroll_run",
+    virtual: { expected_net_total: "the net the person saw, compared with the recomputed payroll_run.net_total" },
+  },
+  PayrollRunAdjust: { table: "payroll_adjustment" },
   PayrollSettingsVersion: {
     table: "payroll_setting",
     virtual: { changed_by_name: "who changed it, from app_user and employee" },
@@ -395,6 +424,9 @@ module.exports = {
   PayrollAdjustmentPage,
   PayrollAdjustmentParams,
   PayrollAdjustmentAdd,
+  PayrollMonthQuery,
+  PayrollRunSubmission,
+  PayrollRunAdjust,
   PayrollSettingsVersion,
   PayrollSettings,
   PayrollSettingsChange,
