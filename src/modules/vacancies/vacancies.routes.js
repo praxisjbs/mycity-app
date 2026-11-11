@@ -3,6 +3,7 @@
  * /api/v1/recruitment/vacancies: Recruitment · Vacancies (docs/guides/recruitment.md §5).
  *
  *   GET  /, /summary, /suggested, /:id      `recruitment` view, scope by hiring manager
+ *   GET  /hiring-managers                   `recruitment` view: who may be a hiring manager (the picker)
  *   POST /                                  `recruitment` create: New Vacancy (draft, or published)
  *   PATCH /:id                              `recruitment` edit
  *   POST /:id/publish, /pause, /resume, /close   `recruitment` edit: the lifecycle
@@ -30,6 +31,10 @@ route(router, "get", "/summary",
 route(router, "get", "/suggested",
   { query: v.SeatSuggestionListQuery, response: v.SeatSuggestionPage, summary: "Vacant seats with no vacancy yet" },
   requirePermission("recruitment", "view"), controller.suggested);
+
+route(router, "get", "/hiring-managers",
+  { query: v.HiringManagerListQuery, response: v.HiringManagerPage, summary: "Who may be a vacancy's hiring manager" },
+  requirePermission("recruitment", "view"), controller.hiringManagers);
 
 route(router, "get", "/settings",
   { response: v.CareersSettings, summary: "Careers Settings: About MyCityApp and the Default Traits" },

@@ -209,6 +209,8 @@ const EmployeeListQuery = listQuery(
     line_manager_id: uuid.optional(),
     /** `ending`: active people whose contract ends within 30 days, as Contracts Ending counts them. */
     contract: z.enum(["ending"]).optional(),
+    /** `true`: the caller is left out, for a picker whose form may not name them (Raise Query). */
+    exclude_self: z.enum(["true", "false"]).optional(),
   },
   ["display_name", "staff_number", "job_title", "department", "start_date", "created_at"],
 );

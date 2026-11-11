@@ -192,7 +192,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [SkylineHero](#skylinehero) | `SkylineHero` | The public site's hero, glass teal in light and Deep Green in dark: the page's heading over the drawn Lagos skyline. `index` fills the first screen under the header, the skyline blurred and slowly breathing, with a pill, one yellow accent word, a lede, a search and figures that count up; `role` heads a vacancy, All Roles at its top left and its foot fading into the page. l, m and pane are the earlier panels, lit as Lagos is lit right now. | beta |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
-| Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
+| Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
 | Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
 | Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
 | Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary. | beta |
@@ -6543,7 +6543,7 @@ The trail: the last places a person went on this device and the one ahead, each 
 
 ### ActionCard
 
-An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel); busy while it runs, the result line under it, Draw It Again once it has expired.
+An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired.
 
 | | |
 |---|---|

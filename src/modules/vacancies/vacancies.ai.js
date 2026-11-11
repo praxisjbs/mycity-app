@@ -69,13 +69,13 @@ module.exports = defineManifest({
       risk: "standard",
       form: "none: New Vacancy's form sends the area it picks on its map as { token }; the card picks it the same way (VacancyAdd)",
       fields: Object.keys(LABELS),
-      picks: { department_id: "department", hiring_manager_id: "employee", location: "place" },
+      picks: { department_id: "department", hiring_manager_id: "hiring_manager", location: "place" },
       resolve: RESOLVE,
       names: (values, _actor, db) => names(values, db),
       asks: [
         { field: "title", question: "What is the role called?" },
         { field: "department_id", question: "Which department is it in?", read: "departments.list", params: { active: "true" } },
-        { field: "hiring_manager_id", question: "Who is the hiring manager?", read: "employees.list", params: { status: "active" } },
+        { field: "hiring_manager_id", question: "Who is the hiring manager?", read: "vacancies.hiring_managers" },
         { field: "employment_type", question: "How is it engaged?", choices: ["Full Time", "Part Time", "Contract", "Internship"] },
         { field: "work_pattern", question: "Where is the work done?", choices: ["On Site", "Hybrid", "Remote"] },
         { field: "location", question: "Which city or area is it in?", when: { field: "work_pattern", not: ["remote"] } },
@@ -99,7 +99,7 @@ module.exports = defineManifest({
       risk: "standard",
       form: "none: Edit Vacancy changes the vacancy open on Recruitment, Vacancies and never names it; the card does",
       fields: ["vacancy_id", ...Object.keys(LABELS).filter((k) => k !== "publish")],
-      picks: { department_id: "department", hiring_manager_id: "employee", location: "place" },
+      picks: { department_id: "department", hiring_manager_id: "hiring_manager", location: "place" },
       asks: [{ field: "vacancy_id", question: "Which vacancy?", read: "vacancies.list" }],
       resolve: { ...RESOLVE, vacancy_id: (value, actor, db) => service.idOf(db, value, actor.scope) },
       names: (values, _actor, db) => names(values, db),
@@ -123,6 +123,15 @@ module.exports = defineManifest({
       "design: About MyCityApp and the Default Traits shape every vacancy and interview card, designed whole on Careers Settings (decision 35)",
   },
   reads: [
+    {
+      // Who the hiring manager may be, by the save's own rule: New Vacancy's question offers and matches only them.
+      key: "vacancies.hiring_managers",
+      description: "List the people who may be a vacancy's hiring manager: active, holding Recruitment, in the asker's reach",
+      params: c.vacancies.HiringManagerListQuery,
+      permission: ["recruitment", "view"],
+      run: (_client, params, actor) => service.hiringManagers(params, actor.scope),
+      cite: (row) => ({ type: "employee", id: row.employee_id, label: row.display_name }),
+    },
     {
       key: "vacancies.list",
       description: "List vacancies: the role, its department and hiring manager, status (draft, open, paused, closed), applicants, days open and the closing date",

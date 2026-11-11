@@ -7,7 +7,7 @@ import { useFreshSignIn, type ConfirmedWay } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
 import { schemas, type AiActionCard, type AiActionResult, type Department } from "@mycity/contract/contract.gen.ts";
 import { LeaveTypeSelect } from "@/features/people/Leave";
-import { ColleaguePicker, DepartmentPicker, EmployeePicker, PartnerDealPicker, PartnerRecordPicker, PolicyPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, WorksitePicker, type PartnerDealChoice, type PartnerRecordChoice, type PolicyChoice, type ProjectChoice, type TaskChoice, type WorksiteChoice } from "@/features/shared/pickers";
+import { ColleaguePicker, DepartmentPicker, EmployeePicker, HiringManagerPicker, PartnerDealPicker, PartnerRecordPicker, PolicyPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, WorksitePicker, type PartnerDealChoice, type PartnerRecordChoice, type PolicyChoice, type ProjectChoice, type TaskChoice, type WorksiteChoice } from "@/features/shared/pickers";
 import { places } from "@/features/shared/places";
 import { hrefFor } from "@/lib/routes";
 import { useRouter } from "@/lib/router";
@@ -94,7 +94,8 @@ const idsIn = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
  * list, decision 32), a task the person can see (Wait On Task's own list), someone on People's
  * register (the employee pickers of People's forms), a worksite in use, a policy a query or rule may
  * cite, a place picked as every address is (AddressField, F27: the card holds the place's token),
- * and the people Add Work Site may put on a site, the person included. What is already picked
+ * the people Add Work Site may put on a site, the person included, and who may be a vacancy's hiring
+ * manager (New Vacancy's own list). What is already picked
  * reads by the name the card carries; a pick made here keeps its own, until Save Changes has the
  * server name it again.
  */
@@ -129,6 +130,8 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
       return <TaskPicker value={tasks} onChange={(t) => (setTasks(t), set(t.map((x) => x.task_id)))} />;
     case "employee":
       return <EmployeePicker value={people} onChange={pickPeople} multiple={many} filters={{ status: "active" }} placeholder="Search staff" />;
+    case "hiring_manager":
+      return <HiringManagerPicker value={people} onChange={pickPeople} />;
     case "site_member":
       return <ColleaguePicker value={people} onChange={pickPeople} multiple withSelf placeholder="Search people" />;
     case "worksite":

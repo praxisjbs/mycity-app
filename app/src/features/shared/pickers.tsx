@@ -12,7 +12,8 @@ import { PersonPicker, RecordPicker } from "@mycity/ui";
  *
  * Everyone with an employee record, paged at 25 by the server and narrowed by
  * what the person types (FRONTEND_GUIDE §4: never a dropdown of everyone). `filters` narrows
- * it on the server: `{ status: "active" }` for a line manager, who must work here now.
+ * it on the server: `{ status: "active" }` for a line manager, who must work here now;
+ * `exclude_self: "true"` where the form may not name the person filling it (Raise Query).
  */
 export function EmployeePicker({
   value,
@@ -25,7 +26,7 @@ export function EmployeePicker({
   onChange: (value: PersonRef[]) => void;
   multiple?: boolean;
   placeholder?: string;
-  filters?: Pick<EmployeeListQuery, "status" | "department_id">;
+  filters?: Pick<EmployeeListQuery, "status" | "department_id" | "exclude_self">;
 }) {
   const list = usePaged("GET /api/v1/employees", filters ? { filters } : undefined);
   const photos = usePhotos(list.rows.map((row) => row.photo_url));
@@ -50,6 +51,24 @@ export function EmployeePicker({
       onChange={onChange}
       multiple={multiple}
       placeholder={placeholder}
+    />
+  );
+}
+
+/**
+ * Who may be a vacancy's hiring manager (New Vacancy, Edit Vacancy and the New Vacancy card's Edit):
+ * active people holding Recruitment in the writer's reach, the rule the save holds them to, searched
+ * by the server (GET /recruitment/vacancies/hiring-managers; recruitment.md §6.1).
+ */
+export function HiringManagerPicker({ value, onChange }: { value: PersonRef[]; onChange: (value: PersonRef[]) => void }) {
+  const list = usePaged("GET /api/v1/recruitment/vacancies/hiring-managers");
+  const photos = usePhotos(list.rows.map((row) => row.photo_url));
+  return (
+    <PersonPicker
+      photo={(person) => photos(person.photo_url)}
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value}
+      onChange={onChange}
     />
   );
 }

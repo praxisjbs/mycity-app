@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { dispatch } from "@/api/mock/core";
+import { grantsFor, PEOPLE } from "@/api/mock/data/people";
 import { ASSIST } from "@/api/mock/modules/recruitment";
 import { copyProblems, dialog, openAs, press, settled, type } from "./testKit";
 
@@ -120,6 +121,26 @@ describe("Recruitment · New Vacancy's interview", () => {
     expect(within(form).queryByLabelText("Location")).toBeNull();
     expect(copyProblems()).toEqual([]);
   }, 120000);
+
+  it("offers as hiring manager only who holds Recruitment, as the save requires (fault #3 of 11/11)", async () => {
+    const holds = (key: string) => (grantsFor(key).recruitment ?? []).includes("view");
+    const recruiter = PEOPLE.find((p) => holds(p.user_key) && p.user_key !== "cynthia")!;
+    const outsider = PEOPLE.find((p) => !holds(p.user_key))!;
+    let form = await newVacancy();
+    type(form, "Job Title", "Data Analyst");
+    await press(form, "Next");
+    form = dialog();
+    expect(question(form)).toBe("Which department is it in, and who leads the hiring?");
+    const search = within(form).getByPlaceholderText("Search people");
+    const offered = () => within(form).queryAllByRole("option").map((o) => o.textContent).join(" | ");
+    fireEvent.change(search, { target: { value: recruiter.first_name } });
+    await settled();
+    expect(offered()).toContain(recruiter.display_name);
+    // Someone without Recruitment is never offered: the save would refuse them ("No Recruitment access").
+    fireEvent.change(search, { target: { value: outsider.first_name } });
+    await settled();
+    expect(offered()).not.toContain(outsider.display_name);
+  });
 
   it("with the AI off, asks the eight fixed questions and drafts plainly from the answers", async () => {
     ASSIST.available = false;
