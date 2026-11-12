@@ -182,7 +182,7 @@ describe("the routes", () => {
   const routes = routesOf(require("./training.routes").router);
 
   test("the person's own routes are self; every other route needs the knowledge grant and training.manage", () => {
-    expect(routes.length).toBe(24);
+    expect(routes.length).toBe(26);
     for (const r of routes) {
       if (r.path.startsWith("/me")) {
         expect(r.contract.self).toBe(true);
