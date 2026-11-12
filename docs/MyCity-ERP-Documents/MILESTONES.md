@@ -1078,9 +1078,11 @@ record and M6's only source of truth.
   (Pension Reform Act 2014, s.4(1)); PAYE is remitted by the 10th of the next month (Withholding Regulations 2024, reg
   7(1)(b)(i)). A third pass (12/11/2026) read the Joint Revenue Board's Personal Income Tax Guidelines 2026 and the 2002
   PAYE Regulations: PAYE is computed cumulatively over the year to date, refunded when the cumulative tax falls, and the
-  employer gives rent relief in PAYE on the person's evidence; the minimum wage for PAYE is ₦70,000 a month. The band
-  reading for part of a year and the pension threshold stay with MyCity's accountant, who confirms the register before
-  any figure is entered.
+  employer gives rent relief in PAYE on the person's evidence; the minimum wage for PAYE is ₦70,000 a month. A fourth pass
+  the same day settled the rest from the agencies: pension covers employers of three or more (PenCom), NHF is 2.5% of
+  the month's gross pay (FMBN), and the 2024 minimum wage Act is in force from 29 July 2024 (the wage commission's
+  circulars). The band reading for part of a year stays with MyCity's accountant, who confirms the register before any
+  figure is entered.
 
 ### Definition of done
 
