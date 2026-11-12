@@ -11,8 +11,8 @@ page. Anyone can apply there with a CV. You screen the applications, send tests,
 and keep good people for later.
 
 Open it from **Recruitment** in the menu on a computer. On a phone, press **More** in the bar at the
-bottom, then **Recruitment**. This chapter covers seven tabs along the top: **Vacancies**,
-**Candidates**, **Assessments**, **Interviews**, **Offers**, **Talent Pool** and **Analytics**. What candidates see
+bottom, then **Recruitment**. This chapter covers eight tabs along the top: **Vacancies**,
+**Candidates**, **Assessments**, **Interviews**, **Offers**, **Onboarding**, **Talent Pool** and **Analytics**. What candidates see
 is in [The Public Site](#public-careers).
 
 > **Important:** Operations & People, Management, Implementation and the CEO see every vacancy. A
@@ -835,6 +835,119 @@ or the CEO. An accepted offer cannot be withdrawn.
 4. Press **Save Letter**. Offers approved from now on use it; those already approved keep theirs.
 5. **Restore Default** puts MyCity's own wording back. Yours stays in the history.
 
+## Onboarding {#recruitment-onboarding screen=recruitment/onboarding icon=userplus}
+
+Onboarding takes a hire from a signed offer to their first day and their login. When a candidate
+signs their offer, their case opens here: they send their documents and guarantors, MyCity checks
+them, both sides sign the contract, and the department's plan is worked through.
+
+![The Onboarding screen](shot:recruitment-onboarding)
+
+A case goes through these, in order:
+
+| Status | What it means |
+|---|---|
+| **Documentation** | The hire sends their documents, guarantors and BVN, and the contract is signed |
+| **Pre-Onboarding** | Everything is checked and signed. The case waits for the start date |
+| **Onboarding** | From the start date: the plan's steps, each with an owner and a due day |
+| **Completed** | Every step done and the hire's login sent. They are hired |
+| **Cancelled** | Withdrawn, or the candidate was not progressed |
+
+### Read the cases {#recruitment-onboarding-read}
+
+1. Open [Recruitment · Onboarding](/recruitment?tab=onboarding).
+2. The tiles count the cases at **Documentation**, with how many documents wait to be verified, at
+   **Pre-Onboarding**, at **Onboarding**, with the steps overdue, and those **Hired This Month**.
+3. Pick a **Status** to see only those cases, or search by name or role.
+4. Each row shows the hire, the role, the department, the start date, how many required documents
+   are **Outstanding** and the status. On a phone the list keeps the hire, the start date and the status.
+5. Press a case. On a computer it opens in a wide window; on a phone, in a sheet.
+   ![A case](shot:recruitment-onboarding-case)
+6. The case's own card shows the role, the start date, **Pre-Onboarding** (what it still waits on,
+   or the day it got there), whether the **BVN** is entered and when the **Privacy Notice** was
+   accepted. The BVN itself is never shown.
+7. **Documents** lists the checklist, each with its status: **Not Sent**, **To Verify**, **Verified**
+   or **Rejected**. The bar counts the required ones verified.
+8. **Guarantors** shows the two the hire entered, each with their check: **To Check**, **Passed** or
+   **Failed**.
+9. **Contract** shows its number, the signers and where each stands.
+10. From the start date, **Onboarding Plan** lists the steps, with their owner, due day and SOP.
+
+### Check what the hire sent {#recruitment-onboarding-verify needs="recruitment edit"}
+
+1. Open the case on [Recruitment · Onboarding](/recruitment?tab=onboarding).
+2. Under **Documents**, press **View File** to open what they sent.
+3. Press **Verify** if it is right. A file still being scanned for viruses cannot be verified yet.
+4. Or press **Reject**, type the **Reason** and press **Reject Document**. The hire reads it beside
+   the document on their page and sends another.
+
+To check a guarantor, call them, then press **Record Check** under their name. Pick **Passed** or
+**Failed** under **Outcome**, add a **Note** if you like, and press **Record Check**. A failed
+guarantor is changed by the hire, and checked again.
+
+When every required document is verified, both guarantors have passed, the BVN is entered and the
+contract is signed, the case moves to **Pre-Onboarding** by itself.
+
+### Remind the hire {#recruitment-onboarding-remind needs="recruitment edit"}
+
+If the hire lost their email, or their link expired, press **Send Reminder** on the case. A fresh
+link goes to them and the old one stops working. It works only while the case is at **Documentation**.
+
+### Sign the contract for MyCity {#recruitment-onboarding-contract}
+
+The contract is made when the offer is signed. Only the Offer Signatory signs it for MyCity, and the
+hire's link goes out after that.
+
+1. Open the case on [Recruitment · Onboarding](/recruitment?tab=onboarding).
+2. Under **Contract**, press **Sign for Company**.
+3. Check your **Full Name** and **Title**, draw or type your signature, and tick
+   **Agree to Sign Electronically**.
+4. Press **Sign Contract**. The hire gets an email with their own signing link.
+
+If they cannot find it, press **Resend Contract**: a new link goes out and the old one stops working.
+**Download PDF** saves the contract. Once the hire signs, both of you get the signed copy by email.
+
+### Work through the plan {#recruitment-onboarding-steps needs="recruitment edit"}
+
+On the start date the case moves to **Onboarding** and the department's plan is copied onto it. Each
+step's owner is told, and reminded once if it goes past its day (shown as **Overdue**).
+
+1. Open the case on [Recruitment · Onboarding](/recruitment?tab=onboarding).
+2. Under **Onboarding Plan**, press **Mark Step Done** on each step as it is done.
+
+### Complete onboarding {#recruitment-onboarding-complete needs="recruitment edit"}
+
+Once every step is done:
+
+1. Press **Complete Onboarding** on the case.
+2. Type their **Company Email**. It becomes their work email and the login they are invited on.
+3. Press **Complete Onboarding**. The case is **Completed**, the hire gets their invitation, and
+   their seat on the Organogram is filled.
+
+An address someone else already uses is refused, and nothing changes.
+
+### Withdraw a hire {#recruitment-onboarding-withdraw needs="recruitment edit"}
+
+If the hire is not joining, press **Withdraw Hire** on the case, type the **Reason** and press
+**Withdraw Hire**. **Keep Hire** goes back instead. Their links stop working, an unsigned contract is
+cancelled, and their record is archived. The hire is not emailed. A completed case cannot be withdrawn.
+
+### Onboarding settings {#recruitment-onboarding-settings needs="recruitment edit"}
+
+1. Open [Recruitment · Onboarding](/recruitment?tab=onboarding) and press **Onboarding Settings**.
+   ![Onboarding Settings](shot:recruitment-onboarding-settings)
+2. **Checklist** lists the documents a hire sends. Press one to change it, or **Add Document** for a
+   new one: its **Name**, a **Code**, what it **Takes** (**File**, **Value** or **Both**), and
+   whether it is **Required** or **Expires**. Untick **Active** to stop asking for it. Press
+   **Save Document**. Cases already open keep their list.
+3. **Onboarding Plans** lists each department's plan; **Company Default** is for a department without
+   one. Press one, or **Add Plan**. Give each step a title, its **Owner**, its **Due Day** counted from
+   the start date, and an **SOP** if one applies. **Add Step** adds another. Press **Save Plan**. A
+   case keeps the steps it was given.
+4. **Standard Contract** is the contract's wording. Change it and press **Save Contract**. Contracts
+   made from now on use it; those already made keep theirs. **Restore Default** puts the shipped
+   wording back.
+
 ## Talent Pool {#recruitment-pool screen=recruitment/talent-pool icon=star}
 
 The Talent Pool keeps good candidates who were not hired this time, for 24 months.
@@ -1128,4 +1241,32 @@ do:
 crop: modal
 marks:
   1: button "Change Email" | Correct the address
+```
+
+```shot recruitment-onboarding
+open: /recruitment?tab=onboarding
+as: operations
+do:
+  - wait: text "Chiamaka Eze"
+marks:
+  1: button "Onboarding Settings" | The checklist, plans and contract
+  2: row 1 | A case: press it to open
+```
+
+```shot recruitment-onboarding-case
+open: /recruitment?tab=onboarding
+as: operations
+do:
+  - click: text "Chiamaka Eze"
+  - wait: button "Send Reminder"
+crop: modal
+marks:
+  1: button "Verify" | Check what the hire sent
+```
+
+```shot recruitment-onboarding-settings
+open: /recruitment?tab=onboarding&panel=settings
+as: operations
+do:
+  - wait: text "Standard Contract"
 ```

@@ -3,7 +3,7 @@ title: Help
 kind: public-help
 order: 2000
 milestones: M4
-summary: How to find a role, apply, take an assessment, sign an offer, read a proposal, sign an agreement and check a document on MyCityApp's public site.
+summary: How to find a role, apply, take an assessment, sign an offer, send your joining documents, read a proposal, sign an agreement and check a document on MyCityApp's public site.
 icon: globe
 ---
 
@@ -12,7 +12,7 @@ need an account: the pages you fill in open from a link of your own.
 
 Every page has the same bar at the top: the MyCityApp mark, which opens the front page, and the
 links **Vacancy**, **Verify Document** and **Help**. On a phone they are in the menu at the top
-right. Your private Apply, Assessment, Sign Offer, Proposal and Sign Agreement links arrive by
+right. Your private Apply, Assessment, Sign Offer, Upload Documents, Proposal and Sign Agreement links arrive by
 email and are not in the navigation. The moon or sun beside them switches between light and dark, and the site keeps your
 choice on your device.
 
@@ -269,6 +269,50 @@ declined after.
 
 An offer past its day says *This Offer Has Expired*, and one withdrawn says *Offer Withdrawn*. If you
 open `/sign` without the private link, the page says *Use Your Offer Email*.
+
+## Upload Documents {#public-onboard icon=upload}
+
+Once you sign your offer, we email you a link to this page. You send the documents MyCity needs
+before your first day, two guarantors and your BVN. You need no account.
+
+### Accept the privacy notice {#public-onboard-privacy}
+
+1. Open the link in your email. Your role and start date are at the left, with how many documents
+   you have sent.
+2. Read the **Privacy Notice**: what we keep, who sees it and why.
+3. Tick **I Have Read the Notice** and press **Accept Notice**. Nothing can be sent before this.
+
+### Send your documents {#public-onboard-documents}
+
+![Your documents](shot:public-onboard)
+
+1. Under **Your Documents**, each document shows its state: **To Send**, **Sent**, **Verified** or
+   **Send Again**. **Optional** ones may be left out.
+2. Press **Choose a File** under a document and pick a PDF or a photo, up to 15 MB. It is sent at once.
+3. A document that takes a typed value, such as your MyLagosApp Wallet ID, has a **Value**: type it
+   and press **Save Value**.
+4. A document marked **Send Again** was sent back. The reason is under its name; press
+   **Send Another File**.
+
+### Add your guarantors {#public-onboard-guarantors}
+
+You need two, not related to you: a **Previous Employer**, and a **Personal Guarantor** who has known
+you four years or more. Serving police, military or other uniformed staff are not accepted.
+
+1. Under **Your Guarantors**, fill in each one's **Full Name**, **Relationship** and **Phone**.
+2. Add the signed **Guarantor Form** with **Choose the Form**.
+3. Press **Save Guarantor**. MyCity calls them to check: **Being Checked**, then **Passed**.
+   **Change Guarantor** means the check failed; enter someone else, or correct the details.
+
+A guarantor who has passed cannot be changed.
+
+### Enter your BVN {#public-onboard-bvn}
+
+1. Under **Your BVN**, type the eleven digits of your **BVN**.
+2. Press **Save BVN**. It is kept masked on your staff record and never shown again.
+
+When everything is checked and the contract is signed, the page says *Documents Complete* and takes
+nothing more. If your link stops working, ask Operations & People for a fresh one.
 
 ## Your Proposal {#public-proposal icon=doc}
 
@@ -591,4 +635,13 @@ do:
   - wait: text "Document Verified"
 marks:
   1: text "Awarded To" | Who earned it
+```
+
+```shot public-onboard
+site: public
+open: /onboard/Fw8bK3sHr6Ty
+do:
+  - wait: heading "Your Documents"
+marks:
+  1: text "Send Again" | Sent back, with the reason under it
 ```

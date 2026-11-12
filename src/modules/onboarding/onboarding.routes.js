@@ -3,6 +3,7 @@
  * /api/v1/recruitment/onboarding: Recruitment · Onboarding (docs/guides/offers.md §5).
  *
  *   GET  /                                         `recruitment` view: the cases, 25 a page, in scope
+ *   GET  /summary                                  `recruitment` view: the figures above the list
  *   GET  /:id                                      `recruitment` view: one case, its checklist,
  *                                                  guarantors, contract and what it waits on
  *   POST /:id/items/:item_id/verify, /reject       `recruitment` edit: check what the hire sent
@@ -40,6 +41,7 @@ route(router, "get", "/plans/:id", { params: o.OnboardingPlanParams, response: o
 route(router, "put", "/plans/:id", { params: o.OnboardingPlanParams, body: o.OnboardingPlanSave, response: o.OnboardingPlan, summary: "Save an onboarding plan" }, edit, controller.savePlan);
 
 route(router, "get", "/", { query: o.OnboardingListQuery, response: o.OnboardingPage, summary: "The onboarding cases" }, view, controller.list);
+route(router, "get", "/summary", { response: o.OnboardingSummary, summary: "The figures above the Onboarding list" }, view, controller.summary);
 route(router, "get", "/:id", { params: o.OnboardingParams, response: o.OnboardingDetail, summary: "One onboarding case" }, view, controller.get);
 route(router, "post", "/:id/items/:item_id/verify", { params: o.ChecklistItemParams, body: c.common.EmptyBody, response: o.OnboardingDetail, summary: "Verify a document" }, edit, controller.verifyItem);
 route(router, "post", "/:id/items/:item_id/reject", { params: o.ChecklistItemParams, body: o.ChecklistItemReject, response: o.OnboardingDetail, summary: "Reject a document" }, edit, controller.rejectItem);

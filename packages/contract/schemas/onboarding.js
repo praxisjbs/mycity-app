@@ -291,6 +291,22 @@ const OnboardingListQuery = listQuery(
 );
 const OnboardingPage = Paged(OnboardingRow);
 
+/**
+ * The figures above the Onboarding list, over the cases in the reader's scope: how many at each open
+ * status, the files waiting for a check, the steps past their due day, and the hires completed this
+ * month (Lagos time).
+ */
+const OnboardingSummary = z
+  .object({
+    documentation: z.number().int().min(0),
+    to_verify: z.number().int().min(0),
+    pre_onboarding: z.number().int().min(0),
+    onboarding: z.number().int().min(0),
+    overdue_steps: z.number().int().min(0),
+    completed_this_month: z.number().int().min(0),
+  })
+  .strict();
+
 /** Reject an uploaded document: the reason the hire reads. */
 const ChecklistItemReject = z.object({ reason: text(300) }).strict();
 
@@ -412,6 +428,7 @@ const TABLES = {
   },
   OnboardingListQuery: { table: null, reason: "list controls and filters for the cases" },
   OnboardingPage: { table: null, reason: "a page of cases" },
+  OnboardingSummary: { table: null, reason: "counts over the cases, their items and steps" },
   ChecklistItemReject: { table: null, reason: "the reason, kept as rejected_reason" },
   OnboardingCancel: { table: null, reason: "the reason, kept as end_reason" },
   OnboardingComplete: { table: "employee" },
@@ -465,6 +482,7 @@ module.exports = {
   OnboardingDetail,
   OnboardingListQuery,
   OnboardingPage,
+  OnboardingSummary,
   ChecklistItemReject,
   OnboardingCancel,
   OnboardingComplete,

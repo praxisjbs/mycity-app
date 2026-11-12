@@ -253,6 +253,11 @@ async function list(query, scope) {
   return { ...page, data: page.data.map(rowOf) };
 }
 
+/** The figures above the Onboarding list, within the reader's scope. */
+async function summary(scope) {
+  return repo.summary(pool, scope, lagos.today());
+}
+
 async function get(id, user, scope) {
   return detailOf(pool, await visible(pool, id, scope), user);
 }
@@ -582,6 +587,7 @@ module.exports = {
   requiredCount,
   caseForOffer,
   list,
+  summary,
   get,
   detailOf,
   itemOf,

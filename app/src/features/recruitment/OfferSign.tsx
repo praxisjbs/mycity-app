@@ -1,12 +1,13 @@
 /**
- * Sign for the Company (docs/guides/offers.md §3 step 2): the Offer Signatory signs an approved
- * offer in the hub, already signed in, so there is no email code. Full name and title, a signature
- * drawn on the pad or typed, and I Agree to Sign Electronically: `POST /offers/:id/sign` with the
- * contract's SignSubmit, the same shape the candidate's signing page sends.
+ * Sign for the Company (docs/guides/offers.md §3 steps 2 and 5a): the Offer Signatory signs an
+ * approved offer, or a hire's employment contract, in the hub, already signed in, so there is no
+ * email code. Full name and title, a signature drawn on the pad or typed, and I Agree to Sign
+ * Electronically: `POST /offers/:id/sign` or `POST /contracts/:id/sign` with the contract's
+ * SignSubmit, the same shape the candidate's signing page sends.
  */
 import { useRef, useState } from "react";
 import signatureSchemas from "@mycity/contract/schemas/signatures.js";
-import type { OfferDetail } from "@mycity/contract/contract.gen.ts";
+import type { OfferDetail, SignerView } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useMutation } from "@/api/hooks";
 import { CheckboxField, ChoiceField, Field, FormError, FormFooter, Grid, SignatureField, TextField, toast, useContractForm, Button, type SignatureFieldHandle } from "@mycity/ui";
@@ -33,11 +34,29 @@ const bodyOf = (v: Values, png?: string) => ({
 });
 
 export function SignForm({ offer, close, onSaved }: { offer: OfferDetail; close: () => void; onSaved: () => void }) {
-  const me = offer.signers.find((s) => s.role === "mycity");
+  const run = useMutation("POST /api/v1/recruitment/offers/:id/sign");
+  return (
+    <CompanySignForm
+      signers={offer.signers}
+      label="Sign Offer"
+      close={close}
+      submit={async (body) => {
+        await run.run({ params: { id: offer.offer_id }, body });
+        onSaved();
+        toast(`${offer.number} signed for the company`);
+      }}
+    />
+  );
+}
+
+type SignBody = ReturnType<typeof bodyOf>;
+
+/** The company's signature on any signed record: the record's own route is `submit`. */
+export function CompanySignForm({ signers, label, submit, close }: { signers: SignerView[]; label: string; submit: (body: SignBody) => Promise<void>; close: () => void }) {
+  const me = signers.find((s) => s.role === "mycity");
   const f = useContractForm<Values>({ full_name: me?.name ?? "", title: me?.title ?? "", method: "draw", typed: "", consent: false }, bodySchema<Values>(signatureSchemas.SignSubmit, (v) => bodyOf(v)));
   const pad = useRef<SignatureFieldHandle>(null);
   const [empty, setEmpty] = useState(false);
-  const run = useMutation("POST /api/v1/recruitment/offers/:id/sign");
   const [problem, setProblem] = useState<string | null>(null);
   const sign = async () => {
     setProblem(null);
@@ -46,10 +65,8 @@ export function SignForm({ offer, close, onSaved }: { offer: OfferDetail; close:
     setEmpty(!drawn);
     if (!f.check() || !drawn) return;
     try {
-      await run.run({ params: { id: offer.offer_id }, body: bodyOf(f.values, png) });
+      await submit(bodyOf(f.values, png));
       close();
-      onSaved();
-      toast(`${offer.number} signed for the company`);
     } catch (e) {
       if (e instanceof ApiError && e.fields.signature_png) setEmpty(true);
       sayRefusal(e, f, setProblem);
@@ -82,7 +99,7 @@ export function SignForm({ offer, close, onSaved }: { offer: OfferDetail; close:
       <FormError>{problem}</FormError>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={sign}>Sign Offer</Button>
+        <Button variant="primary" onClick={sign}>{label}</Button>
       </FormFooter>
     </>
   );

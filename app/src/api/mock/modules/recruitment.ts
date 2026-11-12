@@ -23,10 +23,8 @@ import type {
   VacancyDetail,
   VacancyQuestion,
 } from "@mycity/contract/contract.gen.ts";
-import type { OnboardingDetail } from "@/api/types/recruitment";
-import type { Status } from "@/api/types/performance";
 import type { RawResponse } from "../../client";
-import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
+import { at, created, fail, invalid, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, DEPARTMENTS, grantsFor, PEOPLE, ref, refKey } from "../data/people";
 import * as D from "../data/recruitment";
 import { pickAnAddress, placeOf } from "./maps";
@@ -1778,55 +1776,4 @@ R("POST /api/v1/recruitment/pool/:id/remove", "edit", (req) => {
     p.removed_at = nowIso();
     return ok(p);
   });
-});
-
-/* ------------------------------------------------------------------ *
- * M5 (INTERIM, owner AJ): Onboarding, until M5 puts it on the contract (PR 7). Offers are in offers.ts.
- * ------------------------------------------------------------------ */
-
-const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
-
-const DOCS = ["Signed offer letter", "Employment contract", "Valid ID", "Passport photograph", "Bank verification number", "Academic certificates", "Data privacy acknowledgement"];
-const ONB: OnboardingDetail[] = [
-  ["Kunle Afolabi", "Head, Sales & Revenue", isoDaysAhead(12), 4, S("warn", "Documentation")],
-  ["Dayo Martins", "Content Producer", isoDaysAgo(14), 7, S("ok", "Onboarding")],
-  ["Samuel Akpan", "Support Officer", isoDaysAgo(185), 7, S("ok", "Confirmed")],
-].map((o, i) => {
-  const done = o[3] as number;
-  return {
-    onboarding_id: sid(`onb:${i}`),
-    name: o[0] as string,
-    role: o[1] as string,
-    start_date: o[2] as string,
-    documents_done: done,
-    documents_total: DOCS.length,
-    stage: o[4] as Status,
-    checklist: DOCS.map((d, j) => ({ name: d, status: j < done ? S("ok", "Received") : j < 6 ? S("warn", "Requested") : S("err", "Outstanding") })),
-    plan: [
-      ["Day 0, pre-onboarding", "Account created, device issued, channels joined"],
-      ["Day 1", "Welcome, handbook, NDPA acknowledgement, clock in set up"],
-      ["Week 1", "Platform walkthrough, meet the six departments"],
-      ["Week 2", "First KPIs assigned by the department manager"],
-      ["Month 3", "Probation decision: confirm or extend"],
-    ].map(([title, text], k) => ({ title, text, done: done === DOCS.length && k < (i === 2 ? 5 : 3) })),
-  };
-});
-route("GET /api/v1/recruitment/onboarding/summary", () =>
-  ok({
-    in_progress: ONB.filter((o) => o.stage.text !== "Confirmed").length,
-    blocked: ONB.filter((o) => o.documents_done < o.documents_total).length,
-    starting_this_month: 2,
-    confirmed_90d: 3,
-    chain: [{ label: "Offer Accepted", state: "done" }, { label: "Documentation", state: "now" }, { label: "Pre-Onboarding", state: null }, { label: "Onboarding", state: null }, { label: "Confirmed", state: null }],
-    focus_id: ONB[0].onboarding_id,
-  }),
-);
-route("GET /api/v1/recruitment/onboarding", (req) => paged(ONB.map(({ checklist, plan, ...r }) => (void checklist, void plan, r)), req, { search: (o) => [o.name, o.role] }));
-route("GET /api/v1/recruitment/onboarding/:id", (req) => {
-  const o = ONB.find((x) => x.onboarding_id === req.params.id);
-  return o ? ok(o) : notFound();
-});
-route("POST /api/v1/recruitment/onboarding/:id/remind", (req) => {
-  const o = ONB.find((x) => x.onboarding_id === req.params.id);
-  return o ? ok(o) : notFound();
 });

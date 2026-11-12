@@ -24,9 +24,9 @@ describe("the plan, read from the docs", () => {
     // whose rows stay, Dropped.
     expect(docs.screens["Payroll|payroll-runs"]).toEqual({ m: "M6", api: true, delivered: true });
     expect(docs.screens["Payroll|configurations"]).toEqual({ m: "M6", api: true, delivered: true });
-    // Knowledge Hub's SOPs are built (M10 PR 2); Recruitment's Onboarding has its API (M5 PR 6b), its screen to come.
+    // Knowledge Hub's SOPs are built (M10 PR 2); Recruitment's Onboarding too (M5 PR 7).
     expect(docs.screens["Knowledge Hub|sops"]).toEqual({ m: "M10", api: true, delivered: true });
-    expect(docs.screens["Recruitment|onboarding"]).toEqual({ m: "M5", api: true, delivered: false });
+    expect(docs.screens["Recruitment|onboarding"]).toEqual({ m: "M5", api: true, delivered: true });
     expect(docs.screens["Employee Self-Service|my-leave"]).toMatchObject({ m: "M1", api: true, delivered: true });
     expect(docs.milestones.find((m) => m.key === "M8")).toMatchObject({ n: 8, demo: "2026-12-11" });
     // "with M1": the foundation takes the next milestone's demo day.
@@ -95,11 +95,11 @@ describe("the API's answers", () => {
     expect(deliveryPlan.closedTypes()).not.toContain("payroll_run");
     expect(deliveryPlan.closedTypes()).not.toContain("salary_structure");
     expect(deliveryPlan.closedTypes()).not.toContain("leave_request");
-    // The docs' own plan: Onboarding has its API, so staging opens it; production waits for its screen.
+    // The docs' own plan: Onboarding is built (M5 PR 7), so staging and production both open it.
     deliveryPlan.use({ plan: docs, rule: "staging" });
     expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(true);
     deliveryPlan.use({ plan: docs, rule: "production" });
-    expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(false);
+    expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(true);
   });
 
   test("a test, or a plan that cannot be read, holds nothing back", () => {

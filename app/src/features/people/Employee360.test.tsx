@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { ModalProvider } from "@mycity/ui";
 import { installMatchMedia, setViewport } from "@mycity/ui/testing";
@@ -67,5 +67,20 @@ describe("the record's Queries and Sanctions tabs", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Sanctions" }));
     expect(await screen.findByText("QRY-0011")).toBeTruthy();
     expect(screen.queryByText("QRY-0015")).toBeNull();
+  }, 30000);
+});
+
+describe("the record's Documents tab", () => {
+  it("People see the person's documents, open one, and verify one awaiting a check", async () => {
+    await signedInAs("cynthia@mycityapp.io", <Employee360 id={byKey("chidera")!.employee_id} />);
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Documents" }));
+    expect(await screen.findByText("Employment contract")).toBeTruthy();
+    expect(screen.getAllByText("Missing").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Request Document" })).toBeTruthy();
+    fireEvent.click(screen.getByText("Proof of residential address"));
+    const sheet = await screen.findByRole("dialog", { name: "Proof of residential address" });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Verify Document" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Proof of residential address" })).toBeNull());
+    await waitFor(() => expect(screen.getAllByText("Verified").length).toBeGreaterThan(1));
   }, 30000);
 });

@@ -7,7 +7,8 @@
  *
  * Nothing here acts. Verifying a document, recording a reference check, marking a step done,
  * completing onboarding (which invites a login) and withdrawing a case are a person's judgement on the
- * screen. The hire's upload, guarantors and BVN (UploadItem, GuarantorInput, BvnEnter) are
+ * screen: Complete Onboarding (OnboardingComplete) and Withdraw (OnboardingCancel) stay off the chat,
+ * one-way steps that hire or archive a person (AJ, 12/11/2026, closing M5). The hire's upload, guarantors and BVN (UploadItem, GuarantorInput, BvnEnter) are
  * theirs alone, on their own link, and never reach the chat (handoff decisions 4 and 9); they are
  * not create or edit forms of the staff app, so gate 23 asks no reason of them. M5 registers no AI
  * job (handoff decision 7).

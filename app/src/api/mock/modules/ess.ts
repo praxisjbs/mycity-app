@@ -3,7 +3,7 @@ import { at, invalid, isoDaysAhead, ok, paged, route, sid, fail } from "../core"
 import type { EmployeeHistoryEntry, EssProfile, ExportFile } from "@mycity/contract/contract.gen.ts";
 import organisation from "@mycity/contract/schemas/organisation.js";
 import { exportFile } from "./shared";
-import { byKey, managerOf } from "../data/people";
+import { byId, byKey, grantsFor, managerOf } from "../data/people";
 import { workWeekOf } from "./attendance";
 import { pickAnAddress, placeOf, typedPlace, type KeptPlace } from "./maps";
 
@@ -148,6 +148,7 @@ const docsOf = (user: string) => {
         version: null,
       },
       doc(5, "Bank verification number", "verified", p.start_date ? at(300, "11:00") : null, null, null),
+      doc(6, "Proof of residential address", "awaiting_verification", at(2, "18:30"), null, null),
     ]);
   }
   return DOCS.get(user)!;
@@ -159,6 +160,53 @@ route("GET /api/v1/ess/documents", (req) =>
     filters: { status: (r, v) => r.status === v },
   }),
 );
+
+/*
+ * The employee record's Documents tab (docs/guides/foundation.md §5 track B): the same vault, read
+ * by someone holding `people` view; Request Document and Verify Document with `people` edit. A new
+ * hire's onboarding uploads arrive here on the server; the mock keeps each person's own fixtures.
+ */
+const peopleMay = (req: { user: string | null }, act: "view" | "edit") => Boolean(req.user && (grantsFor(req.user).people ?? []).includes(act));
+const denied = () => fail(403, "PERMISSION_DENIED", "You do not have access to this");
+const keyOf = (id: string) => byId(id)?.user_key ?? null;
+const summaryOf = (rows: ReturnType<typeof docsOf>) => {
+  const n = (s: string) => rows.filter((r) => r.status === s).length;
+  return { documents: rows.filter((r) => r.document_id).length, signed: n("signed"), verified: n("verified"), expiring: n("expiring"), missing: n("missing") };
+};
+
+route("GET /api/v1/employees/:id/documents", (req) => {
+  if (!peopleMay(req, "view")) return denied();
+  const key = keyOf(req.params.id!);
+  if (!key) return fail(404, "NOT_FOUND", "That employee does not exist");
+  return paged(docsOf(key), req, { search: (r) => [r.name], filters: { status: (r, v) => r.status === v } });
+});
+route("GET /api/v1/employees/:id/documents/summary", (req) => {
+  if (!peopleMay(req, "view")) return denied();
+  const key = keyOf(req.params.id!);
+  return key ? ok(summaryOf(docsOf(key))) : fail(404, "NOT_FOUND", "That employee does not exist");
+});
+route("POST /api/v1/employees/:id/document-requests", (req) => {
+  if (!peopleMay(req, "edit")) return denied();
+  const key = keyOf(req.params.id!);
+  if (!key) return fail(404, "NOT_FOUND", "That employee does not exist");
+  const name = String(req.body.name ?? "").trim();
+  if (!name) return invalid({ name: ["Name the document"] });
+  const rid = sid(`r:${key}:${name}:${Date.now()}`);
+  const row = { row_key: `req:${rid}`, document_id: null, document_request_id: rid, name, status: "missing" as const, uploaded_at: null, expires_on: null, number: null, mime: null, bytes: null, version: null };
+  docsOf(key).push(row);
+  return { status: 201, body: row };
+});
+route("POST /api/v1/documents/:id/verify", (req) => {
+  if (!peopleMay(req, "edit")) return denied();
+  for (const rows of DOCS.values()) {
+    const d = rows.find((r) => r.document_id === req.params.id);
+    if (!d) continue;
+    if (d.status !== "awaiting_verification") return fail(409, "NOT_AWAITING", "This document is not waiting for a check");
+    d.status = "verified";
+    return ok({ document_id: d.document_id, doc_type: "employee_document", title: d.name, original_name: d.name, mime: d.mime ?? "application/pdf", bytes: d.bytes ?? 0, content_hash: null, version: 1, is_current: true, entity_type: "employee", entity_id: req.params.id, subject_employee_id: null, sensitivity: "personal", scan_status: "clean", source: "upload", number: d.number, locked_at: null, expires_on: d.expires_on, verified_at: new Date().toISOString(), uploaded_by_name: null, created_at: d.uploaded_at ?? new Date().toISOString() });
+  }
+  return fail(404, "NOT_FOUND", "That document does not exist");
+});
 
 route("GET /api/v1/ess/documents/summary", (req) => {
   const rows = docsOf(req.user!);

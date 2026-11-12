@@ -5,16 +5,17 @@
 | Owner | AJ |
 | Milestone | M5 |
 | Backend modules | `offers`, `signatures`, `onboarding`, `employment_contracts` |
-| Frontend paths | `app/src/features/recruitment/Offers.tsx` (with `OfferForm.tsx`, `OfferSign.tsx`, `OfferSettings.tsx`), `app/src/features/recruitment/Onboarding.tsx`, `public-app/src/pages/SignOffer.tsx`, `public-app/src/pages/Verify.tsx` |
+| Frontend paths | `app/src/features/recruitment/Offers.tsx` (with `OfferForm.tsx`, `OfferSign.tsx`, `OfferSettings.tsx`), `app/src/features/recruitment/Onboarding.tsx` (with `OnboardingCase.tsx`, `OnboardingSettings.tsx`), `app/src/features/people/EmployeeDocuments.tsx`, `public-app/src/pages/SignOffer.tsx`, `public-app/src/pages/Verify.tsx`, `public-app/src/pages/UploadDocuments.tsx` |
 | Permission key(s) | `recruitment` (offers and onboarding cases); `people` (the hire's documents on the Employee 360) |
 | Capabilities | none; who approves an offer is the `recruitment.offer` flow on Settings · Approvals, not a capability |
 | Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, #112 Upload Documents (added with PR 6a; `new:screen` makes staff-app tabs only); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
-| Status | Draft |
-| Last changed | 11/11/2026 |
+| Status | Built |
+| Last changed | 12/11/2026 |
 
 The public pages (`public-app/src/pages/SignOffer.tsx`, `Verify.tsx`) joined **Frontend paths** with
-PR 4, which wired them. The People 360 Documents tab joins with PR 7; until then `foundation.md` owns
-`app/src/features/people/`, so adding it here now would make every change there ask for this guide too.
+PR 4, which wired them; Upload Documents with PR 7. The People 360 Documents tab joined with PR 7 as
+its own file, `EmployeeDocuments.tsx`, so a change to the rest of `app/src/features/people/` still
+asks only for `foundation.md`, which owns that folder (the tab is on `documents`' routes, track B).
 
 ---
 
@@ -200,6 +201,7 @@ employee record (masked, never sent to an AI model).
 | `GET /api/v1/recruitment/offers/settings`, `PUT .../settings/signatory` | `OfferSettings`, `OfferSignatorySave` | `recruitment` edit | | the Offer Signatory (setting `recruitment.offer_signatory`) |
 | `GET/PUT /api/v1/recruitment/offers/settings/letter`, `POST .../letter/restore` | `OfferLetterTemplate`, `OfferLetterTemplateSave` | `recruitment` edit | | the standard wording, a `template_version` of `offer-letter` |
 | `GET /api/v1/recruitment/onboarding` | `OnboardingListQuery` → `OnboardingPage` | `recruitment` view · all/team (the case's owner) | yes, 25 | filters: status, department, q (the hire or the role) |
+| `GET /api/v1/recruitment/onboarding/summary` | → `OnboardingSummary` | `recruitment` view · all/team (the case's owner) | | the figures above the list: cases at documentation with the items sent and waiting for a check, at pre-onboarding, at onboarding with the steps past their due day, and completed this month (Lagos) |
 | `GET /api/v1/recruitment/onboarding/:id` | → `OnboardingDetail` | `recruitment` view | | the checklist, guarantors, `bvn_entered` (never the number), the contract, `waiting_on`, the plan's `steps` (owner, due day, `overdue`, SOP), `can_complete`, `can_withdraw` |
 | `POST /api/v1/recruitment/onboarding/:id/items/:item_id/verify` | `EmptyBody` → `OnboardingDetail` | `recruitment` edit | | an item sent and, for a file, scanned clean (409 `SCAN_PENDING`, `FILE_INFECTED`); then the gate |
 | `POST /api/v1/recruitment/onboarding/:id/items/:item_id/reject` | `ChecklistItemReject` → `OnboardingDetail` | `recruitment` edit | | back to the hire with the reason |
@@ -320,7 +322,7 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 - **AI routes**: "make an offer to <candidate>" opens New Offer with the application; "who still owes documents" opens Onboarding filtered.
 - **AI cards**: New Offer is a card (`offers.create`, `OfferCard`: the candidate picked from the shortlist through `candidates.list`, the start date, the monthly basic salary; the rest starts from the vacancy and the draft is finished on Offers); the document upload and BVN forms are `not_offered: personal`. Approving, signing, sending and withdrawing stay on the screen.
 - **Search** (`offers.search.js`, `onboarding.search.js`): offers by number (OFF-), candidate and role; onboarding cases by the hire's name or the role (built in PR 6a, opening the case by `?case=` as a contract does); employment contracts by number (CON-).
-- `onboarding.ai.js` (PR 6a, a route added in PR 6b): the read `onboarding.list` and four routes (the fourth, cases at onboarding); Mark Step Done, Complete Onboarding and Withdraw stay on the screen; the Checklist and Plans settings' forms are `not_offered` (`design:`). The hire's upload, guarantor and BVN forms are not staff-app create or edit forms, so gate 23 asks no reason of them; they never reach the chat.
+- `onboarding.ai.js` (PR 6a, a route added in PR 6b): the read `onboarding.list` and four routes (the fourth, cases at onboarding); Mark Step Done, Complete Onboarding and Withdraw stay on the screen (confirmed by AJ closing M5, 12/11/2026: both are one-way, hiring or archiving a person, so neither becomes a chat card); the Checklist and Plans settings' forms are `not_offered` (`design:`). The hire's upload, guarantor and BVN forms are not staff-app create or edit forms, so gate 23 asks no reason of them; they never reach the chat.
 
 ## 10 · On screen and mobile
 
@@ -329,16 +331,17 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list across the page (number, candidate, role, start date, annual compensation with Outside Range, status, sent, expiry); a pressed row opens the offer in a wide dialog (F31 as amended 08/11/2026): the offer's summary with Signers under its details in the same card, beside Monthly Pay with Approval under the pay in the same card, then History across it, and Close at its foot; the offer's summary, Monthly Pay with Outside Range and its reason, Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates); View Letter beside Withdraw Offer, which opens the letter in a dialog of its own: the PDF with Open in Tab and Download PDF once it is made (as a query's letter, M3), the wording on paper before; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
-| Recruitment · Onboarding | the cases list (hire, role, start date, status, items outstanding); a case's checklist with each item's state, the contract, the plan steps | help on Pre-Onboarding: every required document verified and the contract signed | why documentation comes first: §3 here |
+| Recruitment · Onboarding | the figures (Documentation with the documents to verify, Pre-Onboarding, Onboarding with the steps overdue, Hired This Month); the cases list across the page (hire, role, department, start date, outstanding, status); a pressed row opens the case in the wide dialog (F31 as amended 11/11/2026): the case (role, department, start date, Pre-Onboarding with what it waits on, BVN entered or not, the privacy notice, Send Reminder, Withdraw Hire, Complete Onboarding), Documents (each item's state, View File, Verify, Reject with the reason), Guarantors (each one's check, View Form, Record Check), Contract (the signers, Download PDF, Sign for Company, Resend Contract) two by two, then Onboarding Plan across it (owner, due day, SOP, Overdue, Mark Step Done); Onboarding Settings (Checklist, Onboarding Plans, Standard Contract) | help on Pre-Onboarding: what the gate needs; help on BVN: where it is entered and that it is never shown | why documentation comes first: §3 here |
 | Public · Sign Offer | the letter, Signers, the three steps (Read the Letter, Confirm Your Email, Sign Below), Send Code, the code, full name, title, Draw or Type, Agree to Sign Electronically, Accept and Sign, Decline the Offer, the outcome | help on Email Code | "this document is locked and verifiable" reassurance: never shown |
-| Public · Upload Documents | the privacy notice to accept, each item with its state, upload | help on BVN | how the files are stored: the manual |
+| Public · Upload Documents | the role and start date with how many documents are sent; the privacy notice to accept first; then Your Documents (each item with its state, a rejection's reason, Choose a File or the value), Your Guarantors (two, each with its check), Your BVN; Documents Complete once documentation is done | help on BVN; help on Guarantor Form | how the files are stored: the manual |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Recruitment · Offers | the four figures two to a row, then offer cards with a status pill; a tapped card opens the offer in a full bottom sheet | the role, compensation and expiry columns (in the sheet instead); the page subtitle | the record's next step (Submit for Approval, Sign for Company or Send Offer), full width in the sheet; New Offer in Quick Actions | bottom bar Recruitment; tabs scroll sideways |
-| Recruitment · Onboarding | case cards with items outstanding; the case opens in a sheet | the plan's due dates (in the step) | Verify, full width per item | as above |
+| Recruitment · Onboarding | the four figures two to a row, then case cards with the start date and status; a tapped card opens the case in a full bottom sheet, its cards one under another | the role, department and outstanding columns; a step's due day and SOP (in the step's card) | Verify per item, Complete Onboarding full width | as above |
+| Public · Upload Documents | the role and start date, then the privacy notice or the checklist | the steps list | each item's upload, Save Guarantor and Save BVN, full width | the public header menu |
 | Public · Sign Offer | the role and expiry, then the letter, then the signature box | the steps list | Accept and Sign, full width at the foot | the public header menu |
 
 ## 11 · Edge cases
@@ -440,6 +443,10 @@ Open, for MyCity: the privacy notice's wording (`onboarding.upload.privacyNotice
 what the system does; Operations & People to confirm it before go-live.
 
 ## 14 · Change log
+
+- 12/11/2026 · AJ · PR 8, close-out (§9, §14): the guide to Built. Every M5 form has a chat card or its reason (New Offer the only card; Complete Onboarding and Withdraw stay on the screen, decided); ⌘K reaches offers, cases and contracts; every picture of the Recruitment, People and public-site chapters retaken. The empty stubs deleted (`jobs/handlers/signature-reminder.js`, `signatures.controller.js`, `signatures.routes.js`); `employment_contracts.test.js` holds the module's unit tests (its statuses, its values, what a signature covers, its routes). MyCity's sample contract has still not arrived (§13).
+
+- 12/11/2026 · AJ · PR 7, the onboarding screens (§1, §2, §5, §10): Recruitment · Onboarding rewritten on the contract (`Onboarding.tsx`, `OnboardingCase.tsx`, `OnboardingSettings.tsx`; its mock `app/src/api/mock/modules/onboarding.ts`), the INTERIM types and mock removed; `GET /recruitment/onboarding/summary` (`OnboardingSummary`, contract first; AJ chose figures over none); the public Upload Documents page (`/onboard/<token>`); the Employee 360 Documents tab on `documents`' routes (`EmployeeDocuments.tsx`, AJ); Sign for the Company shared by the offer and the contract (`CompanySignForm`).
 
 - 12/11/2026 · AJ · Closing PR 6 (§3 step 8, §6, §7, §11, §13): Not Progressing on an application at Documentation or after ends its open case as Withdraw does (`onboarding.end_for_application` in place of `onboarding.stop_links`); a `line_manager` step's owner comes from the vacancy's Organogram seat until `hireIn` fills it.
 - 11/11/2026 · AJ · PR 6b, onboarding to hired (§3 step 8, §4 to §7, §9, §11, §13): `onboarding-dispatch` (the start date, the plan's steps copied with their owners and due days, overdue steps reminded once; 5060), Mark Step Done, Complete Onboarding (the company email, the login invited, `hireIn`, one transaction), Withdraw (the contract, links, employee and application ended with the case); `OnboardingDetail.steps`, `can_complete`, `can_withdraw`.

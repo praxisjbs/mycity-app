@@ -22,7 +22,7 @@ const SHOT_ID = SLUG;
 const SCREEN = /^([a-z_]+)\/([a-z0-9-]+)$/;
 const DEVICES = ["desktop", "phone"];
 /** A public site address (public-app/src/lib/router.tsx): a page, and its slug, token or number. */
-const PUBLIC_OPEN = /^\/((jobs|apply|assess|sign|verify|proposal)(\/[A-Za-z0-9._-]+)?)?$/;
+const PUBLIC_OPEN = /^\/((jobs|apply|assess|sign|onboard|verify|proposal)(\/[A-Za-z0-9._-]+)?)?$/;
 
 /** The demo accounts a picture is taken as; `guest` is nobody signed in (the sign-in screen, a link). */
 const ACCOUNTS = ["operations", "ceo", "manager", "staff", "admin", "guest"];
@@ -302,7 +302,7 @@ function parseShot(id, lines, at) {
     // Nobody signs in on the public site; its addresses are a page and a slug, token or number.
     if (spec.as !== "operations" && spec.as !== "guest") problems.push(`shot ${id}: a public page is taken signed out; leave out as`);
     spec.as = "guest";
-    if (!spec.open || !PUBLIC_OPEN.test(spec.open)) problems.push(`shot ${id}: open is a public address, like /, /jobs, /jobs/<slug>, /apply/<token>, /assess/<token>, /sign/<token>, /verify/<reference> or /proposal/<token>`);
+    if (!spec.open || !PUBLIC_OPEN.test(spec.open)) problems.push(`shot ${id}: open is a public address, like /, /jobs, /jobs/<slug>, /apply/<token>, /assess/<token>, /sign/<token>, /onboard/<token>, /verify/<reference> or /proposal/<token>`);
   } else if (!spec.open || !/^\/([a-z-]+)?(\?\S*)?$/.test(spec.open)) problems.push(`shot ${id}: open is the screen's address, like /people?tab=employees (or / for the sign-in screen)`);
   const ns = spec.marks.map((m) => m.n);
   if (ns.some((n, i) => n !== i + 1)) problems.push(`shot ${id}: marks are numbered 1, 2, 3 in order`);

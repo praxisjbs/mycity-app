@@ -802,6 +802,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 12/11/2026 · AJ · Nothing of M4 changed. Beside it, M5 PR 7 puts the Onboarding tab on the contract (`Onboarding.tsx`, `OnboardingCase.tsx`, `OnboardingSettings.tsx`, `docs/guides/offers.md` §2, §10), removes the last INTERIM types (`app/src/api/types/recruitment.ts`) and their block in the mock, and shares Sign for the Company between the offer and the contract (`CompanySignForm` in `OfferSign.tsx`).
 - 11/11/2026 · AJ · M5 PR 6b, for GE to review: `candidates.withdrawnIn` (§6.3) and its repo write
   `setWithdrawn`, with the event `application.withdrawn` (§7): M5's Withdraw on an onboarding case sets
   the application's long-unused `withdrawn` status (with `withdrawn_at`), stops its links and mails no

@@ -77,6 +77,34 @@ function list(db, query, scope) {
   );
 }
 
+/**
+ * The figures above the list, over the cases in the reader's scope: each open status, the items sent
+ * and waiting for a check, the pending steps past their due day, and the cases completed this month.
+ */
+async function summary(db, scope, today) {
+  const params = [today];
+  const s = scopeClause(scope, { column: "oc.owner_id" }, params);
+  const { rows } = await db.query(
+    `SELECT count(*) FILTER (WHERE oc.status = 'documentation')::int AS documentation,
+            COALESCE(sum((SELECT count(*) FROM onboarding_checklist_item i
+                           WHERE i.onboarding_case_id = oc.onboarding_case_id AND i.status = 'uploaded'))
+                     FILTER (WHERE oc.status = 'documentation'), 0)::int AS to_verify,
+            count(*) FILTER (WHERE oc.status = 'pre_onboarding')::int AS pre_onboarding,
+            count(*) FILTER (WHERE oc.status = 'onboarding')::int AS onboarding,
+            COALESCE(sum((SELECT count(*) FROM onboarding_case_step st
+                           WHERE st.onboarding_case_id = oc.onboarding_case_id AND st.status = 'pending'
+                             AND st.due_on < $1::date))
+                     FILTER (WHERE oc.status = 'onboarding'), 0)::int AS overdue_steps,
+            count(*) FILTER (WHERE oc.status = 'completed'
+                               AND date_trunc('month', oc.completed_at AT TIME ZONE 'Africa/Lagos')
+                                 = date_trunc('month', now() AT TIME ZONE 'Africa/Lagos'))::int AS completed_this_month
+       FROM onboarding_case oc
+      ${s.where}`,
+    params,
+  );
+  return rows[0];
+}
+
 async function insertCase(client, row) {
   const { rows } = await client.query(
     `INSERT INTO onboarding_case (application_id, offer_id, employee_id, owner_id, status, starts_on)
@@ -629,6 +657,7 @@ module.exports = {
   byOffer,
   byApplication,
   list,
+  summary,
   insertCase,
   setStatus,
   setCompleted,

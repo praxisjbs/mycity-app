@@ -80,6 +80,7 @@ describe("the routes", () => {
       "GET /plans/:id",
       "PUT /plans/:id",
       "GET /",
+      "GET /summary",
       "GET /:id",
       "POST /:id/items/:item_id/verify",
       "POST /:id/items/:item_id/reject",

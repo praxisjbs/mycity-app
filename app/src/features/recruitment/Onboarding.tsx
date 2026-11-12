@@ -1,76 +1,114 @@
 /**
- * Recruitment · Onboarding (M5, owner AJ; INTERIM until M5 puts it on the contract): new hires from
- * documentation to confirmation, each with the document checklist and the plan. Moved out of
- * index.tsx unchanged.
+ * Recruitment · Onboarding (docs/guides/offers.md §2, §3 steps 5a to 8, §10; M5, owner AJ): every
+ * case in the reader's scope with the figures above it, across the page; a row opens its case in the
+ * wide dialog on desktop and a sheet on a phone (ListDetail `modal`, F31 as amended 11/11/2026). A
+ * case is opened by the offer's acceptance, never here, so the screen has no New action.
+ *
+ * The address opens what ⌘K, the assistant and a notification ask for: `?case=` a case (an
+ * employment contract opens its case too), `?status=` a filter, `?panel=settings` the Onboarding
+ * settings.
  */
-import { useState } from "react";
-import { useApi, useMutation, usePaged } from "@/api/hooks";
-import "@/api/types/recruitment";
-import type { OnboardingRow } from "@/api/types/recruitment";
+import { useEffect, useRef, useState } from "react";
+import type { OnboardingRow, OnboardingStatus } from "@mycity/contract/contract.gen.ts";
+import { useApi, usePaged } from "@/api/hooks";
+import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { ChainCard, PagedTable } from "@/features/shared/sections";
-import { toTrail } from "@/features/shared/wire";
-import { Button, Card, CardHeader, cn, DataView, DetailPane, formatDate, Grid, LoadingRows, Meter, PageHeader, StatusPill, Timeline, toast, useIsPhone } from "@mycity/ui";
+import { PagedTable } from "@/features/shared/sections";
+import { useSearchParams } from "@/lib/router";
+import { Button, cn, FilterSelect, formatDate, ListDetail, PageHeader, Toolbar, useIsPhone, useModal } from "@mycity/ui";
+import { CASE_STATUS, OnboardingCase } from "./OnboardingCase";
+import { OnboardingSettingsPanel } from "./OnboardingSettings";
+import { pill } from "./shared";
+
+const STATUSES: Array<[string, string]> = [["", "All Statuses"], ...Object.entries(CASE_STATUS).map(([k, [, t]]) => [k, t] as [string, string])];
 
 export function Onboarding() {
-  const s = useApi("GET /api/v1/recruitment/onboarding/summary");
-  const list = usePaged("GET /api/v1/recruitment/onboarding");
+  const modal = useModal();
+  const auth = useAuth();
+  const mayEdit = auth.can("recruitment", "edit");
+  const [params, setParams] = useSearchParams();
+  const [status, setStatus] = useState(params.get("status") ?? "");
+  const summary = useApi("GET /api/v1/recruitment/onboarding/summary");
+  const list = usePaged("GET /api/v1/recruitment/onboarding", { filters: status ? { status: status as OnboardingStatus } : {} });
   const phone = useIsPhone();
-  const [sel, setSel] = useState<string | null>(null);
-  // On desktop the summary's focus shows unasked under the list; on a phone a new hire opens in a sheet when tapped (F31).
-  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
-  const d = useApi("GET /api/v1/recruitment/onboarding/:id", { params: { id: focus ?? "" }, enabled: !!focus });
-  const remind = useMutation("POST /api/v1/recruitment/onboarding/:id/remind");
-  const x = d.data;
+  // Nothing opens unasked: a row opens its case in the dialog, or the sheet on a phone (F31).
+  const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
+  const settings = () => modal.open({ title: "Onboarding Settings", wide: true, body: (close) => <OnboardingSettingsPanel close={close} /> });
+
+  // A link opens what it names whenever it arrives, then leaves the address in one step.
+  const linked = params.get("case");
+  const panel = params.get("panel");
+  const asked = params.get("status");
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    const ask = linked ? `case:${linked}` : panel === "settings" ? "settings" : asked !== null ? `status:${asked}` : null;
+    if (!ask) return void (opened.current = null);
+    if (opened.current === ask) return;
+    opened.current = ask;
+    setParams({ case: null, panel: null, status: null }, { replace: true });
+    if (asked !== null) setStatus(asked);
+    if (linked) return void setPicked({ id: linked, title: "Onboarding" });
+    if (panel === "settings" && mayEdit) settings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked, panel, asked]);
+
+  const s = summary.data;
+  const n = (v: number | undefined) => (v === undefined ? "–" : String(v));
   return (
     <>
-      <PageHeader title="Onboarding" sub="Documentation first, then onboarding" />
-      {s.data && (
-        <>
-          <KpiTiles items={[{ label: "In Progress", value: String(s.data.in_progress) }, { label: "Blocked on Documents", value: String(s.data.blocked), tone: s.data.blocked ? "warn" : "ok" }, { label: "Starting This Month", value: String(s.data.starting_this_month) }, { label: "Confirmed, 90d", value: String(s.data.confirmed_90d), tone: "ok" }]} />
-          <ChainCard steps={s.data.chain} note="Onboarding does not open until the document checklist completes. That sequence was requested by MyCity." />
-        </>
-      )}
-      <PagedTable<OnboardingRow>
-        title="In Progress"
-        list={list}
-        rowKey={(o) => o.onboarding_id}
-        noun="new hire"
-        onRowClick={(o) => setSel(o.onboarding_id)}
-        columns={[
-          { key: "n", label: "New Hire", render: (o) => <span className={cn(o.onboarding_id === focus && "font-semibold")}>{o.name}</span> },
-          { key: "r", label: "Role", render: (o) => o.role, desktop: true },
-          { key: "s", label: "Start Date", render: (o) => formatDate(o.start_date) },
-          { key: "d", label: "Documents", render: (o) => `${o.documents_done} of ${o.documents_total}` },
-          { key: "st", label: "Stage", render: (o) => <StatusPill s={o.stage} /> },
+      <PageHeader
+        title="Onboarding"
+        sub="Documents, checks and the first month"
+        actions={mayEdit && <Button icon="cog" onClick={settings}>Onboarding Settings</Button>}
+      />
+      <KpiTiles
+        mobileCols={2}
+        items={[
+          { label: "Documentation", value: n(s?.documentation), sub: s ? `${s.to_verify} to verify` : undefined, tone: s?.to_verify ? "warn" : undefined },
+          { label: "Pre-Onboarding", value: n(s?.pre_onboarding) },
+          { label: "Onboarding", value: n(s?.onboarding), sub: s ? `${s.overdue_steps} ${s.overdue_steps === 1 ? "step" : "steps"} overdue` : undefined, tone: s?.overdue_steps ? "err" : undefined },
+          { label: "Hired This Month", value: n(s?.completed_this_month), tone: s?.completed_this_month ? "ok" : undefined },
         ]}
       />
-      <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Onboarding">
-        {x ? (
-          <Grid cols={2} className="mt-3 phone:mt-0">
-            <DataView
-              title="Document Checklist"
-              right={<span className="w-36"><Meter pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
-              rows={x.checklist}
-              rowKey={(r) => r.name}
-              columns={[{ key: "d", label: "Required Document", render: (r) => r.name }, { key: "s", label: x.name, render: (r) => <StatusPill s={r.status} /> }]}
-              footer={
-                x.documents_done < x.documents_total && (
-                  <div className="flex justify-end border-t border-border px-3.5 py-2.5">
-                    <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { await remind.run({ params: { id: x.onboarding_id }, body: {} }); toast(`Reminder sent to ${x.name} for ${x.documents_total - x.documents_done} documents`); }}>Remind {x.name.split(" ")[0]}</Button>
-                  </div>
-                )
-              }
-            />
-            <Card>
-              <CardHeader title="Onboarding Plan" />
-              <Timeline items={toTrail(x.plan.map((p) => ({ title: p.title, when: p.text, tone: p.done ? "ok" as const : null })))} />
-            </Card>
-          </Grid>
-        ) : (
-          phone && focus && <Card><LoadingRows /></Card>
-        )}
-      </DetailPane>
+      <Toolbar>
+        <FilterSelect
+          label="Status"
+          value={status}
+          onChange={(v) => {
+            setStatus(v);
+            setPicked(null);
+          }}
+          options={STATUSES}
+        />
+      </Toolbar>
+      <ListDetail
+        layout="modal"
+        size="wide"
+        full
+        open={picked !== null}
+        onClose={() => setPicked(null)}
+        title={picked?.title ?? "Onboarding"}
+        list={
+          <PagedTable<OnboardingRow>
+            title="New Hires"
+            list={list}
+            search="Search hires"
+            rowKey={(o) => o.onboarding_case_id}
+            noun="new hire"
+            onRowClick={(o) => setPicked({ id: o.onboarding_case_id, title: o.hire_name })}
+            empty={list.q || status ? undefined : { title: "No New Hires Yet" }}
+            columns={[
+              { key: "who", label: "New Hire", render: (o) => <span className={cn(o.onboarding_case_id === picked?.id ? "font-semibold" : "font-medium")}>{o.hire_name}</span> },
+              { key: "role", label: "Role", render: (o) => o.job_title, desktop: true },
+              { key: "dept", label: "Department", render: (o) => o.department ?? "–", desktop: true },
+              { key: "start", label: "Start Date", render: (o) => (o.starts_on ? formatDate(o.starts_on) : "–") },
+              { key: "out", label: "Outstanding", align: "n", render: (o) => (o.status === "documentation" ? String(o.items_outstanding) : "–") },
+              { key: "status", label: "Status", render: (o) => pill(CASE_STATUS[o.status]) },
+            ]}
+          />
+        }
+        detail={picked ? <OnboardingCase key={picked.id} id={picked.id} wide={!phone} /> : null}
+      />
     </>
   );
 }

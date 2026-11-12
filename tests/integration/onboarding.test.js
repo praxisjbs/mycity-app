@@ -319,6 +319,13 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     expect(JSON.stringify(kase)).not.toContain("22233344455");
     const list = await h.as("ops").get("/recruitment/onboarding?status=documentation");
     expect(list.body.data.find((r) => r.onboarding_case_id === hire.onboarding_case_id)).toMatchObject({ hire_name: hire.name, items_outstanding: 2 });
+    // The figures above the list count the case at documentation and the files it waits to check.
+    const figures = await h.as("ops").get("/recruitment/onboarding/summary");
+    expect(figures.status).toBe(200);
+    expect(Object.keys(figures.body).sort()).toEqual(["completed_this_month", "documentation", "onboarding", "overdue_steps", "pre_onboarding", "to_verify"]);
+    expect(figures.body.documentation).toBeGreaterThanOrEqual(1);
+    expect(figures.body.to_verify).toBeGreaterThanOrEqual(1);
+    expect((await h.as("staff").get("/recruitment/onboarding/summary")).status).toBe(403);
 
     // A file still being scanned waits; once clean it is verified.
     const verify = (itemId) => h.as("ops").post(`/recruitment/onboarding/${hire.onboarding_case_id}/items/${itemId}/verify`).send({});
@@ -493,6 +500,7 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     expect(completed.status).toBe(200);
     expect(completed.body).toMatchObject({ status: "completed", can_complete: false, can_withdraw: false });
     expect(completed.body.completed_at).toBeTruthy();
+    expect((await h.as("ops").get("/recruitment/onboarding/summary")).body.completed_this_month).toBeGreaterThanOrEqual(1);
     expect(await one("SELECT work_email::text AS work_email FROM employee WHERE employee_id = $1", [hire.employee_id])).toEqual({ work_email: "dayo.adeyemi@mycity.test" });
     const login = await one(
       `SELECT u.email::text AS email, array_agg(r.code::text) AS roles

@@ -21,6 +21,7 @@ import "./modules/reviews";
 import "./modules/queries";
 import "./modules/recruitment";
 import "./modules/offers";
+import "./modules/onboarding";
 import "./modules/payroll";
 import "./modules/partnerships";
 import "./modules/partnerships_agreements";

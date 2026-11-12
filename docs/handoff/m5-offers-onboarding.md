@@ -150,8 +150,8 @@ earlier: M5's forms use help terms.
 - [x] PR 5 · Acceptance to hire (11/11/2026)
 - [x] PR 6a · Onboarding to the documentation gate (11/11/2026)
 - [x] PR 6b · Onboarding to hired (11/11/2026)
-- [ ] PR 7 · Onboarding screens
-- [ ] PR 8 · Close-out
+- [x] PR 7 · Onboarding screens (12/11/2026)
+- [x] PR 8 · Close-out (12/11/2026; no further review, AJ)
 
 ---
 
@@ -181,6 +181,62 @@ earlier: M5's forms use help terms.
 ---
 
 ## 6 · Log
+
+- 12/11/2026 · AJ · PR 8, close-out (guide §9, §14; Status Built). Checked rather than redone: every M5
+  create or edit form has a chat card or its reason (gate 23 green; New Offer the one card); ⌘K finds
+  offers, cases and contracts (gate 10 green).
+  - Decided here, with AJ: Complete Onboarding and Withdraw stay on the screen, no chat card (both
+    one-way: they hire or archive a person); the reason is in `onboarding.ai.js`'s header.
+  - The empty stubs deleted: `jobs/handlers/signature-reminder.js` (the scheduler
+    `signature-reminders` is the job; README §5.15's M5 handler cell emptied), `signatures.controller.js`
+    and `signatures.routes.js` (signatures has only public routes). `employment_contracts.test.js` now
+    holds the module's unit tests (8): its statuses and moves, its values from the accepted offer,
+    what a signature covers (the appendix's headings, never their bodies), its routes' grants.
+  - Every picture the gate called stale retaken (`npm run guide:shots -- --stale`): Recruitment,
+    People, Quick Start and the public site, with the five new ones of PR 7.
+  - No further review before the draft goes ready (AJ, 12/11/2026): the reviews asked of GE
+    (`candidates.withdrawnIn`, `application.withdrawn`, PR 6b) and TB (`organisation.setBvnIn`, PR 6a;
+    the Employee 360 Documents tab, PR 7) are waived; AJ owns every M5 decision. MyCity's sample
+    employment contract has not arrived: the shipped wording stays the placeholder, replaced on the
+    Standard Contract settings when it comes.
+  - Verified in a Linux workspace on Node 20 with PostgreSQL 16, pgvector and Redis: `npm run ci`, every
+    gate, the screen gates and a11y included. The whole jest suite (4,118 tests: 4,115 passed and the
+    one it failed, the public Help's section list, passes after it learned of Upload Documents); the
+    frontend tests of ui, app and public-app. Three tests that pinned the old state were brought up to
+    date: the onboarding routes list (`/summary`), the delivery plan (Onboarding now delivered on
+    staging and production) and the public Help's sections (`public-onboard`). The fixes were re-run
+    file by file, not with a second whole-suite run. The PR needs the line `User-guide-unchanged:` for
+    the Queries & Sanctions chapter, whose steps on a record's tabs did not change.
+- 12/11/2026 · AJ · PR 7, the onboarding screens (guide §1, §2, §5, §10, §14; PROGRESS #43 and #112 UI
+  and Mobile, Built).
+  - Decided here, with AJ: the screen shows figures, on a new `GET /recruitment/onboarding/summary`
+    (`OnboardingSummary`, contract first, in the reader's scope: documentation with the items waiting
+    for a check, pre-onboarding, onboarding with the steps overdue, completed this month); the Employee
+    360 Documents tab is built here on track B's existing `documents` routes (no backend change); no
+    further review (AJ).
+  - Recruitment · Onboarding (`Onboarding.tsx`, `OnboardingCase.tsx`, `OnboardingSettings.tsx`): the
+    figures, the cases across the page, a case in the wide dialog (F31 as amended 11/11/2026): the case
+    (what it waits on, BVN entered, the privacy notice; Send Reminder, Withdraw Hire, Complete Onboarding
+    with the company email), Documents (View File, Verify, Reject with the reason), Guarantors (View
+    Form, Record Check), Contract (the signers, Download PDF, Sign for Company, Resend Contract), then
+    Onboarding Plan (Mark Step Done). Onboarding Settings: Checklist, Onboarding Plans (steps with owner,
+    due day and SOP), Standard Contract. Opened by `?case=` (⌘K, a contract), `?status=`,
+    `?panel=settings`. Sign for the Company is one form for the offer and the contract
+    (`CompanySignForm` in `OfferSign.tsx`). The INTERIM types (`app/src/api/types/recruitment.ts`) and
+    the old mock block are gone; the mock is `app/src/api/mock/modules/onboarding.ts` (six cases, every
+    status).
+  - Public · Upload Documents (`public-app/src/pages/UploadDocuments.tsx`, `/onboard/<token>`): the
+    privacy notice first, each item (a file, a value or both, a rejection's reason), two guarantors
+    with their forms and checks, the BVN once, Documents Complete after the gate; its mock
+    `public-app/src/api/mock/onboard.ts` and three demo links. `packages/contract/guide.js` takes
+    `/onboard/<token>` as a public picture's address.
+  - Employee 360 · Documents (`app/src/features/people/EmployeeDocuments.tsx`): the counts, the list,
+    View File and Download, Verify Document, Request Document, Upload Document; the mock's routes in
+    `ess.ts`. `foundation.md` §2 and §14.
+  - User Guide: Onboarding in `recruitment.md` (eight tasks, three pictures), Upload Documents in
+    `public-site.md`, Someone's documents in `people.md`.
+  - Verified in a Linux workspace on Node 20 with PostgreSQL 16, pgvector and Redis: see the PR 8 entry
+    above for the whole `npm run ci`.
 
 - 12/11/2026 · AJ · Closing PR 6, two gaps found in its review (guide §3 step 8, §6, §7, §11, §13).
   Nothing of M5 merges before PR 8 (AJ): PR 6a and 6b stay on `m5/offers`.

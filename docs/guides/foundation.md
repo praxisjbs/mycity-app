@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 11/11/2026 |
+| Last changed | 12/11/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -73,7 +73,7 @@ These finish M0 and no prompt can do them:
 | Screen | Where | Who | Track | Today | After |
 |---|---|---|---|---|---|
 | People · Employees (#24) | Staff app | `people` view; add, edit, archive with create, edit, delete | A | **Built** (17/10/2026) | Real API: list at 25 with search, filters and server sort, the record with tabs, Add, Edit, Archive, Restore, Send Invite, Import Staff |
-| Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | **Built** (17/10/2026) | Profile, job, reporting line, login and history on the real API; the Documents tab is track B's, on the `documents` module that has landed |
+| Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | **Built** (17/10/2026) | Profile, job, reporting line, login, documents and history on the real API; the Documents tab (`EmployeeDocuments.tsx`, 12/11/2026, AJ for M5) is on track B's `documents` routes: the counts, the list, View File and Download, Verify Document, Request Document and Upload Document (`people` edit) |
 | Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | **Built** (17/10/2026) | As `organogram.md` describes, on the real API, with the phone focus view |
 | Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | **Built** (17/10/2026) | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | **Built** (17/10/2026) | Their documents and the ones People asked for, upload, download, preview |
@@ -1190,6 +1190,8 @@ screen.
 - The sign-in screen's drawings or licensed photographs: TB (`identity.md` §13).
 
 ## 14 · Change log
+
+- 12/11/2026 · AJ · The employee record's Documents tab, for M5 (`offers.md` §2; a new hire's onboarding uploads land on their record): `app/src/features/people/EmployeeDocuments.tsx` on the `documents` module's routes as built in track B (`GET /employees/:id/documents` and `/summary`, `POST /employees/:id/documents` and `/document-requests`, `POST /documents/:id/verify`): the counts strip, the list, a row opening View File and Download, and with `people` edit Verify Document, Request Document and Upload Document. No backend change; the mock gains the same routes (`app/src/api/mock/modules/ess.ts`).
 
 - 11/11/2026 · AJ · The organisation module gains `setBvnIn` and `hasBvn` (service and repo) for M5's Upload Documents page (§6.1, `offers.md` §3 step 6): the hire's BVN on `employee.bvn` (migration `5040`), its audit saying only that it was entered. Nothing else changes for an existing caller.
 - 11/11/2026 · TB · `GET /exports/:id` also answers for a generated document that is not an export when the vault lets the caller read it, so a Download button can wait on a PDF kept for good while the worker renders it (Download Certificate, `knowledge.md` §6.9). An export stays its asker's alone.

@@ -16,6 +16,7 @@ const p = (req) => req.validated.params;
 
 module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.validated.query, scopeOf(req))),
+  summary: async (req, res) => ok(res, await service.summary(scopeOf(req))),
   get: async (req, res) => ok(res, await service.get(p(req).id, req.user, scopeOf(req))),
   verifyItem: async (req, res) => ok(res, await service.verifyItem(withActor(req), scopeOf(req), p(req).id, p(req).item_id)),
   rejectItem: async (req, res) =>
