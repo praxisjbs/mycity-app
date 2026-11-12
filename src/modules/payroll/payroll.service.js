@@ -8,8 +8,9 @@
  *   createRun, computeRun, submitRun, discardRun,
  *   excludePerson, includePerson, addAdjustment,
  *   removeAdjustment, markPaid                         what its buttons do
- *   getSettings, changeSettings                        Configurations' setting: the pay day, Bank Details Required,
- *                                                      the advanced option and the accountant's three conventions
+ *   getSettings, changeSettings, removeSettingsChange  Configurations' setting: the pay day, Bank Details Required,
+ *                                                      the advanced option and the accountant's conventions; and
+ *                                                      Remove Change of a version still to come
  *   settle, sentBack                                   the approval's end, copied onto the run after commit
  *
  * The salary-derived amounts leave under the names the salary mask governs (`gross_pay`, `total_deductions`,
@@ -374,8 +375,9 @@ const COLUMNS = ["advanced_enabled", "pay_day", "require_bank_details", ...setti
  * PATCH /payroll/settings (`payroll.configure`): a new version from `effective_from`, today or later (422
  * EFFECTIVE_IN_THE_PAST). What is sent changes; the rest carries over from the latest version, and a change for the
  * day a version already starts joins it. The conventions are taken only once the option has been on or is being
- * switched on (409 ADVANCED_OFF). Switching on needs a statutory rate in force that day (409 NO_RATES) and all three
- * conventions set, in this change or before (409 NO_CONVENTIONS) (§6.11 rules 3 and 4, §3.5).
+ * switched on (409 ADVANCED_OFF). Switching on needs a statutory rate in force that day (409 NO_RATES) and the two
+ * conventions the screen asks for set, in this change or before (409 NO_CONVENTIONS); PAYE Basis is not asked since
+ * PR 10, and an unset one reads as annualised (§6.11 rules 3 and 4, §3.5, §13.2 item 32).
  */
 async function changeSettings(actor, body) {
   settings.assertNotPast(body.effective_from);
@@ -391,9 +393,9 @@ async function changeSettings(actor, body) {
     if (switchingOn) {
       if (!(await statutoryRates.anyInForce(client, body.effective_from)))
         throw new AppError("NO_RATES", "Enter a statutory rate in force from this date first", 409, { effective_from: ["No rate that day"] });
-      const unset = settings.CONVENTIONS.filter((c) => merged[c] === null || merged[c] === undefined);
+      const unset = settings.REQUIRED_CONVENTIONS.filter((c) => merged[c] === null || merged[c] === undefined);
       if (unset.length)
-        throw new AppError("NO_CONVENTIONS", "Set the three conventions to switch on", 409, Object.fromEntries(unset.map((c) => [c, ["Pick one"]])));
+        throw new AppError("NO_CONVENTIONS", "Set the conventions to switch on", 409, Object.fromEntries(unset.map((c) => [c, ["Pick one"]])));
     }
     const row = await settings.writeVersion(client, body.effective_from, { ...merged, changed_by: actor.user_id || null, reason: body.reason || null });
     const changed = COLUMNS.filter((c) => body[c] !== undefined && body[c] !== (base[c] ?? null));
@@ -407,6 +409,29 @@ async function changeSettings(actor, body) {
     });
   });
   return getSettings();
+}
+
+/**
+ * DELETE /payroll/settings/versions/:effective_from (`payroll.configure`): Remove Change. The version of the setting
+ * still to come (a pay day, the switch or the bank rule waiting for its day) is taken back and the version before it runs
+ * on. 409 VERSION_IN_FORCE once it has started, or when a run sent for approval, approved or paid was computed with it (it
+ * read the pay day at its month's end); 404 for a day no version starts on. Audited as a security event, as a change is.
+ */
+async function removeSettingsChange(actor, { effective_from: from }) {
+  await tx(async (client) => {
+    if (from > lagos.today()) await lock.assertVersionUnread(client, from);
+    const { removed, reopened } = await settings.removeVersion(client, from);
+    const gone = removed[0];
+    const runsOn = reopened[0] || null;
+    await emit(client, {
+      key: EVENTS.PAYROLL_SETTING_REMOVED,
+      entity: { type: "payroll_setting", id: gone.payroll_setting_id },
+      actor,
+      before: { ...Object.fromEntries(COLUMNS.map((c) => [c, gone[c] ?? null])), effective_from: from },
+      after: runsOn ? { runs_on: runsOn.payroll_setting_id, effective_from: runsOn.effective_from } : { runs_on: null },
+      payload: { payroll_setting_id: gone.payroll_setting_id, effective_from: from, runs_on: runsOn ? runsOn.payroll_setting_id : null },
+    });
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -479,6 +504,7 @@ module.exports = {
   markPaid,
   getSettings,
   changeSettings,
+  removeSettingsChange,
   settle,
   sentBack,
   runLabel,

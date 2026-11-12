@@ -178,8 +178,9 @@ async function computeInto(client, run) {
   // (§6.11 rule 2, §6.12). With no PAYE table, or the conventions unset, the run says what is missing (No Rates Set):
   // the items that have rates are computed, PAYE is not, and Submit refuses it.
   const advanced = setting.advanced_enabled === true;
-  const conventions = Object.fromEntries(settings.CONVENTIONS.map((c) => [c, setting[c] ?? null]));
-  const conventionsSet = settings.CONVENTIONS.every((c) => conventions[c] !== null);
+  // An unset PAYE basis reads as annualised (§13.2 item 32); the two flags have no default.
+  const conventions = settings.conventionsOf(setting);
+  const conventionsSet = settings.REQUIRED_CONVENTIONS.every((c) => conventions[c] !== null);
   const rated = advanced ? await statutoryRates.ratesOn(client, last) : { rates: {}, rows: [] };
   const missing = advanced ? [...(rated.rates.paye ? [] : ["paye"]), ...(conventionsSet ? [] : ["conventions"])] : [];
 
@@ -255,6 +256,8 @@ async function computeInto(client, run) {
           flat_amount: r.flat_amount,
           position: r.position,
           effective_from: r.effective_from,
+          // Where the figure came from (§6.12 rule 12), so the report says it of a run long after it changes.
+          ...statutoryRates.sourceOf(r),
         })),
       }),
     },

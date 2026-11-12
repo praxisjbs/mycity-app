@@ -2,11 +2,13 @@
 /**
  * The statutory engine and its rates, with no database (docs/guides/payroll.md §6.12): each item, the PAYE bands, the
  * relief as a flat amount and a rate, both PAYE bases and both reducing conventions, an item with no row not computed,
- * employer lines out of the net, the save's checks, the report's template and the routes' grants. The runs against
+ * employer lines out of the net, the save's checks (its legal source among them), an unset PAYE basis, the report's
+ * template with each item's source, and the routes' grants. The runs against
  * the real migrations are tests/integration/payroll-advanced.test.js.
  *
  * THE RATES HERE ARE TEST RATES: round figures invented for this file so the expected amounts can be worked by hand.
- * None is Nigerian law, none is in any seed, and none may be copied into one (§6.12 rule 5).
+ * None is Nigerian law, none is in any seed, and none may be copied into one (§6.12 rule 5). Their source is a TEST
+ * SOURCE, labelled so: no instrument says any of them.
  */
 const c = require("@mycity/contract");
 const calc = require("../payroll/payroll.calc");
@@ -34,6 +36,9 @@ const TEST = Object.freeze({
   nsitf: { base: "annual_payroll", rate: "1" },
 });
 const REDUCING = { paye_basis: "annualised", pension_reduces_taxable: true, nhf_reduces_taxable: true };
+/** A TEST SOURCE, labelled: no instrument says any of the test rates; it only satisfies the rule that every version names one. */
+const SOURCE = Object.freeze({ source_title: "TEST SOURCE, not a law", source_section: "Test section 1", source_checked_on: "2026-11-10" });
+const NO_SOURCE = Object.freeze({ no_legal_source: true, no_source_reason: "Test rate for this file, not a law" });
 const amountsOf = (lines) => Object.fromEntries(lines.map((l) => [l.code, l.amount]));
 
 describe("computeStatutory (§6.12), on TEST RATES", () => {
@@ -161,10 +166,11 @@ describe("a version as it is entered (StatutoryRatesSave)", () => {
   const fields = (r) => Object.fromEntries(r.error.issues.map((i) => [i.path.join("."), i.message]));
 
   test("PAYE takes contiguous bands from nothing, only the last open", () => {
-    expect(S.safeParse({ item: "paye", effective_from: "2026-12-01", bands: TEST.paye.bands.map(({ position, ...b }) => b) }).success).toBe(true);
+    expect(S.safeParse({ item: "paye", effective_from: "2026-12-01", bands: TEST.paye.bands.map(({ position, ...b }) => b), ...SOURCE }).success).toBe(true);
     const r = S.safeParse({
       item: "paye",
       effective_from: "2026-12-01",
+      ...SOURCE,
       bands: [
         { band_from: "10.00", band_to: "100.00", rate: "5" },
         { band_from: "200.00", band_to: "150.00", rate: "10" },
@@ -176,35 +182,102 @@ describe("a version as it is entered (StatutoryRatesSave)", () => {
       "bands.1.band_from": "Start where last ends",
       "bands.1.band_to": "Above its start",
     });
-    expect(fields(S.safeParse({ item: "paye", effective_from: "2026-12-01" }))).toEqual({ bands: "Enter the bands" });
+    expect(fields(S.safeParse({ item: "paye", effective_from: "2026-12-01", ...SOURCE }))).toEqual({ bands: "Enter the bands" });
   });
 
   test("a rate is a percentage up to 100; the relief needs an amount or a rate; other items one rate", () => {
-    expect(fields(S.safeParse({ item: "nhf", effective_from: "2026-12-01", rate: "101" }))).toEqual({ rate: "At most 100" });
-    expect(fields(S.safeParse({ item: "nhf", effective_from: "2026-12-01", rate: "two" }))).toEqual({ rate: "Enter a rate" });
-    expect(fields(S.safeParse({ item: "nhf", effective_from: "2026-12-01" }))).toEqual({ rate: "Enter a rate" });
-    expect(fields(S.safeParse({ item: "relief", effective_from: "2026-12-01", rate: "0", flat_amount: "0.00" }))).toEqual({ flat_amount: "Enter an amount or rate" });
-    expect(fields(S.safeParse({ item: "itf", effective_from: "2026-12-01", rate: "1", flat_amount: "5.00" }))).toEqual({ flat_amount: "Only relief has one" });
-    expect(fields(S.safeParse({ item: "itf", effective_from: "2026-12-01", rate: "1", base: "basic" }))).toEqual({ base: "Not a base for this" });
+    const at = { effective_from: "2026-12-01", ...SOURCE };
+    expect(fields(S.safeParse({ item: "nhf", ...at, rate: "101" }))).toEqual({ rate: "At most 100" });
+    expect(fields(S.safeParse({ item: "nhf", ...at, rate: "two" }))).toEqual({ rate: "Enter a rate" });
+    expect(fields(S.safeParse({ item: "nhf", ...at }))).toEqual({ rate: "Enter a rate" });
+    expect(fields(S.safeParse({ item: "relief", ...at, rate: "0", flat_amount: "0.00" }))).toEqual({ flat_amount: "Enter an amount or rate" });
+    expect(fields(S.safeParse({ item: "itf", ...at, rate: "1", flat_amount: "5.00" }))).toEqual({ flat_amount: "Only relief has one" });
+    expect(fields(S.safeParse({ item: "itf", ...at, rate: "1", base: "basic" }))).toEqual({ base: "Not a base for this" });
+  });
+
+  test("every version names its source, or No Legal Source with a reason; never neither, never both (§6.12 rule 12)", () => {
+    const at = { item: "nhf", rate: "2", effective_from: "2026-12-01" };
+    // Neither: each missing part on its own field, carrying SOURCE_REQUIRED so the API answers with it.
+    const none = S.safeParse(at);
+    expect(fields(none)).toEqual({ source_title: "Name the source", source_section: "Name the section", source_checked_on: "Pick the day checked" });
+    expect(none.error.issues.every((i) => i.params && i.params.code === "SOURCE_REQUIRED")).toBe(true);
+    expect(fields(S.safeParse({ ...at, source_title: "TEST SOURCE" }))).toEqual({ source_section: "Name the section", source_checked_on: "Pick the day checked" });
+    // An empty text field is not sent: it counts as missing.
+    expect(fields(S.safeParse({ ...at, ...SOURCE, source_title: "  " }))).toEqual({ source_title: "Name the source" });
+    expect(S.safeParse({ ...at, ...SOURCE }).success).toBe(true);
+    expect(S.safeParse({ ...at, ...SOURCE, source_url: "https://example.test/test-source.pdf", source_document_id: "00000000-0000-4000-8000-000000000009" }).success).toBe(true);
+    expect(fields(S.safeParse({ ...at, ...SOURCE, source_url: "javascript:alert(1)" }))).toEqual({ source_url: "Not a link" });
+    expect(fields(S.safeParse({ ...at, ...SOURCE, source_url: "not a link" }))).toEqual({ source_url: "Not a link" });
+    // No Legal Source: a reason of 10 to 500 characters and nothing of a source.
+    expect(S.safeParse({ ...at, ...NO_SOURCE }).success).toBe(true);
+    const noReason = S.safeParse({ ...at, no_legal_source: true });
+    expect(fields(noReason)).toEqual({ no_source_reason: "Give a reason" });
+    expect(noReason.error.issues[0].params).toEqual({ code: "SOURCE_REQUIRED" });
+    expect(fields(S.safeParse({ ...at, no_legal_source: true, no_source_reason: "Too short" }))).toEqual({ no_source_reason: "At least 10 characters" });
+    expect(fields(S.safeParse({ ...at, ...NO_SOURCE, source_title: "TEST SOURCE" }))).toEqual({ source_title: "Not with No Source" });
+    expect(fields(S.safeParse({ ...at, ...SOURCE, no_source_reason: "A reason without the box ticked" }))).toEqual({ no_source_reason: "Only with No Source" });
+    // A PAYE table names its source once, for every band.
+    expect(fields(S.safeParse({ item: "paye", effective_from: "2026-12-01", bands: TEST.paye.bands.map(({ position, ...b }) => b) }))).toMatchObject({ source_title: "Name the source" });
+  });
+
+  test("the API answers a missing source with SOURCE_REQUIRED, and anything else refused with it as VALIDATION_FAILED", async () => {
+    const { validator } = require("../../shared/http/validate");
+    const refuse = (body) =>
+      new Promise((resolve) => validator({ body: S })({ body, params: {}, query: {} }, {}, (err) => resolve(err ? { code: err.code, status: err.status, fields: err.fields } : null)));
+    expect(await refuse({ item: "nhf", rate: "2", effective_from: "2026-12-01" })).toMatchObject({ code: "SOURCE_REQUIRED", status: 422, fields: { source_title: ["Name the source"] } });
+    expect(await refuse({ item: "nhf", rate: "x", effective_from: "2026-12-01" })).toMatchObject({ code: "VALIDATION_FAILED", fields: { rate: ["Enter a rate"], source_title: ["Name the source"] } });
+    expect(await refuse({ item: "nhf", rate: "2", effective_from: "2026-12-01", ...SOURCE })).toBeNull();
   });
 
   test("the rows written: the side is code, the base the item's own unless another allowed one is named", () => {
-    const paye = rates.rowsOf({ item: "paye", effective_from: "2026-12-01", bands: TEST.paye.bands }, "u1");
-    expect(paye.map((r) => [r.kind, r.base, r.position, r.band_from, r.band_to])).toEqual([
-      ["employee", "taxable", 1, "0.00", "1000000.00"],
-      ["employee", "taxable", 2, "1000000.00", null],
+    const paye = rates.rowsOf({ item: "paye", effective_from: "2026-12-01", bands: TEST.paye.bands, ...SOURCE }, "u1");
+    expect(paye.map((r) => [r.kind, r.base, r.position, r.band_from, r.band_to, r.source_title])).toEqual([
+      ["employee", "taxable", 1, "0.00", "1000000.00", "TEST SOURCE, not a law"],
+      ["employee", "taxable", 2, "1000000.00", null, "TEST SOURCE, not a law"],
     ]);
-    expect(rates.rowsOf({ item: "pension_employer", rate: "6" }, null)).toEqual([
-      { item: "pension_employer", kind: "employer", base: "pensionable", rate: "6", created_by: null },
+    expect(rates.rowsOf({ item: "pension_employer", rate: "6", ...SOURCE }, null)).toEqual([
+      {
+        item: "pension_employer",
+        kind: "employer",
+        base: "pensionable",
+        rate: "6",
+        no_legal_source: false,
+        no_source_reason: null,
+        source_title: "TEST SOURCE, not a law",
+        source_section: "Test section 1",
+        source_url: null,
+        source_document_id: null,
+        source_checked_on: "2026-11-10",
+        created_by: null,
+      },
     ]);
-    expect(rates.rowsOf({ item: "nhf", rate: "2", base: "gross" }, null)[0].base).toBe("gross");
-    expect(rates.rowsOf({ item: "relief", flat_amount: "100.00" }, null)[0]).toMatchObject({ rate: "0", flat_amount: "100.00" });
+    // No Legal Source writes its reason and nothing of a source, as statutory_rate_source_check holds it.
+    expect(rates.rowsOf({ item: "itf", rate: "1", ...NO_SOURCE }, null)[0]).toMatchObject({
+      no_legal_source: true,
+      no_source_reason: "Test rate for this file, not a law",
+      source_title: null,
+      source_section: null,
+      source_checked_on: null,
+    });
+    expect(rates.rowsOf({ item: "nhf", rate: "2", base: "gross", ...SOURCE }, null)[0].base).toBe("gross");
+    expect(rates.rowsOf({ item: "relief", flat_amount: "100.00", ...SOURCE }, null)[0]).toMatchObject({ rate: "0", flat_amount: "100.00" });
     expect(Object.keys(c.statutory.ITEM_BASES).sort()).toEqual(Object.keys(c.statutory.ITEM_KIND).sort());
   });
 
   test("a stored row reads as the contract's StatutoryRate", () => {
-    const row = { statutory_rate_id: "00000000-0000-4000-8000-000000000001", item: "nhf", kind: "employee", base: "basic", rate: "2.500000", band_from: null, band_to: null, flat_amount: null, position: null, effective_from: "2026-12-01", effective_to: null, created_by_name: null, created_at: new Date("2026-11-10T09:00:00Z") };
-    expect(c.statutory.StatutoryRate.parse(rates.present(row))).toMatchObject({ rate: "2.5", position: null });
+    const row = { statutory_rate_id: "00000000-0000-4000-8000-000000000001", item: "nhf", kind: "employee", base: "basic", rate: "2.500000", band_from: null, band_to: null, flat_amount: null, position: null, effective_from: "2026-12-01", effective_to: null, ...SOURCE, source_url: null, source_document_id: null, no_legal_source: false, no_source_reason: null, created_by_name: null, created_at: new Date("2026-11-10T09:00:00Z") };
+    expect(c.statutory.StatutoryRate.parse(rates.present(row))).toMatchObject({ rate: "2.5", position: null, source_title: "TEST SOURCE, not a law", no_legal_source: false });
+  });
+
+  test("an unset PAYE basis reads as annualised; the two flags have no default (§13.2 item 32)", () => {
+    const settings = require("../payroll/payroll.config.repo");
+    expect(settings.REQUIRED_CONVENTIONS).toEqual(["pension_reduces_taxable", "nhf_reduces_taxable"]);
+    expect(settings.conventionsOf({ paye_basis: null, pension_reduces_taxable: true, nhf_reduces_taxable: false })).toEqual({ paye_basis: "annualised", pension_reduces_taxable: true, nhf_reduces_taxable: false });
+    expect(settings.conventionsOf({ paye_basis: "monthly", pension_reduces_taxable: null, nhf_reduces_taxable: null })).toEqual({ paye_basis: "monthly", pension_reduces_taxable: null, nhf_reduces_taxable: null });
+    // An unset basis computes exactly as annualised does.
+    const person = { gross: "200000.00", basic: "100000.00", pensionable: "150000.00" };
+    const unset = calc.computeStatutory({ ...person, rates: TEST, conventions: settings.conventionsOf({ pension_reduces_taxable: true, nhf_reduces_taxable: true }) });
+    expect(unset).toEqual(calc.computeStatutory({ ...person, rates: TEST, conventions: REDUCING }));
   });
 });
 
@@ -216,9 +289,11 @@ describe("the statutory report (§6.12 rule 6)", () => {
     config_snapshot: {
       conventions: REDUCING,
       statutory_rates: [
-        { item: "paye", base: "taxable", rate: "10" },
-        { item: "pension_employee", base: "pensionable", rate: "5" },
+        { item: "paye", base: "taxable", rate: "10", ...SOURCE, source_url: "https://example.test/test-source.pdf", no_legal_source: false, no_source_reason: null },
+        { item: "pension_employee", base: "pensionable", rate: "5", ...NO_SOURCE },
+        // A row of a snapshot taken before sources were kept: it has none of the source keys.
         { item: "itf", base: "annual_payroll", rate: "1" },
+        { item: "relief", base: "gross", rate: "10", flat_amount: "100000.00", ...NO_SOURCE },
       ],
     },
   };
@@ -247,6 +322,14 @@ describe("the statutory report (§6.12 rule 6)", () => {
       ["Employee Pension", "Employee", "5%", "pensionable pay", "Pension PIN", "₦20,000.00"],
       ["ITF", "Employer", "1%", "payroll", null, "₦4,500.00"],
     ]);
+    // Each item's source as the snapshot holds it; a row from before sources were kept reads as 6040 marked it.
+    expect(vars.items.map((i) => [i.source_label, i.source_link])).toEqual([
+      ["TEST SOURCE, not a law, Test section 1. Checked 10/11/2026", "https://example.test/test-source.pdf"],
+      ["No Legal Source: Test rate for this file, not a law", null],
+      ["No Legal Source: Entered before sources were required", null],
+    ]);
+    expect(vars.relief_source_label).toBe("No Legal Source: Test rate for this file, not a law");
+    expect(report.varsOf({ ...run, config_snapshot: { ...run.config_snapshot, statutory_rates: [] } }, lines).relief_source_label).toBeNull();
     expect(vars.items[0].rows.map((r) => [r.employee_name, r.statutory_number, r.base, r.amount])).toEqual([
       ["Ada Tester", "TIN-TEST", "₦371,666.67", "₦66,000.00"],
       ["Bola Tester", null, "₦240,666.67", "₦39,800.00"],
@@ -262,6 +345,8 @@ describe("the statutory report (§6.12 rule 6)", () => {
     expect(html).toContain("Not Set");
     expect(html).not.toContain("<script>x");
     expect(html.match(/<section class="sr-item">/g)).toHaveLength(4);
+    expect(html).toContain("Source: TEST SOURCE, not a law, Test section 1. Checked 10/11/2026 · https://example.test/test-source.pdf");
+    expect(html).toContain("Relief Source");
     // An employer item has no person's number: no column for it.
     expect(html.indexOf("ITF")).toBeGreaterThan(-1);
   });
@@ -275,6 +360,7 @@ describe("the routes", () => {
       ["GET", "/rates", { key: "payroll", action: "view" }, null],
       ["GET", "/items", { key: "payroll", action: "view" }, null],
       ["POST", "/rates", { key: "payroll", action: "edit" }, "payroll.configure"],
+      ["DELETE", "/rates/:item/versions/:effective_from", { key: "payroll", action: "edit" }, "payroll.configure"],
     ]);
   });
 
@@ -283,6 +369,7 @@ describe("the routes", () => {
     const find = (method, path) => routes.find((r) => r.method === method && r.path === path);
     expect(find("GET", "/settings")).toMatchObject({ permission: { key: "payroll", action: "view" } });
     expect(find("PATCH", "/settings")).toMatchObject({ permission: { key: "payroll", action: "edit" }, capability: "payroll.configure" });
+    expect(find("DELETE", "/settings/versions/:effective_from")).toMatchObject({ permission: { key: "payroll", action: "edit" }, capability: "payroll.configure" });
     expect(find("POST", "/runs/:id/statutory-report")).toMatchObject({ permission: { key: "payroll", action: "export" } });
   });
 });

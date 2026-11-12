@@ -9,6 +9,7 @@
   .sr-item { margin: 0 0 6mm 0; }
   .sr-h { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; color: #014339; margin: 5mm 0 0.5mm 0; }
   .sr-sub { font-size: 9pt; color: #71717A; margin: 0 0 1.5mm 0; }
+  .sr-source { font-size: 8.5pt; color: #3F3F46; margin: 0 0 1.5mm 0; }
   .sr-lines { margin: 0; width: 100%; }
   .sr-lines th { font-size: 9pt; }
   .sr-lines tr { page-break-inside: avoid; }
@@ -27,6 +28,7 @@
       <tr><td class="sr-key">PAYE Basis</td><td class="sr-val">{{ paye_basis_label }}</td></tr>
       <tr><td class="sr-key">Pension Reduces Taxable Pay</td><td class="sr-val">{{ pension_reduces_label }}</td></tr>
       <tr><td class="sr-key">NHF Reduces Taxable Pay</td><td class="sr-val">{{ nhf_reduces_label }}</td></tr>
+      {{#if relief_source_label}}<tr><td class="sr-key">Relief Source</td><td class="sr-val">{{ relief_source_label }}</td></tr>{{/if}}
     </table>
   </div>
 
@@ -34,6 +36,7 @@
   <section class="sr-item">
     <h2 class="sr-h">{{ label }}</h2>
     <p class="sr-sub">{{ kind_label }} · {{ rate_label }} of {{ base_label }}</p>
+    <p class="sr-source">Source: {{ source_label }}{{#if source_link}} · {{ source_link }}{{/if}}</p>
     <table class="sr-lines">
       <thead>
         <tr>

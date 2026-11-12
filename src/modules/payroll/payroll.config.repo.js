@@ -2,8 +2,9 @@
 /**
  * The payroll setting as it stood on a date (docs/guides/payroll.md §4.2, §6.11). It is effective-dated
  * (`shared/db/effective-dated`): read here with `versionOn`, written with `addVersion` by the settings
- * route (PR 5). With no row the run is simple, the pay day is the default 30 and bank details are a
- * warning; nothing is seeded (A26), so the defaults below are the whole of "no setting".
+ * route (PR 5), and taken back with `removeVersion` (Remove Change, PR 10). With no row the run is simple,
+ * the pay day is the default 30 and bank details are a warning; nothing is seeded (A26), so the defaults
+ * below are the whole of "no setting".
  *
  *   settingOn(db, date)   the version in force on a date, or the defaults
  *   payDayOf(setting)     the pay day, 30 when none is set
@@ -96,8 +97,30 @@ async function nextPayDate(db, today, isPaid) {
  * Configurations (PR 5): the setting's versions, and the rule every configuration change keeps
  * ------------------------------------------------------------------ */
 
-/** The three conventions of §6.12 rule 1: the accountant's choices, none with a default. */
+/** The three conventions of §6.12 rule 1: the accountant's choices, stored on the setting. */
 const CONVENTIONS = Object.freeze(["paye_basis", "pension_reduces_taxable", "nhf_reduces_taxable"]);
+
+/**
+ * The conventions switching on needs (409 NO_CONVENTIONS) and a run needs set: whether pension, and NHF, reduce taxable
+ * pay. PAYE Basis left the screen in PR 10 (§6.12 rule 11), so it is not among them (§13.2 item 32).
+ */
+const REQUIRED_CONVENTIONS = Object.freeze(["pension_reduces_taxable", "nhf_reduces_taxable"]);
+
+/** How an unset PAYE basis is read (§13.2 item 32): the bands as the law publishes them, annual amounts, the tax ÷ 12. */
+const UNSET_PAYE_BASIS = "annualised";
+
+/**
+ * The conventions a run computes with, from a setting: the two flags as set (null when not), and the PAYE basis as set
+ * or, unset, `annualised`.
+ * @param {object} setting  a version of the setting, or the defaults
+ */
+function conventionsOf(setting) {
+  return {
+    paye_basis: setting.paye_basis ?? UNSET_PAYE_BASIS,
+    pension_reduces_taxable: setting.pension_reduces_taxable ?? null,
+    nhf_reduces_taxable: setting.nhf_reduces_taxable ?? null,
+  };
+}
 
 /**
  * A configuration change starts today or later in Lagos, never earlier (§6.11 rule 3): the setting, a statutory rate,
@@ -161,10 +184,24 @@ function writeVersion(client, from, data) {
   return effective.addVersion(client, { table: "payroll_setting", key: { scope: "organisation" }, from, data, writable: WRITABLE, replace: true });
 }
 
+/**
+ * Remove Change: the version of the setting that starts on `from`, a day still to come, is taken back and the version
+ * before it runs on (shared/db/effective-dated removeVersion; 409 VERSION_IN_FORCE once it has started, 404 for a day no
+ * version starts on). Inside the caller's transaction.
+ * @param {import("pg").PoolClient} client
+ * @param {string} from
+ */
+function removeVersion(client, from) {
+  return effective.removeVersion(client, { table: "payroll_setting", key: { scope: "organisation" }, from });
+}
+
 module.exports = {
   DEFAULT_PAY_DAY,
   DEFAULTS,
   CONVENTIONS,
+  REQUIRED_CONVENTIONS,
+  UNSET_PAYE_BASIS,
+  conventionsOf,
   settingOn,
   payDayOf,
   payDateOf,
@@ -176,4 +213,5 @@ module.exports = {
   lockLatest,
   hasBeenOn,
   writeVersion,
+  removeVersion,
 };

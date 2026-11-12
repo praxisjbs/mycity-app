@@ -8,7 +8,13 @@
  *   list(query)                 GET /statutory/rates, 25 a page
  *   items()                     GET /statutory/items: the seven items, each with today's version and the next
  *   save(actor, body)           POST /statutory/rates (`payroll.configure`): a version from today or later, never
- *                               backdated (422 EFFECTIVE_IN_THE_PAST, payroll.config.repo); one starting that day is replaced
+ *                               backdated (422 EFFECTIVE_IN_THE_PAST, payroll.config.repo); one starting that day is
+ *                               replaced. It carries its legal source or No Legal Source (the contract refuses neither,
+ *                               SOURCE_REQUIRED); the day checked is not still to come (422 CHECKED_IN_THE_FUTURE); a
+ *                               document it names is claimed from the upload engine as a `statutory_source`
+ *   removeChange(actor, p)      DELETE /statutory/rates/:item/versions/:effective_from (`payroll.configure`): Remove
+ *                               Change of a version still to come; the version before it runs on. 409 VERSION_IN_FORCE
+ *                               once it has started, or when an advanced run sent for approval read it
  *   requestReport(actor, id)    POST /payroll/runs/:id/statutory-report: an approved or paid advanced run's report
  *   assertMayReadReport(user)   a reader whose role hides pay or tax numbers is not handed the report (403)
  */
@@ -18,12 +24,14 @@ const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { canSee } = require("../../shared/rbac/field-mask");
+const vault = require("../../shared/documents/vault");
 const lagos = require("../../shared/time/lagos");
 const { assertNotPast } = require("../payroll/payroll.config.repo");
+const lock = require("../payroll/payroll.lock");
 const rates = require("./statutory.rates");
 const report = require("./statutory.report");
 const repo = require("./statutory.repo");
-const { EVENTS } = require("./statutory.events");
+const { EVENTS, SOURCE_DOC_TYPE } = require("./statutory.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -52,6 +60,7 @@ function brief(item, rows) {
     base: r.base,
     bands: item === "paye" ? mine.length : null,
     effective_from: r.effective_from,
+    ...rates.sourceOf(r),
   };
 }
 
@@ -71,21 +80,82 @@ async function items() {
   };
 }
 
+/** The day a source was read is today or before, in Lagos: nobody has checked a law on a day still to come. */
+function assertCheckedBefore(body) {
+  if (body.source_checked_on && body.source_checked_on > lagos.today())
+    throw new AppError("CHECKED_IN_THE_FUTURE", "The day checked is today or earlier", 422, { source_checked_on: ["Not after today"] });
+}
+
+/**
+ * The instrument a version names, in the vault: a file the person staged through the upload engine is claimed for the
+ * version (`statutory_source`, restricted); one an earlier version already holds is named again as it is, since one law
+ * serves many versions. Anything else is refused on the field (422 DOCUMENT_NOT_STAGED, vault.claim).
+ */
+async function claimSource(client, documentId, versionRowId, actor) {
+  if (!documentId) return null;
+  const held = await vault.get(client, documentId);
+  if (held && held.doc_type === SOURCE_DOC_TYPE && held.is_current && held.scan_status !== "infected") return held;
+  return vault.claim(client, {
+    document_id: documentId,
+    doc_type: SOURCE_DOC_TYPE,
+    entity: { type: "statutory_return", id: versionRowId },
+    actor,
+    field: "source_document_id",
+    sensitivity: "restricted",
+  });
+}
+
+/** What an audit line says of a version's source: whether it has one, and the instrument named; never a figure. */
+const sourceAudit = (row) => ({
+  no_legal_source: row.no_legal_source === true,
+  source_title: row.source_title ?? null,
+  source_section: row.source_section ?? null,
+  source_document_id: row.source_document_id ?? null,
+});
+
 /** POST /statutory/rates: the version's rows, as a page. */
 async function save(actor, body) {
   assertNotPast(body.effective_from);
+  assertCheckedBefore(body);
   await tx(async (client) => {
     const written = await rates.saveVersion(client, body, actor);
+    await claimSource(client, body.source_document_id, written[0].statutory_rate_id, actor);
+    const facts = { item: body.item, effective_from: body.effective_from, rows: written.length, ...sourceAudit(written[0]) };
     await emit(client, {
       key: EVENTS.STATUTORY_RATE_SAVED,
       entity: { type: "statutory_return", id: written[0].statutory_rate_id },
       actor,
-      after: { item: body.item, effective_from: body.effective_from, rows: written.length },
-      payload: { item: body.item, effective_from: body.effective_from, rows: written.length },
+      after: facts,
+      payload: facts,
     });
   });
   const page = await repo.versionRows(pool, body.item, body.effective_from);
   return { ...page, data: page.data.map(rates.present) };
+}
+
+/**
+ * DELETE /statutory/rates/:item/versions/:effective_from: Remove Change. A version still to come is taken back and the
+ * version before it runs on again. One that has started is history (409 VERSION_IN_FORCE, shared/db/effective-dated);
+ * so is one an advanced run sent for approval, approved or paid was computed with (payroll.lock, §13.2 item 34). The
+ * run of its month is locked first, then the item's versions, the order Compute takes them in.
+ * @param {object} actor
+ * @param {{item: string, effective_from: string}} version  StatutoryVersionParams
+ */
+async function removeChange(actor, version) {
+  await tx(async (client) => {
+    if (version.effective_from > lagos.today()) await lock.assertVersionUnread(client, version.effective_from, { advancedOnly: true });
+    const { removed, reopened } = await rates.removeVersion(client, version);
+    const facts = { item: version.item, effective_from: version.effective_from, rows: removed.length };
+    const runsOn = reopened.length ? { effective_from: String(reopened[0].effective_from).slice(0, 10), rows: reopened.length } : null;
+    await emit(client, {
+      key: EVENTS.STATUTORY_RATE_REMOVED,
+      entity: { type: "statutory_return", id: removed[0].statutory_rate_id },
+      actor,
+      before: { ...facts, ...sourceAudit(removed[0]) },
+      after: { item: version.item, runs_on: runsOn },
+      payload: { ...facts, runs_on: runsOn },
+    });
+  });
 }
 
 /** The report carries pay and tax numbers: a reader whose role hides either is refused it. */
@@ -97,4 +167,4 @@ async function assertMayReadReport(user) {
 /** POST /payroll/runs/:id/statutory-report: 202 with the file the screen waits on. */
 const requestReport = (actor, runId) => tx((client) => report.requestReport(client, runId, { actor }));
 
-module.exports = { list, items, save, assertMayReadReport, requestReport };
+module.exports = { list, items, save, removeChange, assertMayReadReport, requestReport };

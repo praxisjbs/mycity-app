@@ -90,7 +90,7 @@ async function lockRunsOfPeriods(client, periods) {
   // pagination:complete the runs of the at most twelve months one deduction's instalments fall in
   const { rows } = await completeQuery(
     client,
-    `SELECT payroll_run_id, period::text AS period, status FROM payroll_run
+    `SELECT payroll_run_id, period::text AS period, status, advanced FROM payroll_run
       WHERE period = ANY($1::date[]) ORDER BY period FOR UPDATE`,
     [periods],
     { label: "The runs of a deduction's months", ceiling: 24 },

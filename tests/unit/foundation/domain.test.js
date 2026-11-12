@@ -339,6 +339,80 @@ describe("effective dating", () => {
     await expect(ed.addVersion(c, { table: "salary_assignment", key: { employee_id: "e1" }, from: "2026-11-01", data: {} }))
       .rejects.toMatchObject({ status: 409, code: "VERSION_EXISTS" });
   });
+
+  describe("removeVersion: Remove Change of a version still to come", () => {
+    const key = { employee_id: "e1" };
+
+    test("locks the key, takes out every row of the version, and lets the version before run on to the next one", async () => {
+      const c = client([
+        { rows: [] }, // the lock
+        { rows: [{ effective_from: "2026-12-01" }] }, // a version starts that day
+        { rows: [{ effective_from: "2027-01-01" }] }, // the next version's first day
+        { rows: [{ id: "taken-1" }, { id: "taken-2" }] }, // taken out
+        { rows: [{ id: "before" }] }, // runs on
+      ]);
+      const r = await ed.removeVersion(c, { table: "salary_assignment", key, from: "2026-12-01", today: "2026-11-11" });
+      expect(c.calls[0].sql).toMatch(/FOR UPDATE/);
+      expect(c.calls[3].sql).toMatch(/^DELETE FROM "salary_assignment" WHERE .* effective_from = \$2::date RETURNING \*$/);
+      expect(c.calls[3].params).toEqual(["e1", "2026-12-01"]);
+      // The version before ended on the taken one's first day; it now ends where that one did.
+      expect(c.calls[4].sql).toMatch(/SET effective_to = \$3::date WHERE .* AND effective_to = \$2::date/);
+      expect(c.calls[4].params).toEqual(["e1", "2026-12-01", "2027-01-01"]);
+      expect(r).toEqual({ removed: [{ id: "taken-1" }, { id: "taken-2" }], reopened: [{ id: "before" }] });
+    });
+
+    test("the last version taken back leaves the one before open", async () => {
+      const c = client([{ rows: [] }, { rows: [{ effective_from: "2026-12-01" }] }, { rows: [{ effective_from: null }] }, { rows: [{}] }, { rows: [] }]);
+      await ed.removeVersion(c, { table: "salary_assignment", key, from: "2026-12-01", today: "2026-11-11" });
+      expect(c.calls[4].params).toEqual(["e1", "2026-12-01", null]);
+    });
+
+    test("a version in force today or before is history: 409 VERSION_IN_FORCE, nothing taken out", async () => {
+      for (const today of ["2026-12-01", "2026-12-15"]) {
+        const c = client([{ rows: [] }, { rows: [{ effective_from: "2026-12-01" }] }]);
+        await expect(ed.removeVersion(c, { table: "salary_assignment", key, from: "2026-12-01", today })).rejects.toMatchObject({
+          status: 409,
+          code: "VERSION_IN_FORCE",
+          fields: { effective_from: ["Already in force"] },
+        });
+        expect(c.calls.some((x) => /^(DELETE|UPDATE)\b/.test(x.sql))).toBe(false);
+      }
+    });
+
+    test("a day no version starts on is a 404", async () => {
+      const c = client([{ rows: [] }, { rows: [] }]);
+      await expect(ed.removeVersion(c, { table: "salary_assignment", key, from: "2026-12-02", today: "2026-11-11" })).rejects.toMatchObject({ status: 404, code: "NOT_FOUND" });
+    });
+  });
+});
+
+describe("the request validator", () => {
+  const { z } = require("zod");
+  const { validator, refusedAs, codeOf } = require("../../../src/shared/http/validate");
+  const named = z
+    .object({ title: z.string().optional(), size: z.number().optional() })
+    .strict()
+    .superRefine((v, ctx) => {
+      if (!v.title) ctx.addIssue({ code: "custom", path: ["title"], message: "Name it", params: { code: "TITLE_REQUIRED" } });
+    });
+  const refuse = (body) =>
+    new Promise((resolve) => validator({ body: named })({ body, params: {}, query: {} }, {}, (err) => resolve(err ? [err.code, err.fields] : null)));
+
+  test("a refusal whose every issue names one rule of the contract's is answered with that rule's code", async () => {
+    expect(await refuse({})).toEqual(["TITLE_REQUIRED", { title: ["Name it"] }]);
+  });
+
+  test("anything else refused beside it, or nothing named, is VALIDATION_FAILED as before", async () => {
+    expect(await refuse({ size: "big" })).toEqual(["VALIDATION_FAILED", { size: ["Expected number, received string"] }]);
+    const both = z.object({ a: z.string() }).superRefine((v, ctx) => ctx.addIssue({ code: "custom", path: ["a"], message: "No", params: { code: "A_RULE" } }));
+    const mixed = await new Promise((resolve) => validator({ body: both, query: named })({ body: { a: "x" }, query: {}, params: {} }, {}, (err) => resolve(err.code)));
+    expect(mixed).toBe("VALIDATION_FAILED");
+    expect(await refuse({ title: "A", extra: 1 })).toEqual(["VALIDATION_FAILED", { extra: ["is not allowed"] }]);
+    expect(await refuse({ title: "A" })).toBeNull();
+    expect(refusedAs([])).toBe("VALIDATION_FAILED");
+    expect(refusedAs(["A_RULE", null])).toBe("VALIDATION_FAILED");
+    expect(codeOf({ code: "custom", params: { code: "lower" } })).toBeNull();
+  });
 });
 
 describe("phone numbers (contract)", () => {

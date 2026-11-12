@@ -8,7 +8,8 @@
  *
  * THE RATES HERE ARE TEST RATES. Every rate, band and relief below is invented for this file and labelled so; none is
  * Nigerian law, none is in any seed, and none may be copied into one (§6.12 rule 5). They are round figures so the
- * expected amounts can be worked by hand in the comments.
+ * expected amounts can be worked by hand in the comments. Each version names a TEST SOURCE, labelled so: no instrument
+ * says any of them; it only meets the rule that every version names its source or No Legal Source (PR 10).
  *
  * Configurations refuses a day in the past, so the configuration is entered with Lagos's "today" moved back (a spy on
  * shared/time/lagos.today), exactly as MyCity would enter it ahead of the month: the employee pension from 1 September
@@ -48,23 +49,35 @@ const SEP = "2026-09-01";
 const OCT = "2026-10-01";
 const NOV = "2026-11-01";
 
-/** TEST RATES, invented for this file (never law, never seeded). PAYE bands are annual: the run is annualised. */
+/** A TEST SOURCE, labelled: no instrument says any of the test rates (§6.12 rule 12 asks every version for one). */
+const TEST_SOURCE = { source_title: "TEST SOURCE, not a law", source_section: "Test section 1", source_checked_on: "2026-08-01" };
+const NO_SOURCE = { no_legal_source: true, no_source_reason: "Test rate for this file, not a law" };
+
+/**
+ * TEST RATES, invented for this file (never law, never seeded). PAYE bands are annual: the run is annualised, the
+ * reading of an unset PAYE basis (§13.2 item 32).
+ */
 const TEST_RATES = {
-  pension_employee: { item: "pension_employee", rate: "5" },
-  pension_employer: { item: "pension_employer", rate: "6" },
-  nhf: { item: "nhf", rate: "2" },
-  relief: { item: "relief", rate: "10", flat_amount: "100000.00" },
-  itf: { item: "itf", rate: "1" },
-  nsitf: { item: "nsitf", rate: "1" },
+  pension_employee: { item: "pension_employee", rate: "5", ...TEST_SOURCE },
+  pension_employer: { item: "pension_employer", rate: "6", ...TEST_SOURCE },
+  nhf: { item: "nhf", rate: "2", ...TEST_SOURCE },
+  relief: { item: "relief", rate: "10", flat_amount: "100000.00", ...NO_SOURCE },
+  itf: { item: "itf", rate: "1", ...TEST_SOURCE },
+  nsitf: { item: "nsitf", rate: "1", ...TEST_SOURCE },
   paye: {
     item: "paye",
+    ...TEST_SOURCE,
     bands: [
       { band_from: "0.00", band_to: "1000000.00", rate: "10" },
       { band_from: "1000000.00", band_to: null, rate: "20" },
     ],
   },
 };
-const CONVENTIONS = { paye_basis: "annualised", pension_reduces_taxable: true, nhf_reduces_taxable: true };
+/** The conventions the screen asks for when switching on; PAYE Basis left it in PR 10. */
+const CONVENTIONS = { pension_reduces_taxable: true, nhf_reduces_taxable: true };
+/** What a run computes with from them: an unset basis reads as annualised. */
+const COMPUTED_CONVENTIONS = { paye_basis: "annualised", ...CONVENTIONS };
+const pdf = () => Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -96,6 +109,13 @@ describeDb("the advanced option against the real migrations", () => {
     post: (path, body = {}) => request(app).post(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
     put: (path, body = {}) => request(app).put(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
     patch: (path, body = {}) => request(app).patch(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
+    del: (path) => request(app).delete(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`),
+    stage: () =>
+      request(app)
+        .post("/api/v1/documents")
+        .set("Authorization", `Bearer ${tokens[who]}`)
+        .field("purpose", "document")
+        .attach("file", pdf(), { filename: "test-source.pdf", contentType: "application/pdf" }),
   });
   const employeeId = (who) => ids[who] || people[who].employee.employee_id;
 
@@ -304,7 +324,8 @@ describeDb("the advanced option against the real migrations", () => {
         expect.objectContaining({ item: "pension_employee", kind: "employee", base: "pensionable", rate: "5", effective_from: SEP, effective_to: null }),
       ]);
 
-      const noConventions = await as("ops").patch("/payroll/settings", { effective_from: SEP, advanced_enabled: true, paye_basis: "annualised" });
+      // PAYE Basis is not asked (§13.2 item 32): the two flags are what switching on needs.
+      const noConventions = await as("ops").patch("/payroll/settings", { effective_from: SEP, advanced_enabled: true });
       expect(noConventions.status).toBe(409);
       expect(noConventions.body.error).toMatchObject({
         code: "NO_CONVENTIONS",
@@ -315,12 +336,12 @@ describeDb("the advanced option against the real migrations", () => {
       expect(on1.status).toBe(200);
       // It starts later: today is still simple, the next version is the advanced one.
       expect(on1.body).toMatchObject({ advanced_enabled: false, advanced_has_been_on: true, current: null });
-      expect(on1.body.next).toMatchObject({ advanced_enabled: true, paye_basis: "annualised", effective_from: SEP, changed_by_name: "Tunde Bakare" });
+      expect(on1.body.next).toMatchObject({ advanced_enabled: true, paye_basis: null, pension_reduces_taxable: true, effective_from: SEP, changed_by_name: "Tunde Bakare" });
 
       // A second change for the same day joins that day's version.
       const payDay = await as("ops").patch("/payroll/settings", { effective_from: SEP, pay_day: 28 });
       expect(payDay.status).toBe(200);
-      expect(payDay.body.next).toMatchObject({ advanced_enabled: true, pay_day: 28, paye_basis: "annualised" });
+      expect(payDay.body.next).toMatchObject({ advanced_enabled: true, pay_day: 28, nhf_reduces_taxable: true });
       expect((await q("SELECT count(*)::int AS n FROM payroll_setting")).rows[0].n).toBe(1);
     });
     const audit = await one(`SELECT count(*)::int AS n FROM event_log WHERE event_key = 'payroll_setting.changed'`);
@@ -336,6 +357,7 @@ describeDb("the advanced option against the real migrations", () => {
       const first = await as("ops").post("/statutory/rates", {
         item: "paye",
         effective_from: OCT,
+        ...TEST_SOURCE,
         bands: [
           { band_from: "0.00", band_to: "500000.00", rate: "5" },
           { band_from: "500000.00", band_to: "1000000.00", rate: "10" },
@@ -481,8 +503,11 @@ describeDb("the advanced option against the real migrations", () => {
       (await one(`SELECT sum(employer_total)::text AS s FROM payslip WHERE payroll_run_id = $1 AND status <> 'excluded'`, [runs.oct])).s,
     );
     const snapshot = (await one(`SELECT config_snapshot FROM payroll_run WHERE payroll_run_id = $1`, [runs.oct])).config_snapshot;
-    expect(snapshot).toMatchObject({ advanced: true, conventions: CONVENTIONS, statutory_missing: [] });
+    // The basis was never set: the run read it as annualised, and kept each rate's source with its figure.
+    expect(snapshot).toMatchObject({ advanced: true, conventions: COMPUTED_CONVENTIONS, statutory_missing: [] });
     expect(snapshot.statutory_rates.filter((r) => r.item === "paye")).toHaveLength(2);
+    expect(snapshot.statutory_rates.find((r) => r.item === "nhf")).toMatchObject({ source_title: "TEST SOURCE, not a law", source_section: "Test section 1", no_legal_source: false });
+    expect(snapshot.statutory_rates.find((r) => r.item === "relief")).toMatchObject({ no_legal_source: true, no_source_reason: NO_SOURCE.no_source_reason });
     expect((await problemsOf(runs.oct)).some((p) => p.code === "NO_RATES")).toBe(false);
   });
 
@@ -493,7 +518,7 @@ describeDb("the advanced option against the real migrations", () => {
       const off = await as("ops").patch("/payroll/settings", { effective_from: NOV, advanced_enabled: false });
       expect(off.status).toBe(200);
       expect(off.body).toMatchObject({ advanced_enabled: true, advanced_has_been_on: true });
-      expect(off.body.next).toMatchObject({ advanced_enabled: false, paye_basis: "annualised", pay_day: 28 });
+      expect(off.body.next).toMatchObject({ advanced_enabled: false, paye_basis: null, pay_day: 28 });
     });
     await as("ops").post(`/payroll/runs/${runs.oct}/compute`);
     const pension = (await lines(runs.oct, "ada")).find((l) => l.code === "pension_employee");
@@ -535,6 +560,10 @@ describeDb("the advanced option against the real migrations", () => {
     expect(doc.render_html).toContain("₦66,000.00");
     expect(doc.render_html).toContain("₦371,666.67");
     expect(doc.render_html).toContain("Annualised");
+    // Each item's source as the run kept it, and the relief's (§6.12 rules 6 and 12).
+    expect(doc.render_html).toContain("Source: TEST SOURCE, not a law, Test section 1. Checked 01/08/2026");
+    expect(doc.render_html).toContain("Relief Source");
+    expect(doc.render_html).toContain("No Legal Source: Test rate for this file, not a law");
     const event = await one(`SELECT payload FROM event_log WHERE event_key = 'payroll_run.statutory_report_requested' ORDER BY occurred_at DESC LIMIT 1`);
     expect(event.payload).toMatchObject({ payroll_run_id: runs.oct, document_id: report.body.document_id });
     expect(JSON.stringify(event.payload)).not.toMatch(/66000|371666/);
@@ -549,6 +578,170 @@ describeDb("the advanced option against the real migrations", () => {
     const report = await as("ops").post(`/payroll/runs/${runs.aug}/statutory-report`);
     expect(report.status).toBe(409);
     expect(report.body.error.code).toBe("ADVANCED_OFF");
+  });
+
+  test("every version names its source or No Legal Source: SOURCE_REQUIRED on the field, a document from the vault", async () => {
+    const at = { item: "nhf", rate: "3", effective_from: "2027-02-01" };
+    const none = await as("ops").post("/statutory/rates", at);
+    expect(none.status).toBe(422);
+    expect(none.body.error).toMatchObject({
+      code: "SOURCE_REQUIRED",
+      fields: { source_title: ["Name the source"], source_section: ["Name the section"], source_checked_on: ["Pick the day checked"] },
+    });
+    const noReason = await as("ops").post("/statutory/rates", { ...at, no_legal_source: true });
+    expect(noReason.body.error).toMatchObject({ code: "SOURCE_REQUIRED", fields: { no_source_reason: ["Give a reason"] } });
+    const both = await as("ops").post("/statutory/rates", { ...at, ...TEST_SOURCE, ...NO_SOURCE });
+    expect(both.body.error).toMatchObject({ code: "VALIDATION_FAILED", fields: { source_title: ["Not with No Source"] } });
+    const later = await as("ops").post("/statutory/rates", { ...at, ...TEST_SOURCE, source_checked_on: "2099-01-01" });
+    expect(later.status).toBe(422);
+    expect(later.body.error).toMatchObject({ code: "CHECKED_IN_THE_FUTURE", fields: { source_checked_on: ["Not after today"] } });
+
+    // The instrument goes through the upload engine and is claimed by the save; a file someone else staged is refused.
+    const theirs = await as("clerk").stage();
+    expect(theirs.status).toBe(201);
+    const stolen = await as("ops").post("/statutory/rates", { ...at, ...TEST_SOURCE, source_document_id: theirs.body.document_id });
+    expect([stolen.status, stolen.body.error.fields]).toEqual([422, { source_document_id: ["Upload it again"] }]);
+    const mine = await as("ops").stage();
+    const saved = await as("ops").post("/statutory/rates", {
+      ...at,
+      ...TEST_SOURCE,
+      source_url: "https://example.test/test-source.pdf",
+      source_document_id: mine.body.document_id,
+    });
+    expect(saved.status).toBe(201);
+    expect(saved.body.data).toEqual([
+      expect.objectContaining({
+        item: "nhf",
+        effective_from: "2027-02-01",
+        source_title: "TEST SOURCE, not a law",
+        source_section: "Test section 1",
+        source_url: "https://example.test/test-source.pdf",
+        source_document_id: mine.body.document_id,
+        source_checked_on: "2026-08-01",
+        no_legal_source: false,
+        no_source_reason: null,
+      }),
+    ]);
+    const doc = await one("SELECT doc_type, sensitivity, entity_type FROM document WHERE document_id = $1", [mine.body.document_id]);
+    expect(doc).toEqual({ doc_type: "statutory_source", sensitivity: "restricted", entity_type: "statutory_return" });
+    // Restricted: payroll edit opens it, an employee does not even learn it exists.
+    expect((await as("ops").get(`/documents/${mine.body.document_id}`)).status).toBe(200);
+    expect((await as("staff").get(`/documents/${mine.body.document_id}`)).status).toBe(404);
+
+    // One law serves many versions: a later one names the same document again.
+    const again = await as("ops").post("/statutory/rates", { item: "nhf", rate: "4", effective_from: "2027-03-01", ...TEST_SOURCE, source_document_id: mine.body.document_id });
+    expect(again.status).toBe(201);
+    const noSource = await as("ops").post("/statutory/rates", { item: "itf", rate: "1", effective_from: "2027-02-01", ...NO_SOURCE });
+    expect(noSource.status).toBe(201);
+    expect(noSource.body.data[0]).toMatchObject({ no_legal_source: true, no_source_reason: NO_SOURCE.no_source_reason, source_title: null });
+
+    // The items carry the source back, current and next.
+    const items = (await as("ops").get("/statutory/items")).body.items;
+    const nhf = items.find((i) => i.item === "nhf");
+    expect(nhf.current).toMatchObject({ effective_from: OCT, source_title: "TEST SOURCE, not a law", no_legal_source: false });
+    expect(nhf.next).toMatchObject({ effective_from: "2027-02-01", source_document_id: mine.body.document_id });
+    expect(items.find((i) => i.item === "relief").current).toMatchObject({ no_legal_source: true, source_title: null });
+
+    // The table holds a row to one or the other, whoever writes it.
+    const bare = q(
+      `INSERT INTO statutory_rate (item, kind, base, rate, effective_from, effective_to) VALUES ('nsitf', 'employer', 'annual_payroll', 1, '2020-01-01', '2020-02-01')`,
+    );
+    await expect(bare).rejects.toMatchObject({ code: "23514", constraint: "statutory_rate_source_check" });
+    const event = await one(`SELECT payload FROM event_log WHERE event_key = 'statutory_rate.saved' ORDER BY occurred_at DESC LIMIT 1`);
+    expect(event.payload).toMatchObject({ item: "itf", no_legal_source: true });
+    expect(JSON.stringify(event.payload)).not.toMatch(/"rate"/);
+  });
+
+  test("Remove Change takes back a version still waiting, and the version before it runs on; one in force stays", async () => {
+    const nhfRows = async () =>
+      (await q(`SELECT rate::text AS rate, effective_from::text AS f, effective_to::text AS t FROM statutory_rate WHERE item = 'nhf' ORDER BY effective_from`)).rows;
+    expect(await nhfRows()).toEqual([
+      { rate: "2.000000", f: OCT, t: "2027-02-01" },
+      { rate: "3.000000", f: "2027-02-01", t: "2027-03-01" },
+      { rate: "4.000000", f: "2027-03-01", t: null },
+    ]);
+    expect((await as("clerk").del("/statutory/rates/nhf/versions/2027-02-01")).body.error.code).toBe("CAPABILITY_REQUIRED");
+
+    // The middle version goes: October runs on to March's first day.
+    const middle = await as("ops").del("/statutory/rates/nhf/versions/2027-02-01");
+    expect(middle.status).toBe(204);
+    expect(await nhfRows()).toEqual([
+      { rate: "2.000000", f: OCT, t: "2027-03-01" },
+      { rate: "4.000000", f: "2027-03-01", t: null },
+    ]);
+    // The last goes: October is open again.
+    expect((await as("ops").del("/statutory/rates/nhf/versions/2027-03-01")).status).toBe(204);
+    expect(await nhfRows()).toEqual([{ rate: "2.000000", f: OCT, t: null }]);
+    const nhf = (await as("ops").get("/statutory/items")).body.items.find((i) => i.item === "nhf");
+    expect(nhf).toMatchObject({ current: { effective_from: OCT }, next: null });
+
+    // A version in force is history; a day no version starts on is not found.
+    const inForce = await as("ops").del(`/statutory/rates/nhf/versions/${OCT}`);
+    expect(inForce.status).toBe(409);
+    expect(inForce.body.error).toMatchObject({ code: "VERSION_IN_FORCE", fields: { effective_from: ["Already in force"] } });
+    expect((await as("ops").del("/statutory/rates/nhf/versions/2027-05-01")).status).toBe(404);
+    expect((await as("ops").del("/statutory/rates/nhf/versions/not-a-day")).status).toBe(422);
+
+    // A PAYE table goes whole, and the table before it, two bands, is open again.
+    const table = await as("ops").post("/statutory/rates", {
+      item: "paye",
+      effective_from: "2027-02-01",
+      ...TEST_SOURCE,
+      bands: [
+        { band_from: "0.00", band_to: "500000.00", rate: "5" },
+        { band_from: "500000.00", band_to: "2000000.00", rate: "15" },
+        { band_from: "2000000.00", band_to: null, rate: "25" },
+      ],
+    });
+    expect(table.status).toBe(201);
+    expect((await as("ops").del("/statutory/rates/paye/versions/2027-02-01")).status).toBe(204);
+    const paye = (await q(`SELECT position, effective_from::text AS f, effective_to::text AS t FROM statutory_rate WHERE item = 'paye' ORDER BY position`)).rows;
+    expect(paye).toEqual([
+      { position: 1, f: OCT, t: null },
+      { position: 2, f: OCT, t: null },
+    ]);
+    const removed = (await q(`SELECT payload FROM event_log WHERE event_key = 'statutory_rate.removed' ORDER BY occurred_at`)).rows.map((r) => r.payload);
+    expect(removed.map((p) => [p.item, p.effective_from, p.rows])).toEqual([
+      ["nhf", "2027-02-01", 1],
+      ["nhf", "2027-03-01", 1],
+      ["paye", "2027-02-01", 3],
+    ]);
+    expect(removed[0].runs_on).toEqual({ effective_from: OCT, rows: 1 });
+    expect(JSON.stringify(removed)).not.toMatch(/"rate"/);
+  });
+
+  test("Remove Change on the setting, and on a version a run sent for approval was computed with", async () => {
+    const later = await as("ops").patch("/payroll/settings", { effective_from: "2027-02-01", pay_day: 31 });
+    expect(later.body.next).toMatchObject({ pay_day: 31, effective_from: "2027-02-01" });
+    expect((await as("clerk").del("/payroll/settings/versions/2027-02-01")).body.error.code).toBe("CAPABILITY_REQUIRED");
+    expect((await as("ops").del("/payroll/settings/versions/2027-02-01")).status).toBe(204);
+    const now = (await as("ops").get("/payroll/settings")).body;
+    expect(now.next).toBeNull();
+    expect(now.current).toMatchObject({ effective_from: NOV, effective_to: null, advanced_enabled: false });
+    expect((await as("ops").del(`/payroll/settings/versions/${NOV}`)).body.error.code).toBe("VERSION_IN_FORCE");
+    const audit = await one(
+      `SELECT l.payload, a.before FROM event_log l JOIN audit_ledger a ON a.event_id = l.event_id
+        WHERE l.event_key = 'payroll_setting.removed' ORDER BY l.occurred_at DESC LIMIT 1`,
+    );
+    expect(audit.payload).toMatchObject({ effective_from: "2027-02-01" });
+    expect(audit.before).toMatchObject({ pay_day: 31 });
+
+    // November's run, simple, is sent and approved with a pay day and a pension rate waiting from 20 November.
+    await on("2026-11-11", async () => {
+      expect((await as("ops").patch("/payroll/settings", { effective_from: "2026-11-20", pay_day: 31 })).status).toBe(200);
+      expect((await as("ops").post("/statutory/rates", { ...TEST_RATES.pension_employee, rate: "9", effective_from: "2026-11-20" })).status).toBe(201);
+      const submitted = await as("ops").post(`/payroll/runs/${runs.nov}/submit`, {});
+      expect(submitted.status).toBe(200);
+      expect((await as("ceo").post(`/workflow/instances/${submitted.body.workflow_instance_id}/approve`, {})).status).toBe(200);
+      await drain();
+      expect((await as("ops").get(`/payroll/runs/${runs.nov}`)).body.status).toBe("approved");
+      // The run read the pay day at its month's end, so that change stays...
+      const read = await as("ops").del("/payroll/settings/versions/2026-11-20");
+      expect(read.status).toBe(409);
+      expect(read.body.error).toMatchObject({ code: "VERSION_IN_FORCE", fields: { effective_from: ["A run uses it"] } });
+      // ...but a simple run reads no statutory rate, so the pension change can still be taken back.
+      expect((await as("ops").del("/statutory/rates/pension_employee/versions/2026-11-20")).status).toBe(204);
+    });
   });
 
   test("the contract carries no rate: every figure on the wire came from a row entered here", () => {

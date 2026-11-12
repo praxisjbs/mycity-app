@@ -15,6 +15,7 @@ import type {
   SalaryGrade,
   StatutoryItemState,
   StatutoryRate,
+  StatutorySource,
 } from "@mycity/contract/contract.gen.ts";
 import payrollSchemas from "@mycity/contract/schemas/payroll.js";
 import salarySchemas from "@mycity/contract/schemas/salary_structure.js";
@@ -646,6 +647,7 @@ type SplitRow = Version & { employee_id: string; code: string; label: string; am
 interface Issue {
   path: PropertyKey[];
   message: string;
+  params?: { code?: unknown };
 }
 interface Checker<T> {
   safeParse(v: unknown): { success: true; data: T } | { success: false; error: { issues: Issue[] } };
@@ -667,13 +669,37 @@ const advancedOff = () => fail(409, "ADVANCED_OFF", "Switch on Advanced Payroll 
 const hasBeenOn = () => SETTINGS.some((v) => v.advanced_enabled);
 const operatorName = (u: string) => byKey(u)?.display_name ?? null;
 
-/** The body through the contract's schema: the parsed value, or the 422 the API sends. */
+/**
+ * The body through the contract's schema: the parsed value, or the 422 the API sends. Like shared/http/validate, a
+ * refusal whose every issue names one rule of the contract's (`params.code`, SOURCE_REQUIRED) is answered with it.
+ */
 function checked<T>(schema: unknown, body: unknown, then: (data: T) => RawResponse): RawResponse {
   const r = (schema as Checker<T>).safeParse(body);
   if (r.success) return then(r.data);
   const fields: Record<string, string[]> = {};
   for (const i of r.error.issues) fields[i.path.map(String).join(".") || "body"] ??= [i.message];
+  const codes = r.error.issues.map((i) => (typeof i.params?.code === "string" ? i.params.code : null));
+  if (codes[0] && codes.every((c) => c === codes[0])) return fail(422, codes[0], "Check the highlighted fields", fields);
   return invalid(fields);
+}
+
+/**
+ * Remove Change on a list of versions (shared/db/effective-dated removeVersion): the version of a key starting on `from`,
+ * a day still to come, comes off, and the version before it runs on to where it ended. One in force is 409
+ * VERSION_IN_FORCE; a day no version starts on is 404. A run of that month sent for approval, approved or paid that read
+ * it (only an advanced one, for a rate) keeps it too (payroll.lock assertVersionUnread).
+ */
+function removeVersion<T extends Version>(list: T[], mine: (r: T) => boolean, from: string, opts: { advancedOnly?: boolean } = {}): RawResponse {
+  if (!list.some((r) => mine(r) && r.effective_from === from)) return notFound();
+  if (from <= todayIso()) return fail(409, "VERSION_IN_FORCE", "This change is in force. Save a new one from a later date instead.", { effective_from: ["Already in force"] });
+  const run = RUNS.get(`${from.slice(0, 7)}-01`);
+  // The mock's runs are all simple, so only the setting is ever kept by one; a rate never is.
+  if (run && ["submitted", "approved", "paid"].includes(run.status) && !opts.advancedOnly)
+    return fail(409, "VERSION_IN_FORCE", "A payroll run sent for approval was computed with this change", { effective_from: ["A run uses it"] });
+  const end = list.filter((r) => mine(r) && r.effective_from > from).reduce<string | null>((d, r) => (d === null || r.effective_from < d ? r.effective_from : d), null);
+  for (let i = list.length - 1; i >= 0; i -= 1) if (mine(list[i]) && list[i].effective_from === from) list.splice(i, 1);
+  for (const r of list) if (mine(r) && r.effective_to === from) r.effective_to = end;
+  return noContent();
 }
 
 /**
@@ -714,6 +740,8 @@ function settingsView(): PayrollSettings {
 route("GET /api/v1/payroll/settings", (req) => (canRun(req.user!) ? ok(settingsView()) : forbiddenRead()));
 
 const CONVENTION_KEYS = ["paye_basis", "pension_reduces_taxable", "nhf_reduces_taxable"] as const;
+/** What switching on needs: PAYE Basis is not asked since PR 10, and an unset one reads as annualised. */
+const REQUIRED_CONVENTIONS = ["pension_reduces_taxable", "nhf_reduces_taxable"] as const;
 
 route("PATCH /api/v1/payroll/settings", (req) => {
   if (!configures(req.user!)) return notConfigurer();
@@ -732,8 +760,8 @@ route("PATCH /api/v1/payroll/settings", (req) => {
     if (conventionsSent && b.advanced_enabled !== true && !hasBeenOn()) return fail(409, "ADVANCED_OFF", "Conventions are set when Advanced Payroll is switched on");
     if (b.advanced_enabled === true && latest?.advanced_enabled !== true) {
       if (!RATES.some((r) => inForce(r, b.effective_from))) return fail(409, "NO_RATES", "Enter a statutory rate in force from this date first", { effective_from: ["No rate that day"] });
-      const unset = CONVENTION_KEYS.filter((k) => merged[k] === null);
-      if (unset.length) return fail(409, "NO_CONVENTIONS", "Set the three conventions to switch on", Object.fromEntries(unset.map((k) => [k, ["Pick one"]])));
+      const unset = REQUIRED_CONVENTIONS.filter((k) => merged[k] === null);
+      if (unset.length) return fail(409, "NO_CONVENTIONS", "Set the conventions to switch on", Object.fromEntries(unset.map((k) => [k, ["Pick one"]])));
     }
     const row: PayrollSettingsVersion = {
       payroll_setting_id: sid(`setting:${b.effective_from}`),
@@ -747,6 +775,11 @@ route("PATCH /api/v1/payroll/settings", (req) => {
   });
 });
 
+route("DELETE /api/v1/payroll/settings/versions/:effective_from", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  return removeVersion(SETTINGS, () => true, req.params.effective_from);
+});
+
 /* Statutory rates */
 
 const ITEMS: StatutoryRate["item"][] = ["paye", "pension_employee", "pension_employer", "nhf", "itf", "nsitf", "relief"];
@@ -758,8 +791,26 @@ function brief(item: StatutoryRate["item"], rows: StatutoryRate[]): StatutoryIte
   const mine = rows.filter((r) => r.item === item);
   if (!mine.length) return null;
   const r = mine[0];
-  return { rate: item === "paye" ? null : r.rate, flat_amount: item === "relief" ? r.flat_amount : null, base: r.base, bands: item === "paye" ? mine.length : null, effective_from: r.effective_from };
+  return {
+    rate: item === "paye" ? null : r.rate,
+    flat_amount: item === "relief" ? r.flat_amount : null,
+    base: r.base,
+    bands: item === "paye" ? mine.length : null,
+    effective_from: r.effective_from,
+    ...sourceOf(r),
+  };
 }
+
+/** A version's legal source, every column, as the API reads it back. */
+const sourceOf = (r: StatutorySource): StatutorySource => ({
+  source_title: r.source_title,
+  source_section: r.source_section,
+  source_url: r.source_url,
+  source_document_id: r.source_document_id,
+  source_checked_on: r.source_checked_on,
+  no_legal_source: r.no_legal_source,
+  no_source_reason: r.no_source_reason,
+});
 
 route("GET /api/v1/statutory/items", (req) => {
   if (!canRun(req.user!)) return forbiddenRead();
@@ -788,15 +839,42 @@ route("GET /api/v1/statutory/rates", (req) => {
   );
 });
 
-type RatesSave = { item: StatutoryRate["item"]; effective_from: string; base?: StatutoryRate["base"]; rate?: string; flat_amount?: string; bands?: Array<{ band_from: string; band_to: string | null; rate: string }> };
+type RatesSave = {
+  item: StatutoryRate["item"];
+  effective_from: string;
+  base?: StatutoryRate["base"];
+  rate?: string;
+  flat_amount?: string;
+  bands?: Array<{ band_from: string; band_to: string | null; rate: string }>;
+  source_title?: string;
+  source_section?: string;
+  source_url?: string;
+  source_document_id?: string;
+  source_checked_on?: string;
+  no_legal_source?: boolean;
+  no_source_reason?: string;
+};
 
 route("POST /api/v1/statutory/rates", (req) => {
   if (!configures(req.user!)) return notConfigurer();
   return checked<RatesSave>(statutorySchemas.StatutoryRatesSave, req.body, (b) => {
     if (b.effective_from < todayIso()) return tooEarly();
+    if (b.source_checked_on && b.source_checked_on > todayIso())
+      return fail(422, "CHECKED_IN_THE_FUTURE", "The day checked is today or earlier", { source_checked_on: ["Not after today"] });
     const kind = statutorySchemas.ITEM_KIND[b.item] as StatutoryRate["kind"];
     const base = (b.base ?? statutorySchemas.ITEM_BASES[b.item][0]) as StatutoryRate["base"];
-    const common = { item: b.item, kind, base, effective_from: b.effective_from, effective_to: null, created_by_name: operatorName(req.user!), created_at: now() };
+    const source: StatutorySource = b.no_legal_source
+      ? { source_title: null, source_section: null, source_url: null, source_document_id: null, source_checked_on: null, no_legal_source: true, no_source_reason: b.no_source_reason ?? null }
+      : {
+          source_title: b.source_title ?? null,
+          source_section: b.source_section ?? null,
+          source_url: b.source_url ?? null,
+          source_document_id: b.source_document_id ?? null,
+          source_checked_on: b.source_checked_on ?? null,
+          no_legal_source: false,
+          no_source_reason: null,
+        };
+    const common = { item: b.item, kind, base, effective_from: b.effective_from, effective_to: null, ...source, created_by_name: operatorName(req.user!), created_at: now() };
     const rows: StatutoryRate[] =
       b.item === "paye"
         ? (b.bands ?? []).map((band, i) => ({ ...common, statutory_rate_id: sid(`rate:paye:${b.effective_from}:${i}`), rate: band.rate, band_from: band.band_from, band_to: band.band_to, flat_amount: null, position: i + 1 }))
@@ -805,6 +883,13 @@ route("POST /api/v1/statutory/rates", (req) => {
     if (refused) return refused;
     return created({ data: rows, page: { number: 1, size: __CONTRACT_PAGE_SIZE__, total: rows.length, pages: 1, has_next: false } });
   });
+});
+
+route("DELETE /api/v1/statutory/rates/:item/versions/:effective_from", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  return checked<{ item: StatutoryRate["item"]; effective_from: string }>(statutorySchemas.StatutoryVersionParams, req.params, (p) =>
+    removeVersion(RATES, (r) => r.item === p.item, p.effective_from, { advancedOnly: true }),
+  );
 });
 
 /* Salary structure */

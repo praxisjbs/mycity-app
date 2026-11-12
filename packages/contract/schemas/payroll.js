@@ -49,7 +49,11 @@ const RunStatus = z.enum(["draft", "computed", "submitted", "approved", "paid"])
 /** What a one-off adjustment does to the person's pay. */
 const AdjustmentKind = z.enum(["earning", "deduction"]);
 
-/** How PAYE bands are applied (guide §6.12 rule 1): the accountant's choice, entered on Configurations. */
+/**
+ * How PAYE bands are applied (guide §6.12 rules 1 and 11). No screen offers it since PR 10, because every deduction is
+ * monthly and the bands are entered as the law publishes them; unset, a run reads it as `annualised` (§13.2 item 32). The
+ * API still takes it, and PR 11 fixes it to the reading the research records.
+ */
 const PayeBasis = z.enum(["annualised", "monthly"]);
 
 const ProblemSeverity = z.enum(["blocking", "warning"]);
@@ -304,8 +308,9 @@ const PayrollSettings = z
  * PATCH /payroll/settings (`payroll.configure`): a new version from `effective_from` (today or later, Lagos). Only
  * what is sent changes; the rest carries over from the latest version. A second change from the same day joins that
  * day's version. The conventions are taken once the option has been on or is being switched on (409 ADVANCED_OFF
- * otherwise); switching on needs a statutory rate in force on the day (409 NO_RATES) and all three conventions
- * set, here or before (409 NO_CONVENTIONS) (guide §6.11 rules 3 and 4).
+ * otherwise); switching on needs a statutory rate in force on the day (409 NO_RATES) and both conventions the screen
+ * asks for (whether pension, and NHF, reduce taxable pay) set, here or before (409 NO_CONVENTIONS) (guide §6.11 rules
+ * 3 and 4). `paye_basis` is no longer needed to switch on (§13.2 item 32).
  */
 const PayrollSettingsChange = z
   .object({
@@ -320,6 +325,13 @@ const PayrollSettingsChange = z
   })
   .strict()
   .refine(changesBeside(["effective_from", "reason"]), nothingOn("effective_from"));
+
+/**
+ * DELETE /payroll/settings/versions/:effective_from: Remove Change, the version of the setting that starts on a day still
+ * to come (a pay day, the switch or the bank rule waiting; 409 VERSION_IN_FORCE once it has started); the version before
+ * it runs on again (guide §5, §13.1 item 33).
+ */
+const PayrollSettingsVersionParams = z.object({ effective_from: isoDate }).strict();
 
 /** POST /payroll/runs/:id/email-payslips: send to those not yet emailed, or to everyone again. */
 const PayslipEmailAll = z.object({ resend: z.boolean().default(false) }).strict();
@@ -397,6 +409,7 @@ const TABLES = {
     },
   },
   PayrollSettingsChange: { table: "payroll_setting" },
+  PayrollSettingsVersionParams: { table: null, reason: "the :effective_from path parameter of Remove Change" },
   PayslipEmailAll: { table: null, reason: "whether to mail again those already emailed; each send sets payslip.emailed_at" },
 };
 
@@ -430,5 +443,6 @@ module.exports = {
   PayrollSettingsVersion,
   PayrollSettings,
   PayrollSettingsChange,
+  PayrollSettingsVersionParams,
   PayslipEmailAll,
 };

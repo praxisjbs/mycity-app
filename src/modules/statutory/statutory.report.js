@@ -2,7 +2,8 @@
 /**
  * The statutory report (docs/guides/payroll.md §6.12 rule 6): a run's PAYE, pension, NHF, ITF and NSITF, per item
  * and per person, with the base each rate was applied to and the amount, the employee and employer totals, the
- * conventions the run was computed with and each person's tax and pension numbers (Not Set where none is held).
+ * conventions the run was computed with, each item's legal source (and the relief's) as the run's snapshot holds it,
+ * and each person's tax and pension numbers (Not Set where none is held).
  *
  *   statutory_report    an export document (kept 24 hours, read by whoever pressed the button), restricted, rendered
  *                       by the worker's pdf-render job from `templates/documents/statutory-report.html`
@@ -19,7 +20,7 @@ const { defineVariables } = require("../../shared/templates/variables");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const m = require("../../shared/money/money");
-const { formatMonth } = require("../../shared/time/day-first");
+const { formatDate, formatMonth } = require("../../shared/time/day-first");
 const lock = require("../payroll/payroll.lock");
 const repo = require("./statutory.repo");
 const { EVENTS } = require("./statutory.events");
@@ -58,6 +59,22 @@ const STATUS = Object.freeze({ approved: "Approved", paid: "Paid" });
 const yesNo = (v) => (v === true ? "Yes" : v === false ? "No" : "Not Set");
 const BASIS = Object.freeze({ annualised: "Annualised", monthly: "Monthly" });
 
+/** What a snapshot taken before sources were kept says of its rows: 6040 marked such rows with this reason. */
+const BEFORE_SOURCES = "Entered before sources were required";
+
+/**
+ * A rate's legal source as the report prints it: the instrument and section with the day checked, or No Legal Source
+ * with its reason; and its link, when it has one.
+ * @param {object|undefined} r  a row of the run's snapshot (`statutory_rates`)
+ * @returns {{label: string, link: string|null}}
+ */
+function sourceLabel(r) {
+  if (!r || r.no_legal_source === true || !r.source_title)
+    return { label: `No Legal Source: ${(r && r.no_source_reason) || BEFORE_SOURCES}`, link: null };
+  const checked = r.source_checked_on ? `. Checked ${formatDate(r.source_checked_on)}` : "";
+  return { label: `${r.source_title}, ${r.source_section}${checked}`, link: r.source_url || null };
+}
+
 /**
  * The report's variables from the run and its statutory lines, every value as printed. The rate and base of each item
  * are the ones in the run's snapshot (the rates it was computed with), so a rate changed since does not show.
@@ -82,12 +99,15 @@ function varsOf(run, lines) {
     const total = m.sum(rows.map((r) => r.amount));
     if (rows[0].kind === "employer") employer = employer.plus(total);
     else employee = employee.plus(total);
+    const source = sourceLabel(rate);
     items.push({
       label: words.label,
       kind_label: rows[0].kind === "employer" ? "Employer" : "Employee",
       rate_label: code === "paye" ? "Progressive bands" : rate ? `${m.money(String(rate.rate)).toFixed()}%` : rows[0].detail || "Rate",
       base_label: BASES[rate ? rate.base : code === "paye" ? "taxable" : "gross"] || "pay",
       number_label: words.number,
+      source_label: source.label,
+      source_link: source.link,
       rows: rows.map((r) => ({
         employee_name: r.employee_name,
         staff_number: String(r.staff_number),
@@ -107,6 +127,7 @@ function varsOf(run, lines) {
     paye_basis_label: BASIS[conventions.paye_basis] || "Not Set",
     pension_reduces_label: yesNo(conventions.pension_reduces_taxable),
     nhf_reduces_label: yesNo(conventions.nhf_reduces_taxable),
+    relief_source_label: used.has("relief") ? sourceLabel(used.get("relief")).label : null,
     items,
     employee_total: m.formatNaira(employee),
     employer_total: m.formatNaira(employer),
@@ -136,4 +157,4 @@ const requestReport = lock.defineWrite("statutoryReport", "published", async (cl
   return exportFiles.present(doc);
 });
 
-module.exports = { REPORT_DOC, varsOf, requestReport };
+module.exports = { REPORT_DOC, varsOf, sourceLabel, requestReport };
