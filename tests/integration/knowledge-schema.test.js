@@ -1,6 +1,6 @@
 "use strict";
 /**
- * M10 Knowledge Hub's schema and reference data (migrations 10400 and 10410,
+ * M10 Knowledge Hub's schema and reference data (migrations 10400, 10410 and 10440,
  * seeds/reference/10490_seed_knowledge.sql; docs/guides/knowledge.md §4) on the real migrations: the
  * shape every table must have (a trigger, an index and an ON DELETE on each foreign key, a CHECK equal
  * to the contract's enum), the rows the constraints refuse, the numbers an SOP, a course and a
@@ -22,9 +22,9 @@ const catalog = require("../../src/shared/access/access.catalog");
 const c = require("@mycity/contract");
 
 const FILES = Object.fromEntries(migrate.listMigrations().map((f) => [f.name, f]));
-const M10 = ["10400_sops", "10410_training", "10490_seed_knowledge"].map((n) => FILES[n]);
+const M10 = ["10400_sops", "10410_training", "10440_training_notes", "10490_seed_knowledge"].map((n) => FILES[n]);
 
-const MUTABLE = ["sop", "sop_version", "training_course", "training_item", "training_assignment", "training_enrolment"];
+const MUTABLE = ["sop", "sop_version", "training_course", "training_item", "training_assignment", "training_enrolment", "training_note"];
 const WRITTEN_WHOLE = ["sop_step", "training_assignment_audience", "training_item_progress"];
 const TABLES = [...MUTABLE, ...WRITTEN_WHOLE];
 const CAPABILITIES = ["sops.manage", "training.manage"];
@@ -120,8 +120,8 @@ describeDb("M10 Knowledge Hub schema and reference data against the real migrati
           [TABLES],
         )
       ).rows;
-      // sop 4, sop_version 4, sop_step 2, course 5, item 2, assignment 3, audience 4, enrolment 6, progress 2.
-      expect(keys).toHaveLength(32);
+      // sop 4, sop_version 4, sop_step 2, course 5, item 2, assignment 3, audience 4, enrolment 6, progress 2, note 2.
+      expect(keys).toHaveLength(34);
       // 'a' is NO ACTION, what Postgres does when no ON DELETE is written.
       expect(keys.filter((k) => k.on_delete === "a").map((k) => k.conname)).toEqual([]);
       expect(keys.filter((k) => !k.indexed).map((k) => k.conname)).toEqual([]);
@@ -337,7 +337,7 @@ describeDb("M10 Knowledge Hub schema and reference data against the real migrati
   });
 
   describe("undone and applied again", () => {
-    test("10490, 10410 and 10400 come off in that order and go back, leaving the database as it was", async () => {
+    test("10490, 10440, 10410 and 10400 come off in that order and go back, leaving the database as it was", async () => {
       await rolledBack(async (cl) => {
         const shape = async () => ({
           tables: (await cl.query("SELECT relname FROM pg_class WHERE relname = ANY($1) AND relkind = 'r' ORDER BY relname", [TABLES])).rows.map((r) => r.relname),

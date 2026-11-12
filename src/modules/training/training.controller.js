@@ -38,5 +38,7 @@ module.exports = {
   done: async (req, res) => ok(res, await service.done(withActor(req), id(req))),
   undone: async (req, res) => ok(res, await service.undone(withActor(req), id(req))),
   proof: async (req, res) => ok(res, await service.proof(withActor(req), id(req), body(req))),
+  myNote: async (req, res) => ok(res, await service.myNote(req.user, id(req))),
+  saveNote: async (req, res) => ok(res, await service.saveNote(withActor(req), id(req), body(req))),
   myCertificate: async (req, res) => res.status(202).json(await certificate.mine(req.user, id(req))),
 };

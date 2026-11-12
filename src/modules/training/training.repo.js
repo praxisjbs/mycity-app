@@ -731,6 +731,20 @@ const signerOf = (db, userId) =>
 const userOf = (db, userId) =>
   one(db, "SELECT user_id, employee_id, status FROM app_user WHERE user_id = $1", [userId]);
 
+/** A person's note on a course (§6.13), or null before their first save. */
+const noteOf = (db, courseId, employeeId) =>
+  one(db, "SELECT body, updated_at FROM training_note WHERE training_course_id = $1 AND employee_id = $2", [courseId, employeeId]);
+
+/** Writes the person's note on a course, the first save creating it; answers the row as saved. */
+const saveNote = (client, courseId, employeeId, body) =>
+  one(
+    client,
+    `INSERT INTO training_note (training_course_id, employee_id, body) VALUES ($1, $2, $3)
+     ON CONFLICT (employee_id, training_course_id) DO UPDATE SET body = EXCLUDED.body
+     RETURNING body, updated_at, (xmax = 0) AS created`,
+    [courseId, employeeId, body],
+  );
+
 module.exports = {
   AT_WORK,
   REACHES,
@@ -790,4 +804,6 @@ module.exports = {
   overdueAcross,
   signerOf,
   userOf,
+  noteOf,
+  saveNote,
 };

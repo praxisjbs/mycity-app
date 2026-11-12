@@ -814,6 +814,27 @@ route("POST /api/v1/training/me/courses/:id/proof", (req) => {
   return ok(myCourseOf(o.c, o.e));
 });
 
+/** My Notes (§6.13): one per person and course, theirs alone. */
+const NOTES = new Map<string, { body: string; updated_at: string }>();
+const noteKey = (req: Req, c: MockCourse) => `${employeeOf(req)}:${c.training_course_id}`;
+
+route("GET /api/v1/training/me/courses/:id/note", (req) => {
+  const o = openable(req, req.params.id);
+  if (!o) return notFound();
+  const n = NOTES.get(noteKey(req, o.c));
+  return ok({ training_course_id: o.c.training_course_id, body: n?.body ?? "", updated_at: n?.updated_at ?? null });
+});
+
+route("PUT /api/v1/training/me/courses/:id/note", (req) => {
+  const o = openable(req, req.params.id);
+  if (!o) return notFound();
+  const body = String((req.body as { body?: unknown })?.body ?? "");
+  if (body.length > 20000) return invalid({ body: ["Note is too long"] });
+  const n = { body, updated_at: new Date().toISOString() };
+  NOTES.set(noteKey(req, o.c), n);
+  return ok({ training_course_id: o.c.training_course_id, ...n });
+});
+
 route("POST /api/v1/training/me/courses/:id/certificate", (req) => {
   const o = openable(req, req.params.id);
   if (!o?.e?.certificate_number) return notFound();

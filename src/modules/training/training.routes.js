@@ -30,6 +30,8 @@
  *   POST   /me/items/:id/undone         Undone, until completion
  *   POST   /me/courses/:id/proof        Add Proof
  *   POST   /me/courses/:id/certificate  Download Certificate: my PDF (202, pending while it renders)
+ *   GET    /me/courses/:id/note         My Notes on a course: mine alone
+ *   PUT    /me/courses/:id/note         save My Notes as I type
  */
 const router = require("express").Router();
 const c = require("@mycity/contract");
@@ -63,6 +65,14 @@ route(router, "post", "/me/items/:id/undone",
 route(router, "post", "/me/courses/:id/proof",
   { params: IdParams, body: t.ProofAdd, response: t.MyCourse, self: true, summary: "Add proof, completing the course" },
   controller.proof);
+
+route(router, "get", "/me/courses/:id/note",
+  { params: IdParams, response: t.TrainingNote, self: true, summary: "My notes on a course" },
+  controller.myNote);
+
+route(router, "put", "/me/courses/:id/note",
+  { params: IdParams, body: t.TrainingNoteSave, response: t.TrainingNote, self: true, summary: "Save my notes on a course" },
+  controller.saveNote);
 
 route(router, "post", "/me/courses/:id/certificate",
   { params: IdParams, body: c.common.EmptyBody, response: c.documents.ExportFile, self: true,

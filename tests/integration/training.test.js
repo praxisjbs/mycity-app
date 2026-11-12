@@ -661,6 +661,36 @@ describeDb("training against the real migrations", () => {
     expect(page.body.page.total).toBe(300);
   }, 180_000);
 
+  test("My Notes: one note per person and course, theirs alone, saved as typed (§6.13)", async () => {
+    const empty = await as("staff").get(`/training/me/courses/${ids.course}/note`);
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual({ training_course_id: ids.course, body: "", updated_at: null });
+
+    const first = await as("staff").put(`/training/me/courses/${ids.course}/note`, { body: "Lock the screen before leaving the desk." });
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ training_course_id: ids.course, body: "Lock the screen before leaving the desk." });
+    expect(first.body.updated_at).toEqual(expect.any(String));
+    const second = await as("staff").put(`/training/me/courses/${ids.course}/note`, { body: "Lock the screen.\nReport a lost phone the same day." });
+    expect(second.body.body).toBe("Lock the screen.\nReport a lost phone the same day.");
+    expect((await q("SELECT count(*)::int AS n FROM training_note WHERE employee_id = $1", [employeeId("staff")])).rows[0].n).toBe(1);
+
+    // Another person on the same course reads their own note, never this one; a manager has no route to it.
+    expect((await as("sales").get(`/training/me/courses/${ids.course}/note`)).body.body).toBe("");
+    expect((await as("ops").get(`/training/courses/${ids.course}/note`)).status).toBe(404);
+
+    // A course the person may not open is a 404, as the course is; a note past the limit is refused.
+    const draft = await as("ops").post("/training/courses", { title: "Still Being Written", summary: "Not yet published" });
+    expect((await as("staff").get(`/training/me/courses/${draft.body.training_course_id}/note`)).status).toBe(404);
+    expect((await as("staff").put(`/training/me/courses/${draft.body.training_course_id}/note`, { body: "x" })).status).toBe(404);
+    const long = await as("staff").put(`/training/me/courses/${ids.course}/note`, { body: "x".repeat(20001) });
+    expect(long.status).toBe(422);
+
+    // The audit records that a note was saved and its length, never what it says.
+    const saved = await q("SELECT payload FROM event_log WHERE event_key = 'training.note_saved' AND entity_id = $1 ORDER BY occurred_at", [ids.course]);
+    expect(saved.rows.map((r) => r.payload.characters)).toEqual([40, 50]);
+    expect(JSON.stringify(saved.rows)).not.toContain("Lock the screen");
+  });
+
   test("⌘K and Praxis AI: builders find courses; everyone finds their own and the Library's", async () => {
     const types = (res) => res.body.groups.map((g) => g.type);
     const titles = (res, type) => (res.body.groups.find((g) => g.type === type) || { items: [] }).items.map((i) => i.title);

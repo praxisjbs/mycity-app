@@ -63,6 +63,8 @@ export function Switch({ checked, onChange, label, disabled, className }: Switch
 export interface ToggleRowProps {
   /** What the setting is, Title Case, at most 4 words. */
   title: ReactNode;
+  /** The switch's accessible name when `title` is not plain text (a help term around it): the same words. */
+  label?: string;
   /** One short line about it, when the title is not enough. */
   text?: ReactNode;
   /** On or off. */
@@ -76,14 +78,14 @@ export interface ToggleRowProps {
 }
 
 /** A setting row: what it is, a line about it, and its switch. */
-export function ToggleRow({ title, text, checked, onChange, changed, disabled }: ToggleRowProps) {
+export function ToggleRow({ title, label, text, checked, onChange, changed, disabled }: ToggleRowProps) {
   return (
     <div className={cn("flex items-center justify-between gap-3 border-b border-border py-2 last:border-b-0", changed && "-mx-3.5 bg-warning-soft px-3.5")}>
       <div>
         <div className="text-sm font-semibold">{title}</div>
         {text && <div className="text-xs text-subtle-foreground">{text}</div>}
       </div>
-      <Switch checked={checked} onChange={onChange} label={typeof title === "string" ? title : "Switch"} disabled={disabled} />
+      <Switch checked={checked} onChange={onChange} label={label ?? (typeof title === "string" ? title : "Switch")} disabled={disabled} />
     </div>
   );
 }

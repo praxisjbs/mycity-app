@@ -14,6 +14,7 @@
  *   withdraw       an assignment stops enrolling; places not started go with their tasks
  *   start, done, undone, proof   the person's own (§6.8); completion runs under the enrolment's
  *                  lock and allocates the certificate's number and hash in the same transaction
+ *   myNote, saveNote   the person's own running note on a course they may open (§6.13)
  *   remind         Remind Overdue; remindersDue and reminderCheck are the reminder engine's (§6.11)
  *   enrolJoiner, sweep, closeLeaver   the worker's: joiners enrolled, leavers closed
  *
@@ -823,6 +824,43 @@ async function proof(user, id, body) {
   return myCourse(user, courseId);
 }
 
+/** The person's note on a course as the contract carries it: empty, never saved, before the first. */
+const toNote = (courseId, row) => ({
+  training_course_id: courseId,
+  body: row ? row.body : "",
+  updated_at: row ? iso(row.updated_at) : null,
+});
+
+/** GET /training/me/courses/:id/note: the person's own note on a course they may open (§6.13). */
+async function myNote(user, id) {
+  const { course, employeeId } = await openable(pool, user, id);
+  return toNote(course.training_course_id, await repo.noteOf(pool, course.training_course_id, employeeId));
+}
+
+/**
+ * PUT /training/me/courses/:id/note: saves the whole note as the person types (§6.13). Any course
+ * they may open, before Start and after completion alike; the event carries its length, never its
+ * text, so the audit holds nothing the person wrote.
+ */
+async function saveNote(user, id, { body }) {
+  return tx(async (client) => {
+    const { course, employeeId } = await openable(client, user, id);
+    const row = await repo.saveNote(client, course.training_course_id, employeeId, body);
+    await emit(client, {
+      key: EVENTS.TRAINING_NOTE_SAVED,
+      entity: { type: COURSE_ENTITY, id: course.training_course_id },
+      actor: user,
+      payload: {
+        training_course_id: course.training_course_id,
+        subject_employee_id: employeeId,
+        characters: body.length,
+        first: Boolean(row.created),
+      },
+    });
+    return toNote(course.training_course_id, row);
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * The worker's: tasks and notices, joiners, leavers, the task's close
  * ------------------------------------------------------------------ */
@@ -1046,6 +1084,8 @@ module.exports = {
   done,
   undone,
   proof,
+  myNote,
+  saveNote,
   settleEnrolments,
   closeTask,
   enrolJoiner,
