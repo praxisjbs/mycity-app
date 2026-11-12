@@ -720,8 +720,9 @@ An offer goes through these, in order:
    window under them. Press **Close** at its foot to go back to the list. On a phone it opens in a sheet,
    one part under another.
    ![An offer](shot:recruitment-offer-record)
-6. The offer shows the role, the department, the start date, when it expires, and the **Score**
-   the candidate had when the offer was made.
+6. The offer shows the role, the department, the start date and the **Score** the candidate had
+   when the offer was made. While it is with the candidate, **Expires** gives its last day; once
+   that day has passed unsigned, **Expired On**.
 7. **Monthly Pay** lists each pay line, the **Monthly Total** and the year's pay. **Vacancy Range**
    is the role's monthly range. A total outside it shows **Outside Range**, with the reason.
 8. **Approval**, under the pay on a computer, shows each stage and who approved or rejected it, with any reason.

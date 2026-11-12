@@ -48,6 +48,7 @@ const { EVENTS, ENTITY, SCOPE, SUBJECT } = require("./onboarding.events");
 const contracts = () => require("../employment_contracts/employment_contracts.service");
 const candidates = () => require("../candidates/candidates.service");
 const users = () => require("../users/users.service");
+const documents = () => require("../documents/documents.service");
 
 /** Who moves a case on its start date: the system, as for every scheduled sweep. */
 const SYSTEM = Object.freeze({ user_id: null });
@@ -324,6 +325,8 @@ async function verifyItem(actor, scope, id, itemId) {
     if (it.document_id && it.scan_status === "pending") throw refused("SCAN_PENDING", "Wait for the virus scan to finish");
     if (it.document_id && it.scan_status === "infected") throw refused("FILE_INFECTED", "This file failed the virus scan; reject it");
     await repo.itemVerified(client, itemId, actor.user_id);
+    // The same file on the hire's record (their Documents tab) is verified with it, so People never check it twice.
+    if (it.document_id) await documents().verifiedIn(client, actor, it.document_id, row.employee_id);
     await emit(client, {
       key: EVENTS.ONBOARDING_ITEM_VERIFIED,
       entity: { type: ENTITY, id },
@@ -364,6 +367,9 @@ async function checkGuarantor(actor, scope, id, guarantorId, body) {
     if (body.check_status === "passed" && (!g.form_document_id || !g.id_document_id))
       throw refused("FORM_REQUIRED", "The signed form and ID are needed");
     await repo.recordCheck(client, guarantorId, body, actor.user_id);
+    // A passed check vouches for the signed form and the ID copy: both verified on the hire's record.
+    if (body.check_status === "passed")
+      for (const doc of [g.form_document_id, g.id_document_id]) await documents().verifiedIn(client, actor, doc, row.employee_id);
     await emit(client, {
       key: EVENTS.ONBOARDING_GUARANTOR_CHECKED,
       entity: { type: ENTITY, id },

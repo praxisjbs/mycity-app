@@ -276,7 +276,11 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
             ["Department", o.department ?? "–"],
             ["Start Date", o.start_date ? formatDate(o.start_date) : "–"],
             ["Email", o.candidate_email],
-            ...(o.expires_at ? [[o.status === "sent" ? "Expires" : "Expired On", formatDateTime(o.expires_at)] as [string, string]] : []),
+            // The day it lapses while it is with the candidate, and the day it lapsed once it has: an
+            // offer accepted, declined or withdrawn before then never expired.
+            ...(o.expires_at && (o.status === "sent" || o.status === "expired")
+              ? [[o.status === "sent" ? "Expires" : "Expired On", formatDateTime(o.expires_at)] as [string, string]]
+              : []),
             [<HelpTerm key="s" help={SCORE_HELP}>Score</HelpTerm>, o.score_snapshot === null ? "–" : o.score_snapshot.toFixed(1)],
             ...(o.end_reason ? [["Reason", <span key="r" data-copy="content">{o.end_reason}</span>] as [string, React.ReactNode]] : []),
           ]}

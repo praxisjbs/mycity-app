@@ -58,6 +58,8 @@ describe("Recruitment · Offers", () => {
     expect(within(r).getByText("Monthly Total")).toBeTruthy();
     expect(within(r).getAllByText("Accepted").length).toBeGreaterThan(0);
     expect(within(r).getByText("Accepted and signed")).toBeTruthy();
+    // Accepted before its day, it never expired: no Expired On beside it.
+    expect(within(r).queryByText("Expired On")).toBeNull();
     // The letter waits behind View Letter, in a window of its own.
     expect(within(r).queryByText(/We are pleased to offer you employment/)).toBeNull();
     await press(r, "View Letter");
@@ -104,6 +106,7 @@ describe("Recruitment · Offers", () => {
     await waitFor(() => expect(within(record("Tunde Bakare")).getByRole("button", { name: "Send Offer" })).toBeTruthy());
     await press(record("Tunde Bakare"), "Send Offer");
     await waitFor(() => expect(within(record("Tunde Bakare")).getAllByText("With Candidate").length).toBeGreaterThan(0));
+    expect(within(record("Tunde Bakare")).getByText("Expires")).toBeTruthy();
     expect(within(record("Tunde Bakare")).getByRole("button", { name: "Resend Offer" })).toBeTruthy();
   }, 60000);
 

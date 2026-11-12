@@ -134,8 +134,12 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    typed value), a passport photograph and the bank Account Opening Form; the signed offer and the
    contract are added by the system. Each file lands on the employee (People 360 Documents tab, the
    `employee_document` type) the moment it is sent, quarantined and scanned as any stranger's upload,
-   and is then named on its item; Operations & People verify each once its scan is clean, or reject
-   it with a reason the hire reads beside the item and send it again. The hire enters their BVN (a masked
+   and is then named on its item: from then it is titled by its requirement ("Valid ID"), a
+   guarantor's form and ID copy by the guarantor ("Guarantor Form, Adaobi Nwosu", "ID Copy, ...";
+   `vault.setTitle`), so the Documents tab never shows a file's own name. Operations & People verify
+   each once its scan is clean, which verifies the same document on the hire's record
+   (`documents.verifiedIn`, as People's Verify Document), or reject it with a reason the hire reads
+   beside the item and send it again. The hire enters their BVN (a masked
    number on the employee record, no upload; they may correct it until documentation completes, AJ
    12/11/2026, since nobody else ever sees it to catch a slip), picks their **home address**
    (`AddressField`, kept as the employee record's home address) and enters their **two guarantors**:
@@ -144,9 +148,10 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    birth, contact and residential addresses (both picked, F27), whether they have been convicted of
    a criminal offence (and what happened) and whether they recommend the hire, the signed Guarantor
    Form and a copy of their ID. Operations & People run a reference check on each and record Passed
-   or Failed; a guarantor passes only with the signed form and the ID copy in (`FORM_REQUIRED`). A
-   failed guarantor is corrected by the hire, which starts its check again; a guarantor who has
-   passed stays as they are.
+   or Failed; a guarantor passes only with the signed form and the ID copy in (`FORM_REQUIRED`), and
+   a pass verifies both on the hire's record. A failed guarantor is corrected by the hire, which
+   starts its check again; a guarantor who has passed stays as they are. Years Known is asked of the
+   personal guarantor only; left empty it is not given (never 0).
 7. **Pre-onboarding.** When every required item is verified, both guarantors have passed, the BVN
    and the home address are entered and the contract is signed, the case moves to `pre_onboarding` and the application to
    Pre-Onboarding (`candidates.advanceIn`) in the same transaction. The gate is asked after each of
@@ -294,6 +299,9 @@ employee record (masked, never sent to an AI model).
 - A sealed copy prints its QR in the letterhead's header, so on every page (partnerships.md §6.9 step 7).
 - Documentation completes when every required item is verified, both guarantors have passed their reference checks, the BVN and the home address are entered and the contract is signed. Onboarding never opens before that.
 - A guarantor passes only with the signed Guarantor Form and an ID copy in. Both their addresses are picked (F27).
+- A document checked on the case is checked on the hire's record: Verify on an item, and a guarantor's
+  pass for their form and ID copy, mark the document verified there too (`documents.verifiedIn`). Each
+  file the hire names is titled by what it is, never left as its file's name.
 - The BVN may be corrected by the hire until documentation completes (AJ, 12/11/2026); after that the page takes nothing.
 - The hire has 15 days to sign their contract from each link made for it; declined or lapsed, Reissue Contract makes a new one while the case is at documentation.
 - The settings (Offer Signatory, the offer and contract wording, the Checklist, the Plans) and Operations & People's case actions (Verify, Reject, Record Check, Send Reminder, Resend and Reissue Contract, Complete Onboarding, Withdraw) need `recruitment` edit at scope all; a Head of Department's team grant reads their hires' cases and marks their steps done (AJ, 12/11/2026).
@@ -373,7 +381,7 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list across the page (number, candidate, role, start date, annual compensation with Outside Range, status, sent, expiry); a pressed row opens the offer in a wide dialog (F31 as amended 08/11/2026): the offer's summary with Signers under its details in the same card, beside Monthly Pay with Approval under the pay in the same card, then History across it, and Close at its foot; the offer's summary, Monthly Pay with Outside Range and its reason, Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates); View Letter beside Withdraw Offer, which opens the letter in a dialog of its own: the PDF with Open in Tab and Download PDF once it is made (as a query's letter, M3), the wording on paper before; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
+| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list across the page (number, candidate, role, start date, annual compensation with Outside Range, status, sent, expiry); a pressed row opens the offer in a wide dialog (F31 as amended 08/11/2026): the offer's summary with Signers under its details in the same card, beside Monthly Pay with Approval under the pay in the same card, then History across it, and Close at its foot; the offer's summary, Monthly Pay with Outside Range and its reason, Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates); the expiry, as Expires while the offer is with the candidate and Expired On once it lapsed (an offer accepted, declined or withdrawn shows none); View Letter beside Withdraw Offer, which opens the letter in a dialog of its own: the PDF with Open in Tab and Download PDF once it is made (as a query's letter, M3), the wording on paper before; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
 | Recruitment · Onboarding | the figures (Documentation with the documents to verify, Pre-Onboarding, Onboarding with the steps overdue, Hired This Month); the cases list across the page (hire, role, department, start date, outstanding, status); a pressed row opens the case in the wide dialog (F31 as amended 11/11/2026): the case (role, department, start date, Pre-Onboarding with what it waits on, BVN and Home Address entered or not, the privacy notice, Send Reminder, Withdraw Hire, Complete Onboarding), Documents (each item's state, View File, Verify, Reject with the reason), Guarantors (each one's check, date of birth, both addresses, Convicted, Recommends, View Form, View ID, Record Check), Contract (the signers, Download PDF, Sign for Company, Resend Contract, Reissue Contract) two by two, then Onboarding Plan across it (owner, due day, SOP, Overdue, Mark Step Done); Onboarding Settings (Checklist, Onboarding Plans, Standard Contract), shown to whom `can_configure` names. Verify, Reject, Record Check, Send Reminder, Complete Onboarding and Withdraw Hire show only for `can_check`, `can_complete` and `can_withdraw` | help on Pre-Onboarding: what the gate needs; help on BVN: where it is entered and that it is never shown | why documentation comes first: §3 here |
 | Public · Sign Offer | the letter, Signers, the three steps (Read the Letter, Confirm Your Email, Sign Below), Send Code, the code, full name, title, Draw or Type, Agree to Sign Electronically, Accept and Sign, Decline the Offer, the outcome | help on Email Code | "this document is locked and verifiable" reassurance: never shown |
 | Public · Upload Documents | the role and start date with how many documents are sent; the privacy notice to accept first; then Your Documents (each item with its state, a rejection's reason, Choose a File or the value), Your Guarantors (two, each with its check: name, relationship, phone, date of birth, Contact Address and Residential Address picked, Ever Convicted with What Happened, Recommends You, the Guarantor Form and the ID Copy), Your Address (Home Address, picked; Change Address), Your BVN (Change BVN); Documents Complete once documentation is done | help on BVN; help on Guarantor Form; help on ID Copy | how the files are stored: the manual |
@@ -508,7 +516,21 @@ Decided 11/11/2026 (AJ), for PR 6b:
 Open, for MyCity: the privacy notice's wording (`onboarding.upload.privacyNotice`) is written from
 what the system does; Operations & People to confirm it before go-live.
 
+Open, for AJ (found filming the Milestone 5 video, 12/11/2026): the Upload Documents page shares the
+public write limit, 20 a minute from one address (`RATE_LIMIT_PUBLIC_WRITES_PER_MIN`), and each
+document costs two writes (the file, then naming it on its item). A hire who sends the New Joiner list
+briskly is told "Too many requests. Wait a moment and try again." within the minute; the whole page is
+30 writes or more. A limit of its own for `/onboard/<token>`, counted per link as staff uploads are
+counted per person, is a security setting (SYSTEM_ARCHITECTURE §3, §4) and is not changed here.
+
+Open, for AJ (the same filming): a file the hire sent that Operations & People rejected stays on their
+Employee 360 Documents tab as Awaiting Check, under the requirement's title beside the file that
+replaced it. Rejected is not a state of a person's document; whether it is removed, marked or kept as
+the record of what was sent is AJ's to decide.
+
 ## 14 · Change log
+
+- 12/11/2026 · GE · Found filming the Milestone 5 videos (`docs/runbooks/training-videos.md` §7), fixed (§3 step 6, §6, §10): a hire's files read on their Documents tab by their file's name and as Awaiting Check after Operations & People had verified them on the case; now each is titled by its requirement or guarantor when named (`vault.setTitle`, new) and verified on the record with the item or the guarantor's pass (`documents.verifiedIn`, new, which People's Verify Document now uses too). A previous employer's Years Known, never asked, was saved as 0 (`blank(z.coerce.number())` reads "" as 0); `GuarantorInput.years_known` is `optionalWhole`. The offer's details read Expired On for an accepted, declined or withdrawn offer; now Expires while it is with the candidate and Expired On only once it lapsed. Every Markdown email's written-out link now wraps on a phone (the email layout).
 
 - 12/11/2026 · AJ · The audit of #122 (§2 to §8, §10, §11, §13): the offer's employment type in the employee's spellings (5070, the vacancy's mapped in New Offer); the hire's work email a placeholder until Complete Onboarding, their candidate address the personal email every mail goes to, Send refused for an active employee, and an acceptance refusal reaching the candidate as a plain retry; scope all for the settings and Operations & People's case actions (`can_check`, `can_configure`), Mark Step Done for the case's owner; the chat card's range reason; Reissue Contract, and 15 days for the hire to sign; Reopen refused past Offer; MyCity's Guarantor Form on each guarantor (5100, both addresses picked) and the form and ID copy needed to pass; the hire's home address picked and a gate condition; the BVN correctable until the gate; the contract's hire name frozen (5080); the confirmation date by `lagos.addMonths`; Withdraw shown with an approval only to its submitter or the CEO; offers and contracts locked request first; a signatory named after approval opens the request by signing; Withdraw honours `withdrawnIn`'s answer; a department's plan links only its own SOPs; the access log and metrics write a public link's token as `:token`. Employee 360's Documents tab opens a document beside the list (F31).
 

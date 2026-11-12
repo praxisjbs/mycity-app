@@ -31,6 +31,12 @@ const SAID = [
   [/\bAPP-0*(\d+)/g, "app $1"],
   [/\bASM-0*(\d+)/g, "A S M $1"],
   [/\bQRY-0*(\d+)/g, "query $1"],
+  [/\bOFF-0*(\d+)/g, "offer $1"],
+  [/\bCON-0*(\d+)/g, "contract $1"],
+  [/\bBVN\b/g, "B V N"],
+  [/\bNYSC\b/g, "N Y S C"],
+  [/\bMyLagosApp\b/g, "My Lagos App"],
+  [/ & /g, " and "],
   [/\bhub\.mycityapp\.io\b/g, "hub dot my city app dot I O"],
   [/\|/g, ""],
 ];

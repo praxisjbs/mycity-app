@@ -175,6 +175,8 @@ async function item(caseId, itemId, body) {
     if (needsFile && !body.document_id) throw refused("FILE_REQUIRED", "Add the file", 422, { document_id: ["Add the file"] });
     if (needsValue && !body.entered_value) throw refused("VALUE_REQUIRED", "Enter the number", 422, { entered_value: ["Enter the number"] });
     if (needsFile) await ownFile(client, row, body.document_id, "document_id");
+    // On the hire's record it reads as what it is ("Valid ID"), not as the file's own name.
+    if (needsFile) await vault.setTitle(client, body.document_id, it.title);
     await repo.itemUploaded(client, itemId, {
       document_id: needsFile ? body.document_id : null,
       entered_value: needsValue ? body.entered_value : null,
@@ -205,6 +207,9 @@ async function guarantor(caseId, body) {
     if (same && same.check_status === "passed") throw refused("ALREADY_CHECKED", "This guarantor has passed their check");
     if (body.form_document_id) await ownFile(client, row, body.form_document_id, "form_document_id");
     if (body.id_document_id) await ownFile(client, row, body.id_document_id, "id_document_id");
+    // Filed on the hire's record under the guarantor's name, not the file's.
+    if (body.form_document_id) await vault.setTitle(client, body.form_document_id, `Guarantor Form, ${body.full_name}`);
+    if (body.id_document_id) await vault.setTitle(client, body.id_document_id, `ID Copy, ${body.full_name}`);
     const id = await repo.saveGuarantor(client, caseId, {
       ...body,
       contact_address_line: places.lineOf(body.contact_address),
