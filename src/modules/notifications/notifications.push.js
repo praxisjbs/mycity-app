@@ -12,13 +12,12 @@
  *   pushTest(user, device)  always shown, even with the app open
  *
  * Each (notice, device) is recorded in push_delivery, so a retried job sends only to the
- * devices still owed. The link is the record's screen when its person may open its module,
- * as in the bell; otherwise none, and the device opens the bell.
+ * devices still owed. The link is the one the bell and the email give the person
+ * (service.readerLink, the route map's `self` included); otherwise none, and the device opens the bell.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
-const grantsCache = require("../../shared/rbac/grants-cache");
 const push = require("../../services/push/web-push");
 const payloads = require("../../services/push/payload");
 const { EVENTS } = require("./notifications.events");
@@ -52,12 +51,10 @@ async function retire(sub, reason) {
   });
 }
 
-/** The record's screen, when the person may open its module. */
+/** The record's screen for its person, as the bell and the email link it (service.readerLink). */
 async function pathOf(row) {
-  const user = await grantsCache.getAuthUser(pool, row.user_id);
-  if (!user) return null;
-  const [shown] = await service.present([row], service.opener(user));
-  return shown && shown.link ? shown.link.path : null;
+  const link = await service.readerLink(row);
+  return link ? link.path : null;
 }
 
 /** Sends one payload to each subscription; returns how many went and how many to try again. */

@@ -3,7 +3,9 @@
  * The bell, end to end: the real migrations on a throwaway database, the whole app
  * through HTTP, the outbox drained as the worker would. Real notices come from the
  * fan-out (a password change); the edge cases (another person's row, an email-only
- * row, a record the reader cannot open, a second page) are rows written here.
+ * row, a record the reader cannot open, a second page) are rows written here. One notice's
+ * link is the same on the bell, the push and the email, the reader's own (§6, Where a
+ * notice opens).
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/notifications
  *
@@ -20,6 +22,11 @@ const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const realtime = require("../../src/services/realtime/emitter");
+const systemMail = require("../../src/services/mail/system-mail.service");
+const webPush = require("../../src/services/push/web-push");
+const vapid = require("../../src/services/push/vapid");
+const routeMap = require("../../src/shared/route-map");
+const queues = require("../../src/jobs/queues");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -308,6 +315,66 @@ describeDb("the bell against the real migrations", () => {
         [staffId],
       );
       expect(again.n).toBe(1);
+    });
+
+    test("the bell, the push and the email give one link, the reader's own: a temporary site opens on Work Location Requests; a record they may open nowhere has none", async () => {
+      const [site, run] = [crypto.randomUUID(), crypto.randomUUID()];
+      const channels = ["in_app", "email", "push"];
+      const onSite = await notify(staffId, { title: "Temporary Site Approved", entity_type: "attendance_temporary_site", entity_id: site, channels });
+      const onRun = await notify(staffId, { title: "Payroll Run Approved", entity_type: "payroll_run", entity_id: run, channels });
+      const own = { module: "ess", tab: "work-location-requests", path: `/ess?tab=work-location-requests&site=${site}` };
+      // The premise: the record's staff screen is People · Worksites, which an employee cannot open.
+      expect(routeMap.linkFor("attendance_temporary_site", site)).toMatchObject({ module: "people", tab: "worksites" });
+
+      const bell = (await staff.get("/notifications?status=unread")).body.data;
+      expect(bell.find((n) => n.notification_id === onSite.notification_id).link).toEqual(own);
+      expect(bell.find((n) => n.notification_id === onRun.notification_id).link).toBeNull();
+
+      // The socket's copy and the email, through the delivery job itself.
+      const rows = (await q("SELECT * FROM notification WHERE notification_id = ANY($1::uuid[]) ORDER BY created_at", [[onSite.notification_id, onRun.notification_id]])).rows;
+      const told = jest.spyOn(realtime, "toUser").mockReturnValue(true);
+      jest.spyOn(queues, "enqueue").mockResolvedValue({ id: "1" });
+      systemMail.__reset();
+      const deliver = require("../../src/jobs/handlers/notification-deliver");
+      const out = await deliver({ data: { event: { key: "test.happened" }, notifications: rows, push: null }, updateData: async () => undefined });
+      expect(out).toMatchObject({ in_app: 2, email: 2, push_queued: 2 });
+      const socket = (id) => told.mock.calls.find(([, kind, n]) => kind === "notification" && n.notification_id === id)[2];
+      expect(socket(onSite.notification_id).link).toEqual(own);
+      expect(socket(onRun.notification_id).link).toBeNull();
+      const mailOf = (title) => systemMail.capturedMail().find((m) => m.template === "notification" && m.subject === title);
+      const button = (mail) => {
+        const a = /<a href="([^"]+)"[^>]*>Open in MyCity App<\/a>/.exec(mail.html || "");
+        return a ? a[1].replace(/&amp;/g, "&") : null;
+      };
+      expect(button(mailOf("Temporary Site Approved"))).toBe(new URL(own.path, config.STAFF_ORIGIN).href);
+      expect(button(mailOf("Payroll Run Approved"))).toBeNull();
+
+      // The push, to a device of theirs, carries the same path; none for the record they may open nowhere.
+      const pushed = [];
+      vapid.resetForTest();
+      const restore = webPush.useTransportForTest(async (subscription, body) => {
+        pushed.push(JSON.parse(body));
+        return { statusCode: 201 };
+      });
+      try {
+        expect((await staff.get("/notifications/push/config")).status).toBe(200);
+        const ecdh = crypto.createECDH("prime256v1");
+        ecdh.generateKeys();
+        const device = {
+          endpoint: `https://push.example.test/send/links-${crypto.randomBytes(6).toString("hex")}`,
+          p256dh: ecdh.getPublicKey().toString("base64url"),
+          auth: crypto.randomBytes(16).toString("base64url"),
+        };
+        expect((await staff.post("/notifications/push/subscriptions").send(device)).status).toBeLessThan(300);
+        const sender = require("../../src/modules/notifications/notifications.push");
+        await sender.pushNotice(onSite.notification_id);
+        await sender.pushNotice(onRun.notification_id);
+      } finally {
+        restore();
+      }
+      expect(pushed.find((p) => p.id === onSite.notification_id).path).toBe(own.path);
+      expect(pushed.find((p) => p.id === onRun.notification_id).path).toBeNull();
+      await q("UPDATE notification SET read_at = now() WHERE notification_id = ANY($1::uuid[])", [[onSite.notification_id, onRun.notification_id]]);
     });
 
     test("the bell pages at 25", async () => {

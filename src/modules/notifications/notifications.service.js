@@ -97,13 +97,25 @@ async function list(user, query) {
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
 /**
+ * The link a notice gives its own person, the same on every channel: the bell and the banner
+ * (asNotice), the push (notifications.push.js) and the email (jobs/handlers/notification-deliver.js).
+ * The screen is screenTo's for that person's own grants, the route map's `self` included, so an
+ * employee's payslip opens ESS · My Payslips; null when they may open neither screen.
+ * @param {{user_id: string, entity_type?: string|null, entity_id?: string|null}} row
+ * @returns {Promise<{module: string, tab: string, path: string}|null>}
+ */
+async function readerLink(row) {
+  const user = await grantsCache.getAuthUser(pool, row.user_id);
+  const [shown] = await present([row], user ? opener(user) : async () => false);
+  return shown.link;
+}
+
+/**
  * A row as a socket carries it to the bell, the banner and the urgent bar: the contract's
- * Notification, its link only when its person may open the record's module.
+ * Notification, its link only when its person may open the record's screen (readerLink).
  */
 async function asNotice(row) {
-  const user = await grantsCache.getAuthUser(pool, row.user_id);
-  const canOpen = user ? opener(user) : async () => false;
-  const [shown] = await present([row], canOpen);
+  const link = await readerLink(row);
   return {
     notification_id: row.notification_id,
     category: row.category,
@@ -116,7 +128,7 @@ async function asNotice(row) {
     body: row.body || null,
     entity_type: row.entity_type ?? null,
     entity_id: row.entity_id ?? null,
-    link: shown.link,
+    link,
     read_at: iso(row.read_at),
     created_at: iso(row.created_at || Date.now()),
   };
@@ -700,6 +712,7 @@ module.exports = {
   withdrawForRecord,
   list,
   asNotice,
+  readerLink,
   urgent,
   unreadCount,
   badges,
