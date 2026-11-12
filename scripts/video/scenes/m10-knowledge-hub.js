@@ -70,26 +70,49 @@ const dialog = (s) => s.page.locator("[role=dialog], [role=alertdialog]").last()
 const inDialog = (s, label) => dialog(s).getByLabel(label, { exact: true }).first();
 const text = (s, words) => s.page.getByText(words, { exact: true }).first();
 const button = (s, name, within) => (within || s.page).getByRole("button", { name, exact: true }).first();
+/** A chip (a pressed-state button): the lists' filters. */
+const chip = (s, name) => s.page.getByRole("button", { name, exact: true }).first();
 
-/** A signature drawn on a pad, at a person's pace: two loops and a tail. */
+/** Today in Lagos as a date field takes it (DD/MM/YYYY). */
+function today() {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+  return `${p.day}/${p.month}/${p.year}`;
+}
+
+/**
+ * A signature drawn on a pad at a person's pace: a looped capital, then a run of joined loops that
+ * shrink to a tail, the way a hurried hand writes a name.
+ */
 async function sign(s, pad) {
   await pad.scrollIntoViewIfNeeded();
   const box = await pad.boundingBox();
-  const at = (t) => ({
-    x: box.x + box.width * (0.15 + 0.7 * t),
-    y: box.y + box.height * (0.55 - 0.22 * Math.sin(t * Math.PI * 5) * (1 - t * 0.4)),
-  });
-  const start = at(0);
-  if (s.phone) {
-    // A finger: Playwright's touch has no drag, so the pad's pointer events are sent as a mouse.
-    await s.page.mouse.move(start.x, start.y);
-  } else await s.hover(pad);
-  await s.page.mouse.move(start.x, start.y, { steps: 6 });
+  const W = box.width * 0.7;
+  const H = box.height * 0.32;
+  const x0 = box.x + box.width * 0.14;
+  const y0 = box.y + box.height * 0.56;
+  // A prolate cycloid loops where the pen doubles back; the loops shrink and flatten to the end.
+  const at = (t) => {
+    const k = t * 7 * Math.PI;
+    const r = 1.35 * (1 - 0.55 * t);
+    return { x: x0 + W * (t + (r * Math.sin(k)) / 26), y: y0 - H * (r * Math.cos(k)) * (0.55 + 0.45 * (1 - t)) * 0.5 };
+  };
+  const stroke = async (from, to, n) => {
+    const a = at(from);
+    await s.page.mouse.move(a.x, a.y, { steps: 6 });
+    await s.page.mouse.down();
+    for (let i = 1; i <= n; i++) {
+      const p = at(from + ((to - from) * i) / n);
+      await s.page.mouse.move(p.x, p.y, { steps: 2 });
+    }
+    await s.page.mouse.up();
+  };
+  if (!s.phone) await s.hover(pad);
+  await stroke(0, 0.62, 70);
+  await stroke(0.66, 1, 36);
+  // The underline.
+  await s.page.mouse.move(x0 + W * 0.05, y0 + H * 0.75, { steps: 4 });
   await s.page.mouse.down();
-  for (let i = 1; i <= 60; i++) {
-    const p = at(i / 60);
-    await s.page.mouse.move(p.x, p.y, { steps: 2 });
-  }
+  await s.page.mouse.move(x0 + W * 0.9, y0 + H * 0.62, { steps: 18 });
   await s.page.mouse.up();
   await s.wait(0.3);
 }
@@ -152,17 +175,18 @@ module.exports = {
           start: POLICIES,
           lines: [
             { say: "Policies lists each one: who it applies to, the version in force, and how many acknowledged it.", do: (s) => s.hover(text(s, "Code of Conduct")) },
-            { say: "The chips narrow it: In Force, Awaiting Approval, Starts Soon, Draft, or Archived.", do: (s) => s.hover(s.page.getByRole("radio", { name: "Starts Soon" })) },
+            { say: "The chips narrow it: In Force, Awaiting Approval, Starts Soon, Draft, or Archived.", do: (s) => s.hover(chip(s, "Starts Soon")) },
             "Cynthia holds Manage Policies, as do the Implementation Team and the CEO.",
             { say: "She starts a new one. New Policy, its title, then Start Policy.", do: async (s) => { await s.click("New Policy"); await s.type(inDialog(s, "Title"), POLICY, { delay: 45 }); await s.click(button(s, "Start Policy", dialog(s))); } },
             { say: "Under Policy Settings it applies to Everyone, and needs each person's acknowledgement.", do: (s) => s.hover(text(s, "Needs Acknowledgement")) },
-            { say: "She pastes the policy's text from her document.", do: (s) => s.type(s.page.getByLabel("Policy Text").first(), POLICY_TEXT, { delay: 4 }) },
+            { say: "She pastes the policy's text from her document.", do: (s) => s.type(s.page.getByRole("textbox", { name: "Policy Text", exact: true }), POLICY_TEXT, { delay: 4 }) },
             { say: "Tidy With AI suggests headings and lists, keeping her words.", do: async (s) => { await s.click("Tidy With AI"); await text(s, "Tidied").waitFor({ timeout: 90000 }); }, hold: 0.6 },
             { say: "She reads Tidied beside Yours, and presses Use Tidied Text.", do: (s) => s.click("Use Tidied Text"), hold: 0.4 },
             { say: "Save Draft keeps it. Nobody is told yet.", do: (s) => s.click("Save Draft"), hold: 0.6 },
-            { say: "She presses Publish Policy, picks the first day, and adds a note.", do: async (s) => { await s.click("Publish Policy"); await s.type(inDialog(s, "Note"), "First version of our remote work rules.", { delay: 22 }); } },
+            { say: "She presses Publish Policy, gives the first day, and adds a note.", do: async (s) => { await s.click("Publish Policy"); await s.type(inDialog(s, "First Day"), today(), { delay: 60 }); await s.type(inDialog(s, "Note"), "First version of our remote work rules.", { delay: 22 }); } },
             { say: "She signs in Your Signature, with the mouse or a finger.", do: (s) => sign(s, dialog(s).getByRole("img", { name: "Your Signature" })) },
             { say: "Publish Policy. Everyone is told, and asked to acknowledge it after they clock in.", do: (s) => s.click(button(s, "Publish Policy", dialog(s))), hold: 0.8 },
+            { say: "It applies to Cynthia too, so she's asked at once. She presses Acknowledge.", do: (s) => s.click(button(s, "Acknowledge", s.page.getByRole("dialog", { name: "Policy Update" }))), hold: 0.6 },
             "A policy that needs approval reads Submit for Approval instead. The CEO approves it.",
           ],
         },
@@ -198,7 +222,7 @@ module.exports = {
           start: SOPS,
           lines: [
             { say: "SOPs are each department's standard operating procedures. Every member of staff reads them.", do: (s) => s.wait(0.4) },
-            { say: "The chips show one department's. Aaron presses Branding and Marketing.", do: (s) => s.click(s.page.getByRole("radio", { name: "Branding & Marketing" })) },
+            { say: "The chips show one department's. Aaron presses Branding and Marketing.", do: (s) => s.click(chip(s, "Branding & Marketing")) },
             { say: "He opens Campaign Launch. It reads beside the list.", do: (s) => s.click(text(s, "Campaign Launch")) },
             { say: "Its Purpose, its Scope, the Roles Involved, then numbered Steps, each with who does it.", do: (s) => s.scroll(320, text(s, "Purpose")), hold: 0.4 },
             { say: "Open Screen takes him to the screen a step happens on.", do: (s) => s.hover(button(s, "Open Screen")) },
@@ -334,7 +358,7 @@ module.exports = {
             { say: "His notes are his alone. They save as he types, and follow him to any device.", do: (s) => s.type(s.page.getByRole("textbox", { name: /My Notes/ }), "Hover before I click. We never ask for passwords.", { delay: 26 }), hold: 0.4 },
             { say: "Move to Top puts it out of the way. Minimise keeps only its bar.", do: async (s) => { await s.click("Move to Top"); await s.click("Minimise Notes"); } },
             { say: "He opens the lesson, reads it, and presses Mark Done at its foot.", do: async (s) => { await s.click(s.page.getByRole("button", { name: /Spot the Signs/ })); await s.scroll(900); await s.click("Mark Done"); } },
-            { say: "Next Item: the video. Play Video plays it in the course.", do: async (s) => { await s.click("Next Item"); await s.click("Play Video"); await s.wait(4); }, hold: 0.6 },
+            { say: "Next Item: the video. Play Video plays it from YouTube, inside the course.", do: async (s) => { await s.click("Next Item"); await s.page.getByRole("button", { name: /Play Video/ }).first().scrollIntoViewIfNeeded(); }, hold: 0.6 },
             { say: "He adds a line to his notes as he watches.", do: async (s) => { await s.click("Open Notes"); await s.type(s.page.getByRole("textbox", { name: /My Notes/ }), "\nReport it to IT on Staff Community.", { delay: 24, clear: false }); await s.click("Minimise Notes"); } },
             { say: "Mark Done, then Next Item: the checklist, page by page.", do: async (s) => { await s.click("Mark Done"); await s.click("Next Item"); await s.wait(1.5); await s.scroll(700); } },
             { say: "The last Mark Done completes the course.", do: async (s) => { await s.scroll(900); await s.click("Mark Done"); }, hold: 0.8 },
@@ -350,7 +374,7 @@ module.exports = {
           as: "aaron",
           start: MY_TRAINING,
           label: { eyebrow: "On a staff member's phone", title: "My Training", subtitle: "The certificate of completion" },
-          setup: (s) => s.click(s.page.getByRole("radio", { name: "Completed" })),
+          setup: (s) => s.click(chip(s, "Completed")),
           lines: [
             { say: "Completed lists it, with the date and its certificate number.", do: (s) => s.wait(0.6) },
             { say: "Download Certificate saves the PDF on his phone.", do: (s) => s.click(s.page.getByRole("button", { name: "Download Certificate" }).first()), hold: 0.6 },

@@ -1,3 +1,4 @@
+/* global document */
 "use strict";
 /**
  * Milestone 10 handover, part 2 of 2: Praxis AI (Ask, the answer and its pane, an action card,
@@ -26,7 +27,6 @@ const QUESTIONS = {
 };
 
 const dialog = (s) => s.page.locator("[role=dialog], [role=alertdialog]").last();
-const inDialog = (s, label) => dialog(s).getByLabel(label, { exact: true }).first();
 const text = (s, words) => s.page.getByText(words, { exact: true }).first();
 const button = (s, name, within) => (within || s.page).getByRole("button", { name, exact: true }).first();
 
