@@ -4601,6 +4601,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `title` | `ReactNode` | yes | What the setting is, Title Case, at most 4 words. |
+| `label` | `string` |  | The switch's accessible name when `title` is not plain text (a help term around it): the same words. |
 | `text` | `ReactNode` |  | One short line about it, when the title is not enough. |
 | `checked` | `boolean` | yes | On or off. |
 | `onChange` | `(checked: boolean) => unknown` | yes | Called with the new state; hand back its work and the switch is busy until it settles. |

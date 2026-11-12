@@ -593,6 +593,7 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 
 ## 14 · Change log
 
+- 12/11/2026 · TB · Training · Settings: the Library and Proof Required switches are named by their words again (a screen reader heard "Switch", since their titles carry a help term); `ToggleRow` takes a `label` for its switch. Found while filming the Milestone 10 video (`docs/runbooks/training-videos.md` §7).
 - 12/11/2026 · TB · My Notes (§6.13), at TB's request for the Milestone 10 video: one running note per person and course, saved as they type and theirs alone (`training_note`, migration `10440`; `GET` and `PUT /training/me/courses/:id/note`; `training.note_saved`, audit only, its length never its text). Take Notes on My Training's course opens `NoteTaker` (new in `packages/ui`): it floats over the course without blocking it, moves by its bar or the arrow keys on desktop, docks top or bottom on a phone, minimises to its bar and closes. Praxis AI reads no note (`personal:`).
 
 - 11/11/2026 · TB · The staging seed's first run on staging left both PDFs out: Chromium, started from the command line as `mycity-stg`, could not write that user's HOME. The PDF service now gives it the temp folder then, as the services do, and the seed gives an existing course the items it lacks, in their place (§6.12), so a second run adds them.

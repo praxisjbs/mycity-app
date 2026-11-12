@@ -841,8 +841,8 @@ function Settings({ c }: { c: Course }) {
     <>
       <Card>
         <CardHeader title="Settings" />
-        <ToggleRow title={<HelpTerm help="Anyone may take it, assigned or not.">Library</HelpTerm>} checked={c.library} disabled={fixed} onChange={(v) => set({ library: v })} />
-        <ToggleRow title={<HelpTerm help="Asked at the end: a certificate link or a file.">Proof Required</HelpTerm>} checked={c.proof_required} disabled={fixed} onChange={(v) => set({ proof_required: v })} />
+        <ToggleRow title={<HelpTerm help="Anyone may take it, assigned or not.">Library</HelpTerm>} label="Library" checked={c.library} disabled={fixed} onChange={(v) => set({ library: v })} />
+        <ToggleRow title={<HelpTerm help="Asked at the end: a certificate link or a file.">Proof Required</HelpTerm>} label="Proof Required" checked={c.proof_required} disabled={fixed} onChange={(v) => set({ proof_required: v })} />
         <ToggleRow title="Issue Certificate" checked={c.issue_certificate} disabled={fixed} onChange={(v) => set({ issue_certificate: v })} />
       </Card>
       {!fixed && (

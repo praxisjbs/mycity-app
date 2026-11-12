@@ -14,6 +14,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M3 Queries and Sanctions (8:56) | made before this tooling; the reference (§2) | Delivered 04/11/2026 | same folder |
 | M4 Recruitment, part 1: Vacancies and Candidates (9:07, 12 chapters) | `m4-recruitment-1.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
 | M4 Recruitment, part 2: Assessments and Interviews (6:54, 11 chapters) | `m4-recruitment-2.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
+| M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
+| M10 Praxis AI, part 2: Praxis AI and AI Control (7:00, 10 chapters) | `m10-praxis-ai.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 
 ---
 
@@ -233,6 +235,25 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
     `GEMINI_API_KEY` unset (`env -u GEMINI_API_KEY npm run ci`): with a key in the environment, the
     backend's "no provider set up" tests find one and fail.
 
+11. **YouTube in a cloud session.** Filming's Chromium uses the session's `HTTPS_PROXY` (bypassing
+    MyCity's two hosts, `film.js`), so a course's YouTube item loads its poster; but YouTube refuses
+    playback to the cloud machine ("Video unavailable", whatever the page). Film the item with
+    **Play Video** shown, not pressed, and say what it does; on a person's own network it plays.
+12. **AI answers differ from take to take.** The model words each answer itself: a button under one
+    answer (**Open Approvals**) or a **From** chip may not be there next time. Point at such things
+    softly (`soft()` in `m10-praxis-ai.js`: glide there if it shows within a few seconds), and wait
+    for an answer by its **Helpful**, a question's choices or a card's button, never by time.
+13. **A snapshot before each chapter that writes**, and a restore before its retake: a failed take
+    leaves half a record (a policy started, a course created) that the retake would meet twice.
+    `snap_ready` (seeded, Gemini tested), then one after each writing chapter; probes that ask the
+    AI leave conversations in a person's History, so restore before filming History.
+14. **Find a screen's real roles before scripting it.** Chips are pressed-state buttons, not radios;
+    a course's sections are radios named with their counts ("People 5"); Add Item is a menu;
+    Assign Training's Departments is a list of options. A probe that signs in, takes steps and prints
+    the page's ARIA tree (Playwright's `ariaSnapshot()`) saves a failed take each.
+15. **The signature.** `sign()` in `m10-knowledge-hub.js` draws joined loops and an underline with the
+    pointer; a sine wave reads as a scribble. Policies and courses both take it.
+
 ## 7 · Bugs found while filming
 
 Each is fixed on the video's branch, in the screen's own code, its guide and chapter with it, and
@@ -244,9 +265,32 @@ listed here and in `docs/PROGRESS.md`.
 | 10/11/2026 | Recruitment · Candidates (#39) | A candidate opened in a dialog at every desktop width, where F31 and the User Guide put them beside the board | Fixed: beside the board on a wide desktop, the board keeping its full width until a card is pressed (`ListDetail` `fillUntilPicked`, new); forms return to the candidate in place; headings one level down, the two score cards stacked |
 | 10/11/2026 | Recruitment · Assessments (#40), Talent Pool (#44) | An assessment, a sitting and a person in the pool opened in a dialog on desktop, as candidates did | Fixed the same way, the first record shown until another is pressed; a long assessment name leads its card, under the title Assessment (four words a card title) |
 | 10/11/2026 | AI · Deep Reasoning, Top Tier | The newest Pro model, which these jobs take, is listed to a new key but refused (§6.6) | Not code: set on the filming database. Production's key to be checked on AI Control |
+| 12/11/2026 | Knowledge Hub · Training (#65), Notification Settings | The Library and Proof Required switches, and Sound in App and Quiet Hours, were named "Switch" to a screen reader: a `ToggleRow` whose title carries a help term named its switch "Switch" | Fixed the same day: `ToggleRow` takes `label`, the four rows pass it; a test in `Switch.test.tsx` |
+| 12/11/2026 | ESS · My Training (#110) | TB asked for notes while taking a course | Built first: My Notes (`knowledge.md` §6.13), praxisjbs/mycity-app#132, merged before filming |
+| 12/11/2026 | Training certificate | The publisher's drawn signature prints on a white box over the certificate's cream paper: the pad saves an opaque PNG | Not fixed: for TB (the pad, or the certificate's template, makes white transparent; policies use the same pad) |
+| 12/11/2026 | Praxis AI · partnerships | "Which partnerships have gone inactive?" answered with a table whose Health read the raw code `on_track`, where the User Guide says a status reads in words | Not fixed: for TB (the answer's table comes from the model; the engine's post-processing should word codes) |
+| 12/11/2026 | AI Control · Actions | Deep Reasoning and Top Tier show Gemini 2.5 Pro as Ready while the key is refused it (§6.6): Ready means set up, not tested | Not code: set on camera to Gemini 3.1 Pro Preview then 3.8 Flash. Production's key to be checked the same way |
+| 12/11/2026 | Praxis AI, MILESTONES §15 | "A user without expense permission" does not exist among MyCity's staff: every role but System Administrator may view expenses (their own) | Not code: the video shows a staff member asking about expenses (answered from his own only) and refused company payroll |
 | 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opened in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say; once beside it, its section headings skipped a level and its two small cards broke words | Fixed the same day: `ListDetail` on a wide desktop (the first role shown until another is pressed), its forms return to it in place; the dialog stays on a phone and where two columns do not fit; headings `h3`; the cards stack in the pane. Tests and the User Guide's pictures follow |
 
 ## 8 · Where the work stands
+
+**12/11/2026 · TB (with Claude).** Both Milestone 10 videos written, filmed and assembled on a
+development database with the staging seed and Gemini's key: part 1, Knowledge Hub (8:34, 11
+chapters) and part 2, Praxis AI and AI Control (7:00, 10 chapters), both -16.4 LUFS. Decided by TB:
+two videos; Policies a full chapter; MyCity's own people do the work (an internal guide, as real as
+it can be): Cynthia Osakunih writes a policy and builds the course, Chinyere Elechi writes Branding &
+Marketing's SOP with Draft With AI, Aaron Agama acknowledges the policy and takes the course on his
+phone with My Notes (built for the video, praxisjbs/mycity-app#132), Ifeoma Mbonu asks the six target
+questions, Bassey Ekpe is refused company payroll, the JBS Praxis Team as IT fixes Deep Reasoning's
+chain and shows where the Anthropic key goes. A new short course, Spotting Phishing Messages (a lesson
+from Draft Lesson, CISA's YouTube video, a one-page PDF printed at filming), is taken to a certificate
+verified on go.mycityapp.io. One screen fixed on the way and four findings for TB (§7); the
+tooling learnt §6.11 to §6.15.
+
+- [x] Write, film and check both M10 videos (12/11/2026).
+- [ ] Upload both to Drive (§5) and add their links to the table at the top.
+- [ ] TB: the §7 findings of 12/11/2026 (the certificate's signature box, the partnerships answer's raw code).
 
 **11/11/2026 · GE.** Recruitment's desktop was put back as GE left it (Vacancies, Candidates and
 Assessments open a record in the wide dialog; Suggested From Organogram behind View Empty Seats; the

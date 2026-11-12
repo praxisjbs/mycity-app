@@ -1,4 +1,3 @@
-/* global document */
 "use strict";
 /**
  * Milestone 10 handover, part 2 of 2: Praxis AI (Ask, the answer and its pane, an action card,
@@ -30,15 +29,37 @@ const dialog = (s) => s.page.locator("[role=dialog], [role=alertdialog]").last()
 const text = (s, words) => s.page.getByText(words, { exact: true }).first();
 const button = (s, name, within) => (within || s.page).getByRole("button", { name, exact: true }).first();
 
-/** Ask a question in the box at the foot of Ask, and wait for the answer to land. */
+/** In Edit Chain: search a place's models and pick one from that place's own list. */
+async function chainPick(s, place, words, model) {
+  const box = dialog(s).getByRole("searchbox", { name: place });
+  await s.type(box, words, { delay: 60 });
+  await s.click(box.locator("xpath=following::*[@role='listbox'][1]").getByRole("option", { name: model, exact: true }));
+}
+
+/**
+ * Point at something an answer may or may not hold (the model words each answer itself): glide
+ * there when it shows within a few seconds, else leave the pointer where it is.
+ */
+async function soft(s, loc) {
+  if (await loc.waitFor({ state: "visible", timeout: 4000 }).then(() => true, () => false)) await s.hover(loc);
+}
+
+/**
+ * Ask a question in the box at the foot of Ask, and wait for Praxis AI to answer: a new answer's
+ * Helpful, a question's choices, or a card's button.
+ */
 async function ask(s, question) {
-  const box = s.page.getByRole("textbox", { name: "Ask a Question" });
-  const before = await s.page.getByRole("article").count().catch(() => 0);
-  await s.type(box, question, { delay: 28 });
-  await s.click("Send");
-  // The answer is in when Send answers again and Reading Your Records has gone.
-  await s.page.getByText("Reading Your Records").first().waitFor({ state: "hidden", timeout: 120000 }).catch(() => null);
-  await s.page.waitForFunction((n) => document.querySelectorAll("article").length > n, before, { timeout: 120000 }).catch(() => null);
+  const p = s.page;
+  const helpful = () => p.getByRole("button", { name: "Helpful", exact: true }).count();
+  const before = await helpful();
+  await s.type(p.getByRole("textbox", { name: "Ask a Question" }), question, { delay: 26 });
+  await s.click(p.getByRole("button", { name: "Send", exact: true }));
+  for (let i = 0; i < 240; i++) {
+    if ((await helpful()) > before) break;
+    if (await p.getByRole("button", { name: "Create Task", exact: true }).isVisible().catch(() => false)) break;
+    if (await p.getByRole("button", { name: "Normal", exact: true }).isVisible().catch(() => false)) break;
+    await s.wait(0.5);
+  }
   await s.settle();
 }
 
@@ -82,8 +103,9 @@ module.exports = {
           lines: [
             { say: "Praxis AI answers questions from MyCity's own records, and drafts changes for you to press.", do: (s) => s.hover(s.page.getByRole("link", { name: "Praxis AI" }).first()) },
             "It reads only what the person asking may read. It never acts by itself.",
-            { say: "Ask is the conversation. History lists your questions and what they cost.", do: (s) => s.hover(s.page.getByRole("button", { name: "Praxis AI" }).first()) },
+            "Ask is the conversation. History lists your questions and what they cost.",
             "We follow Ifeoma Mbonu, the Chief Executive Officer, Bassey Ekpe from Technology,|and the JBS Praxis Team as IT.",
+            { say: "Praxis AI opens from the menu, or from the spark at the top of any screen.", do: (s) => s.click(s.page.getByRole("link", { name: "Praxis AI" }).first()) },
           ],
         },
       ],
@@ -96,14 +118,14 @@ module.exports = {
           as: "ifeoma",
           start: ASK,
           lines: [
-            { say: "A new conversation offers Try Asking. Ifeoma types her own question instead.", do: (s) => s.hover(text(s, "Try Asking")) },
-            { say: "Who has overdue tasks?", speech: "Who has overdue tasks?", do: (s) => ask(s, QUESTIONS.tasks), hold: 0.4 },
-            { say: "It says Reading Your Records, then what it reads. The answer starts with a few sentences.", hold: 0.6 },
-            { say: "The table lists each person and task. A row opens its record.", do: (s) => s.scroll(400), hold: 0.4 },
-            { say: "From names what was read. The pane on the right shows the figures, the table and Sources.", do: (s) => s.hover(s.page.getByRole("tab", { name: "Sources" }).first()) },
+            { say: "A new conversation offers Try Asking. Ifeoma types her own question.", do: (s) => s.hover(text(s, "Try Asking")) },
+            { say: "Who has overdue tasks?", do: (s) => ask(s, QUESTIONS.tasks), hold: 0.4 },
+            { say: "While it reads, it says Reading Your Records. The answer starts with a few sentences.", hold: 0.6 },
+            { say: "From names what it was read from. A chip opens those records in the pane on the right.", do: (s) => soft(s, s.page.getByRole("button", { name: "From", exact: true }).last()) },
             { say: "She asks the next: which expenses are waiting for approval?", do: (s) => ask(s, QUESTIONS.expenses), hold: 0.4 },
-            { say: "Each request, who raised it, the amount, and whose approval it waits on.", do: (s) => s.scroll(400), hold: 0.6 },
-            { say: "A button under the answer opens the screen to act on it.", do: (s) => s.hover(s.page.getByRole("button", { name: /^Open / }).last()) },
+            { say: "Each request, its amount, and whose approval it waits on. A row opens its record.", do: (s) => s.hover(s.page.getByRole("tab", { name: "Table" })) },
+            { say: "Open Approvals opens the screen to act on it.", do: (s) => soft(s, s.page.getByRole("button", { name: "Open Approvals" }).last()) },
+            { say: "Sources lists every read: what it was filtered by, and how many rows it returned.", do: (s) => s.click(s.page.getByRole("tab", { name: "Sources" })), hold: 0.6 },
           ],
         },
       ],
@@ -116,13 +138,13 @@ module.exports = {
           as: "ifeoma",
           start: ASK,
           lines: [
-            "MyCity asked for six questions to be answered from the records, each citing them.",
-            { say: "Who is due for confirmation?", do: (s) => ask(s, QUESTIONS.confirmation), hold: 0.6 },
-            { say: "Which partnerships have gone inactive?", do: (s) => ask(s, QUESTIONS.partnerships), hold: 0.6 },
-            { say: "Which candidates are waiting for feedback?", do: (s) => ask(s, QUESTIONS.candidates), hold: 0.6 },
-            { say: "And budget against actual this month.", do: (s) => ask(s, QUESTIONS.budget), hold: 0.6 },
-            { say: "Overview charts what was counted or summed. Export saves every row to Excel, with what was asked.", do: (s) => s.hover(s.page.getByRole("button", { name: "Export" }).last()) },
-            { say: "Helpful or Not Helpful tells the team how it did.", do: (s) => s.hover(s.page.getByRole("button", { name: "Helpful" }).last()) },
+            "MyCity asked for six questions to be answered from the records. Two are done. Here are the other four.",
+            { say: "Who is due for confirmation?", do: (s) => ask(s, QUESTIONS.confirmation), hold: 0.8 },
+            { say: "Which partnerships have gone inactive?", do: (s) => ask(s, QUESTIONS.partnerships), hold: 0.8 },
+            { say: "Which candidates are waiting for feedback?", do: (s) => ask(s, QUESTIONS.candidates), hold: 0.8 },
+            { say: "And budget against actual spend this month.", do: (s) => ask(s, QUESTIONS.budget), hold: 0.8 },
+            { say: "Overview charts what was counted or summed. Export saves every row to Excel, with what was asked.", do: (s) => soft(s, s.page.getByRole("button", { name: "Export" }).last()) },
+            { say: "Helpful or Not Helpful tells the team how it did.", do: (s) => soft(s, s.page.getByRole("button", { name: "Helpful" }).last()) },
             "An answer is a first reading of the records, not a decision. Check figures on their screen before acting.",
           ],
         },
@@ -136,9 +158,10 @@ module.exports = {
           as: "bassey",
           start: ASK,
           lines: [
-            "Bassey Ekpe is a Content and Listing Associate. He holds no rights over expenses.",
-            { say: "He asks the same question about expenses.", do: (s) => ask(s, QUESTIONS.expenses), hold: 0.6 },
-            { say: "Praxis AI tells him that isn't available to him. It checks his rights before it reads anything.", hold: 0.6 },
+            "Bassey Ekpe is a Content and Listing Associate. He sees his own expenses, nobody else's.",
+            { say: "He asks the same question about expenses. He is answered from his own requests only.", do: (s) => ask(s, QUESTIONS.expenses), hold: 0.6 },
+            { say: "He asks for this month's payroll.", do: (s) => ask(s, "Show this month's payroll"), hold: 0.6 },
+            { say: "Company payroll is not available to him. His rights are checked before anything is read.", hold: 0.6 },
             "The model never decides who sees what. The hub does, exactly as on the screens.",
           ],
         },
@@ -152,13 +175,14 @@ module.exports = {
           as: "ifeoma",
           start: ASK,
           lines: [
-            { say: "Asked to do something, Praxis AI draws it as a card. Nothing happens until you press.", do: (s) => ask(s, "Add a task for Cynthia Osakunih to send the monthly staff report by Friday"), hold: 0.4 },
-            { say: "The card shows the task as it will be made: its title, who, and the due day.", do: (s) => s.scroll(300), hold: 0.4 },
-            { say: "Edit changes a field first. Cancel does nothing.", do: (s) => s.hover(s.page.getByRole("button", { name: "Edit" }).last()) },
+            { say: "Asked to do something, Praxis AI drafts it. Nothing happens until you press.", do: (s) => ask(s, "Add a task for Cynthia Osakunih to send the monthly staff report by Friday"), hold: 0.4 },
+            { say: "When something is missing, it asks first. How urgent is it? Ifeoma presses Normal.", do: async (s) => { const n = s.page.getByRole("button", { name: "Normal", exact: true }); await s.click(n); for (let i = 0; i < 120 && !(await s.page.getByRole("button", { name: "Create Task", exact: true }).isVisible().catch(() => false)); i++) await s.wait(0.5); await s.settle(); } },
+            { say: "The card shows the task as it will be made: its title, who it's for, and Friday's date.", do: (s) => s.hover(s.page.getByRole("button", { name: "Create Task", exact: true })), hold: 0.4 },
+            { say: "Edit changes a field first. Cancel does nothing.", do: (s) => soft(s, s.page.getByRole("button", { name: "Edit" }).last()) },
             { say: "Ifeoma presses Create Task. It runs with her own rights, checked again at the press.", do: (s) => s.click(s.page.getByRole("button", { name: "Create Task" }).last()), hold: 0.6 },
             { say: "Done lists the task, with Open.", hold: 0.4 },
             "Approvals, money, payroll and deletes ask Confirm It's You first.",
-            { say: "The microphone beside the box records a question, and writes it down for you to check and send.", do: (s) => s.hover(s.page.getByRole("button", { name: /Record|Microphone|Voice/ }).first()) },
+            { say: "Record Question, beside the box, takes a spoken question and writes it down for you to check and send.", do: (s) => s.hover(s.page.getByRole("button", { name: "Record Question" })) },
           ],
         },
       ],
@@ -192,7 +216,15 @@ module.exports = {
             { say: "Every feature is an action, and every action belongs to a job:|Default, Fast, Deep Reasoning, Image Reading, Transcription, Embeddings, Top Tier.", do: (s) => s.hover(text(s, "Deep Reasoning")) },
             { say: "Each job has a chain: the model asked first, then up to three fallbacks.", do: (s) => s.hover(text(s, "First")) },
             "Deep Reasoning takes Gemini's newest stable Pro. MyCity's key is not allowed that one.",
-            { say: "So IT presses Edit Chain on Deep Reasoning, and picks Gemini 3.1 Pro first.", do: async (s) => { await s.click(s.page.getByRole("button", { name: "Edit Chain" }).nth(2)); await s.type(dialog(s).getByRole("searchbox").first(), "3.1-pro", { delay: 50 }); await s.click(s.page.getByRole("option", { name: /gemini-3\.1-pro-preview/ }).first()); } },
+            {
+              say: "So IT presses Edit Chain on Deep Reasoning, removes 2.5 Pro,|and picks Gemini 3.1 Pro first, with 3.8 Flash behind it.",
+              do: async (s) => {
+                await s.click(s.page.getByRole("button", { name: "Edit Chain", exact: true }).nth(2));
+                await s.click(dialog(s).getByRole("button", { name: "Remove Gemini 2.5 Pro" }));
+                await chainPick(s, "First Choice", "3.1 Pro", "Gemini 3.1 Pro Preview Gemini");
+                await chainPick(s, "Fallback 1", "3.8 Flash", "Gemini 3.8 Flash Gemini");
+              },
+            },
             { say: "Save Chain. A failing model is skipped for the next in the chain, so answers keep coming.", do: (s) => s.click(button(s, "Save Chain", dialog(s))), hold: 0.6 },
             { say: "Below, Actions lists every feature, its job, its first choice, and whether it sends personal data.", do: (s) => s.scroll(700), hold: 0.4 },
             "Personal data never goes to DeepSeek.",
@@ -225,7 +257,7 @@ module.exports = {
           as: "team",
           start: INTEGRATIONS,
           lines: [
-            { say: "The providers' keys live on Settings, Integrations. AI shows the AI providers.", do: (s) => s.click(s.page.getByRole("radio", { name: "AI" })) },
+            { say: "The providers' keys live on Settings, Integrations. AI shows the AI providers.", do: (s) => s.click(s.page.getByRole("button", { name: "AI", exact: true })) },
             { say: "Gemini is Working. Test checks it now, and records the models the key may use.", do: async (s) => { const row = s.page.getByRole("row").filter({ hasText: "Gemini" }).first(); await s.click(row.getByRole("button", { name: "Test" })); }, hold: 0.8 },
             "Anthropic reads Not Set Up. Its key is needed for Top Tier work, the long drafting.",
             { say: "IT opens Anthropic, and presses Edit Settings.", do: async (s) => { await s.click(s.page.getByRole("row").filter({ hasText: "Anthropic" }).first()); await s.click("Edit Settings"); } },
