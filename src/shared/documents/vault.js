@@ -406,6 +406,22 @@ async function lock(client, documentId, actor) {
 }
 
 /**
+ * Name a document by what it is, once that is known after it was stored: a file a stranger sent on
+ * a link, before they said which item of their list it is ("Valid ID", not "IMG_2041.jpg"). Lists
+ * show the title before the file's own name. A locked document keeps its title.
+ * @returns {Promise<boolean>} whether the title changed
+ */
+async function setTitle(client, documentId, title) {
+  if (!inTransaction(client))
+    throw new Error("vault.setTitle must run inside atomically()");
+  const { rowCount } = await client.query(
+    `UPDATE document SET title = $2 WHERE document_id = $1 AND locked_at IS NULL AND title IS DISTINCT FROM $2`,
+    [documentId, String(title).trim().slice(0, 200)],
+  );
+  return rowCount > 0;
+}
+
+/**
  * Remove a document that was only ever meant to be kept for a while (an export, a day after
  * it was made: shared/documents/exports.js). The row and its derived files' rows go now, inside
  * the caller's transaction, with `document.removed` on the record; the bytes go after commit,
@@ -861,6 +877,7 @@ module.exports = {
   claim,
   STAGED_DOC_TYPE,
   lock,
+  setTitle,
   remove,
   removeFiles,
   TRANSIENT_MINUTES,

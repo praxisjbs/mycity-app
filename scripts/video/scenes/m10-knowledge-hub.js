@@ -11,6 +11,7 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const { sign } = require("../sign");
 
 const POLICIES = "/knowledge?tab=policies";
 const SOPS = "/knowledge?tab=sops";
@@ -81,39 +82,6 @@ const section = (s, name) => s.page.getByRole("radio", { name: new RegExp(`^${na
 function today() {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).map((x) => [x.type, x.value]));
   return `${p.day}/${p.month}/${p.year}`;
-}
-
-/**
- * A signature drawn on a pad at a person's pace: four joined loops that shrink to a tail, the way
- * a hurried hand writes a name, then an underline. (A prolate cycloid: the pen doubles back.)
- */
-async function sign(s, pad) {
-  await pad.scrollIntoViewIfNeeded();
-  const box = await pad.boundingBox();
-  const W = box.width * 0.62;
-  const H = box.height * 0.3;
-  const x0 = box.x + box.width * 0.16;
-  const y0 = box.y + box.height * 0.42;
-  const at = (t) => {
-    const k = t * 8 * Math.PI;
-    const r = 1 - 0.45 * t;
-    return { x: x0 + W * (t + (r * Math.sin(k)) / 9), y: y0 + H * 0.7 * r * Math.cos(k) * (0.6 + 0.4 * (1 - t)) };
-  };
-  if (!s.phone) await s.hover(pad);
-  const a = at(0);
-  await s.page.mouse.move(a.x, a.y, { steps: 6 });
-  await s.page.mouse.down();
-  for (let i = 1; i <= 110; i++) {
-    const p = at(i / 110);
-    await s.page.mouse.move(p.x, p.y, { steps: 2 });
-  }
-  await s.page.mouse.up();
-  // The underline.
-  await s.page.mouse.move(x0 - W * 0.04, y0 + H * 1.15, { steps: 5 });
-  await s.page.mouse.down();
-  await s.page.mouse.move(x0 + W * 0.95, y0 + H * 1.0, { steps: 18 });
-  await s.page.mouse.up();
-  await s.wait(0.3);
 }
 
 module.exports = {
