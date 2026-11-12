@@ -64,7 +64,7 @@ const YES_NO: Array<["yes" | "no", string]> = [
 function placesFor(token: string): Places {
   return {
     search: (q, opts) => api.call("GET /api/public/v1/onboard/:token/places/search", { params: { token }, query: { q }, signal: opts?.signal }).then((r) => r.places),
-    pin: (point) => api.call("GET /api/public/v1/onboard/:token/places/pin", { params: { token }, query: { lat: point.lat.toFixed(6), lon: point.lon.toFixed(6) } }),
+    pin: (point) => api.call("GET /api/public/v1/onboard/:token/places/pin", { params: { token }, query: { lat: Number(point.lat.toFixed(6)), lon: Number(point.lon.toFixed(6)) } }),
     read: (t: string) => maps.readPlaceToken(t) as PlaceSummary | null,
   };
 }

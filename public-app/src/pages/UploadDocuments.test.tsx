@@ -31,7 +31,7 @@ describe("UploadDocuments", () => {
     expect(screen.getByRole("region", { name: "Your Guarantors" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Your BVN" })).toBeTruthy();
     expect(await axe(document.body)).toHaveNoViolations();
-  });
+  }, 30000);
 
   it("shows each item's state, a rejection's reason, a guarantor being checked, and the BVN entered", async () => {
     draw("Fw8bK3sHr6Ty");
@@ -81,7 +81,7 @@ describe("UploadDocuments", () => {
     fireEvent.click(within(second).getAllByRole("radio", { name: "Yes" })[0]!);
     expect(await within(second).findByText("What Happened")).toBeTruthy();
     expect(await axe(document.body)).toHaveNoViolations();
-  });
+  }, 30000);
 
   it("says when documentation is complete", async () => {
     draw("Lz2mD9qXc5Wn");

@@ -96,7 +96,7 @@ export function OnboardingCase({ id, wide = false }: { id: string; wide?: boolea
     const url = `/api/v1/documents/${doc.document_id}/content`;
     if (viewableFile(doc.mime_type)) return files.view(url, { name: doc.file_name, mime: doc.mime_type, at: at ? `Sent ${formatDate(at)}` : null });
     // A file the browser cannot show is downloaded; the press waits for it, so a second press waits too (F26).
-    return saveFile(url, doc.file_name);
+    return saveFile(url, doc.file_name).then(() => undefined);
   };
   const atDocs = c.status === "documentation" && c.can_check;
   const head = [<CaseCard key="case" c={c} onChanged={reload} />, c.contract ? <ContractCard key="contract" contract={c.contract} onChanged={reload} /> : null].filter(Boolean);

@@ -455,6 +455,8 @@ describe("keeping a place", () => {
       "deal.venue",
       "employee.home_address",
       "lead.cities",
+      "onboarding_guarantor.contact_address",
+      "onboarding_guarantor.residential_address",
       "organisation.address",
       "partner.cities",
       "partner.headquarters",
