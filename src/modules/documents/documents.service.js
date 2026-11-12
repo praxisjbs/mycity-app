@@ -323,22 +323,28 @@ async function verify(user, documentId) {
       "Only a document that belongs to an employee is verified here",
       422,
     );
-  await tx(async (client) => {
-    const marked = await repo.markVerified(client, documentId, user);
-    if (!marked) return;
-    await emit(client, {
-      key: EVENTS.DOCUMENT_VERIFIED,
-      entity: { type: "employee", id: doc.subject_employee_id },
-      module: "people",
-      actor: user,
-      payload: {
-        document_id: documentId,
-        employee_id: doc.subject_employee_id,
-        subject_employee_id: doc.subject_employee_id,
-      },
-    });
-  });
+  await tx((client) => verifiedIn(client, user, documentId, doc.subject_employee_id));
   return repo.get(pool, documentId);
+}
+
+/**
+ * Mark an employee's document verified inside the caller's transaction: People's Verify Document,
+ * and a module that checked the same file on its own screen (Onboarding's Verify on a hire's
+ * checklist item, a guarantor's form and ID passing their check), so the person's Documents tab
+ * never asks for it to be checked again. Verified already: nothing changes, nothing is emitted.
+ * @returns {Promise<boolean>} whether it was marked now
+ */
+async function verifiedIn(client, actor, documentId, employeeId) {
+  const marked = await repo.markVerified(client, documentId, actor);
+  if (!marked) return false;
+  await emit(client, {
+    key: EVENTS.DOCUMENT_VERIFIED,
+    entity: { type: "employee", id: employeeId },
+    module: "people",
+    actor,
+    payload: { document_id: documentId, employee_id: employeeId, subject_employee_id: employeeId },
+  });
+  return true;
 }
 
 /* ------------------------------------------------------------------ *
@@ -373,5 +379,6 @@ module.exports = {
   addVersion,
   requestDocument,
   verify,
+  verifiedIn,
   serve,
 };

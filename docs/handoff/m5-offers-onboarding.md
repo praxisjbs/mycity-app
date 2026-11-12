@@ -189,6 +189,14 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
+- 12/11/2026 · JP · Filming the two M5 training videos (`docs/runbooks/training-videos.md` §7, §8) found
+  four faults, fixed on `claude/sharp-gates-u3h7te` (guide §3 step 6, §6, §10, §13, §14): a hire's files
+  on their Documents tab read by their file's name and stayed Awaiting Check after the case verified
+  them (`vault.setTitle`, `documents.verifiedIn`); a previous employer's Years Known saved as 0
+  (`optionalWhole`); an accepted offer read Expired On; the Markdown emails' written-out link widened
+  them past a phone. Two left for AJ (guide §13): Upload Documents shares the public write limit of 20
+  a minute; a rejected file stays Awaiting Check on the record.
+
 - 12/11/2026 · AJ · The audit of #122 (12/11/2026, 22 items), fixed on `m5/offers`; guide §2 to §8,
   §10, §11, §13, §14. Each fix has a test that fails on `d79e8f23` and passes now (22 tests, run on a
   clean checkout of that commit).

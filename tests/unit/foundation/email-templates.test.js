@@ -62,3 +62,20 @@ test("the invitation names who invited them, the job, the sign-in email and the 
   expect(out.text).toContain("You sign in with ada@mycity.test.");
   expect(out.text).toContain("expires in 72 hours");
 });
+
+test("a long link written out in an email wraps, so the message never grows wider than a phone", async () => {
+  // The Markdown emails end with "copy this address into your browser:" and the link in full, one
+  // unbroken word of 60 characters or more; unwrapped, it pushed the whole message past a phone's
+  // width (found filming the Milestone 5 video, 12/11/2026). The layout's body cell lets it break.
+  const sign_url = `https://go.mycityapp.io/sign/${"j6nZuYzIvLR6ZF7cqxSMVbYSFkYdUeb9".repeat(2)}`;
+  const out = await mail.renderEmail(
+    db,
+    "offer-sent",
+    { vacancy_title: "Head, Sales & Revenue", reference: "OFF-0001", sign_url, expires_at: "2026-11-27T16:37:00.000Z" },
+    { recipient, org },
+  );
+  const cell = out.html.match(/<td style="([^"]*)">\s*[^<]*<p>Dear Ada,/);
+  expect(cell).not.toBeNull();
+  expect(cell[1]).toContain("overflow-wrap:anywhere");
+  expect(cell[1]).toContain("word-break:break-word");
+});

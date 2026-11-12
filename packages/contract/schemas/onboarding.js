@@ -43,6 +43,7 @@ const { uuid, text, optionalText, email, phone, blank, isoDate, isoDateTime, lis
 const { DocumentRef } = require("./documents");
 const { EmploymentContractView } = require("./employment_contracts");
 const { PlaceInput } = require("./maps");
+const { optionalWhole } = require("./vacancies");
 
 const OnboardingStatus = z.enum(["documentation", "pre_onboarding", "onboarding", "completed", "cancelled"]);
 const ChecklistItemStatus = z.enum(["pending", "uploaded", "verified", "rejected"]);
@@ -218,7 +219,8 @@ const GuarantorInput = z
     job_title: optionalText(120),
     phone,
     email: blank(email),
-    years_known: blank(z.coerce.number().int().min(0).max(80)),
+    /** Asked of a personal guarantor only: left empty, it is not given (never 0). */
+    years_known: optionalWhole(0, 80, "At most 80 years"),
     date_of_birth: isoDate,
     contact_address: PlaceInput,
     residential_address: PlaceInput,

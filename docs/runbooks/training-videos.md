@@ -14,6 +14,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M3 Queries and Sanctions (8:56) | made before this tooling; the reference (§2) | Delivered 04/11/2026 | same folder |
 | M4 Recruitment, part 1: Vacancies and Candidates (9:07, 12 chapters) | `m4-recruitment-1.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
 | M4 Recruitment, part 2: Assessments and Interviews (6:54, 11 chapters) | `m4-recruitment-2.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
+| M5 Offers and Onboarding, part 1: Offers (7:08, 10 chapters) | `m5-offers-1.js` | Made 12/11/2026; to upload (§5) | |
+| M5 Offers and Onboarding, part 2: Documentation and Onboarding (6:41, 11 chapters) | `m5-onboarding-2.js` | Made 12/11/2026; to upload (§5) | |
 | M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 | M10 Praxis AI, part 2: Praxis AI and AI Control (7:00, 10 chapters) | `m10-praxis-ai.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 
@@ -47,6 +49,13 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
    and give it the EICAR test signature alone (`<md5 of the EICAR string>:68:Eicar-Test-Signature` in
    `/var/lib/clamav/eicar.hdb`), with `TCPSocket 3310`: a real scan that passes a clean file and
    catches the test virus. Start it before the seed, so the seed's CVs are scanned as they arrive.
+6. **Address search, when a video picks an address** (M5 part 2: the hire's home address and both
+   guarantors'). Every address is picked (F27), and with no Geoapify key the field says "Address
+   search is unavailable". Geoapify takes its key in the address, so a network secret cannot carry
+   it: the environment needs `GEOAPIFY_API_KEY` as a variable, which a new session picks up. Copy it
+   into the filming `.env` without printing it.
+7. **pgvector.** Where the image's PostgreSQL lacks it (`pg_available_extensions` has no `vector`),
+   `apt-get install postgresql-16-pgvector` before `CREATE EXTENSION vector`.
 
 ## 2 · The pattern (measured from the Milestone 3 video, 04/11/2026)
 
@@ -251,8 +260,27 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
     a course's sections are radios named with their counts ("People 5"); Add Item is a menu;
     Assign Training's Departments is a list of options. A probe that signs in, takes steps and prints
     the page's ARIA tree (Playwright's `ariaSnapshot()`) saves a failed take each.
-15. **The signature.** `sign()` in `m10-knowledge-hub.js` draws joined loops and an underline with the
-    pointer; a sine wave reads as a scribble. Policies and courses both take it.
+15. **The signature.** `sign()` (`scripts/video/sign.js`, shared since M5) draws joined loops and an
+    underline with the pointer; a sine wave reads as a scribble. Policies, courses, offers and
+    contracts all take it, the company's in a dialog and the candidate's on their phone.
+16. **A help term's popup is a dialog.** Hovering **Score** or **Pre-Onboarding** opens a popup with the
+    dialog role, so "the dialog on top" is then the popup, not the record: address a record's window by
+    its name (`getByRole("dialog", { name: "Offer" })`, M5's `record()` and `kase()`).
+17. **A tab's name carries its count.** Once a case waits, the Onboarding tab reads "Onboarding 1":
+    match a tab by its start (`{ name: /^Onboarding/ }`), never exactly.
+18. **The public pages' write limit.** go.mycityapp.io allows 20 writes a minute from one address
+    (`RATE_LIMIT_PUBLIC_WRITES_PER_MIN`), and Upload Documents spends two a document. A phone shot that
+    writes starts in a fresh minute (`freshMinute()` in `m5-onboarding-2.js`); the signing page's code
+    also waits a minute between sends. A retake inside the minute meets "Too many requests".
+19. **One real day.** A record's dates are stamped by the server, so a scene never runs a job "as"
+    another day: the steps would read Done today under a start date weeks away. M5's hire starts on
+    the filming day, and the morning's dispatch is run by hand that day (`morningRun()`); film both
+    parts on one database, the same day, or film both again.
+20. **Read a field's kind before typing into it.** Office Days is a number of days a week: words typed
+    into it vanish, and the shot shows an empty field under a line that says otherwise.
+21. **A signing code by its arrival.** `mail.message()` answers the newest mail of a kind, which before
+    the new one arrives is the last one sent: read the code before pressing Send Code and wait for a
+    different one (`codeAfter()` in `m5-onboarding-2.js`).
 
 ## 7 · Bugs found while filming
 
@@ -271,9 +299,35 @@ listed here and in `docs/PROGRESS.md`.
 | 12/11/2026 | Praxis AI · partnerships | "Which partnerships have gone inactive?" answered with a table whose Health read the raw code `on_track`, where the User Guide says a status reads in words | Not fixed: for TB (the answer's table comes from the model; the engine's post-processing should word codes) |
 | 12/11/2026 | AI Control · Actions | Deep Reasoning and Top Tier show Gemini 2.5 Pro as Ready while the key is refused it (§6.6): Ready means set up, not tested | Not code: set on camera to Gemini 3.1 Pro Preview then 3.8 Flash. Production's key to be checked the same way |
 | 12/11/2026 | Praxis AI, MILESTONES §15 | "A user without expense permission" does not exist among MyCity's staff: every role but System Administrator may view expenses (their own) | Not code: the video shows a staff member asking about expenses (answered from his own only) and refused company payroll |
+| 12/11/2026 | Every Markdown email (offer, contract, documents, assessment, interview, apply, payslip, proposal) | On a phone the message was wider than the screen and cut off on the right: the "copy this address into your browser" line ends in the link in full, one unbroken word the body cell would not break | Fixed the same day: the layout's body cell breaks a long word (`templates/email/layout.html`); a test in `email-templates.test.js` |
+| 12/11/2026 | Recruitment · Offers (#42) | An accepted offer read **Expired On** beside its expiry day, as did a declined or withdrawn one: every offer but one with its candidate took that label | Fixed the same day: **Expires** while it is with the candidate, **Expired On** once it has expired, nothing otherwise; `Offers.test.tsx` |
+| 12/11/2026 | People · Employee 360, Documents; Recruitment · Onboarding (#43) | A hire's documents read by their file's name ("guarantor-id-2.pdf", on a phone "IMG_2041.jpg") and stayed **Awaiting Check** after Operations & People had verified every one on the case: Verified 0 of 14 | Fixed the same day: named on its item, a file is titled by its requirement or guarantor (`vault.setTitle`, new); Verify on the case, and a guarantor's pass, verify the document on the record (`documents.verifiedIn`, new, which People's Verify Document uses too); `onboarding.test.js` (integration) |
+| 12/11/2026 | Upload Documents (#112), Recruitment · Onboarding (#43) | A previous employer's **Years Known**, which their form never asks, was saved as 0 and shown as "Years Known 0": `blank(z.coerce.number())` reads "" as 0 | Fixed the same day: `GuarantorInput.years_known` is `optionalWhole` (as Assessments and Interviews); `onboarding.test.js` (unit) |
+| 12/11/2026 | People · Employee 360, Documents | A file the hire sent that Operations & People rejected on the case (the first passport photograph) stays on their record as **Awaiting Check** beside the one that replaced it, under the same title | Not fixed: for AJ (rejected is not a state of a person's document; remove it, mark it, or leave it as the record of what was sent) |
+| 12/11/2026 | Upload Documents (#112) | The page shares the public write limit, 20 a minute from one address, and spends two writes a document: a hire sending the New Joiner list briskly is told "Too many requests" within the minute | Not fixed: for AJ, a security setting (SYSTEM_ARCHITECTURE §3, §4; `offers.md` §13). Filming paces it (§6.18) |
 | 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opened in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say; once beside it, its section headings skipped a level and its two small cards broke words | Fixed the same day: `ListDetail` on a wide desktop (the first role shown until another is pressed), its forms return to it in place; the dialog stays on a phone and where two columns do not fit; headings `h3`; the cards stack in the pane. Tests and the User Guide's pictures follow |
 
 ## 8 · Where the work stands
+
+**12/11/2026 · JBS Praxis (with Claude).** Both Milestone 5 videos written, filmed and assembled on one
+development database, the same day, with the staging seed: part 1, Offers (7:08, 10 chapters,
+-16.3 LUFS) and part 2, Documentation and Onboarding (6:41, 11 chapters, -16.4 LUFS). Two parts, as
+M2, M4 and M10. Kunle Afolabi, the seed's invented candidate at Shortlist for Head, Sales & Revenue, is
+followed from the board's Make Offer to his login. Cynthia Osakunih names herself Offer Signatory,
+makes, submits, signs and sends the offer, links the default plan's HR Induction step to SOP-0009, signs
+the contract, checks his documents and guarantors and completes onboarding; the JBS Praxis Team, the
+hiring manager, set as head of Implementation (every seeded vacancy's department) so the approval shows
+both stages, approves first and works through the plan on its phone; Ifeoma Mbonu approves on her
+phone. Kunle signs the offer and the contract, sends the New Joiner list (sample documents printed at
+filming, marked SAMPLE), two guarantors with picked addresses, his home address and his BVN on his
+phone. He starts on the filming day, so the morning's dispatch is run by hand that day (§6.19). No AI:
+M5 registers none. Six findings (§7): four fixed on this branch, two for AJ. The tooling learnt §1.6,
+§1.7 and §6.16 to §6.21; `sign()` moved to `scripts/video/sign.js`; `SAID` reads OFF-, CON-, BVN, NYSC,
+MyLagosApp and "&".
+
+- [x] Write, film and check both M5 videos (12/11/2026).
+- [ ] Upload both to Drive (§5) and add their links to the table at the top.
+- [ ] AJ: the §7 findings of 12/11/2026 left open (Upload Documents' write limit; a rejected file's state on the record).
 
 **12/11/2026 · TB (with Claude).** Both Milestone 10 videos written, filmed and assembled on a
 development database with the staging seed and Gemini's key: part 1, Knowledge Hub (8:34, 11

@@ -138,3 +138,28 @@ describe("the routes", () => {
     expect(all).not.toContain("POST /:id/steps/:step_id/done");
   });
 });
+
+describe("a guarantor as the hire enters them", () => {
+  const { GuarantorInput } = require("../../../packages/contract/schemas/onboarding");
+  const here = { device: { lat: 6.4474, lon: 3.4721, accuracy_m: 12 } };
+  const base = {
+    position: 1, kind: "previous_employer", full_name: "Adaobi Nwosu", relationship: "Former line manager",
+    phone: "08031234567", date_of_birth: "1975-07-22", contact_address: here, residential_address: here,
+    convicted: false, recommends: true,
+  };
+  const years = (v) => GuarantorInput.parse({ ...base, ...v }).years_known;
+
+  // The previous employer's form never asks how long they have known the hire; its empty field was
+  // read as 0 and the case showed "Years Known 0" (found filming the Milestone 5 video, 12/11/2026).
+  test("a previous employer's Years Known left empty is not given, never 0", () => {
+    expect(years({ years_known: "" })).toBeUndefined();
+    expect(years({ years_known: null })).toBeUndefined();
+    expect(years({ years_known: "7" })).toBe(7);
+  });
+
+  test("a personal guarantor still needs four years or more", () => {
+    expect(GuarantorInput.safeParse({ ...base, position: 2, kind: "personal", years_known: "" }).success).toBe(false);
+    expect(GuarantorInput.safeParse({ ...base, position: 2, kind: "personal", years_known: "3" }).success).toBe(false);
+    expect(years({ position: 2, kind: "personal", years_known: "12" })).toBe(12);
+  });
+});

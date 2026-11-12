@@ -1191,6 +1191,8 @@ screen.
 
 ## 14 · Change log
 
+- 12/11/2026 · JP · Documents, found filming the M5 videos (`offers.md` §3 step 6, §14): `documents.verifiedIn(client, actor, documentId, employeeId)`, the Verify Document mark and its `document.verified` event inside the caller's transaction, used by People's own Verify Document and by Onboarding when it verifies a hire's item or passes a guarantor, so a file checked on the case never reads Awaiting Check on the person's Documents tab; `vault.setTitle` names a file stored before anyone said what it is (a hire's upload, titled by its requirement). No route or screen changed.
+
 - 12/11/2026 · AJ · The employee record's Documents tab (the audit of M5's #122, `offers.md` §14): a document opens beside the list on a wide desktop and in a sheet on a phone (`ListDetail`, F31), no longer in a centred dialog; Upload Document's What Is It is `useContractForm` with the upload's own `EmployeeDocumentUpload` (gate 12). `EmployeeDocuments.test.tsx` added; the Employee 360 test follows the side-by-side record.
 
 - 12/11/2026 · AJ · The employee record's Documents tab, for M5 (`offers.md` §2; a new hire's onboarding uploads land on their record): `app/src/features/people/EmployeeDocuments.tsx` on the `documents` module's routes as built in track B (`GET /employees/:id/documents` and `/summary`, `POST /employees/:id/documents` and `/document-requests`, `POST /documents/:id/verify`): the counts strip, the list, a row opening View File and Download, and with `people` edit Verify Document, Request Document and Upload Document. No backend change; the mock gains the same routes (`app/src/api/mock/modules/ess.ts`).

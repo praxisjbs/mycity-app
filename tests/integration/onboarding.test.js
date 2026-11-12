@@ -318,12 +318,15 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     const wallet = itemNamed(first.body, "MyLagosApp Wallet ID");
     expect((await pub().post(`/onboard/${hire.link}/items/${idItem.onboarding_checklist_item_id}`).send({ entered_value: "x" })).body.error.code).toBe("FILE_REQUIRED");
     expect((await pub().post(`/onboard/${hire.link}/items/${idItem.onboarding_checklist_item_id}`).send({ document_id: file.body.document_id })).status).toBe(200);
+    // On the hire's Documents tab it reads as what it is, not as the file's own name.
+    expect((await one("SELECT title FROM document WHERE document_id = $1", [file.body.document_id])).title).toBe("Valid ID");
     expect((await pub().post(`/onboard/${hire.link}/items/${wallet.onboarding_checklist_item_id}`).send({ entered_value: "MLA-204417" })).status).toBe(200);
 
     // Two guarantors of different kinds; a personal one has known the hire four years or more. Each
     // as MyCity's Guarantor Form asks: born when, both addresses picked, the two answers, then the
     // signed form and an ID copy (the second guarantor's come later).
-    const docs = { form: file.body.document_id, id: file.body.document_id };
+    const form = await pub().post(`/onboard/${hire.link}/files`).attach("file", PDF, "form.pdf");
+    const docs = { form: form.body.document_id, id: file.body.document_id };
     const g1 = guarantorBody(1, "previous_employer", docs);
     const typed = await pub().post(`/onboard/${hire.link}/guarantors`).send({ ...g1, contact_address: "12 Allen Avenue" });
     expect(typed.status).toBe(422);
@@ -402,6 +405,8 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
       client.release();
     }
     expect((await verify(idItem.onboarding_checklist_item_id)).status).toBe(200);
+    // Verified on the case, it is verified on the hire's record too: People never check it twice.
+    expect((await one("SELECT verified_at IS NOT NULL AS verified FROM document WHERE document_id = $1", [file.body.document_id])).verified).toBe(true);
 
     // A rejection goes back to the hire with its reason; they send it again.
     const rejected = await h.as("ops").post(`/recruitment/onboarding/${hire.onboarding_case_id}/items/${wallet.onboarding_checklist_item_id}/reject`).send({ reason: "This is not a Wallet ID." });
@@ -417,6 +422,8 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
       h.as("ops").post(`/recruitment/onboarding/${hire.onboarding_case_id}/guarantors/${g.onboarding_guarantor_id}/check`).send({ check_status: status, check_note: "Called on the number given." });
     const [one1, one2] = kase.guarantors;
     expect((await check(one1, "passed")).status).toBe(200);
+    // A passed check vouches for the signed form, filed under the guarantor's name and verified.
+    expect(await one("SELECT title, verified_at IS NOT NULL AS verified FROM document WHERE document_id = $1", [form.body.document_id])).toEqual({ title: "Guarantor Form, Kunle Bello", verified: true });
     // No signed form or ID copy yet: the second cannot pass.
     const noForm = await check(one2, "passed");
     expect(noForm.status).toBe(409);
