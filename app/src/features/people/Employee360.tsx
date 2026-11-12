@@ -40,14 +40,16 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
+import { EmployeeDocuments } from "./EmployeeDocuments";
 import { EditEmployee } from "./EmployeeForm";
 import { employmentStatus, employmentType, loginStatus, RESTRICTED_HELP, workPattern } from "./status";
 
 /**
  * The employee 360 (docs/guides/foundation.md §2, §10): one person, with their profile,
  * job, work schedule (their week, attendance.md §6.13), reporting line, login and history as tabs,
- * and their queries and sanctions for a viewer holding `queries` view (queries.md §2, §6.1: only
- * the ones that viewer may see). Documents arrive with the documents module's own tab.
+ * their documents (the `documents` module's routes, EmployeeDocuments.tsx; a new hire's onboarding
+ * uploads among them), and their queries and sanctions for a viewer holding `queries` view
+ * (queries.md §2, §6.1: only the ones that viewer may see).
  *
  * A field the viewer may not see comes back null and shows Restricted, with a help term
  * naming who may see it (§10.1). A person's own record is never masked from them.
@@ -58,6 +60,7 @@ const TABS = [
   { value: "schedule", label: "Work Schedule" },
   { value: "line", label: "Reporting Line" },
   { value: "login", label: "Login" },
+  { value: "documents", label: "Documents" },
   { value: "history", label: "History" },
 ];
 /** Shown only to a viewer holding `queries` view; the lists keep the query visibility rule. */
@@ -201,6 +204,7 @@ export function Employee360({ id }: { id: string }) {
       {tab === "schedule" && <EmployeeWorkSchedule id={id} />}
       {tab === "line" && <ReportingLine employee={e} onChanged={reload} />}
       {tab === "login" && <Login employee={e} onChanged={reload} />}
+      {tab === "documents" && <EmployeeDocuments id={id} />}
       {tab === "history" && <History id={id} />}
       {seesQueries && tab === "queries" && <PersonQueries id={id} />}
       {seesQueries && tab === "sanctions" && <PersonSanctions id={id} />}

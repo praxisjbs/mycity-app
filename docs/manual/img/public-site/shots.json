@@ -87,6 +87,14 @@
       "phone"
     ]
   },
+  "public-onboard": {
+    "spec": "e01cfa44a18f98d4",
+    "source": "558b83310c63d062",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "public-proposal": {
     "spec": "ddc4fdc435deabe8",
     "source": "558b83310c63d062",

@@ -5,7 +5,7 @@ import type { Endpoints as Contract } from "@mycity/contract/contract.gen.ts";
  *
  * Every route comes from the generated contract (packages/contract/contract.gen.ts, F15), picked
  * by name so the public client can only reach the public surface: Careers, a Vacancy, Apply and
- * an Assessment (M4), Sign Offer and Verify Document (M5, the signatures routes), a Proposal (M7)
+ * an Assessment (M4), Sign Offer and Verify Document (M5, the signatures routes), Upload Documents (M5, a new hire's checklist), a Proposal (M7)
  * and Help (the User Guide's chapter for people outside MyCity), with their request parts as the API
  * accepts them and their responses as it sends them, and the index's figures (`/jobs/summary`). A
  * page whose routes are not in the contract yet adds its INTERIM
@@ -37,6 +37,15 @@ type ContractRoute =
   | "POST /api/public/v1/sign/:token/code/verify"
   | "POST /api/public/v1/sign/:token/sign"
   | "POST /api/public/v1/sign/:token/decline"
+  | "GET /api/public/v1/onboard/:token"
+  | "POST /api/public/v1/onboard/:token/privacy"
+  | "POST /api/public/v1/onboard/:token/files"
+  | "POST /api/public/v1/onboard/:token/items/:item_id"
+  | "POST /api/public/v1/onboard/:token/guarantors"
+  | "POST /api/public/v1/onboard/:token/bvn"
+  | "POST /api/public/v1/onboard/:token/address"
+  | "GET /api/public/v1/onboard/:token/places/search"
+  | "GET /api/public/v1/onboard/:token/places/pin"
   | "GET /api/public/v1/verify/:ref"
   | "GET /api/public/v1/verify/t/:token"
   | "GET /api/public/v1/help"

@@ -52,6 +52,8 @@ const nextAhead = (c: Pick<CandidateDetail, "stage" | "next_stages">) => c.next_
 const SOURCE: Record<string, string> = { careers: "Careers page", invited: "Invited", pool: "Talent Pool" };
 const CV_STATE: Record<string, string> = { none: "None sent", checking: "Being checked", clean: "Ready", infected: "Failed the virus check" };
 const WEIGHTED_HELP = "From the parts scored so far, with this role's weights.";
+/** The stages a hire's onboarding case owns: not progressed there, a card is not reopened. */
+const PAST_OFFER: readonly string[] = ["documentation", "pre_onboarding", "onboarding"];
 const words = (s: string) => STAGE_LABEL[s as ApplicationStage] ?? (s === "not_progressed" ? "Not Progressing" : s);
 
 export function CandidateSheet({ id, close }: { id: string; close: () => void }) {
@@ -96,7 +98,9 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
   // The one button in view, in this order: the next stage ahead, Make Offer, Reopen, Open Offer.
   const offerStage = offers && STAGE_ORDER.indexOf(c.stage) >= STAGE_ORDER.indexOf("offer");
   const makeOffer = offers && mayAdd && live && c.stage === "shortlist";
-  const mayReopen = mayEdit && c.status === "not_progressed" && role.data && role.data.status !== "closed";
+  // Past Offer the hire's case, contract and record ended with Not Progressing: the API refuses Reopen.
+  const mayReopen =
+    mayEdit && c.status === "not_progressed" && !PAST_OFFER.includes(c.stage) && role.data && role.data.status !== "closed";
   const choices: Array<Act | false | undefined | null> = [
     ahead ? moveTo(ahead) : null,
     makeOffer && { label: "Make Offer", icon: "send", onSelect: () => (close(), navigate(`/recruitment?tab=offers&new=1&application=${c.application_id}`)) },

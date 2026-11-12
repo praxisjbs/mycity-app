@@ -11,7 +11,10 @@
  *  - request count and duration recorded on the same hook, so metrics and the
  *    log cannot disagree;
  *  - the serialised request is trimmed to method, url, ip and user agent. Headers
- *    are not logged: they carry the token and the cookie.
+ *    are not logged: they carry the token and the cookie;
+ *  - a public link's token in the path (`/onboard/<token>`, `/sign/<token>`, `/verify/t/<token>`)
+ *    is written as `:token`: the link is the key to someone's documents, and a log is read by more
+ *    people than the link was sent to.
  */
 const pinoHttp = require("pino-http");
 const { logger } = require("../config/logger");
@@ -20,6 +23,14 @@ const metrics = require("../shared/observability/metrics");
 const requestStats = require("../shared/observability/request-stats");
 
 const QUIET = /^\/api\/health(\/|$)/;
+
+/** A path segment shaped like a public token: 32 random bytes in base64url are 43 characters. */
+const TOKEN_SEGMENT = /\/[A-Za-z0-9_-]{40,}(?=[/?#]|$)/g;
+
+/** The url as the log may keep it: every token-shaped path segment as `:token`. */
+function safeUrl(url) {
+  return String(url || "").replace(TOKEN_SEGMENT, "/:token");
+}
 
 function record(req, res) {
   try {
@@ -65,11 +76,11 @@ function accessLog() {
     },
     customSuccessMessage(req, res) {
       record(req, res);
-      return `${req.method} ${req.originalUrl || req.url} ${res.statusCode}`;
+      return `${req.method} ${safeUrl(req.originalUrl || req.url)} ${res.statusCode}`;
     },
     customErrorMessage(req, res, err) {
       record(req, res);
-      return `${req.method} ${req.originalUrl || req.url} ${res.statusCode} ${err ? err.message : ""}`.trim();
+      return `${req.method} ${safeUrl(req.originalUrl || req.url)} ${res.statusCode} ${err ? err.message : ""}`.trim();
     },
     customProps(req) {
       const ctx = requestContext.get() || {};
@@ -83,7 +94,7 @@ function accessLog() {
       req(req) {
         return {
           method: req.method,
-          url: req.url,
+          url: safeUrl(req.url),
           ip: req.raw ? req.raw.ip : req.ip,
           user_agent: req.headers && req.headers["user-agent"],
         };
@@ -95,4 +106,4 @@ function accessLog() {
   });
 }
 
-module.exports = { accessLog, QUIET };
+module.exports = { accessLog, QUIET, safeUrl };

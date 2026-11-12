@@ -15,6 +15,9 @@
  *     seal: (client, ctx) => documentRow,                // documents.generate with the signatures,
  *                                                        // the certificate and the QR (ctx below)
  *     onSigned, onCompleted, onDeclined, onEnded,        // (client, ctx) in the same transaction
+ *     sealedMailFor,                                     // (db, {request, signer}) the module's own
+ *                                                        // wording for one signer's sealed copy, or null
+ *     sealedTo,                                          // (db, id) others who get the sealed copy
  *   });
  *
  * and sends a document for signature inside its own transaction:
@@ -72,17 +75,19 @@ const origin = () => String(config.PUBLIC_ORIGIN).replace(/\/+$/, "");
  * @param {string} subjectType  e.g. "offer", "employment_contract", "partnership_agreement"
  * @param {{document_type: string, letter: Function, blocks?: Function, contentHash: Function, seal: Function,
  *          onSigned?: Function, onCompleted?: Function, onDeclined?: Function, onEnded?: Function,
- *          recordStatus?: Function, sealedTo?: Function}} adapter
+ *          recordStatus?: Function, sealedTo?: Function, sealedMailFor?: Function}} adapter
  *   blocks    (db, id) => RichTextBlock[] | null: the document as blocks, where it has headings,
  *             numbered clauses or tables; the pages draw these instead of the letter's lines
  *   sealedTo  (db, id) => [{ name, email }]: who besides the signers receives the sealed copy (the
  *             record's owner), mailed with the signers once it is sealed
+ *   sealedMailFor (db, {request, signer}) => {template, data, recipient?} | null: the module's own
+ *             wording for one signer's sealed copy; null leaves that signer to signature-completed
  */
 function defineSignable(subjectType, adapter) {
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(subjectType)) throw new Error(`defineSignable: "${subjectType}" is snake_case`);
   for (const fn of ["letter", "contentHash", "seal"])
     if (typeof adapter[fn] !== "function") throw new Error(`defineSignable(${subjectType}): ${fn} is a function`);
-  for (const fn of ["blocks", "onSigned", "onCompleted", "onDeclined", "onEnded", "recordStatus", "sealedTo"])
+  for (const fn of ["blocks", "onSigned", "onCompleted", "onDeclined", "onEnded", "recordStatus", "sealedTo", "sealedMailFor"])
     if (adapter[fn] !== undefined && typeof adapter[fn] !== "function")
       throw new Error(`defineSignable(${subjectType}): ${fn} is a function`);
   if (!["offer_letter", "employment_contract", "agreement"].includes(adapter.document_type))
@@ -530,6 +535,15 @@ async function storeImage(client, png, signatureId, actor) {
   return doc.document_id;
 }
 
+/**
+ * Hold a request for the caller's transaction, before the record it signs: the signing page takes the
+ * request first and the record in its hooks, so a module's own write (Withdraw, Resend) takes them in
+ * the same order and the two never wait on each other.
+ */
+async function holdRequestIn(client, signatureRequestId) {
+  return repo.request(client, signatureRequestId, { forUpdate: true });
+}
+
 /** Write one signature, then complete the request when it was the last. In the caller's transaction. */
 async function signRow(client, r, s, body, meta, actor) {
   const adapter = adapterOf(r.subject_type);
@@ -649,6 +663,7 @@ module.exports = {
   verifyCode,
   sign,
   signAsStaffIn,
+  holdRequestIn,
   decline,
   documentFor,
   verifyKey,

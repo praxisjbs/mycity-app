@@ -138,6 +138,22 @@ function requirePermission(key, action) {
 }
 
 /**
+ * After requirePermission: pass only when the grant's scope is the whole company (`all`). For
+ * settings that apply to everyone and for writes a module keeps to the people who act for every
+ * team (a Head of Department's team grant reads and drafts, but does not configure).
+ */
+function requireAllScope() {
+  const mw = async function allScopeCheck(req, _res, next) {
+    requireUser(req);
+    const p = req.permission || { key: "?", action: "?" };
+    if (req.scope !== "all") throw deny(req, `${p.key}.${p.action}:all`, { module: p.key, action: `${p.action}:all` });
+    return next();
+  };
+  mw.scope = "all";
+  return mw;
+}
+
+/**
  * Pass when the caller holds ANY of several grants. Only for routes where the
  * members are equal in power; OR-ing a weak grant with a strong one hands the
  * weak one the strong surface. The scope is the widest among the grants held.
@@ -336,6 +352,7 @@ async function scopeFor(user, key, action) {
 
 module.exports = {
   requirePermission,
+  requireAllScope,
   scopeFor,
   requireAnyPermission,
   requireCapability,

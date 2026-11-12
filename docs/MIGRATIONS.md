@@ -177,6 +177,7 @@ says production holds no seeded data, so A26 limits what a reference seed may co
 | Code lists the code switches on (statuses, the contract's enums) | Anything "so the screen isn't empty" |
 | Public holidays set by law (Nigeria's, `0448`), those the government names late marked `expected` | Holidays MyCity gives on its own account |
 | Template defaults the generator needs to render | Secrets, keys, URLs of external services |
+| MyCity's New Joiner list and default onboarding plan (`5399`, AJ 11/11/2026): Send Offer refuses an empty checklist, so a new database needs one; inserted only when absent | |
 
 Business choices are entered by MyCity on the screen that owns them, or loaded through the import
 engine, on staging and production alike. Demonstration data belongs in `seeds/staging/` (JavaScript,

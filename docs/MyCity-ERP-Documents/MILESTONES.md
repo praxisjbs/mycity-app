@@ -936,7 +936,10 @@ completes.
 - **The employee is created at acceptance**, without a login until onboarding completes; the hire's
   documents sit on the Employee 360's Documents tab from then. M4's `hireIn` moves the application
   to Hired and fills the Organogram seat; the vacancy closes as filled when its openings are hired.
-- **The checklist is MyCity's New Joiner list** (entered on screen, A26): proof of address, a valid
+- **The checklist is MyCity's New Joiner list** (kept on screen; seeded once, an exception to A26
+  decided by AJ on 11/11/2026 because Send Offer refuses an empty checklist, so the code cannot run
+  without one, with MyCity's Your First 30 Days as the default onboarding plan; `seeds/reference/5399`
+  inserts both only when absent and never writes over an edit): proof of address, a valid
   ID, certificates with NYSC, evidence of separation, birth certificate, the Employee Data Form, the
   MyLagosApp Wallet ID, a passport photograph and the bank Account Opening Form, with the signed
   offer and the contract added by the system; **two guarantors**, each reference-checked; the BVN as

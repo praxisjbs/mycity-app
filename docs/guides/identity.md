@@ -55,7 +55,9 @@ administrator can reset their two-step from Settings · Users.
    `POST /users` with the employee and roles. `users.invite` creates the login with no usable
    password and emits `app_user.created` and `auth.link_requested` (purpose `invite`). The outbox
    handler `identity.send_link` mints the link token, keeps only its hash in `password_reset`, and
-   queues the `user-invite` email with `STAFF_ORIGIN/welcome?token=…` (72 hours).
+   queues the `user-invite` email with `STAFF_ORIGIN/welcome?token=…` (72 hours). Another module's
+   step that ends in a login invites inside its own transaction through `users.inviteIn(client, body,
+   actor)`, the same invitation: M5's Complete Onboarding (`offers.md` §3 step 8), with the role Staff.
 2. **First password.** The link opens Welcome: `POST /auth/link` checks it, `POST /auth/reset`
    sets the password (`auth.password_set`), spends the link and every other open one, and the card
    returns to Sign In with the email filled.
@@ -473,6 +475,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 11/11/2026 · AJ · `users.inviteIn(client, body, actor)`: Invite User's own step inside a caller's transaction, for M5's Complete Onboarding, which invites the hire's login on their company email with the role Staff all or nothing with the rest of that step (§3 step 1). The invitation, its link and its mail are unchanged.
 - 03/11/2026 · JP · `access.ai.js`: Save Role is `design` (`praxis-ai.md` decision 35): a role's grants are designed on Roles and Permissions with the whole matrix in view, so who may do what never changes from the chat. No screen changed.
 - 01/11/2026 · JP · Confirm It's You starts on the strongest way the person has: a passkey when they have one, else the PIN, else the password (`useFreshSignIn`, `app/src/auth/FreshSignIn.tsx`; its choices in that order), for a Praxis AI card of a sensitive class as for My Security (`docs/guides/praxis-ai.md` §6.11, decision 11); the hook tells its caller which way was used (`onConfirmed`), so Praxis AI can offer Set Passkey once to a person who used the PIN or the password and has none. §10's My Security row: Confirm With now reads Passkey, PIN or Password.
 

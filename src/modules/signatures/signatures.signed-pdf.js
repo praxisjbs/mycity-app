@@ -94,27 +94,53 @@ async function sealed(documentId) {
   }
 }
 
+/**
+ * The sealed copy to each signer. A module may word one signer's mail itself, where the document is
+ * about that person and its own email says more than this one does (`sealedMailFor` on its
+ * defineSignable: the candidate of an offer gets `offer-signed`). It answers null for the signers it
+ * leaves to `signature-completed`. The sealed copy is attached either way, and the jobId stays the
+ * signature's, so a handler that runs twice still mails once. A signer recorded from paper has no
+ * address and is skipped; then whoever the adapter's `sealedTo` names (an agreement's owner) gets
+ * `signature-completed`, once per address.
+ */
 async function mailSealed(requestId) {
   const r = await repo.request(pool, requestId);
   if (!r || !r.sealed_at) return 0;
   const queues = require("../../jobs/queues");
+  const adapter = service().adapterOf(r.subject_type);
   const data = { title: r.title, reference: r.reference, verify_url: `${origin()}/verify/${encodeURIComponent(r.reference)}` };
-  const mail = (to, jobId) =>
-    queues.enqueue("email-send", EMAILS.completed, { to, template: EMAILS.completed, data, attachments: [{ document_id: r.sealed_document_id }] }, { jobId });
+  const attachments = [{ document_id: r.sealed_document_id }];
   const mailed = new Set();
   let sent = 0;
   for (const s of await repo.signaturesOf(pool, requestId)) {
     // A signature recorded from paper has no address: nobody was sent a link.
     if (s.status !== "signed" || !s.signer_email) continue;
-    await mail({ name: s.signer_name, email: s.signer_email }, `signature-completed-${s.signature_id}`);
+    const own = adapter.sealedMailFor ? await adapter.sealedMailFor(pool, { request: r, signer: s }) : null;
+    const template = own ? own.template : EMAILS.completed;
+    await queues.enqueue(
+      "email-send",
+      template,
+      {
+        to: { name: s.signer_name, email: s.signer_email },
+        ...(own && own.recipient ? { recipient: own.recipient } : {}),
+        template,
+        data: own ? own.data : data,
+        attachments,
+      },
+      { jobId: `signature-completed-${s.signature_id}` },
+    );
     mailed.add(String(s.signer_email).toLowerCase());
     sent += 1;
   }
-  const adapter = service().adapterOf(r.subject_type);
   for (const to of adapter.sealedTo ? (await adapter.sealedTo(pool, r.subject_id)) || [] : []) {
     if (!to || !to.email || mailed.has(String(to.email).toLowerCase())) continue;
     mailed.add(String(to.email).toLowerCase());
-    await mail({ name: to.name || to.email, email: to.email }, `signature-completed-${requestId}-${crypto.createHash("sha256").update(String(to.email).toLowerCase()).digest("hex").slice(0, 16)}`);
+    await queues.enqueue(
+      "email-send",
+      EMAILS.completed,
+      { to: { name: to.name || to.email, email: to.email }, template: EMAILS.completed, data, attachments },
+      { jobId: `signature-completed-${requestId}-${crypto.createHash("sha256").update(String(to.email).toLowerCase()).digest("hex").slice(0, 16)}` },
+    );
     sent += 1;
   }
   return sent;

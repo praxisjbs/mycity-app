@@ -914,7 +914,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "offers.OfferCard",
-      "schema_sha": "3468c73acb8be089",
+      "schema_sha": "9b256df5e49327f7",
       "screen": null
     },
     {
@@ -2077,6 +2077,17 @@
       "bulk": null,
       "schema": "offers.OfferListQuery",
       "schema_sha": "1ef2069374a40ace",
+      "screen": null
+    },
+    {
+      "key": "onboarding.list",
+      "kind": "read",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "onboarding.OnboardingListQuery",
+      "schema_sha": "5ab5282ff1c97f96",
       "screen": null
     },
     {
@@ -3598,6 +3609,17 @@
       "screen": "recruitment.vacancies"
     },
     {
+      "key": "recruitment.route.change_the_onboarding_document_checklist",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.onboarding"
+    },
+    {
       "key": "recruitment.route.change_the_wording_of_a_candidate_email",
       "kind": "route",
       "module_key": "recruitment",
@@ -3618,6 +3640,17 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.offers"
+    },
+    {
+      "key": "recruitment.route.check_whether_a_hire_has_signed_their_contract",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.onboarding"
     },
     {
       "key": "recruitment.route.fill_in_my_interview_card",
@@ -3708,6 +3741,28 @@
       "screen": "recruitment.offers"
     },
     {
+      "key": "recruitment.route.see_which_new_hires_are_in_their_first_weeks_of_onboarding",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.onboarding"
+    },
+    {
+      "key": "recruitment.route.see_who_still_owes_onboarding_documents",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.onboarding"
+    },
+    {
       "key": "recruitment.route.send_an_assessment_to_the_candidates_of_a_role",
       "kind": "route",
       "module_key": "recruitment",
@@ -3717,6 +3772,28 @@
       "schema": null,
       "schema_sha": null,
       "screen": "recruitment.assessments"
+    },
+    {
+      "key": "recruitment.route.sign_an_employment_contract_for_the_company",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.onboarding"
+    },
+    {
+      "key": "recruitment.route.verify_a_new_hire_s_documents",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.onboarding"
     },
     {
       "key": "recruitment.route.write_a_new_assessment",

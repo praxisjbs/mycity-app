@@ -19,6 +19,7 @@ import { PlannedPage } from "@/shell/Planned";
 const Apply = lazy(() => import("@/pages/Apply").then((m) => ({ default: m.Apply })));
 const Assessment = lazy(() => import("@/pages/Assessment").then((m) => ({ default: m.Assessment })));
 const SignOffer = lazy(() => import("@/pages/SignOffer").then((m) => ({ default: m.SignOffer })));
+const UploadDocuments = lazy(() => import("@/pages/UploadDocuments").then((m) => ({ default: m.UploadDocuments })));
 
 function Loading({ title }: { title: string }) {
   return (
@@ -40,7 +41,7 @@ export function App() {
 }
 
 /** Which page's PROGRESS row decides whether a route opens yet (F14). */
-const ROW: Record<string, string> = { home: "home", careers: "careers", vacancy: "vacancy", apply: "apply", assess: "assess", sign: "sign", verify: "verify", "verify-qr": "verify", proposal: "proposal", help: "help" };
+const ROW: Record<string, string> = { home: "home", careers: "careers", vacancy: "vacancy", apply: "apply", assess: "assess", sign: "sign", onboard: "onboard", verify: "verify", "verify-qr": "verify", proposal: "proposal", help: "help" };
 
 function Routes() {
   const { path, search, navigate } = useRouter();
@@ -62,6 +63,7 @@ function Routes() {
     case "apply": return <Suspense fallback={<Loading title="Apply" />}><Apply key={r.token} token={r.token} /></Suspense>;
     case "assess": return <Suspense fallback={<Loading title="Assessment" />}><Assessment key={r.token} token={r.token} /></Suspense>;
     case "sign": return <Suspense fallback={<Loading title="Offer of Employment" />}><SignOffer key={r.token} token={r.token} /></Suspense>;
+    case "onboard": return <Suspense fallback={<Loading title="Upload Documents" />}><UploadDocuments key={r.token} token={r.token} /></Suspense>;
     case "verify": return <Verify key={r.number ?? ""} number={r.number} />;
     case "verify-qr": return <Verify key={`t-${r.token}`} number={null} qr={r.token} />;
     case "proposal": return <Proposal key={r.token} token={r.token} />;
@@ -70,7 +72,7 @@ function Routes() {
   }
 }
 
-const TITLE: Record<string, string> = { home: "Work With Us", careers: "Vacancy", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", verify: "Verify a Document", proposal: "Proposal", help: "Help" };
+const TITLE: Record<string, string> = { home: "Work With Us", careers: "Vacancy", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", onboard: "Upload Documents", verify: "Verify a Document", proposal: "Proposal", help: "Help" };
 
 function NotFound() {
   const { navigate } = useRouter();
