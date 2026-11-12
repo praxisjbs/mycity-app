@@ -245,6 +245,11 @@ its screen; gate 22 refuses any of the four missing.
 
 M5's owners (`offers.md` §3 step 6, registered with the audit of #122): `onboarding_guarantor.contact_address` and `.residential_address` (address, `onboarding`, personal), picked on the public Upload Documents page through the hire's link (`/onboard/:token/places/search`, `/pin`).
 
+M6's owner (`payroll.md` §13.1 item 41, registered in PR 11): `employee_rent_declaration.property_address` (address,
+`organisation`, personal), the rented property of a person's rent declaration for rent relief, picked on the record's Tax and
+Pension tab (Declare Rent) and saved with `places.save()` in `employee.rent.js`; its line is kept on the declaration and
+renamed through `organisation.events.js`.
+
 M7's owners (`partnerships.md` §6.19, registered in PR 1): `partner.headquarters` (area, `partners`),
 `partner.cities` and `lead.cities` (city, `partners` and `leads`; one row a city, keyed by the record
 and the city's place in its list, since a place is one row an owner and key) and `deal.venue`
@@ -359,6 +364,7 @@ None.
 
 ## 14 · Change log
 
+- 12/11/2026 · JP · One owner for M6 PR 11 (`payroll.md` §13.1 item 41): `employee_rent_declaration.property_address` (address level, personal, module `organisation`), the rented property of a person's rent declaration, an `AddressField` on Declare Rent bound to `PlaceInput`, saved with `places.save()` in `employee.rent.js` and renamed through `organisation.events.js`; removing a declaration removes its place. `maps.test.js`'s registry list follows.
 - 12/11/2026 · AJ · Two owners for M5 (`offers.md` §3 step 6): `onboarding_guarantor.contact_address` and `onboarding_guarantor.residential_address` (address level, personal, module `onboarding`, each a line on the guarantor, renamed through `onboarding.events.js`), picked on the public Upload Documents page through `/api/public/v1/onboard/:token/places/search` and `/pin`, which reuse maps' handlers behind the hire's link. The hire's home address there is `employee.home_address`. `maps.test.js`'s registry list follows.
 
 - 05/11/2026 · GE · A new owner, `vacancy.location` (Recruitment, level area, not personal): a vacancy's

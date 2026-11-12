@@ -1,14 +1,14 @@
 {
   "people-add-department": {
     "spec": "cb2ed881013823ad",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop"
     ]
   },
   "people-add-job": {
     "spec": "807d900a2d0f960f",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -16,7 +16,7 @@
   },
   "people-add-person": {
     "spec": "2833d3e5ac9b6e19",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -24,14 +24,14 @@
   },
   "people-add-role": {
     "spec": "81308a4536e04c60",
-    "source": "d8af851148d05384",
+    "source": "da9f8028180181f1",
     "devices": [
       "desktop"
     ]
   },
   "people-add-worksite": {
     "spec": "13e04a9de901571f",
-    "source": "f102487d5f6f18eb",
+    "source": "5ca2388a036fce3c",
     "devices": [
       "desktop",
       "phone"
@@ -39,7 +39,7 @@
   },
   "people-attendance": {
     "spec": "b309e30b085f4402",
-    "source": "9f3d5dd400a01a4b",
+    "source": "6cbd03a2a3deece9",
     "devices": [
       "desktop",
       "phone"
@@ -47,7 +47,7 @@
   },
   "people-attendance-day": {
     "spec": "bf1435298229e249",
-    "source": "9f3d5dd400a01a4b",
+    "source": "6cbd03a2a3deece9",
     "devices": [
       "desktop",
       "phone"
@@ -55,7 +55,7 @@
   },
   "people-attendance-decide": {
     "spec": "312f6a770c624858",
-    "source": "9f3d5dd400a01a4b",
+    "source": "6cbd03a2a3deece9",
     "devices": [
       "desktop",
       "phone"
@@ -63,7 +63,7 @@
   },
   "people-attendance-pay": {
     "spec": "bc51d4cc2a142fd5",
-    "source": "e36f11bc45c4f16c",
+    "source": "693e072b61a67069",
     "devices": [
       "desktop",
       "phone"
@@ -71,7 +71,7 @@
   },
   "people-departments": {
     "spec": "bbc3906f24c19582",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -79,7 +79,7 @@
   },
   "people-devices": {
     "spec": "919c4a0f0e2155de",
-    "source": "ca3bacc0a32b67d5",
+    "source": "d6c901736cc98463",
     "devices": [
       "desktop",
       "phone"
@@ -87,7 +87,7 @@
   },
   "people-documents": {
     "spec": "8adcaae32c6667a2",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -95,7 +95,7 @@
   },
   "people-employees": {
     "spec": "5953b0f4b3738e2e",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -103,7 +103,7 @@
   },
   "people-leave": {
     "spec": "a754bbefe30a7b46",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -111,7 +111,7 @@
   },
   "people-leave-record": {
     "spec": "f8c8ab06e1834f45",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -119,7 +119,7 @@
   },
   "people-leave-request": {
     "spec": "bcd0bcfb774de11e",
-    "source": "4ecc553a634cd414",
+    "source": "53ebae07f37c2925",
     "devices": [
       "desktop",
       "phone"
@@ -127,7 +127,7 @@
   },
   "people-leave-type": {
     "spec": "28a4989ba50c2147",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -135,7 +135,7 @@
   },
   "people-organogram": {
     "spec": "a8c85e33f01ef229",
-    "source": "d8af851148d05384",
+    "source": "da9f8028180181f1",
     "devices": [
       "desktop",
       "phone"
@@ -143,7 +143,15 @@
   },
   "people-record": {
     "spec": "dabf9149a2344980",
-    "source": "63e2d04f708fcf60",
+    "source": "c18e15c4219b4075",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-rent": {
+    "spec": "f99379b7ff50d256",
+    "source": "c18e15c4219b4075",
     "devices": [
       "desktop",
       "phone"
@@ -151,7 +159,7 @@
   },
   "people-reporting": {
     "spec": "0baac0aaae239efd",
-    "source": "6214c636ae032591",
+    "source": "8db8365261cf2e05",
     "devices": [
       "desktop",
       "phone"
@@ -159,7 +167,7 @@
   },
   "people-schedule": {
     "spec": "9b834a9972ed5b8e",
-    "source": "f0b27a850da8d3db",
+    "source": "822d471c4a2a0295",
     "devices": [
       "desktop",
       "phone"
@@ -167,7 +175,7 @@
   },
   "people-schedule-set": {
     "spec": "947d17906ed9a116",
-    "source": "f0b27a850da8d3db",
+    "source": "822d471c4a2a0295",
     "devices": [
       "desktop",
       "phone"
@@ -175,7 +183,7 @@
   },
   "people-worksites": {
     "spec": "ae05a0bb276baf92",
-    "source": "f102487d5f6f18eb",
+    "source": "5ca2388a036fce3c",
     "devices": [
       "desktop",
       "phone"
@@ -183,7 +191,7 @@
   },
   "people-worksites-site": {
     "spec": "63cab4927058c114",
-    "source": "2b9821cda237e56d",
+    "source": "e830eee6a16834ed",
     "devices": [
       "desktop",
       "phone"

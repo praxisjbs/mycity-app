@@ -612,6 +612,8 @@ describeDb("identity against the real migrations", () => {
         "pension_pin",
         /* 1170: no photo until the person adds one on My Profile. */
         "photo_document_id",
+        /* 6050: the State a person lives in, where their PAYE goes, entered on the record when known. */
+        "state_of_residence",
         "tax_id",
         "worksite_id",
       ]);

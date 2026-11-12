@@ -82,6 +82,8 @@ async function get(client, employeeId) {
     pension_pin: row.pension_pin ?? null,
     pension_administrator: row.pension_administrator ?? null,
     nhf_number: row.nhf_number ?? null,
+    nhf_contributes: row.nhf_contributes === true,
+    state_of_residence: row.state_of_residence ?? null,
     created_at: at(row.created_at),
     photo_url: photoPath(row.photo_document_id, PHOTO_VARIANTS.profile),
   };

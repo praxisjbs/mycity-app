@@ -52,6 +52,24 @@ route(router, "patch", "/employees/:id/line-manager",
   { body: c.organisation.EmployeeReportingUpdate, response: c.organisation.Employee360, summary: "Set who someone reports to" },
   edit, controller.setLineManager);
 
+/*
+ * A person's declared rent for payroll's rent relief (docs/guides/payroll.md §13.1 item 41), by tax year: tax data,
+ * masked as employee.statutory, so a role that hides it is refused (organisation.controller assertSeesTax).
+ */
+route(router, "get", "/employees/:id/rent-declarations",
+  { params: c.organisation.RentDeclarationParams, query: c.common.PageQuery, response: c.organisation.RentDeclarationPage,
+    summary: "A person's declared rent, by tax year" },
+  view, controller.rentDeclarations);
+
+route(router, "put", "/employees/:id/rent-declarations/:year",
+  { params: c.organisation.RentDeclarationYearParams, body: c.organisation.RentDeclarationSave, response: c.organisation.RentDeclaration,
+    summary: "Declare a person's rent for a tax year" },
+  edit, controller.saveRentDeclaration);
+
+route(router, "delete", "/employees/:id/rent-declarations/:year",
+  { params: c.organisation.RentDeclarationYearParams, no_content: true, summary: "Remove a person's rent declaration for a year" },
+  edit, controller.removeRentDeclaration);
+
 route(router, "get", "/employees/:id/history",
   { query: c.common.PageQuery, response: c.organisation.EmployeeHistoryPage, summary: "What has been done to a record" },
   view, controller.history);

@@ -135,7 +135,8 @@ icon: spark
 ![Add Employee, first step](shot:qs-add-employee)
 
 1. Open [People · Employees](/people?tab=employees) and press **Add Employee**.
-2. Fill in **Person**, **Job**, **Pay and Bank** and **Next of Kin**, pressing **Next** after each.
+2. Fill in **Person**, **Job**, **Pay and Bank**, **Tax and Pension** and **Next of Kin**, pressing
+   **Next** after each.
 3. Pick a **Worksite** for anyone On Site or Hybrid.
 4. Press **Add Employee**. Read [Add an employee](#people-add-employee).
 

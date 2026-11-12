@@ -49,7 +49,7 @@ cards by name, number or department, up or down.
 
 ### Add an employee {#people-add-employee needs="people create"}
 
-Add a person once they have accepted their offer, before their first day. The form has four steps.
+Add a person once they have accepted their offer, before their first day. The form has five steps.
 Each step checks its own fields before **Next** lets you on. A few checks need the hub, so they come
 when you press **Add Employee**; the form then goes back to the step with the field marked.
 
@@ -70,10 +70,13 @@ when you press **Add Employee**; the form then goes back to the step with the fi
    **Next**.
 7. On **Pay and Bank**, enter **Gross Monthly**, **Bank** and the ten-digit **Account Number** if
    you have them. Press **Next**.
-8. On **Next of Kin**, enter **Next of Kin**, **Next of Kin Phone** and **Relationship** if you have
+8. On **Tax and Pension**, enter **Tax ID**, **Pension PIN**, **Pension Administrator** and
+   **NHF Number** if you have them. Tick **Contributes to NHF** only if the person has chosen to
+   contribute to the National Housing Fund, and pick their **State of Residence**. Press **Next**.
+9. On **Next of Kin**, enter **Next of Kin**, **Next of Kin Phone** and **Relationship** if you have
    them. Press **Back** to return to an earlier step. On the first step, **Cancel** closes the form.
-9. Press **Add Employee**. The message gives their staff number, such as
-   *Ada Okafor added as 00042*, and their record opens.
+10. Press **Add Employee**. The message gives their staff number, such as
+    *Ada Okafor added as 00042*, and their record opens.
 
 The staff number is given by the hub, in order. You never type it.
 
@@ -87,6 +90,9 @@ The staff number is given by the hub, in order. You never type it.
 | **Contract Ends**, **Probation Ends** | On or after the start date | No |
 | **Line Manager** | Someone on the active staff | No |
 | **Account Number** | Exactly ten digits | No |
+| **Tax ID**, **Pension PIN**, **NHF Number** | As printed on their card or letter, letters and digits | No |
+| **Contributes to NHF** | Ticked only when the person has chosen to contribute | No |
+| **State of Residence** | The State they live in, where their tax is paid | No |
 
 > **Tip:** A field you cannot see on the form is one your role does not set. People or Management
 > fill it in later.
@@ -104,6 +110,7 @@ The form marks a field as soon as you leave it, and the mark goes the moment it 
 | **Check the email** | Not an email address | Check the spelling, with one @ |
 | **Not a phone number** | Not a Nigerian mobile, or a foreign number with its country code | Type it as `0803 123 4567` |
 | **Ten digits** | The account number is not ten digits | Type all ten digits |
+| **Letters and digits** | A tax or pension number holds a space or a sign other than - or / | Type it as it is printed |
 | **Not below zero** | **Gross Monthly** has a minus | Type the amount without it. Zero is allowed |
 | **Check the amount** or **Two decimals at most** | **Gross Monthly** has a second point, a comma out of place, or more than two decimals | Type it as `350,000` or `350000.50` |
 | *At most 100 characters*, or another number | A name, job title, bank or next of kin is longer than the field holds | Shorten it |
@@ -140,15 +147,19 @@ If the hub cannot be reached, a line above the buttons says
 7. **Documents** lists what is held on them. See [Someone's documents](#people-documents).
 8. **History** lists every change under **What**, **Who** and **When**. **System** means the hub
    made the change.
-9. Press **Back to Employees** to return to the list.
+9. **Tax and Pension** holds their tax and pension numbers, whether they contribute to NHF and the
+   State they live in, and under **Rent Relief** the rent they declared for each year. It shows
+   only if your role sees tax and pension. See [Declare someone's rent](#people-rent).
+10. Press **Back to Employees** to return to the list.
 
 Fields shown as **Restricted** are ones your role does not see, or that nobody has filled in yet.
 On a phone the record's buttons sit full width under the name, and the tabs scroll sideways.
 
 ### Open and correct a record {#people-record}
 
-A record's tabs are **Profile**, **Job**, **Work Schedule**, **Reporting Line**, **Login**,
-**Documents** and **History**. If you may see queries, it also has **Queries** and **Sanctions**:
+A record's tabs are **Profile**, **Job**, **Tax and Pension**, **Work Schedule**, **Reporting
+Line**, **Login**, **Documents** and **History**. **Tax and Pension** shows only if your role sees
+tax and pension. If you may see queries, it also has **Queries** and **Sanctions**:
 [Someone's queries and sanctions](#queries-person).
 
 ![A person's record](shot:people-record)
@@ -179,6 +190,38 @@ they sent when they joined, what People asked them for, and what expires soon.
    ESS · My Documents.
 7. {needs="people edit"} Press **Upload Document** to file one yourself: say **What Is It**, then
    choose the file.
+
+### Declare someone's rent {#people-rent needs="people edit"}
+
+When payroll gives rent relief, it takes a share of the rent a person paid for the year off their
+tax. The person tells you the rent and gives you the evidence of payment; you declare it here, one
+declaration a year.
+
+![A person's Tax and Pension tab](shot:people-rent)
+
+1. Open the person from [People · Employees](/people?tab=employees) and press **Tax and Pension**.
+2. Under **Rent Relief**, press **Declare Rent**.
+3. Pick the **Year**: this year or next.
+4. Enter **Rent Paid**, the person's own share if others share the tenancy, and the months it covers
+   in **Covers From** and **Covers To**.
+5. Enter the **Legal Tenant** and the **Landlord**, and at least one of **Landlord Phone**,
+   **Landlord Tax ID** and **Landlord NIN**.
+6. In **Property Address**, type and pick the address from the list.
+7. Under **Evidence**, upload the receipt or tenancy agreement.
+8. Press **Declare Rent**. The message says *Rent for 2026 declared*. **This Year's Share** shows the
+   part of the rent that falls in the year.
+
+To correct a declaration, press **Change Rent** under it, fix the fields and press **Save Rent**. To
+take away one made in error, press **Remove Rent** and confirm with **Remove Declaration**.
+
+| The field says | What it means | What to do |
+|---|---|---|
+| **Upload the evidence** | No evidence of payment is attached | Upload it |
+| **Give one landlord ID** | No phone, Tax ID or NIN for the landlord | Enter one of them |
+| **Not before From** | **Covers To** is before **Covers From** | Correct the months |
+| **Outside the year** | No month of the rent falls in the year picked | Check the year and the months |
+| **This year or next** | The year is another one | Pick this year or next |
+| **Eleven digits** | The landlord's NIN is not eleven digits | Type all eleven |
 
 ### When an edit is refused {#people-record-refused needs="people edit"}
 
@@ -1029,6 +1072,19 @@ marks:
   1: button "Edit Record" | Correct the record
   2: button "Archive Record" | When they leave
   3: tab "Login" | Their login
+```
+
+```shot people-rent
+open: /people?tab=employees
+as: operations
+sources:
+  - app/src/features/people/TaxAndPension.tsx
+do:
+  - click: row 1
+  - click: tab "Tax and Pension"
+  - wait: button "Declare Rent"
+marks:
+  1: button "Declare Rent" | Declare a year's rent
 ```
 
 ```shot people-organogram

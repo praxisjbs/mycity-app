@@ -8,8 +8,8 @@
  *   createRun, computeRun, submitRun, discardRun,
  *   excludePerson, includePerson, addAdjustment,
  *   removeAdjustment, markPaid                         what its buttons do
- *   getSettings, changeSettings, removeSettingsChange  Configurations' setting: the pay day, Bank Details Required,
- *                                                      the advanced option and the accountant's conventions; and
+ *   getSettings, changeSettings, removeSettingsChange  Configurations' setting: the pay day, Bank Details Required
+ *                                                      and the advanced option; and
  *                                                      Remove Change of a version still to come
  *   settle, sentBack                                   the approval's end, copied onto the run after commit
  *
@@ -138,7 +138,11 @@ async function summary(user) {
 const PROBLEM_WORDS = Object.freeze({
   NO_SALARY: { message: (n) => `No Salary Set for ${n.name}`, action: "Set the pay, or exclude them" },
   NEGATIVE_NET: { message: (n) => `${n.name} would be paid less than nothing`, action: "Spread a deduction, add an adjustment or exclude them" },
-  NO_RATES: { message: () => "No PAYE bands or conventions in force", action: "Enter them on Configurations" },
+  NO_RATES: { message: () => "Statutory figures are missing", action: "Enter them on Configurations" },
+  EARLIER_RUN_OPEN: {
+    message: (n) => (n.n === 1 ? "An earlier run this year is still open" : `${n.n} earlier runs this year are still open`),
+    action: "Send them for approval first",
+  },
   OVERTIME_WAITING: {
     message: (n) => `${n.n} overtime ${n.n === 1 ? "item waits" : "items wait"} for a decision for ${n.name}`,
     action: "Ask the line manager to decide",
@@ -336,9 +340,6 @@ const presentVersion = (v) =>
         advanced_enabled: v.advanced_enabled === true,
         pay_day: v.pay_day ?? null,
         require_bank_details: v.require_bank_details === true,
-        paye_basis: v.paye_basis ?? null,
-        pension_reduces_taxable: v.pension_reduces_taxable ?? null,
-        nhf_reduces_taxable: v.nhf_reduces_taxable ?? null,
         effective_from: v.effective_from,
         effective_to: v.effective_to ?? null,
         reason: v.reason ?? null,
@@ -360,24 +361,19 @@ async function getSettings(db = pool) {
     pay_day: settings.payDayOf(now),
     pay_day_is_default: !now.pay_day,
     require_bank_details: now.require_bank_details === true,
-    paye_basis: now.paye_basis ?? null,
-    pension_reduces_taxable: now.pension_reduces_taxable ?? null,
-    nhf_reduces_taxable: now.nhf_reduces_taxable ?? null,
     current: presentVersion(current),
     next: presentVersion(next),
   };
 }
 
 /** The setting's own columns, from a version or the defaults. */
-const COLUMNS = ["advanced_enabled", "pay_day", "require_bank_details", ...settings.CONVENTIONS];
+const COLUMNS = ["advanced_enabled", "pay_day", "require_bank_details"];
 
 /**
  * PATCH /payroll/settings (`payroll.configure`): a new version from `effective_from`, today or later (422
  * EFFECTIVE_IN_THE_PAST). What is sent changes; the rest carries over from the latest version, and a change for the
- * day a version already starts joins it. The conventions are taken only once the option has been on or is being
- * switched on (409 ADVANCED_OFF). Switching on needs a statutory rate in force that day (409 NO_RATES) and the two
- * conventions the screen asks for set, in this change or before (409 NO_CONVENTIONS); PAYE Basis is not asked since
- * PR 10, and an unset one reads as annualised (§6.11 rules 3 and 4, §3.5, §13.2 item 32).
+ * day a version already starts joins it. Switching on needs a statutory rate in force that day (409 NO_RATES) (§6.11
+ * rules 3 and 4, §3.5). The accountant's conventions are not asked since PR 11: the law settles them (§6.12 rule 14).
  */
 async function changeSettings(actor, body) {
   settings.assertNotPast(body.effective_from);
@@ -386,17 +382,9 @@ async function changeSettings(actor, body) {
     const base = latest || settings.DEFAULTS;
     const merged = {};
     for (const c of COLUMNS) merged[c] = body[c] !== undefined ? body[c] : (base[c] ?? (c === "advanced_enabled" || c === "require_bank_details" ? false : null));
-    const conventionsSent = settings.CONVENTIONS.some((c) => body[c] !== undefined);
     const switchingOn = body.advanced_enabled === true && base.advanced_enabled !== true;
-    if (conventionsSent && body.advanced_enabled !== true && !(await settings.hasBeenOn(client)))
-      throw new AppError("ADVANCED_OFF", "Conventions are set when Advanced Payroll is switched on", 409);
-    if (switchingOn) {
-      if (!(await statutoryRates.anyInForce(client, body.effective_from)))
-        throw new AppError("NO_RATES", "Enter a statutory rate in force from this date first", 409, { effective_from: ["No rate that day"] });
-      const unset = settings.REQUIRED_CONVENTIONS.filter((c) => merged[c] === null || merged[c] === undefined);
-      if (unset.length)
-        throw new AppError("NO_CONVENTIONS", "Set the conventions to switch on", 409, Object.fromEntries(unset.map((c) => [c, ["Pick one"]])));
-    }
+    if (switchingOn && !(await statutoryRates.anyInForce(client, body.effective_from)))
+      throw new AppError("NO_RATES", "Enter a statutory rate in force from this date first", 409, { effective_from: ["No rate that day"] });
     const row = await settings.writeVersion(client, body.effective_from, { ...merged, changed_by: actor.user_id || null, reason: body.reason || null });
     const changed = COLUMNS.filter((c) => body[c] !== undefined && body[c] !== (base[c] ?? null));
     await emit(client, {

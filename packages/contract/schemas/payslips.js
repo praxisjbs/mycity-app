@@ -12,7 +12,8 @@
  *
  * A line's `kind` gives its direction and its amount is never negative: an `earning` adds to the net, a
  * `deduction` takes from it, an `employer` charge is MyCity's own cost and never reduces it. The statutory
- * codes (`paye`, `pension_employee`, `pension_employer`, `nhf`, `itf`, `nsitf`) appear only in advanced mode.
+ * codes (`paye`, `paye_refund`, `pension_employee`, `pension_employer`, `nhf`, `itf`, `nsitf`) appear only in advanced
+ * mode; `paye_refund` is an earning, the tax paid back when the year's cumulative tax falls (guide §13.1 item 43).
  *
  * Amounts derived from a salary carry the names the salary mask governs (guide §6.13): a payslip's totals
  * are `gross_pay`, `total_deductions` and `net_pay`, a line's amount is `pay_amount`; `gross_monthly`,
@@ -48,6 +49,7 @@ const PayslipLineCode = z.enum([
   "adjustment_earning",
   "adjustment_deduction",
   "paye",
+  "paye_refund",
   "pension_employee",
   "pension_employer",
   "nhf",

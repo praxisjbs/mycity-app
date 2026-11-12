@@ -14,8 +14,8 @@
  * the approvals' own card (approvals.decide).
  *
  * The advanced switch, the pay day and the bank rule (`PayrollSettingsChange`) are not a card: they are one version
- * of the setting, saved with the date they start and, to switch on, the rates in force and the accountant's three
- * conventions in view, so the assistant opens Configurations ("turn on advanced payroll") and the person saves it
+ * of the setting, saved with the date they start and, to switch on, the statutory figures in force in view, so the
+ * assistant opens Configurations ("turn on advanced payroll") and the person saves it
  * there. The rates, bands, grades, placements and pay components carry their own reasons (`ai:none design:` on the
  * statutory and salary_structure controllers).
  */

@@ -43,6 +43,7 @@ import {
 import { EmployeeDocuments } from "./EmployeeDocuments";
 import { EditEmployee } from "./EmployeeForm";
 import { employmentStatus, employmentType, loginStatus, RESTRICTED_HELP, workPattern } from "./status";
+import { TaxAndPension } from "./TaxAndPension";
 
 /**
  * The employee 360 (docs/guides/foundation.md §2, §10): one person, with their profile,
@@ -63,6 +64,8 @@ const TABS = [
   { value: "documents", label: "Documents" },
   { value: "history", label: "History" },
 ];
+/** Shown only to a viewer whose role sees tax and pension (employee.statutory): payroll guide §13.1 items 41, 44, 46. */
+const TAX_TAB = { value: "tax", label: "Tax and Pension" };
 /** Shown only to a viewer holding `queries` view; the lists keep the query visibility rule. */
 const QUERY_TABS = [
   { value: "queries", label: "Queries" },
@@ -106,6 +109,7 @@ export function Employee360({ id }: { id: string }) {
 
   const canEdit = me.grants.people?.includes("edit");
   const seesQueries = Boolean(me.grants.queries?.includes("view"));
+  const seesTax = !me.hidden_fields.includes("tax_id");
   const canArchive = me.grants.people?.includes("delete");
   // Only someone on the active staff list is invited (the API refuses anyone else, users.invite.js).
   const canInvite = me.grants.settings?.includes("create") && e.login.state === "none" && e.status === "active";
@@ -198,9 +202,16 @@ export function Employee360({ id }: { id: string }) {
           </ActionGroup>
         }
       />
-      <Tabs items={seesQueries ? [...TABS, ...QUERY_TABS] : TABS} value={tab} onValueChange={setTab} label="Employee Record" className="mb-3" />
+      <Tabs
+        items={[...TABS.slice(0, 2), ...(seesTax ? [TAX_TAB] : []), ...TABS.slice(2), ...(seesQueries ? QUERY_TABS : [])]}
+        value={tab}
+        onValueChange={setTab}
+        label="Employee Record"
+        className="mb-3"
+      />
       {tab === "profile" && <Profile employee={e} />}
       {tab === "job" && <Job employee={e} />}
+      {seesTax && tab === "tax" && <TaxAndPension employee={e} />}
       {tab === "schedule" && <EmployeeWorkSchedule id={id} />}
       {tab === "line" && <ReportingLine employee={e} onChanged={reload} />}
       {tab === "login" && <Login employee={e} onChanged={reload} />}

@@ -90,7 +90,7 @@ module.exports = defineManifest({
       input: c.organisation.EmployeeAdd,
       permission: ["people", "create"],
       risk: "standard",
-      form: "none: Add Employee's form also takes personal details, bank and pay, which a card never carries; the card is its work record",
+      form: "none: Add Employee's form also takes personal details, bank, pay and tax, which a card never carries; the card is its work record",
       // The work record alone (JBS Praxis, 03/11/2026): personal details, bank and pay stay on the record's own screen.
       fields: ["first_name", "middle_name", "last_name", "preferred_name", "work_email", "phone", "job_title", "department_id", "line_manager_id", "worksite_id", "start_date", "employment_type", "work_pattern", "contract_ends_on", "confirmation_due_on"],
       picks: { department_id: "department", line_manager_id: "employee", worksite_id: "worksite" },
@@ -251,6 +251,8 @@ module.exports = defineManifest({
     EmployeeReportingUpdate: "via employees.reporting: Reporting Line's own request, which never names its record; the card is EmployeeReportingChange",
     DepartmentUpdate: "via departments.edit: Edit Department's own request, which never names its department; the card is DepartmentChange",
     OrgSeatUpdate: "via seats.edit: Edit Open Role's own request, which never names its role; the card is OrgSeatChange",
+    RentDeclarationSave:
+      "personal: a person's declared rent, their landlord and the evidence of payment are tax data masked as employee.statutory, entered with the evidence on the record's Tax and Pension tab",
   },
   summaries: [
     {

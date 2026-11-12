@@ -258,7 +258,9 @@ describe("the pay date (§6.11 rule 1)", () => {
   test("with no setting the run is simple, the pay day is 30 and bank details are a warning", async () => {
     const empty = { query: async () => ({ rows: [] }) };
     const setting = await settings.settingOn(empty, "2026-10-01");
-    expect(setting).toMatchObject({ advanced_enabled: false, require_bank_details: false, pay_day: null, paye_basis: null });
+    expect(setting).toMatchObject({ advanced_enabled: false, require_bank_details: false, pay_day: null });
+    // The accountant's conventions left the setting in PR 11: the law settles them (§6.12 rule 14).
+    expect(setting).not.toHaveProperty("paye_basis");
     expect(settings.payDayOf(setting)).toBe(30);
     expect(settings.payDayOf({ pay_day: 25 })).toBe(25);
     expect(settings.DEFAULT_PAY_DAY).toBe(30);

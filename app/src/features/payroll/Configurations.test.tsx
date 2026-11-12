@@ -18,14 +18,15 @@ import Configurations from "./Configurations";
 
 /**
  * Payroll · Configurations on the in-browser mock, in the contract's shapes (docs/guides/payroll.md §3.5, §6.11, §6.12,
- * §10): it starts as production does, with nothing entered; the seven items read Not Set; Switch On asks for the date and
- * the two conventions (no PAYE Basis) and is refused with no rate in force; a rate is entered with its source and a PAYE
- * table with No Legal Source, each shown in the Source column; a change still waiting is taken back with Remove Change;
- * the pay day offers Last Day of Month; the option on, the conventions, the grades and the people against their bands
- * show; a phone opens a person in a sheet. The rules themselves are the API's, tested in
+ * §10): it starts as production does, with nothing entered; the eight items read Not Set; Switch On asks for the date
+ * alone (the law settles the conventions, §6.12 rule 14) and is refused with no figure in force; a rate is entered with
+ * its source and a PAYE table with No Legal Source, each shown in the Source column; rent relief takes its rate and its
+ * cap, the minimum wage a month's amount; a change still waiting is taken back with Remove Change; the pay day offers
+ * Last Day of Month; the option on, the grades and the people against their bands show, and a person's Prior Pay is set
+ * in their sheet; a phone opens a person in a sheet. The rules themselves are the API's, tested in
  * tests/integration/payroll-advanced.test.js.
  *
- * THE RATES HERE ARE TEST RATES, invented for this file: never law, never seeded. Their source is a TEST SOURCE.
+ * THE FIGURES HERE ARE TEST FIGURES, invented for this file: never law, never seeded. Their source is a TEST SOURCE.
  *
  * The mock keeps its state for the whole file, so the tests run in order, each building on the last.
  */
@@ -93,31 +94,31 @@ const daysOn = (n: number) => {
 const TEST_SOURCE = { source_title: "TEST SOURCE", source_section: "Test section 1", source_checked_on: todayIso() };
 
 describe("Payroll · Configurations", () => {
-  it("starts as production does: the default pay day, the seven items Not Set, no bands, nothing of the structure", async () => {
+  it("starts as production does: the default pay day, the eight items Not Set, no bands, nothing of the structure", async () => {
     await open();
     const settings = payroll.PayrollSettings.parse(await api.call("GET /api/v1/payroll/settings", {}));
     expect(settings).toMatchObject({ advanced_enabled: false, advanced_has_been_on: false, pay_day: 30, pay_day_is_default: true });
     expect(statutory.StatutoryItems.parse(await api.call("GET /api/v1/statutory/items", {})).items.every((i) => i.current === null)).toBe(true);
     expect(await screen.findByText("30 (default)")).toBeTruthy();
-    await waitFor(() => expect(screen.getAllByText("Not Set")).toHaveLength(7));
-    for (const item of ["PAYE", "Employee Pension", "Employer Pension", "NHF", "ITF", "NSITF", "Relief"]) expect(screen.getByText(item)).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByText("Not Set")).toHaveLength(8));
+    for (const item of ["PAYE", "Employee Pension", "Employer Pension", "NHF", "ITF", "NSITF", "Rent Relief", "Minimum Wage"]) expect(screen.getByText(item)).toBeTruthy();
+    // The old relief (the Consolidated Relief Allowance's shape) is retired (§13.1 item 41).
+    expect(screen.queryByText("Relief")).toBeNull();
     expect(await screen.findByText("No PAYE Bands")).toBeTruthy();
     expect(screen.queryByText("Conventions")).toBeNull();
     expect(screen.queryByText("Grades")).toBeNull();
     expect(await axe(document.body)).toHaveNoViolations();
   }, 40000);
 
-  it("Switch On asks for the three conventions, and is refused until a rate is in force that day", async () => {
+  it("Switch On asks for the date alone, and is refused until a figure is in force that day", async () => {
     await open();
     await screen.findByText("30 (default)");
     fireEvent.click(screen.getByRole("switch", { name: "Advanced Payroll" }));
     const form = await screen.findByRole("dialog", { name: "Switch On Advanced Payroll" });
-    // Every deduction is monthly: the form offers no PAYE Basis (§6.12 rule 11).
+    // The law settles the conventions (§6.12 rule 14): no PAYE Basis, no Reduces Taxable Pay.
     expect(within(form).queryByText("PAYE Basis")).toBeNull();
-    expect(within(form).queryByRole("radio", { name: "Annualised" })).toBeNull();
-    fireEvent.click(within(form).getByRole("button", { name: "Switch On" }));
-    await waitFor(() => expect(within(form).getAllByText("Pick one")).toHaveLength(2));
-    for (const group of ["Pension Reduces Taxable Pay", "NHF Reduces Taxable Pay"]) fireEvent.click(within(within(form).getByRole("radiogroup", { name: group })).getByRole("radio", { name: "Yes" }));
+    expect(within(form).queryByText("Pension Reduces Taxable Pay")).toBeNull();
+    expect(within(form).queryByRole("radiogroup")).toBeNull();
     fireEvent.click(within(form).getByRole("button", { name: "Switch On" }));
     await waitFor(() => expect(within(form).getByText("No rate that day")).toBeTruthy());
     expect(await axe(document.body)).toHaveNoViolations();
@@ -225,13 +226,43 @@ describe("Payroll · Configurations", () => {
     expect(await axe(document.body)).toHaveNoViolations();
   }, 40000);
 
-  it("switched on with the conventions, the structure shows: a grade, people against their band, a pay split", async () => {
+  it("rent relief takes its rate and its cap, the minimum wage a month's amount and no rate", async () => {
     await open();
-    await api.call("PATCH /api/v1/payroll/settings", { body: { effective_from: todayIso(), advanced_enabled: true, pension_reduces_taxable: true, nhf_reduces_taxable: true } });
+    fireEvent.click(await screen.findByText("Rent Relief"));
+    const rent = await screen.findByRole("dialog", { name: "Set Rent Relief" });
+    type(within(rent).getByRole("textbox", { name: "Rate" }), "10");
+    fireEvent.click(within(rent).getByRole("button", { name: "Save Rate" }));
+    await waitFor(() => expect(within(rent).getByText("Enter the cap")).toBeTruthy());
+    type(within(rent).getByRole("textbox", { name: "Cap a Year" }), "300000");
+    fireEvent.click(within(rent).getByRole("checkbox", { name: "No Legal Source" }));
+    type(within(rent).getByRole("textbox", { name: "Reason" }), "Test figures for this file, not a law");
+    fireEvent.click(within(rent).getByRole("button", { name: "Save Rate" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Set Rent Relief" })).toBeNull());
+    expect(await screen.findByText("10%, cap ₦300,000.00")).toBeTruthy();
+
+    fireEvent.click(await screen.findByText("Minimum Wage"));
+    const wage = await screen.findByRole("dialog", { name: "Set Minimum Wage" });
+    expect(within(wage).queryByRole("textbox", { name: "Rate" })).toBeNull();
+    type(within(wage).getByRole("textbox", { name: "Monthly Amount" }), "50000");
+    fireEvent.click(within(wage).getByRole("checkbox", { name: "No Legal Source" }));
+    type(within(wage).getByRole("textbox", { name: "Reason" }), "Test figures for this file, not a law");
+    fireEvent.click(within(wage).getByRole("button", { name: "Save Rate" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Set Minimum Wage" })).toBeNull());
+    expect(await screen.findByText("₦50,000.00")).toBeTruthy();
+    const items = statutory.StatutoryItems.parse(await api.call("GET /api/v1/statutory/items", {})).items;
+    expect(items.find((i) => i.item === "rent_relief")!.current).toMatchObject({ rate: "10", flat_amount: "300000.00" });
+    expect(items.find((i) => i.item === "minimum_wage")!.current).toMatchObject({ rate: null, flat_amount: "50000.00" });
+    expect(await axe(document.body)).toHaveNoViolations();
+  }, 40000);
+
+  it("switched on, the structure shows: a grade, people against their band, a pay split, Prior Pay", async () => {
+    await open();
+    await api.call("PATCH /api/v1/payroll/settings", { body: { effective_from: todayIso(), advanced_enabled: true } });
     invalidate("/api/v1");
-    expect(await screen.findByText("Conventions", {}, { timeout: 5000 })).toBeTruthy();
-    expect(screen.getByText("Pension Reduces Taxable Pay")).toBeTruthy();
-    expect(screen.queryByText("PAYE Basis")).toBeNull();
+    expect(await screen.findByText("Grades", {}, { timeout: 5000 })).toBeTruthy();
+    // The conventions are the law's (§6.12 rule 14): no card asks for them.
+    expect(screen.queryByText("Conventions")).toBeNull();
+    expect(screen.queryByText("Pension Reduces Taxable Pay")).toBeNull();
     const grade = salary.SalaryGrade.parse(
       await api.call("POST /api/v1/salary-structure/grades", { body: { code: "T1", name: "Test Band", minimum: "100000.00", maximum: "300000.00", effective_from: todayIso() } }),
     );
@@ -249,13 +280,27 @@ describe("Payroll · Configurations", () => {
     type(within(form).getByRole("textbox", { name: "Amount" }), "1.00");
     fireEvent.click(within(form).getByRole("button", { name: "Save Components" }));
     await waitFor(() => expect(within(form).getByText("Must equal the gross")).toBeTruthy());
+    fireEvent.click(within(form).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Set Pay Components" })).toBeNull());
+
+    // Prior Pay: this year's taxable pay and tax before MyCity's first statutory month (§13.1 item 42).
+    expect(await screen.findByText("None")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Set Prior Pay" }));
+    const prior = await screen.findByRole("dialog", { name: "Set Prior Pay" });
+    fireEvent.click(within(prior).getByRole("button", { name: "Save Prior Pay" }));
+    await waitFor(() => expect(within(prior).getAllByText("Required").length).toBe(2));
+    type(within(prior).getByRole("textbox", { name: "Taxable Pay" }), "2000000");
+    type(within(prior).getByRole("textbox", { name: "Tax Paid" }), "100000");
+    fireEvent.click(within(prior).getByRole("button", { name: "Save Prior Pay" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Set Prior Pay" })).toBeNull());
+    expect(await screen.findByText(`Prior Tax ${todayIso().slice(0, 4)}`)).toBeTruthy();
     expect(await axe(document.body)).toHaveNoViolations();
   }, 40000);
 
   it("on a phone the items are cards, the band chart is left off, and a person opens in a sheet", async () => {
     setViewport(390);
     await open();
-    await screen.findByText("Conventions", {}, { timeout: 5000 });
+    await screen.findByText("Grades", {}, { timeout: 5000 });
     expect(document.querySelector("table")).toBeNull();
     expect(screen.queryByText("Bands by Grade")).toBeNull();
     const people = salary.GradePlacementPage.parse(await api.call("GET /api/v1/salary-structure/placements", { query: {} }));

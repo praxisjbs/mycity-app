@@ -1,4 +1,5 @@
-import type { ApprovalInstance, ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalInstance, ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType, RentDeclaration, RentDeclarationSave } from "@mycity/contract/contract.gen.ts";
+import { todayIso } from "@mycity/ui";
 import type { Department, EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
 import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { exportFile } from "./shared";
@@ -203,12 +204,25 @@ route("GET /api/v1/employees/summary", (req) => {
  * null clears it, as the API's correction does.
  */
 const EXTRA = new Map<string, Partial<Employee360>>();
+/** The tax and pension fields (employee.statutory), set on Edit's Tax and Pension step (payroll guide §13.1 items 44, 46). */
+const STATUTORY_FIELDS = ["tax_id", "pension_pin", "pension_administrator", "nhf_number", "nhf_contributes", "state_of_residence"];
 
 function record(p: MockPerson, viewer: string): Employee360 {
   const canSee = full(viewer) || viewer === p.user_key;
   const [first, ...rest] = p.display_name.split(" ");
   const extra = EXTRA.get(p.employee_id) ?? {};
-  const restricted = new Set(["date_of_birth", "home_address", "personal_email", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship", "bank_name", "account_number", "gross_monthly"]);
+  const restricted = new Set([
+    "date_of_birth",
+    "home_address",
+    "personal_email",
+    "next_of_kin_name",
+    "next_of_kin_phone",
+    "next_of_kin_relationship",
+    "bank_name",
+    "account_number",
+    "gross_monthly",
+    ...STATUTORY_FIELDS,
+  ]);
   const own = Object.fromEntries(Object.entries(extra).filter(([k]) => canSee || !restricted.has(k)));
   return { ...base(p, viewer, canSee, first, rest), worksite_id: siteOf(p.user_key)?.worksite_id ?? null, ...own };
 }
@@ -260,11 +274,13 @@ function base(p: MockPerson, viewer: string, canSee: boolean, first: string, res
     bank_name: canSee ? p.bank_name : null,
     account_number: canSee ? `00000${p.account_last4}` : null,
     gross_monthly: canSee ? p.gross_monthly : null,
-    // Tax and pension numbers (employee.statutory): none recorded in the mock.
+    // Tax and pension (employee.statutory): none recorded in the mock until Edit sets them; NHF off until chosen.
     tax_id: null,
     pension_pin: null,
     pension_administrator: null,
     nhf_number: null,
+    nhf_contributes: canSee ? false : null,
+    state_of_residence: null,
     created_at: at(200, "09:00"),
     photo_url: null,
   };
@@ -405,7 +421,7 @@ route("PATCH /api/v1/employees/:id", (req) => {
   if (str("date_of_birth")) p.date_of_birth = str("date_of_birth")!;
   if (str("confirmed_on")) p.status = "confirmed";
   const extra = { ...(EXTRA.get(p.employee_id) ?? {}) } as Record<string, unknown>;
-  for (const k of ["middle_name", "gender", "contract_ends_on", "confirmation_due_on", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship", "account_number", "personal_email"])
+  for (const k of ["middle_name", "gender", "contract_ends_on", "confirmation_due_on", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship", "account_number", "personal_email", ...STATUTORY_FIELDS])
     if (b[k] !== undefined) extra[k] = b[k];
   EXTRA.set(p.employee_id, extra as Partial<Employee360>);
   return ok(record(p, req.user!));
@@ -1167,3 +1183,65 @@ export const leaveRequests = (): ReadonlyArray<LeaveRequest & { key: string }> =
 export const leaveYear = yearOf;
 
 export const _reports = reportsOf;
+
+/* A person's declared rent for a tax year, for rent relief (payroll guide §13.1 item 41): on the record's Tax and Pension tab. */
+
+const RENTS: RentDeclaration[] = [];
+
+route("GET /api/v1/employees/:id/rent-declarations", (req) => {
+  const p = mine(req);
+  if (!p) return notFound();
+  if (!full(req.user!) && req.user !== p.user_key) return fail(403, "FIELD_RESTRICTED", "Your role cannot see tax details.");
+  return paged(RENTS.filter((r) => r.employee_id === p.employee_id).sort((a, b) => b.year - a.year), req);
+});
+
+route("PUT /api/v1/employees/:id/rent-declarations/:year", (req) => {
+  const p = mine(req);
+  if (!p) return notFound();
+  if (!full(req.user!)) return fail(403, "FIELD_RESTRICTED", "Your role cannot see tax details.");
+  const year = Number(req.params.year);
+  const now = Number(todayIso().slice(0, 4));
+  if (year !== now && year !== now + 1) return fail(422, "YEAR_NOT_ALLOWED", "Pick this year or next", { year: ["This year or next"] });
+  const parsed = organisation.RentDeclarationSave.safeParse(req.body);
+  if (!parsed.success) return refusal(parsed.error.issues);
+  const b = parsed.data as RentDeclarationSave;
+  const months = (iso: string) => Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7)) - 1;
+  const inYear = Math.min(months(b.covers_to), year * 12 + 11) - Math.max(months(b.covers_from), year * 12) + 1;
+  if (inYear <= 0) return fail(422, "COVERS_OUTSIDE_YEAR", "The rent covers no month of this year", { covers_from: ["Outside the year"] });
+  // The year's share in kobo, half up, as the API pro-rates it (employee.rent.js yearRentOf).
+  const whole = BigInt(months(b.covers_to) - months(b.covers_from) + 1);
+  const yearKobo = (BigInt(b.rent_paid.replace(".", "")) * BigInt(inYear) * 2n + whole) / (2n * whole);
+  const row: RentDeclaration = {
+    employee_rent_declaration_id: uuid(),
+    employee_id: p.employee_id,
+    year,
+    rent_paid: b.rent_paid,
+    year_rent: `${yearKobo / 100n}.${String(yearKobo % 100n).padStart(2, "0")}`,
+    covers_from: b.covers_from,
+    covers_to: b.covers_to,
+    tenant_name: b.tenant_name,
+    landlord_name: b.landlord_name,
+    landlord_phone: b.landlord_phone ?? null,
+    landlord_tax_id: b.landlord_tax_id ?? null,
+    landlord_nin: b.landlord_nin ?? null,
+    property_address: "Picked address",
+    property_address_place: null,
+    evidence_document_id: b.evidence_document_id,
+    entered_by_name: byKey(req.user!)?.display_name ?? null,
+    updated_at: new Date().toISOString(),
+  };
+  const at = RENTS.findIndex((r) => r.employee_id === p.employee_id && r.year === year);
+  if (at >= 0) RENTS[at] = { ...row, employee_rent_declaration_id: RENTS[at].employee_rent_declaration_id };
+  else RENTS.push(row);
+  return ok(row);
+});
+
+route("DELETE /api/v1/employees/:id/rent-declarations/:year", (req) => {
+  const p = mine(req);
+  if (!p) return notFound();
+  if (!full(req.user!)) return fail(403, "FIELD_RESTRICTED", "Your role cannot see tax details.");
+  const at = RENTS.findIndex((r) => r.employee_id === p.employee_id && r.year === Number(req.params.year));
+  if (at < 0) return notFound();
+  RENTS.splice(at, 1);
+  return noContent();
+});
