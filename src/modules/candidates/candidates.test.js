@@ -128,7 +128,7 @@ describe("Candidate Emails", () => {
     expect(emails.markdownOf('<p style="x">Hello {{ recipient.first_name }},</p><p><a href="{{ apply_url }}" style="y">Apply Now</a></p>')).toBe(
       "Hello {{ recipient.first_name }},\n\n[Apply Now]({{ apply_url }})",
     );
-    expect(emails.KEYS).toHaveLength(9);
+    expect(emails.KEYS).toHaveLength(10);
   });
 });
 

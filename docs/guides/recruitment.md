@@ -247,7 +247,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/candidates/:id/score` | `EmptyBody` → `CandidateDetail` | `recruitment` edit · all/team | no | `cv-screen`, Deep Reasoning |
 | `POST /recruitment/candidates/score-all` | `ScoreAll` → `ScoreAllQueued` | `recruitment` edit · all/team | no | Screen With AI: the one to three must-meet conditions are kept on the vacancy (left out, the kept ones are used again), then every active, unscored application of it is read through the outbox |
 | `POST /recruitment/candidates/invitations` | `ApplyInvite` → `ApplyInviteSent` | `recruitment` create | no | Emails an Apply link |
-| `GET /recruitment/candidates/emails` | `CandidateEmailListQuery` → `CandidateEmailPage` | `recruitment` view | yes | The nine candidate emails (M4's five, M5's four), each with its current version and `can_edit` (edit · all) |
+| `GET /recruitment/candidates/emails` | `CandidateEmailListQuery` → `CandidateEmailPage` | `recruitment` view | yes | The ten candidate emails (M4's five, M5's five), each with its current version and `can_edit` (edit · all) |
 | `GET /recruitment/candidates/emails/:key`, `PUT .../:key` | `CandidateEmailParams`; `CandidateEmail`, `CandidateEmailSave` | view; edit · all | no | Subject and Markdown body saved as the next version, checked against the email's variables. Saved only with edit over every vacancy (scope all), as each goes to every candidate |
 | `POST /recruitment/candidates/emails/:key/restore` | `EmptyBody` → `CandidateEmail` | `recruitment` edit · all | no | Restore Default: the shipped wording saved as the next version |
 | `GET /recruitment/assessments/summary` | `AssessmentsSummary` | `recruitment` view · all/team | no | |
@@ -597,13 +597,16 @@ defaults are themselves Markdown (front matter `format: markdown`), so an edit s
 shipped words and Restore Default saves them back unchanged; a link is a Markdown link, never a styled
 button (GE · (Ose), 04/11/2026). The emails:
 `application-received`, `apply-invite`, `assessment-invite`, `interview-invite` (with the `.ics`), and
-`candidate-not-progressed`. M5's four are kept in the same store, so the one screen words all nine
-(#79, 06/11/2026; `contract-sent` added by AJ for M5 PR 5, 11/11/2026): `offer-sent` (the offer's
+`candidate-not-progressed`. M5's five are kept in the same store, so the one screen words all ten
+(#79, 06/11/2026; `contract-sent` added by AJ for M5 PR 5, 11/11/2026; `onboarding-document-rejected`
+by AJ, 12/11/2026): `offer-sent` (the offer's
 number, its signing link and when it lapses), `offer-signed` (the number, the Verify link, the first
 day when set; M5 attaches the sealed offer), `contract-sent` (the contract's number, its signing link
-and when it stops working) and `onboarding-documents` (the documents link and the day they are due by,
-when set). This module ships their wording and declares their variables (`OfferSentEmailVars`,
-`OfferSignedEmailVars`, `ContractSentEmailVars`, `OnboardingDocumentsEmailVars`); M5 sends them. They go through system mail from the outbox, paced like all system mail;
+and when it stops working), `onboarding-documents` (the documents link and the day they are due by,
+when set) and `onboarding-document-rejected` (the item rejected and its reason, or the guarantor whose
+check failed, with a fresh documents link). This module ships their wording and declares their
+variables (`OfferSentEmailVars`, `OfferSignedEmailVars`, `ContractSentEmailVars`,
+`OnboardingDocumentsEmailVars`, `OnboardingDocumentRejectedEmailVars`); M5 sends them. They go through system mail from the outbox, paced like all system mail;
 while mail is paused they wait. Staging sends real mail marked `[STAGING]` (A4); its seed applies only
 with test addresses.
 
@@ -803,6 +806,11 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 12/11/2026 · AJ · `onboarding-document-rejected`, a tenth Candidate Email (§6.8,
+  `OnboardingDocumentRejectedEmailVars`): M5 mails the hire what to send again, with a fresh link,
+  when Operations & People reject an item or a guarantor's check fails (`offers.md` §13). For GE to
+  review; nothing else of M4 changed.
 
 - 12/11/2026 · GE · Nothing of M4 changed. Beside it, M5's Offers tab (`Offers.tsx`, `offers.md` §10, §14) shows an offer's expiry as Expires while it is with the candidate and Expired On once it lapsed, and nothing for one accepted, declined or withdrawn; found filming the M5 video.
 

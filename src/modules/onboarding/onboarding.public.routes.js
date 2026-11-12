@@ -3,7 +3,8 @@
  * /api/public/v1/onboard: the hire's Upload Documents page on go.mycityapp.io (docs/guides/offers.md
  * §3 step 6, §5). No sign-in, no permission: the link is the key (middleware/public-token.js, scope
  * `onboarding.upload`, the case its subject) and every answer is the allow-listed UploadPack. Writes
- * are held to the public surface's write limit.
+ * have a limit of their own, 60 a minute a link (middleware/rate-limit.js onboardLimiter), not the
+ * public surface's write limit per address: the page spends thirty writes or more.
  *
  *   GET  /:token                       the checklist as the hire sees it, with the privacy notice
  *   POST /:token/privacy               accept the privacy notice (before anything else)
