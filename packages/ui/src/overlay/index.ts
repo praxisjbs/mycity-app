@@ -10,4 +10,5 @@ export { Menu, type MenuProps, type MenuItem, type MenuTriggerProps } from "./Me
 export { Tooltip, type TooltipProps } from "./Tooltip";
 export { useUnsavedChanges, useDismiss } from "./context";
 export * from "./LockScreen";
+export * from "./NoteTaker";
 export * from "./PhonePage";

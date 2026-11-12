@@ -97,6 +97,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Overlays | [LockScreen](#lockscreen) | `LockScreen` | The full-screen lock over the staff app when a session ends: who is signed in, why it locked, and their password to carry on. | beta |
 | Overlays | [Menu](#menu) | `Menu` | A short list of actions behind one button (the ⋮ on a record, the + in a composer, the account menu). | stable |
 | Overlays | [Modal](#modal) | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` | THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened with useModal or controlled with open. | stable |
+| Overlays | [NoteTaker](#notetaker) | `NoteTaker` | A small notes panel that floats over a page while the person keeps working: moved by its bar, minimised to that bar, or closed. Nothing behind it is blocked. | beta |
 | Overlays | [PhonePage](#phonepage) | `PhonePage` | A full-screen page that slides in from the right over the screen on a phone, like a native app's next screen: Back, a title, its own actions, a body that scrolls. | beta |
 | Overlays | [Popover](#popover) | `Popover` | A small panel anchored to the button that opens it: filters, a quick pick, a short preview. | stable |
 | Overlays | [Sheet](#sheet) | `Sheet` | The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc; one with a text field closes only on purpose. | stable |
@@ -2977,6 +2978,42 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 ```tsx
 modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })
 <Modal open={open} onClose={() => setOpen(false)} title="Edit Worksite" footer={<Button variant="primary">Save Worksite</Button>}>{fields}</Modal>
+```
+
+### NoteTaker
+
+A small notes panel that floats over a page while the person keeps working: moved by its bar, minimised to that bar, or closed. Nothing behind it is blocked.
+
+| | |
+|---|---|
+| Use | A person's own notes beside what they read or watch (ESS · My Training's My Notes on a course), saved by the screen as they type. |
+| Avoid | A form saved with a button (Modal); a comment others read (a thread); anything that must stop the person until it is answered (ConfirmDialog). |
+| Phone | Docked full width at the foot of the screen or the sheet, with a 44 px Move to Top (Move to Bottom) in its bar instead of dragging (F19); minimised, it is its bar alone. |
+| Accessibility | A labelled region, not a dialog: focus moves into the note when it opens and is never trapped. On desktop Move Notes drags it, or the arrow keys move it while that button has focus. Saving, Saved and Not saved are announced politely. |
+| Status | beta |
+| Exports | `NoteTaker` |
+| Import | `import { NoteTaker } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/NoteTaker.tsx` |
+| Test | `packages/ui/src/overlay/NoteTaker.test.tsx` |
+| Gallery | `packages/ui/src/overlay/NoteTaker.gallery.tsx` (`npm run gallery`, `#/NoteTaker`) |
+
+**NoteTaker** props (`NoteTakerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Shown or not; the screen keeps it, so a Take Notes button opens it again. |
+| `onClose` | `() => void \| Promise<unknown>` | yes | Close Notes: the panel goes; what was typed is the screen's to keep. Return the last save and the button waits for it. |
+| `subject` | `string` |  | What the notes are on (a course's title), under the panel's name. |
+| `value` | `string` | yes | The note's text. |
+| `onChange` | `(value: string) => void` | yes | Every keystroke; the screen saves it (after a pause, as a draft is). |
+| `saved` | `"saving" \| "saved" \| "failed" \| null` |  | Where the last save stands: Saving, Saved or Not saved in the bar. |
+| `onRetry` | `() => void \| Promise<unknown>` |  | Try Again beside Not saved. |
+| `maxLength` | `number` |  | The longest note the server keeps, in characters. |
+| `loading` | `boolean` |  | The note is still loading: the box waits, read only. |
+| `label` | `string` |  | The panel's name; My Notes. |
+
+```tsx
+<NoteTaker open={open} onClose={() => setOpen(false)} subject={course.title} value={body} onChange={setBody} saved="saved" />
 ```
 
 ### PhonePage

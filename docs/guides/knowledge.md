@@ -10,7 +10,7 @@
 | Capabilities | `sops.manage` (write, publish and archive any department's SOPs; Knowledge Hub · SOPs) · `training.manage` (build, publish, assign and archive courses, and see everyone's progress; Knowledge Hub · Training) |
 | Screens (PROGRESS.md rows) | #63 SOPs, #65 Training, #110 ESS · My Training; #64 FAQs and #66 Announcements are Dropped |
 | Status | Agreed |
-| Last changed | 11/11/2026 |
+| Last changed | 12/11/2026 |
 
 This guide is **M10 Knowledge Hub's single source of truth**: the rules, the data, the API, the
 screens and the build plan (Appendix A). The build tracker is `docs/handoff/m10-knowledge-hub.md`.
@@ -73,7 +73,7 @@ are gone.
 |---|---|---|---|---|
 | Knowledge Hub · SOPs (`sops`) | Knowledge Hub | `knowledge` view: everyone | Published SOPs grouped by department (number, title, department, version, updated); one opens as a reader: Purpose, Scope, Roles Involved, the numbered Steps with who, the screen link and the file; its versions. A writer also sees Drafts and Archived | Search, filter by department; a writer (§6.2): New SOP, Edit (the draft), Draft With AI, Save Draft, Discard Changes, Publish SOP (a note), Archive SOP, open a past version |
 | Knowledge Hub · Training (`training`) | Knowledge Hub | `knowledge` view with `training.manage` | Courses (number, title, items, Library or Assigned Only, Assigned, Completed, Overdue, state); a course opens with Items, People and Settings | New Course, add and order items (Upload File, Video Link, Course Link, Lesson with Draft Lesson), Publish Course (signature), Assign Training (audience, due), Remind Overdue, Withdraw Assignment, Archive Course, Download a certificate |
-| ESS · My Training (`my-training`) | Employee Self-Service | Every employee, own | To Do (assigned, due first, overdue marked), In Progress, Completed (with Download Certificate), Library | Start, open an item (lesson inline, file viewer, video player, link in a new tab), Mark Done, Add Proof, Download Certificate |
+| ESS · My Training (`my-training`) | Employee Self-Service | Every employee, own | To Do (assigned, due first, overdue marked), In Progress, Completed (with Download Certificate), Library | Start, open an item (lesson inline, file viewer, video player, link in a new tab), Mark Done, Add Proof, Download Certificate; Take Notes (My Notes, the person's own note on the course, floating over it, §6.13) |
 | User Guide's help for the screen in view | Over any screen (`user-guide.md` §3) | As the screen | Under the screen's guide section, **Procedures**: the published SOPs whose steps name this screen | Open the SOP |
 | My Workspace · Tasks | My Workspace | The person assigned | A task "Complete <course>" with the due date, linked to the course | Open the course on My Training; it closes itself on completion |
 | Notifications (bell, push) | Global | The department (new SOP version); the person (assigned, reminder, certificate ready); `training.manage` (nothing by default) | As §7 | Open the SOP or the course |
@@ -133,9 +133,10 @@ are gone.
 | `training_assignment_audience` (10410) | `training_assignment_id`, one of `department_id`, `role_id`, `employee_id` | Rows, because who is enrolled is found in SQL |
 | `training_enrolment` (10410) | `training_course_id`, `employee_id`, `training_assignment_id` (null for a library start), `due_on`, `started_at`, `completed_at`, `proof_url`, `proof_document_id`, `certificate_number`, `certificate_document_id`, `certificate_hash`, `task_id`, `reminded_at`, `reminders_sent` | One per person and course (unique). `certificate_number` is unique |
 | `training_item_progress` (10410) | `training_enrolment_id`, `training_item_id`, `done_at` | One per item done (unique); deleting an item cascades |
+| `training_note` (10440) | `training_course_id`, `employee_id`, `body` (up to 20,000 characters) | My Notes (§6.13): one per person and course (unique), on the course rather than the enrolment so a Library course can be noted before Start; the person's alone |
 
 Schema migrations: `migrations/10400_sops.sql`, `migrations/10410_training.sql`, and
-`migrations/10420_training_tasks.sql` (a task's record may be a `training_enrolment`, §6.7). Reference data:
+`migrations/10420_training_tasks.sql` (a task's record may be a `training_enrolment`, §6.7), `10430_training_certificate_facts.sql` (§6.9) and `10440_training_notes.sql` (My Notes, §6.13). Reference data:
 `seeds/reference/10490_seed_knowledge.sql`: the capabilities `sops.manage` and `training.manage`
 for Operations & People and Implementation (the CEO holds every capability); the numbering schemes
 `sop` (`SOP-0001`), `training_course` (`TRN-0001`) and `training_certificate` (`CERT-2026-0001`,
@@ -185,6 +186,8 @@ not use them; a later release drops them (MIGRATIONS §8), together with
 | `POST /api/v1/training/me/items/:id/done` | `EmptyBody` → `MyCourse` | self, own | no | May complete the course (§6.8). A Library course not started: 409 `NOT_STARTED` |
 | `POST /api/v1/training/me/items/:id/undone` | `EmptyBody` → `MyCourse` | self, own | no | Not after completion (409 `COURSE_COMPLETED`) |
 | `POST /api/v1/training/me/courses/:id/proof` | `ProofAdd` (`url` or `document_id`) → `MyCourse` | self, own | no | Completes the course. Every item done first (409 `ITEMS_LEFT`); only where it is asked (409 `PROOF_NOT_ASKED`) |
+| `GET /api/v1/training/me/courses/:id/note` | → `TrainingNote` (`body`, `updated_at`, null before the first save) | self, own | no | My Notes on a course the person may open (§6.8's rule: theirs, or a Library course); anyone else's course is a 404 |
+| `PUT /api/v1/training/me/courses/:id/note` | `TrainingNoteSave` (`body`, the whole text, up to 20,000 characters) → `TrainingNote` | self, own | no | Saved as the person types (§6.13); before Start and after completion alike |
 | `POST /api/v1/training/me/courses/:id/certificate` | `EmptyBody` → `ExportFile` (202) | self, own | no | The stored PDF, downloaded on the device that asked; `pending` while the worker renders it, then the screen waits on `GET /exports/:id`. 409 `NO_CERTIFICATE` without one |
 | `POST /api/v1/training/enrolments/:id/certificate` | `EmptyBody` → `ExportFile` (202) | `knowledge` view, `training.manage` | no | Anyone's, as above |
 | `GET /api/public/v1/verify/:ref` | → `VerifyResult` | public | no | A `CERT-` number is answered by `training.certificate.js` (§6.10): `document_type` `training_certificate` and its `certificate` facts; no auth import |
@@ -412,6 +415,26 @@ hub opens with real content (TB, 11/11/2026):
   demonstration data is loaded by hand on the server (`docs/runbooks/deploy.md`); running the
   staging seeds again after a release adds only this file's records.
 
+### 6.13 My Notes
+
+Added 12/11/2026 at TB's request (the Milestone 10 video's brief): a learner takes notes while they
+work through a course, without leaving it.
+
+- **One running note per person and course** (`training_note`), saved to their account, so it follows
+  them from a laptop to a phone and stays after completion. Up to 20,000 characters of plain text.
+- **The person's alone.** Only the `/training/me` routes read or write it, as its owner; no manager,
+  `training.manage` holder or the CEO has a route to it, Praxis AI reads none (`training.ai.js`
+  `not_offered`, `personal:`), search finds none, and nobody is told. `training.note_saved` is audit
+  only and carries the note's length, never its text.
+- **Any course the person may open** (§6.8): their own, or a published Library course before Start.
+- **On screen** Take Notes (on the course's card) opens `NoteTaker` from `@mycity/ui` over the course:
+  a small panel that never blocks the page behind it. On desktop it floats bottom right, is moved by
+  its bar (or Move Notes and the arrow keys) and stays inside the window; on a phone it docks full
+  width at the foot of the course's sheet, and Move to Top swaps it to the top (no dragging on a
+  phone, F19). Minimise Notes keeps its bar; Close Notes closes it. It saves 0.8 s after typing
+  pauses, on Close Notes and when the course closes or another opens; the bar reads Saving, Saved
+  or Not saved (with Try Again).
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -428,6 +451,7 @@ hub opens with real content (TB, 11/11/2026):
 | `training.started`, `training.item_done`, `training.item_undone`, `training.proof_added` | As named | Audit (progress is not notified) |
 | `training.completed` | Completion | Audit; outbox `training.close_task` and `training.issue_certificate` (the certificate generated; the worker renders and stores its PDF) |
 | `training.certificate_ready` | Its PDF stored (`document.generated`) | Tells the person ("Certificate ready", the course and the number) |
+| `training.note_saved` | Saving My Notes (§6.13) | Audit only: the course, the person and the note's length, never its text |
 | `training.reminder_due` | Reminder `training_due`, every 5 minutes, 08:00 to 18:00 Lagos (§6.11); Remind Overdue | Tells the person ("Training due" or "Training overdue") |
 
 Notification category: `knowledge` (as Policies), so a person's Knowledge Hub preference governs
@@ -453,6 +477,7 @@ else's training in M10 (§13).
   `training.mine` (the reader's enrolments with status and due date), `training.library` (Library
   courses), `training.progress` (`training.manage`: courses with assigned, completed, overdue),
   `training.overdue` (`training.manage`: people overdue, paged). Paged at 25.
+- **My Notes** are never read by Praxis AI (§6.13).
 - **AI actions**: none in M10. Assigning and publishing need a signature or reach many people and
   stay on the screen; the module's `.ai.js` says so with `design:` (gate 19).
 - **AI routes**: write or change an SOP → Knowledge Hub · SOPs; build or assign a course →
@@ -479,7 +504,7 @@ else's training in M10 (§13).
 |---|---|---|---|
 | Knowledge Hub · SOPs | Department chips, Search SOPs, the list (SOP, Department, Version, Updated); an SOP: title, number, department, version, updated, Purpose, Scope, Roles Involved, numbered Steps (text, Who, Open Screen, the file); Versions; a writer: New SOP (Department, Title, Start SOP), Edit SOP (Title, Purpose, Scope, Roles Involved, each step's Step, Who, Screen and File; Add Step; Move Up, Move Down, Remove Step), Save Draft, the draft's bar (Draft saved, not published; Discard Changes, Publish SOP), Draft With AI (From: Pasted Text or PDF File; Yours beside Drafted, Keep Mine, Use This Draft), Publish SOP (Note), Archive SOP (Reason), the State chips (Published, Draft, Archived) | Screen: the screen this step happens on, where the SOP is listed under Procedures; Draft With AI's Procedure: wording kept, steps found; Roles Involved: one role a line; Note: what changed | Why SOPs are not the User Guide, the writer rule, versions: §1.1, §6 here |
 | Knowledge Hub · Training | State chips (All, Draft, Published, Archived), the list (Course, State, Items, Library, Assigned, Completed, Overdue); a course beside it: its facts (Number, Items, Length, Published, Completed), Items (each: kind, title, minutes; Add Item with Upload File, Video Link, Course Link, Lesson; Draft Lesson beside the editor, Yours beside Drafted, Keep Mine, Use Lesson; each item's menu: Edit Item, Remove Item, Move Up, Move Down; drag to order), People (Status chips: Everyone, Not Started, In Progress, Completed, Overdue; Employee, Status, Department, Due, Progress, Completed, Certificate; Remind Overdue), Assignments (Audience, State, Due Within, New Joiners, Assigned, Assigned On, Withdraw), Settings (Library, Proof Required, Issue Certificate as switches; Course Details: Title, Summary, Proof Prompt, Save Course); Publish Course (Your Signature), Assign Training (Who Takes It: Everyone or Pick Who with Departments, Roles, People; Due Within (Days); Keep Assigning New Joiners), Archive Course (Reason) | Library: anyone may take it; New Joiners: enrols those who join later; Proof Required: asked at the end; Your Signature: printed on every certificate; Due: the date it was set for; Link: a YouTube link plays in the course | How enrolment, tasks and reminders work: §6.7, §6.11 |
-| ESS · My Training | List chips (To Do, In Progress, Completed, Library); To Do and In Progress (course, status, Due, Progress), Completed (date, certificate number, Download Certificate), Library (course, Length); a course beside the list: its facts (Due, Length, Progress), Start Course for a Library course, its items with Done marks; an item opens in place (All Items, at its top and its foot): the lesson as text, a PDF (grown to its pages) or a picture in the viewer, an MP4 or a YouTube video behind Play Video, Open Link for any other link, Download File for anything else; Mark Done, Mark Not Done (until completion), Next Item; Proof with the course's prompt and Add Proof (Link or File); Completed with the certificate number, the proof and Download Certificate | Due: the date it was set for | How certificates are signed and verified: §6.9, the manual |
+| ESS · My Training | List chips (To Do, In Progress, Completed, Library); To Do and In Progress (course, status, Due, Progress), Completed (date, certificate number, Download Certificate), Library (course, Length); a course beside the list: its facts (Due, Length, Progress), Start Course for a Library course, its items with Done marks; an item opens in place (All Items, at its top and its foot): the lesson as text, a PDF (grown to its pages) or a picture in the viewer, an MP4 or a YouTube video behind Play Video, Open Link for any other link, Download File for anything else; Mark Done, Mark Not Done (until completion), Next Item; Proof with the course's prompt and Add Proof (Link or File); Completed with the certificate number, the proof and Download Certificate; Take Notes, and My Notes over the course (the course's title, the note, Saving, Saved or Not saved with Try Again; Move Notes, Minimise Notes, Open Notes, Close Notes; Move to Top or Move to Bottom on a phone) | Due: the date it was set for | How certificates are signed and verified: §6.9, the manual |
 | User Guide's help for a screen | Procedures: SOP titles with their department | Nothing | How the link is made: §3 step 3 |
 
 ### 10.2 Phone layout
@@ -488,7 +513,7 @@ else's training in M10 (§13).
 |---|---|---|---|---|
 | Knowledge Hub · SOPs | Department chips scrolling sideways, then SOP cards (title, department, version); an SOP opens in a bottom sheet (F31) with its steps as a numbered list | Updated column; Versions behind a row in the sheet | New SOP in the floating button (writers); Edit SOP a full-screen sheet; Publish SOP in the draft's bar | More, then Knowledge Hub |
 | Knowledge Hub · Training | Course cards (title, state pill, completed of assigned, overdue pill); a course opens in a full bottom sheet with Items, People, Assignments and Settings as a segmented control | Items, Library, Assigned and Department columns; Assignments' table (a list of cards instead); the drag handle (Move Up and Move Down in each item's menu) | New Course in the floating button; Assign Training or Publish Course, and Archive Course, full width at the sheet's foot | More, then Knowledge Hub |
-| ESS · My Training | To Do cards first (title, status pill, due, a progress bar), then In Progress, Completed, Library as chips; a course opens in a full bottom sheet | Library's summaries (title and length only); the subtitle | Mark Done full width at the foot of the open item in the course's sheet, Next Item and All Items under it; Start Course and Add Proof full width | ESS tabs |
+| ESS · My Training | To Do cards first (title, status pill, due, a progress bar), then In Progress, Completed, Library as chips; a course opens in a full bottom sheet | Library's summaries (title and length only); the subtitle; dragging My Notes | Mark Done full width at the foot of the open item in the course's sheet, Next Item and All Items under it; Start Course, Take Notes and Add Proof full width; My Notes docked at the sheet's foot (Move to Top) | ESS tabs |
 
 ## 11 · Edge cases
 
@@ -567,6 +592,8 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 - [ ] ⌘K finds an SOP, a course and My Training; FAQs are nowhere.
 
 ## 14 · Change log
+
+- 12/11/2026 · TB · My Notes (§6.13), at TB's request for the Milestone 10 video: one running note per person and course, saved as they type and theirs alone (`training_note`, migration `10440`; `GET` and `PUT /training/me/courses/:id/note`; `training.note_saved`, audit only, its length never its text). Take Notes on My Training's course opens `NoteTaker` (new in `packages/ui`): it floats over the course without blocking it, moves by its bar or the arrow keys on desktop, docks top or bottom on a phone, minimises to its bar and closes. Praxis AI reads no note (`personal:`).
 
 - 11/11/2026 · TB · The staging seed's first run on staging left both PDFs out: Chromium, started from the command line as `mycity-stg`, could not write that user's HOME. The PDF service now gives it the temp folder then, as the services do, and the seed gives an existing course the items it lacks, in their place (§6.12), so a second run adds them.
 - 11/11/2026 · TB · PR 6 built: the staging seed (§6.12: ten SOPs across MyCity's five departments, published quietly; NDPA Data Protection Essentials and Partner Outreach, real courses of checked YouTube videos, our lessons and PDFs and free outside courses; NDPA assigned to Implementation), the User Guide's Training section (Knowledge Hub chapter, which now names M10) and My Training (Employee Self-Service chapter), with pictures. Decided on the way: Publish SOP takes `quiet` from the seed only, so MyCity's staff are not told of demonstration SOPs (§7); the empty `knowledge-embed` job stub is deleted, since the hub's AI reads are queries, not vectors (`praxis-ai.md` §1 item 6).

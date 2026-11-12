@@ -25,6 +25,8 @@
  *   training.certificate_ready     its PDF is stored: the person is told "Certificate ready"
  *   training.enrolment_closed      a leaver's open enrolment removed and its task cancelled
  *   training.reminder_due          the reminder engine's `training_due`, or Remind Overdue
+ *   training.note_saved            a person saved their own note on a course: audit only, its
+ *                                  length and never its text (§6.13)
  *
  * New joiners are enrolled by `training.enrol_joiners` on employee.created, employee.updated and
  * access.roles_set, and by the `training-joiners` job every morning at 06:00 Lagos as a backstop.
@@ -58,6 +60,7 @@ const EVENTS = defineEvents("knowledge", {
   "training.completed": { summary: "Someone completed a course" },
   "training.certificate_ready": { summary: "A certificate of completion was issued" },
   "training.enrolment_closed": { summary: "A leaver's course was closed" },
+  "training.note_saved": { summary: "Someone saved their own notes on a course" },
   "training.reminder_due": { summary: "Someone was reminded of a course" },
 });
 

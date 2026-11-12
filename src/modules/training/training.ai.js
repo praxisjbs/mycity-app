@@ -28,6 +28,7 @@ module.exports = defineManifest({
     CourseUpdate: "design: a course's title, summary and settings are set beside its items on Knowledge Hub, Training",
     ItemCreate: "design: an item is an upload, a video or course link or a lesson written in the editor, put in order on the screen",
     AssignmentCreate: "design: Assign Training reaches many people at once with a task and a notice each, so it is pressed on the screen",
+    TrainingNoteSave: "personal: My Notes are the person's own words on a course, read and written by them alone on ESS, My Training",
   },
   reads: [
     {

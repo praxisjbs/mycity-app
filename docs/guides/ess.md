@@ -47,7 +47,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · My Requests (`my-requests`) | Staff app | Every employee | Their own expense requests: KPI cards, the list, a request in the modal. Built by M8 (`docs/guides/expenses.md` §2, §10), listed here because it is an ESS tab | New Request, Edit, Send Again, Cancel Request |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | One tab, a Queries and Sanctions switch: their queries (open first) and their sanctions | Respond to an open query; open a letter. Sanctions are read only |
 | ESS · My Documents (`my-documents`) | Staff app | Every employee | Their vault: contracts, certificates, ID; signed, verified, expiring, missing | Upload a requested document, preview, download |
-| ESS · My Training (`my-training`, M10) | Staff app | Every employee, own | Owned by TB (`knowledge.md`): the courses assigned to them (due first), in progress, completed with their certificates, and the Library | Start a course, Mark Done, Add Proof, Download Certificate |
+| ESS · My Training (`my-training`, M10) | Staff app | Every employee, own | Owned by TB (`knowledge.md`): the courses assigned to them (due first), in progress, completed with their certificates, and the Library | Start a course, Mark Done, Add Proof, Download Certificate, Take Notes (My Notes, their own) |
 | ESS · My Security (`my-security`) | Staff app | Every employee | Password (when it was changed), two-step sign-in, the PIN, passkeys, where they are signed in, recent sign-ins with how each began; a link to My Devices | Change password; set up, change or turn off two-step (no Turn Off while a role they hold requires it) and choose how often it asks; new recovery codes; set, change or remove the PIN; add, rename or remove a passkey; sign out one device or all the others; open My Devices |
 | Shell avatar (rail, phone top bar, More) | Staff app | Every employee | The photo from My Profile, or initials | |
 | People · Employees (employee record) | Staff app | People; Download Their Data the CEO only | The same employee record | Where People edit the fields an employee cannot; the CEO asks for a copy of one person's data (Download Their Data) |
@@ -447,6 +447,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 12/11/2026 · TB · ESS · My Training (#110): Take Notes opens My Notes, the person's own running note on the course, floating over it (`knowledge.md` §6.13, §10).
 - 11/11/2026 · TB · ESS · My Training (#110): a PDF grows to its pages, so the course scrolls through it to the item's actions and back; All Items at the item's foot too; an item, or the way back, starts at the course's top (`knowledge.md` §10, §14).
 - 11/11/2026 · TB · ESS · My Training (#110) built on the contract (M10 PR 5, `knowledge.md` §10): To Do,
   In Progress, Completed and Library, a course beside the list (a sheet on a phone) with its items

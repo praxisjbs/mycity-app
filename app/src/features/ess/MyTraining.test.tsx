@@ -150,6 +150,28 @@ describe("ESS · My Training", () => {
     expect(await screen.findByRole("heading", { name: "Fire Safety at the Office", level: 2 }, { timeout: 5000 })).toBeTruthy();
   }, 30000);
 
+  it("Take Notes opens My Notes over the course: saved as typed, kept when closed, and still there when opened again", async () => {
+    await signedIn();
+    list("In Progress");
+    await course("Data Protection Essentials");
+    fireEvent.click(screen.getByRole("button", { name: "Take Notes" }));
+    const notes = await screen.findByRole("region", { name: "My Notes" }, { timeout: 5000 });
+    const box = await within(notes).findByRole("textbox", { name: "My Notes on Data Protection Essentials" });
+    await waitFor(() => expect(box.hasAttribute("readonly")).toBe(false), { timeout: 5000 });
+    fireEvent.change(box, { target: { value: "Report a lost laptop the same day." } });
+    // The course behind it is still open to work in.
+    await item("Key Rules");
+    expect(await screen.findByRole("heading", { name: "Why it matters" }, { timeout: 5000 })).toBeTruthy();
+    await waitFor(() => expect(within(notes).getByRole("status").textContent).toBe("Saved"), { timeout: 5000 });
+    fireEvent.click(within(notes).getByRole("button", { name: "Minimise Notes" }));
+    expect(within(notes).queryByRole("textbox")).toBeNull();
+    fireEvent.click(within(notes).getByRole("button", { name: "Close Notes" }));
+    await waitFor(() => expect(screen.queryByRole("region", { name: "My Notes" })).toBeNull(), { timeout: 5000 });
+    fireEvent.click(screen.getByRole("button", { name: "Take Notes" }));
+    expect(await screen.findByDisplayValue("Report a lost laptop the same day.", {}, { timeout: 5000 })).toBeTruthy();
+    expect(await axe(document.body)).toHaveNoViolations();
+  }, 30000);
+
   it("on a phone, a course opens in a sheet, with Mark Done full width at the foot of its item", async () => {
     setViewport(390);
     await signedIn();
@@ -158,5 +180,18 @@ describe("ESS · My Training", () => {
     fireEvent.click(await within(sheet).findByRole("button", { name: /When the Alarm Sounds/ }, { timeout: 5000 }));
     const done = await within(sheet).findByRole("button", { name: "Mark Done" }, { timeout: 5000 });
     expect(done.className).toContain("w-full");
+  }, 30000);
+
+  it("on a phone, My Notes opens inside the course's sheet, docked, and moves to the top with a tap", async () => {
+    setViewport(390);
+    await signedIn();
+    fireEvent.click(await screen.findByText("Fire Safety at the Office", {}, { timeout: 5000 }));
+    const sheet = await screen.findByRole("dialog", { name: "Course" }, { timeout: 5000 });
+    fireEvent.click(await within(sheet).findByRole("button", { name: "Take Notes" }, { timeout: 5000 }));
+    const notes = await within(sheet).findByRole("region", { name: "My Notes" }, { timeout: 5000 });
+    expect(notes.className).toContain("bottom-3");
+    expect(within(notes).queryByRole("button", { name: "Move Notes" })).toBeNull();
+    fireEvent.click(within(notes).getByRole("button", { name: "Move to Top" }));
+    expect(notes.className).toContain("top-3");
   }, 30000);
 });
