@@ -10,6 +10,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type Ancho
  *   /apply/<token>         opaque, one person, not indexable
  *   /assess/<token>        opaque
  *   /sign/<token>          opaque
+ *   /onboard/<token>       opaque, a new hire's documents (M5)
  *   /verify/<number>       a reference, not a secret
  *   /verify/t/<token>      the QR on a sealed document: the record and the document itself
  *   /proposal/<token>      opaque, one proposal, not indexable (M7)
@@ -27,6 +28,7 @@ export type Route =
   | { page: "apply"; token: string }
   | { page: "assess"; token: string }
   | { page: "sign"; token: string }
+  | { page: "onboard"; token: string }
   | { page: "verify"; number: string | null }
   | { page: "verify-qr"; token: string }
   | { page: "proposal"; token: string }
@@ -42,7 +44,7 @@ export function parse(path: string): Route {
   if (p === "/help") return { page: "help" };
   const qr = /^\/verify\/t\/([^/]+)$/.exec(p);
   if (qr) return { page: "verify-qr", token: decodeURIComponent(qr[1]!) };
-  const m = /^\/(jobs|apply|assess|sign|verify|proposal)\/([^/]+)$/.exec(p);
+  const m = /^\/(jobs|apply|assess|sign|onboard|verify|proposal)\/([^/]+)$/.exec(p);
   if (!m) return { page: "not-found" };
   const v = decodeURIComponent(m[2]!);
   switch (m[1]) {
@@ -50,6 +52,7 @@ export function parse(path: string): Route {
     case "apply": return { page: "apply", token: v };
     case "assess": return { page: "assess", token: v };
     case "sign": return { page: "sign", token: v };
+    case "onboard": return { page: "onboard", token: v };
     case "proposal": return { page: "proposal", token: v };
     default: return { page: "verify", number: v };
   }

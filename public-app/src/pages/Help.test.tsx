@@ -19,9 +19,9 @@ describe("Help", () => {
   it("shows every section of the public chapter, with its contents beside it", async () => {
     draw();
     expect(await screen.findByRole("heading", { level: 2, name: "The Front Page" })).toBeTruthy();
-    for (const title of ["Open Roles", "A Vacancy", "Apply", "Assessment", "Sign Offer", "Your Proposal", "Sign an Agreement", "Verify a Document"])
+    for (const title of ["Open Roles", "A Vacancy", "Apply", "Assessment", "Sign Offer", "Upload Documents", "Your Proposal", "Sign an Agreement", "Verify a Document"])
       expect(screen.getByRole("heading", { level: 2, name: title })).toBeTruthy();
-    expect(within(screen.getByRole("navigation", { name: "Help Sections" })).getAllByRole("link")).toHaveLength(9);
+    expect(within(screen.getByRole("navigation", { name: "Help Sections" })).getAllByRole("link")).toHaveLength(10);
     expect(within(screen.getByRole("navigation", { name: "Help Contents" })).getByRole("link", { name: "Apply" }).getAttribute("href")).toBe("#public-apply");
   }, 30000);
 

@@ -35,6 +35,10 @@ const OWNERS = Object.freeze([
   Object.freeze({ name: "partner.cities", module: "partners", level: "city", personal: false }),
   Object.freeze({ name: "lead.cities", module: "leads", level: "city", personal: false }),
   Object.freeze({ name: "deal.venue", module: "partner_pipeline", level: "address", personal: false }),
+  // A new hire's two guarantors (offers.md §3 step 6, MyCity's Guarantor Form): where to reach them and
+  // where they live, both personal. The hire's own address is employee.home_address.
+  Object.freeze({ name: "onboarding_guarantor.contact_address", module: "onboarding", level: "address", personal: true }),
+  Object.freeze({ name: "onboarding_guarantor.residential_address", module: "onboarding", level: "address", personal: true }),
 ]);
 
 const BY_NAME = new Map(OWNERS.map((o) => [o.name, o]));

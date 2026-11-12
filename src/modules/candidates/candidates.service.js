@@ -36,6 +36,8 @@ const vacancyRepo = require("../vacancies/vacancies.repo");
 const vacancies = require("../vacancies/vacancies.service");
 const repo = require("./candidates.repo");
 const pipeline = require("./candidates.pipeline");
+/** The stages M5's onboarding case owns: a card here has an employee record and a case behind it. */
+const HIRE_STAGES = Object.freeze(["documentation", "pre_onboarding", "onboarding"]);
 const { shown } = require("./candidates.screening");
 const { scorecard } = require("./candidates.scorecard");
 const { daysAtStage } = require("./candidates.sla");
@@ -388,6 +390,28 @@ async function hireIn(client, actor, applicationId, { employee_id: employeeId })
 }
 
 /**
+ * The hire withdrew, in the caller's transaction (M5's Withdraw on the onboarding case, AJ
+ * 11/11/2026): an application active from Documentation to Onboarding takes status withdrawn with the
+ * reason, keeps the stage it reached, and its live links stop. No candidate mail: they are the one who
+ * left. `application.withdrawn` is recorded. False for one not active there, so the caller decides.
+ */
+async function withdrawnIn(client, actor, applicationId, reason) {
+  const row = await repo.get(client, applicationId, { lock: true });
+  if (!row || row.status !== "active" || !HIRE_STAGES.includes(row.stage)) return false;
+  await repo.setWithdrawn(client, applicationId, reason);
+  await publicToken.revokeFor(client, { subject_type: "application", subject_id: applicationId });
+  await emit(client, {
+    key: EVENTS.APPLICATION_WITHDRAWN,
+    entity: { type: "application", id: applicationId },
+    actor,
+    before: { status: row.status },
+    after: { status: "withdrawn" },
+    payload: { application_id: applicationId, number: row.number, stage: row.stage, vacancy_id: row.vacancy_id },
+  });
+  return true;
+}
+
+/**
  * Not Progressing, at any stage and on a closed role too (a role closed with people still in it lets
  * them be told; GE, 05/11/2026). Reopen still needs the role live.
  */
@@ -451,6 +475,9 @@ async function reopen(actor, scope, id) {
   return tx(async (client) => {
     const row = await visibleRow(client, id, scope, { lock: true });
     if (row.status !== "not_progressed") throw new AppError("MOVE_NOT_ALLOWED", "Only a candidate not progressed can be reopened", 409);
+    // Past Offer, Not Progressing ended the hire's onboarding case, contract and employee record
+    // (offers.md §6): reopened, the card would be active with none of them. A new application starts again.
+    if (HIRE_STAGES.includes(row.stage)) throw new AppError("MOVE_NOT_ALLOWED", "A hire past Offer cannot be reopened", 409);
     assertVacancyLive(row);
     await transition(client, pipeline.MACHINE, {
       entity_id: id,
@@ -628,6 +655,7 @@ module.exports = {
   offerEndedIn,
   correctEmailIn,
   hireIn,
+  withdrawnIn,
   notProgressed,
   notProgressAllIn,
   reopen,

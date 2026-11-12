@@ -247,7 +247,7 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
 | `POST /recruitment/candidates/:id/score` | `EmptyBody` → `CandidateDetail` | `recruitment` edit · all/team | no | `cv-screen`, Deep Reasoning |
 | `POST /recruitment/candidates/score-all` | `ScoreAll` → `ScoreAllQueued` | `recruitment` edit · all/team | no | Screen With AI: the one to three must-meet conditions are kept on the vacancy (left out, the kept ones are used again), then every active, unscored application of it is read through the outbox |
 | `POST /recruitment/candidates/invitations` | `ApplyInvite` → `ApplyInviteSent` | `recruitment` create | no | Emails an Apply link |
-| `GET /recruitment/candidates/emails` | `CandidateEmailListQuery` → `CandidateEmailPage` | `recruitment` view | yes | The eight candidate emails (M4's five, M5's three), each with its current version and `can_edit` (edit · all) |
+| `GET /recruitment/candidates/emails` | `CandidateEmailListQuery` → `CandidateEmailPage` | `recruitment` view | yes | The nine candidate emails (M4's five, M5's four), each with its current version and `can_edit` (edit · all) |
 | `GET /recruitment/candidates/emails/:key`, `PUT .../:key` | `CandidateEmailParams`; `CandidateEmail`, `CandidateEmailSave` | view; edit · all | no | Subject and Markdown body saved as the next version, checked against the email's variables. Saved only with edit over every vacancy (scope all), as each goes to every candidate |
 | `POST /recruitment/candidates/emails/:key/restore` | `EmptyBody` → `CandidateEmail` | `recruitment` edit · all | no | Restore Default: the shipped wording saved as the next version |
 | `GET /recruitment/assessments/summary` | `AssessmentsSummary` | `recruitment` view · all/team | no | |
@@ -435,11 +435,18 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   - `hireIn(client, actor, id, { employee_id })`: from Onboarding only (409 otherwise), the stage and
     status `hired`, `application.hired`, then `vacancies.hiredIn` (§6.1). The employee is the one M5
     created at acceptance; the application does not keep it (M5's `onboarding_case` does).
+  - `withdrawnIn(client, actor, id, reason)`: M5's Withdraw on an onboarding case (the hire is not
+    joining; AJ, 11/11/2026). An application active at Documentation, Pre-Onboarding or Onboarding takes
+    status `withdrawn` with `withdrawn_at` and the reason, keeps its stage, its links stop, and
+    `application.withdrawn` is recorded. No candidate mail: they are the one who left. Anything else
+    answers false.
 - The board's columns (`VacancyDetail.board_stages`) are the hand-moved stages and then Offer. The
   staff app shows Offer once M5's Offers screen opens in its build (the delivery plan, F14), so it is
   never an empty column before M5. Documentation to Onboarding are the Onboarding screen's. A hired
   application leaves the board: the board asks for one status at a time, In Progress (`active`) first.
-- Not Progressing works from any stage before Hired, and Reopen returns the card to where it stopped.
+- Not Progressing works from any stage before Hired, and Reopen returns the card to where it stopped,
+  except past Offer (Documentation, Pre-Onboarding, Onboarding): the hire's case ended with it, so
+  Reopen is refused there.
 - Not Progressing works at any stage and on a closed role too, so the people left in a closed role can
   be told (`can_not_progress` on the sheet; GE, 05/11/2026); moves, Reopen and Score With AI still need
   the role not closed. It sets `status` `not_progressed` with a reason of at least 10 characters, records the
@@ -590,12 +597,13 @@ defaults are themselves Markdown (front matter `format: markdown`), so an edit s
 shipped words and Restore Default saves them back unchanged; a link is a Markdown link, never a styled
 button (GE · (Ose), 04/11/2026). The emails:
 `application-received`, `apply-invite`, `assessment-invite`, `interview-invite` (with the `.ics`), and
-`candidate-not-progressed`. M5's three are kept in the same store, so the one screen words all eight
-(#79, 06/11/2026): `offer-sent` (the offer's number, its signing link and when it lapses),
-`offer-signed` (the number, the Verify link, the first day when set) and `onboarding-documents` (the
-documents link and the day they are due by, when set). This module ships their wording and declares
-their variables (`OfferSentEmailVars`, `OfferSignedEmailVars`, `OnboardingDocumentsEmailVars`); M5 sends
-them. They go through system mail from the outbox, paced like all system mail;
+`candidate-not-progressed`. M5's four are kept in the same store, so the one screen words all nine
+(#79, 06/11/2026; `contract-sent` added by AJ for M5 PR 5, 11/11/2026): `offer-sent` (the offer's
+number, its signing link and when it lapses), `offer-signed` (the number, the Verify link, the first
+day when set; M5 attaches the sealed offer), `contract-sent` (the contract's number, its signing link
+and when it stops working) and `onboarding-documents` (the documents link and the day they are due by,
+when set). This module ships their wording and declares their variables (`OfferSentEmailVars`,
+`OfferSignedEmailVars`, `ContractSentEmailVars`, `OnboardingDocumentsEmailVars`); M5 sends them. They go through system mail from the outbox, paced like all system mail;
 while mail is paused they wait. Staging sends real mail marked `[STAGING]` (A4); its seed applies only
 with test addresses.
 
@@ -630,6 +638,7 @@ with test addresses.
 | `application.score_requested` | Screen With AI, one per application | outbox: the AI read (§6.4), one at a time |
 | `application.scored` | after an AI read is kept | audit |
 | `application.reopened` | after Reopen | audit; the card refreshes |
+| `application.withdrawn` | `candidates.withdrawnIn`, when M5 withdraws an onboarding case | audit; no mail |
 | `application.hired` | `candidates.hireIn`, when M5's onboarding completes | audit; the vacancy's seat is filled and the vacancy closes as filled in the same transaction (§6.1), with `org_seat.filled` (`organogram.md` §7) and `vacancy.closed` |
 | `application.email_corrected` | `candidates.correctEmailIn`, an offer's Change Email (M5) | audit |
 | `recruitment.candidate_email_saved` | a candidate email reworded, or its default restored | audit |
@@ -795,6 +804,19 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 12/11/2026 · AJ · Reopen is refused for an application not progressed at Documentation, Pre-Onboarding or Onboarding ("A hire past Offer cannot be reopened"): Not Progressing there ended the hire's onboarding case, contract and employee record (`offers.md` §6), so a reopened card would have none of them. `candidates.reopen`, the sheet (no Reopen at those stages) and the mock (§6.3). Changed on M5's branch at AJ's decision after the audit of #122; `withdrawnIn` shares the stage list. The Offers and Onboarding tabs show their settings only to whom the summary's `can_configure` names (`offers.md` §8).
+
+- 12/11/2026 · AJ · Nothing of M4 changed. Beside it, M5 PR 7 puts the Onboarding tab on the contract (`Onboarding.tsx`, `OnboardingCase.tsx`, `OnboardingSettings.tsx`, `docs/guides/offers.md` §2, §10), removes the last INTERIM types (`app/src/api/types/recruitment.ts`) and their block in the mock, and shares Sign for the Company between the offer and the contract (`CompanySignForm` in `OfferSign.tsx`).
+- 11/11/2026 · AJ · M5 PR 6b, for GE to review: `candidates.withdrawnIn` (§6.3) and its repo write
+  `setWithdrawn`, with the event `application.withdrawn` (§7): M5's Withdraw on an onboarding case sets
+  the application's long-unused `withdrawn` status (with `withdrawn_at`), stops its links and mails no
+  one. M5's Complete Onboarding now calls `hireIn` (`offers.md` §3 step 8). Nothing else in M4 changed.
+- 11/11/2026 · AJ · M5 PR 6a: nothing in M4 changed. `candidates.test.js` counts the nine Candidate
+  Emails PR 5 left (it still said eight), and M5's documentation gate now moves an application from
+  Documentation to Pre-Onboarding through `advanceIn` (`offers.md` §3 step 7).
+- 11/11/2026 · AJ · M5 PR 5: `contract-sent`, a ninth Candidate Email (`ContractSentEmailVars`, the
+  contract's number, signing link and expiry), for the employment contract the hire signs after the
+  company (§6.8); M5 attaches the sealed offer to `offer-signed`.
 - 11/11/2026 · GE · A vacancy opens as its own page (`?id=`, Back to Vacancies, the trail named after the role), as TB asked at the meeting, rather than in the wide dialog; ⌘K's link lands on it. Candidates and Assessments keep the dialog, Interviews and Offers their widest one.
 - 11/11/2026 · GE · A vacancy's and a candidate's foot hold one button, the next step, and More Actions (the shared `Menu`, an action sheet on a phone) for the rest, the destructive one red and last (§10): the rows of six to nine buttons were too many.
 - 11/11/2026 · GE · Recruitment's desktop layout put back as GE left it: Vacancies, Candidates and Assessments (the library and Sittings) open a record in the wide dialog again, the list or board keeping the page's width (`ListDetail` `layout="modal"` `size="wide"`, F31 amended 11/11/2026; #109 and #110 had put them beside the list). Vacancies' Suggested From Organogram is behind View Empty Seats beside the status filter, in a dialog. The charts moved to a new tab, Analytics (#111), kept light: four figures, then Funnel, All Roles (from Vacancies), Screening Scores (from Candidates), Assessment Averages and Offers and Pool, read from the summaries the tabs already use; no API changed. The board no longer uses `ListDetail` `fillUntilPicked`. Talent Pool, Interviews and Offers are unchanged.

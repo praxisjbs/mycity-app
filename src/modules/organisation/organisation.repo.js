@@ -993,6 +993,30 @@ async function setBirthday(db, employeeId, { day, month }) {
 }
 
 /**
+ * A hire's Bank Verification Number (migration 5040), entered once by them on the upload page (M5).
+ * Not in UPDATE_COLUMNS, so it never reaches an audit row's before or after. Answers whether it was
+ * set before, or null when there is no such person.
+ */
+async function setBvn(db, employeeId, bvn) {
+  const row = await one(
+    db,
+    `WITH old AS (SELECT bvn IS NOT NULL AS had FROM employee WHERE employee_id = $1 FOR UPDATE)
+     UPDATE employee e SET bvn = $2, updated_at = now()
+       FROM old
+      WHERE e.employee_id = $1
+      RETURNING old.had`,
+    [employeeId, bvn],
+  );
+  return row ? { had: row.had } : null;
+}
+
+/** Whether the person's BVN is on record (never the number). */
+async function hasBvn(db, employeeId) {
+  const row = await one(db, "SELECT bvn IS NOT NULL AS has FROM employee WHERE employee_id = $1", [employeeId]);
+  return Boolean(row && row.has);
+}
+
+/**
  * Move a person to another staff number. A staff number is not a field of the form, so
  * it is not in UPDATE_COLUMNS: only the roster reaches this, when the sheet takes back a
  * number it says belongs to someone else.
@@ -1355,6 +1379,8 @@ module.exports = {
   EMPLOYEE_COLUMNS,
   namesOf,
   setBirthday,
+  setBvn,
+  hasBvn,
   photoDocumentOf,
   setPhotoDocument,
   INSERT_COLUMNS,

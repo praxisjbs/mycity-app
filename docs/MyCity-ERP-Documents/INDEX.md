@@ -15,6 +15,7 @@ listed with them below.
 | `payroll-samples/` | Drafts for MyCity to approve (M6 built its template from the draft; the sign-off is still open): the payslip sample (fictional person and figures, simple payroll, A4). Added 8 November 2026 for M6's payslip template (`docs/guides/payroll.md` §6.10). | Double click `payslip-sample.html`; it opens in any browser |
 | `training-samples/` | Drafts for MyCity to approve before M10 builds them: the training certificate of completion (fictional person, signer and number, A4 landscape). Added 11 November 2026 for M10's certificate template (`docs/guides/knowledge.md` §6.9). | Double click `certificate-sample.html`; it opens in any browser |
 | `letter-samples/` | MyCity's six disciplinary letters (query, attendance query, caution, warning, suspension, dismissal), redacted: names, dates and offences are placeholders. Added 27 October 2026 for M3's letter templates. | Any markdown reader, or a text editor |
+| `onboarding-samples/` | MyCity's offer and onboarding documents, redacted: the short sample offer letter, the Employee Data, Guarantor and Providus Salary Account forms, the October 2026 Incentive Plan and an outline of the HR Induction deck. Added 11 November 2026 for M5 (`docs/guides/offers.md`). | Any markdown reader, or a text editor |
 
 ## Opening the two HTML files
 

@@ -504,8 +504,9 @@ function ended(o: MockOffer) {
  * ------------------------------------------------------------------ */
 
 const startOfMonth = () => `${new Date().toISOString().slice(0, 7)}-01`;
-R("GET /api/v1/recruitment/offers/summary", "view", () =>
+R("GET /api/v1/recruitment/offers/summary", "view", (req) =>
   ok({
+    can_configure: can(req, "edit"),
     drafts: OFFERS.filter((o) => o.status === "draft").length,
     with_approval: OFFERS.filter((o) => o.status === "approval").length,
     to_send: OFFERS.filter((o) => o.status === "approved").length,

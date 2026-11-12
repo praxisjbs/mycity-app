@@ -5,8 +5,9 @@
  * with each offer's status, role and expiry; never the letter.
  *
  *   offers.create   New Offer as a card the person confirms: a shortlisted candidate, the start date
- *                   and the monthly basic salary; every other term starts from the vacancy, as the
- *                   form does, and the draft is finished on Offers before it goes for approval.
+ *                   and the monthly basic salary (with the reason, when it sits outside the vacancy's
+ *                   range: refused without one, as the form is); every other term starts from the
+ *                   vacancy, and the draft is finished on Offers before it goes for approval.
  *
  * Approving, signing, sending and withdrawing stay on the screen: an approval is the approver's own
  * decision, a signature is the signer's own act, and a link goes to a candidate.
@@ -44,7 +45,13 @@ module.exports = defineManifest({
       ],
       run: (values, actor) => service.createFromCard(actor, actor.scope, values),
       readback: (offer) => [{ type: "offer", id: offer.offer_id, label: `${offer.number}, ${offer.candidate_name}`, status: "draft", link: offersPath }],
-      labels: { application_id: "Candidate", start_date: "Start Date", basic_salary: "Basic Salary (Monthly)", job_title: "Job Title" },
+      labels: {
+        application_id: "Candidate",
+        start_date: "Start Date",
+        basic_salary: "Basic Salary (Monthly)",
+        job_title: "Job Title",
+        range_reason: "Reason Outside Range",
+      },
     },
   ],
   reads: [

@@ -80,6 +80,7 @@ describe("job registry", () => {
       "interview-reminders",
       "mail-sync",
       "media-reconcile",
+      "onboarding-dispatch",
       "outbox-dispatch",
       "partner-inactivity",
       "places-name",

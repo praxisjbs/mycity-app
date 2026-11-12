@@ -17,7 +17,7 @@ const meta = (req) => ({ ip: req.ip, user_agent: String(req.headers["user-agent"
 
 module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.validated.query, req.user, scopeOf(req))),
-  summary: async (req, res) => ok(res, await service.summary(scopeOf(req))),
+  summary: async (req, res) => ok(res, await service.summary(scopeOf(req), req.user)),
   draft: async (req, res) => ok(res, await service.draft(req.validated.query.application_id, req.user, scopeOf(req))),
   get: async (req, res) => ok(res, await service.get(id(req), req.user, scopeOf(req))),
   create: async (req, res) => created(res, await service.create(withActor(req), scopeOf(req), req.validated.body)),

@@ -137,17 +137,18 @@ If the hub cannot be reached, a line above the buttons says
    open their record.
 6. **Login** shows **Sign In**: whether they can sign in, the email they use, their **Roles** and
    when they last signed in.
-7. **History** lists every change under **What**, **Who** and **When**. **System** means the hub
+7. **Documents** lists what is held on them. See [Someone's documents](#people-documents).
+8. **History** lists every change under **What**, **Who** and **When**. **System** means the hub
    made the change.
-8. Press **Back to Employees** to return to the list.
+9. Press **Back to Employees** to return to the list.
 
 Fields shown as **Restricted** are ones your role does not see, or that nobody has filled in yet.
 On a phone the record's buttons sit full width under the name, and the tabs scroll sideways.
 
 ### Open and correct a record {#people-record}
 
-A record's tabs are **Profile**, **Job**, **Work Schedule**, **Reporting Line**, **Login** and
-**History**. If you may see queries, it also has **Queries** and **Sanctions**:
+A record's tabs are **Profile**, **Job**, **Work Schedule**, **Reporting Line**, **Login**,
+**Documents** and **History**. If you may see queries, it also has **Queries** and **Sanctions**:
 [Someone's queries and sanctions](#queries-person).
 
 ![A person's record](shot:people-record)
@@ -158,6 +159,26 @@ A record's tabs are **Profile**, **Job**, **Work Schedule**, **Reporting Line**,
 3. {needs="people edit"} Change what is wrong and press **Save Record**. Empty a field to remove what
    it held. Moving someone to **On Site** or **Hybrid** asks for their **Worksite**. The message
    names them, such as *Ada Okafor saved*. If you changed nothing, the form just closes.
+
+### Someone's documents {#people-documents}
+
+A person's **Documents** tab holds every document filed on them: their contract and the documents
+they sent when they joined, what People asked them for, and what expires soon.
+
+![A person's documents](shot:people-documents)
+
+1. Open the person from [People · Employees](/people?tab=employees) and press **Documents**.
+2. The strip counts their **Documents**, those **Signed**, **Verified**, **Expiring** and **Missing**.
+3. Each row shows the document, when it was uploaded, its status and when it expires.
+4. Press one. On a computer it opens beside the list; on a phone, in a sheet. **View File** opens it
+   and **Download** saves it.
+5. {needs="people edit"} A document **Awaiting Check** has **Verify Document**: press it once you
+   have checked it.
+6. {needs="people edit"} Press **Request Document**, type which **Document** and a **Note** if you
+   like, and press **Request Document**. It shows as **Missing** until they upload it from
+   ESS · My Documents.
+7. {needs="people edit"} Press **Upload Document** to file one yourself: say **What Is It**, then
+   choose the file.
 
 ### When an edit is refused {#people-record-refused needs="people edit"}
 
@@ -1266,4 +1287,15 @@ crop: modal
 marks:
   1: text "Added By" | Who asked for it
   2: text "Purpose" | Why they are going
+```
+
+```shot people-documents
+open: /people?tab=employees
+as: operations
+do:
+  - click: row 1
+  - click: tab "Documents"
+  - wait: text "Employment contract"
+marks:
+  1: button "Request Document" | Ask them for a document
 ```

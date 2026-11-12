@@ -39,6 +39,20 @@ describe("the letter's text", () => {
   });
 });
 
+describe("the employment type", () => {
+  test("a vacancy's spellings become the employee's, which the offer and the employee record hold", () => {
+    expect(render.employmentFromVacancy("contract")).toBe("contractor");
+    expect(render.employmentFromVacancy("internship")).toBe("intern");
+    expect(render.employmentFromVacancy("full_time")).toBe("full_time");
+    expect(render.employmentFromVacancy("part_time")).toBe("part_time");
+    expect(render.employmentFromVacancy(null)).toBeNull();
+    const { EMPLOYMENT_TYPES } = require("@mycity/contract").organisation;
+    for (const v of Object.values(render.FROM_VACANCY)) expect(EMPLOYMENT_TYPES).toContain(v);
+    // Every employee spelling prints on the letter.
+    for (const t of EMPLOYMENT_TYPES) expect(render.EMPLOYMENT[t]).toBeTruthy();
+  });
+});
+
 describe("routes", () => {
   test("every route holds a recruitment grant; New Offer needs create, the writes edit, the company's signature view", () => {
     const rs = routesOf(routes.router);
@@ -54,5 +68,12 @@ describe("routes", () => {
     expect(action("POST", "/:id/sign")).toBe("view");
     // No route approves: an offer is approved in its approval.
     expect(rs.some((r) => /approve/.test(r.path))).toBe(false);
+  });
+
+  test("the settings need the whole company's scope; a Head of Department's team grant drafts offers but never configures them", () => {
+    const guarded = routes.router.stack
+      .filter((l) => l.route && l.route.stack.some((m) => m.handle.scope === "all"))
+      .map((l) => `${Object.keys(l.route.methods)[0].toUpperCase()} ${l.route.path}`);
+    expect(guarded).toEqual(["GET /settings", "PUT /settings/signatory", "GET /settings/letter", "PUT /settings/letter", "POST /settings/letter/restore"]);
   });
 });

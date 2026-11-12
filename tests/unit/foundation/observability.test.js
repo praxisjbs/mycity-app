@@ -79,4 +79,25 @@ describe("metrics", () => {
     expect(metrics.templatePath("/api/v1/employees/3f2a1c4e-0000-4000-8000-000000000001/documents?x=1"))
       .toBe("/api/v1/employees/:id/documents");
   });
+  test("templatePath never keeps a public link's token", () => {
+    const token = require("node:crypto").randomBytes(32).toString("base64url");
+    expect(metrics.templatePath(`/api/public/v1/onboard/${token}/bvn`)).toBe("/api/public/v1/onboard/:token/bvn");
+  });
+});
+
+describe("access log", () => {
+  const { safeUrl } = require("../../../src/middleware/access-log");
+  const token = require("node:crypto").randomBytes(32).toString("base64url");
+
+  test("a public link's token is written as :token, wherever it sits in the path", () => {
+    expect(safeUrl(`/api/public/v1/onboard/${token}`)).toBe("/api/public/v1/onboard/:token");
+    expect(safeUrl(`/api/public/v1/sign/${token}/code?x=1`)).toBe("/api/public/v1/sign/:token/code?x=1");
+    expect(safeUrl(`/api/public/v1/verify/t/${token}/document`)).toBe("/api/public/v1/verify/t/:token/document");
+  });
+
+  test("ordinary paths and ids pass unchanged", () => {
+    const path = "/api/v1/recruitment/onboarding/3f2a1c4e-0000-4000-8000-000000000001/items";
+    expect(safeUrl(path)).toBe(path);
+    expect(safeUrl("/api/public/v1/verify/OFF-2026-0001")).toBe("/api/public/v1/verify/OFF-2026-0001");
+  });
 });
