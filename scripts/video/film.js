@@ -123,7 +123,11 @@ function hands(page, { phone, origin }) {
 async function browserFor(origins, port) {
   const { chromium } = require("playwright");
   const hosts = Object.values(origins).map((o) => new URL(o));
+  // Where outbound traffic must pass a proxy (a cloud session), a YouTube video in a course plays
+  // through it; MyCity's two hosts, which are this machine, never do.
+  const via = process.env.HTTPS_PROXY || process.env.https_proxy;
   return chromium.launch({
+    ...(via ? { proxy: { server: via, bypass: [...hosts.map((u) => u.hostname), "127.0.0.1", "localhost"].join(",") } } : {}),
     executablePath: process.env.MYCITY_CHROMIUM || undefined,
     args: [
       `--host-resolver-rules=${hosts.map((u) => `MAP ${u.hostname}:${u.port || 80} 127.0.0.1:${port}`).join(", ")}`,
