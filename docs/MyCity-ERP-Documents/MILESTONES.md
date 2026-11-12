@@ -248,7 +248,7 @@ start and still land on 18 December.
 | 3 | Queries & Consequence Management | 5% | 26–30 Oct | Fri 30 Oct | **GE** |
 | 4 | Recruitment End to End | 13% | 2–13 Nov | Fri 13 Nov | **GE** |
 | 5 | Offers, Documentation & Onboarding | 11% | 16–20 Nov | Fri 20 Nov | **AJ** · GE |
-| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **TB** · LA |
+| 6 | Payroll & Notifications | 11% | 23–27 Nov | Fri 27 Nov | **LA** |
 | 7 | Partnerships, CRM & Trackers | 10% | 30 Nov–4 Dec | Fri 4 Dec | **LA** · GE |
 | 8 | Expenses & Budget Control | 8% | 7–11 Dec | Fri 11 Dec | **AJ** |
 | 9 | Settings & Governance | 7% | 7–11 Dec ∥ | Fri 11 Dec | **TB** |
@@ -952,7 +952,7 @@ completes.
 
 ## 11 · M6 — Payroll & Notifications · 11%
 
-**Owner TB** with **LA** for the screens (JBS Praxis, 09/11/2026; LA was first planned, AJ named on 05/11/2026, LA again from 09/11/2026). **23–27 Nov. Demo Fri 27 Nov.**
+**Owner LA**, the whole milestone (JBS Praxis, 12/11/2026; TB owned it until then, with LA on the screens from 09/11/2026). **23–27 Nov. Demo Fri 27 Nov.**
 
 ### Jurisdiction decides the donor
 
@@ -1076,8 +1076,24 @@ record and M6's only source of truth.
   means where they apply. NSITF's 1% of monthly payroll is the Employee's Compensation Act's minimum (s.33(1)) and
   NSITF's stated rate today; pension is at least 8% from the employee and 10% from the employer of monthly emoluments
   (Pension Reform Act 2014, s.4(1)); PAYE is remitted by the 10th of the next month (Withholding Regulations 2024, reg
-  7(1)(b)(i)). The PAYE method and the pension threshold stay unverified. MyCity's accountant confirms the register before
-  any figure is entered.
+  7(1)(b)(i)). A third pass (12/11/2026) read the Joint Revenue Board's Personal Income Tax Guidelines 2026 and the 2002
+  PAYE Regulations: PAYE is computed cumulatively over the year to date, refunded when the cumulative tax falls, and the
+  employer gives rent relief in PAYE on the person's evidence; the minimum wage for PAYE is ₦70,000 a month. A fourth pass
+  the same day settled the rest from the agencies: pension covers employers of three or more (PenCom), NHF is 2.5% of
+  the month's gross pay (FMBN), and the 2024 minimum wage Act is in force from 29 July 2024 (the wage commission's
+  circulars). The band reading for part of a year was decided on 12/11/2026 (below).
+
+### Amended 12/11/2026 (JBS Praxis)
+
+`docs/guides/payroll.md` §13.1 items 38 to 40 record these; where they differ from the lines above, they win.
+
+- **LA owns M6 in full**: the milestone, its backend and its screens, and the remaining pull requests (PR 8, PR 10,
+  PR 11). TB hands over.
+- **MyCity has no accountant.** Operations & People run its payroll and do not apply statutory deductions yet. The
+  advanced option stays built and shipped off, ready to use and to configure the day they start; they then enter each
+  figure of the guide's §6.16 with its source on Configurations. Nothing in the build waits for a confirmation, and
+  "confirmed by MyCity's accountant" above means entered by Operations & People.
+- **PAYE's bands are scaled to the months elapsed in the calendar year** in the cumulative calculation.
 
 ### Definition of done
 
