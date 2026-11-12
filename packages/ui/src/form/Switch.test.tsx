@@ -34,6 +34,12 @@ describe("Switch, ToggleRow, CheckboxField", () => {
     expect(screen.getByRole("switch", { name: "Weekend Shifts" })).toBeChecked();
   });
 
+  it("ToggleRow names its switch by `label` when the title is a help term, never a bare Switch", () => {
+    render(<ToggleRow title={<span>Library</span>} label="Library" checked={false} onChange={() => undefined} />);
+    expect(screen.getByRole("switch", { name: "Library" })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Switch" })).toBeNull();
+  });
+
   it("CheckboxField ticks by its own label", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

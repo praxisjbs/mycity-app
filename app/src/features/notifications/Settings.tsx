@@ -119,6 +119,7 @@ function ThisDevice() {
               "Sound in App"
             )
           }
+          label="Sound in App"
           checked={sound}
           onChange={setSound}
         />
@@ -229,6 +230,7 @@ function QuietAndDigest() {
       <CardHeader title="Quiet Hours and Digest" />
       <ToggleRow
         title={<HelpTerm help="Pushes wait until these hours end. Urgent notices and security alerts still come through.">Quiet Hours</HelpTerm>}
+        label="Quiet Hours"
         checked={s.quiet_enabled}
         onChange={(on) => saveQuiet({ quiet_enabled: on })}
       />

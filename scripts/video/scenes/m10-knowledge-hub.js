@@ -72,6 +72,10 @@ const text = (s, words) => s.page.getByText(words, { exact: true }).first();
 const button = (s, name, within) => (within || s.page).getByRole("button", { name, exact: true }).first();
 /** A chip (a pressed-state button): the lists' filters. */
 const chip = (s, name) => s.page.getByRole("button", { name, exact: true }).first();
+/** A menu's item (Add Item's four kinds). */
+const menu = (s, name) => s.page.getByRole("menuitem", { name, exact: true }).first();
+/** One of an open course's sections (Items 3, People 4, Assignments, Settings): a radio named with its count. */
+const section = (s, name) => s.page.getByRole("radio", { name: new RegExp(`^${name}( \\d+)?$`) }).first();
 
 /** Today in Lagos as a date field takes it (DD/MM/YYYY). */
 function today() {
@@ -80,39 +84,34 @@ function today() {
 }
 
 /**
- * A signature drawn on a pad at a person's pace: a looped capital, then a run of joined loops that
- * shrink to a tail, the way a hurried hand writes a name.
+ * A signature drawn on a pad at a person's pace: four joined loops that shrink to a tail, the way
+ * a hurried hand writes a name, then an underline. (A prolate cycloid: the pen doubles back.)
  */
 async function sign(s, pad) {
   await pad.scrollIntoViewIfNeeded();
   const box = await pad.boundingBox();
-  const W = box.width * 0.7;
-  const H = box.height * 0.32;
-  const x0 = box.x + box.width * 0.14;
-  const y0 = box.y + box.height * 0.56;
-  // A prolate cycloid loops where the pen doubles back; the loops shrink and flatten to the end.
+  const W = box.width * 0.62;
+  const H = box.height * 0.3;
+  const x0 = box.x + box.width * 0.16;
+  const y0 = box.y + box.height * 0.42;
   const at = (t) => {
-    const k = t * 7 * Math.PI;
-    const r = 1.35 * (1 - 0.55 * t);
-    return { x: x0 + W * (t + (r * Math.sin(k)) / 26), y: y0 - H * (r * Math.cos(k)) * (0.55 + 0.45 * (1 - t)) * 0.5 };
-  };
-  const stroke = async (from, to, n) => {
-    const a = at(from);
-    await s.page.mouse.move(a.x, a.y, { steps: 6 });
-    await s.page.mouse.down();
-    for (let i = 1; i <= n; i++) {
-      const p = at(from + ((to - from) * i) / n);
-      await s.page.mouse.move(p.x, p.y, { steps: 2 });
-    }
-    await s.page.mouse.up();
+    const k = t * 8 * Math.PI;
+    const r = 1 - 0.45 * t;
+    return { x: x0 + W * (t + (r * Math.sin(k)) / 9), y: y0 + H * 0.7 * r * Math.cos(k) * (0.6 + 0.4 * (1 - t)) };
   };
   if (!s.phone) await s.hover(pad);
-  await stroke(0, 0.62, 70);
-  await stroke(0.66, 1, 36);
-  // The underline.
-  await s.page.mouse.move(x0 + W * 0.05, y0 + H * 0.75, { steps: 4 });
+  const a = at(0);
+  await s.page.mouse.move(a.x, a.y, { steps: 6 });
   await s.page.mouse.down();
-  await s.page.mouse.move(x0 + W * 0.9, y0 + H * 0.62, { steps: 18 });
+  for (let i = 1; i <= 110; i++) {
+    const p = at(i / 110);
+    await s.page.mouse.move(p.x, p.y, { steps: 2 });
+  }
+  await s.page.mouse.up();
+  // The underline.
+  await s.page.mouse.move(x0 - W * 0.04, y0 + H * 1.15, { steps: 5 });
+  await s.page.mouse.down();
+  await s.page.mouse.move(x0 + W * 0.95, y0 + H * 1.0, { steps: 18 });
   await s.page.mouse.up();
   await s.wait(0.3);
 }
@@ -250,7 +249,7 @@ module.exports = {
             { say: "She picks the screen where the contract step happens: Partnerships.", do: (s) => s.pick(dialog(s).getByLabel("Screen", { exact: true }).nth(3), "Partnerships · Partners") },
             { say: "Save Draft. Nobody is told until she publishes.", do: (s) => s.click(button(s, "Save Draft", dialog(s))), hold: 0.6 },
             { say: "She presses Publish SOP. The first version needs no note.", do: async (s) => { await s.click("Publish SOP"); await s.click(button(s, "Publish SOP", dialog(s))); }, hold: 0.8 },
-            "Version 1 is in force. Everyone in Branding and Marketing is told: New SOP.",
+            { say: "Version 1 is in force. Everyone in Branding and Marketing is told: New SOP.", do: (s) => s.click(chip(s, "Published")) },
             "A later version asks for a note saying what changed, and every version is kept.",
           ],
         },
@@ -266,7 +265,7 @@ module.exports = {
           lines: [
             { say: "A step that names a screen lists its SOP in that screen's help. Cynthia is on Partnerships.", do: (s) => s.wait(0.4) },
             { say: "She opens the User Guide from her name at the foot of the menu.", do: async (s) => { await s.click(s.page.getByRole("button", { name: /Cynthia Osakunih/ }).first()); await s.click(s.page.getByRole("menuitem", { name: "User Guide" })); } },
-            { say: "Under the screen's section, Procedures lists Influencer Collaboration, with its department.", do: (s) => s.hover(text(s, "Procedures")), hold: 0.6 },
+            { say: "Under the screen's section, Procedures lists Influencer Collaborations, with its department.", do: (s) => s.hover(text(s, "Procedures")), hold: 0.6 },
             "The procedure is where the work happens.",
           ],
         },
@@ -284,8 +283,8 @@ module.exports = {
             { say: "Training is for people who hold Manage Training: Operations and People, Implementation and the CEO.", do: (s) => s.hover(text(s, "NDPA Data Protection Essentials")) },
             "Each course shows its state, its items, whether it's in the Library, and how many are assigned, completed and overdue.",
             { say: "Cynthia presses New Course, types its title and summary, and presses Create Course.", do: async (s) => { await s.click("New Course"); await s.type(inDialog(s, "Title"), COURSE, { delay: 40 }); await s.type(inDialog(s, "Summary"), "How to spot a phishing message, and what to do.", { delay: 18 }); await s.click(button(s, "Create Course", dialog(s))); } },
-            { say: "A course is items in order: a file, a video link, a link to an outside course, or a lesson.", do: (s) => s.click("Add Item") },
-            { say: "First a lesson. She names it, and presses Draft Lesson.", do: async (s) => { await s.click(dialog(s).getByRole("radio", { name: "Lesson" })); await s.type(inDialog(s, "Title"), "Spot the Signs", { delay: 40 }); await s.type(inDialog(s, "Minutes"), "5", { delay: 60 }); await s.click(button(s, "Draft Lesson", dialog(s))); } },
+            { say: "A course is items in order. Add Item offers a file, a video link, a link to an outside course, or a lesson.", do: (s) => s.click("Add Item") },
+            { say: "First a lesson. She names it, and presses Draft Lesson.", do: async (s) => { await s.click(menu(s, "Lesson")); await s.type(inDialog(s, "Title"), "Spot the Signs", { delay: 40 }); await s.type(inDialog(s, "Minutes"), "5", { delay: 60 }); await s.click(button(s, "Draft Lesson", dialog(s))); } },
             { say: "She pastes IT's notes into Source Text, and presses Draft Lesson.", do: async (s) => { await s.type(inDialog(s, "Source Text"), LESSON_SOURCE, { delay: 2 }); await s.click(button(s, "Draft Lesson", dialog(s)).last()); await dialog(s).getByText("Drafted", { exact: true }).first().waitFor({ timeout: 90000 }); }, hold: 0.6 },
             { say: "The lesson comes back with headings and key points, keeping the facts. Use Lesson.", do: (s) => s.click(button(s, "Use Lesson", dialog(s))) },
             { say: "She reads it through, and presses Add Item.", do: (s) => s.click(button(s, "Add Item", dialog(s)).last()), hold: 0.4 },
@@ -293,7 +292,7 @@ module.exports = {
               say: "Next, a video. A YouTube link plays inside the course.",
               do: async (s) => {
                 await s.click("Add Item");
-                await s.click(dialog(s).getByRole("radio", { name: "Video Link" }));
+                await s.click(menu(s, "Video Link"));
                 await s.type(inDialog(s, "Title"), "Recognize and Report Phishing", { delay: 30 });
                 await s.type(inDialog(s, "Link"), VIDEO, { delay: 16 });
                 await s.type(inDialog(s, "Minutes"), "1", { delay: 60 });
@@ -305,7 +304,7 @@ module.exports = {
               say: "Then a file: IT's one-page checklist, as a PDF.",
               do: async (s) => {
                 await s.click("Add Item");
-                await s.click(dialog(s).getByRole("radio", { name: "Upload File" }));
+                await s.click(menu(s, "Upload File"));
                 await s.type(inDialog(s, "Title"), "Phishing Checklist", { delay: 30 });
                 await dialog(s).locator("input[type=file]").first().setInputFiles(CHECKLIST());
                 await dialog(s).getByText("phishing-checklist.pdf").first().waitFor({ timeout: 30000 });
@@ -315,7 +314,7 @@ module.exports = {
               hold: 0.4,
             },
             { say: "A course link opens a free outside course, like a certification, in a new tab.", hold: 0.2 },
-            { say: "The items show in the order people take them. She drags one by its handle to move it.", do: (s) => s.hover(s.page.getByRole("button", { name: /Drag/ }).first()) },
+            { say: "The items show in the order people take them. Drag one by its handle, or use Move Up and Move Down, to change it.", do: (s) => s.hover(text(s, "Recognize and Report Phishing")) },
           ],
         },
       ],
@@ -329,13 +328,13 @@ module.exports = {
           start: TRAINING,
           setup: (s) => s.click(text(s, COURSE)),
           lines: [
-            { say: "In Settings, Library lets anyone take it, assigned or not. She switches it on.", do: async (s) => { await s.click(s.page.getByRole("radio", { name: "Settings" })); await s.click(s.page.getByRole("switch", { name: "Library" })); } },
+            { say: "In Settings, Library lets anyone take it, assigned or not. She switches it on.", do: async (s) => { await s.click(section(s, "Settings")); await s.click(s.page.getByRole("switch", { name: "Library" })); } },
             { say: "Proof Required asks for proof at the end, such as an outside course's certificate. Not here.", do: (s) => s.hover(s.page.getByRole("switch", { name: "Proof Required" })) },
             { say: "Issue Certificate is on. Whoever finishes gets a MyCity certificate.", do: (s) => s.hover(s.page.getByRole("switch", { name: "Issue Certificate" })) },
             { say: "She presses Publish Course, and signs. Her signature is printed on every certificate of this course.", do: async (s) => { await s.click("Publish Course"); await sign(s, dialog(s).getByRole("img", { name: "Your Signature" })); } },
             { say: "Publish Course.", do: (s) => s.click(button(s, "Publish Course", dialog(s))), hold: 0.6 },
             { say: "Now Assign Training. Who Takes It: Everyone, or Pick Who.", do: (s) => s.click("Assign Training") },
-            { say: "She picks Branding and Marketing. Departments, roles and named people can be mixed.", do: async (s) => { await s.click(dialog(s).getByRole("radio", { name: "Pick Who" })); await s.pick(inDialog(s, "Departments"), "Branding & Marketing"); } },
+            { say: "She picks Branding and Marketing. Departments, roles and named people can be mixed.", do: async (s) => { await s.click(dialog(s).getByRole("radio", { name: "Pick Who" })); const dept = dialog(s).getByRole("listbox", { name: "Departments" }).getByRole("option", { name: "Branding & Marketing" }); await s.wait(0.6); await s.hover(dept); await dept.click(); await s.wait(0.3); } },
             { say: "Due Within seven days. Keep Assigning New Joiners gives it to whoever joins later.", do: (s) => s.type(inDialog(s, "Due Within (Days)"), "7", { delay: 80 }) },
             { say: "Assign Training. Each person gets a task in My Workspace, due on the day, and a notice.", do: (s) => s.click(button(s, "Assign Training", dialog(s))), hold: 0.8 },
             "Those overdue are reminded before, on and after the due date.",
@@ -381,13 +380,13 @@ module.exports = {
           ],
         },
         {
-          kind: "phone",
+          // The PDF as it prints: landscape, so the whole picture rather than a phone's width.
+          kind: "desktop",
           site: "go",
           start: "/verify",
-          label: { eyebrow: "The certificate", title: "Certificate of Completion", subtitle: "Signed by its publisher, with a QR" },
           setup: async (s) => {
             const art = path.join(OUT(), "certificate.png");
-            await s.page.setContent(`<body style="margin:0;background:#00201d;display:flex;align-items:center;justify-content:center;height:100vh"><img src="data:image/png;base64,${fs.readFileSync(art).toString("base64")}" style="width:100%"></body>`);
+            await s.page.setContent(`<body style="margin:0;background:#00201d;display:flex;align-items:center;justify-content:center;height:100vh"><img src="data:image/png;base64,${fs.readFileSync(art).toString("base64")}" style="max-width:96vw;max-height:96vh;box-shadow:0 8px 40px rgba(0,0,0,.45)"></body>`);
           },
           lines: [
             { say: "It names Aaron, the course, its items and length, the day he finished,|and Cynthia's signature as its publisher.", hold: 0.6 },
@@ -419,11 +418,11 @@ module.exports = {
           start: TRAINING,
           setup: (s) => s.click(text(s, COURSE)),
           lines: [
-            { say: "Back on Training, Cynthia opens People.", do: (s) => s.click(s.page.getByRole("radio", { name: "People" })) },
-            { say: "Each person's status, due date, progress, and certificate. The chips narrow it.", do: (s) => s.hover(s.page.getByRole("radio", { name: "Overdue" })) },
-            { say: "Remind Overdue reminds everyone past their due date, once a day at most.", do: (s) => s.hover(button(s, "Remind Overdue")) },
-            { say: "Download Certificate saves anyone's certificate.", do: (s) => s.hover(s.page.getByRole("button", { name: "Download Certificate" }).first()) },
-            { say: "Assignments lists who each assignment reaches. Withdraw takes one back.", do: (s) => s.click(s.page.getByRole("radio", { name: "Assignments" })), hold: 0.4 },
+            { say: "Back on Training, Cynthia opens People.", do: async (s) => { await s.click(section(s, "People")); await s.scroll(380); } },
+            { say: "Each person's status, due date, progress, and certificate. The chips narrow it.", do: (s) => s.hover(chip(s, "Completed")) },
+            { say: "Once someone is past the due date, Remind Overdue reminds them all, once a day at most.", do: (s) => s.hover(chip(s, "Overdue")) },
+            { say: "Aaron has finished. Download Certificate, at the end of his row, saves his certificate.", do: (s) => s.hover(text(s, "Aaron Agama")) },
+            { say: "Assignments lists who each assignment reaches. Withdraw takes one back.", do: (s) => s.click(section(s, "Assignments")), hold: 0.4 },
             "Search finds any SOP or course from anywhere, by its title or number.",
             "And nobody but Aaron ever reads his notes: not Cynthia, not the CEO, not Praxis AI.",
           ],
