@@ -5,8 +5,9 @@
  * manager). Never a document, a guarantor's details or the BVN: they are the hire's own and sit
  * behind the record.
  *
- * Nothing here acts. Verifying a document and recording a reference check are a person's judgement
- * on the screen. The hire's upload, guarantors and BVN (UploadItem, GuarantorInput, BvnEnter) are
+ * Nothing here acts. Verifying a document, recording a reference check, marking a step done,
+ * completing onboarding (which invites a login) and withdrawing a case are a person's judgement on the
+ * screen. The hire's upload, guarantors and BVN (UploadItem, GuarantorInput, BvnEnter) are
  * theirs alone, on their own link, and never reach the chat (handoff decisions 4 and 9); they are
  * not create or edit forms of the staff app, so gate 23 asks no reason of them. M5 registers no AI
  * job (handoff decision 7).
@@ -42,6 +43,7 @@ module.exports = defineManifest({
   routes: [
     { intent: "see who still owes onboarding documents", screen: "recruitment.onboarding", params: { status: "documentation" } },
     { intent: "verify a new hire's documents", screen: "recruitment.onboarding" },
+    { intent: "see which new hires are in their first weeks of onboarding", screen: "recruitment.onboarding", params: { status: "onboarding" } },
     { intent: "change the onboarding document checklist", screen: "recruitment.onboarding", params: { panel: "settings" } },
   ],
 });

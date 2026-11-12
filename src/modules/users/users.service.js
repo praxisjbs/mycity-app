@@ -46,6 +46,15 @@ async function invite(body, actor) {
   return rowOf(userId);
 }
 
+/**
+ * Invite inside the caller's transaction: another module's step that ends in a login (M5's Complete
+ * Onboarding, docs/guides/offers.md §3 step 8), all or nothing with the rest of that step.
+ * @returns {Promise<string>} the new login's user_id
+ */
+async function inviteIn(client, body, actor) {
+  return invites.invite(client, body, actor);
+}
+
 async function resendInvite(userId, actor) {
   const email = await tx((client) => invites.resend(client, userId, actor));
   return { sent: true, email };
@@ -149,6 +158,7 @@ async function resetTwoStep(userId, actor) {
 }
 
 module.exports = {
+  inviteIn,
   list,
   summary,
   candidates,

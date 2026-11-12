@@ -23,6 +23,9 @@ module.exports = {
   checkGuarantor: async (req, res) =>
     ok(res, await service.checkGuarantor(withActor(req), scopeOf(req), p(req).id, p(req).guarantor_id, req.validated.body)),
   remind: async (req, res) => ok(res, await service.remind(withActor(req), scopeOf(req), p(req).id)),
+  markStepDone: async (req, res) => ok(res, await service.markStepDone(withActor(req), scopeOf(req), p(req).id, p(req).step_id)),
+  complete: async (req, res) => ok(res, await service.complete(withActor(req), scopeOf(req), p(req).id, req.validated.body)),
+  withdraw: async (req, res) => ok(res, await service.withdraw(withActor(req), scopeOf(req), p(req).id, req.validated.body)),
 
   requirements: async (req, res) => sendPaged(res, await checklist.requirements(req.validated.query)),
   createRequirement: async (req, res) => created(res, await checklist.createRequirement(withActor(req), req.validated.body)),

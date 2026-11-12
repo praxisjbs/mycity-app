@@ -17,22 +17,44 @@
  *                       guarantors passed, the BVN entered and the contract signed move the case to
  *                       pre_onboarding and the application with it. Asked after each of those changes,
  *                       the contract's signature included (contractSignedIn)
+ *   dispatch()          onboarding-dispatch, daily (guide §3 step 8): a case at pre_onboarding whose
+ *                       start date has come moves to onboarding, the application with it, and its
+ *                       plan's steps are copied on with each owner named (startIn); then the owner of
+ *                       every step past its due day is reminded, once a step (remindOverdue). Safe to
+ *                       run twice
+ *   markStepDone()      Mark Step Done
+ *   complete()          Complete Onboarding, one transaction: every step done, the company email made
+ *                       the hire's work email, their login invited on it (Staff), candidates.hireIn
+ *                       (the seat filled, the vacancy closed when its openings are), the case completed
+ *   withdraw()          Withdraw: the hire did not join. The case cancelled, an unsigned contract
+ *                       cancelled, the links stopped, the employee archived, the application withdrawn
  *
  * The public upload page is onboarding.upload.js; the Checklist settings onboarding.checklist.js; the
- * Plans settings onboarding.plans.js. Onboarding itself (the start date, the plan's steps, Complete
- * Onboarding and the login invite) comes with the rest of the onboarding backend (PR 6b).
+ * Plans settings onboarding.plans.js.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
+const { logger } = require("../../config/logger");
+const lagos = require("../../shared/time/lagos");
+const publicToken = require("../../shared/tokens/public-token");
 const organisation = require("../organisation/organisation.service");
 const repo = require("./onboarding.repo");
 const checklist = require("./onboarding.checklist");
-const { EVENTS, ENTITY } = require("./onboarding.events");
+const sop = require("./onboarding.sop");
+const { EVENTS, ENTITY, SCOPE, SUBJECT } = require("./onboarding.events");
 
 const contracts = () => require("../employment_contracts/employment_contracts.service");
 const candidates = () => require("../candidates/candidates.service");
+const users = () => require("../users/users.service");
+
+/** Who moves a case on its start date: the system, as for every scheduled sweep. */
+const SYSTEM = Object.freeze({ user_id: null });
+/** The statuses a case may be withdrawn from: anything before it completed or was withdrawn. */
+const OPEN = Object.freeze(["documentation", "pre_onboarding", "onboarding"]);
+/** The role a hire's login is invited with (Settings · Users and Roles' Staff). */
+const HIRE_ROLE = "employee";
 
 const notFound = () => new AppError("NOT_FOUND", "That onboarding case does not exist", 404);
 const refused = (code, message, status = 409, fields) => new AppError(code, message, status, fields);
@@ -166,6 +188,22 @@ const rowOf = (r) => ({
   created_at: iso(r.created_at),
 });
 
+/** OnboardingStep: due days compared with today in Lagos. */
+const stepOf = (st, sops, today) => ({
+  onboarding_case_step_id: st.onboarding_case_step_id,
+  position: Number(st.position),
+  title: st.title,
+  description: st.description || null,
+  owner_role: st.owner_role,
+  owner_id: st.owner_id || null,
+  owner_name: st.owner_name || null,
+  due_on: st.due_on || null,
+  overdue: st.status === "pending" && Boolean(st.due_on) && st.due_on < today,
+  sop: (st.sop_id && sops.get(st.sop_id)) || null,
+  status: st.status,
+  done_at: iso(st.done_at),
+});
+
 /** Everything the gate reads, on the caller's connection. */
 async function stateOf(db, row, user = null) {
   // One after another: inside a transaction they share one client.
@@ -185,6 +223,9 @@ async function stateOf(db, row, user = null) {
 /** OnboardingDetail. */
 async function detailOf(db, row, user) {
   const s = await stateOf(db, row, user);
+  const steps = await repo.caseSteps(db, row.onboarding_case_id);
+  const sops = await sop.sopsById(db, steps.map((st) => st.sop_id));
+  const today = lagos.today();
   return {
     ...rowOf(row),
     application_id: row.application_id,
@@ -201,6 +242,9 @@ async function detailOf(db, row, user) {
     bvn_entered: s.bvnEntered,
     contract: s.contract,
     waiting_on: s.waiting,
+    steps: steps.map((st) => stepOf(st, sops, today)),
+    can_complete: row.status === "onboarding" && steps.every((st) => st.status === "done"),
+    can_withdraw: OPEN.includes(row.status),
   };
 }
 
@@ -322,6 +366,217 @@ async function remind(actor, scope, id) {
   return detailOf(pool, await repo.get(pool, id), actor);
 }
 
+/* ------------------------------------------------------------------ *
+ * Onboarding: the start date and the plan's steps (onboarding-dispatch)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Start one case on its start date, in the caller's transaction: its plan's steps copied on (the
+ * department's active plan, else the company's default), each owner the person who holds the step's
+ * role now (the line manager read from the vacancy's Organogram seat while the hire's record names
+ * none; the case's owner when nobody holds the role: decided with AJ, 11/11/2026), each due day the start
+ * date plus the step's offset, its SOP kept; the case to onboarding and the application to Onboarding.
+ * A case not at pre_onboarding, or not yet at its start date, is left alone. True when it moved.
+ */
+async function startIn(client, caseId, today) {
+  const row = await repo.get(client, caseId, { lock: true });
+  if (!row || row.status !== "pre_onboarding" || !row.starts_on || row.starts_on > today) return false;
+  // An application ended under it (Not Progressing) is never started; endForApplication closes the case.
+  if (!(await repo.applicationActive(client, row.application_id))) return false;
+  const plan = await repo.planFor(client, row.department_id);
+  const planSteps = plan ? await repo.steps(client, plan.onboarding_plan_id) : [];
+  const held = await repo.roleHolders(client, {
+    employeeId: row.employee_id,
+    departmentId: row.department_id,
+    applicationId: row.application_id,
+  });
+  const holderOf = {
+    case_owner: row.owner_id,
+    line_manager: held.line_manager,
+    head_of_department: held.head_of_department,
+    hire: row.employee_id,
+  };
+  await repo.insertCaseSteps(
+    client,
+    caseId,
+    planSteps.map((st) => ({
+      ...st,
+      position: Number(st.position),
+      owner_id: holderOf[st.owner_role] || row.owner_id || null,
+      due_on: lagos.addDays(row.starts_on, Number(st.due_offset_days)),
+    })),
+  );
+  if (!(await repo.setStatus(client, caseId, ["pre_onboarding"], "onboarding"))) return false;
+  await candidates().advanceIn(client, SYSTEM, row.application_id, "onboarding");
+  const owners = [...new Set((await repo.caseSteps(client, caseId)).map((st) => st.owner_id).filter(Boolean))];
+  const logins = [];
+  for (const id of owners) {
+    const login = await repo.loginOf(client, id);
+    if (login) logins.push(login);
+  }
+  await emit(client, {
+    key: EVENTS.ONBOARDING_STARTED,
+    entity: { type: ENTITY, id: caseId },
+    actor: null,
+    payload: payload(row, { onboarding_plan_id: plan ? plan.onboarding_plan_id : null, step_count: planSteps.length, step_owner_user_ids: logins }),
+  });
+  return true;
+}
+
+/**
+ * Remind the owner of every step past its due day, once a step: their login, else the case's owner's.
+ * A step marked done before the run is not reminded; one reminded stays reminded.
+ */
+async function remindOverdue(today) {
+  let reminded = 0;
+  for (const due of await repo.overdueSteps(pool, today)) {
+    reminded += await tx(async (client) => {
+      const row = await repo.get(client, due.onboarding_case_id, { lock: true });
+      if (!row || row.status !== "onboarding") return 0;
+      const st = await repo.caseStep(client, due.onboarding_case_id, due.onboarding_case_step_id, { lock: true });
+      if (!st || !(await repo.markReminded(client, st.onboarding_case_step_id))) return 0;
+      const to = (await repo.loginOf(client, st.owner_id)) || row.owner_user_id || null;
+      await emit(client, {
+        key: EVENTS.ONBOARDING_STEP_OVERDUE,
+        entity: { type: ENTITY, id: row.onboarding_case_id },
+        actor: null,
+        payload: payload(row, { onboarding_case_step_id: st.onboarding_case_step_id, title: st.title, due_on: st.due_on, remind_user_id: to }),
+      });
+      return 1;
+    });
+  }
+  return reminded;
+}
+
+/**
+ * onboarding-dispatch (jobs/schedulers/onboarding-dispatch.js): start every case whose start date has
+ * come, then remind the owners of overdue steps. Each case is its own transaction, so one refusal
+ * leaves the rest to start; it is logged and tried again on the next run.
+ * @param {{today?: string}} [opts]  the Lagos day to run as (tests); today by default
+ */
+async function dispatch({ today = lagos.today() } = {}) {
+  let started = 0;
+  let failed = 0;
+  for (const id of await repo.dueToStart(pool, today)) {
+    try {
+      if (await tx((client) => startIn(client, id, today))) started += 1;
+    } catch (err) {
+      failed += 1;
+      logger.warn({ err, onboarding_case_id: id }, "onboarding-dispatch: a case did not start");
+    }
+  }
+  const reminded = await remindOverdue(today);
+  return { started, failed, reminded };
+}
+
+/** Mark Step Done: a pending step of a case at onboarding. */
+async function markStepDone(actor, scope, id, stepId) {
+  return tx(async (client) => {
+    const row = await visible(client, id, scope, { lock: true });
+    if (row.status !== "onboarding") throw refused("NOT_IN_ONBOARDING", "Onboarding has not started for this hire");
+    const st = await repo.caseStep(client, id, stepId, { lock: true });
+    if (!st) throw refused("NOT_FOUND", "That step is not on this case", 404);
+    if (!(await repo.stepDone(client, stepId, actor.user_id))) throw refused("STEP_DONE", "This step is already done");
+    await emit(client, {
+      key: EVENTS.ONBOARDING_STEP_DONE,
+      entity: { type: ENTITY, id },
+      actor,
+      payload: payload(row, { onboarding_case_step_id: stepId, title: st.title }),
+    });
+    return detailOf(client, await repo.get(client, id), actor);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Complete Onboarding and Withdraw
+ * ------------------------------------------------------------------ */
+
+/**
+ * Complete Onboarding, all or nothing: the company email becomes the hire's work email (it was their
+ * candidate address since acceptance; organisation refuses one another person or login holds), their
+ * login is invited on it with the Staff role, the application is hired (candidates.hireIn: the
+ * Organogram seat filled, the vacancy closed as filled when its openings are), and the case completed.
+ */
+async function complete(actor, scope, id, { work_email: workEmail }) {
+  return tx(async (client) => {
+    const row = await visible(client, id, scope, { lock: true });
+    if (row.status !== "onboarding") throw refused("NOT_IN_ONBOARDING", "Onboarding has not started for this hire");
+    if (!row.employee_id) throw refused("NO_EMPLOYEE", "This case has no employee record");
+    if ((await repo.openSteps(client, id)) > 0) throw refused("STEPS_OPEN", "Mark every step done first");
+    await organisation.updateEmployee(client, row.employee_id, { work_email: workEmail }, actor);
+    const userId = await users().inviteIn(client, { employee_id: row.employee_id, role_codes: [HIRE_ROLE] }, actor);
+    const hired = await candidates().hireIn(client, actor, row.application_id, { employee_id: row.employee_id });
+    if (!(await repo.setCompleted(client, id))) throw refused("NOT_IN_ONBOARDING", "Onboarding has not started for this hire");
+    await emit(client, {
+      key: EVENTS.ONBOARDING_COMPLETED,
+      entity: { type: ENTITY, id },
+      actor,
+      payload: payload(row, { user_id: userId, seat_filled: hired.seat_filled, vacancy_closed: hired.vacancy_closed }),
+    });
+    return detailOf(client, await repo.get(client, id), actor);
+  });
+}
+
+/**
+ * Withdraw: the hire is not joining (guide §11), at any point before completion. In one transaction
+ * the contract is cancelled while still unsigned (a signed one stays the record of what was signed),
+ * the Upload Documents links stop, the employee made at acceptance is archived, the application is
+ * withdrawn (no mail to the hire) and the case cancelled with the reason.
+ */
+async function withdraw(actor, scope, id, { reason }) {
+  return tx(async (client) => {
+    const row = await visible(client, id, scope, { lock: true });
+    if (!OPEN.includes(row.status)) throw refused("CASE_ENDED", "This case has already ended");
+    await candidates().withdrawnIn(client, actor, row.application_id, reason);
+    if (!(await endIn(client, actor, row, reason, "Did not join: onboarding withdrawn"))) throw refused("CASE_ENDED", "This case has already ended");
+    return detailOf(client, await repo.get(client, id), actor);
+  });
+}
+
+/**
+ * End an open case in the caller's transaction, as Withdraw and Not Progressing both do: an unsigned
+ * contract cancelled, the Upload Documents links stopped, the employee made at acceptance archived,
+ * the case cancelled with the reason, `onboarding.cancelled`. The application is the caller's.
+ */
+async function endIn(client, actor, row, reason, archiveReason) {
+  const id = row.onboarding_case_id;
+  await contracts().cancelIn(client, actor, id, reason);
+  await publicToken.revokeFor(client, { subject_type: SUBJECT, subject_id: id, scope: SCOPE });
+  if (row.employee_id) {
+    const employee = await organisation.findEmployeeById(client, row.employee_id);
+    if (employee && employee.status !== "archived") await organisation.archiveEmployee(client, row.employee_id, archiveReason, actor);
+  }
+  if (!(await repo.setCancelled(client, id, reason))) return false;
+  await emit(client, {
+    key: EVENTS.ONBOARDING_CANCELLED,
+    entity: { type: ENTITY, id },
+    actor,
+    payload: payload(row, { from_status: row.status }),
+  });
+  return true;
+}
+
+/**
+ * Not Progressing (M4) on an application at Documentation or after, from the outbox: its case ends as
+ * Withdraw ends it, the reason the application's, so no hire is left half onboarded (no live contract,
+ * no active employee, no case the start date would move). A case already ended only has its links
+ * stopped again. Safe to run twice.
+ */
+async function endForApplication(applicationId, actorUserId = null) {
+  const found = await repo.byApplication(pool, applicationId);
+  if (!found) return false;
+  return tx(async (client) => {
+    const row = await repo.get(client, found.onboarding_case_id, { lock: true });
+    if (!row || !OPEN.includes(row.status)) {
+      await publicToken.revokeFor(client, { subject_type: SUBJECT, subject_id: found.onboarding_case_id, scope: SCOPE });
+      return false;
+    }
+    const reason = (await repo.applicationEndReason(client, applicationId)) || "Not progressed in Recruitment";
+    const actor = actorUserId ? { user_id: actorUserId } : null;
+    return endIn(client, actor, row, reason, "Did not join: not progressed in Recruitment");
+  });
+}
+
 module.exports = {
   openCaseIn,
   requiredCount,
@@ -338,4 +593,10 @@ module.exports = {
   rejectItem,
   checkGuarantor,
   remind,
+  startIn,
+  dispatch,
+  markStepDone,
+  complete,
+  withdraw,
+  endForApplication,
 };

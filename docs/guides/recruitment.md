@@ -435,6 +435,11 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   - `hireIn(client, actor, id, { employee_id })`: from Onboarding only (409 otherwise), the stage and
     status `hired`, `application.hired`, then `vacancies.hiredIn` (§6.1). The employee is the one M5
     created at acceptance; the application does not keep it (M5's `onboarding_case` does).
+  - `withdrawnIn(client, actor, id, reason)`: M5's Withdraw on an onboarding case (the hire is not
+    joining; AJ, 11/11/2026). An application active at Documentation, Pre-Onboarding or Onboarding takes
+    status `withdrawn` with `withdrawn_at` and the reason, keeps its stage, its links stop, and
+    `application.withdrawn` is recorded. No candidate mail: they are the one who left. Anything else
+    answers false.
 - The board's columns (`VacancyDetail.board_stages`) are the hand-moved stages and then Offer. The
   staff app shows Offer once M5's Offers screen opens in its build (the delivery plan, F14), so it is
   never an empty column before M5. Documentation to Onboarding are the Onboarding screen's. A hired
@@ -631,6 +636,7 @@ with test addresses.
 | `application.score_requested` | Screen With AI, one per application | outbox: the AI read (§6.4), one at a time |
 | `application.scored` | after an AI read is kept | audit |
 | `application.reopened` | after Reopen | audit; the card refreshes |
+| `application.withdrawn` | `candidates.withdrawnIn`, when M5 withdraws an onboarding case | audit; no mail |
 | `application.hired` | `candidates.hireIn`, when M5's onboarding completes | audit; the vacancy's seat is filled and the vacancy closes as filled in the same transaction (§6.1), with `org_seat.filled` (`organogram.md` §7) and `vacancy.closed` |
 | `application.email_corrected` | `candidates.correctEmailIn`, an offer's Change Email (M5) | audit |
 | `recruitment.candidate_email_saved` | a candidate email reworded, or its default restored | audit |
@@ -796,6 +802,10 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 11/11/2026 · AJ · M5 PR 6b, for GE to review: `candidates.withdrawnIn` (§6.3) and its repo write
+  `setWithdrawn`, with the event `application.withdrawn` (§7): M5's Withdraw on an onboarding case sets
+  the application's long-unused `withdrawn` status (with `withdrawn_at`), stops its links and mails no
+  one. M5's Complete Onboarding now calls `hireIn` (`offers.md` §3 step 8). Nothing else in M4 changed.
 - 11/11/2026 · AJ · M5 PR 6a: nothing in M4 changed. `candidates.test.js` counts the nine Candidate
   Emails PR 5 left (it still said eight), and M5's documentation gate now moves an application from
   Documentation to Pre-Onboarding through `advanceIn` (`offers.md` §3 step 7).

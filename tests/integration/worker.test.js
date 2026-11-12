@@ -609,6 +609,7 @@ describe("schedules and heartbeat", () => {
       "interview-reminders",
       "mail-sync",
       "media-reconcile",
+      "onboarding-dispatch",
       "partner-inactivity",
       "places-name",
       "proposal-expiry",

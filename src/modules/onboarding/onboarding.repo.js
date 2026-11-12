@@ -1,8 +1,8 @@
 "use strict";
 /**
  * Onboarding: the SQL (docs/guides/offers.md §4, §6). Writes onboarding_case,
- * onboarding_checklist_item, onboarding_guarantor, document_requirement, onboarding_plan and
- * onboarding_plan_step; reads the hire's offer, employee, department and documents, and the SOPs a
+ * onboarding_checklist_item, onboarding_guarantor, document_requirement, onboarding_plan,
+ * onboarding_plan_step and onboarding_case_step; reads the hire's offer, employee, department and documents, and the SOPs a
  * plan step points to. Never emits (BACKEND_GUIDE §2).
  *
  * Scope: a case belongs to its owner, the vacancy's hiring manager (onboarding_case.owner_id), as an
@@ -97,6 +97,95 @@ async function setStatus(client, id, from, to, { documentationCompleted = false 
     [id, from, to, documentationCompleted],
   );
   return rowCount === 1;
+}
+
+/** Complete Onboarding: from onboarding only. True when it moved. */
+async function setCompleted(client, id) {
+  const { rowCount } = await client.query(
+    `UPDATE onboarding_case SET status = 'completed', completed_at = now()
+      WHERE onboarding_case_id = $1 AND status = 'onboarding'`,
+    [id],
+  );
+  return rowCount === 1;
+}
+
+/** Withdraw: from any status before completion, with the reason kept. True when it moved. */
+async function setCancelled(client, id, reason) {
+  const { rowCount } = await client.query(
+    `UPDATE onboarding_case SET status = 'cancelled', cancelled_at = now(), end_reason = $2
+      WHERE onboarding_case_id = $1 AND status IN ('documentation', 'pre_onboarding', 'onboarding')`,
+    [id, reason],
+  );
+  return rowCount === 1;
+}
+
+/** Cases at pre-onboarding whose start date has come: what onboarding-dispatch starts. */
+async function dueToStart(db, today) {
+  const { rows } = await db.query(
+    `SELECT onboarding_case_id FROM onboarding_case
+      WHERE status = 'pre_onboarding' AND starts_on IS NOT NULL AND starts_on <= $1::date
+      ORDER BY starts_on, onboarding_case_id
+      LIMIT 200 -- pagination:batch the dispatch starts at most 200 a run; the rest wait for the next`,
+    [today],
+  );
+  return rows.map((r) => r.onboarding_case_id);
+}
+
+/**
+ * Who holds each step role for a case, among people who work here now. The line manager is the
+ * hire's own when their record names one; until hireIn fills their seat it does not, so it is read
+ * from the vacancy's Organogram seat: the person the seat reports to, or the holder of the seat it
+ * reports to, climbing through vacant seats (as employee_effective_manager does, migration 1160).
+ * The head is their department's. The case's owner and the hire are on the case row itself.
+ */
+async function roleHolders(db, { employeeId, departmentId, applicationId }) {
+  const { rows } = await db.query(
+    `WITH RECURSIVE up AS (
+       SELECT s.line_manager_id AS manager_id, s.line_manager_seat_id AS next_seat_id, 0 AS hops
+         FROM application a
+         JOIN vacancy v ON v.vacancy_id = a.vacancy_id
+         JOIN org_seat s ON s.org_seat_id = v.org_seat_id
+        WHERE a.application_id = $3
+       UNION ALL
+       SELECT COALESCE(s.filled_by_employee_id, s.line_manager_id),
+              CASE WHEN s.filled_by_employee_id IS NULL THEN s.line_manager_seat_id END, up.hops + 1
+         FROM up
+         JOIN org_seat s ON s.org_seat_id = up.next_seat_id
+        WHERE up.manager_id IS NULL AND up.hops < 32
+     ),
+     seat_manager AS (
+       SELECT up.manager_id FROM up WHERE up.manager_id IS NOT NULL ORDER BY up.hops LIMIT 1
+     )
+     SELECT COALESCE(lm.employee_id, sm.employee_id) AS line_manager, hd.employee_id AS head_of_department
+       FROM (SELECT 1) one
+       LEFT JOIN employee e ON e.employee_id = $1
+       LEFT JOIN employee lm ON lm.employee_id = e.line_manager_id AND lm.status = 'active'
+       LEFT JOIN seat_manager smx ON true
+       LEFT JOIN employee sm ON sm.employee_id = smx.manager_id AND sm.status = 'active'
+       LEFT JOIN department d ON d.department_id = COALESCE($2, e.department_id)
+       LEFT JOIN employee hd ON hd.employee_id = d.head_employee_id AND hd.status = 'active'`,
+    [employeeId || null, departmentId || null, applicationId || null],
+  );
+  return rows[0] || { line_manager: null, head_of_department: null };
+}
+
+/** Whether the case's application is still active (a Not Progressing one is not started). */
+async function applicationActive(db, applicationId) {
+  const { rows } = await db.query("SELECT status FROM application WHERE application_id = $1", [applicationId]);
+  return Boolean(rows[0] && rows[0].status === "active");
+}
+
+/** Why an application was not progressed, for the case it ends. */
+async function applicationEndReason(db, applicationId) {
+  const { rows } = await db.query("SELECT rejection_reason FROM application WHERE application_id = $1", [applicationId]);
+  return rows[0] ? rows[0].rejection_reason : null;
+}
+
+/** The active login of an employee, to tell them something; null when they have none. */
+async function loginOf(db, employeeId) {
+  if (!employeeId) return null;
+  const { rows } = await db.query("SELECT user_id FROM app_user WHERE employee_id = $1 AND status = 'active'", [employeeId]);
+  return rows[0] ? rows[0].user_id : null;
 }
 
 /** The hire accepted the privacy notice; the first time is kept. */
@@ -218,6 +307,94 @@ async function strangerDocument(db, documentId, employeeId) {
     [documentId, employeeId],
   );
   return rows[0] || null;
+}
+
+/* ------------------------------------------------------------------ *
+ * The case's plan steps (copied on the start date)
+ * ------------------------------------------------------------------ */
+
+const CASE_STEP = `
+  SELECT s.onboarding_case_step_id, s.onboarding_case_id, s.position, s.title, s.description, s.owner_role,
+         s.owner_id, btrim(oe.first_name || ' ' || oe.last_name) AS owner_name, s.due_on, s.sop_id, s.status,
+         s.done_by, s.done_at, s.reminded_at
+    FROM onboarding_case_step s
+    LEFT JOIN employee oe ON oe.employee_id = s.owner_id`;
+
+/** A case's steps in the plan's order. */
+async function caseSteps(db, caseId) {
+  // pagination:complete one case's steps, forty at most (OnboardingPlanSave caps a plan's steps)
+  const { rows } = await completeQuery(
+    db,
+    `${CASE_STEP} WHERE s.onboarding_case_id = $1 ORDER BY s.position, s.onboarding_case_step_id`,
+    [caseId],
+    { label: "A case's steps" },
+  );
+  return rows;
+}
+
+async function caseStep(db, caseId, stepId, { lock = false } = {}) {
+  if (lock) await db.query("SELECT 1 FROM onboarding_case_step WHERE onboarding_case_step_id = $1 FOR UPDATE", [stepId]);
+  const { rows } = await db.query(`${CASE_STEP} WHERE s.onboarding_case_id = $1 AND s.onboarding_case_step_id = $2`, [caseId, stepId]);
+  return rows[0] || null;
+}
+
+/** The plan's steps onto the case, once: a position already there is left as it is. */
+async function insertCaseSteps(client, caseId, given) {
+  let added = 0;
+  for (const s of given) {
+    const { rowCount } = await client.query(
+      `INSERT INTO onboarding_case_step (onboarding_case_id, onboarding_plan_step_id, position, title, description,
+                                         owner_role, owner_id, due_on, sop_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (onboarding_case_id, position) DO NOTHING`,
+      [caseId, s.onboarding_plan_step_id, s.position, s.title, s.description || null, s.owner_role, s.owner_id || null, s.due_on, s.sop_id || null],
+    );
+    added += rowCount;
+  }
+  return added;
+}
+
+/** Mark Step Done: a pending step only. True when it changed. */
+async function stepDone(client, stepId, userId) {
+  const { rowCount } = await client.query(
+    `UPDATE onboarding_case_step SET status = 'done', done_by = $2, done_at = now()
+      WHERE onboarding_case_step_id = $1 AND status = 'pending'`,
+    [stepId, userId || null],
+  );
+  return rowCount === 1;
+}
+
+/** How many of a case's steps are still pending. */
+async function openSteps(db, caseId) {
+  const { rows } = await db.query(
+    "SELECT count(*)::int AS n FROM onboarding_case_step WHERE onboarding_case_id = $1 AND status = 'pending'",
+    [caseId],
+  );
+  return rows[0].n;
+}
+
+/** Pending steps due before today on cases at onboarding whose owner has not been reminded yet. */
+async function overdueSteps(db, today) {
+  const { rows } = await db.query(
+    `SELECT s.onboarding_case_step_id, s.onboarding_case_id
+       FROM onboarding_case_step s
+       JOIN onboarding_case oc ON oc.onboarding_case_id = s.onboarding_case_id AND oc.status = 'onboarding'
+      WHERE s.status = 'pending' AND s.reminded_at IS NULL AND s.due_on < $1::date
+      ORDER BY s.due_on, s.onboarding_case_step_id
+      LIMIT 500 -- pagination:batch the dispatch reminds at most 500 steps a run; the rest wait for the next`,
+    [today],
+  );
+  return rows;
+}
+
+/** The owner was reminded of an overdue step: once. True the first time. */
+async function markReminded(client, stepId) {
+  const { rowCount } = await client.query(
+    `UPDATE onboarding_case_step SET reminded_at = now()
+      WHERE onboarding_case_step_id = $1 AND reminded_at IS NULL AND status = 'pending'`,
+    [stepId],
+  );
+  return rowCount === 1;
 }
 
 /* ------------------------------------------------------------------ *
@@ -454,6 +631,20 @@ module.exports = {
   list,
   insertCase,
   setStatus,
+  setCompleted,
+  setCancelled,
+  dueToStart,
+  roleHolders,
+  applicationActive,
+  applicationEndReason,
+  loginOf,
+  caseSteps,
+  caseStep,
+  insertCaseSteps,
+  stepDone,
+  openSteps,
+  overdueSteps,
+  markReminded,
   acknowledgePrivacy,
   activeRequirements,
   requiredCount,

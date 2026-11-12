@@ -149,7 +149,7 @@ earlier: M5's forms use help terms.
 - [x] PR 4 · Offers screens (07/11/2026)
 - [x] PR 5 · Acceptance to hire (11/11/2026)
 - [x] PR 6a · Onboarding to the documentation gate (11/11/2026)
-- [ ] PR 6b · Onboarding to hired
+- [x] PR 6b · Onboarding to hired (11/11/2026)
 - [ ] PR 7 · Onboarding screens
 - [ ] PR 8 · Close-out
 
@@ -181,6 +181,72 @@ earlier: M5's forms use help terms.
 ---
 
 ## 6 · Log
+
+- 12/11/2026 · AJ · Closing PR 6, two gaps found in its review (guide §3 step 8, §6, §7, §11, §13).
+  Nothing of M5 merges before PR 8 (AJ): PR 6a and 6b stay on `m5/offers`.
+  - Not Progressing (M4) on an application at Documentation or after left its case open, its unsigned
+    contract signable and its employee active, and the start date would still move the case (and
+    Complete then failed on `hireIn`). Now `onboarding.end_for_application` (in place of
+    `onboarding.stop_links`; `upload.stopLinks` removed) ends an open case as Withdraw does, through
+    one `endIn`: the contract while unsigned, the links, the employee archived, the case `cancelled`
+    with the application's reason. The application stays M4's `not_progressed`. An ended case only has
+    its links stopped again; the outbox delivering it twice changes nothing. `startIn` also skips a
+    case whose application is not active.
+  - A `line_manager` step went to the case's owner, the hire's record naming no line manager before
+    `hireIn` fills their seat. Now `repo.roleHolders` reads it from the vacancy's Organogram seat:
+    whom the seat reports to, or the holder of the seat it reports to, climbing vacant seats as
+    `employee_effective_manager` (1160) does; the case's owner only when that finds nobody.
+  - Tests: the Not Progressing case ends with its contract and employee; the plan's line-manager step
+    goes to whom the vacancy's seat reports to, and is reminded to them. Onboarding's integration file
+    (6) and unit tests (11) green, and the whole jest suite green on PostgreSQL 16 with pgvector and
+    Redis, Node 20 (12/11/2026), with PR 6b's four corrected files; the checks and document gates too.
+    Not run: the frontend and screen gates (no screen changed).
+
+- 11/11/2026 · AJ · PR 6b, onboarding to hired (guide §3 step 8, §4 to §7, §9, §11, §13). `onboarding-dispatch`
+  is a scheduler now (`jobs/schedulers/onboarding-dispatch.js`, 06:43 Lagos, in `registry.js` SCHEDULERS;
+  the empty `jobs/handlers/onboarding-dispatch.js` deleted and taken off README): on a case's start date,
+  `pre_onboarding → onboarding`, the application to Onboarding (`candidates.advanceIn`), the plan's steps
+  copied onto `onboarding_case_step` (`repo.planFor`: the department's active plan, else the default),
+  each owner resolved from its role as decided (the case's owner when nobody holds it), `due_on` the start
+  date plus its offset, its SOP kept; then each overdue step's owner reminded once. Each case its own
+  transaction; run twice, nothing more happens. `onboarding.service`: `startIn`, `dispatch`,
+  `markStepDone`, `complete`, `withdraw`; routes `POST /:id/steps/:step_id/done`, `/complete`
+  (`OnboardingComplete`, the company email), `/withdraw` (`OnboardingCancel`). `OnboardingDetail` gains
+  `steps` (`OnboardingStep`, with the SOP as `StepSop`), `can_complete`, `can_withdraw`.
+  - Complete Onboarding, one transaction: every step done; `organisation.updateEmployee` changes
+    `work_email` to the company address (its `assertWorkEmailFree` refuses one held); `users.inviteIn`
+    (new in users' service: the invite inside the caller's transaction) makes the login on it, role
+    `employee`; `candidates.hireIn`; the case `completed`; `onboarding.completed`. Identity's
+    follow-the-work-email step meets a login already on the new address and does nothing.
+  - Withdraw, one transaction, from documentation, pre-onboarding or onboarding: `employment_contracts.cancelIn`
+    (an unsigned contract cancelled; a signed one stays signed, the record of what was signed), the
+    Upload Documents links revoked, the employee archived (`organisation.archiveEmployee`, reason "Did not
+    join: onboarding withdrawn", no last day), the application withdrawn, the case `cancelled` with the
+    reason.
+  - Decided here, with AJ: Withdraw withdraws the application through a new `candidates.withdrawnIn`
+    (status `withdrawn`, `withdrawn_at`, its links revoked, `application.withdrawn`, no candidate mail;
+    GE to review, M4's service and repo); Withdraw is open until completion, onboarding included.
+  - Decided while building: an overdue step is reminded once, kept on `onboarding_case_step.reminded_at`
+    (new migration 5060 rather than an edit to 5050, which developers' databases have already run); the
+    reminder goes to the step owner's login, else the case's owner's (a hire has no login before
+    Complete). The `line_manager` step's owner: see the closing entry of 12/11 above.
+  - Verified here, in a Linux workspace with PostgreSQL 16, pgvector and Redis, on Node 20:
+    `tests/integration/onboarding.test.js` (6: the two new ones walk pre-onboarding to hired and a
+    withdrawal), the module's unit tests (11), the recruitment, offers, signatures and agreements
+    integration files (93 tests); gates lint, migration numbers, reversibility (UP, DOWN, UP),
+    idempotency, schema drift, contract columns, route contracts, AI manifest coverage, AI no-writes, AI
+    awareness, AI engine boundary, search coverage, contract, module catalogue, public surface,
+    schedulers, pagination, provenance, money, dates, dashes, upload, progress, guides, readme-map,
+    user-guide, codeowners; `gen:contract` and `gen:ai-catalogue` run. The whole jest suite (4,110
+    tests): 238 of 242 files green at once; the other four had pinned what this PR changes and pass
+    after it: the scheduler lists (`worker-jobs`, `worker`) gain `onboarding-dispatch`, and the delivery
+    plan's tests (`delivery-plan`, `workflow`'s Need You) used Onboarding as the screen without an API.
+    It was the last one, so they now read the docs' plan with Onboarding's API taken back. Not run: the
+    frontend and screen gates (no screen changed).
+  - For PR 7: with #43's API ticked, staging would open Recruitment · Onboarding, still the INTERIM
+    screen, which asks for `GET /recruitment/onboarding/summary` (not built). Nothing of M5 merges
+    before PR 8 (AJ, 12/11/2026), so staging never shows it; PR 7 rewrites the screen on the contract
+    and decides whether it needs a summary route.
 
 - 11/11/2026 · AJ · PR 6a, onboarding to the documentation gate (guide §3 steps 6 and 7, §4 to §7, §9,
   §11, §13). Built in `src/modules/onboarding/`: `.checklist` (the gate's rules, `waitingOn`, and the

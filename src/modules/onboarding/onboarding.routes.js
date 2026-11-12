@@ -8,10 +8,15 @@
  *   POST /:id/items/:item_id/verify, /reject       `recruitment` edit: check what the hire sent
  *   POST /:id/guarantors/:guarantor_id/check       `recruitment` edit: a reference check, Passed or Failed
  *   POST /:id/remind                               `recruitment` edit: Send Reminder, a fresh link
+ *   POST /:id/steps/:step_id/done                  `recruitment` edit: Mark Step Done
+ *   POST /:id/complete                             `recruitment` edit: Complete Onboarding, with the
+ *                                                  hire's company email
+ *   POST /:id/withdraw                             `recruitment` edit: Withdraw, the hire not joining
  *   GET, POST /requirements, PATCH /requirements/:id    `recruitment` edit: the Checklist settings
  *   GET, POST /plans, GET, PUT /plans/:id               `recruitment` edit: the Plans settings
  *
- * A case is opened by the offer's acceptance, never by a route here; the contract's own routes are
+ * A case is opened by the offer's acceptance and started on its start date by onboarding-dispatch,
+ * never by a route here; the contract's own routes are
  * /recruitment/contracts (employment_contracts.routes.js).
  */
 const express = require("express");
@@ -40,5 +45,8 @@ route(router, "post", "/:id/items/:item_id/verify", { params: o.ChecklistItemPar
 route(router, "post", "/:id/items/:item_id/reject", { params: o.ChecklistItemParams, body: o.ChecklistItemReject, response: o.OnboardingDetail, summary: "Reject a document" }, edit, controller.rejectItem);
 route(router, "post", "/:id/guarantors/:guarantor_id/check", { params: o.GuarantorParams, body: o.ReferenceCheckRecord, response: o.OnboardingDetail, summary: "Record a reference check" }, edit, controller.checkGuarantor);
 route(router, "post", "/:id/remind", { params: o.OnboardingParams, body: c.common.EmptyBody, response: o.OnboardingDetail, summary: "Send the Upload Documents link again" }, edit, controller.remind);
+route(router, "post", "/:id/steps/:step_id/done", { params: o.CaseStepParams, body: c.common.EmptyBody, response: o.OnboardingDetail, summary: "Mark an onboarding step done" }, edit, controller.markStepDone);
+route(router, "post", "/:id/complete", { params: o.OnboardingParams, body: o.OnboardingComplete, response: o.OnboardingDetail, summary: "Complete onboarding" }, edit, controller.complete);
+route(router, "post", "/:id/withdraw", { params: o.OnboardingParams, body: o.OnboardingCancel, response: o.OnboardingDetail, summary: "Withdraw an onboarding case" }, edit, controller.withdraw);
 
 module.exports = { basePath: "/recruitment/onboarding", surface: "staff", router };

@@ -10,8 +10,10 @@
  *
  * Statuses (the contract's spelling is the tables' CHECKs, migration 5030):
  *   case    documentation → pre_onboarding (every required item verified, the contract signed)
- *           → onboarding (the start date) → completed; or cancelled
+ *           → onboarding (the start date) → completed (every step done, Complete Onboarding);
+ *           or cancelled (Withdraw, before completion)
  *   item    pending → uploaded → verified, or rejected (back to the hire with the reason)
+ *   step    pending → done (Mark Step Done)
  *
  * The requirements are MyCity's New Joiner list, seeded once as reference data and kept on the
  * Checklist settings (5399; A26 allows it because Send Offer refuses an empty checklist, AJ
@@ -29,6 +31,9 @@
  * due day counted from the start date and an optional SOP. The plan with no department is the
  * company's default (MyCity's Your First 30 Days), used for a department without its own. The
  * steps are copied onto the case when it reaches onboarding, the role resolved then to a person.
+ *
+ * Complete Onboarding takes the hire's company email: it becomes their work email and their login's,
+ * invited with the Staff role.
  */
 const { z } = require("zod");
 const { uuid, text, optionalText, email, phone, blank, isoDate, isoDateTime, listQuery, Paged } = require("./common");
@@ -45,6 +50,7 @@ const ReferenceCheckStatus = z.enum(["pending", "passed", "failed"]);
 const GateCondition = z.enum(["documents", "guarantors", "bvn", "contract"]);
 /** Who owns a plan step, named when the steps are copied onto a hire's case. */
 const StepOwnerRole = z.enum(["case_owner", "line_manager", "head_of_department", "hire"]);
+const CaseStepStatus = z.enum(["pending", "done"]);
 
 /** A Bank Verification Number: eleven digits. */
 const bvn = z.string().trim().regex(/^\d{11}$/, "Eleven digits");
@@ -215,6 +221,27 @@ const ReferenceCheckRecord = z
   })
   .strict();
 
+/**
+ * One step of the hire's plan, as copied onto their case on the start date: its owner named, its due
+ * day counted from the start date, its SOP as it stands now (null once archived).
+ */
+const OnboardingStep = z
+  .object({
+    onboarding_case_step_id: uuid,
+    position: z.number().int().min(1),
+    title: z.string(),
+    description: z.string().nullable(),
+    owner_role: StepOwnerRole,
+    owner_id: uuid.nullable(),
+    owner_name: z.string().nullable(),
+    due_on: isoDate.nullable(),
+    overdue: z.boolean(),
+    sop: StepSop.nullable(),
+    status: CaseStepStatus,
+    done_at: isoDateTime.nullable(),
+  })
+  .strict();
+
 /** One case as the Onboarding list shows it. */
 const OnboardingRow = z
   .object({
@@ -244,11 +271,15 @@ const OnboardingDetail = OnboardingRow.extend({
   bvn_entered: z.boolean(),
   contract: EmploymentContractView.nullable(),
   waiting_on: z.array(GateCondition),
+  steps: z.array(OnboardingStep),
+  can_complete: z.boolean(),
+  can_withdraw: z.boolean(),
 });
 
 /** A case's checklist item or guarantor, in the path. */
 const ChecklistItemParams = z.object({ id: uuid, item_id: uuid }).strict();
 const GuarantorParams = z.object({ id: uuid, guarantor_id: uuid }).strict();
+const CaseStepParams = z.object({ id: uuid, step_id: uuid }).strict();
 const OnboardingParams = z.object({ id: uuid }).strict();
 
 const OnboardingListQuery = listQuery(
@@ -263,8 +294,11 @@ const OnboardingPage = Paged(OnboardingRow);
 /** Reject an uploaded document: the reason the hire reads. */
 const ChecklistItemReject = z.object({ reason: text(300) }).strict();
 
-/** Cancel a case (the hire did not join): the reason it keeps. */
+/** Withdraw a case (the hire did not join): the reason it keeps. */
 const OnboardingCancel = z.object({ reason: text(500) }).strict();
+
+/** Complete Onboarding: the hire's company email, their work email and their login's from now. */
+const OnboardingComplete = z.object({ work_email: email }).strict();
 
 /* ------------------------------------------------------------------ *
  * The hire's upload page (go.mycityapp.io/onboard/<token>)
@@ -341,6 +375,15 @@ const TABLES = {
   OnboardingPlanParams: { table: null, reason: "the plan in the path" },
   ChecklistItemParams: { table: null, reason: "the case and its item in the path" },
   GuarantorParams: { table: null, reason: "the case and its guarantor in the path" },
+  CaseStepParams: { table: null, reason: "the case and its step in the path" },
+  OnboardingStep: {
+    table: "onboarding_case_step",
+    virtual: {
+      owner_name: "the owner's employee name",
+      overdue: "pending and due_on before today",
+      sop: "the sop behind sop_id",
+    },
+  },
   OnboardingParams: { table: null, reason: "the case in the path" },
   UploadItemParams: { table: null, reason: "the link and the item in the path" },
   UploadFile: { table: null, reason: "a multipart upload's fields; the file is stored as a document" },
@@ -362,12 +405,16 @@ const TABLES = {
       bvn_entered: "the hire's employee.bvn is set",
       contract: "its employment_contract",
       waiting_on: "the documentation gate's conditions still unmet",
+      steps: "onboarding_case_step rows",
+      can_complete: "at onboarding with every step done",
+      can_withdraw: "not yet completed or cancelled",
     },
   },
   OnboardingListQuery: { table: null, reason: "list controls and filters for the cases" },
   OnboardingPage: { table: null, reason: "a page of cases" },
   ChecklistItemReject: { table: null, reason: "the reason, kept as rejected_reason" },
   OnboardingCancel: { table: null, reason: "the reason, kept as end_reason" },
+  OnboardingComplete: { table: "employee" },
   UploadPack: { table: null, reason: "the upload page's view of a case, its checklist and guarantors" },
   PrivacyAcknowledge: { table: null, reason: "kept as onboarding_case.privacy_acknowledged_at" },
   UploadItem: { table: "onboarding_checklist_item", virtual: { document_id: "the file, kept on the item and filed on the employee" } },
@@ -394,6 +441,7 @@ module.exports = {
   DocumentRequirementParams,
   ChecklistItemParams,
   GuarantorParams,
+  CaseStepParams,
   OnboardingParams,
   UploadItemParams,
   UploadFile,
@@ -402,6 +450,8 @@ module.exports = {
   RequirementKind,
   GuarantorKind,
   ReferenceCheckStatus,
+  CaseStepStatus,
+  OnboardingStep,
   Guarantor,
   GuarantorInput,
   ReferenceCheckRecord,
@@ -417,6 +467,7 @@ module.exports = {
   OnboardingPage,
   ChecklistItemReject,
   OnboardingCancel,
+  OnboardingComplete,
   UploadPack,
   PrivacyAcknowledge,
   UploadItem,

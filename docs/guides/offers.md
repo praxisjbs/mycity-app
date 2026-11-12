@@ -32,7 +32,7 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | Recruitment · Offers (`offers`) | staff app | `recruitment` view; a hiring manager their vacancies (team scope) | every offer: number, candidate, role, compensation, status, expiry; the offer's letter as the candidate will read it, its approval chain and signers | New Offer (from a shortlisted application), Edit, Submit for Approval, Approve and Reject (approvers), Send Offer, Resend, Withdraw, View Letter (the letter in a dialog of its own, with Open in Tab and Download PDF) |
-| Recruitment · Onboarding (`onboarding`) | staff app | `recruitment` view | every onboarding case: hire, role, start date, status, checklist progress; one case's checklist, contract and plan | Verify and Reject a document, Request Document, Send Reminder, Sign for Company and Resend Contract on the contract, Mark Step Done, Complete Onboarding; Checklist, Plans and Contract settings |
+| Recruitment · Onboarding (`onboarding`) | staff app | `recruitment` view | every onboarding case: hire, role, start date, status, checklist progress; one case's checklist, contract and plan | Verify and Reject a document, Request Document, Send Reminder, Sign for Company and Resend Contract on the contract, Mark Step Done, Complete Onboarding, Withdraw; Checklist, Plans and Contract settings |
 | Recruitment · Candidates (`candidates`) | staff app | as M4 | the Offer column (GE) | Open Offer on the sheet of a card at Offer or after (Offers opened by `?application=`); Make Offer on a shortlisted one (`?new=1&application=`) |
 | Public · Sign Offer (`/sign/<token>`) | go.mycityapp.io | the candidate holding the link | the letter, the signing steps, the outcome | Send Code, sign (draw or type), Accept and Sign, Decline the Offer |
 | Public · Verify Document (`/verify/<number>`, `/verify/t/<token>`) | go.mycityapp.io | anyone | status, signers, the two verdicts; by QR token the document too | look up a reference |
@@ -126,11 +126,29 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    those (a verification, a reference check, the BVN, the hire's signature on the contract), so
    whichever comes last opens it. The case shows what it still waits on (`waiting_on`). Nothing
    before that opens onboarding, and from then the upload page takes nothing more.
-8. **Onboarding.** On the start date the case moves to `onboarding` and the department's plan steps
-   are added, each with an owner and a due date and linked to the department's SOPs. Complete
-   Onboarding (every step done) asks for the hire's company email, closes the case, calls
+8. **Onboarding.** `onboarding-dispatch` runs every morning (06:43 Lagos). A case at
+   `pre_onboarding` whose start date has come moves to `onboarding`, the application to Onboarding
+   (`candidates.advanceIn`), and its plan's steps are copied onto the case (`onboarding_case_step`):
+   the department's active plan, else the company's default. Each step's owner is the person who
+   holds its role then: `case_owner` the case's owner (the vacancy's hiring manager), `line_manager`
+   the hire's line manager (their record names none until `hireIn` fills their seat, so it is read from
+   the vacancy's Organogram seat: whom the seat reports to, or the holder of the seat it reports to,
+   through any vacant seats between), `head_of_department` the department's head, `hire` the employee;
+   the case's owner when nobody holds it. A case whose application is no longer active is not started. Each is due on the start date plus its offset and keeps its
+   SOP. The owners are told. The same run reminds the owner of each step past its due day, once a
+   step (`reminded_at`): their login, else the case's owner's (a hire has none yet). Run twice, it
+   changes nothing more. Mark Step Done marks a pending step done.
+   **Complete Onboarding** (every step done) asks for the hire's company email and, in one
+   transaction, makes it their work email (`organisation.updateEmployee`, which refuses an address
+   another person or login holds; it was their candidate address since acceptance), invites their
+   login on it with the Staff role (`users.inviteIn`, the invitation mailed from the outbox), calls
    `candidates.hireIn` (the application to Hired, the Organogram seat filled, the vacancy closed as
-   filled when its openings are) and invites the hire's login to the company email.
+   filled when its openings are) and closes the case `completed`.
+   **Withdraw** (the hire is not joining) is open until the case completes: in one transaction the
+   contract is cancelled while unsigned (`employment_contracts.cancelIn`; a signed one stays as the
+   record of what was signed), the Upload Documents links stop, the employee made at acceptance is
+   archived, the application is withdrawn (`candidates.withdrawnIn`: status `withdrawn`, its links
+   stopped, no mail to the hire) and the case is `cancelled` with the reason.
 9. **Verify.** Every signed document carries a QR on each page linking to `/verify/t/<token>`;
    a typed reference shows status and verdicts, not content (A9).
 
@@ -149,13 +167,14 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
 | `employment_contract` | `onboarding_case_id`, `employee_id`, `number` (CON), `document_id`, `signature_request_id` | 5000 |
 | `onboarding_plan` | `department_id` (null for the company's default), `name`, `active` | 5050. One plan a department and one default (partial unique indexes). The default, Your First 30 Days from the HR Induction deck, is seeded by 5399 with its four steps |
 | `onboarding_plan_step` | `onboarding_plan_id`, `position`, `title`, `owner_role`, `due_offset_days`, `sop_id` | 5050. The owner is a role (`case_owner`, `line_manager`, `head_of_department`, `hire`), named as a person when the steps are copied onto a case; the due day counts from the start date. `sop_id` has no foreign key: `sop` is M10's (10400, after this block), so the service takes only an SOP in force |
-| `onboarding_case_step` | `onboarding_case_id`, `position`, `title`, `owner_role`, `owner_id`, `due_on`, `sop_id`, `status` (`pending`, `done`), `done_by`, `done_at` | 5050. The plan's steps copied onto the case when it reaches onboarding (PR 6b), so a plan changed later never changes a hire's steps |
+| `onboarding_case_step` | `onboarding_case_id`, `position`, `title`, `owner_role`, `owner_id`, `due_on`, `sop_id`, `status` (`pending`, `done`), `done_by`, `done_at`, `reminded_at` | 5050. The plan's steps copied onto the case when it reaches onboarding (PR 6b), so a plan changed later never changes a hire's steps. 5060 adds `reminded_at`: an overdue step's owner is reminded once |
 | `employee.bvn` | eleven digits | 5040, masked under `employee.bank` (organisation's table, TB reviews) |
 | `talent_pool`, `talent_pool_member` | | 5000, never used (M4's pool is `talent_pool_entry`, 4060). Dropped in 5010 |
 
 Schema migration files: `migrations/5000_offers_onboarding.sql` (merged, never edited),
 `5010_offer_terms.sql`, `5020_signature_evidence.sql`, `5030_onboarding_documentation.sql`,
-`5040_employee_bvn.sql`, `5050_onboarding_plans.sql`, `5090_drop_unused_talent_pool.sql`. Reference data:
+`5040_employee_bvn.sql`, `5050_onboarding_plans.sql`, `5060_onboarding_step_reminders.sql`,
+`5090_drop_unused_talent_pool.sql`. Reference data:
 `seeds/reference/5099_seed_offers_onboarding.sql` and `5199_seed_m5_statuses.sql` (statuses);
 `5399_seed_new_joiner_list.sql`, the New Joiner list and the default plan;
 `5299_seed_offer_flow.sql`, the `recruitment.offer` flow's version 1 and Head of Department's
@@ -181,12 +200,14 @@ employee record (masked, never sent to an AI model).
 | `GET /api/v1/recruitment/offers/settings`, `PUT .../settings/signatory` | `OfferSettings`, `OfferSignatorySave` | `recruitment` edit | | the Offer Signatory (setting `recruitment.offer_signatory`) |
 | `GET/PUT /api/v1/recruitment/offers/settings/letter`, `POST .../letter/restore` | `OfferLetterTemplate`, `OfferLetterTemplateSave` | `recruitment` edit | | the standard wording, a `template_version` of `offer-letter` |
 | `GET /api/v1/recruitment/onboarding` | `OnboardingListQuery` → `OnboardingPage` | `recruitment` view · all/team (the case's owner) | yes, 25 | filters: status, department, q (the hire or the role) |
-| `GET /api/v1/recruitment/onboarding/:id` | → `OnboardingDetail` | `recruitment` view | | the checklist, guarantors, `bvn_entered` (never the number), the contract, `waiting_on` |
+| `GET /api/v1/recruitment/onboarding/:id` | → `OnboardingDetail` | `recruitment` view | | the checklist, guarantors, `bvn_entered` (never the number), the contract, `waiting_on`, the plan's `steps` (owner, due day, `overdue`, SOP), `can_complete`, `can_withdraw` |
 | `POST /api/v1/recruitment/onboarding/:id/items/:item_id/verify` | `EmptyBody` → `OnboardingDetail` | `recruitment` edit | | an item sent and, for a file, scanned clean (409 `SCAN_PENDING`, `FILE_INFECTED`); then the gate |
 | `POST /api/v1/recruitment/onboarding/:id/items/:item_id/reject` | `ChecklistItemReject` → `OnboardingDetail` | `recruitment` edit | | back to the hire with the reason |
 | `POST /api/v1/recruitment/onboarding/:id/guarantors/:guarantor_id/check` | `ReferenceCheckRecord` → `OnboardingDetail` | `recruitment` edit | | Passed or Failed with a note; then the gate |
 | `POST /api/v1/recruitment/onboarding/:id/remind` | `EmptyBody` → `OnboardingDetail` | `recruitment` edit | | Send Reminder: a fresh link mailed, every earlier one stopped |
-| `POST /api/v1/recruitment/onboarding/:id/steps/:stepId/done`, `/complete` | | `recruitment` edit | | PR 6b |
+| `POST /api/v1/recruitment/onboarding/:id/steps/:step_id/done` | `EmptyBody` → `OnboardingDetail` | `recruitment` edit | | Mark Step Done: a pending step of a case at onboarding (409 `NOT_IN_ONBOARDING`, `STEP_DONE`) |
+| `POST /api/v1/recruitment/onboarding/:id/complete` | `OnboardingComplete` → `OnboardingDetail` | `recruitment` edit | | the company email; every step done (409 `NOT_IN_ONBOARDING`, `STEPS_OPEN`; 409 `EMPLOYEE_EXISTS` or `LOGIN_EMAIL_TAKEN` for an address held); one transaction (§3 step 8) |
+| `POST /api/v1/recruitment/onboarding/:id/withdraw` | `OnboardingCancel` → `OnboardingDetail` | `recruitment` edit | | the reason; any case not completed or cancelled (409 `CASE_ENDED`); one transaction (§3 step 8) |
 | `GET/POST /api/v1/recruitment/onboarding/requirements`, `PATCH .../requirements/:id` | `DocumentRequirementListQuery` → `DocumentRequirementPage`; `DocumentRequirementCreate`, `DocumentRequirementEdit` → `DocumentRequirement` | `recruitment` edit | yes, 25 | the Checklist settings; a code is kept once made (409 `CODE_TAKEN`) |
 | `GET/POST /api/v1/recruitment/onboarding/plans`, `GET/PUT .../plans/:id` | `OnboardingPlanListQuery` → `OnboardingPlanPage`; `OnboardingPlanSave` → `OnboardingPlan` | `recruitment` edit | yes, 25 | the Plans settings; a plan saved whole (409 `PLAN_EXISTS`, 422 `SOP_NOT_FOUND`) |
 | `GET /api/public/v1/sign/:token` | → `SigningView` | public token `signature.sign` (one a signer) | | the first opening is recorded; 404 for any bad or ended link (signatures) |
@@ -238,7 +259,11 @@ employee record (masked, never sent to an AI model).
 - The BVN is never returned by any route (only `bvn_entered`), never written into an audit row, and never sent to a model.
 - The Upload Documents link is never kept or put in the outbox: only its hash is stored, and the mail is queued with it straight after its own transaction. Not Progressing stops it.
 - A personal guarantor has known the hire four years or more; the two are not the same kind.
-- Onboarding plan steps come from the hire's department plan; Complete Onboarding needs every step done, then the login is invited (`users.invite`).
+- Onboarding plan steps come from the hire's department plan (its default when it has none active), copied onto the case on the start date with each owner resolved from the step's role (the case's owner when nobody holds it) and due on the start date plus the step's offset. A case reaches onboarding only from pre-onboarding, on or after its start date; a case still at documentation on its start date starts the morning after its gate opens.
+- An overdue step is a pending one whose due day has passed; its owner (or the case's owner, when the owner has no login) is reminded once.
+- Complete Onboarding needs the case at onboarding and every step done. The company email becomes the hire's work email and their login's (role Staff), and `hireIn` runs, all in one transaction: a refusal of any part keeps nothing.
+- Not Progressing (M4) on an application at Documentation or after ends its open case as Withdraw does, with the application's reason; the application is M4's (`not_progressed`).
+- Withdraw ends a case before completion. An unsigned contract is cancelled; a signed one stays signed. The employee is archived and the application withdrawn; the hire is not mailed.
 - No AI drafts an offer or a contract: both are the template plus the offer's fields. M5 registers no AI job.
 
 ## 7 · Events, jobs and notifications
@@ -267,10 +292,14 @@ employee record (masked, never sent to an AI model).
 | `onboarding.guarantor_checked` | a reference check recorded | audit |
 | `onboarding.documentation_completed` | the gate, in the transaction of whatever came last | tells the owner; the application at Pre-Onboarding |
 | `onboarding.requirement_saved`, `.plan_saved` | the Checklist and Plans settings | audit |
-| `application.not_progressed` (M4) | Not Progressing | the case's Upload Documents links stop (`onboarding.stop_links`) |
-| `onboarding.completed` | Complete Onboarding | invite the hire's login |
+| `application.not_progressed` (M4) | Not Progressing | its open case ends as Withdraw ends it: the contract while unsigned, the links, the employee archived, the case `cancelled` with the application's reason (`onboarding.end_for_application`); an ended case only has its links stopped again |
+| `onboarding.started` | the start date (`onboarding-dispatch`) | tells the case's owner and every step owner with a login |
+| `onboarding.step_done` | Mark Step Done | audit |
+| `onboarding.step_overdue` | a step past its due day (`onboarding-dispatch`), once a step | tells its owner, or the case's owner when the owner has no login |
+| `onboarding.completed` | Complete Onboarding | tells the case's owner; the login's invitation is mailed by identity's own outbox step in the same transaction (`users.inviteIn`), and `application.hired` and the vacancy's events follow from `hireIn` |
+| `onboarding.cancelled` | Withdraw | tells the case's owner; `contract.cancelled` (when unsigned), `employee.archived` and `application.withdrawn` in the same transaction |
 | `signature-reminders` job | daily, 06:17 Lagos | ends requests past their end; their links stop working |
-| `onboarding-dispatch` job | daily | move cases to `onboarding` on their start date; remind owners of overdue steps |
+| `onboarding-dispatch` job | daily, 06:43 Lagos (`jobs/schedulers/onboarding-dispatch.js`) | move cases to `onboarding` on their start date with their plan's steps; remind owners of overdue steps, once a step. Each case its own transaction; at most 200 cases and 500 reminders a run, the rest the next |
 
 ## 8 · Permissions and visibility by role
 
@@ -291,7 +320,7 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 - **AI routes**: "make an offer to <candidate>" opens New Offer with the application; "who still owes documents" opens Onboarding filtered.
 - **AI cards**: New Offer is a card (`offers.create`, `OfferCard`: the candidate picked from the shortlist through `candidates.list`, the start date, the monthly basic salary; the rest starts from the vacancy and the draft is finished on Offers); the document upload and BVN forms are `not_offered: personal`. Approving, signing, sending and withdrawing stay on the screen.
 - **Search** (`offers.search.js`, `onboarding.search.js`): offers by number (OFF-), candidate and role; onboarding cases by the hire's name or the role (built in PR 6a, opening the case by `?case=` as a contract does); employment contracts by number (CON-).
-- `onboarding.ai.js` (PR 6a): the read `onboarding.list` and three routes; the Checklist and Plans settings' forms are `not_offered` (`design:`). The hire's upload, guarantor and BVN forms are not staff-app create or edit forms, so gate 23 asks no reason of them; they never reach the chat.
+- `onboarding.ai.js` (PR 6a, a route added in PR 6b): the read `onboarding.list` and four routes (the fourth, cases at onboarding); Mark Step Done, Complete Onboarding and Withdraw stay on the screen; the Checklist and Plans settings' forms are `not_offered` (`design:`). The hire's upload, guarantor and BVN forms are not staff-app create or edit forms, so gate 23 asks no reason of them; they never reach the chat.
 
 ## 10 · On screen and mobile
 
@@ -328,7 +357,18 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 - The hire's link has lapsed or was lost: Send Reminder makes a fresh one and stops the rest.
 - A department with no active plan of its own: its hires follow the company's default plan.
 - No document requirements set: Send Offer is refused until the checklist has at least one required item.
-- The hire leaves before the start date: Withdraw on the case ends it; the employee is archived.
+- The hire leaves before the start date: Withdraw on the case ends it; the employee is archived and
+  the application withdrawn (no mail). Withdraw stays open while the case is at onboarding, until it
+  completes.
+- The start date passes while the hire is still at documentation: the case waits; the morning after
+  the gate opens, `onboarding-dispatch` starts it, its steps due from the start date (so some may be
+  overdue at once, and are reminded).
+- The step's role is held by nobody (no line manager on the record or above the vacancy's seat, a
+  department with no head): the step goes to the case's owner.
+- Not Progressing at Documentation or after: the case ends as on Withdraw (no half-onboarded hire), and
+  the start date never moves it.
+- The company email is another employee's or login's: Complete Onboarding is refused and nothing of
+  it is kept.
 - No Offer Signatory named when the offer is accepted: the contract's company signer is whoever
   signed the offer for the company.
 - The hire declines the contract or lets it lapse: the contract is `cancelled` and the owner told;
@@ -383,11 +423,26 @@ Decided 11/11/2026 (AJ), for PR 6:
 - Request Document is Reject (with the reason the hire reads) and Send Reminder (a fresh link); no
   third action.
 
+Decided 11/11/2026 (AJ), for PR 6b:
+
+- **Withdraw also withdraws the application**: `candidates.withdrawnIn`, new in M4's service (status
+  `withdrawn`, its links stopped, `application.withdrawn`; no mail, as the hire is the one leaving),
+  for GE to review. Not Progressing would have mailed the hire a rejection.
+- **Withdraw is open until the case completes**, onboarding included.
+- The login is invited in Complete Onboarding's own transaction through `users.inviteIn`, new in
+  users' service, so the email, the login and `hireIn` stand or fall together.
+- An overdue step is reminded once, kept on `onboarding_case_step.reminded_at` (migration 5060).
+- Closing PR 6 (AJ, 12/11/2026): Not Progressing at Documentation or after ends the case as Withdraw
+  does; a `line_manager` step's owner is read from the vacancy's Organogram seat while the hire's
+  record names no line manager.
+
 Open, for MyCity: the privacy notice's wording (`onboarding.upload.privacyNotice`) is written from
 what the system does; Operations & People to confirm it before go-live.
 
 ## 14 · Change log
 
+- 12/11/2026 · AJ · Closing PR 6 (§3 step 8, §6, §7, §11, §13): Not Progressing on an application at Documentation or after ends its open case as Withdraw does (`onboarding.end_for_application` in place of `onboarding.stop_links`); a `line_manager` step's owner comes from the vacancy's Organogram seat until `hireIn` fills it.
+- 11/11/2026 · AJ · PR 6b, onboarding to hired (§3 step 8, §4 to §7, §9, §11, §13): `onboarding-dispatch` (the start date, the plan's steps copied with their owners and due days, overdue steps reminded once; 5060), Mark Step Done, Complete Onboarding (the company email, the login invited, `hireIn`, one transaction), Withdraw (the contract, links, employee and application ended with the case); `OnboardingDetail.steps`, `can_complete`, `can_withdraw`.
 - 11/11/2026 · AJ · PR 6a, onboarding to the documentation gate (§3 steps 6 and 7, §4 to §7, §9, §11, §13): the Checklist and Plans settings, the New Joiner list and Your First 30 Days seeded (5399), plans and the case's steps (5050), the Upload Documents link and page API with the privacy notice, files on the employee and scanned, two guarantors with their checks, the BVN, verify and reject, the gate (asked after each of its conditions, the contract's signature included), `waiting_on`, ⌘K and the assistant's read. Fixed from PR 5: the contract's company name on a database without a company profile, and its signature request's creator at acceptance.
 - 11/11/2026 · GE · The letter left the offer's dialog, which it made long: View Letter, beside Withdraw Offer, opens it in a dialog of its own, the PDF with Open in Tab and Download PDF once made (`DocumentPreview`, as a query's letter in M3), the wording on paper before (§10). Download PDF moved there from the offer's buttons.
 - 11/11/2026 · TB · M10 PR 4 (`knowledge.md` §6.10): Verify a Document also checks a training certificate by its number. `VerifyResult.document_type` is `VerifiedDocumentType` (the signed types and `training_certificate`; the signing page keeps `SignedDocumentType`), and the result gains `certificate` (holder, course, completion date), null for every signed document. The page shows a certificate's Awarded To, Course, Completed and Published By; offers and agreements read as before.

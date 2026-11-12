@@ -465,7 +465,9 @@ indexes · `5040` `employee.bvn` (eleven digits, masked under `employee.bank`; o
 TB reviews) · `5050` `onboarding_plan` (one a department, and one default with no department),
 `onboarding_plan_step` (an owner role, a due day from the start date, an SOP by id with no foreign
 key, as `sop` is M10's and created after this block) and `onboarding_case_step` (the steps a case
-works through, copied from its plan with the owner and due date resolved) · `5090` 5000's unused
+works through, copied from its plan with the owner and due date resolved) · `5060`
+`onboarding_case_step.reminded_at` (an overdue step's owner reminded once, by `onboarding-dispatch`)
+· `5090` 5000's unused
 `talent_pool` and `talent_pool_member` dropped · `5199` the
 statuses `5010` and `5030` add · `5299` the `recruitment.offer` flow, version 1 (Head of
 Department, then the CEO; the same definition as `shared/workflow/definitions.js`), and Head of
@@ -476,7 +478,7 @@ MILESTONES §10, as Send Offer refuses an empty checklist; its DOWN takes back o
 saved and requirements no checklist has used. Every CHECK equals the contract's enums
 (`docs/guides/offers.md` §4).
 
-**Owes:** nothing; PR 6b writes `onboarding_case_step`, already made by `5050`.
+**Owes:** nothing; PR 6b writes `onboarding_case_step` (`5050`, with `5060`'s `reminded_at`).
 
 ### M6 Payroll & Notifications · 6000 to 6999 · TB
 

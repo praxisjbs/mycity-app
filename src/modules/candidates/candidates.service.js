@@ -388,6 +388,28 @@ async function hireIn(client, actor, applicationId, { employee_id: employeeId })
 }
 
 /**
+ * The hire withdrew, in the caller's transaction (M5's Withdraw on the onboarding case, AJ
+ * 11/11/2026): an application active from Documentation to Onboarding takes status withdrawn with the
+ * reason, keeps the stage it reached, and its live links stop. No candidate mail: they are the one who
+ * left. `application.withdrawn` is recorded. False for one not active there, so the caller decides.
+ */
+async function withdrawnIn(client, actor, applicationId, reason) {
+  const row = await repo.get(client, applicationId, { lock: true });
+  if (!row || row.status !== "active" || !["documentation", "pre_onboarding", "onboarding"].includes(row.stage)) return false;
+  await repo.setWithdrawn(client, applicationId, reason);
+  await publicToken.revokeFor(client, { subject_type: "application", subject_id: applicationId });
+  await emit(client, {
+    key: EVENTS.APPLICATION_WITHDRAWN,
+    entity: { type: "application", id: applicationId },
+    actor,
+    before: { status: row.status },
+    after: { status: "withdrawn" },
+    payload: { application_id: applicationId, number: row.number, stage: row.stage, vacancy_id: row.vacancy_id },
+  });
+  return true;
+}
+
+/**
  * Not Progressing, at any stage and on a closed role too (a role closed with people still in it lets
  * them be told; GE, 05/11/2026). Reopen still needs the role live.
  */
@@ -628,6 +650,7 @@ module.exports = {
   offerEndedIn,
   correctEmailIn,
   hireIn,
+  withdrawnIn,
   notProgressed,
   notProgressAllIn,
   reopen,

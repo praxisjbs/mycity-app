@@ -85,7 +85,17 @@ describe("the routes", () => {
       "POST /:id/items/:item_id/reject",
       "POST /:id/guarantors/:guarantor_id/check",
       "POST /:id/remind",
+      "POST /:id/steps/:step_id/done",
+      "POST /:id/complete",
+      "POST /:id/withdraw",
     ]);
+  });
+
+  test("onboarding-dispatch is a daily scheduler the worker starts", () => {
+    const { SCHEDULERS } = require("../../jobs/registry");
+    expect(SCHEDULERS).toContain("onboarding-dispatch");
+    const schedule = require("../../jobs/schedulers/onboarding-dispatch");
+    expect(schedule).toMatchObject({ name: "onboarding-dispatch", pattern: "43 6 * * *" });
   });
 
   test("the hire's page", () => {

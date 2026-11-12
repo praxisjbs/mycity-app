@@ -12,8 +12,9 @@
  *   item()                  an item: the file, the typed value or both, as its requirement asks
  *   guarantor()             a guarantor entered or corrected; a correction waits for its check again
  *   bvn()                   the BVN, kept masked on the employee record (organisation.setBvnIn)
- *   sendLink(), stopLinks() the link, made from the outbox when the case opens and on Send Reminder,
- *                           mailed as `onboarding-documents`; stopped on Not Progressing
+ *   sendLink()              the link, made from the outbox when the case opens and on Send Reminder,
+ *                           mailed as `onboarding-documents`; stopped when the case ends
+ *                           (onboarding.service endIn: Withdraw and Not Progressing)
  *
  * Only a case at documentation takes anything. The link is never kept: only its hash is, and it is
  * made in a transaction of its own and handed straight to the mail queue.
@@ -279,11 +280,4 @@ async function sendLink(caseId, actorUserId = null, { reminder = false } = {}) {
   return true;
 }
 
-/** Not Progressing: the application's Upload Documents links stop working. */
-async function stopLinks(applicationId) {
-  const row = await repo.byApplication(pool, applicationId);
-  if (!row) return 0;
-  return tx((client) => publicToken.revokeFor(client, { subject_type: SUBJECT, subject_id: row.onboarding_case_id, scope: SCOPE }));
-}
-
-module.exports = { DOC_TYPE, privacyNotice, ttlHours, pack, acknowledge, file, item, guarantor, bvn, sendLink, stopLinks };
+module.exports = { DOC_TYPE, privacyNotice, ttlHours, pack, acknowledge, file, item, guarantor, bvn, sendLink };

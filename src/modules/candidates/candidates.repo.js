@@ -294,6 +294,15 @@ async function setStatus(client, id, { status, rejection_reason: reason = null }
   );
 }
 
+/** The candidate withdrew after accepting (M5's Withdraw on the onboarding case): status and when. */
+async function setWithdrawn(client, id, reason) {
+  await client.query(
+    `UPDATE application SET status = 'withdrawn', withdrawn_at = now(), rejection_reason = $2
+      WHERE application_id = $1`,
+    [id, reason || null],
+  );
+}
+
 /** The application's moves, oldest first, with who made each. */
 async function history(db, id) {
   // pagination:complete one application's moves, at most a few dozen; the contract caps the sheet at 50
@@ -423,6 +432,7 @@ async function emailSavedAt(db, key, version) {
 }
 
 module.exports = {
+  setWithdrawn,
   PART_SCORES,
   activeOf,
   leftCvs,

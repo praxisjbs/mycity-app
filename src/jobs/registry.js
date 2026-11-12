@@ -215,6 +215,7 @@ const SCHEDULERS = Object.freeze([
   "agreement-renewals",
   "proposal-expiry",
   "signature-reminders",
+  "onboarding-dispatch",
   "training-joiners",
 ]);
 

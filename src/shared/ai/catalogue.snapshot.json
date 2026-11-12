@@ -3741,6 +3741,17 @@
       "screen": "recruitment.offers"
     },
     {
+      "key": "recruitment.route.see_which_new_hires_are_in_their_first_weeks_of_onboarding",
+      "kind": "route",
+      "module_key": "recruitment",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "recruitment.onboarding"
+    },
+    {
       "key": "recruitment.route.see_who_still_owes_onboarding_documents",
       "kind": "route",
       "module_key": "recruitment",

@@ -497,14 +497,15 @@ describeDb("approvals against the real migrations", () => {
 
   test("a request about a record whose screen has not shipped waits in nobody's Need You (QA DEF-01)", async () => {
     const { workflow_instance_id: id } = await openLeave("staff", 1);
-    // As a request about a new joiner's onboarding would read, before Recruitment · Onboarding has its API on staging (M5).
+    // As a request about a new joiner's onboarding would read while Recruitment · Onboarding had no API on staging
+    // (every screen has its API since M5 PR 6b, so the docs' plan is read with Onboarding's taken back).
     await q("UPDATE workflow_instance SET entity_type = 'onboarding' WHERE workflow_instance_id = $1", [id]);
     const listed = async () => (await as("manager").get("/workflow/mine")).body.data.map((r) => r.workflow_instance_id);
     const counted = async () => (await as("manager").get("/workflow/mine/count")).body.waiting;
     const waiting = await counted();
     expect(await listed()).toContain(id);
     const docs = contractPlan.readPlan((rel) => fs.readFileSync(nodePath.join(__dirname, "../..", rel), "utf8"));
-    deliveryPlan.use({ plan: docs, rule: "staging" });
+    deliveryPlan.use({ plan: { ...docs, screens: { ...docs.screens, "Recruitment|onboarding": { m: "M5", api: false, delivered: false } } }, rule: "staging" });
     try {
       expect(await listed()).not.toContain(id);
       expect(await counted()).toBe(waiting - 1);

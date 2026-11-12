@@ -12,6 +12,9 @@ const deliveryPlan = require("../../../src/shared/delivery-plan");
 
 const ROOT = path.resolve(__dirname, "../../..");
 const docs = contractPlan.readPlan((rel) => fs.readFileSync(path.join(ROOT, rel), "utf8"));
+// Every screen still in the plan has its API now (Recruitment's Onboarding, the last, with M5 PR 6b),
+// so what a screen without one does is shown on the docs' plan with Onboarding's API taken back.
+const unshipped = { ...docs, screens: { ...docs.screens, "Recruitment|onboarding": { m: "M5", api: false, delivered: false } } };
 
 afterEach(() => deliveryPlan.use());
 
@@ -21,9 +24,9 @@ describe("the plan, read from the docs", () => {
     // whose rows stay, Dropped.
     expect(docs.screens["Payroll|payroll-runs"]).toEqual({ m: "M6", api: true, delivered: true });
     expect(docs.screens["Payroll|configurations"]).toEqual({ m: "M6", api: true, delivered: true });
-    // Knowledge Hub's SOPs are built (M10 PR 2); Recruitment's Onboarding waits for its API (M5).
+    // Knowledge Hub's SOPs are built (M10 PR 2); Recruitment's Onboarding has its API (M5 PR 6b), its screen to come.
     expect(docs.screens["Knowledge Hub|sops"]).toEqual({ m: "M10", api: true, delivered: true });
-    expect(docs.screens["Recruitment|onboarding"]).toEqual({ m: "M5", api: false, delivered: false });
+    expect(docs.screens["Recruitment|onboarding"]).toEqual({ m: "M5", api: true, delivered: false });
     expect(docs.screens["Employee Self-Service|my-leave"]).toMatchObject({ m: "M1", api: true, delivered: true });
     expect(docs.milestones.find((m) => m.key === "M8")).toMatchObject({ n: 8, demo: "2026-12-11" });
     // "with M1": the foundation takes the next milestone's demo day.
@@ -70,8 +73,8 @@ describe("the API's answers", () => {
     expect(["production", "staging", "development", "test"].map((env) => deliveryPlan.ruleFor(env))).toEqual(["production", "staging", "staging", "all"]);
   });
 
-  test("on staging, each screen is held back until its API is ticked (Recruitment's Offers has, Onboarding not yet), and what has shipped opens", () => {
-    deliveryPlan.use({ plan: docs, rule: "staging" });
+  test("on staging, each screen is held back until its API is ticked (Recruitment's Offers has, Onboarding not in this plan), and what has shipped opens", () => {
+    deliveryPlan.use({ plan: unshipped, rule: "staging" });
     expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(false);
     expect(deliveryPlan.screenOpen("recruitment", "offers")).toBe(true);
     expect(deliveryPlan.screenOpen("knowledge", "sops")).toBe(true);
@@ -92,10 +95,15 @@ describe("the API's answers", () => {
     expect(deliveryPlan.closedTypes()).not.toContain("payroll_run");
     expect(deliveryPlan.closedTypes()).not.toContain("salary_structure");
     expect(deliveryPlan.closedTypes()).not.toContain("leave_request");
+    // The docs' own plan: Onboarding has its API, so staging opens it; production waits for its screen.
+    deliveryPlan.use({ plan: docs, rule: "staging" });
+    expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(true);
+    deliveryPlan.use({ plan: docs, rule: "production" });
+    expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(false);
   });
 
   test("a test, or a plan that cannot be read, holds nothing back", () => {
-    deliveryPlan.use({ plan: docs, rule: "all" });
+    deliveryPlan.use({ plan: unshipped, rule: "all" });
     expect(deliveryPlan.screenOpen("recruitment", "onboarding")).toBe(true);
     expect(deliveryPlan.closedTypes()).toEqual([]);
     deliveryPlan.use({ plan: null, rule: "staging" });
@@ -120,9 +128,9 @@ describe("⌘K by the plan", () => {
       const client = { query: async (sql) => ({ rows: /\bLIMIT\b/.test(sql) ? rows : [] }), release() {} };
       const db = { connect: async () => client };
       const user = { user_id: "u-1", is_ceo: false };
-      plan.use({ plan: docs, rule: "staging" });
+      plan.use({ plan: unshipped, rule: "staging" });
       expect((await service.search(db, user, { q: "ada" })).groups.map((g) => g.type)).toEqual(["employee"]);
-      plan.use({ plan: docs, rule: "all" });
+      plan.use({ plan: unshipped, rule: "all" });
       expect((await service.search(db, user, { q: "ada" })).groups.map((g) => g.type)).toEqual(["employee", "onboarding"]);
     });
   });
@@ -132,11 +140,11 @@ describe("⌘K by the plan", () => {
     // A Recruitment reader sees every tab of the module, Onboarding among them.
     const reader = { grants: { recruitment: ["view", "create", "edit"], knowledge: ["view"], payroll: ["view"], ess: ["view", "create"], settings: ["view"] }, capabilities: [], is_ceo: false, manages_people: true };
     const screensOf = () => screenEntries(reader).map((e) => e.hit.link);
-    deliveryPlan.use({ plan: docs, rule: "all" });
+    deliveryPlan.use({ plan: unshipped, rule: "all" });
     expect(screensOf()).toEqual(expect.arrayContaining(["/recruitment?tab=onboarding", "/ess?tab=my-leave"]));
-    deliveryPlan.use({ plan: docs, rule: "staging" });
+    deliveryPlan.use({ plan: unshipped, rule: "staging" });
     expect(screensOf()).toEqual(expect.arrayContaining(["/ess?tab=my-leave", "/payroll?tab=payroll-runs", "/payroll?tab=payslips", "/knowledge?tab=sops"]));
-    // Only the screens with their API ticked are offered: not Onboarding.
+    // Only the screens with their API ticked are offered: not Onboarding, in this plan.
     expect(screensOf()).not.toContain("/recruitment?tab=onboarding");
     expect(actionEntries(reader).map((e) => e.hit.link).filter((link) => link && !deliveryPlan.linkOpens(link))).toEqual([]);
   });
