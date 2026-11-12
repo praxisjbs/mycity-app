@@ -459,6 +459,69 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     expect(late.body.error.code).toBe("DOCUMENTATION_DONE");
   }, 180_000);
 
+  test("a rejection is mailed to the hire with a working link; the file sent again replaces the rejected one as its next version (AJ, 12/11/2026)", async () => {
+    await pool.query("UPDATE document_requirement SET active = (code = 'valid_id')");
+    const hire = await hiredToDocumentation("Remi");
+    const url = `/recruitment/onboarding/${hire.onboarding_case_id}`;
+    expect((await pub().post(`/onboard/${hire.link}/privacy`).send({ consent: true })).status).toBe(200);
+    const idItem = (await pub().get(`/onboard/${hire.link}`)).body.items[0];
+    const send = async (name) => {
+      const f = await pub().post(`/onboard/${hire.link}/files`).attach("file", PDF, name);
+      expect(f.status).toBe(200);
+      expect((await pub().post(`/onboard/${hire.link}/items/${idItem.onboarding_checklist_item_id}`).send({ document_id: f.body.document_id })).status).toBe(200);
+      return f.body.document_id;
+    };
+    const reject = (reason) => h.as("ops").post(`${url}/items/${idItem.onboarding_checklist_item_id}/reject`).send({ reason });
+    const rejectedMails = () => mails("onboarding-document-rejected").filter((m) => m.to.email === hire.email);
+    const doc = (id) => one("SELECT title, version, supersedes_id, is_current FROM document WHERE document_id = $1", [id]);
+    const onRecord = async () =>
+      (await pool.query("SELECT document_id FROM document WHERE entity_type = 'employee' AND entity_id = $1 AND is_current AND title = 'Valid ID'", [hire.employee_id])).rows.map((r) => r.document_id);
+
+    // Rejected: the hire is mailed what and why, with a link of its own; the link they have still works.
+    const first = await send("id-blurred.pdf");
+    expect((await reject("The photo page is blurred.")).status).toBe(200);
+    await drain();
+    expect(rejectedMails()).toHaveLength(1);
+    const mail = rejectedMails()[0];
+    expect(mail.data).toMatchObject({ vacancy_title: "Partnerships Manager", document_title: "Valid ID", guarantor_name: null, reason: "The photo page is blurred." });
+    expect((await pub().get(`/onboard/${uploadToken(mail)}`)).status).toBe(200);
+    expect((await pub().get(`/onboard/${hire.link}`)).status).toBe(200);
+
+    // Sent again: one entry on the hire's record, the rejected file kept as its first version.
+    const second = await send("id.pdf");
+    expect(await doc(second)).toEqual({ title: "Valid ID", version: 2, supersedes_id: first, is_current: true });
+    expect((await doc(first)).is_current).toBe(false);
+    expect(await onRecord()).toEqual([second]);
+
+    // Rejected and sent again before the mail went: nothing is mailed, and the chain goes on.
+    expect((await reject("Wrong document.")).status).toBe(200);
+    const third = await send("id-again.pdf");
+    await drain();
+    expect(rejectedMails()).toHaveLength(1);
+    expect(await doc(third)).toMatchObject({ version: 3, supersedes_id: second, is_current: true });
+    expect(await onRecord()).toEqual([third]);
+
+    // A guarantor whose check fails: mailed by name, never with the check's note; corrected, their new
+    // form replaces the old one. A passed check is mailed to nobody.
+    const form = (await pub().post(`/onboard/${hire.link}/files`).attach("file", PDF, "form.pdf")).body.document_id;
+    expect((await pub().post(`/onboard/${hire.link}/guarantors`).send(guarantorBody(1, "previous_employer", { form, id: form }))).status).toBe(200);
+    let g = (await h.as("ops").get(url)).body.guarantors[0];
+    const check = (status) => h.as("ops").post(`${url}/guarantors/${g.onboarding_guarantor_id}/check`).send({ check_status: status, check_note: "Their number was not theirs." });
+    expect((await check("failed")).status).toBe(200);
+    await drain();
+    expect(rejectedMails()).toHaveLength(2);
+    const failed = rejectedMails()[1];
+    expect(failed.data).toMatchObject({ document_title: null, guarantor_name: "Kunle Bello", reason: null });
+    expect(JSON.stringify(failed)).not.toContain("Their number was not theirs");
+    const form2 = (await pub().post(`/onboard/${hire.link}/files`).attach("file", PDF, "form-2.pdf")).body.document_id;
+    expect((await pub().post(`/onboard/${hire.link}/guarantors`).send(guarantorBody(1, "previous_employer", { form: form2, id: form2 }))).status).toBe(200);
+    expect(await doc(form2)).toMatchObject({ version: 2, supersedes_id: form, is_current: true });
+    g = (await h.as("ops").get(url)).body.guarantors[0];
+    expect((await check("passed")).status).toBe(200);
+    await drain();
+    expect(rejectedMails()).toHaveLength(2);
+  }, 180_000);
+
   test("Send Reminder makes a fresh link and stops the earlier one; Not Progressing ends the case as Withdraw does", async () => {
     const hire = await hiredToDocumentation("Chuka");
     const reminded = await h.as("ops").post(`/recruitment/onboarding/${hire.onboarding_case_id}/remind`).send({});

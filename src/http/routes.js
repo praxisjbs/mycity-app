@@ -102,6 +102,7 @@ function buildRoutes(opts = {}) {
     }),
     rateLimit.publicLimiter,
     rateLimit.publicWriteLimiter,
+    rateLimit.onboardLimiter,
     pub,
   );
 

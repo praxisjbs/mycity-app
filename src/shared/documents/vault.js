@@ -422,6 +422,48 @@ async function setTitle(client, documentId, title) {
 }
 
 /**
+ * Make a file already stored the next version of another: a stranger's replacement for a file of
+ * theirs that was refused (a hire's second passport photograph after the first was rejected on the
+ * onboarding case). The older one stays, in the newer one's versions, and leaves the lists that show
+ * current documents only, so a person's record shows one entry for one requirement. Both must be on
+ * the same record. Nothing changes when they are the same file, or the older one is no longer
+ * current (already replaced). Refused for a locked document, as supersede() is.
+ * @returns {Promise<boolean>} whether the older file was replaced now
+ */
+async function follow(client, { document_id: newId, supersedes_id: oldId, actor = null }) {
+  if (!inTransaction(client))
+    throw new Error("vault.follow must run inside atomically()");
+  if (!oldId || !newId || oldId === newId) return false;
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS} FROM document WHERE document_id = ANY($1::uuid[]) ORDER BY document_id FOR UPDATE`,
+    [[oldId, newId]],
+  );
+  const old = rows.find((r) => r.document_id === oldId);
+  const next = rows.find((r) => r.document_id === newId);
+  if (!next) throw new AppError("NOT_FOUND", "Document not found", 404);
+  if (!old || !old.is_current) return false;
+  if (old.entity_type !== next.entity_type || old.entity_id !== next.entity_id)
+    throw new Error("vault.follow: both files must be on the same record");
+  if (next.supersedes_id || !next.is_current)
+    throw new Error("vault.follow: the newer file already follows another");
+  if (old.locked_at)
+    throw new AppError("DOCUMENT_LOCKED", "This document is locked and cannot be replaced", 409);
+  await client.query("UPDATE document SET is_current = false WHERE document_id = $1", [oldId]);
+  await client.query(
+    "UPDATE document SET supersedes_id = $2, version = $3 WHERE document_id = $1",
+    [newId, oldId, old.version + 1],
+  );
+  await emit(client, {
+    key: EVENTS.DOCUMENT_SUPERSEDED,
+    entity: { type: "document", id: newId },
+    module: moduleFor(old.entity_type),
+    actor,
+    payload: { document_id: newId, supersedes_id: oldId, version: old.version + 1 },
+  });
+  return true;
+}
+
+/**
  * Remove a document that was only ever meant to be kept for a while (an export, a day after
  * it was made: shared/documents/exports.js). The row and its derived files' rows go now, inside
  * the caller's transaction, with `document.removed` on the record; the bytes go after commit,
@@ -878,6 +920,7 @@ module.exports = {
   STAGED_DOC_TYPE,
   lock,
   setTitle,
+  follow,
   remove,
   removeFiles,
   TRANSIENT_MINUTES,

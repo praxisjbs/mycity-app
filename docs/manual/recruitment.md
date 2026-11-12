@@ -208,9 +208,9 @@ three test parts are off, and **Interview** when the interview part is off.
 
 ### Change the candidate emails {#recruitment-vacancies-emails needs="recruitment edit"}
 
-Candidates get nine emails: application received, invitation to apply, assessment, interview, not
-progressing, offer sent, offer signed, contract sent and onboarding documents. The last four go out
-from Offers and Onboarding.
+Candidates get ten emails: application received, invitation to apply, assessment, interview, not
+progressing, offer sent, offer signed, contract sent, onboarding documents and document rejected. The
+last five go out from Offers and Onboarding.
 
 1. Open [Recruitment · Vacancies](/recruitment?tab=vacancies).
 2. Press **Candidate Emails** at the top.
@@ -889,13 +889,14 @@ cases but does not check them.
 1. Open the case on [Recruitment · Onboarding](/recruitment?tab=onboarding).
 2. Under **Documents**, press **View File** to open what they sent.
 3. Press **Verify** if it is right. A file still being scanned for viruses cannot be verified yet.
-4. Or press **Reject**, type the **Reason** and press **Reject Document**. The hire reads it beside
-   the document on their page and sends another.
+4. Or press **Reject**, type the **Reason** and press **Reject Document**. The hire is emailed the
+   reason with a fresh link, and sends another. Their record keeps one entry for the document.
 
 To check a guarantor, press **View Form** and **View ID**, call them, then press **Record Check**
 under their name. Pick **Passed** or **Failed** under **Outcome**, add a **Note** if you like, and
 press **Record Check**. A guarantor cannot pass until the hire has sent their signed form and ID copy.
-A failed guarantor is changed by the hire, and checked again.
+A failed guarantor is changed by the hire, and checked again. The hire is emailed to do it, without
+your note.
 
 When every required document is verified, both guarantors have passed, the BVN and home address are
 entered and the contract is signed, the case moves to **Pre-Onboarding** by itself.
