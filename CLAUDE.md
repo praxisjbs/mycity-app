@@ -276,5 +276,5 @@ stands. Bugs found while filming are fixed in the same branch and logged there (
   person; nothing updates a legal figure by itself.
 
 Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M4, community and mailbox) · TB Tom-Blake
-Asaah (Home, M6, M9, M10, M11) · LA Love Adeola (migrations and data, attendance, M7) · AJ Adole
+Asaah (Home, M9, M10, M11) · LA Love Adeola (migrations and data, attendance, M6, M7) · AJ Adole
 Jerome (frontend foundation, ESS, M2, M5, M8).

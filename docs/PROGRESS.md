@@ -1284,13 +1284,14 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 |---|---|---|---|---|---|---|---|---|---|
 | 45 | Payroll Runs | `payroll-runs` | M6 | LA | ☑ | ☑ | ☑ | Built | 11/11/2026 |
 | 46 | Payslips | `payslips` | M6 | LA | ☑ | ☑ | ☑ | Built | 11/11/2026 |
-| 47 | Salary Structure | `salary-structure` | M6 | TB | ☐ | ☐ | ☐ | Dropped | 09/11/2026 |
+| 47 | Salary Structure | `salary-structure` | M6 | LA | ☐ | ☐ | ☐ | Dropped | 12/11/2026 |
 | 48 | Deductions | `deductions` | M6 | LA | ☑ | ☑ | ☑ | Built | 11/11/2026 |
-| 49 | Statutory | `statutory` | M6 | TB | ☐ | ☐ | ☐ | Dropped | 09/11/2026 |
+| 49 | Statutory | `statutory` | M6 | LA | ☐ | ☐ | ☐ | Dropped | 12/11/2026 |
 | 109 | Configurations | `configurations` | M6 | LA | ☑ | ☑ | ☑ | Built | 11/11/2026 |
 
 **Notes**
 
+- 12/11/2026 · JP · M6 ownership and statutory decisions (JBS Praxis; `docs/guides/payroll.md` §13.1 items 38 to 40; documentation only). LA owns M6 in full, so the Owner of #47 and #49 (Dropped) is now LA as #45, #46, #48 and #109 already were; #11 My Payslips keeps AJ. MyCity has no accountant and applies no statutory deduction yet: the advanced option stays built and shipped off, and Operations & People enter the cited figures on Configurations when they start. PAYE's bands are scaled to the months elapsed in the calendar year. No status changes. Left: PR 10, PR 11 (now LA's) and PR 8.
 - 12/11/2026 · JP · M6 PR 9, fourth research pass (`docs/guides/payroll.md` §6.16; documentation only). No row moves. Settled from the agencies: pension covers employers of three or more (PenCom), NHF is 2.5% of the month's gross pay (FMBN), the 2024 minimum wage Act is in force from 29 July 2024 at ₦70,000 a month (the wage commission's circulars; the Board's figure). Left: how the PAYE bands apply to part of a year, and the accountant's confirmation (TB); then PR 11.
 - 12/11/2026 · JP · M6 PR 9, third research pass, from the documents JBS Praxis attached (`docs/guides/payroll.md` §6.16; documentation only). No row moves. Now from their texts: PAYE is computed cumulatively over the year to date and refunded when the cumulative tax falls (the 2002 PAYE Regulations and the Joint Revenue Board's Guidelines 2026); the employer gives rent relief in PAYE on the person's evidence; PAYE is remitted by the 10th; the minimum wage for PAYE is ₦70,000 a month. Still for the accountant: how the bands apply to part of a year, the pension threshold (the Act says 15 and three), NHF's base. Left: the accountant's confirmation (TB), then PR 11, whose scope now includes the cumulative PAYE with refunds and rent relief.
 - 11/11/2026 · JP · M6 PR 12, notification email links (`docs/guides/payroll.md` Appendix A, `m6/notification-links`): no row moves and no status changes. "Your payslip is ready", "Deduction Scheduled" and "Fine Waived" now email a person without `payroll` a link to ESS · My Payslips, the screen their bell opens, and a Payroll reader's own payslip email opens Payroll · Payslips (`notifications.service.readerLink`, one link for the bell, push and email). The definition of done's "the link in each opens the same screen" holds for every payroll notice. Tests: `tests/integration/ai-actions-payroll.test.js` (2 new; both fail on the old code). Left: PR 9, PR 10, PR 11, then PR 8.

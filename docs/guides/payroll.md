@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Owner | TB; the screens are LA's (JBS Praxis, 09/11/2026) |
+| Owner | LA: the milestone, its backend and its screens (JBS Praxis, 12/11/2026, §13.1 item 40; TB owned it until then, with LA on the screens from 09/11/2026) |
 | Milestone | M6 |
 | Backend modules | `payroll`, `payslips`, `deductions`, `salary_structure`, `statutory` |
 | Frontend paths | `app/src/features/payroll/`, `app/src/features/ess/Payslips.tsx` |
@@ -32,7 +32,7 @@ no decision.
   settle, stop and raise it; do not pick.
 - **Changing M6:** change this guide first, in the same pull request as the code, with a Change log line
   (§14). A decision that changes behaviour is recorded in §13 with its date and who took it. Never
-  re-open §13.1; a decision in §13.2 may be changed by TB with a line in §14.
+  re-open §13.1; a decision in §13.2 may be changed by LA with a line in §14.
 - **Before you write code** also read what CLAUDE.md step 2 lists for your task type. Appendix A names,
   in each pull request, the other guides and chapters that PR must change.
 - **Reading order for a newcomer:** §0 and §1 (what and why), §3 (how it flows), §6 (the rules, the
@@ -86,7 +86,7 @@ no decision.
 | JBS Praxis's answers, 08/11/2026 and 09/11/2026 | Statutory built and shipped off; advances recorded by Operations & People; the CEO approves; a leaver's instalments and a negative net; no recurring allowances in simple mode; both payslips as modals; test people on staging; the payslip sample drafted; the rates, conventions, pay day and staff pay data as configuration MyCity enters in the app; LA builds the screens; Written ticked after the merge | Decisions (§13.1) |
 | `docs/guides/attendance.md` §6.17, `queries.md` §6.6, `ess.md` | What attendance and queries hand to payroll and what My Payslips shows | Contracts this guide meets |
 | `docs/DATABASE_SCHEMA.md` M1, M3 and M6 | What exists and what payroll owes | Facts |
-| The primary legal texts read in PR 9, 11/11/2026 (§6.16) | Every statutory figure: its instrument, section, base, threshold and date | Binding for the figures once MyCity's accountant confirms the register (§13.1 item 38); until then none is entered |
+| The primary legal texts read in PR 9, 11/11/2026 (§6.16) | Every statutory figure: its instrument, section, base, threshold and date | Binding for the figures, which Operations & People enter with their sources when MyCity starts statutory payroll (§13.1 item 38) |
 | Not sources | `demo.html` (look only), the mock, the donors' rates and bands, the demo's PAYE bands, Gemini's summaries where the transcript says otherwise, secondary summaries of the law (firms, payroll vendors, the press), which only point to where a text is | Never |
 
 ### 0.3 The starting point (verified 08/11/2026)
@@ -228,8 +228,8 @@ Repayment" in its month's run → the person is told when it is recorded, and se
 picks a date (today or later, never earlier) → refused (409 `NO_RATES`) unless at least one statutory rate is in
 force on that date, and (409 `NO_CONVENTIONS`) unless the three conventions are set → saved as a new version of the
 setting. MyCity enters the rates first, on the same screen, while the option is still off (Statutory Items and PAYE
-Bands are always there, §13.1 item 25), and sets the three conventions in the Switch On request itself, when its
-accountant has confirmed them; no build step waits for them. Runs for months before the date stay simple and
+Bands are always there, §13.1 item 25), and sets the three conventions in the Switch On request itself, when
+Operations & People, who run MyCity's payroll, are ready to start (§13.1 item 38); no build step waits for them. Runs for months before the date stay simple and
 locked runs never change; a run for a month from the date computes statutory lines, shows Employer Cost and
 offers the Statutory Report.
 
@@ -774,7 +774,8 @@ suspension into absent days), so payroll does, from the owners' records:
    needing `payroll.configure`: **Pay Day**; **Bank Details Required** (a person with no bank details blocks Submit);
    and, in advanced mode, the statutory rates and bands, the three conventions (PAYE basis, whether pension reduces
    taxable pay, whether NHF does) and the pay components. Every figure and every convention is entered in the app
-   by MyCity when its accountant confirms it; no build step waits for one. Every person's salary and bank details
+   by Operations & People, who run MyCity's payroll, when MyCity starts statutory payroll (§13.1 item 38); no build
+   step waits for one. Every person's salary and bank details
    are entered on People · Employees or through the staff import (nothing in payroll creates them), and the run
    reports each one missing (§6.15).
 4. **Gated pieces.** Statutory Items and PAYE Bands are on Configurations whatever the option's state, so the
@@ -835,7 +836,7 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    rates they were paid at, and a locked run never changes. Nothing fetches rates from the tax authority: a person
    enters every change, and the engine never defaults one. In code: the set of items (PAYE, employee and employer
    pension, NHF, ITF, NSITF, relief) and the shape of the formula. A new kind of levy or a different formula is a small
-   code change reviewed with MyCity's accountant, not a configuration.
+   code change reviewed with Operations & People, not a configuration.
 8. **The bases, as built (PR 5; §13.2 item 24).** `gross` is the month's earnings on the slip: Monthly Pay or the
    pay split, overtime and earning adjustments; attendance deductions, unpaid days, fines and advances come off the
    net after the statutory items and do not reduce a base. `basic` is the `basic` component as paid (the whole
@@ -866,9 +867,9 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    tax falls below what was deducted, the employer refunds the difference (reg 4(2)), and a joiner's figures carry over
    from the previous employer's leaving certificate (reg 5). The `annualised` reading as built (the month × 12, the bands,
    ÷ 12) is not that method, and the `monthly` reading (bands entered as monthly amounts) has no source. So PR 11 computes
-   PAYE cumulatively over the calendar year, and fixes `paye_basis` (the column stays) to that reading; how the year's bands
-   apply to the pay to date (in full, or pro-rated to the months elapsed) is not stated in either text, and MyCity's
-   accountant or the relevant tax authority's tax tables settle it. PAYE is remitted by the 10th of the next month
+   PAYE cumulatively over the calendar year with **the year's bands scaled to the months elapsed** (JBS Praxis,
+   12/11/2026, §13.1 item 39: neither text says how the bands apply to part of a year), and fixes `paye_basis` (the
+   column stays) to that reading. PAYE is remitted by the 10th of the next month
    (Guidelines para 12.2; Regulations reg 7(1)). PAYE Basis leaves the screen in PR 10. **ITF** is by law a year's contribution, 1% of the calendar year's
    payroll paid by 1 April of the next year (Industrial Training Fund Act, s.6 and s.16), and **NSITF** a monthly one
    (Employee's Compensation Act 2010, s.33(1)); both are computed in each run as 1% of the month's payroll, which adds up
@@ -891,8 +892,8 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    the Pension Reform Act and under the National Housing Fund are eligible deductions, so they reduce chargeable income
    (Nigeria Tax Act 2025, s.30(1) and (2)(a)(iii) and (i)): PR 11 fixes `pension_reduces_taxable` and `nhf_reduces_taxable`
    true in the engine with that citation, and rule 11 fixes the PAYE basis. The texts read leave no statutory convention
-   to the employer, so PR 11 takes away the Conventions card, the three conventions of Switch On and `NO_CONVENTIONS`,
-   unless MyCity's accountant names a point the law leaves open. The employer allows both in PAYE on the deduction record,
+   to the employer, so PR 11 takes away the Conventions card, the three conventions of Switch On and `NO_CONVENTIONS`.
+   The employer allows both in PAYE on the deduction record,
    "subject to appropriate documentary evidence", pension "limited to the actual amount deducted and remitted to an
    approved Pension Fund Administrator" (the Joint Revenue Board's Guidelines 2026, paras 7.3, 8.1 and 8.3).
 15. **The relief, as the Nigeria Tax Act 2025 has it** (§13.3 item 2, answered by PR 9). The `relief` item as
@@ -908,7 +909,8 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    that each tenant of a shared tenancy claims on their own share (para 9.3). PR 11 removes the item's present shape and
    builds rent relief that way: a person's declared rent for the year with its evidence document, the year's relief
    (20% of it, at most ₦500,000, both entered as a version with their source) taken through the cumulative reliefs of the
-   year to date (rule 11). No relief is entered before MyCity's accountant confirms the register (§13.1 item 38).
+   year to date (rule 11). Operations & People enter the 20% and the cap with their source when MyCity starts statutory
+   payroll (§13.1 item 38).
 
 ### 6.13 Money, privacy and dates
 
@@ -975,8 +977,8 @@ that is not a component of the person's split (§6.11 rule 6).
 Every statutory figure the engine may apply is listed here with the instrument it comes from (TB, 11/11/2026, §13.1
 item 31). PR 9 researched each one from the primary text on 11/11/2026 (JP, in a session whose network was opened to the
 government and gazette sites named in the second table for the research and closed again after it; CLAUDE.md, "Research
-has sources"). **Nothing here is entered on Configurations until MyCity's accountant has confirmed the register**
-(§13.1 item 38, pending; TB obtains it). MyCity then enters each figure as a new version from its date, with the section
+has sources"). **MyCity has no accountant and does not apply statutory deductions yet**
+(§13.1 item 38): when it starts, Operations & People, who run its payroll, enter each figure as a new version from its date, with the section
 and the document the second table names (PR 10's Source fields); a figure marked Unverified or No Legal Source is never
 entered as if it were law. **Confirmed** means a primary text read on that day says so; **Unverified** says what is
 missing; **No Legal Source** says why there is none. "Reported" marks what secondary summaries say, recorded only so the
@@ -985,7 +987,7 @@ next reader knows what to look for; it is never a citation.
 | Item | Status | Instrument and section | Figure | Base | Threshold | In force from | Monthly? |
 |---|---|---|---|---|---|---|---|
 | PAYE bands (`paye`) | Confirmed | Nigeria Tax Act, 2025 (No. 7 of 2025), s.58 and the Fourth Schedule, "Individuals' Income Tax Rates" (gazette p. A538; p. A540 of the House's certified copy) | A year's bands of chargeable income: the first ₦800,000 at 0%, the next ₦2,200,000 at 15%, the next ₦9,000,000 at 18%, the next ₦13,000,000 at 21%, the next ₦25,000,000 at 23%, above ₦50,000,000 at 25%. As Set Bands takes them: 0 to 800,000 at 0; 800,000 to 3,000,000 at 15; 3,000,000 to 12,000,000 at 18; 12,000,000 to 25,000,000 at 21; 25,000,000 to 50,000,000 at 23; 50,000,000 with no limit at 25 | Chargeable income: total income (s.28, employment income among it) less the eligible deductions of s.30; the Schedule applies "after the relief allowance and exemptions" of s.30(1) | None, except that s.58 does not charge an individual earning the minimum wage (the minimum-wage row) | 1 January 2026 (the Act's commencement note; s.203) | No: the bands are a year's ("in respect of each year of assessment", s.58; the year of assessment is 1 January to 31 December, s.202). Deducted monthly: the next row |
-| PAYE, the monthly deduction (`paye_basis`) | Confirmed for the method; Unverified for how the bands are read over part of a year | Nigeria Tax Administration Act, 2025 (No. 5 of 2025), s.51(6), (7) and (9); the Operation of Pay-As-You-Earn (PAYE) Regulations (S.I. 18 of 2002), regs 3, 4 and 5, kept in force by the Nigeria Tax Act, 2025, s.199(b); the Joint Revenue Board's Personal Income Tax Guidelines, 2026, paras 7 and 8 | The employer deducts the tax from every payment of emoluments (s.51(6)) so that the year's deductions equal the year's tax (s.51(7)), and does it **cumulatively**: before each payment it works out the year-to-date emoluments, the year-to-date reliefs and eligible deductions, the cumulative taxable emoluments and "the corresponding cumulative tax", and deducts the difference from what it has already deducted (Regulations reg 3 and 4(1); Guidelines paras 7.5 to 7.7: "the tax, if any, deducted or repaid on making the payment"). "Where the cumulative tax is less than the previous cumulative tax, the employer shall refund the difference to the employee" (reg 4(2)). A joiner's year-to-date figures carry over from the previous employer's leaving certificate (reg 4(3), reg 5(2)(b)). Neither text says whether the cumulative tax applies the year's bands in full to the pay to date or the bands pro-rated to the months elapsed: the relevant tax authority's tax tables or MyCity's accountant settle it | Emoluments: "remunerations including all allowances, salaries, wages, perquisites, bonuses, and other forms of compensation" (Guidelines para 1); bonuses, overtime and commission are taxed when paid (para 13) | None | The Regulations since 1 January 2002; the Administration Act from 26 June 2025; the Guidelines dated 24 February 2026 | Yes, from every month's pay, on the year to date. The engine's `annualised` reading (the month × 12, the bands, ÷ 12) is not the prescribed method, and the `monthly` reading (bands entered as monthly amounts) has no source (§6.12 rule 11) |
+| PAYE, the monthly deduction (`paye_basis`) | Confirmed for the method; the band reading decided by JBS Praxis (§13.1 item 39) | Nigeria Tax Administration Act, 2025 (No. 5 of 2025), s.51(6), (7) and (9); the Operation of Pay-As-You-Earn (PAYE) Regulations (S.I. 18 of 2002), regs 3, 4 and 5, kept in force by the Nigeria Tax Act, 2025, s.199(b); the Joint Revenue Board's Personal Income Tax Guidelines, 2026, paras 7 and 8 | The employer deducts the tax from every payment of emoluments (s.51(6)) so that the year's deductions equal the year's tax (s.51(7)), and does it **cumulatively**: before each payment it works out the year-to-date emoluments, the year-to-date reliefs and eligible deductions, the cumulative taxable emoluments and "the corresponding cumulative tax", and deducts the difference from what it has already deducted (Regulations reg 3 and 4(1); Guidelines paras 7.5 to 7.7: "the tax, if any, deducted or repaid on making the payment"). "Where the cumulative tax is less than the previous cumulative tax, the employer shall refund the difference to the employee" (reg 4(2)). A joiner's year-to-date figures carry over from the previous employer's leaving certificate (reg 4(3), reg 5(2)(b)). Neither text says whether the cumulative tax applies the year's bands in full to the pay to date or the bands scaled to the months elapsed; **JBS Praxis decided on 12/11/2026 that they are scaled to the months elapsed in the calendar year** (§13.1 item 39): month m of 12 applies m/12 of each band to the cumulative taxable pay. No legal text names that reading; it meets s.51(7), a joiner's PAYE landing on the year's tax | Emoluments: "remunerations including all allowances, salaries, wages, perquisites, bonuses, and other forms of compensation" (Guidelines para 1); bonuses, overtime and commission are taxed when paid (para 13) | None | The Regulations since 1 January 2002; the Administration Act from 26 June 2025; the Guidelines dated 24 February 2026 | Yes, from every month's pay, on the year to date. The engine's `annualised` reading (the month × 12, the bands, ÷ 12) is not the prescribed method, and the `monthly` reading (bands entered as monthly amounts) has no source (§6.12 rule 11) |
 | PAYE, remittance and returns | Confirmed | Operation of PAYE Regulations 2002, reg 7(1) and reg 10; Deduction of Tax at Source (Withholding) Regulations, 2024 (S.I. No. 34 of 2024), reg 7(1)(b)(i); the Joint Revenue Board's Guidelines, 2026, paras 6.1, 12.1, 12.2 and 25; Nigeria Tax Administration Act, 2025, s.107(1), s.105, s.14 | PAYE is remitted "not later than the 10th day of the month following the deduction" (Guidelines para 12.2; "within ten days of the end of every month", Regulations reg 7(1) and Guidelines para 6.1; the same for PAYE paid to a State Internal Revenue Service, Withholding Regulations reg 7(1)(b)(i)), to the relevant tax authority, which for an employee resident in a State is that State's Internal Revenue Service (Guidelines para 25). A deduction not remitted by the 21st of the next month costs the amount, a penalty of 10% a year and interest at the Central Bank's monetary policy rate (NTAA s.107(1)); not deducting costs 40% (s.105). The employer files a return of every employee's emoluments, deductions and tax by 31 January for the year before (s.14(1) and (2); Guidelines para 12.1), and the employee files their own (s.14(3); by 31 March, Guidelines para 11.1) | n/a | n/a | As each instrument | The remittance is monthly, by the 10th; the return yearly |
 | Pension and NHF reduce taxable pay (`pension_reduces_taxable`, `nhf_reduces_taxable`) | Confirmed | Nigeria Tax Act, 2025, s.30(1) and (2)(a)(i) and (iii); s.31; s.32; the Joint Revenue Board's Guidelines, 2026, paras 7.3 and 8 | The individual's contributions under the National Housing Fund ((i)) and under the Pension Reform Act ((iii)) are eligible deductions: chargeable income is total income less them (and less National Health Insurance Scheme contributions, (ii), interest on a loan for an owner-occupied house, (iv), and life assurance premiums, (v), none of which payroll deducts). The employer records each contribution on the deduction record (Guidelines para 7.3) and they apply "subject to appropriate documentary evidence", NHF "limited to the actual amount contributed" and pension "limited to the actual amount deducted and remitted to an approved Pension Fund Administrator" (paras 8.1 and 8.3) | The contributions as actually made | None | 1 January 2026 | Yes: each month's contribution comes off that month's taxable pay. Both are law, not a convention (§6.12 rule 14) |
 | PAYE, the minimum-wage exemption (no item yet) | Confirmed | Nigeria Tax Act, 2025, s.58; s.163(1)(t) (s.162(1)(t) in the House's certified copy); "National Minimum Wage" in s.202; the Joint Revenue Board's Guidelines, 2026, the exempt employee's return; the National Minimum Wage (Amendment) Bill, 2024, clause 2 (new s.3(1)); the National Salaries, Incomes and Wages Commission's circulars SWC.04/T/140 (23 September 2024) and SWC/S/04/S.542/III/461 (27 September 2024) | The employment income of a person whose gross income from that employment is the national minimum wage or less is exempt (s.163(1)(t)), and s.58 charges no individual earning the minimum wage. The wage is "the extant minimum wage prescribed by the National Minimum Wage (Amendment) Act 2024" (s.202): **₦70,000 a month**, as the Board's return for an exempt employee asks ("Do you earn more than minimum wage of N70,000") and as the Bill set it ("not less than N70,000.00 per month"). The wage commission's circulars record "the enactment of the National Minimum Wage (Amendment) Act 2024" and apply it "with effect from the 29th July 2024". The Act's own text is not published anywhere this research could reach | Gross income from the employment | At or below ₦70,000 a month | The Act from 29 July 2024; the exemption from 1 January 2026 | Monthly: the month's gross against the monthly wage |
@@ -1022,8 +1024,8 @@ Revenue Service's consolidated text, PenCom's own copy of the Pension Reform Act
 for PAYE. **A fourth pass** (12/11/2026, at JBS Praxis's request) settled the three points the third left open, from the agencies
 that apply the law: the pension threshold from PenCom's own statement, the NHF base from FMBN's, and the minimum wage's
 enactment and date from the National Salaries, Incomes and Wages Commission's circulars. **Still not read, and what each
-would settle:** the relevant tax authority's PAYE tax tables or its word on how the bands apply to part of a year (the
-cumulative tax); the Pension Reform Act 2014 as gazetted (whether the gazette carries s.2(2)'s "15"); the National
+would settle:** the relevant tax authority's PAYE tax tables (they would confirm the band reading JBS Praxis decided,
+§13.1 item 39); the Pension Reform Act 2014 as gazetted (whether the gazette carries s.2(2)'s "15"); the National
 Minimum Wage (Amendment) Act 2024's own text (the figure itself rests on the Board's Guidelines and the Bill). Web searches and firms' summaries (KPMG, PwC, Mondaq, law firms' and payroll vendors' notes) were used only to
 find where each text is, and are cited for nothing.
 
@@ -1500,15 +1502,26 @@ Binding; never re-opened. Timestamps are the meeting's transcript.
     effort, each PR then built in a fresh chat from its own prompt with its effort named, parallel PRs and their merge
     order stated (Appendix A, "How the rest is planned"; CLAUDE.md, Working conventions).
 
-**PR 9, the statutory research register (11/11/2026):**
+**JBS Praxis, 12 November 2026** (after PR 9's research):
 
-38. [ ] **Statutory register confirmed by MyCity's accountant**: pending. TB obtains it: the accountant reads §6.16 (each
-    figure, its section, what stays Unverified) and the answers of §13.3 items 2 to 4, and says which stand; this line then
-    carries the date and who confirmed. Until then no statutory figure is entered on Configurations.
+38. **No accountant confirms the register; statutory waits until MyCity is ready.** MyCity has no accountant: Operations &
+    People run its payroll, and they do not apply statutory deductions yet. Statutory stays built and shipped off (item 8)
+    and must be ready to use and to configure on the day they start: Operations & People then enter each figure of §6.16
+    on Configurations with its source (§6.12 rule 12) and switch the option on. Nothing in the build waits for a
+    confirmation. This replaces the pending line "Statutory register confirmed by MyCity's accountant" of 11/11/2026, and
+    wherever items 8 and 21 speak of MyCity's accountant confirming rates or conventions, Operations & People do it.
+39. **PAYE's bands are scaled to the months elapsed in the calendar year.** Each month's cumulative tax applies m/12 of
+    each of the year's bands (m = the months of the calendar year so far) to the cumulative taxable pay, less the PAYE
+    already deducted in the year (§6.12 rule 11, §6.16). A steady earner pays the same each month, and a joiner's PAYE
+    lands on the year's tax (Tax Administration Act s.51(7)). No legal text names the reading; it is MyCity's choice
+    within the law.
+40. **LA owns M6 in full**: the milestone, its backend and its screens, the remaining pull requests (PR 8, PR 10, PR 11)
+    and the decisions this guide gives its owner (§0, §13.2, §13.3); TB hands over. #11 My Payslips keeps AJ as its Owner
+    (item 27), being an ESS screen.
 
 ### 13.2 Decided in writing this guide (change here if wrong)
 
-Each is TB's to change with a line in §14; each is the smallest reading that makes the settled items work.
+Each is LA's to change with a line in §14; each is the smallest reading that makes the settled items work.
 
 1. **One run per month, ever.** Discard deletes a Draft or Computed run (nothing was frozen); there is no cancelled state.
 2. **Five statuses:** `draft`, `computed`, `submitted`, `approved`, `paid`. The demo's Previewed is Computed and its
@@ -1546,7 +1559,7 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
 20. **`sanctions.fines.release`** is added (accepted back to pending before any instalment is in a run), GE reviewing.
 21. **Simple mode prints one Monthly Pay line;** the split into basic, housing and transport exists only in advanced mode.
 22. **The configuration options are one toggle (Bank Details Required) and three conventions** (§13.1 item 21), chosen from
-    the donor's shape and the ways a Nigerian accountant can read PAYE; TB may add, rename or drop one with a line in §14.
+    the donor's shape and the ways a Nigerian accountant can read PAYE; LA may add, rename or drop one with a line in §14.
     **Amended 11/11/2026 (§13.1 items 30 and 34):** PAYE Basis leaves the screen (it read as a choice of when to deduct),
     and the other two stay only if PR 9 finds the law leaves them to the employer. PR 9 (11/11/2026) found that it does
     not: both are eligible deductions under the Nigeria Tax Act 2025, s.30(2)(a), so PR 11 fixes them (§6.12 rule 14).
@@ -1555,7 +1568,7 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
 24. **The statutory bases and PAYE's shape, as PR 5 built them** (§6.12 rules 8 and 9): gross is the month's earnings
     (Monthly Pay or the split, overtime, earning adjustments) and the post-tax deductions reduce no base; ITF and NSITF
     are the month's gross at their rate; the relief's flat amount is read as annual or monthly by the PAYE basis, as the
-    bands are. The accountant may read any of these differently: it is a small code change reviewed with them (§6.12
+    bands are. Operations & People may read any of these differently: it is a small code change reviewed with them (§6.12
     rule 7), recorded here.
 25. **A pay split is used only while it adds up to the gross** (§6.11 rule 6): it must on saving, and a run treats one the
     gross has moved away from as no split (No Pay Split), rather than scale it silently.
@@ -1583,13 +1596,21 @@ Each is TB's to change with a line in §14; each is the smallest reading that ma
 
 | # | Question | Decides | Needed before | Meanwhile |
 |---|---|---|---|---|
-| 1 | Sign-off of the payslip sample (§13.1 item 20) | TB shows Cynthia | PR 4 | The sample is the draft in `docs/MyCity-ERP-Documents/payroll-samples/`; PR 4 built `templates/documents/payslip.html` from it as drafted (the letterhead supplies the logo, the organisation's line and the date; the number, the month and the person's block are in the body) and it is changed when MyCity answers |
-| 2 | Does the Nigeria Tax Act 2025 leave payroll any relief to apply, and in what shape (§6.12 rule 15)? | PR 9's research, MyCity's accountant | PR 11 | **Answered (PR 9), for the accountant to confirm:** the Consolidated Relief Allowance has no source from 1 January 2026 (the Personal Income Tax Act is repealed, NTA s.196(g)); the one relief is rent relief, 20% of the year's rent paid, at most ₦500,000 (s.30(2)(a)(vi)), and the employer gives it in PAYE on the person's information and evidence (the Joint Revenue Board's Guidelines 2026, paras 7.4 and 9). No relief is entered before the register is confirmed; the item stays as built until PR 11 |
-| 3 | The ITF threshold and base, and whether NHF is mandatory for MyCity's private-sector staff (§6.16) | PR 9's research, MyCity's accountant | PR 11 | **Answered (PR 9), for the accountant to confirm:** ITF is 1% of annual payroll (basic pay, allowances and other entitlements) for an employer with 25 or more employees not operating within a free trade zone (ITF Act s.6(1) as substituted by the Business Facilitation Act 2022, s.41; s.16 as inserted in 2011), due by 1 April of the next year; the 5-employee or ₦50 million test of 2011 no longer applies. NHF is voluntary for private-sector employees: such an employee "may contribute" 2.5% of monthly income (NHF Act s.4(1)(b) as substituted by the 2022 Act, s.45). The NHF base is the month's gross pay: the 2023 s.4 says "monthly income" and FMBN states the contribution as "2.5% of the monthly gross salary"; s.26's "basic monthly salaries" is the original Act's word. Neither is entered |
-| 4 | Do pension and NHF apply to staff treated as contractors and consultants (§13.1 item 14)? | PR 9's research, MyCity's accountant | Switching the option on | **Open.** NHF through payroll is an employee's choice (NHF Act s.4(1)); a self-employed person contributes on their own (s.4(2)), not through MyCity's payroll. Pension reaches an "employee", "any person employed in" a private company, organisation or firm (Pension Reform Act 2014, s.120), of an organisation of three or more employees, as PenCom applies the Act (s.120; s.2(2) says 15), and a self-employed person may join voluntarily (s.2(3)). The ITF and Employee's Compensation Acts reach an "employee" (ITF Act s.16; ECA s.73, a contract of employment, oral or written), so whether MyCity's contractors and consultants are employees under them turns on their contracts, for MyCity's accountant and lawyer. PAYE is the tax on an employee's emoluments (Administration Act s.51(6)); a payment to a person who is not an employee falls under deduction at source (s.51(1)): 5% of a resident's consultancy or professional fees, twice that without a Tax Identification Number (Deduction of Tax at Source (Withholding) Regulations 2024, First Schedule and reg 3(c), kept in force by NTA s.199(b)), which MyCity deducts as a body corporate unless it is a small company within reg 4(2); the Joint Revenue Board's Guidelines 2026 name "contractors, consultants" among the non-employees this covers (para 14.1), while a temporary employee's pay is taxed through PAYE (para 13.1). Simple mode pays such a person through payroll with nothing deducted: the accountant is asked whether that stands. The option stays off |
+| 1 | Sign-off of the payslip sample (§13.1 item 20) | LA shows Cynthia | PR 4 | The sample is the draft in `docs/MyCity-ERP-Documents/payroll-samples/`; PR 4 built `templates/documents/payslip.html` from it as drafted (the letterhead supplies the logo, the organisation's line and the date; the number, the month and the person's block are in the body) and it is changed when MyCity answers |
+| 2 | Does the Nigeria Tax Act 2025 leave payroll any relief to apply, and in what shape (§6.12 rule 15)? | PR 9's research; Operations & People | PR 11 | **Answered (PR 9):** the Consolidated Relief Allowance has no source from 1 January 2026 (the Personal Income Tax Act is repealed, NTA s.196(g)); the one relief is rent relief, 20% of the year's rent paid, at most ₦500,000 (s.30(2)(a)(vi)), and the employer gives it in PAYE on the person's information and evidence (the Joint Revenue Board's Guidelines 2026, paras 7.4 and 9). No relief is entered before the register is confirmed; the item stays as built until PR 11 |
+| 3 | The ITF threshold and base, and whether NHF is mandatory for MyCity's private-sector staff (§6.16) | PR 9's research; Operations & People | PR 11 | **Answered (PR 9):** ITF is 1% of annual payroll (basic pay, allowances and other entitlements) for an employer with 25 or more employees not operating within a free trade zone (ITF Act s.6(1) as substituted by the Business Facilitation Act 2022, s.41; s.16 as inserted in 2011), due by 1 April of the next year; the 5-employee or ₦50 million test of 2011 no longer applies. NHF is voluntary for private-sector employees: such an employee "may contribute" 2.5% of monthly income (NHF Act s.4(1)(b) as substituted by the 2022 Act, s.45). The NHF base is the month's gross pay: the 2023 s.4 says "monthly income" and FMBN states the contribution as "2.5% of the monthly gross salary"; s.26's "basic monthly salaries" is the original Act's word. Neither is entered |
+| 4 | Do pension and NHF apply to staff treated as contractors and consultants (§13.1 item 14)? | PR 9's research; Operations & People | Switching the option on | **Open.** NHF through payroll is an employee's choice (NHF Act s.4(1)); a self-employed person contributes on their own (s.4(2)), not through MyCity's payroll. Pension reaches an "employee", "any person employed in" a private company, organisation or firm (Pension Reform Act 2014, s.120), of an organisation of three or more employees, as PenCom applies the Act (s.120; s.2(2) says 15), and a self-employed person may join voluntarily (s.2(3)). The ITF and Employee's Compensation Acts reach an "employee" (ITF Act s.16; ECA s.73, a contract of employment, oral or written), so whether MyCity's contractors and consultants are employees under them turns on their contracts, for Operations & People (with legal advice where they need it). PAYE is the tax on an employee's emoluments (Administration Act s.51(6)); a payment to a person who is not an employee falls under deduction at source (s.51(1)): 5% of a resident's consultancy or professional fees, twice that without a Tax Identification Number (Deduction of Tax at Source (Withholding) Regulations 2024, First Schedule and reg 3(c), kept in force by NTA s.199(b)), which MyCity deducts as a body corporate unless it is a small company within reg 4(2); the Joint Revenue Board's Guidelines 2026 name "contractors, consultants" among the non-employees this covers (para 14.1), while a temporary employee's pay is taxed through PAYE (para 13.1). Simple mode pays such a person through payroll with nothing deducted: Operations & People decide whether that stands. The option stays off |
+| 5 | When the option is switched on mid-year, does each person's year start at zero, or are earlier months' pay and tax entered? | LA with Operations & People | PR 11 | Recommended: zero unless entered, since MyCity deducted no PAYE before |
+| 6 | A joiner with no leaving certificate from a previous employer (Regulations reg 5): does their year start at zero? | LA with Operations & People | PR 11 | Recommended: zero, as item 5 |
+| 7 | Is the minimum-wage exemption tested month by month or on the year's pay? | LA with Operations & People | PR 11 | Recommended: month by month, as the Board's exempt-employee return asks about the monthly wage |
+| 8 | Is the year's rent relief given whole in the month it is declared, or scaled to the months elapsed like the bands? | LA with Operations & People | PR 11 | Recommended: scaled to the months elapsed (item 39), so each month's PAYE stays even |
+| 9 | A PAYE refund (Regulations reg 4(2)) needs a line of its own, since a line is never negative (§6.8 rule 3) | LA | PR 11 | Recommended: an earning line, PAYE Refund |
+| 10 | Does payroll produce a leaver's certificate of pay and tax to date (Regulations regs 4(3) and 5(1))? | LA | PR 11 or later | Not built until decided |
+| 11 | PAYE goes to the State where each employee lives (Guidelines para 25): each person's State of residence on People · Employees, and the statutory report split by State | LA | PR 11 | Recommended: both |
 
-Items 2 to 4 carry PR 9's answers with their citations (§6.16); each closes, and moves to §13.1, once MyCity's accountant
-has confirmed the register (§13.1 item 38).
+Items 2 and 3 carry PR 9's answers with their citations (§6.16) and need no confirmation (§13.1 item 38); item 4 is for
+Operations & People before the option is switched on. Items 5 to 11 are how MyCity applies PAYE in PR 11, each with a
+recommendation; LA settles them with Operations & People and moves each to §13.1.
 
 Answered and moved to §13.1: the approver (item 7), a leaver's instalments and a negative net (16), recurring
 allowances (17), the ESS modal (18), staging mail (19), the statutory rates, the accountant's conventions, the pay day
@@ -1611,11 +1632,11 @@ the team has, at high effort.
 
 | PR | Scope | Lane, owner | Size | Model and effort | Needs merged first | Runs in parallel with |
 |---|---|---|---|---|---|---|
-| 9 | The statutory research register (docs only, network on) | LA, TB reviews, MyCity's accountant confirms | M | Most capable, high | nothing | 10, 12 |
-| 10 | Legal sources on every version, Remove Change, monthly wording, Last Day of Month | Full stack, LA (screens) and TB (backend) | M | Most capable, high | nothing | 9, 12 |
+| 9 | The statutory research register (docs only, network on) | LA | M | Most capable, high | nothing | 10, 12 |
+| 10 | Legal sources on every version, Remove Change, monthly wording, Last Day of Month | Full stack, LA | M | Most capable, high | nothing | 9, 12 |
 | 12 | Notification email links open the reader's own screen | Backend, GE (notifications) | S | Standard model, high | nothing | 9, 10 |
-| 11 | The statutory engine reworked to the research (PAYE on the year to date, the relief, the conventions fixed, NHF by choice, the minimum-wage exemption, ITF and NSITF as cited, the tax numbers on People · Employees) | Full stack, TB | L (grown from M by PR 9's findings) | Most capable, high | 9 and 10 | 8's seed only |
-| 8 | Staging seed, User Guide chapters with pictures, stubs, release check | Docs and seed, LA with TB | M | Standard model, high | 10, 11 and 12 for the pictures | 11 (seed only) |
+| 11 | The statutory engine reworked to the research (PAYE on the year to date, the relief, the conventions fixed, NHF by choice, the minimum-wage exemption, ITF and NSITF as cited, the tax numbers on People · Employees) | Full stack, LA | L (grown from M by PR 9's findings) | Most capable, high | 9 and 10 | 8's seed only |
+| 8 | Staging seed, User Guide chapters with pictures, stubs, release check | Docs and seed, LA | M | Standard model, high | 10, 11 and 12 for the pictures | 11 (seed only) |
 
 **Merge order:** PR 10 before PR 11 (both change `Configurations.tsx`, `statutory.js` and the statutory service), PR 9
 before PR 11 (PR 11 builds what PR 9 records), PR 12 any time, PR 8 last so its pictures show the final screens. PR 8's
@@ -1818,7 +1839,7 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   (§6.16's second table): the upload is made in the app, through PR 10's Source fields (`source_document_id`), since a
   documentation pull request cannot put a file in the vault.
 - Done when: every row of §6.16 is cited, or marked Unverified with what is missing, or No Legal Source with the reason,
-  and MyCity's accountant has confirmed it (§13.1 item 38, dated when it is).
+  ready for Operations & People to enter when MyCity starts statutory payroll (§13.1 item 38: MyCity has no accountant).
 - **Built 11/11/2026 (documentation only).** Read from the primary texts, each copy and day in §6.16's second table: the
   Nigeria Tax Act 2025 and the Nigeria Tax Administration Act 2025 as gazetted, each checked against the House's certified
   copy; the Business Facilitation (Miscellaneous Provisions) Act 2022, which replaced the NHF Act's s.4 and the ITF Act's
@@ -1830,15 +1851,15 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   PenCom's own copy of the Pension Reform Act 2014 and the National Minimum Wage (Amendment) Bill 2024; and, in a fourth
   pass the same day, the agencies' own statements that settle the pension threshold (PenCom: three or more employees),
   the NHF base (FMBN: the month's gross pay) and the minimum wage's enactment (the wage commission's circulars: in force
-  from 29 July 2024). Still not read: the relevant tax authority's tax tables (how the bands apply to part of a year), the
+  from 29 July 2024). Still not read: the relevant tax authority's tax tables (the band reading is decided, §13.1 item 39), the
   pension Act's gazette and the 2024 minimum wage Act's own text. What the findings
   change: PAYE is a year's bands deducted cumulatively over the year to date, with refunds; the Consolidated Relief
   Allowance has no source and rent relief is given in PAYE on the person's evidence; the minimum wage is ₦70,000; pension and NHF
   reduce taxable pay by law; NHF is voluntary for MyCity's staff and on monthly income; ITF needs 25 or more employees;
   NSITF's 1% is the Act's rate for its first two years and NSITF's stated rate today; pension is at least 8% and 10% of
   monthly emoluments, never less than basic, housing and transport; PAYE is remitted by the 10th. PR 11's scope (below)
-  and MILESTONES §11 follow. The accountant's
-  confirmation is TB's to obtain (§13.1 item 38).
+  and MILESTONES §11 follow. MyCity has no accountant: Operations & People enter the figures when MyCity starts
+  statutory payroll (§13.1 item 38), and JBS Praxis decided the band reading (§13.1 item 39).
 
 ### PR 10 · Legal sources, Remove Change and monthly wording (`m6/statutory-sources`)
 
@@ -1864,11 +1885,12 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   and 4; the Joint Revenue Board's Guidelines 2026, para 7), so the year's deductions equal the year's tax (Administration
   Act s.51(7)); a fall in the cumulative tax refunded to the person (reg 4(2)), which needs a refund line, since a line's
   amount is never negative (§6.8 rule 3); a joiner's pay and tax to date from a previous employer's leaving certificate
-  entered on the person for the year (reg 5); how the bands apply to part of a year, and how months before the option was
-  on count, as MyCity's accountant confirms;
+  entered on the person for the year (reg 5); the year's bands scaled to the months elapsed in the calendar year (§13.1
+  item 39); months before the option was on, a joiner without a certificate, the minimum-wage test and rent relief's
+  timing as §13.3 items 5 to 8 settle;
   `paye_basis` fixed to that reading (the column kept, no longer read from the setting); employee pension and NHF
   reducing chargeable income in code with their citation (NTA s.30(2)(a)(iii) and (i)); the Conventions card, the three
-  conventions of Switch On and `NO_CONVENTIONS` removed unless the accountant names a point the law leaves open; no PAYE
+  conventions of Switch On and `NO_CONVENTIONS` removed; no PAYE
   for a person whose gross from MyCity is the national minimum wage or less (NTA s.58 and s.163(1)(t)), the wage (₦70,000
   a month, the Board's figure) entered as a figure with its source, like a rate.
 - **The relief** (§6.12 rule 15): the `relief` item's flat amount and percentage of gross removed (the Consolidated
@@ -1882,12 +1904,12 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   gross pay (the 2023 s.4's "monthly income", as FMBN states it), so `ITEM_BASES` gives NHF `gross` in place of `basic`,
   and only for a person earning the national minimum wage or more.
 - **ITF and NSITF as cited:** ITF at 1% of the month's payroll (basic pay, allowances and other entitlements: the month's
-  gross) and only while MyCity has 25 or more employees and is not in a free trade zone (ITF Act s.6(1)); TB decides
+  gross) and only while MyCity has 25 or more employees and is not in a free trade zone (ITF Act s.6(1)); LA decides
   whether the engine checks the run's headcount or the rate is entered only while MyCity is liable; the report states the
   1 April due date. NSITF at the month's payroll and the rate entered (1%, the Act's minimum and NSITF's stated rate,
   until the Board sets another for MyCity's industry). Pension: MyCity is within the Act from three employees (PenCom's
   reading); the base is the contract's emoluments and never less than
-  basic, housing and transport (Pension Reform Act 2014, s.120), so a pay split marks at least those three pensionable (TB
+  basic, housing and transport (Pension Reform Act 2014, s.120), so a pay split marks at least those three pensionable (LA
   decides whether a split that does not is refused or warned) and No Pay Split's fallback, the whole Monthly Pay, meets
   it; the rates are the Act's minimums, 8% and 10% (s.4(1)), entered with their source. The statutory report states each
   item's remittance date: PAYE by the 10th of the next month, pension within 7 working days of pay day, NHF within one
@@ -1931,8 +1953,9 @@ screen; Email All and Download All work; advances are recorded by Operations & P
 6. On Payslips open one in the modal and Download PDF; Email All Payslips; Download All.
 7. Mark Paid.
 8. On Configurations show the pay day (30 by default, Last Day of Month for the month's end) and change it; show Statutory
-   Items with their sources; switch Advanced Payroll on from next month only with rates PR 9 cited and MyCity's
-   accountant confirmed (otherwise show the switch with the rates Not Set, never an unsourced figure); next month's run
+   Items with their sources; switch Advanced Payroll on from next month only with the rates PR 9 cited, each
+   entered with its source (MyCity applies no statutory deduction yet, §13.1 item 38; otherwise show the switch with the
+   rates Not Set, never an unsourced figure); next month's run
    shows the statutory lines and the Statutory Report.
 9. **Before the demo, on staging:** mail resumed (Settings · Integrations, System Sender, Resume Mail, after the mail
    plan's hourly limit is raised, `docs/runbooks/dns-and-mail.md` §5), the failed outbox rows behind the degraded Events
@@ -1941,8 +1964,9 @@ screen; Email All and Download All work; advances are recorded by Operations & P
 
 **What MyCity enters in the app before the demo** (configuration, so none blocks the build; §13.1 item 21): the pay
 day (30 unless MyCity wants another) and the Bank Details Required choice on Configurations; every person's salary and bank details on People ·
-Employees (or the staff import); and, if the advanced option is to be shown computing, the statutory rates and the
-three conventions its accountant confirms (otherwise the switch is shown with the rates not set). The payslip sample's
+Employees (or the staff import); and, if the advanced option is to be shown computing, the statutory rates of §6.16
+with their sources, entered by Operations & People when MyCity starts statutory payroll (otherwise the switch is shown
+with the rates not set). The payslip sample's
 sign-off is the one open question (§13.3). The approver is settled (the CEO, §13.1 item 7); the demo uses test people
 only (§13.1 item 19).
 
@@ -2010,6 +2034,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 ---
 
 ## 14 · Change log
+
+- 12/11/2026 · JP · JBS Praxis's decisions after PR 9's research (§13.1 items 38 to 40). **LA owns M6 in full** (item 40): the header, §0, §13.2, §13.3 and Appendix A's lanes (PR 8, PR 10 and PR 11 are LA's) name LA where they named TB; #11 My Payslips keeps AJ. **MyCity has no accountant** and does not apply statutory deductions yet (item 38, replacing the pending accountant's confirmation): Operations & People, who run its payroll, enter each figure of §6.16 with its source on Configurations when MyCity starts, and the build waits for nothing; §0.2, §3.5, §6.11 rule 3a, §6.12 rules 7, 14 and 15, §6.16, §13.2 item 24, §13.3, Appendix A (PR 9, PR 11) and Appendix B say Operations & People where they said MyCity's accountant. **PAYE's bands are scaled to the months elapsed in the calendar year** (item 39): §6.12 rule 11, the §6.16 PAYE row and PR 11's scope state it. §13.3 gains items 5 to 11, the smaller PAYE points for PR 11 (a mid-year switch-on, a joiner without a certificate, the minimum-wage test, rent relief's timing, the refund line, the leaver's certificate, the State of residence), each with a recommendation, for LA with Operations & People.
 
 - 12/11/2026 · JP · PR 9, a fourth research pass at JBS Praxis's request, to settle the three points the third left open, from the agencies that apply the law (§6.16): the pension threshold is three or more employees (PenCom's own statement of who the Act covers, its Framework for Micro Pension Plan 2018, matching s.120; s.2(2)'s "15" is an inconsistency the regulator does not apply), so both pension rows are Confirmed; the NHF base is the month's gross pay (the 2023 s.4's "monthly income" and FMBN's own statement, "2.5% of the monthly gross salary"; FMBN's copy of Cap N45 still prints the pre-2023 wording), so NHF is Confirmed and PR 11 gives it the `gross` base; the National Minimum Wage (Amendment) Act 2024 is in force from 29 July 2024 (the National Salaries, Incomes and Wages Commission's circulars of 23 and 27 September 2024), the ₦70,000 resting on the Board's Guidelines and the Bill, so the exemption's row is Confirmed while the Act's own text stays unread. §6.12 rule 11, §13.3 items 3 and 4, Appendix A (PR 9's note, PR 11's NHF base and pension coverage) and the sources table follow.
 

@@ -116,30 +116,20 @@
 /packages/contract/schemas/assistant.js            @tomblakeasaah196 @swizfcodes
 /src/modules/dashboard/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/dashboard.js            @tomblakeasaah196 @swizfcodes
-/src/modules/deductions/                           @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/deductions.js           @tomblakeasaah196 @swizfcodes
 /src/modules/integrations/                         @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/integrations.js         @tomblakeasaah196 @swizfcodes
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
 /src/modules/training/                             @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/training.js             @tomblakeasaah196 @swizfcodes
-/src/modules/payroll/                              @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/payroll.js              @tomblakeasaah196 @swizfcodes
-/src/modules/payslips/                             @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/payslips.js             @tomblakeasaah196 @swizfcodes
 /src/modules/policies/                             @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/policies.js             @tomblakeasaah196 @swizfcodes
 /src/modules/reports/                              @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/reports.js              @tomblakeasaah196 @swizfcodes
-/src/modules/salary_structure/                     @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/salary_structure.js     @tomblakeasaah196 @swizfcodes
 /src/modules/security/                             @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/security.js             @tomblakeasaah196 @swizfcodes
 /src/modules/settings/                             @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/settings.js             @tomblakeasaah196 @swizfcodes
-/src/modules/statutory/                            @tomblakeasaah196 @swizfcodes
-/packages/contract/schemas/statutory.js            @tomblakeasaah196 @swizfcodes
 /src/modules/system_health/                        @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/system_health.js        @tomblakeasaah196 @swizfcodes
 /src/modules/user_guide/                           @tomblakeasaah196 @swizfcodes
@@ -152,6 +142,8 @@
 /packages/contract/schemas/agreements.js           @LovedataX @swizfcodes @tomblakeasaah196
 /src/modules/attendance/                           @LovedataX @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/attendance.js           @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/deductions/                           @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/deductions.js           @LovedataX @swizfcodes @tomblakeasaah196
 /src/modules/devices/                              @LovedataX @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/devices.js              @LovedataX @swizfcodes @tomblakeasaah196
 /src/modules/interactions/                         @LovedataX @swizfcodes @tomblakeasaah196
@@ -164,8 +156,16 @@
 /packages/contract/schemas/partners.js             @LovedataX @swizfcodes @tomblakeasaah196
 /src/modules/partnership_analytics/                @LovedataX @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/partnership_analytics.js @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/payroll/                              @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/payroll.js              @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/payslips/                             @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/payslips.js             @LovedataX @swizfcodes @tomblakeasaah196
 /src/modules/proposals/                            @LovedataX @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/proposals.js            @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/salary_structure/                     @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/salary_structure.js     @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/statutory/                            @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/statutory.js            @LovedataX @swizfcodes @tomblakeasaah196
 /src/modules/worksites/                            @LovedataX @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/worksites.js            @LovedataX @swizfcodes @tomblakeasaah196
 
@@ -238,5 +238,5 @@
 /docs/guides/queries.md                            @swizfcodes @tomblakeasaah196
 /docs/guides/recruitment.md                        @swizfcodes @tomblakeasaah196
 /docs/guides/partnerships.md                       @LovedataX @swizfcodes @tomblakeasaah196
-/docs/guides/payroll.md                            @tomblakeasaah196 @LovedataX @swizfcodes
+/docs/guides/payroll.md                            @LovedataX @swizfcodes @tomblakeasaah196
 /docs/guides/knowledge.md                          @tomblakeasaah196 @swizfcodes
