@@ -786,6 +786,7 @@ R("POST /api/v1/recruitment/candidates/:id/not-progressed", "edit", (req) => {
 R("POST /api/v1/recruitment/candidates/:id/reopen", "edit", (req) =>
   actOn(req, (a) => {
     if (a.status !== "not_progressed") return fail(409, "MOVE_NOT_ALLOWED", "Only a candidate not progressed can be reopened");
+    if (["documentation", "pre_onboarding", "onboarding"].includes(a.stage)) return fail(409, "MOVE_NOT_ALLOWED", "A hire past Offer cannot be reopened");
     a.status = "active";
     a.rejection_reason = null;
     a.history.push({ to: a.stage, days: 0, by: req.user ?? undefined });

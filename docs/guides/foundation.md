@@ -73,7 +73,7 @@ These finish M0 and no prompt can do them:
 | Screen | Where | Who | Track | Today | After |
 |---|---|---|---|---|---|
 | People · Employees (#24) | Staff app | `people` view; add, edit, archive with create, edit, delete | A | **Built** (17/10/2026) | Real API: list at 25 with search, filters and server sort, the record with tabs, Add, Edit, Archive, Restore, Send Invite, Import Staff |
-| Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | **Built** (17/10/2026) | Profile, job, reporting line, login, documents and history on the real API; the Documents tab (`EmployeeDocuments.tsx`, 12/11/2026, AJ for M5) is on track B's `documents` routes: the counts, the list, View File and Download, Verify Document, Request Document and Upload Document (`people` edit) |
+| Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | **Built** (17/10/2026) | Profile, job, reporting line, login, documents and history on the real API; the Documents tab (`EmployeeDocuments.tsx`, 12/11/2026, AJ for M5) is on track B's `documents` routes: the counts, the list with a document beside it (`ListDetail`; a sheet on a phone), View File and Download, Verify Document, Request Document and Upload Document (`people` edit) |
 | Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | **Built** (17/10/2026) | As `organogram.md` describes, on the real API, with the phone focus view |
 | Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | **Built** (17/10/2026) | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | **Built** (17/10/2026) | Their documents and the ones People asked for, upload, download, preview |
@@ -1190,6 +1190,8 @@ screen.
 - The sign-in screen's drawings or licensed photographs: TB (`identity.md` §13).
 
 ## 14 · Change log
+
+- 12/11/2026 · AJ · The employee record's Documents tab (the audit of M5's #122, `offers.md` §14): a document opens beside the list on a wide desktop and in a sheet on a phone (`ListDetail`, F31), no longer in a centred dialog; Upload Document's What Is It is `useContractForm` with the upload's own `EmployeeDocumentUpload` (gate 12). `EmployeeDocuments.test.tsx` added; the Employee 360 test follows the side-by-side record.
 
 - 12/11/2026 · AJ · The employee record's Documents tab, for M5 (`offers.md` §2; a new hire's onboarding uploads land on their record): `app/src/features/people/EmployeeDocuments.tsx` on the `documents` module's routes as built in track B (`GET /employees/:id/documents` and `/summary`, `POST /employees/:id/documents` and `/document-requests`, `POST /documents/:id/verify`): the counts strip, the list, a row opening View File and Download, and with `people` edit Verify Document, Request Document and Upload Document. No backend change; the mock gains the same routes (`app/src/api/mock/modules/ess.ts`).
 

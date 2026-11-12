@@ -23,7 +23,8 @@ const ROWS = `
          ou.user_id AS owner_user_id,
          btrim(e.first_name || ' ' || e.last_name) AS employee_name,
          e.first_name AS employee_first_name, e.last_name AS employee_last_name,
-         e.work_email::text AS employee_email,
+         -- Mail to the hire goes to their own address: the work email is a placeholder until Complete.
+         COALESCE(e.personal_email, e.work_email)::text AS employee_email,
          o.job_title, o.department_id, d.name AS department
     FROM onboarding_case oc
     JOIN offer o ON o.offer_id = oc.offer_id
@@ -432,9 +433,13 @@ async function markReminded(client, stepId) {
 const GUARANTOR = `
   SELECT g.onboarding_guarantor_id, g.onboarding_case_id, g.position, g.kind, g.full_name, g.relationship,
          g.organisation, g.job_title, g.phone, g.email::text AS email, g.years_known, g.form_document_id,
-         g.check_status, g.check_note, g.checked_at, d.original_name, d.bytes, d.mime
+         g.date_of_birth, g.contact_address, g.residential_address, g.convicted, g.conviction_details,
+         g.recommends, g.id_document_id,
+         g.check_status, g.check_note, g.checked_at, d.original_name, d.bytes, d.mime,
+         idd.original_name AS id_original_name, idd.bytes AS id_bytes, idd.mime AS id_mime
     FROM onboarding_guarantor g
-    LEFT JOIN document d ON d.document_id = g.form_document_id`;
+    LEFT JOIN document d ON d.document_id = g.form_document_id
+    LEFT JOIN document idd ON idd.document_id = g.id_document_id`;
 
 async function guarantors(db, caseId) {
   // pagination:complete one case's guarantors, two at most (the table's CHECK on position)
@@ -454,12 +459,18 @@ async function guarantor(db, caseId, guarantorId, { lock = false } = {}) {
 async function saveGuarantor(client, caseId, g) {
   const { rows } = await client.query(
     `INSERT INTO onboarding_guarantor (onboarding_case_id, position, kind, full_name, relationship, organisation,
-                                       job_title, phone, email, years_known, form_document_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                                       job_title, phone, email, years_known, form_document_id, date_of_birth,
+                                       contact_address, residential_address, convicted, conviction_details,
+                                       recommends, id_document_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      ON CONFLICT (onboarding_case_id, position) DO UPDATE
         SET kind = EXCLUDED.kind, full_name = EXCLUDED.full_name, relationship = EXCLUDED.relationship,
             organisation = EXCLUDED.organisation, job_title = EXCLUDED.job_title, phone = EXCLUDED.phone,
             email = EXCLUDED.email, years_known = EXCLUDED.years_known, form_document_id = EXCLUDED.form_document_id,
+            date_of_birth = EXCLUDED.date_of_birth, contact_address = EXCLUDED.contact_address,
+            residential_address = EXCLUDED.residential_address, convicted = EXCLUDED.convicted,
+            conviction_details = EXCLUDED.conviction_details, recommends = EXCLUDED.recommends,
+            id_document_id = EXCLUDED.id_document_id,
             check_status = 'pending', check_note = NULL, checked_by = NULL, checked_at = NULL
      RETURNING onboarding_guarantor_id`,
     [
@@ -474,9 +485,31 @@ async function saveGuarantor(client, caseId, g) {
       g.email || null,
       g.years_known ?? null,
       g.form_document_id || null,
+      g.date_of_birth || null,
+      g.contact_address_line || null,
+      g.residential_address_line || null,
+      g.convicted ?? null,
+      g.convicted ? g.conviction_details || null : null,
+      g.recommends ?? null,
+      g.id_document_id || null,
     ],
   );
   return rows[0].onboarding_guarantor_id;
+}
+
+/** A guarantor's address line rewritten when its waiting place is named (places.owner rename). */
+async function setGuarantorAddressLine(client, column, guarantorId, line) {
+  if (column === "contact_address")
+    await client.query("UPDATE onboarding_guarantor SET contact_address = $2, updated_at = now() WHERE onboarding_guarantor_id = $1", [guarantorId, line]);
+  else if (column === "residential_address")
+    await client.query("UPDATE onboarding_guarantor SET residential_address = $2, updated_at = now() WHERE onboarding_guarantor_id = $1", [guarantorId, line]);
+  else throw new Error(`onboarding: no address column ${column}`);
+}
+
+/** Whether the hire's home address is on their employee record (the gate's `address`). */
+async function addressEntered(db, employeeId) {
+  const { rows } = await db.query("SELECT home_address IS NOT NULL AND btrim(home_address) <> '' AS entered FROM employee WHERE employee_id = $1", [employeeId]);
+  return Boolean(rows[0] && rows[0].entered);
 }
 
 async function recordCheck(client, guarantorId, { check_status: status, check_note: note }, userId) {
@@ -639,7 +672,7 @@ async function sops(db, ids) {
   // pagination:complete the SOPs one plan names, forty at most (one a step)
   const { rows } = await completeQuery(
     db,
-    "SELECT sop_id, number::text AS number, title FROM sop WHERE sop_id = ANY($1::uuid[]) AND status = 'active' ORDER BY number, sop_id",
+    "SELECT sop_id, number::text AS number, title, department_id FROM sop WHERE sop_id = ANY($1::uuid[]) AND status = 'active' ORDER BY number, sop_id",
     [wanted],
     { label: "A plan's SOPs" },
   );
@@ -687,6 +720,8 @@ module.exports = {
   guarantors,
   guarantor,
   saveGuarantor,
+  setGuarantorAddressLine,
+  addressEntered,
   recordCheck,
   requirements,
   requirement,

@@ -92,6 +92,13 @@ describe("the contract's values", () => {
 });
 
 describe("what a signature covers", () => {
+  test("the hire's name as the contract was made with it: a later rename never changes the hash", () => {
+    const made = render.canonicalOf({ ...contract, hire_name: "Chiamaka Eze" }, offer, pay);
+    const renamed = render.canonicalOf({ ...contract, hire_name: "Chiamaka Eze", employee_name: "Chiamaka Eze-Obi" }, offer, pay);
+    expect(renamed).toEqual(made);
+    expect(renamed.employee).toBe("Chiamaka Eze");
+  });
+
   test("the terms and the appendix's headings, never the bodies a stranger would read on Verify", () => {
     const k = render.canonicalOf(contract, offer, pay);
     expect(k).toMatchObject({ number: "CON-0001", employee: "Chiamaka Eze", start_date: "2026-12-01", gross_salary: "450000.00", end_date: null });
@@ -117,5 +124,13 @@ describe("the routes", () => {
     const paths = rs.map((r) => `${r.method} ${r.path}`);
     expect(paths.indexOf("GET /settings/template")).toBeLessThan(paths.indexOf("GET /:id"));
     for (const r of rs.filter((x) => x.method !== "GET")) expect(r.contract.body).toBeTruthy();
+  });
+
+  test("the wording, Resend and Reissue need the whole company's scope: a Head of Department's team grant reads and signs", () => {
+    const stack = (m, p) => routes.router.stack.find((l) => l.route && l.route.path === p && l.route.methods[m.toLowerCase()]).route.stack;
+    const all = (m, p) => stack(m, p).some((x) => x.handle.scope === "all");
+    for (const [m, p] of [["GET", "/settings/template"], ["PUT", "/settings/template"], ["POST", "/settings/template/restore"], ["POST", "/:id/resend"], ["POST", "/:id/reissue"]])
+      expect([m, p, all(m, p)]).toEqual([m, p, true]);
+    for (const [m, p] of [["GET", "/:id"], ["POST", "/:id/sign"]]) expect([m, p, all(m, p)]).toEqual([m, p, false]);
   });
 });

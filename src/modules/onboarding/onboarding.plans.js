@@ -84,7 +84,7 @@ async function assertSavable(client, body, id = null) {
       409,
       { department_id: ["Already has a plan"] },
     );
-  await sop.assertInForce(client, body.steps);
+  await sop.assertInForce(client, body.steps, body.department_id || null);
 }
 
 async function saved(client, actor, id, before) {

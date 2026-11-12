@@ -71,7 +71,14 @@ const guarantor = (key: string, position: 1 | 2, check: Guarantor["check_status"
   phone: position === 1 ? "+2348031234567" : "+2348039876543",
   email: null,
   years_known: position === 1 ? 3 : 9,
+  date_of_birth: position === 1 ? "1971-03-14" : "1968-09-02",
+  contact_address: position === 1 ? "Allen Avenue, Ikeja, Lagos" : "Bourdillon Road, Ikoyi, Lagos",
+  residential_address: position === 1 ? "Oba Akran Avenue, Ikeja, Lagos" : "Bourdillon Road, Ikoyi, Lagos",
+  convicted: false,
+  conviction_details: null,
+  recommends: true,
   form: { document_id: id(`${key}:form${position}`), file_name: `guarantor-${position}.pdf`, size_bytes: 120_000, mime_type: "application/pdf" },
+  id_document: { document_id: id(`${key}:id${position}`), file_name: `guarantor-${position}-id.jpg`, size_bytes: 300_000, mime_type: "image/jpeg" },
   check_status: check,
   check_note: null,
   checked_at: check === "pending" ? null : at(1),
@@ -79,7 +86,7 @@ const guarantor = (key: string, position: 1 | 2, check: Guarantor["check_status"
 
 const base = { company: "MyCity App Ltd", privacy_notice: NOTICE };
 const PACKS = new Map<string, UploadPack>([
-  ["Np4xQ7cVm2Ld", { ...base, first_name: "Kunle", role: "Head, Sales & Revenue", starts_on: day(24), status: "documentation", privacy_acknowledged: false, items: items("kunle", () => "pending"), guarantors: [], bvn_entered: false }],
+  ["Np4xQ7cVm2Ld", { ...base, first_name: "Kunle", role: "Head, Sales & Revenue", starts_on: day(24), status: "documentation", privacy_acknowledged: false, items: items("kunle", () => "pending"), guarantors: [], bvn_entered: false, address_entered: false }],
   [
     "Fw8bK3sHr6Ty",
     {
@@ -92,9 +99,10 @@ const PACKS = new Map<string, UploadPack>([
       items: items("chiamaka", (c) => (c === "valid_id" ? "verified" : c === "proof_of_address" ? "rejected" : ["passport_photo", "employee_data_form", "mylagosapp_wallet"].includes(c) ? "uploaded" : "pending")),
       guarantors: [guarantor("chiamaka", 1, "passed"), guarantor("chiamaka", 2, "pending")],
       bvn_entered: true,
+      address_entered: false,
     },
   ],
-  ["Lz2mD9qXc5Wn", { ...base, first_name: "Bola", role: "Support Officer", starts_on: day(5), status: "pre_onboarding", privacy_acknowledged: true, items: items("bola", () => "verified"), guarantors: [guarantor("bola", 1, "passed"), guarantor("bola", 2, "passed")], bvn_entered: true }],
+  ["Lz2mD9qXc5Wn", { ...base, first_name: "Bola", role: "Support Officer", starts_on: day(5), status: "pre_onboarding", privacy_acknowledged: true, items: items("bola", () => "verified"), guarantors: [guarantor("bola", 1, "passed"), guarantor("bola", 2, "passed")], bvn_entered: true, address_entered: true }],
 ]);
 
 interface Issue {
@@ -151,10 +159,16 @@ route("POST /api/public/v1/onboard/:token/guarantors", (req) => {
   if (!p) return badLink();
   const refused = open(p);
   if (refused) return refused;
-  return parsed<Omit<Guarantor, "onboarding_guarantor_id" | "form" | "check_status" | "check_note" | "checked_at"> & { form_document_id?: string | null }>(onboardingSchemas.GuarantorInput, req.body, (b) => {
+  type Input = Omit<Guarantor, "onboarding_guarantor_id" | "form" | "id_document" | "check_status" | "check_note" | "checked_at" | "contact_address" | "residential_address"> & {
+    form_document_id?: string | null;
+    id_document_id?: string | null;
+    contact_address: { token?: string };
+    residential_address: { token?: string };
+  };
+  return parsed<Input>(onboardingSchemas.GuarantorInput, req.body, (b) => {
     const was = p.guarantors.find((g) => g.position === b.position);
     if (was?.check_status === "passed") return fail(409, "ALREADY_CHECKED", "This guarantor has passed their check");
-    const { form_document_id, ...rest } = b;
+    const { form_document_id, id_document_id, contact_address, residential_address, ...rest } = b;
     const g: Guarantor = {
       onboarding_guarantor_id: was?.onboarding_guarantor_id ?? id(`${req.params.token}:g${b.position}`),
       ...rest,
@@ -162,6 +176,13 @@ route("POST /api/public/v1/onboard/:token/guarantors", (req) => {
       job_title: rest.job_title ?? null,
       email: rest.email ?? null,
       years_known: rest.years_known ?? null,
+      date_of_birth: rest.date_of_birth ?? null,
+      contact_address: lineOf(contact_address),
+      residential_address: lineOf(residential_address),
+      convicted: rest.convicted ?? null,
+      conviction_details: rest.convicted ? (rest.conviction_details ?? null) : null,
+      recommends: rest.recommends ?? null,
+      id_document: id_document_id ? { document_id: id_document_id, file_name: "guarantor-id.jpg", size_bytes: 300_000, mime_type: "image/jpeg" } : (was?.id_document ?? null),
       form: form_document_id ? { document_id: form_document_id, file_name: "guarantor-form.pdf", size_bytes: 120_000, mime_type: "application/pdf" } : (was?.form ?? null),
       check_status: "pending",
       check_note: null,
@@ -171,6 +192,60 @@ route("POST /api/public/v1/onboard/:token/guarantors", (req) => {
     return ok(p);
   });
 });
+route("POST /api/public/v1/onboard/:token/address", (req) => {
+  const p = PACKS.get(req.params.token);
+  if (!p) return badLink();
+  const refused = open(p);
+  if (refused) return refused;
+  return parsed(onboardingSchemas.HireAddressEnter, req.body, () => {
+    p.address_entered = true;
+    return ok(p);
+  });
+});
+
+/* The page's address search and pin: a few invented Lagos streets, tokens in our API's shape with
+   "mock" for a signature (the browser checks the shape only; the mock never ships, F12 to F14). */
+const STREETS: Array<[string, number, number]> = [
+  ["Allen Avenue, Ikeja, Lagos", 6.6005, 3.3545],
+  ["Oba Akran Avenue, Ikeja, Lagos", 6.6018, 3.3515],
+  ["Bourdillon Road, Ikoyi, Lagos", 6.4521, 3.4339],
+  ["7 Admiralty Way, Lekki Phase 1, Lagos", 6.447, 3.472],
+  ["21 Herbert Macaulay Way, Yaba, Lagos", 6.5095, 3.379],
+];
+const b64 = (v: string) => btoa(String.fromCharCode(...new TextEncoder().encode(v))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const placeOf = ([formatted, lat, lon]: [string, number, number], i: number) => ({
+  place_id: `street-${i}`,
+  formatted,
+  lat,
+  lon,
+  kind: "street" as const,
+  token: `p1.${b64(JSON.stringify({ s: "search", f: formatted, la: lat, lo: lon, a: null, k: "street", v: true, p: false }))}.mock`,
+});
+/** The line a picked place reads as, from its token (the mock keeps no places). */
+function lineOf(v: { token?: string } | undefined): string | null {
+  const body = v?.token?.split(".")[1];
+  if (!body) return null;
+  try {
+    return (JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/"))) as { f?: string }).f ?? null;
+  } catch {
+    return null;
+  }
+}
+route("GET /api/public/v1/onboard/:token/places/search", (req) => {
+  if (!PACKS.get(req.params.token)) return badLink();
+  const q = String(req.query.q ?? "").trim().toLowerCase();
+  if (q.length < 2) return invalid({ "query.q": ["Too short"] });
+  const words = q.split(/[\s,]+/).filter(Boolean);
+  return ok({ places: STREETS.map(placeOf).filter((pl) => words.every((w) => pl.formatted.toLowerCase().includes(w))) });
+});
+route("GET /api/public/v1/onboard/:token/places/pin", (req) => {
+  if (!PACKS.get(req.params.token)) return badLink();
+  const lat = Number(req.query.lat);
+  const lon = Number(req.query.lon);
+  const near = STREETS.map(placeOf).sort((a, b) => Math.hypot(a.lat - lat, a.lon - lon) - Math.hypot(b.lat - lat, b.lon - lon))[0]!;
+  return ok({ ...near, lat, lon });
+});
+
 route("POST /api/public/v1/onboard/:token/bvn", (req) => {
   const p = PACKS.get(req.params.token);
   if (!p) return badLink();

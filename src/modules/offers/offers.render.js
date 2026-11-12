@@ -33,6 +33,13 @@ const EMPLOYMENT = {
 };
 const PATTERN = { on_site: "On site", hybrid: "Hybrid", remote: "Remote" };
 
+/**
+ * A vacancy's employment type (vacancies' own spellings) as the offer and the employee hold it
+ * (organisation EMPLOYMENT_TYPES), so a vacancy typed `contract` makes an offer the hire can accept.
+ */
+const FROM_VACANCY = Object.freeze({ full_time: "full_time", part_time: "part_time", contract: "contractor", internship: "intern" });
+const employmentFromVacancy = (type) => (type ? FROM_VACANCY[type] || null : null);
+
 const day = (v) => (v ? (v instanceof Date ? lagos.dateOf(v) : String(v).slice(0, 10)) : null);
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
@@ -156,4 +163,4 @@ async function lines(db, o, vars) {
   return out;
 }
 
-module.exports = { TEMPLATE, EMPLOYMENT, PATTERN, varsOf, canonicalOf, appendixOf, textBlocks, wordingOf, lines, totalOf, annualOf };
+module.exports = { TEMPLATE, EMPLOYMENT, PATTERN, FROM_VACANCY, employmentFromVacancy, varsOf, canonicalOf, appendixOf, textBlocks, wordingOf, lines, totalOf, annualOf };

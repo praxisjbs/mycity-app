@@ -8,17 +8,23 @@
 const { AppError } = require("../../shared/errors");
 const repo = require("./onboarding.repo");
 
-/** sop_id → { sop_id, number, title } for the SOPs in force among those named. */
+/** sop_id → { sop_id, number, title } for the SOPs in force among those named (StepSop: no department). */
 async function sopsById(db, ids) {
-  return new Map((await repo.sops(db, ids)).map((s) => [s.sop_id, s]));
+  return new Map((await repo.sops(db, ids)).map(({ department_id: _d, ...s }) => [s.sop_id, s]));
 }
 
-/** Refuse a step whose SOP is not in force, naming the step. */
-async function assertInForce(db, steps) {
-  const found = await sopsById(db, steps.map((s) => s.sop_id));
+/**
+ * Refuse a step whose SOP is not in force, or is another department's, naming the step. A
+ * department's plan links its own department's SOPs; the company's default plan (no department) any.
+ */
+async function assertInForce(db, steps, departmentId = null) {
+  const found = new Map((await repo.sops(db, steps.map((s) => s.sop_id))).map((s) => [s.sop_id, s]));
   steps.forEach((s, i) => {
-    if (s.sop_id && !found.has(s.sop_id))
-      throw new AppError("SOP_NOT_FOUND", "Pick an SOP in force", 422, { [`steps.${i}.sop_id`]: ["Pick an SOP in force"] });
+    if (!s.sop_id) return;
+    const sop = found.get(s.sop_id);
+    if (!sop) throw new AppError("SOP_NOT_FOUND", "Pick an SOP in force", 422, { [`steps.${i}.sop_id`]: ["Pick an SOP in force"] });
+    if (departmentId && sop.department_id !== departmentId)
+      throw new AppError("SOP_OTHER_DEPARTMENT", "Pick this department's SOP", 422, { [`steps.${i}.sop_id`]: ["Another department's SOP"] });
   });
 }
 

@@ -13,6 +13,7 @@
  * Refuses to run unless the database name ends in "_test". Every person here is invented.
  */
 const request = require("supertest");
+const schemas = require("@mycity/contract");
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 
@@ -304,13 +305,14 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     expect((await pub().post(`/sign/${t}/sign`).send({ full_name: "Nkem Okafor", method: "draw", signature_png: PNG, consent: true })).status).toBe(200);
     await rendered();
 
-    // The employee: no seat, no login, the candidate's address as both emails until onboarding completes.
+    // The employee: no seat, no login; the candidate's address their personal email, where the hire's
+    // mail goes, and the work email a placeholder of the offer's own until onboarding completes.
     const hire = await one(
-      "SELECT staff_number, work_email::text AS work_email, personal_email::text AS personal_email, job_title, start_date, employment_type, work_pattern, line_manager_id, confirmation_due_on FROM employee WHERE work_email = $1",
+      "SELECT staff_number, work_email::text AS work_email, personal_email::text AS personal_email, job_title, start_date::text AS start_date, employment_type, work_pattern, line_manager_id, confirmation_due_on::text AS confirmation_due_on FROM employee WHERE personal_email = $1",
       ["nkem.okafor@example.test"],
     );
     expect(hire).toMatchObject({
-      work_email: "nkem.okafor@example.test",
+      work_email: `${offer.number.toLowerCase()}@hire.invalid`,
       personal_email: "nkem.okafor@example.test",
       job_title: "Partnerships Manager",
       employment_type: "full_time",
@@ -318,7 +320,8 @@ describeDb("Recruitment · Offers against the real migrations", () => {
       line_manager_id: null,
     });
     expect(hire.staff_number).toBeTruthy();
-    expect(hire.confirmation_due_on).toBeTruthy();
+    // Three months' probation from the start date, by the calendar (lagos.addMonths).
+    expect(hire.confirmation_due_on).toBe(lagos.addMonths(hire.start_date, 3));
     expect(await one("SELECT count(*)::int AS n FROM app_user WHERE email = $1", ["nkem.okafor@example.test"])).toEqual({ n: 0 });
 
     // The card is at Documentation, not Hired: hireIn waits for Complete Onboarding (PR 6).
@@ -480,4 +483,145 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     expect(offer).toMatchObject({ status: "draft", job_title: "Partnerships Manager", monthly_total: "450000.00", outside_range: false });
     expect(offer.pay_lines.map((l) => l.name)).toEqual(["Basic Salary"]);
   });
+
+  test("offers.create outside the vacancy's range asks for the reason, never a stock one", async () => {
+    const action = require("../../src/modules/offers/offers.ai").actions.find((a) => a.key === "offers.create");
+    const actor = { ...h.people.ops, scope: { scope: "all", scope_ids: null } };
+    const appId = await applicant("Yemi");
+    const card = { application_id: appId, start_date: lagos.addDays(lagos.today(), 30), basic_salary: "750000.00" };
+    await expect(action.run(card, actor)).rejects.toMatchObject({ code: "RANGE_REASON", fields: { range_reason: expect.any(Array) } });
+    expect(schemas.offers.OfferCard.safeParse({ ...card, range_reason: "Matched a competing offer." }).success).toBe(true);
+    const offer = await action.run({ ...card, range_reason: "Matched a competing offer." }, actor);
+    expect(offer).toMatchObject({ outside_range: true, range_reason: "Matched a competing offer." });
+  });
+
+  test("a vacancy typed contract or internship makes an offer in the employee's spellings, which acceptance takes", async () => {
+    const dept = (await one("SELECT department_id FROM department WHERE name = 'Partnerships'")).department_id;
+    for (const [type, expected, first] of [["contract", "contractor", "Obi"], ["internship", "intern", "Ada"]]) {
+      const v = await h.as("ops").post("/recruitment/vacancies").send({
+        title: `Field Producer (${type})`,
+        department_id: dept,
+        hiring_manager_id: h.people.hod.employee_id,
+        positions: 1,
+        employment_type: type,
+        work_pattern: "on_site",
+        location: { token: area("Ikeja, Lagos") },
+        salary_min: "150000.00",
+        salary_max: "250000.00",
+        description: "Produces the short field videos that show each venue in the city guides at its best.",
+        requirements: "A portfolio of short-form video.",
+        closes_on: lagos.addDays(lagos.today(), 30),
+        publish: true,
+      });
+      expect(v.status).toBe(201);
+      n += 1;
+      const email = `${first.toLowerCase()}.${type}@example.test`;
+      const k = await one("INSERT INTO candidate (first_name, last_name, email) VALUES ($1, 'Nwosu', $2) RETURNING candidate_id", [first, email]);
+      const a = await one(
+        "INSERT INTO application (number, vacancy_id, candidate_id, source, stage, status) VALUES ($1, $2, $3, 'careers', 'shortlist', 'active') RETURNING application_id",
+        [`APP-${String(900 + n).padStart(4, "0")}`, v.body.vacancy_id, k.candidate_id],
+      );
+      const d = await h.as("ops").get(`/recruitment/offers/draft?application_id=${a.application_id}`);
+      expect(d.status).toBe(200);
+      expect(d.body.employment_type).toBe(expected);
+      const made = await h.as("ops").post("/recruitment/offers").send({
+        ...terms(a.application_id, ["200000.00", "0.00", "0.00"]),
+        job_title: `Field Producer (${type})`,
+        employment_type: d.body.employment_type,
+        work_pattern: "on_site",
+        office_days: null,
+      });
+      expect(made.status).toBe(201);
+      await approved(made.body.offer_id);
+      await signedAndSent(made.body.offer_id);
+      const t = tokenOf(mails("offer-sent").filter((m) => m.to.email === email).pop());
+      expect((await pub().post(`/sign/${t}/code`).send({})).status).toBe(200);
+      expect((await pub().post(`/sign/${t}/code/verify`).send({ code: codesSent().pop() })).status).toBe(200);
+      expect((await pub().post(`/sign/${t}/sign`).send({ full_name: `${first} Nwosu`, method: "type", typed: `${first} Nwosu`, consent: true })).status).toBe(200);
+      expect(await one("SELECT status FROM offer WHERE offer_id = $1", [made.body.offer_id])).toEqual({ status: "accepted" });
+      expect(await one("SELECT employment_type FROM employee WHERE personal_email = $1", [email])).toEqual({ employment_type: expected });
+    }
+  }, 180_000);
+
+  test("Send Offer refuses someone already on the staff: acceptance would make them a second record", async () => {
+    n += 1;
+    const k = await one("INSERT INTO candidate (first_name, last_name, email) VALUES ('Tunde', 'Ade', 'tunde@mycity.test') RETURNING candidate_id");
+    const a = await one(
+      "INSERT INTO application (number, vacancy_id, candidate_id, source, stage, status) VALUES ($1, $2, $3, 'invited', 'shortlist', 'active') RETURNING application_id",
+      [`APP-${String(900 + n).padStart(4, "0")}`, vacancyId, k.candidate_id],
+    );
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(a.application_id))).body;
+    await approved(offer.offer_id);
+    await requirements();
+    expect((await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/sign`).send({ full_name: "Ada Obi", method: "type", typed: "Ada Obi", consent: true })).status).toBe(200);
+    const sent = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/send`).send({});
+    expect(sent.status).toBe(409);
+    expect(sent.body.error).toMatchObject({ code: "CANDIDATE_IS_EMPLOYEE", message: "This candidate is already an employee" });
+    expect(await one("SELECT status FROM offer WHERE offer_id = $1", [offer.offer_id])).toEqual({ status: "approved" });
+  }, 90_000);
+
+  test("a refusal at acceptance reaches the candidate as a plain retry, never another person's record", async () => {
+    const appId = await applicant("Bayo");
+    const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    await approved(offer.offer_id);
+    await signedAndSent(offer.offer_id);
+    // Someone already holds the address acceptance would give the hire: organisation refuses it.
+    await pool.query("UPDATE employee SET work_email = $2 WHERE employee_id = $1", [h.people.staff.employee_id, `${offer.number.toLowerCase()}@hire.invalid`]);
+    try {
+      const t = tokenOf(mails("offer-sent").filter((m) => m.to.email === "bayo.okafor@example.test").pop());
+      expect((await pub().post(`/sign/${t}/code`).send({})).status).toBe(200);
+      expect((await pub().post(`/sign/${t}/code/verify`).send({ code: codesSent().pop() })).status).toBe(200);
+      const signed = await pub().post(`/sign/${t}/sign`).send({ full_name: "Bayo Okafor", method: "type", typed: "Bayo Okafor", consent: true });
+      expect(signed.status).toBe(409);
+      expect(signed.body.error).toMatchObject({ code: "NOT_ACCEPTED", message: "We could not take your signature. Try again." });
+      expect(JSON.stringify(signed.body)).not.toMatch(/employee|work email|archived/i);
+      expect(await one("SELECT status FROM offer WHERE offer_id = $1", [offer.offer_id])).toEqual({ status: "sent" });
+    } finally {
+      await pool.query("UPDATE employee SET work_email = 'tunde@mycity.test' WHERE employee_id = $1", [h.people.staff.employee_id]);
+    }
+  }, 90_000);
+
+  test("with its approval, Withdraw shows only for its submitter or the CEO, as the engine allows", async () => {
+    const appId = await applicant("Sade");
+    const made = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    const sub = await h.as("ops").post(`/recruitment/offers/${made.offer_id}/submit`).send({});
+    expect(sub.body).toMatchObject({ status: "approval", can_withdraw: true });
+    // The Head of Department edits this vacancy's offers, but did not submit this one.
+    expect((await h.as("hod").get(`/recruitment/offers/${made.offer_id}`)).body.can_withdraw).toBe(false);
+    expect((await h.as("ceo").get(`/recruitment/offers/${made.offer_id}`)).body.can_withdraw).toBe(true);
+    // Settings are Operations & People's: the summary says so, and the routes refuse a team grant.
+    expect((await h.as("ops").get("/recruitment/offers/summary")).body.can_configure).toBe(true);
+    expect((await h.as("hod").get("/recruitment/offers/summary")).body.can_configure).toBe(false);
+    expect((await h.as("hod").get("/recruitment/offers/settings")).status).toBe(403);
+    expect((await h.as("hod").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.hod.employee_id })).status).toBe(403);
+  });
+
+  test("approved while the signatory had no login: the signatory named later opens the letter by signing", async () => {
+    await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
+    const appId = await applicant("Uche");
+    const made = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
+    const sub = await h.as("ops").post(`/recruitment/offers/${made.offer_id}/submit`).send({});
+    expect(sub.status).toBe(200);
+    // The setting names someone with no login while the approval runs.
+    const setting = await one("SELECT value FROM setting WHERE key = 'recruitment.offer_signatory'");
+    await pool.query("UPDATE setting SET value = $1::jsonb WHERE key = 'recruitment.offer_signatory'", [JSON.stringify({ employee_id: h.people.staff.employee_id })]);
+    await pool.query("UPDATE app_user SET status = 'suspended' WHERE user_id = $1", [h.people.staff.user_id]);
+    try {
+      expect((await h.as("hod").post(`/workflow/instances/${sub.body.workflow_instance_id}/approve`).send({})).status).toBe(200);
+      expect((await h.as("ceo").post(`/workflow/instances/${sub.body.workflow_instance_id}/approve`).send({})).status).toBe(200);
+      await drain();
+    } finally {
+      await pool.query("UPDATE app_user SET status = 'active' WHERE user_id = $1", [h.people.staff.user_id]);
+      await pool.query("UPDATE setting SET value = $1::jsonb WHERE key = 'recruitment.offer_signatory'", [JSON.stringify(setting.value)]);
+    }
+    const approvedOffer = (await h.as("ops").get(`/recruitment/offers/${made.offer_id}`)).body;
+    expect(approvedOffer).toMatchObject({ status: "approved", signers: [], can_sign: true });
+    const signed = await h.as("ops").post(`/recruitment/offers/${made.offer_id}/sign`).send({ full_name: "Ada Obi", method: "type", typed: "Ada Obi", consent: true });
+    expect(signed.status).toBe(200);
+    expect(signed.body.signers.map((x) => [x.role, x.status])).toEqual([
+      ["mycity", "signed"],
+      ["candidate", "pending"],
+    ]);
+    expect(signed.body.can_send).toBe(true);
+  }, 90_000);
 });

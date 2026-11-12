@@ -444,7 +444,9 @@ Scope (§8) is the vacancy's `hiring_manager_id`; Interviews add the caller's se
   staff app shows Offer once M5's Offers screen opens in its build (the delivery plan, F14), so it is
   never an empty column before M5. Documentation to Onboarding are the Onboarding screen's. A hired
   application leaves the board: the board asks for one status at a time, In Progress (`active`) first.
-- Not Progressing works from any stage before Hired, and Reopen returns the card to where it stopped.
+- Not Progressing works from any stage before Hired, and Reopen returns the card to where it stopped,
+  except past Offer (Documentation, Pre-Onboarding, Onboarding): the hire's case ended with it, so
+  Reopen is refused there.
 - Not Progressing works at any stage and on a closed role too, so the people left in a closed role can
   be told (`can_not_progress` on the sheet; GE, 05/11/2026); moves, Reopen and Score With AI still need
   the role not closed. It sets `status` `not_progressed` with a reason of at least 10 characters, records the
@@ -801,6 +803,8 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 12/11/2026 · AJ · Reopen is refused for an application not progressed at Documentation, Pre-Onboarding or Onboarding ("A hire past Offer cannot be reopened"): Not Progressing there ended the hire's onboarding case, contract and employee record (`offers.md` §6), so a reopened card would have none of them. `candidates.reopen`, the sheet (no Reopen at those stages) and the mock (§6.3). Changed on M5's branch at AJ's decision after the audit of #122; `withdrawnIn` shares the stage list. The Offers and Onboarding tabs show their settings only to whom the summary's `can_configure` names (`offers.md` §8).
 
 - 12/11/2026 · AJ · Nothing of M4 changed. Beside it, M5 PR 7 puts the Onboarding tab on the contract (`Onboarding.tsx`, `OnboardingCase.tsx`, `OnboardingSettings.tsx`, `docs/guides/offers.md` §2, §10), removes the last INTERIM types (`app/src/api/types/recruitment.ts`) and their block in the mock, and shares Sign for the Company between the offer and the contract (`CompanySignForm` in `OfferSign.tsx`).
 - 11/11/2026 · AJ · M5 PR 6b, for GE to review: `candidates.withdrawnIn` (§6.3) and its repo write

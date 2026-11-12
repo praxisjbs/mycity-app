@@ -504,6 +504,8 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 12/11/2026 · AJ · Nothing on the Organogram or Org Chart changed. Beside them, the employee record's Documents tab opens a document beside the list (`ListDetail`, F31; `foundation.md` §14), and M5 now creates a hire with a placeholder work email until Complete Onboarding (`offers.md` §3 step 5) and keeps the hire's home address through `organisation.updateEmployee` from the upload page.
+
 - 12/11/2026 · AJ · Nothing on the Organogram or Org Chart changed. Beside them, the employee record gains a Documents tab after Login (`EmployeeDocuments.tsx`, on the `documents` routes, `docs/guides/foundation.md` §2, §14), for M5.
 - 11/11/2026 · AJ · Nothing on the Organogram or Org Chart changed. The organisation module gains `setBvnIn` and `hasBvn` (service and repo) for M5's onboarding: the hire's BVN on `employee.bvn`, emitting `employee.updated` with only whether it was entered (foundation guide §6.1, `offers.md` §3 step 6).
 - 11/11/2026 · TB · Frontend paths: ESS's Org Chart tab is one case in `app/src/features/ess/index.tsx`,

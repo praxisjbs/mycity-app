@@ -170,7 +170,8 @@ they sent when they joined, what People asked them for, and what expires soon.
 1. Open the person from [People · Employees](/people?tab=employees) and press **Documents**.
 2. The strip counts their **Documents**, those **Signed**, **Verified**, **Expiring** and **Missing**.
 3. Each row shows the document, when it was uploaded, its status and when it expires.
-4. Press one. **View File** opens it and **Download** saves it.
+4. Press one. On a computer it opens beside the list; on a phone, in a sheet. **View File** opens it
+   and **Download** saves it.
 5. {needs="people edit"} A document **Awaiting Check** has **Verify Document**: press it once you
    have checked it.
 6. {needs="people edit"} Press **Request Document**, type which **Document** and a **Note** if you

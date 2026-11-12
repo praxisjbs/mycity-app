@@ -44,6 +44,28 @@ const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : d
 const area = (formatted) =>
   token.sign({ source: "search", formatted, lat: 6.45, lon: 3.42, provider_id: `test:${formatted}`, kind: "area", city: "Lagos", state: "Lagos", country_code: "ng", timezone: "Africa/Lagos", verified: true, pending: false });
 
+/** A door-level place, as a guarantor's or the hire's address must be (addresses are picked, F27). */
+const building = (formatted) =>
+  token.sign({ source: "search", formatted, lat: 6.6, lon: 3.35, provider_id: `test:${formatted}`, kind: "building", city: "Lagos", state: "Lagos", country_code: "ng", timezone: "Africa/Lagos", verified: true, pending: false });
+
+/** A guarantor as MyCity's Guarantor Form asks for them; `docs` the signed form and the ID copy. */
+const guarantorBody = (position, kind, docs = {}, extra = {}) => ({
+  position,
+  kind,
+  full_name: kind === "previous_employer" ? "Kunle Bello" : "Ngozi Eze",
+  relationship: kind === "previous_employer" ? "Former manager" : "Family friend",
+  ...(kind === "previous_employer" ? { organisation: "Lagos Events Ltd" } : { years_known: 9 }),
+  phone: kind === "previous_employer" ? "+2348031234567" : "+2348039876543",
+  date_of_birth: "1974-04-12",
+  contact_address: { token: building("12 Allen Avenue, Ikeja") },
+  residential_address: { token: building("4 Bode Thomas Street, Surulere") },
+  convicted: false,
+  recommends: true,
+  ...(docs.form ? { form_document_id: docs.form } : {}),
+  ...(docs.id ? { id_document_id: docs.id } : {}),
+  ...extra,
+});
+
 const mails = (template) => queues.enqueue.mock.calls.filter((c) => c[0] === "email-send" && c[1] === template).map((c) => c[2]);
 const codesSent = () => mails("signature-code").map((m) => m.data.code);
 const lastTo = (template, email) => mails(template).filter((m) => m.to.email === email).pop();
@@ -87,13 +109,15 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
    * A shortlisted candidate through New Offer, approval, both signatures on the offer: the hire's
    * case at documentation with their Upload Documents link mailed. Answers the case and the link.
    */
-  async function hiredToDocumentation(first) {
+  async function hiredToDocumentation(first, { candidateId = null, vacancy = null } = {}) {
     n += 1;
     const email = `${first.toLowerCase()}.adeyemi@example.test`;
-    const k = await one("INSERT INTO candidate (first_name, last_name, email) VALUES ($1, 'Adeyemi', $2) RETURNING candidate_id", [first, email]);
+    const k = candidateId
+      ? { candidate_id: candidateId }
+      : await one("INSERT INTO candidate (first_name, last_name, email) VALUES ($1, 'Adeyemi', $2) RETURNING candidate_id", [first, email]);
     const a = await one(
       "INSERT INTO application (number, vacancy_id, candidate_id, source, stage, status) VALUES ($1, $2, $3, 'careers', 'shortlist', 'active') RETURNING application_id",
-      [`APP-${String(800 + n).padStart(4, "0")}`, vacancyId, k.candidate_id],
+      [`APP-${String(800 + n).padStart(4, "0")}`, vacancy || vacancyId, k.candidate_id],
     );
     const made = await h.as("ops").post("/recruitment/offers").send({
       application_id: a.application_id,
@@ -124,7 +148,7 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     const kase = await one("SELECT onboarding_case_id, employee_id, application_id FROM onboarding_case WHERE offer_id = $1", [offerId]);
     const mail = lastTo("onboarding-documents", email);
     expect(mail).toBeTruthy();
-    return { ...kase, email, mail, link: uploadToken(mail), name: `${first} Adeyemi` };
+    return { ...kase, offer_id: offerId, candidate_id: k.candidate_id, email, mail, link: uploadToken(mail), name: `${first} Adeyemi` };
   }
 
   const itemNamed = (pack, title) => pack.items.find((i) => i.title === title);
@@ -139,9 +163,12 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     expect((await pub().post(`/onboard/${hire.link}/privacy`).send({ consent: true })).status).toBe(200);
     const wallet = (await pub().get(`/onboard/${hire.link}`)).body.items[0];
     expect((await pub().post(`/onboard/${hire.link}/items/${wallet.onboarding_checklist_item_id}`).send({ entered_value: "2044171190" })).status).toBe(200);
-    expect((await pub().post(`/onboard/${hire.link}/guarantors`).send({ position: 1, kind: "previous_employer", full_name: "Kunle Bello", relationship: "Former manager", organisation: "Lagos Events Ltd", phone: "+2348031234567" })).status).toBe(200);
-    expect((await pub().post(`/onboard/${hire.link}/guarantors`).send({ position: 2, kind: "personal", full_name: "Ngozi Eze", relationship: "Family friend", phone: "+2348039876543", years_known: 9 })).status).toBe(200);
+    const form = (await pub().post(`/onboard/${hire.link}/files`).attach("file", PDF, "guarantor-form.pdf")).body.document_id;
+    const docs = { form, id: form };
+    expect((await pub().post(`/onboard/${hire.link}/guarantors`).send(guarantorBody(1, "previous_employer", docs))).status).toBe(200);
+    expect((await pub().post(`/onboard/${hire.link}/guarantors`).send(guarantorBody(2, "personal", docs))).status).toBe(200);
     expect((await pub().post(`/onboard/${hire.link}/bvn`).send({ bvn })).status).toBe(200);
+    expect((await pub().post(`/onboard/${hire.link}/address`).send({ home_address: { token: building("9 Admiralty Way, Lekki") } })).status).toBe(200);
     const url = `/recruitment/onboarding/${hire.onboarding_case_id}`;
     expect((await h.as("ops").post(`${url}/items/${wallet.onboarding_checklist_item_id}/verify`).send({})).status).toBe(200);
     let kase = (await h.as("ops").get(url)).body;
@@ -293,15 +320,27 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     expect((await pub().post(`/onboard/${hire.link}/items/${idItem.onboarding_checklist_item_id}`).send({ document_id: file.body.document_id })).status).toBe(200);
     expect((await pub().post(`/onboard/${hire.link}/items/${wallet.onboarding_checklist_item_id}`).send({ entered_value: "MLA-204417" })).status).toBe(200);
 
-    // Two guarantors of different kinds; a personal one has known the hire four years or more.
-    const g1 = { position: 1, kind: "previous_employer", full_name: "Kunle Bello", relationship: "Former manager", organisation: "Lagos Events Ltd", phone: "+2348031234567", form_document_id: file.body.document_id };
+    // Two guarantors of different kinds; a personal one has known the hire four years or more. Each
+    // as MyCity's Guarantor Form asks: born when, both addresses picked, the two answers, then the
+    // signed form and an ID copy (the second guarantor's come later).
+    const docs = { form: file.body.document_id, id: file.body.document_id };
+    const g1 = guarantorBody(1, "previous_employer", docs);
+    const typed = await pub().post(`/onboard/${hire.link}/guarantors`).send({ ...g1, contact_address: "12 Allen Avenue" });
+    expect(typed.status).toBe(422);
+    const owned = await pub().post(`/onboard/${hire.link}/guarantors`).send({ ...g1, convicted: true });
+    expect(owned.status).toBe(422);
+    expect(JSON.stringify(owned.body.error)).toContain("conviction_details");
     expect((await pub().post(`/onboard/${hire.link}/guarantors`).send(g1)).status).toBe(200);
     const sameKind = await pub().post(`/onboard/${hire.link}/guarantors`).send({ ...g1, position: 2, full_name: "Tolu Bello" });
     expect(sameKind.status).toBe(422);
     expect(sameKind.body.error.code).toBe("SAME_KIND");
-    const g2 = { position: 2, kind: "personal", full_name: "Ngozi Eze", relationship: "Family friend", phone: "+2348039876543", years_known: 3 };
+    const g2 = guarantorBody(2, "personal", {}, { years_known: 3 });
     expect((await pub().post(`/onboard/${hire.link}/guarantors`).send(g2)).status).toBe(422);
     expect((await pub().post(`/onboard/${hire.link}/guarantors`).send({ ...g2, years_known: 9 })).status).toBe(200);
+    const shown = (await pub().get(`/onboard/${hire.link}`)).body.guarantors[0];
+    expect(shown).toMatchObject({ date_of_birth: "1974-04-12", contact_address: "12 Allen Avenue, Ikeja", convicted: false, recommends: true });
+    expect(shown.id_document).toMatchObject({ document_id: file.body.document_id });
+    expect((await one("SELECT count(*)::int AS n FROM place WHERE owner LIKE 'onboarding_guarantor.%'", [])).n).toBe(4);
 
     // The BVN: eleven digits, on the employee record, never on any screen's shape.
     expect((await pub().post(`/onboard/${hire.link}/bvn`).send({ bvn: "1234" })).status).toBe(422);
@@ -309,8 +348,31 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     expect(bvn.status).toBe(200);
     expect(bvn.body.bvn_entered).toBe(true);
     expect(await one("SELECT bvn FROM employee WHERE employee_id = $1", [hire.employee_id])).toEqual({ bvn: "22233344455" });
-    const audit = await pool.query("SELECT before::text || after::text AS t FROM audit_ledger WHERE entity_id = $1", [hire.employee_id]).catch(() => ({ rows: [] }));
-    expect(audit.rows.some((r) => String(r.t).includes("22233344455"))).toBe(false);
+    // Correctable until documentation completes (AJ, 12/11/2026): a slip is the hire's to fix.
+    expect((await pub().post(`/onboard/${hire.link}/bvn`).send({ bvn: "22233344456" })).status).toBe(200);
+    expect((await pub().post(`/onboard/${hire.link}/bvn`).send({ bvn: "22233344455" })).status).toBe(200);
+    // The audit rows of the BVN's writes exist and never hold the number (before, after or metadata).
+    await drain();
+    const audit = await pool.query(
+      `SELECT coalesce(before::text, '') || coalesce(after::text, '') || metadata::text AS t
+         FROM audit_ledger WHERE entity_type = 'employee' AND entity_id = $1 AND 'bvn_entered' = ANY(changed_fields)`,
+      [hire.employee_id],
+    );
+    expect(audit.rows.length).toBeGreaterThan(0);
+    for (const r of audit.rows) expect(r.t).not.toMatch(/2223334445[56]/);
+    const logged = await pool.query("SELECT payload::text AS t FROM event_log WHERE entity_id = $1", [hire.employee_id]);
+    for (const r of logged.rows) expect(r.t).not.toMatch(/2223334445[56]/);
+
+    // The home address: picked, never typed; until it is in, the gate waits on it.
+    expect((await pub().post(`/onboard/${hire.link}/address`).send({ home_address: "9 Admiralty Way" })).status).toBe(422);
+    let kase0 = (await h.as("ops").get(`/recruitment/onboarding/${hire.onboarding_case_id}`)).body;
+    expect(kase0.waiting_on).toContain("address");
+    const placed = await pub().post(`/onboard/${hire.link}/address`).send({ home_address: { token: building("9 Admiralty Way, Lekki") } });
+    expect(placed.status).toBe(200);
+    expect(placed.body.address_entered).toBe(true);
+    kase0 = (await h.as("ops").get(`/recruitment/onboarding/${hire.onboarding_case_id}`)).body;
+    expect(kase0.address_entered).toBe(true);
+    expect(kase0.waiting_on).not.toContain("address");
 
     // Operations & People: the case waits on the documents, the guarantors and the contract.
     let kase = (await h.as("ops").get(`/recruitment/onboarding/${hire.onboarding_case_id}`)).body;
@@ -322,7 +384,8 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     // The figures above the list count the case at documentation and the files it waits to check.
     const figures = await h.as("ops").get("/recruitment/onboarding/summary");
     expect(figures.status).toBe(200);
-    expect(Object.keys(figures.body).sort()).toEqual(["completed_this_month", "documentation", "onboarding", "overdue_steps", "pre_onboarding", "to_verify"]);
+    expect(Object.keys(figures.body).sort()).toEqual(["can_configure", "completed_this_month", "documentation", "onboarding", "overdue_steps", "pre_onboarding", "to_verify"]);
+    expect(figures.body.can_configure).toBe(true);
     expect(figures.body.documentation).toBeGreaterThanOrEqual(1);
     expect(figures.body.to_verify).toBeGreaterThanOrEqual(1);
     expect((await h.as("staff").get("/recruitment/onboarding/summary")).status).toBe(403);
@@ -354,11 +417,15 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
       h.as("ops").post(`/recruitment/onboarding/${hire.onboarding_case_id}/guarantors/${g.onboarding_guarantor_id}/check`).send({ check_status: status, check_note: "Called on the number given." });
     const [one1, one2] = kase.guarantors;
     expect((await check(one1, "passed")).status).toBe(200);
+    // No signed form or ID copy yet: the second cannot pass.
+    const noForm = await check(one2, "passed");
+    expect(noForm.status).toBe(409);
+    expect(noForm.body.error.code).toBe("FORM_REQUIRED");
     kase = (await check(one2, "failed")).body;
     expect(kase.waiting_on).toEqual(["guarantors", "contract"]);
     const page = await pub().get(`/onboard/${hire.link}`);
     expect(page.body.guarantors.every((g) => g.check_note === null)).toBe(true);
-    expect((await pub().post(`/onboard/${hire.link}/guarantors`).send({ ...g2, years_known: 9, full_name: "Ngozi Okeke" })).status).toBe(200);
+    expect((await pub().post(`/onboard/${hire.link}/guarantors`).send({ ...g2, ...guarantorBody(2, "personal", docs), full_name: "Ngozi Okeke" })).status).toBe(200);
     const passedAgain = await pub().post(`/onboard/${hire.link}/guarantors`).send({ ...g1, full_name: "Somebody Else" });
     expect(passedAgain.status).toBe(409);
     expect(passedAgain.body.error.code).toBe("ALREADY_CHECKED");
@@ -409,6 +476,11 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     expect((await one("SELECT status FROM application WHERE application_id = $1", [hire.application_id])).status).toBe("not_progressed");
     // The outbox delivering it twice changes nothing.
     expect(await onboarding.endForApplication(hire.application_id)).toBe(false);
+    // Reopen would bring back an active card with no case, contract or employee behind it.
+    const reopened = await h.as("ops").post(`/recruitment/candidates/${hire.application_id}/reopen`).send({});
+    expect(reopened.status).toBe(409);
+    expect(reopened.body.error).toMatchObject({ code: "MOVE_NOT_ALLOWED", message: "A hire past Offer cannot be reopened" });
+    expect((await one("SELECT status FROM application WHERE application_id = $1", [hire.application_id])).status).toBe("not_progressed");
   }, 120_000);
 
   test("on the start date the plan's steps reach the case with their owners; overdue steps are reminded once; Complete Onboarding hires them", async () => {
@@ -484,7 +556,11 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     const open = await h.as("ops").post(`${hire.url}/complete`).send({ work_email: "dayo.adeyemi@mycity.test" });
     expect(open.status).toBe(409);
     expect(open.body.error.code).toBe("STEPS_OPEN");
-    for (const s of kase.steps.slice(1)) expect((await done(s.onboarding_case_step_id)).status).toBe(200);
+    // A Head of Department marks their own hire's steps done (team scope), and nothing more.
+    const hodView = (await h.as("hod").get(hire.url)).body;
+    expect(hodView).toMatchObject({ can_complete: false, can_withdraw: false, can_check: false });
+    for (const s of kase.steps.slice(1)) expect((await h.as("hod").post(`${hire.url}/steps/${s.onboarding_case_step_id}/done`).send({})).status).toBe(200);
+    expect((await h.as("hod").post(`${hire.url}/complete`).send({ work_email: "dayo.adeyemi@mycity.test" })).status).toBe(403);
     kase = (await h.as("ops").get(hire.url)).body;
     expect(kase.can_complete).toBe(true);
 
@@ -542,4 +618,151 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe("CASE_ENDED");
   }, 120_000);
+  test("Operations & People's actions need the whole company's scope; a Head of Department reads their hire's case", async () => {
+    await pool.query("UPDATE document_requirement SET active = (code = 'mylagosapp_wallet_id')");
+    const hire = await hiredToDocumentation("Gozie");
+    const url = `/recruitment/onboarding/${hire.onboarding_case_id}`;
+    const theirs = await h.as("hod").get(url);
+    expect(theirs.status).toBe(200);
+    expect(theirs.body).toMatchObject({ can_check: false, can_complete: false, can_withdraw: false });
+    expect(theirs.body.contract).toMatchObject({ can_resend: false, can_reissue: false });
+    expect((await h.as("ops").get(url)).body).toMatchObject({ can_check: true, can_withdraw: true });
+    const item = theirs.body.items[0].onboarding_checklist_item_id;
+    for (const [path, body] of [
+      [`${url}/items/${item}/verify`, {}],
+      [`${url}/items/${item}/reject`, { reason: "Not readable." }],
+      [`${url}/remind`, {}],
+      [`${url}/withdraw`, { reason: "Not joining." }],
+      [`/recruitment/contracts/${theirs.body.contract.employment_contract_id}/resend`, {}],
+      [`/recruitment/contracts/${theirs.body.contract.employment_contract_id}/reissue`, {}],
+      ["/recruitment/onboarding/requirements", { code: "hod_item", name: "A Head of Department's item" }],
+      ["/recruitment/onboarding/plans", { department_id: departmentId, name: "Mine", steps: [] }],
+    ])
+      expect([path, (await h.as("hod").post(path).send(body)).status]).toEqual([path, 403]);
+    expect((await h.as("hod").get("/recruitment/onboarding/requirements")).status).toBe(403);
+    expect((await h.as("hod").get("/recruitment/contracts/settings/template")).status).toBe(403);
+    expect((await h.as("hod").get("/recruitment/onboarding/summary")).body.can_configure).toBe(false);
+  }, 120_000);
+
+  test("a declined contract is reissued: a new one for the case, signed company then hire, each with a time to sign", async () => {
+    await pool.query("UPDATE document_requirement SET active = (code = 'mylagosapp_wallet_id')");
+    const hire = await hiredToDocumentation("Halima");
+    const url = `/recruitment/onboarding/${hire.onboarding_case_id}`;
+    const first = (await h.as("ops").get(url)).body.contract;
+    const companySign = (id) =>
+      h.as("ops").post(`/recruitment/contracts/${id}/sign`).send({ full_name: "Ada Obi", title: "Operations & People Lead", method: "type", typed: "Ada Obi", consent: true });
+    expect((await companySign(first.employment_contract_id)).status).toBe(200);
+    // The hire's link has a time limit, so a contract left unsigned lapses (signature-reminders).
+    const req1 = await one("SELECT signature_request_id, expires_at FROM employment_contract ct JOIN signature_request r USING (signature_request_id) WHERE ct.employment_contract_id = $1", [first.employment_contract_id]);
+    expect(req1.expires_at).toBeTruthy();
+    expect(new Date(req1.expires_at).getTime()).toBeGreaterThan(Date.now() + 14 * 86_400_000);
+
+    // A contract only cancelled is reissued.
+    const early = await h.as("ops").post(`/recruitment/contracts/${first.employment_contract_id}/reissue`).send({});
+    expect(early.status).toBe(409);
+    expect(early.body.error.code).toBe("NOT_CANCELLED");
+
+    const t = signToken(lastTo("contract-sent", hire.email));
+    expect((await pub().post(`/sign/${t}/decline`).send({ reason: "The start date does not suit me." })).status).toBe(200);
+    await drain();
+    let kase = (await h.as("ops").get(url)).body;
+    expect(kase.status).toBe("documentation");
+    expect(kase.contract).toMatchObject({ employment_contract_id: first.employment_contract_id, status: "cancelled", can_reissue: true });
+
+    const again = await h.as("ops").post(`/recruitment/contracts/${first.employment_contract_id}/reissue`).send({});
+    expect(again.status).toBe(200);
+    expect(again.body).toMatchObject({ status: "draft", can_sign: true });
+    expect(again.body.employment_contract_id).not.toBe(first.employment_contract_id);
+    expect(again.body.number).not.toBe(first.number);
+    kase = (await h.as("ops").get(url)).body;
+    expect(kase.contract.employment_contract_id).toBe(again.body.employment_contract_id);
+    expect((await one("SELECT status FROM employment_contract WHERE employment_contract_id = $1", [first.employment_contract_id])).status).toBe("cancelled");
+    // The cancelled one is not reissued twice.
+    const twice = await h.as("ops").post(`/recruitment/contracts/${first.employment_contract_id}/reissue`).send({});
+    expect(twice.status).toBe(409);
+
+    expect((await companySign(again.body.employment_contract_id)).status).toBe(200);
+    await signs(signToken(lastTo("contract-sent", hire.email)), hire.name);
+    expect((await one("SELECT status, hire_name FROM employment_contract WHERE employment_contract_id = $1", [again.body.employment_contract_id]))).toEqual({ status: "signed", hire_name: hire.name });
+    expect((await h.as("ops").get(url)).body.waiting_on).not.toContain("contract");
+  }, 180_000);
+
+  test("a hire withdrawn before keeps their address on the archived record; offered again, they accept as a new hire", async () => {
+    await pool.query("UPDATE document_requirement SET active = (code = 'mylagosapp_wallet_id')");
+    const first = await hiredToDocumentation("Ifeoma");
+    expect((await h.as("ops").post(`/recruitment/onboarding/${first.onboarding_case_id}/withdraw`).send({ reason: "Could not start this month." })).status).toBe(200);
+    expect((await one("SELECT status FROM employee WHERE employee_id = $1", [first.employee_id])).status).toBe("archived");
+
+    // The same candidate, offered again for another role: the acceptance makes a new record.
+    const role = await h.as("ops").post("/recruitment/vacancies").send({
+      title: "Partnerships Associate",
+      department_id: departmentId,
+      hiring_manager_id: h.people.hod.employee_id,
+      positions: 1,
+      employment_type: "full_time",
+      work_pattern: "hybrid",
+      location: { token: area("Lekki, Lagos") },
+      salary_min: "400000.00",
+      salary_max: "600000.00",
+      description: "The Partnerships Associate supports the team that signs venues, brands and creators for the city guides.",
+      requirements: "Two years in partnerships or sales.",
+      closes_on: lagos.addDays(lagos.today(), 30),
+      publish: true,
+    });
+    expect(role.status).toBe(201);
+    const second = await hiredToDocumentation("Ifeoma", { candidateId: first.candidate_id, vacancy: role.body.vacancy_id });
+    expect(second.employee_id).not.toBe(first.employee_id);
+    const rows = await pool.query(
+      "SELECT status, work_email::text AS work_email FROM employee WHERE personal_email = $1 ORDER BY created_at",
+      [first.email],
+    );
+    expect(rows.rows.map((r) => r.status)).toEqual(["archived", "active"]);
+    expect(rows.rows[1].work_email).toMatch(/@hire\.invalid$/);
+    // Every mail to the hire goes to their own address, never the placeholder.
+    expect(second.mail.to.email).toBe(first.email);
+    const kase = (await h.as("ops").get(`/recruitment/onboarding/${second.onboarding_case_id}`)).body;
+    const signer = await one(
+      `SELECT s.signer_email::text AS email FROM signature s JOIN employment_contract ct ON ct.signature_request_id = s.signature_request_id
+        WHERE ct.employment_contract_id = $1 AND s.signer_role = 'employee'`,
+      [kase.contract.employment_contract_id],
+    );
+    expect(signer.email).toBe(first.email);
+  }, 180_000);
+
+  test("Withdraw keeps the application's answer: one still active that cannot be withdrawn keeps the case open", async () => {
+    await pool.query("UPDATE document_requirement SET active = (code = 'mylagosapp_wallet_id')");
+    const hire = await hiredToDocumentation("Kelechi");
+    const url = `/recruitment/onboarding/${hire.onboarding_case_id}`;
+    // A card moved back to Offer by hand: withdrawnIn takes only Documentation to Onboarding.
+    await pool.query("UPDATE application SET stage = 'offer' WHERE application_id = $1", [hire.application_id]);
+    const refused = await h.as("ops").post(`${url}/withdraw`).send({ reason: "Not joining." });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe("NOT_WITHDRAWN");
+    expect((await h.as("ops").get(url)).body.status).toBe("documentation");
+    expect((await one("SELECT status FROM employee WHERE employee_id = $1", [hire.employee_id])).status).toBe("active");
+    await pool.query("UPDATE application SET stage = 'documentation' WHERE application_id = $1", [hire.application_id]);
+  }, 120_000);
+
+  test("a department's plan links only that department's SOPs; the company's default any", async () => {
+    const other = (await one("SELECT department_id FROM department WHERE name = 'Operations'")).department_id;
+    const sop = await one("INSERT INTO sop (number, department_id, title) VALUES ('SOP-9001', $1, 'Opening the office') RETURNING sop_id", [other]);
+    const planRow = (await h.as("ops").get("/recruitment/onboarding/plans")).body.data.find((p) => p.department_id === departmentId);
+    const full = (await h.as("ops").get(`/recruitment/onboarding/plans/${planRow.onboarding_plan_id}`)).body;
+    const steps = full.steps.map((st) => ({ title: st.title, owner_role: st.owner_role, due_offset_days: st.due_offset_days }));
+    const wrong = await h.as("ops").put(`/recruitment/onboarding/plans/${planRow.onboarding_plan_id}`).send({
+      department_id: departmentId,
+      name: full.name,
+      steps: [{ ...steps[0], sop_id: sop.sop_id }, ...steps.slice(1)],
+    });
+    expect(wrong.status).toBe(422);
+    expect(wrong.body.error.code).toBe("SOP_OTHER_DEPARTMENT");
+    const def = (await h.as("ops").get("/recruitment/onboarding/plans")).body.data.find((p) => p.department_id === null);
+    const defFull = (await h.as("ops").get(`/recruitment/onboarding/plans/${def.onboarding_plan_id}`)).body;
+    const ok = await h.as("ops").put(`/recruitment/onboarding/plans/${def.onboarding_plan_id}`).send({
+      department_id: null,
+      name: defFull.name,
+      steps: defFull.steps.map((st, i) => ({ title: st.title, owner_role: st.owner_role, due_offset_days: st.due_offset_days, ...(i === 0 ? { sop_id: sop.sop_id } : {}) })),
+    });
+    expect(ok.status).toBe(200);
+  });
 });

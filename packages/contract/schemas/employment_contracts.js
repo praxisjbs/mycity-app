@@ -35,6 +35,11 @@ const EmploymentContractView = z
     can_sign: z.boolean(),
     /** The company has signed and the hire has not: a fresh link may be sent (Resend Contract). */
     can_resend: z.boolean(),
+    /**
+     * Declined or lapsed while the case is still at documentation, and the reader acts for the whole
+     * company: a new contract may be made for the case (Reissue Contract).
+     */
+    can_reissue: z.boolean(),
   })
   .strict();
 
@@ -105,6 +110,7 @@ const TABLES = {
       signers: "its signature request's signature rows",
       can_sign: "the reader against the request's company signer",
       can_resend: "the request's signers' statuses",
+      can_reissue: "the contract's and its case's statuses, and the reader's recruitment scope",
     },
   },
   ContractTemplate: { table: null, reason: "a template_version of templates/documents/employment-contract.html" },

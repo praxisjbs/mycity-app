@@ -18,14 +18,17 @@
  * The requirements are MyCity's New Joiner list, seeded once as reference data and kept on the
  * Checklist settings (5399; A26 allows it because Send Offer refuses an empty checklist, AJ
  * 11/11/2026). A requirement of kind `number` or `both` takes a typed value on its item (the
- * MyLagosApp Wallet ID). The BVN is not a checklist item: it is asked once on the upload page and kept on
+ * MyLagosApp Wallet ID). The BVN is not a checklist item: it is asked on the upload page (the hire may
+ * correct it until documentation completes) and kept on
  * the employee record under employee.bank (masked).
  *
  * Two guarantors a hire, not related to them: one a previous employer, one who has known them
  * four years or more; serving police, military and other uniformed staff are not accepted.
+ * Each carries MyCity's Guarantor Form: date of birth, contact and residential addresses (picked),
+ * the conviction and recommendation answers, the signed form and an ID copy (both needed to pass).
  * Operations & People run a reference check on each (pending → passed or failed). Documentation
- * completes when every required item is verified, both guarantors passed, the BVN is entered and the
- * contract signed (`waiting_on` names what is still owed).
+ * completes when every required item is verified, both guarantors passed, the BVN and the hire's home
+ * address are entered and the contract signed (`waiting_on` names what is still owed).
  *
  * Plans (the Plans settings): a department's onboarding steps, each with the role that owns it, a
  * due day counted from the start date and an optional SOP. The plan with no department is the
@@ -39,15 +42,16 @@ const { z } = require("zod");
 const { uuid, text, optionalText, email, phone, blank, isoDate, isoDateTime, listQuery, Paged } = require("./common");
 const { DocumentRef } = require("./documents");
 const { EmploymentContractView } = require("./employment_contracts");
+const { PlaceInput } = require("./maps");
 
 const OnboardingStatus = z.enum(["documentation", "pre_onboarding", "onboarding", "completed", "cancelled"]);
 const ChecklistItemStatus = z.enum(["pending", "uploaded", "verified", "rejected"]);
-/** What a requirement asks for: a file, a typed number (BVN), or both. */
+/** What a requirement asks for: a file, a typed number (the MyLagosApp Wallet ID), or both. The BVN is no requirement. */
 const RequirementKind = z.enum(["file", "number", "both"]);
 const GuarantorKind = z.enum(["previous_employer", "personal"]);
 const ReferenceCheckStatus = z.enum(["pending", "passed", "failed"]);
 /** What documentation still waits on before the case may move to pre-onboarding. */
-const GateCondition = z.enum(["documents", "guarantors", "bvn", "contract"]);
+const GateCondition = z.enum(["documents", "guarantors", "bvn", "address", "contract"]);
 /** Who owns a plan step, named when the steps are copied onto a hire's case. */
 const StepOwnerRole = z.enum(["case_owner", "line_manager", "head_of_department", "hire"]);
 const CaseStepStatus = z.enum(["pending", "done"]);
@@ -186,7 +190,17 @@ const Guarantor = z
     phone: z.string(),
     email: z.string().nullable(),
     years_known: z.number().int().nullable(),
+    date_of_birth: isoDate.nullable(),
+    /** The addresses' lines as picked (the places themselves are kept by places.save). */
+    contact_address: z.string().nullable(),
+    residential_address: z.string().nullable(),
+    /** MyCity's Guarantor Form: have they been convicted of a criminal offence, and do they recommend the hire. */
+    convicted: z.boolean().nullable(),
+    conviction_details: z.string().nullable(),
+    recommends: z.boolean().nullable(),
     form: DocumentRef.nullable(),
+    /** A copy of the guarantor's ID card, driving licence or passport. */
+    id_document: DocumentRef.nullable(),
     check_status: ReferenceCheckStatus,
     check_note: z.string().nullable(),
     checked_at: isoDateTime.nullable(),
@@ -205,12 +219,24 @@ const GuarantorInput = z
     phone,
     email: blank(email),
     years_known: blank(z.coerce.number().int().min(0).max(80)),
+    date_of_birth: isoDate,
+    contact_address: PlaceInput,
+    residential_address: PlaceInput,
+    convicted: z.boolean({ required_error: "Answer this" }),
+    conviction_details: optionalText(500),
+    recommends: z.boolean({ required_error: "Answer this" }),
+    /** The signed Guarantor Form and the ID copy: each may come later, but both before the check passes. */
     form_document_id: blank(uuid),
+    id_document_id: blank(uuid),
   })
   .strict()
   .refine((v) => v.kind !== "personal" || (v.years_known ?? 0) >= 4, {
     message: "Four years or more",
     path: ["years_known"],
+  })
+  .refine((v) => !v.convicted || Boolean(v.conviction_details), {
+    message: "Say what happened",
+    path: ["conviction_details"],
   });
 
 /** Record a guarantor's reference check. */
@@ -272,6 +298,13 @@ const OnboardingDetail = OnboardingRow.extend({
   contract: EmploymentContractView.nullable(),
   waiting_on: z.array(GateCondition),
   steps: z.array(OnboardingStep),
+  /** The hire's home address has been picked on their page (never the address itself here). */
+  address_entered: z.boolean(),
+  /**
+   * The reader acts for the whole company and the case is at documentation: Verify, Reject, Record
+   * Check and Send Reminder (Operations & People's, guide §8).
+   */
+  can_check: z.boolean(),
   can_complete: z.boolean(),
   can_withdraw: z.boolean(),
 });
@@ -304,6 +337,8 @@ const OnboardingSummary = z
     onboarding: z.number().int().min(0),
     overdue_steps: z.number().int().min(0),
     completed_this_month: z.number().int().min(0),
+    /** The reader acts for the whole company: Onboarding Settings is theirs. */
+    can_configure: z.boolean(),
   })
   .strict();
 
@@ -333,6 +368,7 @@ const UploadPack = z
     items: z.array(OnboardingItem),
     guarantors: z.array(Guarantor).max(2),
     bvn_entered: z.boolean(),
+    address_entered: z.boolean(),
   })
   .strict();
 
@@ -357,8 +393,22 @@ const UploadItem = z
   .strict()
   .refine((v) => Boolean(v.document_id) || Boolean(v.entered_value), { message: "Add the file", path: ["document_id"] });
 
-/** The hire's BVN, asked once on the upload page; kept on employee.bvn. */
+/**
+ * The hire's BVN on the upload page, kept on employee.bvn. They may correct it until documentation
+ * completes (AJ, 12/11/2026): nobody else ever sees it to catch a slip.
+ */
 const BvnEnter = z.object({ bvn }).strict();
+
+/** The hire's home address, picked on the upload page; kept as their employee record's home address. */
+const HireAddressEnter = z.object({ home_address: PlaceInput }).strict();
+
+/** A query for the address search on the upload page (the hire's link is the key). */
+const UploadPlaceSearchQuery = z
+  .object({ q: z.string().trim().min(2).max(120) })
+  .strict();
+const UploadPinQuery = z
+  .object({ lat: z.coerce.number().min(-90).max(90), lon: z.coerce.number().min(-180).max(180) })
+  .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const ROW = {
@@ -422,8 +472,10 @@ const TABLES = {
       contract: "its employment_contract",
       waiting_on: "the documentation gate's conditions still unmet",
       steps: "onboarding_case_step rows",
-      can_complete: "at onboarding with every step done",
-      can_withdraw: "not yet completed or cancelled",
+      address_entered: "the hire's employee.home_address is set",
+      can_check: "at documentation, and the reader's recruitment scope is all",
+      can_complete: "at onboarding with every step done, and the reader's recruitment scope is all",
+      can_withdraw: "not yet completed or cancelled, and the reader's recruitment scope is all",
     },
   },
   OnboardingListQuery: { table: null, reason: "list controls and filters for the cases" },
@@ -436,7 +488,13 @@ const TABLES = {
   PrivacyAcknowledge: { table: null, reason: "kept as onboarding_case.privacy_acknowledged_at" },
   UploadItem: { table: "onboarding_checklist_item", virtual: { document_id: "the file, kept on the item and filed on the employee" } },
   BvnEnter: { table: "employee" },
-  Guarantor: { table: "onboarding_guarantor", virtual: { form: "the document behind form_document_id" } },
+  HireAddressEnter: { table: "employee" },
+  UploadPlaceSearchQuery: { table: null, reason: "an address search on the upload page" },
+  UploadPinQuery: { table: null, reason: "a pinned point on the upload page" },
+  Guarantor: {
+    table: "onboarding_guarantor",
+    virtual: { form: "the document behind form_document_id", id_document: "the document behind id_document_id" },
+  },
   GuarantorInput: { table: "onboarding_guarantor" },
   ReferenceCheckRecord: { table: "onboarding_guarantor" },
 };
@@ -473,6 +531,9 @@ module.exports = {
   GuarantorInput,
   ReferenceCheckRecord,
   BvnEnter,
+  HireAddressEnter,
+  UploadPlaceSearchQuery,
+  UploadPinQuery,
   DocumentRequirement,
   DocumentRequirementCreate,
   DocumentRequirementEdit,

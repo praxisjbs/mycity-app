@@ -8,7 +8,7 @@ the build plan and its log.
 | | |
 |---|---|
 | Branch | `m5/offers` |
-| Pull request | #85 (draft, PR 0 to PR 4); PR 5 on opens a new one from the same branch |
+| Pull request | #85 (merged, PR 0 to PR 4); #122 (draft, PR 5 to PR 8 and the fixes from its audit of 12/11/2026), from the same branch |
 | Owner | AJ (Adole Jerome); every M5 decision is AJ's (team ownership, 06/11/2026: GE M4, AJ M5 and M8, LA M7, TB M6 and M10) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 06/11/2026 |
@@ -101,8 +101,13 @@ GE's (on #79, 06/11/2026):
    and calls `vacancies.hiredIn` for the seat and the vacancy. GE builds both in an M4 PR; until it
    lands, M5 calls a stand-in of the same name. Only `offer` is a board column; the board shows
    `status=active` only, so a hire leaves it.
+   *Amended 11/11/2026 (PR 5) on GE's pipeline (#88): acceptance calls `advanceIn(..., "documentation")`,
+   and `hireIn` runs at Complete Onboarding, not at acceptance. M5 also calls `candidates.withdrawnIn`
+   (PR 6b), and Reopen is refused past Offer (the audit of #122, changed on this branch, AJ).*
 11. **The stage order** is `shortlist → offer → hired`. Documentation, pre-onboarding and onboarding
    live on `onboarding_case.status`, shown on the Onboarding tab.
+   *Amended 11/11/2026 (PR 5): GE's pipeline (#88) has `offer → documentation → pre_onboarding →
+   onboarding → hired`; the application moves with the case (guide §3 steps 5 to 8).*
 12. **Sign Offer and Verify**: GE built the screens on #82 (`PublicPage layout="split"`, the mock,
     Verify by reference and by QR `/verify/t/<token>`). AJ builds the backend and wires them,
     adding the email code, name, title, consent tick, and the signers list and status. PROGRESS
@@ -161,7 +166,9 @@ earlier: M5's forms use help terms.
   at `offer` or later; M5 revokes offer and upload tokens on `application.not_progressed`.
 - The weighted scorecard total is worked out on read, so the offer stores a snapshot.
 - The line manager comes from the vacancy's Organogram seat, not the free-text `reports_to`; the
-  hire's address is picked (`AddressField`) at documentation, as `candidate.location` is free text.
+  hire's address is picked (`AddressField`) at documentation, as `candidate.location` is free text
+  (not built in PR 6 to 8; built with the audit of #122, 12/11/2026: Your Address on the upload page,
+  a gate condition).
 - The `4099` seed still lists the retired `rejected` stage (GE).
 - Arrived from MyCity 07/11/2026 (AJ): the blank Employee Data Form, Guarantor Form and Providus
   Salary Account Opening Form (PDF, for PR 6's checklist items and the guarantor fields), the HR
@@ -181,6 +188,37 @@ earlier: M5's forms use help terms.
 ---
 
 ## 6 · Log
+
+- 12/11/2026 · AJ · The audit of #122 (12/11/2026, 22 items), fixed on `m5/offers`; guide §2 to §8,
+  §10, §11, §13, §14. Each fix has a test that fails on `d79e8f23` and passes now (22 tests, run on a
+  clean checkout of that commit).
+  - Blockers: the offer's employment type CHECK in the employee's spellings (5070, rows converted;
+    New Offer maps a vacancy's `contract` and `internship`); the hire's work email a placeholder
+    (`<offer number>@hire.invalid`) until Complete Onboarding, every mail to the hire to their personal
+    email, Send refused for an active employee (`CANDIDATE_IS_EMPLOYEE`), an acceptance refusal shown
+    to the candidate as a plain retry (`NOT_ACCEPTED`). Found by the new test: the contract's signer
+    took the placeholder; it reads the offer's candidate address now.
+  - Should fix: `requireAllScope()` (new in `middleware/rbac.js`) on the settings and Operations &
+    People's case actions, `can_check` and `can_configure` for the screens, Mark Step Done in scope;
+    `OfferCard.range_reason`; Reissue Contract (`POST /recruitment/contracts/:id/reissue`) and 15 days
+    to sign on each contract link; Reopen refused past Offer (`candidates.reopen` and the board's
+    sheet and mock); MyCity's Guarantor Form on each guarantor (5100; both addresses picked through
+    `/onboard/:token/places/*`, new owners `onboarding_guarantor.*`), the signed form and ID copy
+    needed to pass; the screens (Employee 360 Documents on `ListDetail`, its upload and the page's
+    item value on `useContractForm`, the plan editor's steps keyed for life with SOP labels by id,
+    View File handing back its download), with tests for Onboarding Settings and Employee Documents.
+  - Minor: the contract's `hire_name` (5080) in what its signatures cover; `lagos.addMonths` for the
+    confirmation date; Withdraw with an approval only for its submitter or the CEO; the request held
+    before the offer or contract in every write (`signatures.holdRequestIn`); the long messages cut;
+    Sign for Company shown to a signatory named after approval; the contract row through
+    `repo.insert`; Withdraw honours `withdrawnIn`; the BVN audit test reads the ledger and fails when
+    it should; a department's plan links only its own SOPs (`SOP_OTHER_DEPARTMENT`).
+  - Decided with AJ: the placeholder and the Send check; scope all with the Head of Department's
+    Mark Step Done; the BVN correctable until the gate; the card asks for the reason; Reopen refused
+    past Offer, fixed here ("everything is fixed here, nothing goes to GE"); the hire's address built
+    now. So items 21 and 22 are done here too: `candidates`' `withdrawnIn`, `application.withdrawn`
+    and `contract-sent` are recorded in this log and the guide, and the access log and metrics write
+    a public link's token as `:token`.
 
 - 12/11/2026 · AJ · PR 8, close-out (guide §9, §14; Status Built). Checked rather than redone: every M5
   create or edit form has a chat card or its reason (gate 23 green; New Offer the one card); ⌘K finds

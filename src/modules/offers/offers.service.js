@@ -37,6 +37,7 @@ const vault = require("../../shared/documents/vault");
 const templates = require("../../shared/templates/template-store");
 const workflow = require("../../shared/workflow/engine");
 const profile = require("../../shared/organisation/profile");
+const { logger } = require("../../config/logger");
 const { scopeFor } = require("../../middleware/rbac");
 const signatures = require("../signatures/signatures.service");
 const candidates = require("../candidates/candidates.service");
@@ -52,6 +53,8 @@ const VALID = c.offers.OFFER_VALID_DAYS;
 /** The stages an application may take an offer from: Shortlist, or Offer again after one ended. */
 const OFFERABLE = new Set(["shortlist", "offer"]);
 const ENDED_REASON = "The candidate was not progressed";
+/** The domain of a hire's work email before Complete Onboarding (placeholderEmail). */
+const PLACEHOLDER_DOMAIN = "hire.invalid";
 /** The actor of a step nobody in the hub pressed (the candidate's own decline, a lapse). */
 const NOBODY = Object.freeze({ user_id: null });
 
@@ -75,9 +78,20 @@ async function tx(fn) {
 
 const holds = (scope, row) => Boolean(scope && (scope.scope === "all" || (row.hiring_manager_id && (scope.scope_ids || []).includes(row.hiring_manager_id))));
 
+/**
+ * Hold an offer for a write, its signature request first: the signing page holds the request and
+ * then the offer (acceptedIn, declinedIn), so every write here takes them in that order too, and
+ * Withdraw or Resend never waits on a signature that waits on it.
+ */
+async function lockIn(db, id) {
+  const peek = await repo.get(db, id);
+  if (peek && peek.signature_request_id) await signatures.holdRequestIn(db, peek.signature_request_id);
+  return repo.get(db, id, { lock: true });
+}
+
 /** The offer, or 404 when it is not in the reader's scope. */
-async function visible(db, id, scope, opts) {
-  const row = await repo.get(db, id, opts);
+async function visible(db, id, scope, opts = {}) {
+  const row = opts.lock ? await lockIn(db, id) : await repo.get(db, id);
   if (!row || !holds(scope, row)) throw notFound();
   return row;
 }
@@ -139,6 +153,16 @@ async function detailOf(db, o, user) {
     ? (await signaturesFor(db, o.signature_request_id)).find((s) => s.signer_type === "user" && s.signer_id === user.user_id && s.status === "pending")
     : null;
   const terms = o.terms || {};
+  // Approved with no request yet (no signatory had a login when it was approved): the signatory
+  // named now opens it by signing (ensureRequestIn).
+  const named = o.status === "approved" && !o.signature_request_id ? await repo.signatory(db) : null;
+  const mayOpen = Boolean(named && named.user_id && user && named.user_id === user.user_id);
+  // With its approval, only the submitter or the CEO may withdraw it (the approval engine's rule).
+  let withdrawable = editable && ["approval", "approved", "sent"].includes(o.status);
+  if (withdrawable && o.status === "approval" && o.workflow_instance_id && user && user.is_ceo !== true) {
+    const instance = await workflow.getInstance(db, o.workflow_instance_id);
+    withdrawable = Boolean(instance && instance.opened_by === user.user_id);
+  }
   return {
     ...listed(o),
     vacancy_id: o.vacancy_id,
@@ -182,10 +206,10 @@ async function detailOf(db, o, user) {
     send_refused_at: o.status === "sent" ? iso(await repo.refusedSince(db, o.candidate_email, o.sent_at)) : null,
     can_edit: editable && o.status === "draft",
     can_submit: editable && o.status === "draft",
-    can_sign: o.status === "approved" && Boolean(mine) && Boolean(company) && company.status === "pending",
+    can_sign: (o.status === "approved" && Boolean(mine) && Boolean(company) && company.status === "pending") || mayOpen,
     can_send: editable && o.status === "approved" && Boolean(company) && company.status === "signed",
     can_resend: editable && o.status === "sent",
-    can_withdraw: editable && ["approval", "approved", "sent"].includes(o.status),
+    can_withdraw: withdrawable,
     can_change_email: editable && o.status === "sent",
   };
 }
@@ -204,8 +228,10 @@ async function get(id, user, scope) {
   return detailOf(pool, await visible(pool, id, scope), user);
 }
 
-async function summary(scope) {
-  return repo.summary(pool, scope);
+/** The figures above the list, and whether the reader may open Offer Settings (scope all, guide §8). */
+async function summary(scope, user) {
+  const editing = user ? await scopeFor(user, "recruitment", "edit") : null;
+  return { ...(await repo.summary(pool, scope)), can_configure: Boolean(editing && editing.scope === "all") };
 }
 
 /** The application New Offer is for, in the reader's edit scope, at a stage that may take one. */
@@ -229,7 +255,7 @@ async function draft(applicationId, _user, scope) {
     job_title: v.title,
     department_id: v.department_id,
     reports_to: v.reports_to,
-    employment_type: v.employment_type,
+    employment_type: render.employmentFromVacancy(v.employment_type),
     work_pattern: v.work_pattern,
     probation_months: num(v.probation_months),
     start_date: v.target_start_on && v.target_start_on >= lagos.today() ? v.target_start_on : null,
@@ -350,7 +376,8 @@ async function createFromCard(actor, scope, values) {
     probation_months: d.probation_months,
     job_description: d.job_description,
     pay_lines: [{ name: "Basic Salary", monthly_amount: values.basic_salary }],
-    range_reason: "Drafted from the assistant; set the pay lines before submitting",
+    // Outside the vacancy's range the card asks why, as the form does; payOf refuses it without one.
+    range_reason: values.range_reason || null,
   });
 }
 
@@ -489,7 +516,7 @@ async function settleApproval(offerId, { state, reason, instance_id: instanceId,
 async function sign(actor, scope, id, body, meta) {
   return tx(async (client) => {
     const o = await visible(client, id, scope, { lock: true });
-    if (o.status !== "approved") throw refused("NOT_APPROVED", "Only an approved offer is signed for the company");
+    if (o.status !== "approved") throw refused("NOT_APPROVED", "Only an approved offer is signed");
     const requestId = await ensureRequestIn(client, actor, o);
     if (!requestId) throw refused("NO_SIGNATORY", "Name the Offer Signatory in Offers settings first");
     await signatures.signAsStaffIn(client, actor, requestId, body, meta);
@@ -526,11 +553,14 @@ async function send(actor, scope, id) {
     if (!(await mayEdit(actor, o))) throw notFound();
     if (o.status !== "approved") throw refused("NOT_APPROVED", "Only an approved offer can be sent");
     const company = o.signature_request_id ? (await signatures.signersOf(client, o.signature_request_id)).find((s) => s.role === "mycity") : null;
-    if (!company || company.status !== "signed") throw refused("NOT_SIGNED", "The offer is not signed for the company yet");
+    if (!company || company.status !== "signed") throw refused("NOT_SIGNED", "The company has not signed yet");
     // An accepted offer builds its checklist from the requirements in force, so an empty list would
     // open a case with nothing to ask the hire for (guide §11).
+    // Acceptance creates an employee: someone already on the staff moves through People, not a hire.
+    if (await repo.activeEmployeeWith(client, o.candidate_email))
+      throw refused("CANDIDATE_IS_EMPLOYEE", "This candidate is already an employee", 409);
     if ((await onboarding.requiredCount(client)) === 0)
-      throw refused("NO_REQUIREMENTS", "Set at least one required document on the Onboarding checklist first", 422);
+      throw refused("NO_REQUIREMENTS", "Add a required document to the checklist", 422);
     const days = (o.terms && o.terms.valid_days) || VALID.default;
     const expires = new Date(Date.now() + days * 24 * 3600 * 1000);
     await signatures.setExpiryIn(client, o.signature_request_id, expires);
@@ -618,7 +648,7 @@ async function withdrawForApplication(applicationId, actorUserId) {
   let ended = 0;
   for (const id of await repo.openFor(pool, applicationId)) {
     ended += await tx(async (client) => {
-      const o = await repo.get(client, id, { lock: true });
+      const o = await lockIn(client, id);
       if (!o) return 0;
       return (await withdrawIn(client, actorUserId ? { user_id: actorUserId } : null, o, ENDED_REASON, { asRequester: true })) ? 1 : 0;
     });
@@ -677,22 +707,27 @@ async function sealIn(client, ctx) {
  * What the employee record starts as (guide §3 step 5). The offer holds every field it is made
  * from, which is why Submit for Approval asks for them. No seat and no login: the Organogram seat
  * and the line manager are settled when Complete Onboarding calls `hireIn` (PR 6), and the login is
- * invited then. The candidate's address is both the work and the personal email until Complete
- * Onboarding takes the company one (AJ, 11/11/2026).
+ * invited then. The candidate's address is the personal email, where every mail to the hire goes;
+ * the work email is a placeholder of the offer's own until Complete Onboarding sets the company one
+ * (AJ, 12/11/2026): work emails are unique, and an internal candidate, a rehire or a hire withdrawn
+ * before keeps the candidate's address on another record.
  */
+/**
+ * The work email a hire holds until Complete Onboarding: the offer's number at a reserved domain that
+ * never takes mail (RFC 2606 `.invalid`), unique as the offer is.
+ */
+function placeholderEmail(o) {
+  return `${String(o.number).toLowerCase()}@${PLACEHOLDER_DOMAIN}`;
+}
+
 function employeeFrom(o, pay) {
   const probation = o.probation_months === null || o.probation_months === undefined ? null : Number(o.probation_months);
-  const start = o.start_date ? new Date(o.start_date) : null;
-  let confirmation = null;
-  if (start && probation) {
-    const d = new Date(start);
-    d.setMonth(d.getMonth() + probation);
-    confirmation = lagos.dateOf(d);
-  }
+  const start = o.start_date ? (typeof o.start_date === "string" ? o.start_date.slice(0, 10) : lagos.dateOf(o.start_date)) : null;
+  const confirmation = start && probation ? lagos.addMonths(start, probation) : null;
   return {
     first_name: o.candidate_first_name,
     last_name: o.candidate_last_name,
-    work_email: o.candidate_email,
+    work_email: placeholderEmail(o),
     personal_email: o.candidate_email,
     phone: o.candidate_phone || null,
     job_title: o.job_title,
@@ -700,7 +735,7 @@ function employeeFrom(o, pay) {
     worksite_id: o.worksite_id || null,
     employment_type: o.employment_type,
     work_pattern: o.work_pattern,
-    start_date: typeof o.start_date === "string" ? o.start_date.slice(0, 10) : lagos.dateOf(o.start_date),
+    start_date: start,
     confirmation_due_on: confirmation,
     gross_monthly: render.totalOf(pay),
   };
@@ -735,16 +770,26 @@ async function acceptedIn(client, ctx) {
   const actor = ctx.actor || NOBODY;
   const pay = await repo.payLines(client, o.offer_id);
 
-  const employee = await organisation.createEmployee(client, employeeFrom(o, pay), actor);
-  if (!(await candidates.advanceIn(client, actor, o.application_id, "documentation")))
-    throw refused("NOT_MOVED", "This application cannot move to Documentation", 409);
-  const onboardingCase = await onboarding.openCaseIn(client, actor, { offer: o, employee });
-  await contracts.generateIn(client, actor, {
-    offer: o,
-    onboarding_case: onboardingCase,
-    employee,
-    signatory: await contractSignatoryIn(client, o),
-  });
+  let employee;
+  let onboardingCase;
+  try {
+    employee = await organisation.createEmployee(client, employeeFrom(o, pay), actor);
+    if (!(await candidates.advanceIn(client, actor, o.application_id, "documentation")))
+      throw refused("NOT_MOVED", "This application cannot move to Documentation", 409);
+    onboardingCase = await onboarding.openCaseIn(client, actor, { offer: o, employee });
+    await contracts.generateIn(client, actor, {
+      offer: o,
+      onboarding_case: onboardingCase,
+      employee,
+      signatory: await contractSignatoryIn(client, o),
+    });
+  } catch (err) {
+    // The candidate reads this on the public signing page: a refusal from the hire's side (a record,
+    // a stage, a signatory) is the staff's to see in the log, never another person's details here.
+    if (!(err instanceof AppError) || err.status >= 500) throw err;
+    logger.warn({ offer_id: o.offer_id, code: err.code, message: err.message }, "offers: acceptance refused");
+    throw refused("NOT_ACCEPTED", "We could not take your signature. Try again.");
+  }
 
   await emit(client, {
     key: EVENTS.OFFER_ACCEPTED,

@@ -4,7 +4,8 @@
  * the two guarantors with Record Check; the employment contract with Sign for Company and Resend
  * Contract; and, from the start date, the plan's steps with Mark Step Done. Send Reminder, Complete
  * Onboarding and Withdraw Hire sit on the case's own card. What a person may do comes from the
- * record: its status, `can_complete`, `can_withdraw` and the contract's `can_sign` and `can_resend`.
+ * record: `can_check` (Verify, Reject, Record Check, Send Reminder: Operations & People, guide §8),
+ * `can_complete`, `can_withdraw`, and the contract's `can_sign`, `can_resend` and `can_reissue`.
  * `wide` (the desktop dialog): the case beside its contract, then the checklist, the guarantors (side
  * by side) and the plan across the dialog; a phone's sheet stacks them all.
  */
@@ -72,11 +73,11 @@ const CONTRACT_STATUS: Record<EmploymentContractView["status"], [StatusTone, str
   cancelled: ["neutral", "Cancelled"],
 };
 
-const GATE: Record<GateCondition, string> = { documents: "documents", guarantors: "guarantors", bvn: "BVN", contract: "contract" };
+const GATE: Record<GateCondition, string> = { documents: "documents", guarantors: "guarantors", bvn: "BVN", address: "home address", contract: "contract" };
 const KIND: Record<Guarantor["kind"], string> = { previous_employer: "Previous Employer", personal: "Personal" };
 const OWNER: Record<OnboardingStep["owner_role"], string> = { case_owner: "Case Owner", line_manager: "Line Manager", head_of_department: "Head of Department", hire: "The Hire" };
 
-const PRE_HELP = "Every required document verified, both guarantors passed, the BVN entered and the contract signed. The case then waits for the start date.";
+const PRE_HELP = "Every required document verified, both guarantors passed, the BVN and home address entered and the contract signed. Then it waits for the start date.";
 const BVN_HELP = "The hire enters it once on their upload page. It is kept masked on their record and never shown here.";
 
 const listed = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
@@ -93,10 +94,11 @@ export function OnboardingCase({ id, wide = false }: { id: string; wide?: boolea
   };
   const view = (doc: { document_id: string; file_name: string; mime_type: string }, at?: string | null) => {
     const url = `/api/v1/documents/${doc.document_id}/content`;
-    if (viewableFile(doc.mime_type)) files.view(url, { name: doc.file_name, mime: doc.mime_type, at: at ? `Sent ${formatDate(at)}` : null });
-    else void saveFile(url, doc.file_name);
+    if (viewableFile(doc.mime_type)) return files.view(url, { name: doc.file_name, mime: doc.mime_type, at: at ? `Sent ${formatDate(at)}` : null });
+    // A file the browser cannot show is downloaded; the press waits for it, so a second press waits too (F26).
+    return saveFile(url, doc.file_name);
   };
-  const atDocs = c.status === "documentation";
+  const atDocs = c.status === "documentation" && c.can_check;
   const head = [<CaseCard key="case" c={c} onChanged={reload} />, c.contract ? <ContractCard key="contract" contract={c.contract} onChanged={reload} /> : null].filter(Boolean);
   // The case and its contract side by side in the dialog; the checklist, guarantors and plan across it.
   return (
@@ -147,17 +149,18 @@ function CaseCard({ c, onChanged }: { c: OnboardingDetail; onChanged: () => void
           ["Start Date", c.starts_on ? formatDate(c.starts_on) : "–"],
           [<HelpTerm key="p" help={PRE_HELP}>Pre-Onboarding</HelpTerm>, pre],
           [<HelpTerm key="b" help={BVN_HELP}>BVN</HelpTerm>, c.bvn_entered ? pill(["ok", "Entered"]) : pill(["warn", "Not Entered"])],
+          ["Home Address", c.address_entered ? pill(["ok", "Entered"]) : pill(["warn", "Not Entered"])],
           ["Privacy Notice", c.privacy_acknowledged_at ? `Accepted ${formatDate(c.privacy_acknowledged_at)}` : "Not accepted"],
           ...(c.completed_at ? [["Completed", formatDateTime(c.completed_at)] as [string, string]] : []),
           ...(c.cancelled_at ? [["Cancelled", formatDateTime(c.cancelled_at)] as [string, string]] : []),
           ...(c.end_reason ? [["Reason", <span key="r" data-copy="content">{c.end_reason}</span>] as [string, React.ReactNode]] : []),
         ]}
       />
-      {(c.status === "documentation" || c.can_withdraw || c.can_complete) && (
+      {(c.can_check || c.can_withdraw || c.can_complete) && (
         <ActionGroup>
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             {c.can_withdraw && <Button variant="danger" onClick={withdraw}>Withdraw Hire</Button>}
-            {c.status === "documentation" && <Button icon="bell" onClick={sendReminder}>Send Reminder</Button>}
+            {c.can_check && <Button icon="bell" onClick={sendReminder}>Send Reminder</Button>}
             {c.can_complete && <Button variant="primary" icon="check" className="max-md:w-full" onClick={complete}>Complete Onboarding</Button>}
           </div>
         </ActionGroup>
@@ -167,7 +170,7 @@ function CaseCard({ c, onChanged }: { c: OnboardingDetail; onChanged: () => void
 }
 
 /** The checklist: each item's state, the file or value the hire sent, and Verify and Reject on it. */
-function ItemsCard({ c, open, onChanged, onView }: { c: OnboardingDetail; open: boolean; onChanged: () => void; onView: (d: NonNullable<OnboardingItem["document"]>, at?: string | null) => void }) {
+function ItemsCard({ c, open, onChanged, onView }: { c: OnboardingDetail; open: boolean; onChanged: () => void; onView: (d: NonNullable<OnboardingItem["document"]>, at?: string | null) => Promise<void> | void }) {
   const modal = useModal();
   const verify = useMutation("POST /api/v1/recruitment/onboarding/:id/items/:item_id/verify");
   const required = c.items.filter((i) => i.required);
@@ -230,7 +233,7 @@ function ItemsCard({ c, open, onChanged, onView }: { c: OnboardingDetail; open: 
 }
 
 /** The two guarantors the hire entered, their forms, and each reference check. */
-function GuarantorsCard({ c, open, onChanged, onView, wide }: { c: OnboardingDetail; open: boolean; onChanged: () => void; onView: (d: NonNullable<Guarantor["form"]>) => void; wide: boolean }) {
+function GuarantorsCard({ c, open, onChanged, onView, wide }: { c: OnboardingDetail; open: boolean; onChanged: () => void; onView: (d: NonNullable<Guarantor["form"]>) => Promise<void> | void; wide: boolean }) {
   const modal = useModal();
   const check = (g: Guarantor) => modal.open({ title: "Record Check", body: (close) => <CheckForm c={c} g={g} close={close} onSaved={onChanged} /> });
   return (
@@ -254,12 +257,18 @@ function GuarantorsCard({ c, open, onChanged, onView, wide }: { c: OnboardingDet
                   ["Phone", g.phone],
                   ...(g.email ? [["Email", g.email] as [string, string]] : []),
                   ...(g.years_known !== null ? [["Years Known", String(g.years_known)] as [string, string]] : []),
+                  ...(g.date_of_birth ? [["Date of Birth", formatDate(g.date_of_birth)] as [string, string]] : []),
+                  ...(g.contact_address ? [["Contact Address", <span key="ca" data-copy="content">{g.contact_address}</span>] as [string, React.ReactNode]] : []),
+                  ...(g.residential_address ? [["Residential Address", <span key="ra" data-copy="content">{g.residential_address}</span>] as [string, React.ReactNode]] : []),
+                  ...(g.convicted !== null ? [["Convicted", g.convicted ? <span key="cv" data-copy="content">{`Yes: ${g.conviction_details ?? ""}`}</span> : "No"] as [string, React.ReactNode]] : []),
+                  ...(g.recommends !== null ? [["Recommends", g.recommends ? "Yes" : "No"] as [string, string]] : []),
                   ...(g.check_note ? [["Check Note", <span key="n" data-copy="content">{g.check_note}</span>] as [string, React.ReactNode]] : []),
                 ]}
               />
               <ActionGroup>
                 <div className="mt-2 flex flex-wrap justify-end gap-2">
                   {g.form && <Button size="sm" icon="eye" onClick={() => onView(g.form!)}>View Form</Button>}
+                  {g.id_document && <Button size="sm" icon="eye" onClick={() => onView(g.id_document!)}>View ID</Button>}
                   {open && g.check_status !== "passed" && <Button size="sm" variant="primary" onClick={() => check(g)}>Record Check</Button>}
                 </div>
               </ActionGroup>
@@ -276,6 +285,7 @@ function ContractCard({ contract: k, onChanged }: { contract: EmploymentContract
   const modal = useModal();
   const sign = useMutation("POST /api/v1/recruitment/contracts/:id/sign");
   const resend = useMutation("POST /api/v1/recruitment/contracts/:id/resend");
+  const reissue = useMutation("POST /api/v1/recruitment/contracts/:id/reissue");
   const signFor = () =>
     modal.open({
       title: "Sign for the Company",
@@ -302,6 +312,15 @@ function ContractCard({ contract: k, onChanged }: { contract: EmploymentContract
       say(e);
     }
   };
+  const anew = async () => {
+    try {
+      const made = await reissue.run({ params: { id: k.employment_contract_id }, body: {} });
+      onChanged();
+      toast(`${made.number} ready to sign`);
+    } catch (e) {
+      say(e);
+    }
+  };
   const pdf = () => saveFile(`/api/v1/recruitment/contracts/${k.employment_contract_id}/document`, k.document.file_name);
   return (
     <Card>
@@ -317,6 +336,7 @@ function ContractCard({ contract: k, onChanged }: { contract: EmploymentContract
         <div className="mt-3 flex flex-wrap justify-end gap-2">
           <Button icon="download" onClick={pdf}>Download PDF</Button>
           {k.can_resend && <Button icon="send" onClick={again}>Resend Contract</Button>}
+          {k.can_reissue && <Button variant="primary" icon="refresh" className="max-md:w-full" onClick={anew}>Reissue Contract</Button>}
           {k.can_sign && <Button variant="primary" icon="signature" className="max-md:w-full" onClick={signFor}>Sign for Company</Button>}
         </div>
       </ActionGroup>

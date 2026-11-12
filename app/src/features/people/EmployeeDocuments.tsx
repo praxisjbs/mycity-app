@@ -10,12 +10,15 @@ import { useFileViewer, viewableFile } from "@/features/shared/files";
 import {
   ActionGroup,
   Button,
+  Card,
+  CardHeader,
   DataView,
   Field,
   FormError,
   FormFooter,
   formatDate,
   KeyValue,
+  ListDetail,
   Pill,
   StatStrip,
   TextAreaField,
@@ -24,14 +27,16 @@ import {
   UploadField,
   useContractForm,
   useModal,
+  useSideBySide,
   type StatusTone,
 } from "@mycity/ui";
 
 /**
  * The employee record's Documents tab (docs/guides/foundation.md §2, §5 track B; docs/guides/offers.md
  * §2): every document held on the person, the ones People asked for and are still missing, and what
- * expires soon, on the `documents` module's routes. A row opens the document with View File and
- * Download; Verify Document for one awaiting a check (`people` edit). Upload Document files one on
+ * expires soon, on the `documents` module's routes. A row opens the document beside the list on a wide
+ * desktop and in a sheet on a phone (ListDetail, F31), with View File and Download; Verify Document for
+ * one awaiting a check (`people` edit). Upload Document files one on
  * their record and Request Document asks them for one (both `people` edit). A new hire's onboarding
  * uploads land here from acceptance on.
  */
@@ -58,7 +63,11 @@ export function EmployeeDocuments({ id }: { id: string }) {
   };
   const add = (row?: DocumentRow) => modal.open({ title: "Upload Document", body: (close) => <UploadForm id={id} row={row ?? null} close={close} onSaved={refresh} /> });
   const ask = () => modal.open({ title: "Request Document", body: (close) => <RequestForm id={id} close={close} onSaved={refresh} /> });
-  const open = (d: DocumentRow) => modal.open({ title: d.name, body: (close) => <DocumentSheet d={d} mayEdit={mayEdit} close={close} onView={files.view} onUpload={() => add(d)} onSaved={refresh} /> });
+  // The record in view: the picked row as the list now holds it; beside the list the first shows unasked (F31).
+  const beside = useSideBySide();
+  const [pick, setPick] = useState<string | null>(null);
+  const picked = pick ? (list.rows.find((d) => d.row_key === pick) ?? null) : null;
+  const shown = picked ?? (beside ? (list.rows[0] ?? null) : null);
   const s = summary.data;
   return (
     <>
@@ -71,12 +80,18 @@ export function EmployeeDocuments({ id }: { id: string }) {
           { label: "Missing", value: String(s?.missing ?? 0), tone: "err" },
         ]}
       />
+      <ListDetail
+        open={picked !== null}
+        onClose={() => setPick(null)}
+        title="Document"
+        list={
       <DataView<DocumentRow>
         title="Documents"
         list={list}
         rowKey={(d) => d.row_key}
         noun="document"
-        onRowClick={open}
+        onRowClick={(d) => setPick(d.row_key)}
+        selectedKey={shown ? shown.row_key : null}
         right={
           mayEdit ? (
             <ActionGroup>
@@ -96,13 +111,30 @@ export function EmployeeDocuments({ id }: { id: string }) {
           { key: "ref", label: "Reference", desktop: true, render: (d) => d.number },
         ]}
       />
+        }
+        detail={
+          shown && (
+            <DocumentCard
+              key={shown.row_key}
+              d={shown}
+              mayEdit={mayEdit}
+              onView={files.view}
+              onUpload={() => add(shown)}
+              onSaved={() => {
+                setPick(null);
+                refresh();
+              }}
+            />
+          )
+        }
+      />
       {files.viewer}
     </>
   );
 }
 
 /** One document: its facts, View File and Download, and Verify Document while it waits for a check. */
-function DocumentSheet({ d, mayEdit, close, onView, onUpload, onSaved }: { d: DocumentRow; mayEdit: boolean; close: () => void; onView: ReturnType<typeof useFileViewer>["view"]; onUpload: () => void; onSaved: () => void }) {
+function DocumentCard({ d, mayEdit, onView, onUpload, onSaved }: { d: DocumentRow; mayEdit: boolean; onView: ReturnType<typeof useFileViewer>["view"]; onUpload: () => void; onSaved: () => void }) {
   const verify = useMutation("POST /api/v1/documents/:id/verify");
   const url = d.document_id ? `/api/v1/documents/${d.document_id}/content` : null;
   const mime = d.mime ?? "application/octet-stream";
@@ -110,15 +142,16 @@ function DocumentSheet({ d, mayEdit, close, onView, onUpload, onSaved }: { d: Do
     if (!d.document_id) return;
     try {
       await verify.run({ params: { id: d.document_id }, body: {} });
-      close();
       onSaved();
       toast(`${d.name} verified`);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Not verified. Try again.");
     }
   };
+  const download = () => (url ? saveFile(url, d.name) : undefined);
   return (
-    <>
+    <Card>
+      <CardHeader record title={d.name} right={pill(d)} />
       <KeyValue
         items={[
           ["Uploaded", d.uploaded_at ? formatDate(d.uploaded_at) : "Not uploaded"],
@@ -128,15 +161,14 @@ function DocumentSheet({ d, mayEdit, close, onView, onUpload, onSaved }: { d: Do
         ]}
       />
       <FormFooter>
-        <Button onClick={close}>Close</Button>
-        {url && <Button icon="download" onClick={() => saveFile(url, d.name)}>Download</Button>}
+        {url && <Button icon="download" onClick={download}>Download</Button>}
         {url && viewableFile(mime) && (
-          <Button icon="eye" onClick={() => (close(), onView(url, { name: d.name, mime, at: d.uploaded_at ? `Uploaded ${formatDate(d.uploaded_at)}` : null }))}>
+          <Button icon="eye" onClick={() => onView(url, { name: d.name, mime, at: d.uploaded_at ? `Uploaded ${formatDate(d.uploaded_at)}` : null })}>
             View File
           </Button>
         )}
         {mayEdit && !d.document_id && (
-          <Button variant="primary" icon="upload" onClick={() => (close(), onUpload())}>
+          <Button variant="primary" icon="upload" onClick={onUpload}>
             Upload Document
           </Button>
         )}
@@ -146,17 +178,19 @@ function DocumentSheet({ d, mayEdit, close, onView, onUpload, onSaved }: { d: Do
           </Button>
         )}
       </FormFooter>
-    </>
+    </Card>
   );
 }
 
 /** Upload Document: a file filed on the person's record, or the one a request asked for. */
 function UploadForm({ id, row, close, onSaved }: { id: string; row: DocumentRow | null; close: () => void; onSaved: () => void }) {
-  const [title, setTitle] = useState(row?.name ?? "");
+  // The text beside the file is the upload's own contract (EmployeeDocumentUpload), checked as it is typed.
+  const f = useContractForm({ title: row?.name ?? "" }, documentSchemas.EmployeeDocumentUpload);
+  const title = f.values.title.trim();
   return (
     <>
-      <Field label="What Is It" state={title ? "good" : undefined}>
-        <TextField value={title} onChange={setTitle} placeholder="Valid ID" />
+      <Field label="What Is It" {...f.status("title")}>
+        <TextField {...f.field("title")} placeholder="Valid ID" maxLength={200} />
       </Field>
       <UploadField
         purpose="document"

@@ -290,6 +290,22 @@ async function putSignatory(client, employeeId, userId) {
   );
 }
 
+/**
+ * Whether someone on the staff holds this address as their work or personal email: Send Offer is
+ * refused for them, since acceptance creates an employee (an internal move goes through People).
+ * A record archived or left (a rehire, a hire withdrawn before) does not count.
+ */
+async function activeEmployeeWith(db, email) {
+  if (!email) return false;
+  const { rows } = await db.query(
+    `SELECT 1 FROM employee
+      WHERE (work_email = $1::citext OR personal_email = $1::citext) AND status NOT IN ('archived', 'left')
+      LIMIT 1`,
+    [email],
+  );
+  return rows.length > 0;
+}
+
 /** An active employee, for naming the signatory. */
 async function employee(db, employeeId) {
   const { rows } = await db.query(
@@ -325,6 +341,7 @@ module.exports = {
   application,
   interviewDecision,
   vacancyTerms,
+  activeEmployeeWith,
   signatory,
   putSignatory,
   employee,

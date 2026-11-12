@@ -535,6 +535,15 @@ async function storeImage(client, png, signatureId, actor) {
   return doc.document_id;
 }
 
+/**
+ * Hold a request for the caller's transaction, before the record it signs: the signing page takes the
+ * request first and the record in its hooks, so a module's own write (Withdraw, Resend) takes them in
+ * the same order and the two never wait on each other.
+ */
+async function holdRequestIn(client, signatureRequestId) {
+  return repo.request(client, signatureRequestId, { forUpdate: true });
+}
+
 /** Write one signature, then complete the request when it was the last. In the caller's transaction. */
 async function signRow(client, r, s, body, meta, actor) {
   const adapter = adapterOf(r.subject_type);
@@ -654,6 +663,7 @@ module.exports = {
   verifyCode,
   sign,
   signAsStaffIn,
+  holdRequestIn,
   decline,
   documentFor,
   verifyKey,

@@ -9,7 +9,10 @@
  *   get(), viewOf()                     what the hire's onboarding case shows
  *   sign()                              the company's signer signs in the hub; the hire's link is
  *                                       mailed after commit (`contract-sent`)
- *   resend()                            a fresh link to the hire, every earlier one revoked
+ *   resend()                            a fresh link to the hire, every earlier one revoked, its
+ *                                       time to sign started again
+ *   reissue()                           Reissue Contract: a new contract for a case whose contract
+ *                                       the hire declined or let lapse
  *   cancelIn()                          the case ended before the contract was signed
  *   letterOf(), contentHashOf(), sealIn(), signedIn(), declinedIn(), endedIn()
  *                                       the signatures service's hooks (employment_contracts.events.js)
@@ -37,9 +40,17 @@ const offersRepo = require("../offers/offers.repo");
 const repo = require("./employment_contracts.repo");
 const render = require("./employment_contracts.render");
 const lifecycle = require("./employment_contracts.lifecycle");
+const { scopeFor } = require("../../middleware/rbac");
 const { EVENTS, DOC_TYPE, EMAILS } = require("./employment_contracts.events");
 
 const SUBJECT = "employment_contract";
+/**
+ * How long the hire has to sign once their link is made (Sign for Company, Resend): as an offer's
+ * default (offers.md §6). Past it the request lapses (signature-reminders) and the contract is
+ * cancelled, which Reissue Contract answers.
+ */
+const VALID_DAYS = 15;
+const validUntil = () => new Date(Date.now() + VALID_DAYS * 24 * 3600 * 1000);
 
 const notFound = () => new AppError("NOT_FOUND", "That contract does not exist", 404);
 const refused = (code, message, status = 409) => new AppError(code, message, status);
@@ -58,11 +69,20 @@ async function tx(fn) {
 const holds = (scope, row) =>
   Boolean(scope && (scope.scope === "all" || (row.hiring_manager_id && (scope.scope_ids || []).includes(row.hiring_manager_id))));
 
-/** The contract, or 404 when it is not in the reader's scope. */
-async function visible(db, id, scope, opts) {
+/** The contract, or 404 when it is not in the reader's scope. Held for a write, its request first (as the signing page). */
+async function visible(db, id, scope, opts = {}) {
+  if (opts.lock) {
+    const peek = await repo.get(db, id);
+    if (peek && peek.signature_request_id) await signatures.holdRequestIn(db, peek.signature_request_id);
+  }
   const row = await repo.get(db, id, opts);
   if (!row || !holds(scope, row)) throw notFound();
   return row;
+}
+
+/** The writes only Operations & People make (Resend, Reissue): the reader's scope over every vacancy. */
+function assertAll(scope) {
+  if (!scope || scope.scope !== "all") throw new AppError("PERMISSION_DENIED", "You do not have access to this", 403);
 }
 
 /** The company's name as the offer letter prints it (the profile's display name, never null). */
@@ -82,6 +102,13 @@ const payload = (ct, extra = {}) => ({
 /* ------------------------------------------------------------------ *
  * Reading
  * ------------------------------------------------------------------ */
+
+/** Whether the reader acts for the whole company on recruitment (Resend, Reissue: guide §8). */
+async function actsForAll(user) {
+  if (!user || !user.user_id) return false;
+  const scope = await scopeFor(user, "recruitment", "edit");
+  return Boolean(scope && scope.scope === "all");
+}
 
 /** EmploymentContractView. */
 async function viewOf(db, ct, user) {
@@ -109,7 +136,8 @@ async function viewOf(db, ct, user) {
     can_sign: Boolean(
       user && company && company.status === "pending" && company.signer_type === "user" && company.signer_id === user.user_id,
     ),
-    can_resend: Boolean(company && company.status === "signed" && hire && hire.status === "pending"),
+    can_resend: Boolean(company && company.status === "signed" && hire && hire.status === "pending") && (await actsForAll(user)),
+    can_reissue: ct.status === "cancelled" && ct.case_status === "documentation" && (await actsForAll(user)),
   };
 }
 
@@ -139,9 +167,10 @@ async function forCase(db, caseId, user) {
  */
 async function generateIn(client, actor, { offer, onboarding_case: onboardingCase, employee, signatory }) {
   if (!signatory || !signatory.user_id)
-    throw refused("NO_SIGNATORY", "Name the Offer Signatory in Offers settings first", 422);
+    throw refused("NO_SIGNATORY", "Name the Offer Signatory first", 422);
+  // A hook that runs twice finds the contract and leaves it; only a cancelled one makes room for another.
   const existing = await repo.byCase(client, onboardingCase.onboarding_case_id);
-  if (existing) return existing;
+  if (existing && existing.status !== "cancelled") return existing;
 
   const contractId = crypto.randomUUID();
   const { number } = await numbering.allocate(client, "contract", { date: lagos.today() });
@@ -155,7 +184,8 @@ async function generateIn(client, actor, { offer, onboarding_case: onboardingCas
     ends_on: null,
     employee_name: `${employee.first_name} ${employee.last_name}`.trim(),
     employee_first_name: employee.first_name,
-    employee_email: employee.work_email,
+    // The hire's own address: their work email is a placeholder until Complete Onboarding.
+    employee_email: employee.personal_email || offer.candidate_email,
     staff_number: employee.staff_number,
   };
   const vars = render.varsOf(draft, offer, pay, {
@@ -171,11 +201,15 @@ async function generateIn(client, actor, { offer, onboarding_case: onboardingCas
     date: vars.date,
     template_version: Number(wording.version),
   });
-  await client.query(
-    `INSERT INTO employment_contract (employment_contract_id, onboarding_case_id, employee_id, number, status, starts_on, document_id)
-     VALUES ($1, $2, $3, $4, 'draft', $5, $6)`,
-    [contractId, onboardingCase.onboarding_case_id, employee.employee_id, number, day(offer.start_date), doc.document_id],
-  );
+  await repo.insert(client, {
+    employment_contract_id: contractId,
+    onboarding_case_id: onboardingCase.onboarding_case_id,
+    employee_id: employee.employee_id,
+    number,
+    starts_on: day(offer.start_date),
+    document_id: doc.document_id,
+    hire_name: draft.employee_name,
+  });
   // The candidate's signature is the actor here, and they have no login; a request is always someone's
   // (signature_request.created_by), so it is opened as the company's signatory, its first signer.
   const opener = actor && actor.user_id ? actor : { ...(actor || {}), user_id: signatory.user_id };
@@ -199,7 +233,7 @@ async function generateIn(client, actor, { offer, onboarding_case: onboardingCas
         signer_type: "employee",
         signer_id: employee.employee_id,
         name: draft.employee_name,
-        email: employee.work_email,
+        email: draft.employee_email,
         role: lifecycle.ROLES.hire,
       },
     ],
@@ -210,7 +244,7 @@ async function generateIn(client, actor, { offer, onboarding_case: onboardingCas
     key: EVENTS.CONTRACT_GENERATED,
     entity: { type: SUBJECT, id: contractId },
     actor,
-    payload: payload(ct, { signatory_user_id: signatory.user_id }),
+    payload: payload(ct, { signatory_user_id: signatory.user_id, reissued_from: existing ? existing.employment_contract_id : null }),
   });
   return ct;
 }
@@ -253,6 +287,7 @@ async function sign(actor, scope, id, body, meta) {
     const ct = await visible(client, id, scope, { lock: true });
     if (ct.status !== "draft") throw refused("NOT_WAITING", "This contract is not waiting for the company");
     await signatures.signAsStaffIn(client, actor, ct.signature_request_id, body, meta);
+    await signatures.setExpiryIn(client, ct.signature_request_id, validUntil());
     await repo.setStatus(client, id, ["draft"], "sent");
     const sent = await repo.get(client, id);
     const l = await linkIn(client, actor, sent);
@@ -264,15 +299,63 @@ async function sign(actor, scope, id, body, meta) {
 }
 
 async function resend(actor, scope, id) {
+  assertAll(scope);
   const { view, row, link } = await tx(async (client) => {
     const ct = await visible(client, id, scope, { lock: true });
     if (ct.status !== "sent") throw refused("NOT_SENT", "Only a sent contract can be resent");
+    await signatures.setExpiryIn(client, ct.signature_request_id, validUntil());
     const l = await linkIn(client, actor, ct);
     await emit(client, { key: EVENTS.CONTRACT_RESENT, entity: { type: SUBJECT, id }, actor, payload: payload(ct) });
     return { view: await viewOf(client, ct, actor), row: ct, link: l };
   });
   await mail(row, link);
   return view;
+}
+
+/**
+ * Reissue Contract: the hire declined the contract or let it lapse while the case is still at
+ * documentation. A new contract is generated for the case from the accepted offer, with the wording in
+ * force now and the Offer Signatory named now (else whoever signed the earlier one for the company),
+ * and waits for the company's signature as the first did. The cancelled one stays as it was.
+ */
+async function reissue(actor, scope, id) {
+  assertAll(scope);
+  return tx(async (client) => {
+    const ct = await visible(client, id, scope, { lock: true });
+    if (ct.status !== "cancelled") throw refused("NOT_CANCELLED", "Only a cancelled contract is reissued");
+    if (ct.case_status !== "documentation") throw refused("CASE_ENDED", "This case is past documentation");
+    const latest = await repo.byCase(client, ct.onboarding_case_id);
+    if (latest.employment_contract_id !== ct.employment_contract_id) throw refused("REISSUED", "A newer contract exists");
+    const offer = await offersRepo.get(client, ct.offer_id);
+    const employee = await require("../organisation/organisation.service").findEmployeeById(client, ct.employee_id);
+    const named = await offersRepo.signatory(client);
+    const earlier = (await signatures.signersOf(client, ct.signature_request_id)).find((x) => x.role === lifecycle.ROLES.company);
+    const rows = await require("../signatures/signatures.repo").signaturesOf(client, ct.signature_request_id);
+    const earlierRow = rows.find((x) => x.signer_role === lifecycle.ROLES.company && x.signer_type === "user");
+    const signatory =
+      named && named.user_id
+        ? named
+        : earlierRow
+          ? { user_id: earlierRow.signer_id, name: earlier.name, email: earlierRow.signer_email, job_title: earlier.title || null }
+          : null;
+    const made = await generateIn(client, actor, {
+      offer,
+      onboarding_case: { onboarding_case_id: ct.onboarding_case_id },
+      employee,
+      signatory,
+    });
+    return viewOf(client, made, actor);
+  });
+}
+
+/**
+ * Hold the case's contract's signature request, before the caller holds the case: the hire's
+ * signature holds the request, then the contract, then the case (signedIn, the gate), so Withdraw and
+ * Not Progressing take them in that order too. In the caller's transaction.
+ */
+async function holdForCaseIn(client, caseId) {
+  const ct = await repo.byCase(client, caseId);
+  if (ct && ct.signature_request_id) await signatures.holdRequestIn(client, ct.signature_request_id);
 }
 
 /** The case ended before the contract was signed (onboarding's Withdraw). In the caller's transaction. */
@@ -451,6 +534,8 @@ module.exports = {
   generateIn,
   sign,
   resend,
+  reissue,
+  holdForCaseIn,
   cancelIn,
   letterOf,
   contentHashOf,

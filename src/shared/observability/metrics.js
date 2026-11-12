@@ -77,6 +77,8 @@ function templatePath(p) {
       "/:id",
     )
     .replace(/\/\d+(?=\/|$)/g, "/:n")
+    // A public link's token (43 characters of base64url) is a key, never a label.
+    .replace(/\/[A-Za-z0-9_-]{40,}(?=\/|$)/g, "/:token")
     .slice(0, 120);
 }
 

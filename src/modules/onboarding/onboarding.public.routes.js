@@ -10,7 +10,11 @@
  *   POST /:token/files                 a file, at most 15 MB, on the hire's record and scanned
  *   POST /:token/items/:item_id        an item: the file sent, the typed value, or both
  *   POST /:token/guarantors            a guarantor entered or corrected
- *   POST /:token/bvn                   the BVN, once (eleven digits, kept masked)
+ *   POST /:token/bvn                   the BVN (eleven digits, kept masked); correctable until
+ *                                      documentation completes
+ *   POST /:token/address               the hire's home address, picked
+ *   GET  /:token/places/search, /pin   the address search and a pinned point's name for the page's
+ *                                      address fields (F27), signed as the staff app's are
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -19,6 +23,7 @@ const { requirePublicToken } = require("../../middleware/public-token");
 const upload = require("../../middleware/upload");
 const { ok } = require("../../shared/http/respond");
 const page = require("./onboarding.upload");
+const maps = require("../maps/maps.controller");
 const { SCOPE } = require("./onboarding.events");
 
 const router = express.Router();
@@ -44,5 +49,22 @@ publicRoute(router, "post", "/:token/guarantors", { body: o.GuarantorInput, resp
 
 publicRoute(router, "post", "/:token/bvn", { body: o.BvnEnter, response: o.UploadPack, summary: "Enter the BVN" },
   link, async (req, res) => ok(res, await page.bvn(caseOf(req), req.validated.body)));
+
+publicRoute(router, "post", "/:token/address", { body: o.HireAddressEnter, response: o.UploadPack, summary: "Enter the home address" },
+  link, async (req, res) => ok(res, await page.address(caseOf(req), req.validated.body)));
+
+// The page's address fields search and pin through our API, as the staff app's do (F27): the link is
+// the key, and every place handed back is signed for the form that saves it.
+publicRoute(router, "get", "/:token/places/search", { query: o.UploadPlaceSearchQuery, response: c.maps.PlaceMatches, summary: "Search an address" },
+  link, async (req, res) => {
+    req.validated.query = { q: req.validated.query.q, level: "address" };
+    return maps.search(req, res);
+  });
+
+publicRoute(router, "get", "/:token/places/pin", { query: o.UploadPinQuery, response: c.maps.Place, summary: "Name a pinned point" },
+  link, async (req, res) => {
+    req.validated.query = { ...req.validated.query, level: "address" };
+    return maps.pin(req, res);
+  });
 
 module.exports = { basePath: "/onboard", surface: "public", router };

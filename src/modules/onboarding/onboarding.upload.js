@@ -11,7 +11,9 @@
  *                           upload); named next on an item or as a guarantor's form
  *   item()                  an item: the file, the typed value or both, as its requirement asks
  *   guarantor()             a guarantor entered or corrected; a correction waits for its check again
- *   bvn()                   the BVN, kept masked on the employee record (organisation.setBvnIn)
+ *   bvn()                   the BVN, kept masked on the employee record (organisation.setBvnIn);
+ *                           the hire may correct it until documentation completes (AJ, 12/11/2026)
+ *   address()               the hire's home address, picked (AddressField), on their employee record
  *   sendLink()              the link, made from the outbox when the case opens and on Send Reminder,
  *                           mailed as `onboarding-documents`; stopped when the case ends
  *                           (onboarding.service endIn: Withdraw and Not Progressing)
@@ -28,6 +30,7 @@ const vault = require("../../shared/documents/vault");
 const profile = require("../../shared/organisation/profile");
 const publicToken = require("../../shared/tokens/public-token");
 const lagos = require("../../shared/time/lagos");
+const places = require("../../shared/places/places");
 const organisation = require("../organisation/organisation.service");
 const repo = require("./onboarding.repo");
 const service = require("./onboarding.service");
@@ -83,6 +86,7 @@ async function packOf(db, row) {
   const items = await repo.items(db, row.onboarding_case_id);
   const guarantors = await repo.guarantors(db, row.onboarding_case_id);
   const bvnEntered = await organisation.hasBvn(db, row.employee_id);
+  const addressEntered = await repo.addressEntered(db, row.employee_id);
   const org = await profile.readProfile(db);
   const company = profile.displayName(org);
   return {
@@ -96,6 +100,7 @@ async function packOf(db, row) {
     items: items.map(service.itemOf),
     guarantors: guarantors.map((g) => ({ ...service.guarantorOf(g), check_note: null })),
     bvn_entered: bvnEntered,
+    address_entered: addressEntered,
   };
 }
 
@@ -199,7 +204,15 @@ async function guarantor(caseId, body) {
       throw refused("SAME_KIND", "Your two guarantors are of different kinds", 422, { kind: ["Pick the other kind"] });
     if (same && same.check_status === "passed") throw refused("ALREADY_CHECKED", "This guarantor has passed their check");
     if (body.form_document_id) await ownFile(client, row, body.form_document_id, "form_document_id");
-    const id = await repo.saveGuarantor(client, caseId, body);
+    if (body.id_document_id) await ownFile(client, row, body.id_document_id, "id_document_id");
+    const id = await repo.saveGuarantor(client, caseId, {
+      ...body,
+      contact_address_line: places.lineOf(body.contact_address),
+      residential_address_line: places.lineOf(body.residential_address),
+    });
+    // Both addresses are picked, never typed (F27): each kept as a place of its own.
+    await places.save(client, "onboarding_guarantor.contact_address", id, body.contact_address, { field: "contact_address" });
+    await places.save(client, "onboarding_guarantor.residential_address", id, body.residential_address, { field: "residential_address" });
     await emit(client, {
       key: EVENTS.ONBOARDING_GUARANTOR_SAVED,
       entity: { type: ENTITY, id: caseId },
@@ -217,6 +230,21 @@ async function bvn(caseId, body) {
     assertOpen(row);
     await organisation.setBvnIn(client, row.employee_id, body.bvn, null);
     await emit(client, { key: EVENTS.ONBOARDING_BVN_ENTERED, entity: { type: ENTITY, id: caseId }, actor: null, payload: payload(row) });
+    await service.checkGateIn(client, null, caseId);
+    return packOf(client, await repo.get(client, caseId));
+  });
+}
+
+/**
+ * The hire's home address, picked on their page: their employee record's home address
+ * (organisation.updateEmployee, which keeps the place). It may be the last thing documentation waited on.
+ */
+async function address(caseId, body) {
+  return tx(async (client) => {
+    const row = await caseOf(client, caseId, { lock: true });
+    assertOpen(row);
+    await organisation.updateEmployee(client, row.employee_id, { home_address: body.home_address }, null);
+    await emit(client, { key: EVENTS.ONBOARDING_ADDRESS_ENTERED, entity: { type: ENTITY, id: caseId }, actor: null, payload: payload(row) });
     await service.checkGateIn(client, null, caseId);
     return packOf(client, await repo.get(client, caseId));
   });
@@ -280,4 +308,4 @@ async function sendLink(caseId, actorUserId = null, { reminder = false } = {}) {
   return true;
 }
 
-module.exports = { DOC_TYPE, privacyNotice, ttlHours, pack, acknowledge, file, item, guarantor, bvn, sendLink };
+module.exports = { DOC_TYPE, privacyNotice, ttlHours, pack, acknowledge, file, item, guarantor, bvn, address, sendLink };

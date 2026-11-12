@@ -14,7 +14,7 @@
  *   checkGuarantor()    a guarantor's reference check, Passed or Failed
  *   remind()            Send Reminder: a fresh Upload Documents link, every earlier one stopped
  *   checkGateIn()       the documentation gate (guide §3 step 7): every required item verified, both
- *                       guarantors passed, the BVN entered and the contract signed move the case to
+ *                       guarantors passed, the BVN and home address entered and the contract signed move the case to
  *                       pre_onboarding and the application with it. Asked after each of those changes,
  *                       the contract's signature included (contractSignedIn)
  *   dispatch()          onboarding-dispatch, daily (guide §3 step 8): a case at pre_onboarding whose
@@ -170,7 +170,14 @@ const guarantorOf = (g) => ({
   phone: g.phone,
   email: g.email || null,
   years_known: g.years_known === null || g.years_known === undefined ? null : Number(g.years_known),
+  date_of_birth: g.date_of_birth || null,
+  contact_address: g.contact_address || null,
+  residential_address: g.residential_address || null,
+  convicted: g.convicted === null || g.convicted === undefined ? null : g.convicted,
+  conviction_details: g.conviction_details || null,
+  recommends: g.recommends === null || g.recommends === undefined ? null : g.recommends,
   form: docRef(g.form_document_id, g),
+  id_document: docRef(g.id_document_id, { original_name: g.id_original_name, bytes: g.id_bytes, mime: g.id_mime }),
   check_status: g.check_status,
   check_note: g.check_note || null,
   checked_at: iso(g.checked_at),
@@ -210,14 +217,16 @@ async function stateOf(db, row, user = null) {
   const items = await repo.items(db, row.onboarding_case_id);
   const guarantors = await repo.guarantors(db, row.onboarding_case_id);
   const bvnEntered = row.employee_id ? await organisation.hasBvn(db, row.employee_id) : false;
+  const addressEntered = row.employee_id ? await repo.addressEntered(db, row.employee_id) : false;
   const contract = await contracts().forCase(db, row.onboarding_case_id, user);
   const waiting = checklist.waitingOn({
     items,
     guarantors,
     bvn_entered: bvnEntered,
+    address_entered: addressEntered,
     contract_status: contract ? contract.status : null,
   });
-  return { items, guarantors, bvnEntered, contract, waiting };
+  return { items, guarantors, bvnEntered, addressEntered, contract, waiting };
 }
 
 /** OnboardingDetail. */
@@ -226,6 +235,8 @@ async function detailOf(db, row, user) {
   const steps = await repo.caseSteps(db, row.onboarding_case_id);
   const sops = await sop.sopsById(db, steps.map((st) => st.sop_id));
   const today = lagos.today();
+  // Set by the staff controller (onboarding.controller who()): the reader's recruitment scope is all.
+  const forAll = Boolean(user && user.acts_for_all === true);
   return {
     ...rowOf(row),
     application_id: row.application_id,
@@ -243,8 +254,10 @@ async function detailOf(db, row, user) {
     contract: s.contract,
     waiting_on: s.waiting,
     steps: steps.map((st) => stepOf(st, sops, today)),
-    can_complete: row.status === "onboarding" && steps.every((st) => st.status === "done"),
-    can_withdraw: OPEN.includes(row.status),
+    address_entered: s.addressEntered,
+    can_check: forAll && row.status === "documentation",
+    can_complete: forAll && row.status === "onboarding" && steps.every((st) => st.status === "done"),
+    can_withdraw: forAll && OPEN.includes(row.status),
   };
 }
 
@@ -253,9 +266,9 @@ async function list(query, scope) {
   return { ...page, data: page.data.map(rowOf) };
 }
 
-/** The figures above the Onboarding list, within the reader's scope. */
-async function summary(scope) {
-  return repo.summary(pool, scope, lagos.today());
+/** The figures above the Onboarding list, within the reader's scope; Onboarding Settings for scope all. */
+async function summary(scope, forAll = false) {
+  return { ...(await repo.summary(pool, scope, lagos.today())), can_configure: forAll === true };
 }
 
 async function get(id, user, scope) {
@@ -347,6 +360,9 @@ async function checkGuarantor(actor, scope, id, guarantorId, body) {
     assertDocumentation(row);
     const g = await repo.guarantor(client, id, guarantorId, { lock: true });
     if (!g) throw refused("NOT_FOUND", "That guarantor is not on this case", 404);
+    // MyCity's Guarantor Form is signed and carries the guarantor's ID: neither missing, no pass.
+    if (body.check_status === "passed" && (!g.form_document_id || !g.id_document_id))
+      throw refused("FORM_REQUIRED", "The signed form and ID are needed");
     await repo.recordCheck(client, guarantorId, body, actor.user_id);
     await emit(client, {
       key: EVENTS.ONBOARDING_GUARANTOR_CHECKED,
@@ -530,9 +546,15 @@ async function complete(actor, scope, id, { work_email: workEmail }) {
  */
 async function withdraw(actor, scope, id, { reason }) {
   return tx(async (client) => {
+    // The contract's request before the case, as the hire's signature takes them.
+    await contracts().holdForCaseIn(client, id);
     const row = await visible(client, id, scope, { lock: true });
     if (!OPEN.includes(row.status)) throw refused("CASE_ENDED", "This case has already ended");
-    await candidates().withdrawnIn(client, actor, row.application_id, reason);
+    // An application already ended in Recruitment (Not Progressing, before its outbox ended the case)
+    // has nothing to withdraw; one still active that refuses is a stage this case cannot end from.
+    const withdrawn = await candidates().withdrawnIn(client, actor, row.application_id, reason);
+    if (!withdrawn && (await repo.applicationActive(client, row.application_id)))
+      throw refused("NOT_WITHDRAWN", "This application cannot be withdrawn");
     if (!(await endIn(client, actor, row, reason, "Did not join: onboarding withdrawn"))) throw refused("CASE_ENDED", "This case has already ended");
     return detailOf(client, await repo.get(client, id), actor);
   });
@@ -571,6 +593,7 @@ async function endForApplication(applicationId, actorUserId = null) {
   const found = await repo.byApplication(pool, applicationId);
   if (!found) return false;
   return tx(async (client) => {
+    await contracts().holdForCaseIn(client, found.onboarding_case_id);
     const row = await repo.get(client, found.onboarding_case_id, { lock: true });
     if (!row || !OPEN.includes(row.status)) {
       await publicToken.revokeFor(client, { subject_type: SUBJECT, subject_id: found.onboarding_case_id, scope: SCOPE });

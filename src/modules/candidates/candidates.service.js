@@ -36,6 +36,8 @@ const vacancyRepo = require("../vacancies/vacancies.repo");
 const vacancies = require("../vacancies/vacancies.service");
 const repo = require("./candidates.repo");
 const pipeline = require("./candidates.pipeline");
+/** The stages M5's onboarding case owns: a card here has an employee record and a case behind it. */
+const HIRE_STAGES = Object.freeze(["documentation", "pre_onboarding", "onboarding"]);
 const { shown } = require("./candidates.screening");
 const { scorecard } = require("./candidates.scorecard");
 const { daysAtStage } = require("./candidates.sla");
@@ -395,7 +397,7 @@ async function hireIn(client, actor, applicationId, { employee_id: employeeId })
  */
 async function withdrawnIn(client, actor, applicationId, reason) {
   const row = await repo.get(client, applicationId, { lock: true });
-  if (!row || row.status !== "active" || !["documentation", "pre_onboarding", "onboarding"].includes(row.stage)) return false;
+  if (!row || row.status !== "active" || !HIRE_STAGES.includes(row.stage)) return false;
   await repo.setWithdrawn(client, applicationId, reason);
   await publicToken.revokeFor(client, { subject_type: "application", subject_id: applicationId });
   await emit(client, {
@@ -473,6 +475,9 @@ async function reopen(actor, scope, id) {
   return tx(async (client) => {
     const row = await visibleRow(client, id, scope, { lock: true });
     if (row.status !== "not_progressed") throw new AppError("MOVE_NOT_ALLOWED", "Only a candidate not progressed can be reopened", 409);
+    // Past Offer, Not Progressing ended the hire's onboarding case, contract and employee record
+    // (offers.md §6): reopened, the card would be active with none of them. A new application starts again.
+    if (HIRE_STAGES.includes(row.stage)) throw new AppError("MOVE_NOT_ALLOWED", "A hire past Offer cannot be reopened", 409);
     assertVacancyLive(row);
     await transition(client, pipeline.MACHINE, {
       entity_id: id,

@@ -467,8 +467,14 @@ TB reviews) · `5050` `onboarding_plan` (one a department, and one default with 
 key, as `sop` is M10's and created after this block) and `onboarding_case_step` (the steps a case
 works through, copied from its plan with the owner and due date resolved) · `5060`
 `onboarding_case_step.reminded_at` (an overdue step's owner reminded once, by `onboarding-dispatch`)
-· `5090` 5000's unused
-`talent_pool` and `talent_pool_member` dropped · `5199` the
+· `5070` the offer's employment type CHECK in the employee's spellings (`full_time`, `part_time`,
+`contractor`, `consultant`, `intern`) in place of 5010's vacancy spellings, the rows converted
+· `5080` `employment_contract.hire_name` (the hire's name as the contract was made with it, which
+its signatures cover), filled for the contracts already made · `5090` 5000's unused
+`talent_pool` and `talent_pool_member` dropped · `5100` the rest of MyCity's Guarantor Form on
+`onboarding_guarantor`: `date_of_birth`, `contact_address` and `residential_address` (each a line;
+the places are owners `onboarding_guarantor.*`), `convicted`, `conviction_details`, `recommends`,
+`id_document_id` (FK, indexed) · `5199` the
 statuses `5010` and `5030` add · `5299` the `recruitment.offer` flow, version 1 (Head of
 Department, then the CEO; the same definition as `shared/workflow/definitions.js`), and Head of
 Department's `approve` on recruitment in its team scope, each only while it is as an earlier seed

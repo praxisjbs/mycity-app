@@ -83,6 +83,8 @@ const REQUIREMENTS: DocumentRequirement[] = [
 }));
 
 const SOP = { sop_id: sid("sop:induction"), number: "SOP-0003", title: "New Joiner Induction" };
+/** A second department's guide, not on the knowledge mock's first page: a step shows it by its saved label. */
+const SHADOW_SOP = { sop_id: sid("sop:shadowing"), number: "SOP-0042", title: "Team Shadowing Guide" };
 const PLANS: OnboardingPlan[] = [
   {
     onboarding_plan_id: sid("plan:default"),
@@ -93,7 +95,7 @@ const PLANS: OnboardingPlan[] = [
     updated_at: at(20, "10:00"),
     steps: [
       ["Week 1: welcome and induction", "case_owner", 0, SOP],
-      ["Weeks 2 to 3: shadow the team", "line_manager", 7, null],
+      ["Weeks 2 to 3: shadow the team", "line_manager", 7, SHADOW_SOP],
       ["Week 4: first goals agreed", "line_manager", 21, null],
       ["First month review", "head_of_department", 30, null],
     ].map(([title, owner_role, due, sop], i) => ({
@@ -137,6 +139,7 @@ interface MockCase {
   items: OnboardingItem[];
   guarantors: Guarantor[];
   bvn: boolean;
+  address: boolean;
   contract: { status: EmploymentContractView["status"]; company_at: string | null; hire_at: string | null };
   steps: OnboardingStep[];
 }
@@ -186,7 +189,14 @@ function guarantor(key: string, position: 1 | 2, name: string, check: Guarantor[
     phone: position === 1 ? "+2348031234567" : "+2348039876543",
     email: position === 1 ? "references@lagosmedia.test" : null,
     years_known: position === 1 ? 3 : 9,
+    date_of_birth: position === 1 ? "1971-03-14" : "1968-09-02",
+    contact_address: position === 1 ? "Allen Avenue, Ikeja, Lagos" : "Bourdillon Road, Ikoyi, Lagos",
+    residential_address: position === 1 ? "Oba Akran Avenue, Ikeja, Lagos" : "Bourdillon Road, Ikoyi, Lagos",
+    convicted: false,
+    conviction_details: null,
+    recommends: true,
     form: file(`${key}:g${position}`, `guarantor-${position}.pdf`),
+    id_document: file(`${key}:g${position}:id`, `guarantor-${position}-id.jpg`),
     check_status: check,
     check_note: check === "failed" ? "Number did not answer on three tries" : check === "passed" ? "Confirmed by phone" : null,
     checked_at: check === "pending" ? null : at(3, "14:00"),
@@ -242,6 +252,7 @@ const CASES: MockCase[] = [
     }),
     guarantors: [guarantor("chiamaka", 1, "Olumide Bankole", "passed"), guarantor("chiamaka", 2, "Ngozi Eze", "pending")],
     bvn: true,
+    address: true,
     contract: { status: "sent", company_at: at(14, "10:00"), hire_at: null },
     steps: [],
   },
@@ -262,6 +273,7 @@ const CASES: MockCase[] = [
     items: itemsFor("kunle", "pending"),
     guarantors: [],
     bvn: false,
+    address: false,
     contract: { status: "draft", company_at: null, hire_at: null },
     steps: [],
   },
@@ -281,6 +293,7 @@ const CASES: MockCase[] = [
     items: itemsFor("bola", "verified", { separation: { status: "pending" } }),
     guarantors: [guarantor("bola", 1, "Kehinde Ojo", "passed"), guarantor("bola", 2, "Funke Adewale", "passed")],
     bvn: true,
+    address: true,
     contract: { status: "signed", company_at: at(24, "10:00"), hire_at: at(22, "19:15") },
     steps: [],
   },
@@ -300,6 +313,7 @@ const CASES: MockCase[] = [
     items: itemsFor("samuel", "verified"),
     guarantors: [guarantor("samuel", 1, "Uche Obi", "passed"), guarantor("samuel", 2, "Ada Akpan", "passed")],
     bvn: true,
+    address: true,
     contract: { status: "signed", company_at: at(39, "10:00"), hire_at: at(37, "19:15") },
     steps: stepsFor("samuel", isoDaysAgo(10), 1),
   },
@@ -319,6 +333,7 @@ const CASES: MockCase[] = [
     items: itemsFor("ngozi", "verified"),
     guarantors: [guarantor("ngozi", 1, "Emeka Obi", "passed"), guarantor("ngozi", 2, "Joy Umeh", "passed")],
     bvn: true,
+    address: true,
     contract: { status: "signed", company_at: at(59, "10:00"), hire_at: at(57, "19:15") },
     steps: stepsFor("ngozi", isoDaysAgo(34), 4),
   },
@@ -338,6 +353,7 @@ const CASES: MockCase[] = [
     items: itemsFor("femi", "pending", { valid_id: { status: "uploaded" } }),
     guarantors: [],
     bvn: false,
+    address: false,
     contract: { status: "cancelled", company_at: at(28, "10:00"), hire_at: null },
     steps: [],
   },
@@ -353,6 +369,7 @@ function waitingOn(c: MockCase): GateCondition[] {
   if (outstanding(c) > 0) out.push("documents");
   if (c.guarantors.length < 2 || c.guarantors.some((g) => g.check_status !== "passed")) out.push("guarantors");
   if (!c.bvn) out.push("bvn");
+  if (!c.address) out.push("address");
   if (c.contract.status !== "signed") out.push("contract");
   return out;
 }
@@ -392,6 +409,8 @@ function contractOf(c: MockCase, req: Req): EmploymentContractView {
     created_at: c.created_at,
     can_sign: c.contract.status === "draft" && req.user === SIGNATORY,
     can_resend: c.contract.status === "sent" && can(req, "edit"),
+    // Every mock user with a recruitment grant acts for the whole company (cynthia, ifeoma).
+    can_reissue: c.contract.status === "cancelled" && c.status === "documentation" && can(req, "edit"),
   };
 }
 
@@ -413,8 +432,10 @@ function detailOf(c: MockCase, req: Req): OnboardingDetail {
     contract: contractOf(c, req),
     waiting_on: waitingOn(c),
     steps: c.steps,
-    can_complete: c.status === "onboarding" && c.steps.every((s) => s.status === "done"),
-    can_withdraw: OPEN.includes(c.status),
+    address_entered: c.address,
+    can_check: c.status === "documentation" && can(req, "edit"),
+    can_complete: c.status === "onboarding" && c.steps.every((s) => s.status === "done") && can(req, "edit"),
+    can_withdraw: OPEN.includes(c.status) && can(req, "edit"),
   };
 }
 
@@ -429,7 +450,7 @@ function gate(c: MockCase) {
 const caseNotFound = () => fail(404, "NOT_FOUND", "That case does not exist");
 const notAtDocs = () => fail(409, "NOT_IN_DOCUMENTATION", "This case is past documentation");
 
-R("GET /api/v1/recruitment/onboarding/summary", "view", () => {
+R("GET /api/v1/recruitment/onboarding/summary", "view", (req) => {
   const month = today().slice(0, 7);
   const body: OnboardingSummary = {
     documentation: CASES.filter((c) => c.status === "documentation").length,
@@ -438,6 +459,7 @@ R("GET /api/v1/recruitment/onboarding/summary", "view", () => {
     onboarding: CASES.filter((c) => c.status === "onboarding").length,
     overdue_steps: CASES.filter((c) => c.status === "onboarding").reduce((n, c) => n + c.steps.filter((s) => s.overdue).length, 0),
     completed_this_month: CASES.filter((c) => c.status === "completed" && c.completed_at?.slice(0, 7) === month).length,
+    can_configure: can(req, "edit"),
   };
   return ok(body);
 });
@@ -481,7 +503,7 @@ function savePlan(p: OnboardingPlan, b: PlanBody) {
     description: s.description ?? null,
     owner_role: s.owner_role,
     due_offset_days: s.due_offset_days,
-    sop: s.sop_id ? (s.sop_id === SOP.sop_id ? SOP : { sop_id: s.sop_id, number: "SOP", title: "Linked SOP" }) : null,
+    sop: s.sop_id ? ([SOP, SHADOW_SOP].find((x) => x.sop_id === s.sop_id) ?? { sop_id: s.sop_id, number: "SOP", title: "Linked SOP" }) : null,
   }));
   return p;
 }
@@ -614,6 +636,14 @@ R("POST /api/v1/recruitment/contracts/:id/resend", "edit", (req) => {
   const c = byContract(req.params.id);
   if (!c) return notFound();
   return c.contract.status === "sent" ? ok(contractOf(c, req)) : fail(409, "NOT_SENT", "The company has not signed yet");
+});
+R("POST /api/v1/recruitment/contracts/:id/reissue", "edit", (req) => {
+  const c = byContract(req.params.id);
+  if (!c) return notFound();
+  if (c.contract.status !== "cancelled") return fail(409, "NOT_CANCELLED", "Only a cancelled contract is reissued");
+  if (c.status !== "documentation") return fail(409, "CASE_ENDED", "This case is past documentation");
+  c.contract = { status: "draft", company_at: null, hire_at: null };
+  return ok(contractOf(c, req));
 });
 R("GET /api/v1/recruitment/contracts/:id", "view", (req) => {
   const c = byContract(req.params.id);

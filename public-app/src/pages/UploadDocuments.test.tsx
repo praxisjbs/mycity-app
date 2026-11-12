@@ -58,6 +58,31 @@ describe("UploadDocuments", () => {
     expect(await within(bvn!).findByText("Entered. Thank you.")).toBeTruthy();
   });
 
+  it("the BVN can be corrected until documentation is done", async () => {
+    draw("Fw8bK3sHr6Ty");
+    const bvn = await screen.findByRole("region", { name: "Your BVN" });
+    fireEvent.click(within(bvn).getByRole("button", { name: "Change BVN" }));
+    fireEvent.change(within(bvn).getByRole("textbox"), { target: { value: "22233344456" } });
+    fireEvent.click(within(bvn).getByRole("button", { name: "Save BVN" }));
+    expect(await within(bvn).findByText("Entered. Thank you.")).toBeTruthy();
+  });
+
+  it("the home address is picked, never typed, and a guarantor answers MyCity's form", async () => {
+    draw("Fw8bK3sHr6Ty");
+    const home = await screen.findByRole("region", { name: "Your Address" });
+    fireEvent.click(within(home).getByRole("button", { name: "Save Address" }));
+    // Nothing picked: the field says so, and nothing is sent.
+    expect(await within(home).findByText(/Pick an address|Required/)).toBeTruthy();
+    // The second guarantor's form asks for both addresses, the two answers and an ID copy.
+    const g = screen.getByRole("region", { name: "Your Guarantors" });
+    const second = within(g).getByRole("region", { name: "Personal Guarantor" });
+    for (const label of ["Date of Birth", "Contact Address", "Residential Address", "Ever Convicted", "Recommends You"]) expect(within(second).getAllByText(label).length).toBeGreaterThan(0);
+    expect(within(second).getAllByText(/ID Copy/).length).toBeGreaterThan(0);
+    fireEvent.click(within(second).getAllByRole("radio", { name: "Yes" })[0]!);
+    expect(await within(second).findByText("What Happened")).toBeTruthy();
+    expect(await axe(document.body)).toHaveNoViolations();
+  });
+
   it("says when documentation is complete", async () => {
     draw("Lz2mD9qXc5Wn");
     expect(await screen.findByText("Documents Complete")).toBeTruthy();

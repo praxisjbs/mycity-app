@@ -33,6 +33,7 @@
 const { defineEvents } = require("../../shared/events/catalogue");
 const { defineNotification } = require("../../shared/notifications/fanout");
 const outbox = require("../../shared/events/outbox");
+const places = require("../../shared/places/owners");
 
 const EVENTS = defineEvents("recruitment", {
   "onboarding.opened": { summary: "An onboarding case was opened for a hire" },
@@ -44,6 +45,7 @@ const EVENTS = defineEvents("recruitment", {
   "onboarding.guarantor_saved": { summary: "A hire entered a guarantor" },
   "onboarding.guarantor_checked": { summary: "A guarantor's reference check was recorded" },
   "onboarding.bvn_entered": { summary: "A hire entered their BVN" },
+  "onboarding.address_entered": { summary: "A hire entered their home address" },
   "onboarding.documentation_completed": { summary: "A hire's documentation was completed" },
   "onboarding.started": { summary: "A hire's onboarding started on their start date" },
   "onboarding.step_done": { summary: "An onboarding step was marked done" },
@@ -53,6 +55,12 @@ const EVENTS = defineEvents("recruitment", {
   "onboarding.requirement_saved": { summary: "A document requirement was saved" },
   "onboarding.plan_saved": { summary: "An onboarding plan was saved" },
 });
+
+// A guarantor's address line follows its place when a waiting place is named (addresses.md §6.9).
+for (const column of ["contact_address", "residential_address"])
+  places.owner(`onboarding_guarantor.${column}`, {
+    rename: (client, key, line) => require("./onboarding.repo").setGuarantorAddressLine(client, column, key, line),
+  });
 
 /** The record type a case's events are about (shared/route-map.js `onboarding`). */
 const ENTITY = "onboarding";

@@ -20,19 +20,20 @@ const repo = require("./onboarding.repo");
 const { EVENTS } = require("./onboarding.events");
 
 /** The gate's conditions, in the order the case shows them. */
-const CONDITIONS = Object.freeze(["documents", "guarantors", "bvn", "contract"]);
+const CONDITIONS = Object.freeze(["documents", "guarantors", "bvn", "address", "contract"]);
 
 /**
  * @param {{items: Array<{required: boolean, status: string}>, guarantors: Array<{check_status: string}>,
  *          bvn_entered: boolean, contract_status: string|null}} state
  * @returns {string[]} the conditions not yet met, in CONDITIONS order
  */
-function waitingOn({ items, guarantors, bvn_entered: bvnEntered, contract_status: contractStatus }) {
+function waitingOn({ items, guarantors, bvn_entered: bvnEntered, address_entered: addressEntered, contract_status: contractStatus }) {
   const unmet = new Set();
   if ((items || []).some((i) => i.required && i.status !== "verified")) unmet.add("documents");
   const passed = (guarantors || []).filter((g) => g.check_status === "passed").length;
   if (passed < 2) unmet.add("guarantors");
   if (!bvnEntered) unmet.add("bvn");
+  if (!addressEntered) unmet.add("address");
   if (contractStatus !== "signed") unmet.add("contract");
   return CONDITIONS.filter((c) => unmet.has(c));
 }

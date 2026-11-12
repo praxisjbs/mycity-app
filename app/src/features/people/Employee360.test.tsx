@@ -74,13 +74,14 @@ describe("the record's Documents tab", () => {
   it("People see the person's documents, open one, and verify one awaiting a check", async () => {
     await signedInAs("cynthia@mycityapp.io", <Employee360 id={byKey("chidera")!.employee_id} />);
     fireEvent.mouseDown(await screen.findByRole("tab", { name: "Documents" }));
-    expect(await screen.findByText("Employment contract")).toBeTruthy();
+    expect((await screen.findAllByText("Employment contract")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Missing").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Request Document" })).toBeTruthy();
     fireEvent.click(screen.getByText("Proof of residential address"));
-    const sheet = await screen.findByRole("dialog", { name: "Proof of residential address" });
-    fireEvent.click(within(sheet).getByRole("button", { name: "Verify Document" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Proof of residential address" })).toBeNull());
+    // A wide desktop opens the document beside the list (F31), never in a centred dialog.
+    await waitFor(() => expect(screen.getAllByRole("heading", { name: "Proof of residential address" }).length).toBeGreaterThan(0));
+    expect(screen.queryByRole("dialog", { name: "Proof of residential address" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Verify Document" }));
     await waitFor(() => expect(screen.getAllByText("Verified").length).toBeGreaterThan(1));
   }, 30000);
 });

@@ -157,6 +157,8 @@ const OffersSummary = z
     to_send: z.number().int().min(0),
     with_candidates: z.number().int().min(0),
     accepted_this_month: z.number().int().min(0),
+    /** The reader acts for the whole company: Offer Settings is theirs. */
+    can_configure: z.boolean(),
   })
   .strict();
 
@@ -222,6 +224,8 @@ const OfferCard = z
     start_date: isoDate,
     basic_salary: money,
     job_title: optionalText(160),
+    /** Why the basic salary sits outside the vacancy's range; refused without one when it does. */
+    range_reason: optionalText(300),
   })
   .strict();
 

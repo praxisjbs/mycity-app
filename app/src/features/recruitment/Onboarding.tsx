@@ -59,7 +59,7 @@ export function Onboarding() {
       <PageHeader
         title="Onboarding"
         sub="Documents, checks and the first month"
-        actions={mayEdit && <Button icon="cog" onClick={settings}>Onboarding Settings</Button>}
+        actions={mayEdit && s?.can_configure && <Button icon="cog" onClick={settings}>Onboarding Settings</Button>}
       />
       <KpiTiles
         mobileCols={2}

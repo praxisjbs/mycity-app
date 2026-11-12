@@ -273,7 +273,7 @@ open `/sign` without the private link, the page says *Use Your Offer Email*.
 ## Upload Documents {#public-onboard icon=upload}
 
 Once you sign your offer, we email you a link to this page. You send the documents MyCity needs
-before your first day, two guarantors and your BVN. You need no account.
+before your first day, two guarantors, your home address and your BVN. You need no account.
 
 ### Accept the privacy notice {#public-onboard-privacy}
 
@@ -299,17 +299,29 @@ before your first day, two guarantors and your BVN. You need no account.
 You need two, not related to you: a **Previous Employer**, and a **Personal Guarantor** who has known
 you four years or more. Serving police, military or other uniformed staff are not accepted.
 
-1. Under **Your Guarantors**, fill in each one's **Full Name**, **Relationship** and **Phone**.
-2. Add the signed **Guarantor Form** with **Choose the Form**.
-3. Press **Save Guarantor**. MyCity calls them to check: **Being Checked**, then **Passed**.
+1. Under **Your Guarantors**, fill in each one's **Full Name**, **Relationship**, **Phone** and
+   **Date of Birth**, as on their Guarantor Form.
+2. Pick their **Contact Address** and **Residential Address**: type a street and choose it from the
+   list.
+3. Answer **Ever Convicted** and **Recommends You**. If they were convicted, say **What Happened**.
+4. Add the signed **Guarantor Form** with **Choose the Form**, and a copy of their ID with
+   **Choose the Copy**. Both can come later, but the guarantor is not passed without them.
+5. Press **Save Guarantor**. MyCity calls them to check: **Being Checked**, then **Passed**.
    **Change Guarantor** means the check failed; enter someone else, or correct the details.
 
 A guarantor who has passed cannot be changed.
+
+### Enter your address {#public-onboard-address}
+
+1. Under **Your Address**, type your street in **Home Address** and choose it from the list.
+2. Press **Save Address**. It goes on your staff record.
+3. To correct it, press **Change Address** and pick it again.
 
 ### Enter your BVN {#public-onboard-bvn}
 
 1. Under **Your BVN**, type the eleven digits of your **BVN**.
 2. Press **Save BVN**. It is kept masked on your staff record and never shown again.
+3. Typed it wrong? Press **Change BVN** and enter it again, until your documents are complete.
 
 When everything is checked and the contract is signed, the page says *Documents Complete* and takes
 nothing more. If your link stops working, ask Operations & People for a fresh one.

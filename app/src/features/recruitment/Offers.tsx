@@ -140,7 +140,8 @@ export function Offers() {
         sub="Made, approved, signed and sent"
         actions={
           <>
-            {mayEdit && <Button icon="cog" onClick={settings}>Offer Settings</Button>}
+            {/* The settings are Operations & People's: a team grant drafts offers but never configures them. */}
+            {mayEdit && s?.can_configure && <Button icon="cog" onClick={settings}>Offer Settings</Button>}
             {mayCreate && <Button variant="primary" icon="plus" onClick={() => newOffer()}>New Offer</Button>}
           </>
         }

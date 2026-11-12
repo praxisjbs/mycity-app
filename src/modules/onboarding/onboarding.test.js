@@ -15,11 +15,12 @@ const done = {
   ],
   guarantors: [{ check_status: "passed" }, { check_status: "passed" }],
   bvn_entered: true,
+  address_entered: true,
   contract_status: "signed",
 };
 
 describe("the documentation gate", () => {
-  test("nothing waits once every required item is verified, both guarantors passed, the BVN entered and the contract signed", () => {
+  test("nothing waits once every required item is verified, both guarantors passed, the BVN and address entered and the contract signed", () => {
     expect(waitingOn(done)).toEqual([]);
   });
 
@@ -35,9 +36,10 @@ describe("the documentation gate", () => {
     expect(waitingOn({ ...done, guarantors: [{ check_status: "failed" }, { check_status: "passed" }] })).toEqual(["guarantors"]);
   });
 
-  test("the BVN and a contract only drafted or sent wait; the conditions keep their order", () => {
+  test("the BVN, the home address and a contract only drafted or sent wait; the conditions keep their order", () => {
     expect(waitingOn({ ...done, contract_status: "sent" })).toEqual(["contract"]);
-    expect(waitingOn({ items: [{ required: true, status: "pending" }], guarantors: [], bvn_entered: false, contract_status: null })).toEqual(CONDITIONS);
+    expect(waitingOn({ ...done, address_entered: false })).toEqual(["address"]);
+    expect(waitingOn({ items: [{ required: true, status: "pending" }], guarantors: [], bvn_entered: false, address_entered: false, contract_status: null })).toEqual(CONDITIONS);
   });
 });
 
@@ -107,6 +109,32 @@ describe("the routes", () => {
       "POST /:token/items/:item_id",
       "POST /:token/guarantors",
       "POST /:token/bvn",
+      "POST /:token/address",
+      "GET /:token/places/search",
+      "GET /:token/places/pin",
     ]);
+  });
+
+  test("settings and Operations & People's case actions need the whole company's scope; Mark Step Done the reader's own", () => {
+    const guarded = require("./onboarding.routes")
+      .router.stack.filter((l) => l.route)
+      .map((l) => [`${Object.keys(l.route.methods)[0].toUpperCase()} ${l.route.path}`, l.route.stack.some((m) => m.handle.scope === "all")]);
+    const all = guarded.filter(([, g]) => g).map(([r]) => r);
+    expect(all).toEqual([
+      "GET /requirements",
+      "POST /requirements",
+      "PATCH /requirements/:id",
+      "GET /plans",
+      "POST /plans",
+      "GET /plans/:id",
+      "PUT /plans/:id",
+      "POST /:id/items/:item_id/verify",
+      "POST /:id/items/:item_id/reject",
+      "POST /:id/guarantors/:guarantor_id/check",
+      "POST /:id/remind",
+      "POST /:id/complete",
+      "POST /:id/withdraw",
+    ]);
+    expect(all).not.toContain("POST /:id/steps/:step_id/done");
   });
 });

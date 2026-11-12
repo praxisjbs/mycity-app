@@ -38,7 +38,7 @@ function varsOf(ct, o, pay, { company, signatory = null, sealing = null }) {
     number: ct.number,
     offer_number: o.number,
     employee: {
-      full_name: ct.employee_name || o.candidate_name,
+      full_name: ct.hire_name || ct.employee_name || o.candidate_name,
       first_name: ct.employee_first_name || o.candidate_first_name,
       email: ct.employee_email || o.candidate_email,
       staff_number: ct.staff_number || "",
@@ -75,7 +75,8 @@ function canonicalOf(ct, o, pay) {
   return {
     number: ct.number,
     date: day(ct.created_at),
-    employee: ct.employee_name || o.candidate_name,
+    // The name the contract was made with, so a later rename never changes what was signed.
+    employee: ct.hire_name || ct.employee_name || o.candidate_name,
     job_title: o.job_title,
     contract_type: o.employment_type,
     start_date: day(ct.starts_on) || day(o.start_date),

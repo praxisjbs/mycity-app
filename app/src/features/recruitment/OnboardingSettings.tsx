@@ -267,8 +267,24 @@ function PlanForm({ plan, close }: { plan: OnboardingPlan | null; close: () => v
   const save = useMutation("PUT /api/v1/recruitment/onboarding/plans/:id");
   const [problem, setProblem] = useState<string | null>(null);
   const steps = f.values.steps;
+  // Each step row keeps one key for its life, so removing a step never hands its fields or its SOP's
+  // label to the step below (the contract's steps carry no id of their own to key by).
+  const [rowKeys, setRowKeys] = useState<number[]>(() => steps.map((_, i) => i));
+  const [nextKey, setNextKey] = useState(steps.length);
   const setSteps = (next: StepValues[]) => f.set("steps", next);
   const put = (i: number, patch: Partial<StepValues>) => setSteps(steps.map((s, k) => (k === i ? { ...s, ...patch } : s)));
+  const addStep = () => {
+    setSteps([...steps, blankStep()]);
+    setRowKeys([...rowKeys, nextKey]);
+    setNextKey(nextKey + 1);
+  };
+  const removeStep = (i: number) => {
+    setSteps(steps.filter((_, k) => k !== i));
+    setRowKeys(rowKeys.filter((_, k) => k !== i));
+  };
+  // An SOP's label by its id: the plan's own (an SOP the menu has not loaded yet) and every one loaded.
+  const sopLabel = new Map<string, string>();
+  for (const st of plan?.steps ?? []) if (st.sop) sopLabel.set(st.sop.sop_id, `${st.sop.number} · ${st.sop.title}`);
   const submit = async () => {
     setProblem(null);
     if (!f.check()) return;
@@ -289,6 +305,7 @@ function PlanForm({ plan, close }: { plan: OnboardingPlan | null; close: () => v
     }
   };
   const sopOptions = sops.rows.map((s) => [s.sop_id, `${s.number} · ${s.title}`] as [string, string]);
+  for (const [sopId, label] of sopOptions) sopLabel.set(sopId, label);
   return (
     <>
       <Grid cols={2}>
@@ -317,7 +334,7 @@ function PlanForm({ plan, close }: { plan: OnboardingPlan | null; close: () => v
       <Field label="Steps" {...f.status("steps")}>
         <div className="flex flex-col gap-3">
           {steps.map((s, i) => (
-            <div key={i} className="grid grid-cols-6 items-end gap-2 border-t border-border pt-3 first:border-t-0 first:pt-0 max-md:grid-cols-2">
+            <div key={rowKeys[i] ?? `new-${i}`} className="grid grid-cols-6 items-end gap-2 border-t border-border pt-3 first:border-t-0 first:pt-0 max-md:grid-cols-2">
               <span className="col-span-3 max-md:col-span-2">
                 <Field label={`Step ${i + 1}`}>
                   <TextField name={`step-${i}-title`} value={s.title} onChange={(v) => put(i, { title: v })} maxLength={160} />
@@ -340,7 +357,7 @@ function PlanForm({ plan, close }: { plan: OnboardingPlan | null; close: () => v
                     searchable
                     placeholder="No SOP"
                     options={[["", "No SOP"], ...sopOptions]}
-                    valueLabel={plan?.steps[i]?.sop ? `${plan.steps[i]!.sop!.number} · ${plan.steps[i]!.sop!.title}` : undefined}
+                    valueLabel={s.sop_id ? sopLabel.get(s.sop_id) : undefined}
                     {...paging(sops)}
                     value={s.sop_id}
                     onChange={(v) => put(i, { sop_id: v })}
@@ -349,7 +366,7 @@ function PlanForm({ plan, close }: { plan: OnboardingPlan | null; close: () => v
               </span>
               {steps.length > 1 && (
                 <span className="flex min-h-tap items-center">
-                  <IconButton icon="trash" label={`Remove Step ${i + 1}`} onClick={() => setSteps(steps.filter((_, k) => k !== i))} />
+                  <IconButton icon="trash" label={`Remove Step ${i + 1}`} onClick={() => removeStep(i)} />
                 </span>
               )}
             </div>
@@ -357,7 +374,7 @@ function PlanForm({ plan, close }: { plan: OnboardingPlan | null; close: () => v
         </div>
       </Field>
       {steps.length < 40 && (
-        <Button size="sm" icon="plus" onClick={() => setSteps([...steps, blankStep()])}>
+        <Button size="sm" icon="plus" onClick={addStep}>
           Add Step
         </Button>
       )}

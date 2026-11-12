@@ -356,6 +356,9 @@ You can stop a candidate of a closed vacancy too. They cannot be moved, scored o
 2. Press **Reopen**. They go back to the stage they left.
 3. Their old links stay stopped. Send a new assessment or interview if they need one.
 
+A hire who was not progressed after signing their offer (at **Documentation** or later) cannot be
+reopened: their onboarding ended with it. They apply again instead.
+
 ### Keep a candidate for later {#recruitment-candidates-pool needs="recruitment create"}
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
@@ -800,6 +803,8 @@ working. What the candidate sees is in [Sign an offer](#public-sign).
 When they sign, it shows as **Accepted** and both of you get the signed copy by email. If they
 decline, or it expires, their card goes back to **Shortlist** and you can make another offer.
 
+An offer cannot be sent to someone already on MyCity's staff: a move inside MyCity goes through People.
+
 ### When the email does not arrive {#recruitment-offers-email needs="recruitment edit"}
 
 If the mail server refuses the candidate's address, the offer says so in red at the top, with the
@@ -826,7 +831,8 @@ or the CEO. An accepted offer cannot be withdrawn.
 
 ### Offer settings {#recruitment-offers-settings needs="recruitment edit"}
 
-1. Open [Recruitment · Offers](/recruitment?tab=offers) and press **Offer Settings**.
+1. Open [Recruitment · Offers](/recruitment?tab=offers) and press **Offer Settings**. Only
+   Operations & People see it.
    ![Offer Settings](shot:recruitment-offer-settings)
 2. Press **Offer Signatory**, pick who **Signs for the Company** and press **Save Signatory**. They
    need a login to sign.
@@ -847,7 +853,7 @@ A case goes through these, in order:
 
 | Status | What it means |
 |---|---|
-| **Documentation** | The hire sends their documents, guarantors and BVN, and the contract is signed |
+| **Documentation** | The hire sends their documents, guarantors, home address and BVN, and the contract is signed |
 | **Pre-Onboarding** | Everything is checked and signed. The case waits for the start date |
 | **Onboarding** | From the start date: the plan's steps, each with an owner and a due day |
 | **Completed** | Every step done and the hire's login sent. They are hired |
@@ -864,16 +870,20 @@ A case goes through these, in order:
 5. Press a case. On a computer it opens in a wide window; on a phone, in a sheet.
    ![A case](shot:recruitment-onboarding-case)
 6. The case's own card shows the role, the start date, **Pre-Onboarding** (what it still waits on,
-   or the day it got there), whether the **BVN** is entered and when the **Privacy Notice** was
-   accepted. The BVN itself is never shown.
+   or the day it got there), whether the **BVN** and **Home Address** are entered and when the
+   **Privacy Notice** was accepted. The BVN itself is never shown.
 7. **Documents** lists the checklist, each with its status: **Not Sent**, **To Verify**, **Verified**
    or **Rejected**. The bar counts the required ones verified.
 8. **Guarantors** shows the two the hire entered, each with their check: **To Check**, **Passed** or
-   **Failed**.
+   **Failed**, and what their Guarantor Form says: date of birth, both addresses, **Convicted** and
+   **Recommends**.
 9. **Contract** shows its number, the signers and where each stands.
 10. From the start date, **Onboarding Plan** lists the steps, with their owner, due day and SOP.
 
 ### Check what the hire sent {#recruitment-onboarding-verify needs="recruitment edit"}
+
+Operations & People check a hire's documents and guarantors; a Head of Department sees their hires'
+cases but does not check them.
 
 1. Open the case on [Recruitment · Onboarding](/recruitment?tab=onboarding).
 2. Under **Documents**, press **View File** to open what they sent.
@@ -881,12 +891,13 @@ A case goes through these, in order:
 4. Or press **Reject**, type the **Reason** and press **Reject Document**. The hire reads it beside
    the document on their page and sends another.
 
-To check a guarantor, call them, then press **Record Check** under their name. Pick **Passed** or
-**Failed** under **Outcome**, add a **Note** if you like, and press **Record Check**. A failed
-guarantor is changed by the hire, and checked again.
+To check a guarantor, press **View Form** and **View ID**, call them, then press **Record Check**
+under their name. Pick **Passed** or **Failed** under **Outcome**, add a **Note** if you like, and
+press **Record Check**. A guarantor cannot pass until the hire has sent their signed form and ID copy.
+A failed guarantor is changed by the hire, and checked again.
 
-When every required document is verified, both guarantors have passed, the BVN is entered and the
-contract is signed, the case moves to **Pre-Onboarding** by itself.
+When every required document is verified, both guarantors have passed, the BVN and home address are
+entered and the contract is signed, the case moves to **Pre-Onboarding** by itself.
 
 ### Remind the hire {#recruitment-onboarding-remind needs="recruitment edit"}
 
@@ -905,7 +916,18 @@ hire's link goes out after that.
 4. Press **Sign Contract**. The hire gets an email with their own signing link.
 
 If they cannot find it, press **Resend Contract**: a new link goes out and the old one stops working.
-**Download PDF** saves the contract. Once the hire signs, both of you get the signed copy by email.
+The hire has 15 days from each link to sign. **Download PDF** saves the contract. Once the hire signs,
+both of you get the signed copy by email.
+
+### When the hire declines the contract {#recruitment-onboarding-reissue needs="recruitment edit"}
+
+If the hire declines the contract, or does not sign it in time, it shows as **Cancelled** and the case
+waits at **Documentation**.
+
+1. Open the case on [Recruitment · Onboarding](/recruitment?tab=onboarding).
+2. Under **Contract**, press **Reissue Contract**. A new contract is made from the signed offer with
+   the wording in use today.
+3. Sign it for MyCity as above. The hire then gets a new link.
 
 ### Work through the plan {#recruitment-onboarding-steps needs="recruitment edit"}
 
@@ -913,7 +935,8 @@ On the start date the case moves to **Onboarding** and the department's plan is 
 step's owner is told, and reminded once if it goes past its day (shown as **Overdue**).
 
 1. Open the case on [Recruitment · Onboarding](/recruitment?tab=onboarding).
-2. Under **Onboarding Plan**, press **Mark Step Done** on each step as it is done.
+2. Under **Onboarding Plan**, press **Mark Step Done** on each step as it is done. The hire's Head of
+   Department may mark the steps of their own hires too.
 
 ### Complete onboarding {#recruitment-onboarding-complete needs="recruitment edit"}
 
@@ -935,6 +958,7 @@ cancelled, and their record is archived. The hire is not emailed. A completed ca
 ### Onboarding settings {#recruitment-onboarding-settings needs="recruitment edit"}
 
 1. Open [Recruitment · Onboarding](/recruitment?tab=onboarding) and press **Onboarding Settings**.
+   Only Operations & People see it.
    ![Onboarding Settings](shot:recruitment-onboarding-settings)
 2. **Checklist** lists the documents a hire sends. Press one to change it, or **Add Document** for a
    new one: its **Name**, a **Code**, what it **Takes** (**File**, **Value** or **Both**), and
