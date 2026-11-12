@@ -804,7 +804,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
-- 12/11/2026 · JP · Nothing of M4 changed. Beside it, M5's Offers tab (`Offers.tsx`, `offers.md` §10, §14) shows an offer's expiry as Expires while it is with the candidate and Expired On once it lapsed, and nothing for one accepted, declined or withdrawn; found filming the M5 video.
+- 12/11/2026 · GE · Nothing of M4 changed. Beside it, M5's Offers tab (`Offers.tsx`, `offers.md` §10, §14) shows an offer's expiry as Expires while it is with the candidate and Expired On once it lapsed, and nothing for one accepted, declined or withdrawn; found filming the M5 video.
 
 - 12/11/2026 · AJ · Reopen is refused for an application not progressed at Documentation, Pre-Onboarding or Onboarding ("A hire past Offer cannot be reopened"): Not Progressing there ended the hire's onboarding case, contract and employee record (`offers.md` §6), so a reopened card would have none of them. `candidates.reopen`, the sheet (no Reopen at those stages) and the mock (§6.3). Changed on M5's branch at AJ's decision after the audit of #122; `withdrawnIn` shares the stage list. The Offers and Onboarding tabs show their settings only to whom the summary's `can_configure` names (`offers.md` §8).
 

@@ -14,8 +14,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M3 Queries and Sanctions (8:56) | made before this tooling; the reference (§2) | Delivered 04/11/2026 | same folder |
 | M4 Recruitment, part 1: Vacancies and Candidates (9:07, 12 chapters) | `m4-recruitment-1.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
 | M4 Recruitment, part 2: Assessments and Interviews (6:54, 11 chapters) | `m4-recruitment-2.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
-| M5 Offers and Onboarding, part 1: Offers (7:08, 10 chapters) | `m5-offers-1.js` | Made 12/11/2026; to upload (§5) | |
-| M5 Offers and Onboarding, part 2: Documentation and Onboarding (6:41, 11 chapters) | `m5-onboarding-2.js` | Made 12/11/2026; to upload (§5) | |
+| M5 Offers and Onboarding, part 1: Offers (7:08, 10 chapters) | `m5-offers-1.js` | Made and uploaded 12/11/2026 | [Part 1](https://drive.google.com/file/d/1U9ybR4Xb1KTsRBtn5YNeI_3ZLZvLYTcp/view?usp=drivesdk) |
+| M5 Offers and Onboarding, part 2: Documentation and Onboarding (6:41, 11 chapters) | `m5-onboarding-2.js` | Made and uploaded 12/11/2026 | [Part 2](https://drive.google.com/file/d/1QehhMb7Q3N4-sDeIteZroX3u8YeTy_q5/view?usp=drivesdk) |
 | M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 | M10 Praxis AI, part 2: Praxis AI and AI Control (7:00, 10 chapters) | `m10-praxis-ai.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 
@@ -309,7 +309,7 @@ listed here and in `docs/PROGRESS.md`.
 
 ## 8 · Where the work stands
 
-**12/11/2026 · JBS Praxis (with Claude).** Both Milestone 5 videos written, filmed and assembled on one
+**12/11/2026 · GE (with Claude).** Both Milestone 5 videos written, filmed and assembled on one
 development database, the same day, with the staging seed: part 1, Offers (7:08, 10 chapters,
 -16.3 LUFS) and part 2, Documentation and Onboarding (6:41, 11 chapters, -16.4 LUFS). Two parts, as
 M2, M4 and M10. Kunle Afolabi, the seed's invented candidate at Shortlist for Head, Sales & Revenue, is
@@ -326,7 +326,7 @@ M5 registers none. Six findings (§7): four fixed on this branch, two for AJ. Th
 MyLagosApp and "&".
 
 - [x] Write, film and check both M5 videos (12/11/2026).
-- [ ] Upload both to Drive (§5) and add their links to the table at the top.
+- [x] Upload both to Drive (§5) and add their links to the table at the top (12/11/2026).
 - [ ] AJ: the §7 findings of 12/11/2026 left open (Upload Documents' write limit; a rejected file's state on the record).
 
 **12/11/2026 · TB (with Claude).** Both Milestone 10 videos written, filmed and assembled on a

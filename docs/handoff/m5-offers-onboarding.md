@@ -189,7 +189,7 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
-- 12/11/2026 · JP · Filming the two M5 training videos (`docs/runbooks/training-videos.md` §7, §8) found
+- 12/11/2026 · GE · Filming the two M5 training videos (`docs/runbooks/training-videos.md` §7, §8) found
   four faults, fixed on `claude/sharp-gates-u3h7te` (guide §3 step 6, §6, §10, §13, §14): a hire's files
   on their Documents tab read by their file's name and stayed Awaiting Check after the case verified
   them (`vault.setTitle`, `documents.verifiedIn`); a previous employer's Years Known saved as 0
