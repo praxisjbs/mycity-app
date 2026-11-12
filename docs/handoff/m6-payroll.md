@@ -11,7 +11,7 @@ requirement and settles no decision. Tick a line when it is done, with the date,
 | Owner | LA (Love Adeola) owns the milestone, its backend and its screens (guide §13.1 item 40, JBS Praxis, 12/11/2026); TB (Tom-Blake Asaah) owned it until then, with LA on the screens from 09/11/2026 |
 | Type | Full stack (CLAUDE.md step 1) |
 | Demo | Fri 27 Nov 2026 (MILESTONES §4) |
-| Pull requests | PR 0 (this documentation) merged as praxisjbs/mycity-app#100 on 09/11/2026 (`1352338`); PR 1 (contract, data and scaffolding) merged as praxisjbs/mycity-app#102 on 09/11/2026 (`3b4c382`); PR 2 (calculation and the run) merged as praxisjbs/mycity-app#104 on 09/11/2026 (`a0b19fd`); PR 3 (deductions and advances, with the Deductions screen) merged as praxisjbs/mycity-app#105 on 09/11/2026 (`ff9d89f`); PR 4 (payslips, the PDF, email and ESS) merged as praxisjbs/mycity-app#106 (`78236af`); PR 5 (Configurations and the advanced option, with the Configurations screen) merged as praxisjbs/mycity-app#107 on 10/11/2026 (`d7d1ee4`); PR 6 (AI, search, Home and notices) merged as praxisjbs/mycity-app#114 (`252d173`); PR 7 (the screens) merged as praxisjbs/mycity-app#116 on 11/11/2026 (`142fa7e`); PR 9 (the statutory research register) merged as praxisjbs/mycity-app#128 (`4647816`); PR 12 (notification email links) merged as praxisjbs/mycity-app#126 (`f89cfbc`); PR 10 (legal sources, Remove Change, monthly wording) merged as praxisjbs/mycity-app#130 (`0b4b673`); PR 11 (the statutory engine to the law) built on `m6/statutory-law` on 12/11/2026; PR 8 to come (the guide's Appendix A, "How the rest is planned", after the 11/11/2026 review) |
+| Pull requests | PR 0 (this documentation) merged as praxisjbs/mycity-app#100 on 09/11/2026 (`1352338`); PR 1 (contract, data and scaffolding) merged as praxisjbs/mycity-app#102 on 09/11/2026 (`3b4c382`); PR 2 (calculation and the run) merged as praxisjbs/mycity-app#104 on 09/11/2026 (`a0b19fd`); PR 3 (deductions and advances, with the Deductions screen) merged as praxisjbs/mycity-app#105 on 09/11/2026 (`ff9d89f`); PR 4 (payslips, the PDF, email and ESS) merged as praxisjbs/mycity-app#106 (`78236af`); PR 5 (Configurations and the advanced option, with the Configurations screen) merged as praxisjbs/mycity-app#107 on 10/11/2026 (`d7d1ee4`); PR 6 (AI, search, Home and notices) merged as praxisjbs/mycity-app#114 (`252d173`); PR 7 (the screens) merged as praxisjbs/mycity-app#116 on 11/11/2026 (`142fa7e`); PR 9 (the statutory research register) merged as praxisjbs/mycity-app#128 (`4647816`); PR 12 (notification email links) merged as praxisjbs/mycity-app#126 (`f89cfbc`); PR 10 (legal sources, Remove Change, monthly wording) merged as praxisjbs/mycity-app#130 (`0b4b673`); PR 11 (the statutory engine to the law) opened as praxisjbs/mycity-app#134 on 12/11/2026; PR 8 to come (the guide's Appendix A, "How the rest is planned", after the 11/11/2026 review) |
 
 ---
 
@@ -171,7 +171,9 @@ User Guide (PR 8, last, after PR 11 merges).
       computed, PAYE by State on the report)
 - [x] Tax and pension numbers on People · Employees' form (12/11/2026: a Tax and Pension step with the NHF choice and the
       State, the record's Tax and Pension tab with Declare Rent, the import's six columns)
-- [ ] Tests on labelled rates that follow the cited shapes; `npm run ci` green
+- [x] Tests on labelled rates that follow the cited shapes; `npm run ci` green (12/11/2026: the worked example of the
+      guide's §6.14 asserted to the kobo; the whole run passed all 52 gates in 20 min 35 s on Node 20, and the PR
+      marked ready: praxisjbs/mycity-app#134)
 
 ### PR 12 · Notification email links (GE; any time)
 - [x] `notification-deliver.js` links by the recipient's own screen (`self`), as the bell and push do (11/11/2026: `notifications.service.readerLink`, one link for all three)
