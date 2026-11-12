@@ -1076,7 +1076,10 @@ record and M6's only source of truth.
   means where they apply. NSITF's 1% of monthly payroll is the Employee's Compensation Act's minimum (s.33(1)) and
   NSITF's stated rate today; pension is at least 8% from the employee and 10% from the employer of monthly emoluments
   (Pension Reform Act 2014, s.4(1)); PAYE is remitted by the 10th of the next month (Withholding Regulations 2024, reg
-  7(1)(b)(i)). The PAYE method and the pension threshold stay unverified. MyCity's accountant confirms the register before
+  7(1)(b)(i)). A third pass (12/11/2026) read the Joint Revenue Board's Personal Income Tax Guidelines 2026 and the 2002
+  PAYE Regulations: PAYE is computed cumulatively over the year to date, refunded when the cumulative tax falls, and the
+  employer gives rent relief in PAYE on the person's evidence; the minimum wage for PAYE is ₦70,000 a month. The band
+  reading for part of a year and the pension threshold stay with MyCity's accountant, who confirms the register before
   any figure is entered.
 
 ### Definition of done
