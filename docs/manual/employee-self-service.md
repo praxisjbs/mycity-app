@@ -940,6 +940,22 @@ may take. Each finished course gives you a MyCity certificate.
 > **Tip:** Take a course a little at a time. Your done marks stay, and **In Progress** keeps it for
 > you.
 
+### Take notes on a course {#ess-training-notes}
+
+Your notes are yours alone: nobody else can read them, not even the course's owner.
+
+1. Open a course and press **Take Notes**. **My Notes** opens over the course, with the course's
+   name in its bar.
+   ![My Notes, over a course](shot:ess-training-notes)
+2. Type your notes. They save as you type: the bar reads **Saving**, then **Saved**. If it reads
+   **Not saved**, press **Try Again**.
+3. Keep working through the course while it stays open. On a computer, drag its bar to move it, or
+   press **Move Notes** and use the arrow keys. On a phone, press **Move to Top** or **Move to
+   Bottom**.
+4. Press **Minimise Notes** to keep only its bar, and **Open Notes** to bring it back. Press **Close
+   Notes** when you are done. Press **Take Notes** again any time: your notes are still there, on
+   any device.
+
 ### Start a Library course {#ess-training-library}
 
 1. Press **Library** and press a course.
@@ -1219,6 +1235,24 @@ do:
 crop: viewport
 marks:
   1: button "Mark Done" | When you finish
+```
+
+```shot ess-training-notes
+open: /ess?tab=my-training
+as: staff
+sources:
+  - app/src/features/ess/MyTraining.tsx
+  - packages/ui/src/overlay/NoteTaker.tsx
+do:
+  - click: css [data-ui=page] tbody tr:has-text("Fire Safety at the Office"), [data-ui=page] ul[data-copy=content] > li:has-text("Fire Safety at the Office")
+  - wait: text "When the Alarm Sounds"
+  - click: button "Take Notes"
+  - wait: role region "My Notes"
+  - fill: css section[aria-label="My Notes"] textarea = Two exits on this floor. Meet at the car park gate.
+  - wait: text "Saved"
+crop: viewport
+marks:
+  1: role region "My Notes" | Your own notes
 ```
 
 ```shot ess-training-completed

@@ -730,6 +730,10 @@ and a question asked before a card keeps what it asked for in the answer's `meta
   Verify a Document recomputes its hash from them. Filled for any completion before the file; a CHECK
   keeps the two with the number.
 
+**Built 12/11/2026, My Notes** (`docs/guides/knowledge.md` §6.13):
+- `10440` `training_note`: one running note per person and course (unique on `employee_id`,
+  `training_course_id`), `body` up to 20,000 characters, the person's alone; `updated_at` trigger.
+
 ### M11 Handover · 11000 to 11999 · TB
 
 No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `restore-drill.js`).

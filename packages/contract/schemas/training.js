@@ -300,6 +300,22 @@ const ProofAdd = z
   .strict()
   .refine((v) => (v.url ? 1 : 0) + (v.document_id ? 1 : 0) === 1, { message: "Paste a link or pick a file", path: ["url"] });
 
+/** At most this many characters in a person's note on a course (§6.13). */
+const NOTE_MAX = 20000;
+
+/** My Notes: the person's own running note on a course, theirs alone (§6.13). */
+const TrainingNote = z
+  .object({
+    training_course_id: uuid,
+    body: z.string().max(NOTE_MAX),
+    /** Null until the first save. */
+    updated_at: isoDateTime.nullable(),
+  })
+  .strict();
+
+/** Saving the note as the person types: the whole text, empty to clear it. */
+const TrainingNoteSave = z.object({ body: z.string().max(NOTE_MAX, "Note is too long") }).strict();
+
 /* ------------------------------------------------------------------ *
  * The certificate of completion (templates/documents/training-certificate.html, §6.9)
  * ------------------------------------------------------------------ */
@@ -447,6 +463,8 @@ const TABLES = {
     },
   },
   ProofAdd: { table: null, reason: "the proof, written to training_enrolment.proof_url or proof_document_id" },
+  TrainingNote: { table: "training_note" },
+  TrainingNoteSave: { table: "training_note" },
 };
 
 module.exports = {
@@ -482,5 +500,8 @@ module.exports = {
   MyItem,
   MyCourse,
   ProofAdd,
+  NOTE_MAX,
+  TrainingNote,
+  TrainingNoteSave,
   CertificateDocumentVars,
 };

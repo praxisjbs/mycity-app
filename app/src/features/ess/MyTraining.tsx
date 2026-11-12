@@ -1,6 +1,6 @@
 import training from "@mycity/contract/schemas/training.js";
 import type { MyCourse, MyCourseRow, MyItem, MyTrainingList } from "@mycity/contract/contract.gen.ts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { fetchFile, saveFile, useFileBlob } from "@/api/download";
@@ -28,6 +28,7 @@ import {
   ListDetail,
   LoadingRows,
   Meter,
+  NoteTaker,
   PageHeader,
   Pill,
   RichText,
@@ -40,6 +41,7 @@ import {
   useModal,
   VideoPlayer,
   type ContractSchema,
+  type NoteSave,
 } from "@mycity/ui";
 
 /**
@@ -49,7 +51,8 @@ import {
  * a lesson as text, a PDF or a picture in the viewer, an MP4 or a YouTube video in the player
  * (youtube-nocookie.com), any other link in a new tab. Mark Done and Undone on each; Add Proof (a
  * link or a file) where the course asks for it; Start for a Library course. `?id=` opens a course
- * by its id or the person's enrolment's (a task, a notice).
+ * by its id or the person's enrolment's (a task, a notice). Take Notes opens My Notes, the person's
+ * own note on the course, floating over it while they work (§6.13).
  */
 
 const LISTS: ReadonlyArray<[MyTrainingList, string]> = [
@@ -159,6 +162,7 @@ function toTop(el: HTMLElement | null) {
 function CourseView({ id }: { id: string }) {
   const { data: c, error, reload } = useApi("GET /api/v1/training/me/courses/:id", { params: { id } });
   const [open, setOpen] = useState<string | null>(null);
+  const [notes, setNotes] = useState(false);
   const top = useRef<HTMLDivElement>(null);
   useEffect(() => setOpen(null), [id]);
   useEffect(() => toTop(top.current), [open]);
@@ -172,17 +176,82 @@ function CourseView({ id }: { id: string }) {
   const item = c.items.find((i) => i.training_item_id === open) ?? null;
   return (
     <div ref={top} className="flex flex-col gap-3">
-      <CourseCard c={c} />
+      <CourseCard c={c} onNotes={() => setNotes(true)} />
       {item ? <ItemView c={c} it={item} back={() => setOpen(null)} next={nextOf(c, item)} onNext={setOpen} /> : <ItemList c={c} onOpen={setOpen} />}
       {!item && <Finish c={c} />}
+      <MyNotes key={c.training_course_id} courseId={c.training_course_id} subject={c.title} open={notes} onClose={() => setNotes(false)} />
     </div>
+  );
+}
+
+/** How long typing pauses before My Notes is saved, in ms. */
+const NOTE_PAUSE = 800;
+
+/**
+ * My Notes on a course (§6.13): the person's own, loaded when first opened, saved a moment after
+ * typing pauses, on Close Notes and when the course closes. Only they read it.
+ */
+function MyNotes({ courseId, subject, open, onClose }: { courseId: string; subject: string; open: boolean; onClose: () => void }) {
+  const path = `/api/v1/training/me/courses/${courseId}/note`;
+  const { data, error, reload } = useApi("GET /api/v1/training/me/courses/:id/note", { params: { id: courseId }, enabled: open });
+  const [value, setValue] = useState<string | null>(null);
+  const [saved, setSaved] = useState<NoteSave>(null);
+  const kept = useRef<string | null>(null);
+  const latest = useRef<string | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!data || latest.current !== null) return;
+    kept.current = latest.current = data.body;
+    setValue(data.body);
+    setSaved(data.updated_at ? "saved" : null);
+  }, [data]);
+
+  const save = useCallback(async () => {
+    window.clearTimeout(timer.current);
+    const body = latest.current;
+    if (body === null || body === kept.current) return;
+    setSaved("saving");
+    try {
+      await api.call("PUT /api/v1/training/me/courses/:id/note", { params: { id: courseId }, body: { body } });
+      kept.current = body;
+      invalidate(path);
+      if (latest.current === body) setSaved("saved");
+    } catch {
+      setSaved("failed");
+    }
+  }, [courseId, path]);
+
+  // What is typed and not yet saved is saved when the course closes or another opens.
+  useEffect(() => () => void save(), [save]);
+
+  const change = (next: string) => {
+    latest.current = next;
+    setValue(next);
+    setSaved("saving");
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(save, NOTE_PAUSE);
+  };
+
+  return (
+    <NoteTaker
+      open={open}
+      onClose={() => save().finally(onClose)}
+      subject={subject}
+      value={value ?? ""}
+      onChange={change}
+      saved={error ? "failed" : saved}
+      onRetry={error ? reload : save}
+      maxLength={training.NOTE_MAX}
+      loading={value === null}
+    />
   );
 }
 
 const nextOf = (c: MyCourse, it: MyItem) => c.items[c.items.findIndex((i) => i.training_item_id === it.training_item_id) + 1] ?? null;
 const doneCount = (c: MyCourse) => c.items.filter((i) => i.done_at).length;
 
-function CourseCard({ c }: { c: MyCourse }) {
+function CourseCard({ c, onNotes }: { c: MyCourse; onNotes: () => void }) {
   const start = useMutation("POST /api/v1/training/me/courses/:id/start");
   const phone = useIsPhone();
   const go = async () => {
@@ -210,13 +279,18 @@ function CourseCard({ c }: { c: MyCourse }) {
           ...(c.enrolled ? ([["Progress", <Meter key="p" pct={pct(doneCount(c), c.items.length)} label={`${doneCount(c)} of ${c.items.length}`} name="Course progress" />]] as Array<[string, React.ReactNode]>) : []),
         ]}
       />
-      {!c.enrolled && (
-        <div className="mt-3 flex justify-end">
-          <Button variant="primary" icon="play" onClick={go} block={phone}>
-            Start Course
+      <ActionGroup>
+        <div className="mt-3 flex flex-wrap justify-end gap-2 phone:flex-col-reverse">
+          <Button icon="edit" onClick={onNotes} block={phone}>
+            Take Notes
           </Button>
+          {!c.enrolled && (
+            <Button variant="primary" icon="play" onClick={go} block={phone}>
+              Start Course
+            </Button>
+          )}
         </div>
-      )}
+      </ActionGroup>
     </Card>
   );
 }
