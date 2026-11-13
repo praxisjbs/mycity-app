@@ -2988,7 +2988,7 @@ A small notes panel that floats over a page while the person keeps working: move
 |---|---|
 | Use | A person's own notes beside what they read or watch (ESS · My Training's My Notes on a course), saved by the screen as they type. |
 | Avoid | A form saved with a button (Modal); a comment others read (a thread); anything that must stop the person until it is answered (ConfirmDialog). |
-| Phone | Docked full width at the foot of the screen or the sheet, with a 44 px Move to Top (Move to Bottom) in its bar instead of dragging (F19); minimised, it is its bar alone. |
+| Phone | Docked full width at the foot of the screen or the sheet, with a 44 px Move to Top (Move to Bottom) in its bar instead of dragging (F19); minimised, it is its bar alone. Download Word sits under the note. |
 | Accessibility | A labelled region, not a dialog: focus moves into the note when it opens and is never trapped. On desktop Move Notes drags it, or the arrow keys move it while that button has focus. Saving, Saved and Not saved are announced politely. |
 | Status | beta |
 | Exports | `NoteTaker` |
@@ -3011,9 +3011,10 @@ A small notes panel that floats over a page while the person keeps working: move
 | `maxLength` | `number` |  | The longest note the server keeps, in characters. |
 | `loading` | `boolean` |  | The note is still loading: the box waits, read only. |
 | `label` | `string` |  | The panel's name; My Notes. |
+| `onDownload` | `() => Promise<unknown>` |  | Download Word under the note: the screen saves what is typed, asks the server for the note as a Word file and saves it on this device (an export, as ExportButton's onExport). Absent, no button. |
 
 ```tsx
-<NoteTaker open={open} onClose={() => setOpen(false)} subject={course.title} value={body} onChange={setBody} saved="saved" />
+<NoteTaker open={open} onClose={() => setOpen(false)} subject={course.title} value={body} onChange={setBody} saved="saved" onDownload={() => saveExport(api.call("POST /api/v1/training/me/courses/:id/note/export", { params: { id }, body: {} }))} />
 ```
 
 ### PhonePage

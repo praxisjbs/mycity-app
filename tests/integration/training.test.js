@@ -691,6 +691,44 @@ describeDb("training against the real migrations", () => {
     expect(JSON.stringify(saved.rows)).not.toContain("Lock the screen");
   });
 
+  test("My Notes as a Word file: the note as saved, made in the worker, the person's alone (§6.13)", async () => {
+    await as("staff").put(`/training/me/courses/${ids.course}/note`, { body: "Lock the screen <now> & always.\n\n\tReport a lost phone." });
+    const asked = await as("staff").post(`/training/me/courses/${ids.course}/note/export`, {});
+    expect(asked.status).toBe(202);
+    expect(asked.body).toMatchObject({ status: "pending", file_name: expect.stringMatching(/^my-notes-TRN-\d{4}-.*\.docx$/) });
+    const doc = asked.body;
+    // Nobody else waits on it or reads it, a training.manage holder included.
+    expect((await as("ops").get(`/exports/${doc.document_id}`)).status).toBe(404);
+
+    await drain();
+    expect((await as("staff").get(`/exports/${doc.document_id}`)).body.status).toBe("done");
+    const file = await as("staff").get(`/documents/${doc.document_id}/content`).buffer(true).parse((res, cb) => {
+      const chunks = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(file.status).toBe(200);
+    expect(file.headers["content-type"]).toContain("wordprocessingml");
+    const JSZip = require("jszip");
+    const xml = await (await JSZip.loadAsync(file.body)).file("word/document.xml").async("string");
+    const paras = [...xml.matchAll(/<w:p>(.*?)<\/w:p>/g)].map((m) => [...m[1].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>|<w:tab\/>/g)].map((t) => (t[1] === undefined ? "\t" : t[1])).join(""));
+    expect(paras[0]).toBe("Code of Conduct");
+    expect(paras[1]).toMatch(/^My Notes · .+ · Saved \d{2}\/\d{2}\/\d{4}$/);
+    expect(paras.slice(2)).toEqual(["Lock the screen &lt;now&gt; &amp; always.", "", "\tReport a lost phone."]);
+    expect((await as("ops").get(`/documents/${doc.document_id}/content`)).status).toBe(404);
+    expect((await as("sales").get(`/documents/${doc.document_id}/content`)).status).toBe(404);
+
+    // An empty note has nothing to download; a course the person may not open is a 404.
+    await as("sales").put(`/training/me/courses/${ids.course}/note`, { body: "  " });
+    expect((await as("sales").post(`/training/me/courses/${ids.course}/note/export`, {})).status).toBe(409);
+    const draft = await as("ops").post("/training/courses", { title: "Notes Draft Course", summary: "Not yet published" });
+    expect((await as("staff").post(`/training/me/courses/${draft.body.training_course_id}/note/export`, {})).status).toBe(404);
+    // The audit says a file was asked for; never what the note says.
+    const logged = await q("SELECT payload FROM event_log WHERE event_key = 'training.note_export_requested' AND entity_id = $1", [ids.course]);
+    expect(logged.rows).toHaveLength(1);
+    expect(JSON.stringify(logged.rows)).not.toContain("Lock the screen");
+  });
+
   test("⌘K and Praxis AI: builders find courses; everyone finds their own and the Library's", async () => {
     const types = (res) => res.body.groups.map((g) => g.type);
     const titles = (res, type) => (res.body.groups.find((g) => g.type === type) || { items: [] }).items.map((i) => i.title);

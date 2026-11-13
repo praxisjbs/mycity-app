@@ -15,11 +15,13 @@
  *   start, done, undone, proof   the person's own (§6.8); completion runs under the enrolment's
  *                  lock and allocates the certificate's number and hash in the same transaction
  *   myNote, saveNote   the person's own running note on a course they may open (§6.13)
+ *   exportNote         Download Word: that note as a Word file, made in the worker (buildNoteExport)
  *   remind         Remind Overdue; remindersDue and reminderCheck are the reminder engine's (§6.11)
  *   enrolJoiner, sweep, closeLeaver   the worker's: joiners enrolled, leavers closed
  *
  * Every change to one course runs under its lock. Events carry ids, numbers, titles and dates.
  */
+const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
 const { atomically } = require("../../shared/db/tx");
@@ -28,11 +30,16 @@ const { emit } = require("../../shared/events/emit");
 const numbering = require("../../shared/numbering/numbering");
 const lagos = require("../../shared/time/lagos");
 const vault = require("../../shared/documents/vault");
+const exportFiles = require("../../shared/documents/exports");
+const { buildDocx } = require("../../shared/documents/docx");
+const { exportFilename } = require("../../shared/spreadsheet/cells");
+const { formatDate } = require("../../shared/time/day-first");
+const { config } = require("../../config/env");
 const canonical = require("../../shared/documents/canonical");
 const md = require("../../shared/documents/markdown");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const repo = require("./training.repo");
-const { EVENTS, ENROLMENT_ENTITY, COURSE_ENTITY } = require("./training.events");
+const { EVENTS, ENROLMENT_ENTITY, COURSE_ENTITY, NOTE_EXPORT } = require("./training.events");
 
 const tasks = () => require("../tasks/tasks.service");
 
@@ -861,6 +868,67 @@ async function saveNote(user, id, { body }) {
   });
 }
 
+/**
+ * POST /training/me/courses/:id/note/export: Download Word on My Notes (§6.13). The note as last
+ * saved, so the screen saves what is typed first; answered 202 (ExportFile) while the worker makes
+ * it, and the person's alone (the uploader's read rule; nobody else, `training.manage` included).
+ */
+async function exportNote(user, id) {
+  return tx(async (client) => {
+    const { course, employeeId } = await openable(client, user, id);
+    const note = await repo.noteOf(client, course.training_course_id, employeeId);
+    if (!note || !note.body.trim()) throw new AppError("NOTE_EMPTY", "Write a note first", 409);
+    const doc = await exportFiles.reserve(client, {
+      doc_type: NOTE_EXPORT,
+      entity: { type: NOTE_EXPORT, id: crypto.randomUUID() },
+      subject_employee_id: employeeId,
+      file_name: exportFilename({ base: `my-notes-${course.number}`, env: config.APP_ENV, extension: "docx" }),
+      title: `My Notes, ${course.title}`,
+      actor: user,
+    });
+    await emit(client, {
+      key: EVENTS.TRAINING_NOTE_EXPORT_REQUESTED,
+      entity: { type: COURSE_ENTITY, id: course.training_course_id },
+      actor: user,
+      payload: {
+        training_course_id: course.training_course_id,
+        subject_employee_id: employeeId,
+        requested_by: user.user_id,
+        document_id: doc.document_id,
+      },
+    });
+    return exportFiles.present(doc);
+  });
+}
+
+/**
+ * training.note_export_requested, in the worker: the note made into the Word file the request
+ * reserved: the course's title, "My Notes", the person and the day it was saved, then the note.
+ * Someone no longer active, or not the note's owner, gets a failed file instead.
+ */
+async function buildNoteExport(event, ctx) {
+  const p = event.payload || {};
+  if (!p.document_id) return;
+  const asker = p.requested_by ? await grantsCache.getAuthUser(pool, p.requested_by) : null;
+  if (!asker || asker.status !== "active" || asker.employee_id !== p.subject_employee_id)
+    return exportFiles.fail(p.document_id, "Only the person whose notes these are may have this file.");
+  await exportFiles.make(p.document_id, ctx, async () => {
+    const [course, note, person] = await Promise.all([
+      repo.getCourse(pool, p.training_course_id),
+      repo.noteOf(pool, p.training_course_id, p.subject_employee_id),
+      require("../organisation/organisation.repo").findEmployeeById(pool, p.subject_employee_id),
+    ]);
+    if (!course || !note) throw new Error("training.note_export: the course or the note is gone");
+    const name = person ? `${person.first_name} ${person.last_name}`.trim() : "";
+    return buildDocx({
+      title: course.title,
+      subtitle: ["My Notes", name, `Saved ${formatDate(note.updated_at)}`].filter(Boolean).join(" · "),
+      body: note.body,
+      author: name,
+    });
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * The worker's: tasks and notices, joiners, leavers, the task's close
  * ------------------------------------------------------------------ */
@@ -1086,6 +1154,8 @@ module.exports = {
   proof,
   myNote,
   saveNote,
+  exportNote,
+  buildNoteExport,
   settleEnrolments,
   closeTask,
   enrolJoiner,

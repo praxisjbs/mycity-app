@@ -11,7 +11,7 @@ import { invalid, notFound, ok, route, uuid } from "../core";
 const EXPORTS = new Map<string, { file: ExportFile; owner: string }>();
 
 /** A file asked for by `owner`, named as the server names one ("my-attendance-2026-10-19.xlsx"). */
-export function exportFile(owner: string, base: string, extension: "xlsx" | "pdf" = "xlsx"): RawResponse {
+export function exportFile(owner: string, base: string, extension: "xlsx" | "pdf" | "docx" = "xlsx"): RawResponse {
   const file: ExportFile = { document_id: uuid(), file_name: `${base}-${todayIso()}.${extension}`, status: "pending" };
   EXPORTS.set(file.document_id, { file, owner });
   return { status: 202, body: file };
