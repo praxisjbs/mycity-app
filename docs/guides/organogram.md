@@ -504,6 +504,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 12/11/2026 · JP · Nothing on the Organogram or Org Chart changed. Beside them in `app/src/features/people/`, the employee record gains a Tax and Pension tab after Job and Add Employee and Edit Record a Tax and Pension step (`Employee360.tsx`, `EmployeeForm.tsx`, the new `TaxAndPension.tsx`; `docs/guides/foundation.md` §14, `docs/guides/payroll.md` §13.1 items 41, 44 and 46). Like the other restricted fields, the numbers, the NHF choice, the State and the declared rent are never on an organogram card, a person's sheet or the PDF (§6).
 - 12/11/2026 · AJ · Nothing on the Organogram or Org Chart changed. Beside them, the employee record's Documents tab opens a document beside the list (`ListDetail`, F31; `foundation.md` §14), and M5 now creates a hire with a placeholder work email until Complete Onboarding (`offers.md` §3 step 5) and keeps the hire's home address through `organisation.updateEmployee` from the upload page.
 
 - 12/11/2026 · AJ · Nothing on the Organogram or Org Chart changed. Beside them, the employee record gains a Documents tab after Login (`EmployeeDocuments.tsx`, on the `documents` routes, `docs/guides/foundation.md` §2, §14), for M5.

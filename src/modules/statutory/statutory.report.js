@@ -1,9 +1,11 @@
 "use strict";
 /**
- * The statutory report (docs/guides/payroll.md §6.12 rule 6): a run's PAYE, pension, NHF, ITF and NSITF, per item
- * and per person, with the base each rate was applied to and the amount, the employee and employer totals, the
- * conventions the run was computed with, each item's legal source (and the relief's) as the run's snapshot holds it,
- * and each person's tax and pension numbers (Not Set where none is held).
+ * The statutory report (docs/guides/payroll.md §6.12 rule 6): a run's PAYE (and PAYE Refund), pension, NHF, ITF and NSITF,
+ * per item and per person, with the base each was worked from and the amount, the employee and employer totals, how PAYE
+ * was worked out and the figures with no line of their own (rent relief, the minimum wage), each item's legal source as
+ * the run's snapshot holds it, when and where each is remitted (§6.16), and each person's tax and pension numbers (Not
+ * Set where none is held). PAYE and its refund are grouped by the State each person lives in, whose Internal Revenue
+ * Service the tax goes to (the Guidelines 2026, para 25; §13.1 item 46).
  *
  *   statutory_report    an export document (kept 24 hours, read by whoever pressed the button), restricted, rendered
  *                       by the worker's pdf-render job from `templates/documents/statutory-report.html`
@@ -20,6 +22,7 @@ const { defineVariables } = require("../../shared/templates/variables");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const m = require("../../shared/money/money");
+const lagos = require("../../shared/time/lagos");
 const { formatDate, formatMonth } = require("../../shared/time/day-first");
 const lock = require("../payroll/payroll.lock");
 const repo = require("./statutory.repo");
@@ -39,14 +42,67 @@ defineDocType(REPORT_DOC, {
 });
 defineVariables("document", "statutory-report", c.statutory.StatutoryReportVars);
 
-/** Each item's words on the report: its name, which number identifies a person for it, and its base in words. */
+/** The tenth of the month after a run's period, PAYE's remittance day ("10/11/2026" for October 2026). */
+const tenthOfNext = (period) => formatDate(`${lagos.addMonths(period, 1).slice(0, 8)}10`);
+
+/**
+ * Each line's words on the report: its name, which number identifies a person for it, which rate's source it prints,
+ * whether its people are grouped by State, and when and where it is remitted, as §6.16 cites each.
+ */
 const ITEMS = Object.freeze({
-  paye: { label: "PAYE", number: "Tax ID", of: (p) => p.tax_id },
-  pension_employee: { label: "Employee Pension", number: "Pension PIN", of: (p) => p.pension_pin },
-  pension_employer: { label: "Employer Pension", number: "Pension PIN", of: (p) => p.pension_pin },
-  nhf: { label: "NHF", number: "NHF Number", of: (p) => p.nhf_number },
-  itf: { label: "ITF", number: null, of: () => null },
-  nsitf: { label: "NSITF", number: null, of: () => null },
+  paye: {
+    label: "PAYE",
+    number: "Tax ID",
+    of: (p) => p.tax_id,
+    rate: "paye",
+    byState: true,
+    remit: (period) =>
+      `By ${tenthOfNext(period)}, to the Internal Revenue Service of the State each person lives in (Operation of PAYE Regulations 2002, reg 7(1); Joint Revenue Board's Guidelines 2026, paras 12.2 and 25)`,
+  },
+  paye_refund: {
+    label: "PAYE Refund",
+    number: "Tax ID",
+    of: (p) => p.tax_id,
+    rate: "paye",
+    byState: true,
+    remit: () => "Paid back to each person in this run, the year's cumulative tax having fallen (Operation of PAYE Regulations 2002, reg 4(2))",
+  },
+  pension_employee: {
+    label: "Employee Pension",
+    number: "Pension PIN",
+    of: (p) => p.pension_pin,
+    rate: "pension_employee",
+    remit: () => "Within 7 working days of pay day, with the employer's share (Pension Reform Act 2014, s.11(3))",
+  },
+  pension_employer: {
+    label: "Employer Pension",
+    number: "Pension PIN",
+    of: (p) => p.pension_pin,
+    rate: "pension_employer",
+    remit: () => "Within 7 working days of pay day, with the employee's share (Pension Reform Act 2014, s.11(3))",
+  },
+  nhf: {
+    label: "NHF",
+    number: "NHF Number",
+    of: (p) => p.nhf_number,
+    rate: "nhf",
+    remit: () => "Within one month of the deduction, to the Federal Mortgage Bank of Nigeria (National Housing Fund Act, s.9(2))",
+  },
+  itf: {
+    label: "ITF",
+    number: null,
+    of: () => null,
+    rate: "itf",
+    remit: (period) =>
+      `The year's contribution, by 1 April ${Number(period.slice(0, 4)) + 1} (Industrial Training Fund Act, s.16 as inserted in 2011)`,
+  },
+  nsitf: {
+    label: "NSITF",
+    number: null,
+    of: () => null,
+    rate: "nsitf",
+    remit: () => "In the first two working days of the month (Employee's Compensation Act 2010, s.33(1); NSITF's statement of the rate)",
+  },
 });
 const BASES = Object.freeze({
   gross: "gross pay",
@@ -54,6 +110,7 @@ const BASES = Object.freeze({
   basic: "basic pay",
   taxable: "taxable pay",
   annual_payroll: "payroll",
+  rent: "the year's rent",
 });
 const STATUS = Object.freeze({ approved: "Approved", paid: "Paid" });
 const yesNo = (v) => (v === true ? "Yes" : v === false ? "No" : "Not Set");
@@ -61,6 +118,9 @@ const BASIS = Object.freeze({ annualised: "Annualised", monthly: "Monthly" });
 
 /** What a snapshot taken before sources were kept says of its rows: 6040 marked such rows with this reason. */
 const BEFORE_SOURCES = "Entered before sources were required";
+
+/** Where a person lives, as a group of the report reads it. */
+const stateLabel = (code) => (code && c.organisation.STATE_LABELS[code]) || "Not Set";
 
 /**
  * A rate's legal source as the report prints it: the instrument and section with the day checked, or No Legal Source
@@ -75,9 +135,45 @@ function sourceLabel(r) {
   return { label: `${r.source_title}, ${r.source_section}${checked}`, link: r.source_url || null };
 }
 
+/** A figure with no line of its own, as the box above the items prints it, with its source; or Not in force. */
+function figureRule(label, row, words) {
+  if (!row) return { label, value: "Not in force" };
+  const source = sourceLabel(row);
+  return { label, value: `${words(row)}. Source: ${source.label}${source.link ? ` · ${source.link}` : ""}` };
+}
+
 /**
- * The report's variables from the run and its statutory lines, every value as printed. The rate and base of each item
- * are the ones in the run's snapshot (the rates it was computed with), so a rate changed since does not show.
+ * The box above the items: how PAYE was worked out and the figures that have no line (§6.12 rules 11, 14 and 15). A run
+ * computed before PR 11 kept the accountant's conventions instead, and prints them as it was computed.
+ */
+function rulesOf(snapshot, used) {
+  if (snapshot.paye_method !== "cumulative") {
+    const conventions = snapshot.conventions || {};
+    return [
+      { label: "PAYE Basis", value: BASIS[conventions.paye_basis] || "Not Set" },
+      { label: "Pension Reduces Taxable Pay", value: yesNo(conventions.pension_reduces_taxable) },
+      { label: "NHF Reduces Taxable Pay", value: yesNo(conventions.nhf_reduces_taxable) },
+      ...(used.has("relief") ? [{ label: "Relief Source", value: sourceLabel(used.get("relief")).label }] : []),
+    ];
+  }
+  return [
+    {
+      label: "PAYE",
+      value:
+        "On the year to date, the year's bands scaled to the months elapsed (Operation of PAYE Regulations 2002, regs 3 and 4; Nigeria Tax Administration Act 2025, s.51(7))",
+    },
+    {
+      label: "Taxable Pay",
+      value: "Gross pay less employee pension and NHF as deducted (Nigeria Tax Act 2025, s.30(2)(a)(i) and (iii))",
+    },
+    figureRule("Rent Relief", used.get("rent_relief"), (r) => `${m.money(String(r.rate)).toFixed()}% of the year's rent declared, at most ${m.formatNaira(r.flat_amount)}`),
+    figureRule("Minimum Wage", used.get("minimum_wage"), (r) => `${m.formatNaira(r.flat_amount)} a month: no PAYE at or below it`),
+  ];
+}
+
+/**
+ * The report's variables from the run and its statutory lines, every value as printed. The rate, base and source of each
+ * item are the ones in the run's snapshot (the figures it was computed with), so a figure changed since does not show.
  * @param {object} run    the locked run row, with its config_snapshot
  * @param {object[]} lines  repo.reportLines
  */
@@ -95,39 +191,49 @@ function varsOf(run, lines) {
   let employer = m.ZERO;
   for (const [code, rows] of byItem) {
     const words = ITEMS[code];
-    const rate = used.get(code);
+    const rate = used.get(words.rate);
     const total = m.sum(rows.map((r) => r.amount));
     if (rows[0].kind === "employer") employer = employer.plus(total);
+    else if (code === "paye_refund") employee = employee.minus(total);
     else employee = employee.plus(total);
+    const printed = (r) => ({
+      employee_name: r.employee_name,
+      staff_number: String(r.staff_number),
+      statutory_number: words.of(r) || null,
+      base: r.base_amount === null ? m.formatNaira(r.amount) : m.formatNaira(r.base_amount),
+      amount: m.formatNaira(r.amount),
+    });
+    const groups = [];
+    if (words.byState) {
+      for (const r of rows) {
+        const label = stateLabel(r.state_of_residence);
+        let group = groups.find((g) => g.label === label);
+        if (!group) groups.push((group = { label, rows: [], sum: [] }));
+        group.rows.push(printed(r));
+        group.sum.push(r.amount);
+      }
+    } else groups.push({ label: null, rows: rows.map(printed), sum: null });
     const source = sourceLabel(rate);
+    const paye = code === "paye" || code === "paye_refund";
     items.push({
       label: words.label,
       kind_label: rows[0].kind === "employer" ? "Employer" : "Employee",
-      rate_label: code === "paye" ? "Progressive bands" : rate ? `${m.money(String(rate.rate)).toFixed()}%` : rows[0].detail || "Rate",
-      base_label: BASES[rate ? rate.base : code === "paye" ? "taxable" : "gross"] || "pay",
+      rate_label: paye ? "Cumulative bands" : rate ? `${m.money(String(rate.rate)).toFixed()}%` : rows[0].detail || "Rate",
+      base_label: BASES[paye ? "taxable" : rate ? rate.base : "gross"] || "pay",
       number_label: words.number,
       source_label: source.label,
       source_link: source.link,
-      rows: rows.map((r) => ({
-        employee_name: r.employee_name,
-        staff_number: String(r.staff_number),
-        statutory_number: words.of(r) || null,
-        base: r.base_amount === null ? m.formatNaira(r.amount) : m.formatNaira(r.base_amount),
-        amount: m.formatNaira(r.amount),
-      })),
+      remit_label: words.remit(run.period),
+      groups: groups.map((g) => ({ label: g.label, rows: g.rows, total: g.sum ? m.formatNaira(m.sum(g.sum)) : null })),
       total: m.formatNaira(total),
     });
   }
-  const conventions = snapshot.conventions || {};
   return {
     title: "Statutory Report",
-    number: run.number,
+    run_number: run.number,
     period_label: formatMonth(run.period),
     status_label: STATUS[run.status] || "Approved",
-    paye_basis_label: BASIS[conventions.paye_basis] || "Not Set",
-    pension_reduces_label: yesNo(conventions.pension_reduces_taxable),
-    nhf_reduces_label: yesNo(conventions.nhf_reduces_taxable),
-    relief_source_label: used.has("relief") ? sourceLabel(used.get("relief")).label : null,
+    rules: rulesOf(snapshot, used),
     items,
     employee_total: m.formatNaira(employee),
     employer_total: m.formatNaira(employer),

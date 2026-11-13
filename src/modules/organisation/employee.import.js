@@ -84,6 +84,12 @@ const valuesOf = (employee, extra) => ({
   gender: extra.gender ?? null,
   date_of_birth: extra.date_of_birth ?? null,
   bank_name: extra.bank_name ?? null,
+  tax_id: extra.tax_id ?? null,
+  pension_pin: extra.pension_pin ?? null,
+  pension_administrator: extra.pension_administrator ?? null,
+  nhf_number: extra.nhf_number ?? null,
+  nhf_contributes: extra.nhf_contributes === true,
+  state_of_residence: extra.state_of_residence ?? null,
   line_manager: employee.line_manager_id || employee.line_manager_seat_id || null,
   dotted_manager: employee.dotted_manager_id || employee.dotted_manager_seat_id || null,
 });
@@ -107,6 +113,12 @@ const RESTORED = {
   gender: "gender",
   date_of_birth: "date_of_birth",
   bank_name: "bank_name",
+  tax_id: "tax_id",
+  pension_pin: "pension_pin",
+  pension_administrator: "pension_administrator",
+  nhf_number: "nhf_number",
+  nhf_contributes: "nhf_contributes",
+  state_of_residence: "state_of_residence",
 };
 
 /** A reporting line as setReportingLine takes it: to a person, to a seat, or to nobody. */
@@ -235,6 +247,57 @@ const FIELDS = [
     aliases: ["bank"],
     mask: "employee.bank",
     example: "Providus Bank",
+  },
+  /* Tax and pension, as People · Employees' Tax and Pension step takes them (docs/guides/payroll.md §13.1 items 44, 46). */
+  {
+    key: "tax_id",
+    label: "Tax ID",
+    aliases: ["tin", "tax id", "tax identification number", "tax number"],
+    mask: "employee.statutory",
+    example: "23456789-0001",
+  },
+  {
+    key: "pension_pin",
+    label: "Pension PIN",
+    aliases: ["rsa pin", "pension pin", "pen pin"],
+    mask: "employee.statutory",
+    example: "PEN100123456789",
+  },
+  {
+    key: "pension_administrator",
+    label: "Pension Administrator",
+    aliases: ["pfa", "pension fund administrator", "pension manager"],
+    mask: "employee.statutory",
+    example: "Pension Managers Limited",
+  },
+  {
+    key: "nhf_number",
+    label: "NHF Number",
+    aliases: ["nhf no", "nhf"],
+    mask: "employee.statutory",
+    example: "NHF0012345678",
+  },
+  {
+    key: "nhf_contributes",
+    label: "Contributes to NHF",
+    aliases: ["nhf contribution", "contributes nhf", "pays nhf"],
+    type: "boolean",
+    mask: "employee.statutory",
+    example: "No",
+    hint: "Yes or No: the person's own choice",
+  },
+  {
+    key: "state_of_residence",
+    label: "State of Residence",
+    aliases: ["state", "state of residence", "resident state"],
+    type: "enum",
+    options: c.organisation.NIGERIAN_STATES.map((value) => ({
+      value,
+      label: c.organisation.STATE_LABELS[value],
+      ...(value === "fct" ? { aliases: ["FCT", "Abuja"] } : {}),
+    })),
+    mask: "employee.statutory",
+    example: "Lagos",
   },
 ];
 

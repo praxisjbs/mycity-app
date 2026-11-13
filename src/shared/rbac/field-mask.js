@@ -64,6 +64,9 @@ const FIELDS = Object.freeze({
       "band_minimum",
       "band_maximum",
       "band_position",
+      // A person's taxable pay and tax for a year before MyCity's first statutory month (docs/guides/payroll.md §13.1 item 42).
+      "taxable_pay",
+      "tax_paid",
     ],
   },
   "employee.bank": {
@@ -111,6 +114,19 @@ const FIELDS = Object.freeze({
       "pension_administrator",
       "nhf_number",
       "nsitf_number",
+      // Whether the person contributes to NHF and the State they live in (docs/guides/payroll.md §13.1 items 44 and 46).
+      "nhf_contributes",
+      "state_of_residence",
+      // Their declared rent for a tax year, for rent relief (docs/guides/payroll.md §13.1 item 41).
+      "rent_paid",
+      "year_rent",
+      "tenant_name",
+      "landlord_name",
+      "landlord_phone",
+      "landlord_tax_id",
+      "landlord_nin",
+      "property_address",
+      "property_address_place",
     ],
   },
 });

@@ -7,10 +7,10 @@
 | Backend modules | `payroll`, `payslips`, `deductions`, `salary_structure`, `statutory` |
 | Frontend paths | `app/src/features/payroll/`, `app/src/features/ess/Payslips.tsx` |
 | Permission key(s) | `payroll` (runs, everyone's payslips, deductions, configurations); `ess` (a person's own payslips and deductions) |
-| Capabilities | `payroll.configure` (switch the advanced option on or off, set the pay day, enter statutory rates, bands, salary grades and pay components; the run itself needs only the `payroll` grant) |
+| Capabilities | `payroll.configure` (switch the advanced option on or off, set the pay day, enter statutory rates, bands, salary grades, pay components and a person's Prior Pay; the run itself needs only the `payroll` grant) |
 | Screens (PROGRESS.md rows) | #45 Payroll Runs, #46 Payslips, #48 Deductions, Configurations (new; PR 1 registers it in the next free row, #109 while free (#107 and #108 are the public site's), and marks #47 Salary Structure and #49 Statutory Dropped), #11 My Payslips; changes to Home (the Payroll In Progress card), Settings · Approvals (#72, the `payroll.run` flow), People · Attendance (#25, its Deductions and Overtime views gain a link to the run), Queries & Sanctions · Sanctions (a fine's Payroll state) and the Notification Settings (#74, the Payroll category) |
 | Status | Agreed |
-| Last changed | 11/11/2026 |
+| Last changed | 12/11/2026 |
 
 ---
 
@@ -155,13 +155,13 @@ next run as an adjustment).
 | Payroll · Payroll Runs (`payroll-runs`, #45) | Staff app, People group | `payroll` view | The current run's figures and chain, its problems, its adjustments and the people left out, the run history, the approval | New Run, Compute, Add Adjustment, Exclude, Include, Submit for Approval, Approve, Send Back, Reject (the approver), Mark Paid, Email All Payslips, Download All, Statutory Report (advanced), Discard |
 | Payroll · Payslips (`payslips`, #46) | Staff app | `payroll` view; amounts need the salary grant | The month's payslips (Preview until approved, Published after), one opening in a modal with its lines, or its PDF once rendered | Pick the month, open a payslip, Download PDF (`payroll` edit, a restricted file), search by person; Email All Payslips and Download All once the run is approved |
 | Payroll · Deductions (`deductions`, #48) | Staff app | `payroll` view | Every deduction waiting or running: attendance items, fines, advances; the month's figures | Accept This Month, Spread Over Months, Waive (a fine); Record Advance, Cancel Advance; a link to People · Attendance to waive an attendance item |
-| Payroll · Configurations (`configurations`, new, #109 while free) | Staff app | `payroll` view; changes need `payroll.configure` | Pay Day, Bank Details Required, the Advanced Payroll switch, Statutory Items and PAYE Bands; when on or once it has been: the conventions, Salary Structure, Pay Components | Set Pay Day, Switch On or Off from a date, Save Rate, Save Grade, Place People, Set Pay Components |
+| Payroll · Configurations (`configurations`, new, #109 while free) | Staff app | `payroll` view; changes need `payroll.configure` | Pay Day, Bank Details Required, the Advanced Payroll switch, Statutory Items (eight since PR 11, rent relief and the minimum wage among them) and PAYE Bands; when on or once it has been: Salary Structure and Pay Components, a person's sheet with their Prior Pay | Set Pay Day, Switch On or Off from a date, Save Rate, Save Grade, Place People, Set Pay Components, Set Prior Pay |
 | ESS · My Payslips (`my-payslips`, #11) | Staff app | Every employee, own record | Gross, Net Received, Payslips, Deductions, Next Payday; the year's months; the month's payslip | Change year, open a month, Download PDF, Email a Copy, open Deductions, Download All |
 | Home · Overview, the Payroll In Progress card | Staff app | Readers with the salary field and `payroll` view | Runs not yet paid, in their scope | Open the run |
 | Settings · Approvals (#72) | Staff app | `settings` view | The `payroll.run` flow, its stage and version | Edit Stages (saves a new version) |
 | People · Attendance (#25), ESS · My Attendance (#9) | Staff app | As today | A pay item's status In Payroll once the run is submitted; a waived or frozen item says why | Nothing new; waiving stays here (attendance guide §6.17) |
 | Queries & Sanctions · Sanctions | Staff app | As today | A fine's Payroll state: Waiting, Accepted, Deducted, Waived | Nothing new |
-| People · Employees (#24) | Staff app | As today | The pay fields payroll reads: monthly gross, bank, in advanced mode the pay split and the tax and pension numbers | Set them: already built in M1, the Add and Edit forms' Pay and Bank step (Gross Monthly, Bank, Account Number) and the staff import's same columns; `people` edit, a field masked from a role is left out of its form |
+| People · Employees (#24) | Staff app | As today; the tax fields and the Tax and Pension tab to a role that sees `employee.statutory` | The pay fields payroll reads: monthly gross, bank, in advanced mode the pay split; the tax and pension numbers, the NHF choice and the State of residence; the rent each person declared for a year (PR 11) | Set them: the Add and Edit forms' Pay and Bank step (Gross Monthly, Bank, Account Number, M1) and Tax and Pension step (Tax ID, Pension PIN, Pension Administrator, NHF Number, Contributes to NHF, State of Residence; PR 11), the staff import's same columns; Declare Rent, Change Rent and Remove Rent on the record's Tax and Pension tab; `people` edit, a field masked from a role is left out of its form |
 | Notification Settings (#74), the bell | Staff app | Everyone | The Payroll category: its notices, channels per person | As today |
 | ⌘K, Praxis AI | Everywhere | By permission | Runs, payslips, deductions; reads and cards of §9 | As §9 |
 | Knowledge Hub · User Guide | Staff app | By grants | The Payroll chapter, written when the screens are accepted (Appendix A, PR 8) | Read |
@@ -225,13 +225,14 @@ month → instalments are scheduled exactly as for a spread fine → each appear
 Repayment" in its month's run → the person is told when it is recorded, and sees it on My Payslips · Deductions.
 
 **3.5 Switching the advanced option on.** Someone with `payroll.configure` presses Switch On on Configurations,
-picks a date (today or later, never earlier) → refused (409 `NO_RATES`) unless at least one statutory rate is in
-force on that date, and (409 `NO_CONVENTIONS`) unless the three conventions are set → saved as a new version of the
-setting. MyCity enters the rates first, on the same screen, while the option is still off (Statutory Items and PAYE
-Bands are always there, §13.1 item 25), and sets the three conventions in the Switch On request itself, when
-Operations & People, who run MyCity's payroll, are ready to start (§13.1 item 38); no build step waits for them. Runs for months before the date stay simple and
-locked runs never change; a run for a month from the date computes statutory lines, shows Employer Cost and
-offers the Statutory Report.
+picks a date (today or later, never earlier) → refused (409 `NO_RATES`) unless at least one statutory figure is in
+force on that date → saved as a new version of the setting. Nothing else is asked: the law settles the accountant's
+conventions, so the engine fixes them (PR 11, §6.12 rule 14). MyCity enters the figures first, on the same screen,
+while the option is still off (Statutory Items and PAYE Bands are always there, §13.1 item 25), when Operations &
+People, who run MyCity's payroll, are ready to start (§13.1 item 38); no build step waits for them. Each person's
+tax numbers, NHF choice, State and declared rent are on People · Employees, and their Prior Pay on Configurations
+(§13.1 items 41 to 46). Runs for months before the date stay simple and locked runs never change; a run for a month
+from the date computes statutory lines, shows Employer Cost and offers the Statutory Report.
 
 **3.6 A correction after lock.** A locked run is never edited. The error is put right in the next run as an
 adjustment ("Correction: October overtime", an earning or a deduction, with its reason). The payslip of the
@@ -263,13 +264,17 @@ Paid ends it. A run stuck from an older month still counts, so an unpaid October
 | `salary_grade` | A band: minimum and maximum from a date (advanced) | `6020` | `salary_structure` |
 | `employee_salary_grade` | Where a person is placed, from a date (advanced) | `6020` | `salary_structure` |
 | `employee_pay_component` | A person's pay split into basic, housing, transport and others, from a date (advanced) | `6020` | `salary_structure` |
-| `statutory_rate` | A rate, band or relief in force from a date (advanced) | `6020` | `statutory` |
+| `statutory_rate` | A rate, band or figure in force from a date (advanced); rent relief and the minimum wage join in `6050` | `6020`, `6050` | `statutory` |
+| `employee_pay_to_date` | A person's taxable pay and tax for a year before MyCity's first statutory month (Prior Pay) | `6050` | `statutory` |
+| `employee_rent_declaration` | A person's declared rent for a tax year, with its evidence and the property's address | `6050` | `organisation` (PR 11) |
 
 Changes to tables other people own, each reviewed by that table's owner (MIGRATIONS §1.3, README §12):
 `attendance_pay_item.payroll_run_id` gains its foreign key (owed since `1435`; `ON DELETE SET NULL`, a nullable link; LA); `leave_type` gains
 `unpaid` (M1 leave; AJ); in advanced mode `employee` gains the tax and pension numbers the statutory mask
 already names (`tax_id`, `pension_pin`, `pension_administrator`, `nhf_number`; written through the
-organisation service; TB). `sanctions.fines` gains `release` (§6.6; GE). Nothing else outside M6 changes.
+organisation service; TB) and, in `6050`, `nhf_contributes` and `state_of_residence`, with the new
+`employee_rent_declaration` written by the organisation service (`employee.rent.js`; TB's review). `sanctions.fines`
+gains `release` (§6.6; GE). Nothing else outside M6 changes.
 
 ### 4.2 Columns
 
@@ -288,16 +293,16 @@ keeps its name except the salary-derived amounts, which carry the names the sala
 | `advanced_enabled` | `boolean NOT NULL DEFAULT false` |
 | `pay_day` | `smallint`, `CHECK (pay_day BETWEEN 1 AND 31)`, null until MyCity sets one; null means the default, 30 (`DEFAULT_PAY_DAY` in `payroll.config.repo.js`) |
 | `require_bank_details` | `boolean NOT NULL DEFAULT false`: when true, a person with no bank name or account number is a blocking problem (§6.15), otherwise a warning |
-| `paye_basis` | `text CHECK (paye_basis IN ('annualised', 'monthly'))`, null until set: whether PAYE bands are applied to the month's taxable pay annualised and divided by twelve, or to the month's taxable pay against bands entered as monthly amounts (§6.12) |
-| `pension_reduces_taxable`, `nhf_reduces_taxable` | `boolean`, null until set: whether employee pension, and NHF, reduce the taxable pay before PAYE |
+| `paye_basis` | `text CHECK (paye_basis IN ('annualised', 'monthly'))`. **Unread and unwritten since PR 11**: PAYE is worked out cumulatively over the year to date, as the law prescribes (§6.12 rule 11); the column stays because a merged migration is never edited |
+| `pension_reduces_taxable`, `nhf_reduces_taxable` | `boolean`. **Unread and unwritten since PR 11**: employee pension and NHF reduce taxable pay by law, fixed in the engine (§6.12 rule 14) |
 | `effective_from`, `effective_to` | `date`; no two versions of one scope overlap (an exclusion constraint on `daterange`) |
 | `changed_by` | `uuid REFERENCES app_user ON DELETE RESTRICT` |
 | `reason` | `text`, optional |
 
 With no row the run is simple, the pay day is the default 30 and bank details are a warning. Nothing is seeded (A26):
 the default is a constant in code that JBS Praxis decided on 09/11/2026 (§13.1 item 24), shown on Configurations as
-"30 (default)"; the bank rule and the accountant's conventions are MyCity's choices, entered on Configurations (§13.1
-item 21).
+"30 (default)"; the bank rule is MyCity's choice, entered on Configurations (§13.1 item 21). The accountant's conventions
+left the setting in PR 11 (§6.12 rule 14).
 
 **`payroll_run`**
 
@@ -329,6 +334,7 @@ item 21).
 | `working_days`, `working_days_paid` | `smallint`, the person's month and the part of it paid (a joiner or leaver) |
 | `earnings_total`, `deductions_total`, `net_pay`, `employer_total` | `numeric(18,2) NOT NULL DEFAULT 0` |
 | `bank_name`, `account_last4` | `text`, snapshot at Compute (the full number is never copied) |
+| `taxable_pay` | `numeric(18,2)`, `CHECK (taxable_pay IS NULL OR taxable_pay >= 0)` (`6050`): the month's taxable pay an advanced payslip's PAYE was worked from (gross less employee pension and NHF, before rent relief), which the later months of the year read as their year to date; null in simple mode, with no PAYE table, and in a month the minimum wage exempts. Not on the wire |
 | `document_id` | `uuid REFERENCES document ON DELETE SET NULL`, the PDF; set when the run is approved |
 | `published_at`, `emailed_at` | `timestamptz` |
 
@@ -339,7 +345,7 @@ item 21).
 | `payslip_id` | `uuid NOT NULL REFERENCES payslip ON DELETE CASCADE` |
 | `position` | `smallint NOT NULL`, the order on the slip |
 | `kind` | `earning`, `deduction`, `employer` |
-| `code` | `monthly_pay`, `overtime`, `lateness`, `early_departure`, `absence`, `unpaid_leave`, `unpaid_suspension`, `fine`, `advance`, `adjustment_earning`, `adjustment_deduction`, `paye`, `pension_employee`, `pension_employer`, `nhf`, `itf`, `nsitf` |
+| `code` | `monthly_pay`, `overtime`, `lateness`, `early_departure`, `absence`, `unpaid_leave`, `unpaid_suspension`, `fine`, `advance`, `adjustment_earning`, `adjustment_deduction`, `paye`, `paye_refund` (an earning, `6050`), `pension_employee`, `pension_employer`, `nhf`, `itf`, `nsitf` |
 | `label` | `text NOT NULL`, Title Case, what the slip says |
 | `detail` | `text`, one short line ("3 late arrivals", "QRY-0019, 1 of 3") |
 | `amount` | `numeric(18,2) NOT NULL CHECK (amount >= 0)`; `kind` gives the direction |
@@ -398,10 +404,28 @@ item 21).
   through the upload engine (`POST /documents`) and claimed by the save under the doc type `statutory_source` (module
   `payroll`, `restricted`, so only `payroll` edit holders open it; §13.2 item 33); a later version may name a document
   an earlier one already holds. Merged migrations are never edited, so this is a new one.
+  **Built (PR 11, migration `6050_statutory_law.sql`):** two items join, `rent_relief` (its `rate` of the year's rent and
+  its cap in `flat_amount`, base `rent`) and `minimum_wage` (a month's amount in `flat_amount`, base `gross`, no rate), so
+  `statutory_rate_flat_check` allows an amount on both; `relief` (the Consolidated Relief Allowance's shape) stays in the
+  item `CHECK` for the rows saved before, and the code never saves, lists or computes it again (`RETIRED_ITEMS`, §13.1
+  item 41); the base `CHECK` gains `rent`.
 - `payslip_line.base_amount numeric(18,2)`: what a statutory line's rate was applied to (the month's taxable pay
-  for PAYE), null on every other line; the statutory report prints it.
+  for PAYE and PAYE Refund), null on every other line; the statutory report prints it.
 - `employee.tax_id`, `pension_pin`, `pension_administrator`, `nhf_number` (`text`), masked as `employee.statutory`
-  and written through the organisation service (`PATCH /employees/:id`, `Employee360`).
+  and written through the organisation service (`PATCH /employees/:id`, `Employee360`). **PR 11 (`6050`):**
+  `nhf_contributes boolean NOT NULL DEFAULT false` (the person's choice, §13.1 item 44) and `state_of_residence text`
+  (`CHECK` against the 36 states and the FCT, the contract's `NIGERIAN_STATES`, indexed for the report's groups; §13.1
+  item 46), both masked as `employee.statutory`, set on Add and Edit Employee's Tax and Pension step and the staff import.
+- `employee_rent_declaration` (PR 11, `6050`, owner `organisation`): `employee_id` (RESTRICT), `year smallint` (2026 to
+  2100), `rent_paid numeric(18,2) > 0`, `covers_from` and `covers_to` (a month's first day each, `covers_to >=
+  covers_from`), `tenant_name`, `landlord_name`, `landlord_phone`, `landlord_tax_id`, `landlord_nin` (at least one of the
+  three, `employee_rent_declaration_landlord_check`), `property_address` (the readable line of its place, owner
+  `employee_rent_declaration.property_address`, renamed by the places job), `evidence_document_id` (SET NULL, the
+  `rent_evidence` document, restricted), `entered_by`; one a person a year (`employee_rent_declaration_year_uq`). Every
+  field is masked as `employee.statutory`.
+- `employee_pay_to_date` (PR 11, `6050`, owner `statutory`): `employee_id` (RESTRICT), `year smallint`, `taxable_pay` and
+  `tax_paid numeric(18,2) >= 0`, `document_id` (SET NULL, the `leaving_certificate`, restricted), `entered_by`; one a
+  person a year. The amounts are masked as the salary is (`taxable_pay`, `tax_paid` joined `employee.salary`).
 
 No two versions of one key overlap, held without a `btree_gist` exclusion (the extension is not provisioned): each
 key has one version starting on a given day and at most one open version (two unique indexes a table), and the one
@@ -414,8 +438,10 @@ key's versions and ends the open one the day before the next starts.
   adjustment); `6010_payroll_deductions.sql` (deduction, instalment, and the foreign key from
   `attendance_pay_item.payroll_run_id`, added in a `DO` block that checks `pg_constraint`, with its index);
   `6020_payroll_advanced.sql` (grades, components, rates, and the employee columns); `6030_leave_unpaid.sql`
-  (`leave_type.unpaid`); `6040_statutory_sources.sql` (each statutory version's legal source, PR 10); the reference
-  seed `seeds/reference/6099_seed_payroll.sql`. Gaps are left between
+  (`leave_type.unpaid`); `6040_statutory_sources.sql` (each statutory version's legal source, PR 10);
+  `6050_statutory_law.sql` (rent relief and the minimum wage, the PAYE Refund line, a payslip's taxable pay, the NHF choice
+  and the State on the employee, the rent declarations and Prior Pay; PR 11); the reference seed
+  `seeds/reference/6099_seed_payroll.sql`. Gaps are left between
   numbers so a fix can sit beside what it fixes.
 - **The seed holds only what the code cannot run without** (A26, MIGRATIONS §9): the `payroll.run` approval
   definition (version 1, one stage, the CEO, 72 hours, context `{ net_total: "money" }`, which makes it a
@@ -517,12 +543,15 @@ The ESS routes live in `src/modules/ess/` and call `payslips.service` with the c
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /payroll/settings` | → `PayrollSettings` (`advanced_enabled`, `advanced_has_been_on`, `pay_day` (30 when none is set), `pay_day_is_default`, `require_bank_details`, the three conventions, and `current` and `next`, the version in force and the one that starts later) | `payroll` view · all | no | |
-| `PATCH /payroll/settings` | `PayrollSettingsChange` (`advanced_enabled`, `effective_from`, `pay_day`, `require_bank_details`, `paye_basis`, `pension_reduces_taxable`, `nhf_reduces_taxable`, `reason`) → `PayrollSettings` | `payroll` edit · all, capability `payroll.configure` | no | `effective_from` today or later (422 `EFFECTIVE_IN_THE_PAST`); what is not sent carries over from the latest version, and a change for the day a version already starts joins it; a version starting later is refused (409 `VERSION_EXISTS`); the convention fields are accepted only once the option has been on or is being switched on (409 `ADVANCED_OFF` otherwise); 409 `NO_RATES` to switch on with no rate in force on that date; 409 `NO_CONVENTIONS` with `pension_reduces_taxable` or `nhf_reduces_taxable` unset, on each unset field. `paye_basis` is still taken, but no screen sends it and switching on no longer needs it: unset, Compute reads it as `annualised` (PR 10, §13.2 item 32) |
-| `GET /statutory/items` | → `StatutoryItems` | `payroll` view · all | no | The seven items, always all seven, each with the version in force today and the next (`current`, `next`, null when none, each with its source): a fixed set the code knows, not a list of records, so Configurations shows Not Set for an item with no rate |
-| `GET /statutory/rates` | `StatutoryRateListQuery` (`item`, `as_of`) → `StatutoryRatePage` | `payroll` view · all | yes, 25 | Readable whatever the option's state: the rates are entered before the first switch-on (§13.1 item 25). With `as_of`, the rows in force that day; without, those in force today and those that start later |
-| `POST /statutory/rates` | `StatutoryRatesSave` (`item`, `effective_from`, its `rate`, `flat_amount`, `bands`, and `base` among the item's own; its source: `source_title` and `source_section` (each at most 200 characters), `source_url` (optional, an `http` or `https` link), `source_document_id` (optional, a file staged through `POST /documents`), `source_checked_on`; or `no_legal_source: true` with `no_source_reason` (10 to 500)) → `StatutoryRatePage` (201) | `payroll` edit · all, `payroll.configure` | no | A new version from a date; never backdated (422 `EFFECTIVE_IN_THE_PAST`); the previous version ends the day before and one already starting that day is replaced; accepted while the option is off, so a rate can be in force when it is first switched on. PAYE bands start at nothing, each where the last ends, only the last open. A version with neither a source nor No Legal Source, or with a part of the source missing, is 422 `SOURCE_REQUIRED` on each missing field (the contract's own refusal, so the form says it as it is filled); a source and No Legal Source together are refused on the source's fields ("Not with No Source"); 422 `CHECKED_IN_THE_FUTURE` for a day checked still to come (Lagos); 422 `DOCUMENT_NOT_STAGED` for a document that is neither staged by this person nor already a statutory source |
+| `GET /payroll/settings` | → `PayrollSettings` (`advanced_enabled`, `advanced_has_been_on`, `pay_day` (30 when none is set), `pay_day_is_default`, `require_bank_details`, and `current` and `next`, the version in force and the one that starts later; the conventions left in PR 11) | `payroll` view · all | no | |
+| `PATCH /payroll/settings` | `PayrollSettingsChange` (`advanced_enabled`, `effective_from`, `pay_day`, `require_bank_details`, `reason`) → `PayrollSettings` | `payroll` edit · all, capability `payroll.configure` | no | `effective_from` today or later (422 `EFFECTIVE_IN_THE_PAST`); what is not sent carries over from the latest version, and a change for the day a version already starts joins it; a version starting later is refused (409 `VERSION_EXISTS`); 409 `NO_RATES` to switch on with no figure in force on that date. **Since PR 11** the three conventions are not taken (a body naming one is refused, 422 `VALIDATION_FAILED`, the schema being strict) and `NO_CONVENTIONS` is gone: the law settles them (§6.12 rule 14) |
+| `GET /statutory/items` | → `StatutoryItems` | `payroll` view · all | no | The eight items (PR 11: `paye`, `pension_employee`, `pension_employer`, `nhf`, `itf`, `nsitf`, `rent_relief`, `minimum_wage`; the retired `relief` is not among them), always all eight, each with the version in force today and the next (`current`, `next`, null when none, each with its source; `flat_amount` carries rent relief's cap and the minimum wage): a fixed set the code knows, not a list of records, so Configurations shows Not Set for an item with no figure |
+| `GET /statutory/rates` | `StatutoryRateListQuery` (`item`, `as_of`) → `StatutoryRatePage` | `payroll` view · all | yes, 25 | Readable whatever the option's state: the rates are entered before the first switch-on (§13.1 item 25). With `as_of`, the rows in force that day; without, those in force today and those that start later. A retired item's rows are never listed |
+| `POST /statutory/rates` | `StatutoryRatesSave` (`item` among the eight, `relief` refused on the field since PR 11, `effective_from`, its `rate`, `flat_amount` (rent relief's cap, with its rate; the minimum wage's month, with no rate), `bands`, and `base` among the item's own; its source: `source_title` and `source_section` (each at most 200 characters), `source_url` (optional, an `http` or `https` link), `source_document_id` (optional, a file staged through `POST /documents`), `source_checked_on`; or `no_legal_source: true` with `no_source_reason` (10 to 500)) → `StatutoryRatePage` (201) | `payroll` edit · all, `payroll.configure` | no | A new version from a date; never backdated (422 `EFFECTIVE_IN_THE_PAST`); the previous version ends the day before and one already starting that day is replaced; accepted while the option is off, so a rate can be in force when it is first switched on. PAYE bands start at nothing, each where the last ends, only the last open. A version with neither a source nor No Legal Source, or with a part of the source missing, is 422 `SOURCE_REQUIRED` on each missing field (the contract's own refusal, so the form says it as it is filled); a source and No Legal Source together are refused on the source's fields ("Not with No Source"); 422 `CHECKED_IN_THE_FUTURE` for a day checked still to come (Lagos); 422 `DOCUMENT_NOT_STAGED` for a document that is neither staged by this person nor already a statutory source |
 | `DELETE /statutory/rates/:item/versions/:effective_from` (`StatutoryVersionParams`), `DELETE /payroll/settings/versions/:effective_from` (`PayrollSettingsVersionParams`) | → 204 | `payroll` edit · all, `payroll.configure` | no | **Built (PR 10; §13.1 item 33).** Remove Change: removes a version that has not started yet (a saved band table, a rate, or a setting version: a pay day, the switch or the bank rule waiting for its day), and the version before it runs on again (`shared/db/effective-dated` `removeVersion`); 404 for a day no version starts on; 409 `VERSION_IN_FORCE` for one in force today or before (a new version from a date replaces it instead), and for one a run sent for approval, approved or paid was computed with (a month whose last day is on or after its first day), so a run already paid at a figure never loses it. Audited (`statutory_rate.removed`, `payroll_setting.removed`, security) |
+| `GET /statutory/employees/:employee_id/pay-to-date` (`PayToDateParams`, `PageQuery`) | → `PayToDatePage` | `payroll` view · all | yes, 25 | **PR 11** (§13.1 item 42). A person's Prior Pay, newest year first: their taxable pay and tax for a year before MyCity's first statutory month. Amounts masked as the salary (`taxable_pay`, `tax_paid`). 404 for a person who does not exist |
+| `PUT /statutory/employees/:employee_id/pay-to-date/:year` (`PayToDateYearParams`), `DELETE …` | `PayToDateSave` (`taxable_pay`, `tax_paid`, `document_id` optional) → `PayToDate`; 204 | `payroll` edit · all, `payroll.configure` | no | **PR 11.** The year's figures made or replaced, this year or the next in Lagos (422 `YEAR_NOT_ALLOWED`); a leaving certificate staged through `POST /documents` is claimed as a restricted `leaving_certificate` on the person. Delete: 404 for a year with none. Audited (`pay_to_date.saved`, `.removed`), never a figure |
+| `GET /employees/:id/rent-declarations` (`RentDeclarationParams`, `PageQuery`), `PUT /employees/:id/rent-declarations/:year` (`RentDeclarationYearParams`), `DELETE …` | → `RentDeclarationPage`; `RentDeclarationSave` → `RentDeclaration`; 204 | `people` view; `people` edit · the record's scope | yes, 25 (the list) | **PR 11** (§13.1 item 41), the organisation module's. A person's declared rent by year: the rent paid and the months it covers (pro-rated to the year, `year_rent`), the legal tenant, the landlord with a phone, a Tax ID or a NIN, the property's address (a `PlaceInput`, picked, F27) and the evidence (a staged file claimed as a restricted `rent_evidence` on the person). This year or the next (422 `YEAR_NOT_ALLOWED`); the months must reach the year (422 `COVERS_OUTSIDE_YEAR`). A role whose mask hides `employee.statutory` is refused the routes (403 `FIELD_RESTRICTED`), unless the record is their own. Audited (`employee.rent_declared`, `.rent_declaration_removed`), never an amount |
 | `GET /salary-structure/grades`, `POST /salary-structure/grades` | `SalaryGradeListQuery`, `SalaryGradeSave` → `SalaryGradePage`, `SalaryGrade` | view; edit with `payroll.configure` | yes, 25 | Advanced only (409 `ADVANCED_OFF` until the option is on or has been). A grade's band from a day; its counts of who is placed, below and above |
 | `GET /salary-structure/placements`, `PUT /salary-structure/placements/:employee_id` | `GradePlacementListQuery` (`salary_grade_id`, `band_position`: `below`, `within`, `above`, `unplaced`; sort `employee`, `grade`), `GradePlacementSave` → `GradePlacementPage`, `GradePlacement` | view; edit with `payroll.configure` | yes, 25 | Everyone paid now against their band: Below Minimum, Within, Above Maximum. 422 `GRADE_NOT_IN_FORCE` for a grade with no band on the day |
 | `GET /salary-structure/employees/:employee_id/components`, `PUT …` | `SalaryStructureParams`, `PayComponentsSave` → `PayComponentSet` | view; edit with `payroll.configure` | no | The split today and the next one. A save is a new version from a date: one `basic`, every code once, at most ten, adding up to the person's monthly gross (422 `SPLIT_NOT_GROSS`; 422 `NO_SALARY` with no gross) |
@@ -530,9 +559,11 @@ The ESS routes live in `src/modules/ess/` and call `payslips.service` with the c
 **Errors** (`shared/errors.js`, every one a code the screen can name): `RUN_EXISTS`, `PERIOD_NOT_ALLOWED`,
 `RUN_NOT_EDITABLE`, `RUN_NOT_COMPUTED`, `RUN_NOT_SUBMITTED` (the approval's two ends, which the handlers answer with a quiet no-op),
 `NO_ONE_TO_PAY`, `RUN_HAS_PROBLEMS`, `RUN_CHANGED`, `NOT_IN_RUN`, `NOT_EXCLUDED`, `PAID_IN_THE_FUTURE`, `NOT_APPROVED`, `NOT_READY`, `NO_RATES`,
-`NO_CONVENTIONS`, `ADVANCED_OFF`, `FINE_NOT_MOVABLE`, `OWN_RECORD`, `INSTALMENTS_STARTED` (cancel or release after one is in a run),
+`ADVANCED_OFF`, `FINE_NOT_MOVABLE`, `OWN_RECORD`, `INSTALMENTS_STARTED` (cancel or release after one is in a run),
 `START_NOT_ALLOWED`, `TOO_MANY_MONTHS`, `GRANTED_IN_THE_FUTURE`, `NOT_A_FINE`, `NOT_AN_ADVANCE`, `NOT_ACTIVE` (Deductions, PR 3),
 `EMAIL_TOO_SOON` (429, a copy within a minute of the last mail of a payslip), `NO_PAYSLIPS` (409, a download with nothing to put in it),
+`YEAR_NOT_ALLOWED` (422, a Prior Pay or a rent declaration for a year other than this one or the next) and `COVERS_OUTSIDE_YEAR` (422,
+rent whose months reach no month of the year) (PR 11; `NO_CONVENTIONS` left in PR 11),
 `EFFECTIVE_IN_THE_PAST` (422, a configuration change starting before today), `VERSION_EXISTS` (409, a version already starts later),
 `SPLIT_NOT_GROSS` (422, a pay split that is not the monthly gross), `NO_SALARY` (422, a split for a person with no gross),
 `GRADE_NOT_IN_FORCE` (422, a placement in a grade with no band that day) (Configurations, PR 5);
@@ -778,26 +809,25 @@ suspension into absent days), so payroll does, from the owners' records:
    **period**: a run is advanced when the setting in force on its first day has `advanced_enabled`. Switching on
    from 1 December makes the December run advanced; November, computed in December, stays simple. A locked run
    never changes (it carries `advanced` and its snapshot).
-3. **Switching on** needs `payroll.configure`, a date that is today or later (Lagos, never earlier), at least
-   one statutory rate in force on that date (409 `NO_RATES`) and the two conventions the screen asks for set
-   (409 `NO_CONVENTIONS`: whether pension, and NHF, reduce taxable pay; PAYE Basis is no longer asked, §13.2 item 32).
+3. **Switching on** needs `payroll.configure`, a date that is today or later (Lagos, never earlier) and at least
+   one statutory figure in force on that date (409 `NO_RATES`). Nothing else is asked since PR 11: the law settles
+   the accountant's conventions, which the engine fixes (§6.12 rule 14).
    **Switching off** needs the same date rule and changes later runs only. A version of the setting not yet in force
    (a pay day, the switch or the bank rule waiting for its day) is taken back with Remove Change (§5), and the version
    before it runs on.
 3a. **The options MyCity configures** (§13.1 item 21), each saved as a new version of the setting from a date,
    needing `payroll.configure`: **Pay Day**; **Bank Details Required** (a person with no bank details blocks Submit);
-   and, in advanced mode, the statutory rates and bands (each with its legal source, §6.12 rule 12), the conventions
-   (whether pension reduces taxable pay, whether NHF does; PAYE basis left the screen in PR 10) and the pay components.
+   and, in advanced mode, the statutory figures and bands (each with its legal source, §6.12 rule 12), the pay components
+   and each person's Prior Pay (PR 11; the conventions left the screen, the law settling them, §6.12 rule 14).
    Every figure and every convention is entered in the app by Operations & People, who run MyCity's payroll, when MyCity
    starts statutory payroll (§13.1 item 38); no build step waits for one. Every person's salary and bank details
    are entered on People · Employees or through the staff import (nothing in payroll creates them), and the run
    reports each one missing (§6.15).
 4. **Gated pieces.** Statutory Items and PAYE Bands are on Configurations whatever the option's state, so the
-   rates can be entered before the first switch-on (§13.1 item 25, decided 09/11/2026). The conventions, Salary
-   Structure and Pay Components are visible only when the option is on or has been (`advanced_has_been_on`); their
-   routes answer 409 `ADVANCED_OFF` otherwise, except that the conventions are accepted in the request that
-   switches the option on. In simple mode Configurations holds Pay Day, Bank Details Required, the switch, Statutory
-   Items and PAYE Bands.
+   rates can be entered before the first switch-on (§13.1 item 25, decided 09/11/2026). Salary Structure and Pay
+   Components (each person's sheet, their Prior Pay with it) are visible only when the option is on or has been
+   (`advanced_has_been_on`); the structure's routes answer 409 `ADVANCED_OFF` otherwise. In simple mode Configurations
+   holds Pay Day, Bank Details Required, the switch, Statutory Items and PAYE Bands.
 5. **Salary structure.** Grades are bands (minimum, maximum) from a date; people are placed in a grade from a
    date; a person above the maximum or below the minimum is flagged (Above Maximum, Below Minimum), never blocked,
    and an offer outside its band is not a payroll matter. Salaries stay negotiated: a grade sets no one's pay.
@@ -812,28 +842,30 @@ suspension into absent days), so payroll does, from the owners' records:
 ### 6.12 Statutory calculation (advanced mode)
 
 The engine is the donor's shape, pure and deterministic, with **no rate in the code and none in a seed**: every
-rate, band and relief comes from `statutory_rate` rows in force on the run's last day (a past month uses that
-month's rates). The function is `computeStatutory({ gross, basic, pensionable, rates })` in
-`payroll.calc.js` and returns lines, tested without a database.
+rate, band and figure comes from `statutory_rate` rows in force on the run's last day (a past month uses that
+month's rates). **As built in PR 11** the function is `computeStatutory({ gross, pensionable, rate_of_pay,
+nhf_contributes, month, to_date, year_rent, rates })` in `payroll.calc.js`; it returns the lines and the month's
+taxable pay, tested without a database, and every line it can produce traces to a row of §6.16.
 
-| Item | `kind` | Base | Rows it reads |
-|---|---|---|---|
-| Employee pension (`pension_employee`) | employee | `pensionable` | one row: `rate` |
-| Employer pension (`pension_employer`) | employer | `pensionable` | one row: `rate` |
-| NHF (`nhf`) | employee | `basic` | one row: `rate` |
-| Relief (`relief`) | employee | `gross` | `flat_amount` and a `rate` (both may apply) |
-| PAYE (`paye`) | employee | `taxable` | ordered rows: `band_from`, `band_to`, `rate`, `position` |
-| ITF (`itf`) | employer | `annual_payroll` | one row: `rate` |
-| NSITF (`nsitf`) | employer | `annual_payroll` | one row: `rate` |
+| Item | `kind` | Base (`ITEM_BASES`, the first the default) | Rows it reads | §6.16 row |
+|---|---|---|---|---|
+| Employee pension (`pension_employee`) | employee | `pensionable` (never below basic, housing and transport) or `gross` | one row: `rate` | Employee pension |
+| Employer pension (`pension_employer`) | employer | `pensionable` or `gross` | one row: `rate` | Employer pension |
+| NHF (`nhf`) | employee | `gross` | one row: `rate`; only for a person who chose it, at or above the minimum wage | NHF |
+| PAYE (`paye`), PAYE Refund (`paye_refund`, an earning) | employee | `taxable` | ordered rows: `band_from`, `band_to`, `rate`, `position`, a year's | PAYE bands; PAYE, the monthly deduction |
+| ITF (`itf`) | employer | `annual_payroll` (the month's gross) | one row: `rate` | ITF |
+| NSITF (`nsitf`) | employer | `annual_payroll` (the month's gross) | one row: `rate` | NSITF |
+| Rent relief (`rent_relief`, no line) | employee | `rent` | one row: `rate` of the year's rent and its cap in `flat_amount` | Rent relief |
+| Minimum wage (`minimum_wage`, no line) | employee | `gross` (the person's monthly gross) | one row: a month's `flat_amount` | PAYE, the minimum-wage exemption |
 
-1. **The accountant's conventions are configuration, not code** (§6.11 rule 3a, §13.1 item 21): `paye_basis`
-   (`annualised`: annualise the month's taxable pay, apply the bands, divide by twelve; `monthly`: apply bands
-   entered as monthly amounts to the month's taxable pay), `pension_reduces_taxable` and `nhf_reduces_taxable`.
-   When the flags are true, employee pension and NHF reduce the taxable pay before PAYE; relief is applied as both
-   a flat amount and a percentage; PAYE is progressive over the ordered bands. The function takes the conventions
-   as inputs and has no default for any: an unset flag is `NO_CONVENTIONS` at switch-on. Since PR 10 the screen no
-   longer asks for `paye_basis` (rule 11), so the run hands the function `annualised` for an unset basis
-   (`payroll.config.repo` `conventionsOf`; §13.2 item 32), and a basis set through the API before still reads as set.
+The old `relief` item (a flat amount plus a percentage of gross) is retired (§13.1 item 41, rule 15): refused on save,
+never listed or computed.
+
+1. **The accountant's conventions are the law's since PR 11** (rule 14; they were configuration from PR 5, §13.1 item 21):
+   employee pension and NHF, as deducted, always reduce the taxable pay before PAYE (Nigeria Tax Act 2025, s.30(2)(a)(i)
+   and (iii)), and PAYE is always cumulative over the calendar year to date with the bands scaled to the months elapsed
+   (rule 11). The function takes no convention; `paye_basis`, `pension_reduces_taxable` and `nhf_reduces_taxable` stay
+   as columns of `payroll_setting`, unread, and `NO_CONVENTIONS` is gone. PAYE is progressive over the ordered bands.
 2. Employee items are `deduction` lines and reduce net; employer items are `employer` lines, in
    `employer_total` and on the report, never on the payslip's net.
 3. An item with no row in force is not computed, and a run in advanced mode with no PAYE table shows the blocking
@@ -848,30 +880,55 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    each item also prints its legal source as the run's snapshot holds it (the instrument and section, the day checked
    and the link, or No Legal Source with its reason), and so does the relief when the run had one; a snapshot taken
    before sources were kept prints No Legal Source, "Entered before sources were required", as `6040` marked the rows.
+   **As built in PR 11:** each item also prints its base from the snapshot (PAYE and PAYE Refund the month's taxable pay)
+   and when and where it is remitted, as §6.16 cites it (PAYE by the 10th of the next month to the Internal Revenue
+   Service of the State each person lives in; pension within 7 working days of pay day; NHF within one month of the
+   deduction, to the Federal Mortgage Bank of Nigeria; ITF, the year's, by 1 April of the next year; NSITF in the first
+   two working days of the month); PAYE and PAYE Refund print one group a State, a person with none under Not Set; and a
+   box above the items says how PAYE was worked out (on the year to date, the bands scaled to the months elapsed),
+   what reduces taxable pay, and the figures with no line, rent relief and the minimum wage, each with its source or Not
+   in force. A run computed before PR 11 prints the conventions its snapshot kept instead. The employee total is net of
+   any PAYE Refund.
 7. **What is data and what is code.** Parametric, entered on Configurations as a new version from a date with no code
-   change or deploy: every rate, every band's limits and rate, the relief's flat amount and percentage, the employer
-   percentages, each item's base, and the three conventions. So when the tax authority changes a rate, a band or a relief,
+   change or deploy: every rate, every band's limits and rate, rent relief's percentage and cap, the minimum wage, the
+   employer percentages, and each item's base among those its formula allows (since PR 11 the conventions are code,
+   being the law's, rule 14). So when the tax authority changes a rate, a band or a relief,
    someone with `payroll.configure` enters the new version from its effective date; runs for earlier months keep the
    rates they were paid at, and a locked run never changes. Nothing fetches rates from the tax authority: a person
    enters every change, and the engine never defaults one. In code: the set of items (PAYE, employee and employer
-   pension, NHF, ITF, NSITF, relief) and the shape of the formula. A new kind of levy or a different formula is a small
-   code change reviewed with Operations & People, not a configuration.
-8. **The bases, as built (PR 5; §13.2 item 24).** `gross` is the month's earnings on the slip: Monthly Pay or the
+   pension, NHF, ITF, NSITF, rent relief, the minimum wage) and the shape of the formula, each traced to §6.16. A new
+   kind of levy or a different formula is a small code change reviewed with Operations & People, not a configuration.
+   What a person brings is on their own record, never on Configurations: the tax numbers, the NHF choice, the State and
+   the declared rent on People · Employees, the Prior Pay in their sheet (§13.1 items 41 to 46).
+8. **The bases, as built (PR 11; §13.2 item 24).** `gross` is the month's earnings on the slip: Monthly Pay or the
    pay split, overtime and earning adjustments; attendance deductions, unpaid days, fines and advances come off the
-   net after the statutory items and do not reduce a base. `basic` is the `basic` component as paid (the whole
-   Monthly Pay with no split), `pensionable` the pensionable components as paid (likewise). `annual_payroll` (ITF,
-   NSITF) is the month's gross, each month's share of the year's payroll. Each item's base is the row's own among
-   those its formula allows (`ITEM_BASES` in `statutory.js`; PAYE is always `taxable`).
-9. **PAYE, as built.** Taxable pay is gross less the relief (its flat amount plus its rate of gross), less employee
-   pension and NHF as deducted when the conventions say so, never below nothing. `annualised`: every monthly figure
-   × 12, the bands and the relief's flat amount read as annual amounts, the tax ÷ 12; `monthly`: the bands and the
-   flat amount read as monthly amounts. Each line is rounded once, half up, from full precision; a line of nothing
-   is left off. A line keeps its base (`payslip_line.base_amount`: for PAYE the month's taxable pay) for the report.
-10. **What a run keeps.** Compute writes into `config_snapshot` the conventions, the rate rows it used
-   (`statutory_rates`, each with its source since PR 10) and what was missing (`statutory_missing`: `paye` with no PAYE table in force on the
-   month's last day, `conventions` when one is unset); the items that have rates are computed either way, and No
-   Rates Set reads `statutory_missing`. The report prints the rates from the snapshot, so a rate changed since does
-   not show on an old run's report.
+   net after the statutory items and do not reduce a base. `pensionable` is the components marked pensionable as paid,
+   **never less than the `basic`, `housing` and `transport` components as paid** (Pension Reform Act 2014, s.120; the
+   whole Monthly Pay with no split, which meets it); a pension row may name `gross` instead. NHF is on `gross` (the
+   2023 s.4's "monthly income", as FMBN states it); `basic` is no item's base any more, and a version saved on it before
+   PR 11 is not computed but reported missing (rule 10). `annual_payroll` (ITF, NSITF) is the month's gross, its share of
+   the payroll. Rent relief's base is `rent`, the year's share of the rent the person declared, and the minimum wage is
+   measured against the person's monthly gross (their rate of pay, not the month's earnings). Each item's base is the
+   row's own among those `ITEM_BASES` allows (PAYE is always `taxable`).
+9. **PAYE, as built (PR 11).** The month's taxable pay is gross less employee pension and NHF as deducted, never below
+   nothing (rule 14). The cumulative taxable pay is the year to date (the person's Prior Pay for the year, plus the
+   taxable pay their advanced payslips of the year's earlier months kept, from runs sent for approval, approved or paid)
+   plus this month's, less rent relief to date (the year's relief × month/12, rule 15), never below nothing. The tax on it
+   is progressive over the year's bands each scaled by month/12 (month m of the calendar year, §13.1 item 39); that tax
+   less the PAYE deducted to date (the Prior Pay's tax and the earlier payslips' PAYE less any PAYE Refund) is this
+   month's PAYE, or, when it is below nothing, a **PAYE Refund** earning line of the difference (§13.1 item 43). No PAYE
+   for a person whose monthly gross is the minimum wage in force or less, and their month keeps no taxable pay (§13.1
+   item 45). Each line is rounded once, half up, from full precision; a line of nothing is left off. PAYE and PAYE Refund
+   keep the month's taxable pay as their base (`payslip_line.base_amount`), and the payslip keeps it too
+   (`payslip.taxable_pay`), so the next month reads it. A steady earner pays the same each month; a joiner's PAYE lands
+   on the year's tax by December (§6.14).
+10. **What a run keeps.** Compute writes into `config_snapshot` how PAYE was worked out (`paye_method: "cumulative"`, PR
+   11), the rate rows it used (`statutory_rates`, each with its source since PR 10, rent relief and the minimum wage among
+   them) and what was missing (`statutory_missing`: `paye` with no PAYE table in force on the month's last day,
+   `minimum_wage` when PAYE or NHF is in force without it, and any item whose version names a base its item no longer
+   allows); the items that have their figures are computed either way, and No Rates Set reads `statutory_missing`. The
+   report prints the figures from the snapshot, so a figure changed since does not show on an old run's report. A run
+   computed before PR 11 kept `conventions` instead of `paye_method`.
 11. **Every statutory item is monthly** (TB, 11/11/2026, §13.1 item 30), **and PR 9 found what the law says of each**
    (§6.16). PAYE, employee and employer pension, NHF, ITF and NSITF are each computed for the month and taken in that
    month's run; no item is deducted once a year and no setting, label or help on a screen offers an annual deduction. Where
@@ -898,14 +955,18 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    **NHF** is 2.5% of the month's gross pay, remitted within one month (National Housing Fund Act, s.4 as substituted in
    2023, s.9; FMBN's own statement), and
    **pension** at least 8% from the employee and 10% from the employer of monthly emoluments, remitted within 7 working
-   days of pay day (Pension Reform Act 2014, s.4(1), s.11(3)).
+   days of pay day (Pension Reform Act 2014, s.4(1), s.11(3)). **As built in PR 11:** PAYE is cumulative (rule 9) and
+   `paye_basis` is no longer read; ITF and NSITF are their rate of the month's gross; NHF is a person's own choice on their
+   gross (§13.1 item 44); the statutory report states each item's remittance (rule 6). A threshold about MyCity itself
+   is not computed (ITF's 25 employees outside a free trade zone; pension's three employees, as PenCom applies the Act):
+   Operations & People enter the item only while MyCity is liable, and Statutory Items' help says so (§13.2 item 38).
 12. **Every rate has its source** (TB, 11/11/2026, §13.1 item 31). A rate, a band table, a relief or a convention is
    saved only with its legal source (§4.2) or marked No Legal Source with the reason ("a company rule, not a law").
    Configurations shows each version's source beside its figure, and the statutory report prints each item's source (and
    the relief's) from the run's snapshot, so a report says where the figures it was paid at came from. A figure that came
    from no document is never entered as if it were law. **As built in PR 10:** rates, PAYE tables and the relief carry
-   their source (`StatutoryRatesSave`, 422 `SOURCE_REQUIRED`). A convention's source is PR 11's: rule 14 decides which
-   conventions stay once PR 9 has read the law, and PR 11 adds a source to those that do.
+   their source (`StatutoryRatesSave`, 422 `SOURCE_REQUIRED`). **PR 11:** rent relief and the minimum wage carry theirs as
+   every item does. No convention stays (rule 14), so `payroll_setting` gains no source column.
 13. **People enter every change; nothing updates a legal figure by itself** (TB, 11/11/2026, §13.1 item 32). No job,
    scheduler, fetch or AI call reads a tax authority's site or changes a rate. When the law changes, someone with
    `payroll.configure` enters the new version from its effective date with its source. The assistant never drafts a rate
@@ -919,7 +980,10 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    to the employer, so PR 11 takes away the Conventions card, the three conventions of Switch On and `NO_CONVENTIONS`.
    The employer allows both in PAYE on the deduction record,
    "subject to appropriate documentary evidence", pension "limited to the actual amount deducted and remitted to an
-   approved Pension Fund Administrator" (the Joint Revenue Board's Guidelines 2026, paras 7.3, 8.1 and 8.3).
+   approved Pension Fund Administrator" (the Joint Revenue Board's Guidelines 2026, paras 7.3, 8.1 and 8.3). **As built in
+   PR 11:** `computeStatutory` takes no convention and always takes employee pension and NHF, as deducted, off the month's
+   taxable pay; the Conventions card and form, the Switch On form's conventions, `PayrollSettings`' and
+   `PayrollSettingsChange`'s three fields and `NO_CONVENTIONS` are gone; the columns stay, unread.
 15. **The relief, as the Nigeria Tax Act 2025 has it** (§13.3 item 2, answered by PR 9). The `relief` item as
    built (a flat amount plus a percentage of gross) is the shape of the old Consolidated Relief Allowance, which has no
    legal source from 1 January 2026: the Act repeals the Personal Income Tax Act (s.196(g)) and grants no relief computed
@@ -934,7 +998,12 @@ month's rates). The function is `computeStatutory({ gross, basic, pensionable, r
    builds rent relief that way: a person's declared rent for the year with its evidence document, the year's relief
    (20% of it, at most ₦500,000, both entered as a version with their source) taken through the cumulative reliefs of the
    year to date (rule 11). Operations & People enter the 20% and the cap with their source when MyCity starts statutory
-   payroll (§13.1 item 38).
+   payroll (§13.1 item 38). **As built in PR 11** (§13.1 item 41): `relief` is retired (not an item of the contract, so a
+   save naming it is refused; its rows stay in the table, never listed or computed); `rent_relief` is a version of its rate
+   and its cap (`flat_amount`) with their source; each person's declaration for a year is on People · Employees' Tax and
+   Pension tab (`employee_rent_declaration`, the organisation module's `employee.rent.js`), its rent pro-rated to the year
+   by the months it covers (`year_rent`); the year's relief is the rate of that rent, at most the cap, and Compute takes
+   month/12 of it to date. With no declaration, or no rent relief in force, there is no relief.
 
 ### 6.13 Money, privacy and dates
 
@@ -976,13 +1045,47 @@ Earnings 458,000.00; deductions 95,423.07 (3,500.00 + 17,307.69 + 34,615.38 + 15
 18 and 25): Monthly Pay ₦450,000.00 × 16 / 26 = ₦276,923.08. Allocating ₦10,000.00 over three months gives
 3,333.34, 3,333.33, 3,333.33. The tests assert these to the kobo, and that Compute twice gives the same lines.
 
+**The advanced example (PR 11), on TEST FIGURES.** The same person in an advanced run in October, month 10 of the year:
+Monthly Pay ₦450,000.00 with no split (so all of it is pensionable), NHF chosen, paid the same since January (their year
+to date 9 × 418,500.00 = ₦3,766,500.00 taxable and 9 × 58,700.00 = ₦528,300.00 PAYE), and ₦1,200,000.00 of rent declared
+for 2026. The figures are `statutory.test.js`'s own, invented so each amount can be worked by hand: a year's bands of 0%
+to 600,000.00, 10% to 2,400,000.00 and 20% above; pension 5% from the person and 7% from MyCity; NHF 2%; ITF and NSITF
+0.5%; rent relief 10% of the year's rent, at most 300,000.00; a minimum wage of 50,000.00 a month. **None of them is
+Nigerian law** (§6.16 has the law's), none is in any seed, and their source is a TEST SOURCE, labelled so.
+
+| Line | Code | Working | Base | Amount |
+|---|---|---|---|---|
+| Pension | `pension_employee` | 5% of the pensionable pay | 450,000.00 | 22,500.00 |
+| NHF | `nhf` | 2% of gross, the person chose it | 450,000.00 | 9,000.00 |
+| PAYE | `paye` | cumulative, below | 418,500.00 | 38,700.00 |
+| Employer Pension | `pension_employer` | 7%, out of the net | 450,000.00 | 31,500.00 |
+| ITF | `itf` | 0.5% of the month's gross, out of the net | 450,000.00 | 2,250.00 |
+| NSITF | `nsitf` | 0.5% of the month's gross, out of the net | 450,000.00 | 2,250.00 |
+
+PAYE: the month's taxable pay is 450,000.00 less 22,500.00 and 9,000.00, **418,500.00**, which the payslip keeps; to date
+3,766,500.00 + 418,500.00 = 4,185,000.00. The year's rent relief is 10% of 1,200,000.00, 120,000.00 (under the cap), ×
+10/12 = 100,000.00 to date, so the cumulative chargeable pay is 4,085,000.00. The bands × 10/12 are 0% to 500,000.00,
+10% to 2,000,000.00 (150,000.00) and 20% of the 2,085,000.00 above (417,000.00): 567,000.00 to date, less the 528,300.00
+deducted, **PAYE ₦38,700.00**. With no rent declared it is the steady 58,700.00: the declaration in October catches up
+the relief to date at once.
+
+The other cases the tests assert to the kobo, on the same figures: a steady earner pays 58,700.00 every month and the
+year's deductions are 704,400.00, the tax on the year's 5,022,000.00 (NTAA s.51(7)); a joiner in October with no Prior
+Pay pays nothing in October (418,500.00 is inside the scaled 500,000.00), 28,700.00 in November and 36,850.00 in
+December, the year's tax on 1,255,500.00 (65,550.00); the October person paid 60,000.00 in November is owed back
+15,840.00, a **PAYE Refund** earning line (their cumulative tax falls to 551,160.00 against 567,000.00 deducted); at the
+wage (50,000.00) no PAYE and NHF due, below it neither; a person who did not choose NHF has 427,500.00 taxable. With
+the split Basic 250,000.00, Housing 150,000.00 and Transport 50,000.00 (Transport not marked pensionable), pension's base
+is still 450,000.00 (s.120), and the net is 450,000.00 less 90,200.00, **₦359,800.00**, MyCity's 36,000.00 outside it.
+
 ### 6.15 Problems a run reports
 
 | Code | Severity | Raised when | Fix |
 |---|---|---|---|
 | `NO_SALARY` | Blocking | A person in the run has no `gross_monthly` | Set the pay, or exclude them |
 | `NEGATIVE_NET` | Blocking | A payslip's net is below zero | Spread a deduction, add an adjustment, exclude |
-| `NO_RATES` | Blocking | Advanced mode and a needed item has no rate in force | Enter the rate on Configurations |
+| `NO_RATES` | Blocking | Advanced mode and Compute found a figure missing: no PAYE table, no minimum wage beside PAYE or NHF, or a version on a base its item no longer allows | Enter them on Configurations |
+| `EARLIER_RUN_OPEN` | Blocking | Advanced mode and a run of an earlier month of the same year is still a Draft or Computed one | Send them for approval first |
 | `OVERTIME_WAITING` | Warning | Pending overtime items exist for the period | Ask the line manager to decide them |
 | `NO_BANK` | Warning, or Blocking with Bank Details Required on | A person has no bank name or account number | Add them on People · Employees |
 | `CONTRACT_ENDED` | Warning | An active person's contract ended before the period's last day | Check the person, exclude if needed |
@@ -991,10 +1094,14 @@ Earnings 458,000.00; deductions 95,423.07 (3,500.00 + 17,307.69 + 34,615.38 + 15
 
 Submit refuses while any Blocking problem stands (422 `RUN_HAS_PROBLEMS`); warnings never block. A problem is about one person, and
 Overtime Waiting and Fine Waiting say how many; a run reports problems while it is a Draft or Computed one, and none once it is
-Submitted. An advanced run reports No Rates Set, blocking, when its Compute found no PAYE table in force on the month's last day
-or a convention unset (its snapshot's `statutory_missing`, §6.12 rule 10): the engine never defaults one (§6.12 rule 3), so
-Submit refuses it rather than approve a run with PAYE missing. No Pay Split is a Monthly Pay line on an advanced run's payslip
-that is not a component of the person's split (§6.11 rule 6).
+Submitted. An advanced run reports "Statutory figures are missing", blocking, when its Compute found no PAYE table in
+force on the month's last day, no minimum wage while PAYE or NHF is in force, or a version on a base its item no longer
+allows (its snapshot's `statutory_missing`, §6.12 rule 10): the engine never defaults one (§6.12 rule 3), so Submit
+refuses it rather than approve a run with PAYE missing. A run computed before PR 11 kept `conventions` among them. An
+advanced run also waits for every earlier run of its year to be sent for approval ("An earlier run this year is still
+open"): its PAYE reads the tax those runs deducted, and a month still open would be counted in neither (§6.12 rule 9;
+§13.2 item 39). No Pay Split is a Monthly Pay line on an advanced run's payslip that is not a component of the person's
+split (§6.11 rule 6).
 
 ### 6.16 Legal sources (the statutory register)
 
@@ -1006,23 +1113,24 @@ has sources"). **MyCity has no accountant and does not apply statutory deduction
 and the document the second table names (PR 10's Source fields); a figure marked Unverified or No Legal Source is never
 entered as if it were law. **Confirmed** means a primary text read on that day says so; **Unverified** says what is
 missing; **No Legal Source** says why there is none. "Reported" marks what secondary summaries say, recorded only so the
-next reader knows what to look for; it is never a citation.
+next reader knows what to look for; it is never a citation. **Built** says what the engine does with the row since PR 11
+(12/11/2026): every line it can produce traces to a row here.
 
-| Item | Status | Instrument and section | Figure | Base | Threshold | In force from | Monthly? |
-|---|---|---|---|---|---|---|---|
-| PAYE bands (`paye`) | Confirmed | Nigeria Tax Act, 2025 (No. 7 of 2025), s.58 and the Fourth Schedule, "Individuals' Income Tax Rates" (gazette p. A538; p. A540 of the House's certified copy) | A year's bands of chargeable income: the first ₦800,000 at 0%, the next ₦2,200,000 at 15%, the next ₦9,000,000 at 18%, the next ₦13,000,000 at 21%, the next ₦25,000,000 at 23%, above ₦50,000,000 at 25%. As Set Bands takes them: 0 to 800,000 at 0; 800,000 to 3,000,000 at 15; 3,000,000 to 12,000,000 at 18; 12,000,000 to 25,000,000 at 21; 25,000,000 to 50,000,000 at 23; 50,000,000 with no limit at 25 | Chargeable income: total income (s.28, employment income among it) less the eligible deductions of s.30; the Schedule applies "after the relief allowance and exemptions" of s.30(1) | None, except that s.58 does not charge an individual earning the minimum wage (the minimum-wage row) | 1 January 2026 (the Act's commencement note; s.203) | No: the bands are a year's ("in respect of each year of assessment", s.58; the year of assessment is 1 January to 31 December, s.202). Deducted monthly: the next row |
-| PAYE, the monthly deduction (`paye_basis`) | Confirmed for the method; the band reading decided by JBS Praxis (§13.1 item 39) | Nigeria Tax Administration Act, 2025 (No. 5 of 2025), s.51(6), (7) and (9); the Operation of Pay-As-You-Earn (PAYE) Regulations (S.I. 18 of 2002), regs 3, 4 and 5, kept in force by the Nigeria Tax Act, 2025, s.199(b); the Joint Revenue Board's Personal Income Tax Guidelines, 2026, paras 7 and 8 | The employer deducts the tax from every payment of emoluments (s.51(6)) so that the year's deductions equal the year's tax (s.51(7)), and does it **cumulatively**: before each payment it works out the year-to-date emoluments, the year-to-date reliefs and eligible deductions, the cumulative taxable emoluments and "the corresponding cumulative tax", and deducts the difference from what it has already deducted (Regulations reg 3 and 4(1); Guidelines paras 7.5 to 7.7: "the tax, if any, deducted or repaid on making the payment"). "Where the cumulative tax is less than the previous cumulative tax, the employer shall refund the difference to the employee" (reg 4(2)). A joiner's year-to-date figures carry over from the previous employer's leaving certificate (reg 4(3), reg 5(2)(b)). Neither text says whether the cumulative tax applies the year's bands in full to the pay to date or the bands scaled to the months elapsed; **JBS Praxis decided on 12/11/2026 that they are scaled to the months elapsed in the calendar year** (§13.1 item 39): month m of 12 applies m/12 of each band to the cumulative taxable pay. No legal text names that reading; it meets s.51(7), a joiner's PAYE landing on the year's tax | Emoluments: "remunerations including all allowances, salaries, wages, perquisites, bonuses, and other forms of compensation" (Guidelines para 1); bonuses, overtime and commission are taxed when paid (para 13) | None | The Regulations since 1 January 2002; the Administration Act from 26 June 2025; the Guidelines dated 24 February 2026 | Yes, from every month's pay, on the year to date. The engine's `annualised` reading (the month × 12, the bands, ÷ 12) is not the prescribed method, and the `monthly` reading (bands entered as monthly amounts) has no source (§6.12 rule 11) |
-| PAYE, remittance and returns | Confirmed | Operation of PAYE Regulations 2002, reg 7(1) and reg 10; Deduction of Tax at Source (Withholding) Regulations, 2024 (S.I. No. 34 of 2024), reg 7(1)(b)(i); the Joint Revenue Board's Guidelines, 2026, paras 6.1, 12.1, 12.2 and 25; Nigeria Tax Administration Act, 2025, s.107(1), s.105, s.14 | PAYE is remitted "not later than the 10th day of the month following the deduction" (Guidelines para 12.2; "within ten days of the end of every month", Regulations reg 7(1) and Guidelines para 6.1; the same for PAYE paid to a State Internal Revenue Service, Withholding Regulations reg 7(1)(b)(i)), to the relevant tax authority, which for an employee resident in a State is that State's Internal Revenue Service (Guidelines para 25). A deduction not remitted by the 21st of the next month costs the amount, a penalty of 10% a year and interest at the Central Bank's monetary policy rate (NTAA s.107(1)); not deducting costs 40% (s.105). The employer files a return of every employee's emoluments, deductions and tax by 31 January for the year before (s.14(1) and (2); Guidelines para 12.1), and the employee files their own (s.14(3); by 31 March, Guidelines para 11.1) | n/a | n/a | As each instrument | The remittance is monthly, by the 10th; the return yearly |
-| Pension and NHF reduce taxable pay (`pension_reduces_taxable`, `nhf_reduces_taxable`) | Confirmed | Nigeria Tax Act, 2025, s.30(1) and (2)(a)(i) and (iii); s.31; s.32; the Joint Revenue Board's Guidelines, 2026, paras 7.3 and 8 | The individual's contributions under the National Housing Fund ((i)) and under the Pension Reform Act ((iii)) are eligible deductions: chargeable income is total income less them (and less National Health Insurance Scheme contributions, (ii), interest on a loan for an owner-occupied house, (iv), and life assurance premiums, (v), none of which payroll deducts). The employer records each contribution on the deduction record (Guidelines para 7.3) and they apply "subject to appropriate documentary evidence", NHF "limited to the actual amount contributed" and pension "limited to the actual amount deducted and remitted to an approved Pension Fund Administrator" (paras 8.1 and 8.3) | The contributions as actually made | None | 1 January 2026 | Yes: each month's contribution comes off that month's taxable pay. Both are law, not a convention (§6.12 rule 14) |
-| PAYE, the minimum-wage exemption (no item yet) | Confirmed | Nigeria Tax Act, 2025, s.58; s.163(1)(t) (s.162(1)(t) in the House's certified copy); "National Minimum Wage" in s.202; the Joint Revenue Board's Guidelines, 2026, the exempt employee's return; the National Minimum Wage (Amendment) Bill, 2024, clause 2 (new s.3(1)); the National Salaries, Incomes and Wages Commission's circulars SWC.04/T/140 (23 September 2024) and SWC/S/04/S.542/III/461 (27 September 2024) | The employment income of a person whose gross income from that employment is the national minimum wage or less is exempt (s.163(1)(t)), and s.58 charges no individual earning the minimum wage. The wage is "the extant minimum wage prescribed by the National Minimum Wage (Amendment) Act 2024" (s.202): **₦70,000 a month**, as the Board's return for an exempt employee asks ("Do you earn more than minimum wage of N70,000") and as the Bill set it ("not less than N70,000.00 per month"). The wage commission's circulars record "the enactment of the National Minimum Wage (Amendment) Act 2024" and apply it "with effect from the 29th July 2024". The Act's own text is not published anywhere this research could reach | Gross income from the employment | At or below ₦70,000 a month | The Act from 29 July 2024; the exemption from 1 January 2026 | Monthly: the month's gross against the monthly wage |
-| Consolidated Relief Allowance (`relief` as built) | No Legal Source from 1 January 2026 | Nigeria Tax Act, 2025, s.196(g) (s.195(g) in the House's certified copy); s.30 | None. The Act repeals the Personal Income Tax Act, Cap P8 LFN 2004, from its commencement (s.196(g)), and grants no relief computed on pay: the whole text has no consolidated relief allowance, and the only reliefs it applies before the Fourth Schedule are the eligible deductions of s.30 | n/a | n/a | Repealed 1 January 2026 | n/a. The item's shape (a flat amount plus a percentage of gross) leaves the engine in PR 11 (§6.12 rule 15) |
-| Rent relief (no item yet) | Confirmed | Nigeria Tax Act, 2025, s.30(2)(a)(vi), s.31, s.32(1); the Joint Revenue Board's Guidelines, 2026, paras 7.4 and 9 | 20% of the annual rent the individual paid, at most ₦500,000, "whichever is lower" (s.30(2)(a)(vi); para 9.1). **The employer gives it in PAYE:** its deduction record carries "rent relief with appropriate information or evidence of payment by eligible employees" (para 7.4). The rent is the year's own: rent paid in 2026 counts for 2026 (para 9.4), and rent covering more than one year is pro-rated to it (para 9.5; ₦2,000,000 for 24 months gives ₦1,000,000 for the year and a relief of ₦200,000); in a shared tenancy each tenant claims on their own portion, up to ₦500,000 (para 9.3) | The rent the individual paid for the year, never their pay | The individual declares "the actual rent paid and other prescribed information" (para 9.2) and gives at least the legal tenant's name, the actual rent paid and the period covered, the landlord's full name with one of a mobile number, Tax ID or NIN, and the property's address (para 9.6); the tax authority may ask for evidence and refuse without it (s.32(1)) | 1 January 2026 | A year's amount, given in PAYE through the cumulative reliefs of the year to date (para 7.5) |
-| Employee pension (`pension_employee`) | Confirmed | Pension Reform Act, 2014 (No. 4 of 2014), s.4(1)(b), s.120 ("monthly emoluments", "employee", "employer"), s.2(2) and (3), s.11(3), s.10(1); PenCom's own statement of who the Act covers (its Framework for Micro Pension Plan, 2018) | "A minimum of eight per cent by the employee" of monthly emoluments (s.4(1)(b)); the rates may be raised by agreement, and the Commission told (s.4(2)); the employer deducts it at source and remits it with its own share "not later than 7 working days from the day the employee is paid his salary" (s.11(3)); contributions are tax-deductible (s.10(1); the same in NTA s.30(2)(a)(iii)) | "Monthly emoluments": total emoluments as the employee's contract of employment defines them, "but shall not be less than a total sum of basic salary, housing allowance and transport allowance" (s.120) | **Three or more employees.** PenCom states that the Act "applies to all employees in ... the Private Sector Organizations in which there are three or more employees", and that employees of organisations "with less than three employees" and the self-employed may join under s.2(3). That is the Act's own definition of "employer" (s.120: "any organization or business that employs three persons or more"); s.2(2)'s "15 or more employees" is an inconsistency in the text that the regulator does not apply | 2014 (the copy's assent date is not legible; reported as 1 July 2014) | Yes: a monthly deduction, remitted within 7 working days of pay day |
-| Employer pension (`pension_employer`) | Confirmed | Pension Reform Act, 2014, s.4(1)(a), (4)(b) and (5) | "A minimum of ten per cent by the employer" of monthly emoluments (s.4(1)(a)); an employer may bear the whole, at not less than 20% (s.4(4)(b)). Beside the rates, every employer keeps group life insurance for each employee of at least three times their annual total emolument (s.4(5)), an employer's cost outside payroll | As above (s.120) | As above: three or more employees | As above | Yes: remitted with the employee's share within 7 working days of pay day (s.11(3)) |
-| NHF (`nhf`) | Confirmed | National Housing Fund Act, Cap N45 LFN 2004, s.4 as substituted by the Business Facilitation (Miscellaneous Provisions) Act, 2022 (No. 5 of 2022), s.45; s.9(1) as amended by its s.46; s.9(2); s.26; FMBN's own statement of the contribution | 2.5% of monthly income. An employee earning the national minimum wage and above in the public sector "shall contribute", one in the private sector "may contribute" (s.4(1)(a) and (b)); a self-employed person earning the equivalent "shall contribute" (s.4(2)); interest of 2% a year, or as the Bank determines, is paid on contributions (s.4(3)). The employer deducts it (s.9(1)) and remits it to the Bank "within one month of the making of the deduction" (s.9(2)) | **The month's gross pay.** The 2023 s.4 says "monthly income", and FMBN, the Bank that runs the Fund, states the contribution as "The 2.5% of the monthly gross salary" (its NHF questions and answers) and "2.5% of monthly income" (its legal framework page). "Basic monthly salary" (the old s.4) and "basic monthly salaries" (s.26) are the original Act's words, which FMBN's own copy of Cap N45 still prints as before 2023 | Earning the national minimum wage and above | 8 February 2023 (the 2022 Act's commencement note) | Yes. **For MyCity, a private-sector employer, NHF is voluntary:** it is a deduction only for a person who chooses to contribute |
-| ITF (`itf`) | Confirmed | Industrial Training Fund Act, Cap I9 LFN 2004, s.6 as substituted by the Business Facilitation (Miscellaneous Provisions) Act, 2022, s.41; the definitions in s.16 as inserted by the Industrial Training Fund (Amendment) Act, 2011 (No. 19 of 2011), s.14 | 1% of annual payroll, an employer contribution, never taken from pay (s.6(1)); the Minister may vary the rate by order in the Federal Government Gazette with the Federal Executive Council's approval (s.6(3)) | "Payroll": the sum total of all basic pay, allowances and other entitlements payable within and outside Nigeria to any employee (s.16) | An employer having 25 or more employees in its establishment and not operating within a free trade zone (s.6(1)). "Employees" are all persons employed for salary, wages or other consideration, full time or part time, including temporary employees who work 30 days or more (s.16). The 2011 test (5 or more employees, or fewer with a turnover of ₦50 million a year) was replaced on 8 February 2023 | 8 February 2023 for the threshold; the rate and the definitions since 3 June 2011 | No: a year's contribution for each calendar year, due by the "prescribed date", not later than 1 April of the following year (s.16). Computed monthly here as the month's share, 1% of the month's payroll (§6.12 rule 11) |
-| NSITF (`nsitf`) | Confirmed | Employee's Compensation Act, 2010 (No. 13 of 2010), s.33(1) and (2), s.35, s.73; NSITF's own statement of the rate (its site's FAQ) | The Act: "within the first 2 years of the commencement of this Act", a minimum monthly employer contribution of 1.0% of the total monthly payroll (s.33(1)), after which the Board may prescribe risk classes and different rates by industry (s.33(2)). NSITF states the rate today: "Every employer is required to make a minimum monthly contribution of 1% of the total monthly payroll into the Employees' Compensation Fund. Contributions are payable within the first two working days of each month, and the Board may adjust the rate for any industry based on its assessed occupational risk." No regulation under s.33(2) was found | Total monthly payroll; "payroll" is not defined in the Act | Every employer; an "employee" is a person employed under an oral or written contract of employment on a continuous, part-time, temporary, apprenticeship or casual basis (s.73) | 17 December 2010 | Yes, a monthly contribution (s.33(1)), payable within the first two working days of each month (NSITF); the Act's assessment is due on 1 January of its year, and the Board may take it by instalments (s.35) |
-| Withholding on a contractor's or consultant's fees (no item; outside payroll) | Confirmed | Deduction of Tax at Source (Withholding) Regulations, 2024, reg 3, reg 4(1) and (2), reg 7(1), the First Schedule; kept in force by NTA s.199(b); the Joint Revenue Board's Guidelines, 2026, para 14 | A body corporate deducts tax at source from "commission, consultancy, technical, management, and professional fees": 5% for a resident recipient, 10% for a non-resident; 2% for other services; twice the rate where the recipient has no Tax Identification Number (reg 3(c)). The Guidelines apply it to every "non-employee (including contractors, consultants, and suppliers of goods or services)" (para 14.1). A small company is exempt from deducting where the supplier has a valid TIN and the other conditions of reg 4(2) are met | The fee paid | Every body corporate except a small company within reg 4(2) | 1 January 2025 (reg 11(1)) | Per payment; remitted by the 21st of the next month to the federal service, or by the 30th to a State Internal Revenue Service (reg 7(1); "the last day of the month following", Guidelines para 14.2). This is not a payroll line: it bears on how MyCity pays people who are not its employees (§13.3 item 4) |
+| Item | Status | Instrument and section | Figure | Base | Threshold | In force from | Monthly? | Built |
+|---|---|---|---|---|---|---|---|---|
+| PAYE bands (`paye`) | Confirmed | Nigeria Tax Act, 2025 (No. 7 of 2025), s.58 and the Fourth Schedule, "Individuals' Income Tax Rates" (gazette p. A538; p. A540 of the House's certified copy) | A year's bands of chargeable income: the first ₦800,000 at 0%, the next ₦2,200,000 at 15%, the next ₦9,000,000 at 18%, the next ₦13,000,000 at 21%, the next ₦25,000,000 at 23%, above ₦50,000,000 at 25%. As Set Bands takes them: 0 to 800,000 at 0; 800,000 to 3,000,000 at 15; 3,000,000 to 12,000,000 at 18; 12,000,000 to 25,000,000 at 21; 25,000,000 to 50,000,000 at 23; 50,000,000 with no limit at 25 | Chargeable income: total income (s.28, employment income among it) less the eligible deductions of s.30; the Schedule applies "after the relief allowance and exemptions" of s.30(1) | None, except that s.58 does not charge an individual earning the minimum wage (the minimum-wage row) | 1 January 2026 (the Act's commencement note; s.203) | No: the bands are a year's ("in respect of each year of assessment", s.58; the year of assessment is 1 January to 31 December, s.202). Deducted monthly: the next row | PR 5 (bands as entered); PR 11 reads them as a year's, scaled by month/12 (§6.12 rule 9) |
+| PAYE, the monthly deduction (`paye_basis`) | Confirmed for the method; the band reading decided by JBS Praxis (§13.1 item 39) | Nigeria Tax Administration Act, 2025 (No. 5 of 2025), s.51(6), (7) and (9); the Operation of Pay-As-You-Earn (PAYE) Regulations (S.I. 18 of 2002), regs 3, 4 and 5, kept in force by the Nigeria Tax Act, 2025, s.199(b); the Joint Revenue Board's Personal Income Tax Guidelines, 2026, paras 7 and 8 | The employer deducts the tax from every payment of emoluments (s.51(6)) so that the year's deductions equal the year's tax (s.51(7)), and does it **cumulatively**: before each payment it works out the year-to-date emoluments, the year-to-date reliefs and eligible deductions, the cumulative taxable emoluments and "the corresponding cumulative tax", and deducts the difference from what it has already deducted (Regulations reg 3 and 4(1); Guidelines paras 7.5 to 7.7: "the tax, if any, deducted or repaid on making the payment"). "Where the cumulative tax is less than the previous cumulative tax, the employer shall refund the difference to the employee" (reg 4(2)). A joiner's year-to-date figures carry over from the previous employer's leaving certificate (reg 4(3), reg 5(2)(b)). Neither text says whether the cumulative tax applies the year's bands in full to the pay to date or the bands scaled to the months elapsed; **JBS Praxis decided on 12/11/2026 that they are scaled to the months elapsed in the calendar year** (§13.1 item 39): month m of 12 applies m/12 of each band to the cumulative taxable pay. No legal text names that reading; it meets s.51(7), a joiner's PAYE landing on the year's tax | Emoluments: "remunerations including all allowances, salaries, wages, perquisites, bonuses, and other forms of compensation" (Guidelines para 1); bonuses, overtime and commission are taxed when paid (para 13) | None | The Regulations since 1 January 2002; the Administration Act from 26 June 2025; the Guidelines dated 24 February 2026 | Yes, from every month's pay, on the year to date. The engine's `annualised` reading (the month × 12, the bands, ÷ 12) is not the prescribed method, and the `monthly` reading (bands entered as monthly amounts) has no source (§6.12 rule 11) | PR 11: cumulative on the year to date with the bands × month/12, a PAYE Refund line when it falls, Prior Pay for a joiner's certificate (§6.12 rule 9; §13.1 items 42, 43); `paye_basis` unread |
+| PAYE, remittance and returns | Confirmed | Operation of PAYE Regulations 2002, reg 7(1) and reg 10; Deduction of Tax at Source (Withholding) Regulations, 2024 (S.I. No. 34 of 2024), reg 7(1)(b)(i); the Joint Revenue Board's Guidelines, 2026, paras 6.1, 12.1, 12.2 and 25; Nigeria Tax Administration Act, 2025, s.107(1), s.105, s.14 | PAYE is remitted "not later than the 10th day of the month following the deduction" (Guidelines para 12.2; "within ten days of the end of every month", Regulations reg 7(1) and Guidelines para 6.1; the same for PAYE paid to a State Internal Revenue Service, Withholding Regulations reg 7(1)(b)(i)), to the relevant tax authority, which for an employee resident in a State is that State's Internal Revenue Service (Guidelines para 25). A deduction not remitted by the 21st of the next month costs the amount, a penalty of 10% a year and interest at the Central Bank's monetary policy rate (NTAA s.107(1)); not deducting costs 40% (s.105). The employer files a return of every employee's emoluments, deductions and tax by 31 January for the year before (s.14(1) and (2); Guidelines para 12.1), and the employee files their own (s.14(3); by 31 March, Guidelines para 11.1) | n/a | n/a | As each instrument | The remittance is monthly, by the 10th; the return yearly | PR 11: the statutory report states the remittance and groups PAYE by State of Residence (§6.12 rule 6); the yearly return is not built |
+| Pension and NHF reduce taxable pay (`pension_reduces_taxable`, `nhf_reduces_taxable`) | Confirmed | Nigeria Tax Act, 2025, s.30(1) and (2)(a)(i) and (iii); s.31; s.32; the Joint Revenue Board's Guidelines, 2026, paras 7.3 and 8 | The individual's contributions under the National Housing Fund ((i)) and under the Pension Reform Act ((iii)) are eligible deductions: chargeable income is total income less them (and less National Health Insurance Scheme contributions, (ii), interest on a loan for an owner-occupied house, (iv), and life assurance premiums, (v), none of which payroll deducts). The employer records each contribution on the deduction record (Guidelines para 7.3) and they apply "subject to appropriate documentary evidence", NHF "limited to the actual amount contributed" and pension "limited to the actual amount deducted and remitted to an approved Pension Fund Administrator" (paras 8.1 and 8.3) | The contributions as actually made | None | 1 January 2026 | Yes: each month's contribution comes off that month's taxable pay. Both are law, not a convention (§6.12 rule 14) | PR 11: in the engine, always, as deducted; the conventions gone (§6.12 rule 14) |
+| PAYE, the minimum-wage exemption (no item yet) | Confirmed | Nigeria Tax Act, 2025, s.58; s.163(1)(t) (s.162(1)(t) in the House's certified copy); "National Minimum Wage" in s.202; the Joint Revenue Board's Guidelines, 2026, the exempt employee's return; the National Minimum Wage (Amendment) Bill, 2024, clause 2 (new s.3(1)); the National Salaries, Incomes and Wages Commission's circulars SWC.04/T/140 (23 September 2024) and SWC/S/04/S.542/III/461 (27 September 2024) | The employment income of a person whose gross income from that employment is the national minimum wage or less is exempt (s.163(1)(t)), and s.58 charges no individual earning the minimum wage. The wage is "the extant minimum wage prescribed by the National Minimum Wage (Amendment) Act 2024" (s.202): **₦70,000 a month**, as the Board's return for an exempt employee asks ("Do you earn more than minimum wage of N70,000") and as the Bill set it ("not less than N70,000.00 per month"). The wage commission's circulars record "the enactment of the National Minimum Wage (Amendment) Act 2024" and apply it "with effect from the 29th July 2024". The Act's own text is not published anywhere this research could reach | Gross income from the employment | At or below ₦70,000 a month | The Act from 29 July 2024; the exemption from 1 January 2026 | Monthly: the month's gross against the monthly wage | PR 11: `minimum_wage`, a month's amount with its source; no PAYE at or below it, on the rate of pay (§13.1 item 45) |
+| Consolidated Relief Allowance (`relief` as built) | No Legal Source from 1 January 2026 | Nigeria Tax Act, 2025, s.196(g) (s.195(g) in the House's certified copy); s.30 | None. The Act repeals the Personal Income Tax Act, Cap P8 LFN 2004, from its commencement (s.196(g)), and grants no relief computed on pay: the whole text has no consolidated relief allowance, and the only reliefs it applies before the Fourth Schedule are the eligible deductions of s.30 | n/a | n/a | Repealed 1 January 2026 | n/a. The item's shape (a flat amount plus a percentage of gross) leaves the engine in PR 11 (§6.12 rule 15) | PR 11: retired, its rows kept and never listed or computed (§13.1 item 41) |
+| Rent relief (no item yet) | Confirmed | Nigeria Tax Act, 2025, s.30(2)(a)(vi), s.31, s.32(1); the Joint Revenue Board's Guidelines, 2026, paras 7.4 and 9 | 20% of the annual rent the individual paid, at most ₦500,000, "whichever is lower" (s.30(2)(a)(vi); para 9.1). **The employer gives it in PAYE:** its deduction record carries "rent relief with appropriate information or evidence of payment by eligible employees" (para 7.4). The rent is the year's own: rent paid in 2026 counts for 2026 (para 9.4), and rent covering more than one year is pro-rated to it (para 9.5; ₦2,000,000 for 24 months gives ₦1,000,000 for the year and a relief of ₦200,000); in a shared tenancy each tenant claims on their own portion, up to ₦500,000 (para 9.3) | The rent the individual paid for the year, never their pay | The individual declares "the actual rent paid and other prescribed information" (para 9.2) and gives at least the legal tenant's name, the actual rent paid and the period covered, the landlord's full name with one of a mobile number, Tax ID or NIN, and the property's address (para 9.6); the tax authority may ask for evidence and refuse without it (s.32(1)) | 1 January 2026 | A year's amount, given in PAYE through the cumulative reliefs of the year to date (para 7.5) | PR 11: `rent_relief`, its rate and cap with their source; each person's declaration and evidence on People · Employees, pro-rated to the year, given to date × month/12 (§6.12 rule 15) |
+| Employee pension (`pension_employee`) | Confirmed | Pension Reform Act, 2014 (No. 4 of 2014), s.4(1)(b), s.120 ("monthly emoluments", "employee", "employer"), s.2(2) and (3), s.11(3), s.10(1); PenCom's own statement of who the Act covers (its Framework for Micro Pension Plan, 2018) | "A minimum of eight per cent by the employee" of monthly emoluments (s.4(1)(b)); the rates may be raised by agreement, and the Commission told (s.4(2)); the employer deducts it at source and remits it with its own share "not later than 7 working days from the day the employee is paid his salary" (s.11(3)); contributions are tax-deductible (s.10(1); the same in NTA s.30(2)(a)(iii)) | "Monthly emoluments": total emoluments as the employee's contract of employment defines them, "but shall not be less than a total sum of basic salary, housing allowance and transport allowance" (s.120) | **Three or more employees.** PenCom states that the Act "applies to all employees in ... the Private Sector Organizations in which there are three or more employees", and that employees of organisations "with less than three employees" and the self-employed may join under s.2(3). That is the Act's own definition of "employer" (s.120: "any organization or business that employs three persons or more"); s.2(2)'s "15 or more employees" is an inconsistency in the text that the regulator does not apply | 2014 (the copy's assent date is not legible; reported as 1 July 2014) | Yes: a monthly deduction, remitted within 7 working days of pay day | PR 5; PR 11 keeps the base at least basic, housing and transport. The three-employee threshold is not computed: entered only while MyCity is liable (§13.2 item 38) |
+| Employer pension (`pension_employer`) | Confirmed | Pension Reform Act, 2014, s.4(1)(a), (4)(b) and (5) | "A minimum of ten per cent by the employer" of monthly emoluments (s.4(1)(a)); an employer may bear the whole, at not less than 20% (s.4(4)(b)). Beside the rates, every employer keeps group life insurance for each employee of at least three times their annual total emolument (s.4(5)), an employer's cost outside payroll | As above (s.120) | As above: three or more employees | As above | Yes: remitted with the employee's share within 7 working days of pay day (s.11(3)) | As employee pension; group life insurance is outside payroll |
+| NHF (`nhf`) | Confirmed | National Housing Fund Act, Cap N45 LFN 2004, s.4 as substituted by the Business Facilitation (Miscellaneous Provisions) Act, 2022 (No. 5 of 2022), s.45; s.9(1) as amended by its s.46; s.9(2); s.26; FMBN's own statement of the contribution | 2.5% of monthly income. An employee earning the national minimum wage and above in the public sector "shall contribute", one in the private sector "may contribute" (s.4(1)(a) and (b)); a self-employed person earning the equivalent "shall contribute" (s.4(2)); interest of 2% a year, or as the Bank determines, is paid on contributions (s.4(3)). The employer deducts it (s.9(1)) and remits it to the Bank "within one month of the making of the deduction" (s.9(2)) | **The month's gross pay.** The 2023 s.4 says "monthly income", and FMBN, the Bank that runs the Fund, states the contribution as "The 2.5% of the monthly gross salary" (its NHF questions and answers) and "2.5% of monthly income" (its legal framework page). "Basic monthly salary" (the old s.4) and "basic monthly salaries" (s.26) are the original Act's words, which FMBN's own copy of Cap N45 still prints as before 2023 | Earning the national minimum wage and above | 8 February 2023 (the 2022 Act's commencement note) | Yes. **For MyCity, a private-sector employer, NHF is voluntary:** it is a deduction only for a person who chooses to contribute | PR 11: on gross, only for a person with Contributes to NHF, at or above the minimum wage (§13.1 item 44) |
+| ITF (`itf`) | Confirmed | Industrial Training Fund Act, Cap I9 LFN 2004, s.6 as substituted by the Business Facilitation (Miscellaneous Provisions) Act, 2022, s.41; the definitions in s.16 as inserted by the Industrial Training Fund (Amendment) Act, 2011 (No. 19 of 2011), s.14 | 1% of annual payroll, an employer contribution, never taken from pay (s.6(1)); the Minister may vary the rate by order in the Federal Government Gazette with the Federal Executive Council's approval (s.6(3)) | "Payroll": the sum total of all basic pay, allowances and other entitlements payable within and outside Nigeria to any employee (s.16) | An employer having 25 or more employees in its establishment and not operating within a free trade zone (s.6(1)). "Employees" are all persons employed for salary, wages or other consideration, full time or part time, including temporary employees who work 30 days or more (s.16). The 2011 test (5 or more employees, or fewer with a turnover of ₦50 million a year) was replaced on 8 February 2023 | 8 February 2023 for the threshold; the rate and the definitions since 3 June 2011 | No: a year's contribution for each calendar year, due by the "prescribed date", not later than 1 April of the following year (s.16). Computed monthly here as the month's share, 1% of the month's payroll (§6.12 rule 11) | PR 5 as the month's share; PR 11's report says by 1 April. The 25-employee threshold is not computed (§13.2 item 38) |
+| NSITF (`nsitf`) | Confirmed | Employee's Compensation Act, 2010 (No. 13 of 2010), s.33(1) and (2), s.35, s.73; NSITF's own statement of the rate (its site's FAQ) | The Act: "within the first 2 years of the commencement of this Act", a minimum monthly employer contribution of 1.0% of the total monthly payroll (s.33(1)), after which the Board may prescribe risk classes and different rates by industry (s.33(2)). NSITF states the rate today: "Every employer is required to make a minimum monthly contribution of 1% of the total monthly payroll into the Employees' Compensation Fund. Contributions are payable within the first two working days of each month, and the Board may adjust the rate for any industry based on its assessed occupational risk." No regulation under s.33(2) was found | Total monthly payroll; "payroll" is not defined in the Act | Every employer; an "employee" is a person employed under an oral or written contract of employment on a continuous, part-time, temporary, apprenticeship or casual basis (s.73) | 17 December 2010 | Yes, a monthly contribution (s.33(1)), payable within the first two working days of each month (NSITF); the Act's assessment is due on 1 January of its year, and the Board may take it by instalments (s.35) | PR 5; PR 11's report says the first two working days of the month |
+| Withholding on a contractor's or consultant's fees (no item; outside payroll) | Confirmed | Deduction of Tax at Source (Withholding) Regulations, 2024, reg 3, reg 4(1) and (2), reg 7(1), the First Schedule; kept in force by NTA s.199(b); the Joint Revenue Board's Guidelines, 2026, para 14 | A body corporate deducts tax at source from "commission, consultancy, technical, management, and professional fees": 5% for a resident recipient, 10% for a non-resident; 2% for other services; twice the rate where the recipient has no Tax Identification Number (reg 3(c)). The Guidelines apply it to every "non-employee (including contractors, consultants, and suppliers of goods or services)" (para 14.1). A small company is exempt from deducting where the supplier has a valid TIN and the other conditions of reg 4(2) are met | The fee paid | Every body corporate except a small company within reg 4(2) | 1 January 2025 (reg 11(1)) | Per payment; remitted by the 21st of the next month to the federal service, or by the 30th to a State Internal Revenue Service (reg 7(1); "the last day of the month following", Guidelines para 14.2). This is not a payroll line: it bears on how MyCity pays people who are not its employees (§13.3 item 4) | Not built: outside payroll (§13.3 item 4) |
 
 **Where each was read, and what MyCity uploads.** The figures above were read in these copies on the day shown. The
 last column names the document MyCity uploads with the figure when it enters it on Configurations (PR 10's Source fields
@@ -1078,6 +1186,8 @@ the period, counts and statuses, never an amount (§6.13).
 | `payroll_deduction.fine_pending` | After commit, from an outbox handler on `sanction.issued` whose payload has a `fine_amount` (`deductions.fine_waiting`); its `dedup_key` is the fine, so a retry tells once | Notifies `payroll` edit holders (scope `all`) "Fine Waiting for Payroll", the person and the query number, never the amount |
 | `payroll_setting.changed`, `statutory_rate.saved`, `salary_grade.saved`, `grade_placement.saved`, `pay_components.saved` | Configurations change | Audit; `payroll_setting.changed` is `security: true` so the access watchers are told. Each carries the item, code, person and day, never a rate's figure or an amount; nobody is told. `statutory_rate.saved` also says whether the version has a source or No Legal Source, and names its document |
 | `statutory_rate.removed`, `payroll_setting.removed` | Remove Change on a version not yet in force (PR 10) | Audit, with the version as it stood (`before`) and the version before it reopened; `payroll_setting.removed` is `security: true`, as `.changed` is. Carries the item and the day, never a figure; nobody is told |
+| `pay_to_date.saved`, `pay_to_date.removed` | Save Prior Pay or Remove Prior Pay on Configurations (PR 11) | Audit, `sensitive`: the person and the year, never a figure; the leaving certificate is claimed in the same transaction; nobody is told |
+| `employee.rent_declared`, `employee.rent_declaration_removed` (People's, `organisation.events.js`) | Declare Rent, Save Rent or Remove Rent on People · Employees (PR 11) | Audit, `sensitive`: the person and the year, never the rent; the evidence is claimed and the address saved with `places.save()` in the same transaction; nobody is told |
 | `payroll_run.statutory_report_requested` | Statutory Report was pressed on an approved advanced run | Audit; the document is reserved in the same transaction (`documents.generate`, `statutory_report`, an export kept 24 hours) and the pdf-render job renders it |
 | `document.generated` (doc type `payslip`) | A payslip PDF finishes rendering | Marks it ready for the screen; nothing else |
 | `payroll.email_payslips` (outbox handler) | Email All commits | Walks the run's published payslips not yet emailed (on a resend, not emailed since the press) whose PDF is done, 25 a pass (`pagination:batch`, a batch of work, never a list), and marks each emailed in its own transaction, which emits the `payslip.emailed` that queues its mail; a payslip whose PDF is still rendering makes the handler fail to be retried (10 s, 20 s, 40 s …) and, on the last attempt, is left unmailed for another press |
@@ -1146,13 +1256,16 @@ holds a role is decided in Settings · Users. The CEO passes every check.
 - **The person who submits cannot approve** (the engine's rule). The CEO may approve a run that includes their
   own pay, and their own payslip, fine or advance is recorded and accepted by someone else (§6.6 rule 8).
 - **Restricted fields.** `employee.salary` governs every amount of §6.13; `employee.bank` the bank on a payslip;
-  `employee.statutory` the tax and pension numbers on the report and People · Employees. A Payroll reader
-  without the salary grant sees headcounts and statuses and Restricted for money.
+  `employee.statutory` the tax and pension numbers on the report and People · Employees, and since PR 11 the NHF
+  choice, the State of Residence and the declared rent: a role that hides it gets no Tax and Pension step or tab, and
+  the rent routes refuse it (403 `FIELD_RESTRICTED`) unless the record is the person's own. A Prior Pay's figures
+  are masked as the salary is; changing one needs `payroll.configure`. A Payroll reader without the salary grant
+  sees headcounts and statuses and Restricted for money.
 - **A payslip's PDF** is a restricted document: the person who owns it reads it, anyone else needs `payroll`
   edit (HANDOFF §5 item 7), which Management does not hold.
 - **Capability `payroll.configure`** (catalogued in `src/shared/access/access.catalog.js`, seeded in `6099`, code
-  checked after the grant on `PATCH /payroll/settings`, the statutory-rate, salary-grade, placement and
-  pay-component writes): Operations & People, the Implementation Team and the CEO hold it by default. A screen
+  checked after the grant on `PATCH /payroll/settings`, the statutory-rate, salary-grade, placement,
+  pay-component and, since PR 11, Prior Pay writes): Operations & People, the Implementation Team and the CEO hold it by default. A screen
   hides the controls with `hasCapability(useMe(), "payroll.configure")`; the route still decides. Configurations
   itself shows to every `payroll` viewer, so the tab is not gated by it (no change to `app/src/shell/access.ts`
   tab filtering is needed).
@@ -1214,8 +1327,7 @@ ever wanted, the question CLAUDE.md requires ("which job does it use?", the owne
   Approve and Reject are the approvals' own card (`approvals.decide`). The forms of rates, bands, grades, placements and pay
   components carry `ai:none design:` on their controllers (PR 5), and **the advanced switch, the pay day and the bank rule
   (`PayrollSettingsChange`) are not a card** (§13.2 item 28): they are one version of the setting, saved from a date with the
-  rates in force and the accountant's three conventions in view, so the route "turn on advanced payroll" opens Configurations and
-  the person saves it there. Nothing is added to `scripts/check/ai-forms-gaps.json`. Each action key has an integration test
+  rates in force in view, so the route "turn on advanced payroll" opens Configurations and the person saves it there. Nothing is added to `scripts/check/ai-forms-gaps.json`. Each action key has an integration test
   (`tests/integration/ai-actions-payroll.test.js`, and `payroll-run.test.js` for New Run) and an evaluation case
   (`scripts/ai/eval-assistant.js`); `npm run gen:ai-catalogue` is run and its diff reviewed.
 - **What PR 4 carries.** Gate 9 holds a filled controller to an AI manifest or a written `// ai:none <reason>`, and gate 10 to a search provider: `payslips.controller.js` said `ai:none` with the reason that PR 6 writes `payslips.mine` and `payslips.list` (PR 6 wrote them and removed the line), and `payslips.search.js` answered for `payroll` readers. A payslip has no create or edit form, so gate 23 asks for no card.
@@ -1241,6 +1353,12 @@ ever wanted, the question CLAUDE.md requires ("which job does it use?", the owne
   `npm run gen:ai-catalogue` added 13 entries and changed none. The route map had no "not built yet" note left on a Payroll
   type (PR 2 to PR 5 removed them as they filled each provider). Home's Payroll In Progress card has been live since PR 2
   (`payroll.source.js`, `OWES` empty) and counts a run until it is Paid; this pull request checks it still does (§3.8).
+- **What PR 11 carries.** No new read, card, route or search type. Prior Pay's `PayToDateSave` is the statutory module's,
+  under its `ai:none design:`; People's `RentDeclarationSave` is `not_offered` with a `personal:` reason (a person's rent,
+  landlord and evidence are tax data, entered with the evidence on the record's tab); Add Employee's card still carries the
+  work record alone, its `form` reason now naming tax beside personal details, bank and pay. `npm run gen:ai-catalogue`
+  changed one entry (`employees.add`, its schema's hash) and added none. The new events name the person's record
+  (`employee`) and Configurations (`salary_structure`), which the route map already opens.
 - **AI routes** (intent to screen): "run payroll" to Payroll · Payroll Runs with `action=new`; "my payslip" to
   ESS · My Payslips; "record a salary advance" to Payroll · Deductions with `action=advance`; "turn on advanced
   payroll" to Payroll · Configurations.
@@ -1272,9 +1390,9 @@ Both tables are read by `scripts/check/guides.js`.
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | Payroll · Payroll Runs | The month (desktop subtitle); the open run's card, titled by its month (October 2026 Run): Staff in Run, Gross, Deductions, Net; the chain Draft, Computed, Submitted, Approved, Paid; Number, Waiting On (who has it now), Submitted By, Approved By, Paid On and Sent Back (the reason) as they apply; the problem line "2 blocking, 3 warnings" with Open (Run Problems: Employee, Problem, Fix, Severity, with Exclude on a person); Adjustments (Employee, Label, Kind, Amount) with Add Adjustment; Left Out (Employee, Reason) with Include; Run History (Month, Staff, Gross, Net, Approved By, Status), a row putting its run in the card; Net Payroll by Month (desktop); New Run, Compute Run, Add Adjustment, Exclude, Submit for Approval, Approve, Send Back, Reject (the approver), Mark Paid, Email All Payslips, Download All, Statutory Report (advanced), Discard | Help term on **Status** (Run History's column): what each status lets people do. On the problem line (**Blocking**): what stops Submit. On **Adjustments**: a correction to a locked month goes into the next run. On Send Back's **Reason**: it releases everything frozen. Each at most 35 words | The freeze at Submit, the recompute and `RUN_CHANGED`, rounding, the working-days divisor, one run a month: §6.8, §6.9, the chapter |
-| Payroll · Payslips | The Month select (the runs, newest first; the open run's month to start); Payslips, Gross, Deductions, Net, Visible to Staff (On approval, then Published); the month's payslips, titled Preview or Published (Employee, Gross, Deductions, Net, Status: Preview, Published, Excluded); Email All Payslips and Download All once the run is approved; a payslip opens in the modal: its lines (its PDF once rendered, Preparing while it renders), Net Pay, Download PDF (`payroll` edit) | Help term on **Preview** (the list's title): a payslip is a preview until the run is approved. On **Restricted**: the amount needs the salary grant | PDF generation, the restricted file rule, the breakdown's source: §6.10 |
+| Payroll · Payslips | The Month select (the runs, newest first; the open run's month to start); Payslips, Gross, Deductions, Net, Visible to Staff (On approval, then Published); the month's payslips, titled Preview or Published (Employee, Gross, Deductions, Net, Status: Preview, Published, Excluded); Email All Payslips and Download All once the run is approved; a payslip opens in the modal: its lines (in advanced mode a PAYE Refund among the earnings when the year's PAYE falls, PR 11), its PDF once rendered, Preparing while it renders, Net Pay, Download PDF (`payroll` edit) | Help term on **Preview** (the list's title): a payslip is a preview until the run is approved. On **Restricted**: the amount needs the salary grant | PDF generation, the restricted file rule, the breakdown's source: §6.10 |
 | Payroll · Deductions | Pending Fines, Pending Attendance, Active, Recovered This Year (each opens its list in a pop-up, the ESS rule); the status chips (Pending, Active, Settled, Waived) and the source switch (All, Attendance, Fines, Advances); the list (Employee, Reason, Source, Amount, Month, Status); a row's sheet with Accept This Month, Spread Over Months (Months, Start Month), Waive, Release, Cancel Advance, and for an attendance row Open Attendance; Record Advance (Employee, Amount, Paid On, Months, Start Month, Reason) | Help term on the **Months** field of Spread Over Months and Record Advance: how many months, the first month, equal shares. On **Pending Attendance**: waive these on People · Attendance. On **Release**: only before any share is in a run | Instalment rounding, never your own, the fine and attendance lifecycles: §6.6, queries.md §6.6 |
-| Payroll · Configurations | Payroll Options: Pay Day (30 (default) until set, Last Day of Month for 31, a change waiting with its day) with Set Pay Day (1 to 30 and Last Day of Month), the Bank Details Required switch, the Advanced Payroll row with its state (On, Off, or On or Off from a day) and its switch, and Remove Change on the card while a version of the setting waits for its day; Statutory Items (Item, Type, Rate, Base, Source: the instrument and section, or No Legal Source; Status: In Force, From or Changes a day, Not Set), a row opening Save Rate (Rate, Base, then Source, Section, Link (Optional), Document (Optional, the upload engine), Checked On, or the No Legal Source box swapping them for Reason) and, for a change not yet in force, Remove Change in its footer; PAYE Bands (Band, From, To or No Limit, Rate, Source, Status) with Set Bands (the bands and the same source fields, and Remove Change for a table not yet in force), always; when on or once it has been: Conventions (Pension Reduces Taxable Pay, NHF Reduces Taxable Pay; only those the law leaves to MyCity stay, each with its Source, in PR 11, §6.12 rule 14; PAYE Basis left the screen in PR 10) with Set Conventions, Bands by Grade, Grades (Grade, Name, Minimum, Maximum, Staff, Outside Band, Status) with Add Grade and Save Grade, Pay Components (Employee, Grade, Monthly Gross, Pay Split, Position, with the chips All, Below Minimum, Above Maximum, Not Placed) whose person opens with their grade and split, Place Person and Set Pay Components | Help term on **Advanced Payroll**: "From its date, later runs compute PAYE, pension, NHF, ITF and NSITF. Locked runs never change." On **Bank Details Required**: "When on, a person with no bank details blocks Submit." On **Pay Day**: "30 unless changed. A day past a month's end is its last day." On the PAYE Bands title: "Enter the bands as the law publishes them. Each is taken monthly." On **Source** (Statutory Items' and PAYE Bands' column): "The law a figure comes from. No Legal Source when none." On **Monthly Gross** in Set Pay Components: "The components add up to the monthly gross." Effective From and the source fields carry no help: the date fields refuse a day outside their range themselves, and a dialog's text or date input with a help term fails axe (PR 5) | Why statutory is off by default, how a run picks its mode, the rates' sources, the formula: §6.11, §6.12 |
+| Payroll · Configurations | Payroll Options: Pay Day (30 (default) until set, Last Day of Month for 31, a change waiting with its day) with Set Pay Day (1 to 30 and Last Day of Month), the Bank Details Required switch, the Advanced Payroll row with its state (On, Off, or On or Off from a day) and its switch, and Remove Change on the card while a version of the setting waits for its day; Statutory Items, the eight items (PAYE, Employee Pension, Employer Pension, NHF, ITF, NSITF, Rent Relief, Minimum Wage; Item, Type, Figure: a rate, Rent Relief's rate and cap, the Minimum Wage's monthly amount; Base, Source: the instrument and section, or No Legal Source; Status: In Force, From or Changes a day, Not Set), a row opening its form (Rate, or Rate and Cap a Year, or Monthly Amount; Base where the item allows two; then Source, Section, Link (Optional), Document (Optional, the upload engine), Checked On, or the No Legal Source box swapping them for Reason) with Save Rate and, for a change not yet in force, Remove Change in its footer; PAYE Bands (Band, From, To or No Limit, Rate, Source, Status) with Set Bands (the bands and the same source fields, and Remove Change for a table not yet in force), always; when on or once it has been: Bands by Grade, Grades (Grade, Name, Minimum, Maximum, Staff, Outside Band, Status) with Add Grade and Save Grade, Pay Components (Employee, Grade, Monthly Gross, Pay Split, Position, with the chips All, Below Minimum, Above Maximum, Not Placed) whose person opens with their grade, their split and this year's Prior Pay (Prior Pay and Prior Tax of the year, or None), Place Person, Set Prior Pay (Year: this or next; Taxable Pay, Tax Paid, Certificate (Optional, the upload engine); Save Prior Pay, Remove Prior Pay) and Set Pay Components. The Conventions card left the screen in PR 11 (§6.12 rule 14) | Help term on **Advanced Payroll**: "From its date, later runs compute PAYE, pension, NHF, ITF and NSITF. Locked runs never change." On **Bank Details Required**: "When on, a person with no bank details blocks Submit." On **Pay Day**: "30 unless changed. A day past a month's end is its last day." On the Statutory Items title (PR 11): "Enter an item only while it applies to MyCity: pension from three employees, ITF from 25. No PAYE at or below the minimum wage." On the PAYE Bands title: "Enter the bands as the law publishes them. Each is taken monthly." On **Source** (Statutory Items' and PAYE Bands' column): "The law a figure comes from. No Legal Source when none." On **Prior Pay** in a person's sheet (PR 11): "This year's taxable pay and tax before MyCity's first statutory month, from a leaving certificate or earlier months." On **Monthly Gross** in Set Pay Components: "The components add up to the monthly gross." Effective From and the source fields carry no help: the date fields refuse a day outside their range themselves, and a dialog's text or date input with a help term fails axe (PR 5) | Why statutory is off by default, how a run picks its mode, the rates' sources, the formula: §6.11, §6.12 |
 | ESS · My Payslips | The year with its ‹ › switch (from the person's start year to this one) and Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; the year's months (Month, Net, Status: Paid, Paid with a deduction, In the run); the picked month's payslip in the modal (its PDF once rendered, Preparing while it renders), Download PDF, Email a Copy; Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries) | Help term on **In the run**: approved, and the pay is not yet transferred (§13.1 item 28) | PDF rendering, that no statutory word appears in simple mode: §6.10, ess.md §6 |
 | Home · Payroll In Progress | A count of runs not paid, opening the run | Help term on the card's title (as every Home card) | The card's source and mask: home.md §4.1, §3.8 |
 
@@ -1285,7 +1403,7 @@ Both tables are read by `scripts/check/guides.js`.
 | Payroll · Payroll Runs | Staff in Run and Net two to a row, the chain as a vertical list, the problem line, then run cards (month, net, status pill) | The subtitle, Gross and Deductions cards, the trend chart | Submit for Approval, full width at the foot of the open run's sheet | Bottom bar More, then People; the four tabs scroll sideways |
 | Payroll · Payslips | Four figures two to a row, then payslip cards (person, net, status pill) | The Gross and Deductions columns | Download PDF, full width at the foot of a payslip's full sheet; Email All Payslips and Download All in the run's overflow | As above |
 | Payroll · Deductions | Four figures two to a row, then deduction cards (person, reason, amount, status pill) | The Source column, the subtitle | Accept This Month at the foot of a pending fine's sheet, Spread Over Months and Waive beside it | As above |
-| Payroll · Configurations | Pay Day, the Advanced Payroll row, Statutory Items and PAYE Bands as cards (each with its Source); when on, cards for the rest | The band chart, the subtitle, the Base, Minimum, Maximum, Monthly Gross and Pay Split columns | Switch On or Off, opening its date sheet; Save Rate and Set Bands open as sheets with Remove Change beside the primary for a change still waiting; a person of Pay Components opens in a sheet with Place Person and Set Pay Components | As above |
+| Payroll · Configurations | Pay Day, the Advanced Payroll row, Statutory Items and PAYE Bands as cards (each with its Source); when on, cards for the rest | The band chart, the subtitle, the Base, Minimum, Maximum, Monthly Gross and Pay Split columns | Switch On or Off, opening its date sheet; Save Rate and Set Bands open as sheets with Remove Change beside the primary for a change still waiting; a person of Pay Components opens in a sheet with Place Person, Set Prior Pay and Set Pay Components | As above |
 | ESS · My Payslips | The year switch (44 px targets) and Download All; the figures two to a row; the months as a list with a status pill | The subtitle, the Gross figure; the payslip opens in a modal on desktop and as a full sheet on a phone (F31 as amended, §10.3) | Download PDF at the foot of the month's sheet, Email a Copy beside it | ESS tabs |
 | Home · Payroll In Progress | The card as every Home card | Nothing | Open the run | Bottom bar Home |
 
@@ -1303,7 +1421,7 @@ is added there with `npm run new:component` (header, test and gallery page), nev
 | The payslip | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable` (two columns), `PaperFoot` for the Payroll preview of an unpublished payslip, and for a published one until its PDF has loaded (and on the in-browser mock, which holds no file); `DocumentPreview` with `useFileBlob` for a published one (the real PDF, ess.md §6); `ListDetail` with `layout="modal"`, `size="wide"` and `full`; both screens share `features/payroll/parts.tsx` |
 | Email All, Download All | `Button` with `icon="mail"` handing back its work; `ExportAction` (`saveExport`) for Download All |
 | Deductions | `DataView` with `Chips`, `SegmentedControl` for the source, `StatStrip` for the figures (each opens its list in a pop-up), `ListDetail`, `SelectField` for the months and the start month (the months from the summary's `open_period`; twelve choices, so not `ChoiceField`), `EmployeePicker` for the person, `HelpTerm`; mirror `features/attendance/PayItems.tsx` |
-| Configurations | `ToggleRow` or `Switch`, `Card` and `CardHeader`, `KeyValue`, `DataView`, `BandChart`, `MoneyField`, `DateField min={todayIso()}`, `Banner`, `Details` or `HelpTerm` for support text; for a version's source (PR 10) `TextField`, `DateField max={todayIso()}` for Checked On, `UploadField` (the upload engine; `@mycity/ui` has no `FileField`) for the Document, `CheckboxField` for No Legal Source (a yes or no inside a form, FRONTEND_GUIDE §8.2), `TextAreaField` for its Reason, and `useConfirm` before Remove Change |
+| Configurations | `ToggleRow` or `Switch`, `Card` and `CardHeader`, `KeyValue`, `DataView`, `BandChart`, `MoneyField`, `DateField min={todayIso()}`, `Banner`, `Details` or `HelpTerm` for support text; for a version's source (PR 10) `TextField`, `DateField max={todayIso()}` for Checked On, `UploadField` (the upload engine; `@mycity/ui` has no `FileField`) for the Document, `CheckboxField` for No Legal Source (a yes or no inside a form, FRONTEND_GUIDE §8.2), `TextAreaField` for its Reason, and `useConfirm` before Remove Change; for Prior Pay (PR 11) `SelectField` for the year (two choices), `MoneyField`, `UploadField` and `FileRow` for the certificate, `useConfirm` before Remove Prior Pay; the Statutory Items help on the `DataView` title, never a `HelpTerm` in a row's cell (a phone row is a button) |
 | Money, empty, loading | `Money` (`short` only on KPIs), `MoneyField`, `formatMoney`; `EmptyState` (an illustration, a title, at most 8 words, one action), `LoadingRows`, `ErrorState` |
 
 **Amendments to ask for in PR 7 (record them where the Expenses ones are recorded: FRONTEND_FOUNDATION F31, FRONTEND_GUIDE §7 and CLAUDE.md):**
@@ -1326,14 +1444,18 @@ place in the agreed design are all rebuilt, not kept.
 
 Titles: Payroll Runs, Payslips, Deductions, Configurations, My Payslips. Cards: Run History, the open run's card by its
 month (October 2026 Run; This Run with no run open), Adjustments, Left Out, Run Problems (a pop-up), Preview and Published
-(the month's payslips), 2026 Payslips (My Payslips), Salary Deductions (a pop-up), Pending Deductions, Statutory Items, PAYE Bands, Conventions, Bands by Grade, Pay Components. Buttons: New Run, Open Run, Compute Run,
+(the month's payslips), 2026 Payslips (My Payslips), Salary Deductions (a pop-up), Pending Deductions, Statutory Items, PAYE Bands, Bands by Grade, Pay Components. Buttons: New Run, Open Run, Compute Run,
 Add Adjustment, Exclude, Exclude Person, Include, Submit for Approval, Approve, Approve Run, Send Back, Reject, Reject Run,
 Discard Run, Email Again, Remove Adjustment, Mark Paid, Email All Payslips,
 Download All, Download PDF, Email a Copy, Statutory Report, Accept This Month, Spread Over Months, Waive,
 Release, Record Advance, Cancel Advance, Switch On, Switch Off, Save Rate, Save Grade, Set Pay Day, Set Bands, Save Bands,
-Add Band, Remove Band, Remove Change, Set Conventions, Add Grade, Place Person, Set Pay Components, Save Components, Add Component, Remove
-Component. Cards on Configurations: Payroll Options, Statutory Items, PAYE Bands, Conventions, Bands by Grade, Grades, Pay
-Components. Chips and statuses:
+Add Band, Remove Band, Remove Change, Add Grade, Place Person, Set Prior Pay, Save Prior Pay, Remove Prior Pay, Replace File,
+Set Pay Components, Save Components, Add Component, Remove Component. Cards on Configurations: Payroll Options, Statutory
+Items, PAYE Bands, Bands by Grade, Grades, Pay Components (Set Conventions and the Conventions card left in PR 11).
+Statutory items (PR 11): PAYE, Employee Pension, Employer Pension, NHF, ITF, NSITF, Rent Relief, Minimum Wage; their bases
+Gross Pay, Pensionable Pay, Taxable Pay, Payroll, Year's Rent (Basic Pay only on a version saved before PR 11); the
+column Figure and the fields Rate, Cap a Year, Monthly Amount; a payslip's PAYE Refund; a person's Prior Pay and Prior Tax
+of a year, and Set Prior Pay's Year, Taxable Pay, Tax Paid, Certificate. Chips and statuses:
 Draft, Computed, Submitted, Approved, Paid; Pending, Active, Settled, Waived; Preview, Published, Excluded, Preparing; Paid, Paid
 with a deduction, In the run; Blocking, Warning; In Force, Not
 Set, Below Minimum, Within Band, Above Maximum, Not Placed, No Legal Source, Last Day of Month.
@@ -1343,7 +1465,8 @@ source, Name the section, Pick the day checked, Not with No Source, Not a link, 
 Toasts (at most 8 words): "Run opened for October 2026", "Run computed", "Sent for approval", "October 2026 approved", "Run
 sent back", "Run rejected", "Run marked paid", "Run discarded", "Adjustment added", "Adjustment removed", "Payslips are being
 emailed", "Payslips downloaded", "Sent to your work email", "Deduction scheduled", "Advance recorded", "Pay day saved", "Rate saved", "PAYE bands saved", "Change removed", "Grade saved", "Person
-placed", "Pay components saved". Money is `₦450,000.00` (`formatMoney`), a month "October
+placed", "Pay components saved", "Prior pay saved", "Prior pay removed". A run's problem (PR 11): "An earlier run this year is
+still open", Fix "Send them for approval first"; No Rates Set reads "Statutory figures are missing". Money is `₦450,000.00` (`formatMoney`), a month "October
 2026" (`formatMonth`), a date "08/11/2026" (`formatDate`).
 
 ---
@@ -1386,7 +1509,23 @@ placed", "Pay components saved". Money is `₦450,000.00` (`formatMoney`), a mon
 - **A fine spread across a year end** works: instalments are months, not calendar years.
 - **A run for a month before the advanced option's date** stays simple even if computed after it (§6.11 rule 2).
 - **A rate changed mid-year.** A new version from a date; runs before it keep the rates they were paid at; the
-  report of a past run reads that month's rates.
+  report of a past run reads that month's rates. A new PAYE table mid-year applies, scaled by month/12, to the whole year to
+  date from its first month, as the cumulative method does (§6.12 rule 9).
+- **Advanced months out of order** (PR 11). A run whose earlier months of the year are still a Draft or Computed one
+  reports "An earlier run this year is still open", blocking, until each is sent: its PAYE reads the tax they deducted
+  (§6.15). An earlier month sent back after a later one was computed blocks the later one again until it is resent, and
+  the later one's Submit recomputes it on the year to date as it then stands.
+- **PAYE falls.** A person whose pay drops, or who declares rent late in the year, may have had more deducted than the
+  year's tax to date: the difference is a PAYE Refund earning line on their payslip, never a negative PAYE (§6.12 rule 9).
+- **Switched on mid-year, or a joiner with a certificate.** The year to date counts only advanced payslips. A person's
+  earlier pay and tax for the year (MyCity's months before the option, or a previous employer's leaving certificate) is
+  their Prior Pay on Configurations; with none their year starts at nothing and the year's tax lands by December (§6.14).
+- **Rent across two years.** A declaration covering months of two years counts only this year's months, pro-rated
+  (§6.12 rule 15); a declaration is for this year or next, and a later change catches up the relief in the next run.
+- **At the minimum wage.** A person whose monthly pay is at or below the minimum wage in force pays no PAYE and their
+  month keeps no taxable pay; NHF is taken only at or above it, and only if they chose it (§13.1 items 44, 45).
+- **A version on a base PR 11 no longer allows** (NHF or a pension on basic pay, saved before PR 11) is not computed:
+  the run reports Statutory figures are missing until a version on an allowed base is entered (§6.12 rule 8).
 - **A public holiday set after Compute.** Submit's recompute reads the holidays again; the daily rate moves with
   them; the totals change and `RUN_CHANGED` says so.
 - **Staging sends real mail (A4).** Email All on staging reaches real inboxes with demonstration figures; staging
@@ -1546,6 +1685,36 @@ Binding; never re-opened. Timestamps are the meeting's transcript.
     and the decisions this guide gives its owner (§0, §13.2, §13.3); TB hands over. #11 My Payslips keeps AJ as its Owner
     (item 27), being an ESS screen.
 
+**TB, 12 November 2026** (PR 11's chat, asked before building as its request said; §13.3 items 5 to 9 and 11, and the
+relief's design):
+
+41. **Rent relief is built in full and ships off; the old relief is retired** (§13.3 items 2 and 8). The `relief` item as
+    PR 5 built it (a flat amount plus a percentage of gross, the Consolidated Relief Allowance's shape) is refused on save,
+    not shown and never computed. Rent relief is built as the Joint Revenue Board's Guidelines 2026 have it (paras 7.4 and
+    9): each person's declared rent for a tax year, kept with the person on People · Employees (the rent paid and the
+    months it covers, pro-rated to the year; the legal tenant; the landlord with a mobile number, Tax ID or NIN; the
+    property's address, picked; the evidence through the upload engine), masked as `employee.statutory`; its 20% and its
+    ₦500,000 cap a version on Configurations with their source, like a rate. The year's relief is scaled to the months
+    elapsed, as the bands are (item 39), which answers item 8. It changes nothing until Operations & People enter the
+    figures and switch the option on.
+42. **A person's PAYE year starts at zero in MyCity's first statutory month unless their pay and tax to date are
+    entered** (§13.3 items 5 and 6). The taxable pay and the tax of the year before that month, from a previous
+    employer's leaving certificate (Operation of PAYE Regulations 2002, reg 5) or for MyCity's own months before the option
+    was on, are entered on Configurations in the person's sheet under Pay Components (Set Prior Pay), one pair of figures
+    a person a year, with the certificate when there is one. A joiner with no certificate starts at zero.
+43. **A fall in the cumulative tax is paid back as an earning line, PAYE Refund** (§13.3 item 9; Regulations reg 4(2)),
+    since a line's amount is never negative (§6.8 rule 3).
+44. **NHF is each person's choice.** Contributes to NHF, a yes or no beside the NHF number on People · Employees' Tax and
+    Pension step and in the staff import, masked as `employee.statutory`, is off until set (NHF Act s.4(1)(b) as
+    substituted in 2023). NHF is deducted only when it is on and the person earns the national minimum wage or more.
+45. **The minimum-wage exemption is tested every month on the person's rate of pay** (§13.3 item 7): their monthly gross
+    against the wage in force (₦70,000 a month, entered with its source like a rate). At or below it there is no PAYE that
+    month and that month's pay stays out of the year to date; NHF's "minimum wage and above" reads the same measure.
+46. **Each person's State of residence is kept, and the statutory report splits PAYE by State** (§13.3 item 11; the
+    Guidelines para 25). State of Residence (the 36 states and the Federal Capital Territory) is on People · Employees' Tax
+    and Pension step and in the staff import, masked as `employee.statutory`; PAYE and PAYE Refund print one group a
+    State on the report, a person with none under Not Set.
+
 ### 13.2 Decided in writing this guide (change here if wrong)
 
 Each is LA's to change with a line in §14; each is the smallest reading that makes the settled items work.
@@ -1576,6 +1745,8 @@ Each is LA's to change with a line in §14; each is the smallest reading that ma
 14. **The advanced mode is decided by the run's period**, switching on needs a rate in force (`NO_RATES`) and the three
     conventions set (`NO_CONVENTIONS`), and PR 5 adds the
     employee tax and pension number columns the statutory mask already names, written through the organisation service.
+    **Amended 12/11/2026 (PR 11):** the conventions are the law's and in the engine, so switching on needs a rate in force
+    only, and `NO_CONVENTIONS` is gone; the numbers are on People · Employees' Tax and Pension step.
 15. **The payslip opens in a modal at every width** on Payroll · Payslips and ESS · My Payslips (settled 08/11/2026,
     §13.1 item 18; F31 amended in PR 7).
 16. **A payslip's PDF is a restricted file**: its owner and `payroll` edit holders open it; Management does not.
@@ -1590,13 +1761,16 @@ Each is LA's to change with a line in §14; each is the smallest reading that ma
     **Amended 11/11/2026 (§13.1 items 30 and 34):** PAYE Basis leaves the screen (it read as a choice of when to deduct),
     and the other two stay only if PR 9 finds the law leaves them to the employer. PR 9 (11/11/2026) found that it does
     not: both are eligible deductions under the Nigeria Tax Act 2025, s.30(2)(a), so PR 11 fixes them (§6.12 rule 14).
+    **Built 12/11/2026 (PR 11):** no convention is left; the one toggle stays.
 23. **The pay day is a plain calendar date**: it is never moved for a Sunday or a public holiday (the CEO transfers by
     hand, 4 Nov), and the month-end rule is the only adjustment (§6.11 rule 1).
 24. **The statutory bases and PAYE's shape, as PR 5 built them** (§6.12 rules 8 and 9): gross is the month's earnings
     (Monthly Pay or the split, overtime, earning adjustments) and the post-tax deductions reduce no base; ITF and NSITF
     are the month's gross at their rate; the relief's flat amount is read as annual or monthly by the PAYE basis, as the
     bands are. Operations & People may read any of these differently: it is a small code change reviewed with them (§6.12
-    rule 7), recorded here.
+    rule 7), recorded here. **Amended 12/11/2026 (PR 11)** to what §6.16 cites: PAYE cumulative on the year to date, the
+    pension base never below basic, housing and transport, NHF on gross, the relief retired and rent relief on the
+    declared rent (§6.12 rules 8, 9 and 15; items 36 and 37 below).
 25. **A pay split is used only while it adds up to the gross** (§6.11 rule 6): it must on saving, and a run treats one the
     gross has moved away from as no split (No Pay Split), rather than scale it silently.
 26. **A configuration change for a day that already has a version joins it**, and a version starting later must change
@@ -1605,7 +1779,7 @@ Each is LA's to change with a line in §14; each is the smallest reading that ma
 27. **The statutory report is of an approved or paid run** (the `published` guard): its figures are locked before they
     are reported.
 28. **The advanced switch, the pay day and the bank rule are not a card** (PR 6): `PayrollSettingsChange` is one version of the
-    setting, saved from a date with the statutory rates in force and the accountant's three conventions in view, so Praxis AI
+    setting, saved from a date with the statutory rates in force in view (the three conventions too, until PR 11), so Praxis AI
     opens Configurations (the route "turn on advanced payroll") and the person saves it there, as it does a role's grants
     (praxis-ai.md decision 35). It is not a create or edit form by name, so gate 23 asks for no reason for it.
 29. **A card names the record it acts on** (PR 6): the screen's button on a run or a fine never names it, so Submit, Add
@@ -1623,7 +1797,8 @@ Each is LA's to change with a line in §14; each is the smallest reading that ma
     hands `computeStatutory` `annualised` when `paye_basis` is unset: the bands are entered as the law publishes them,
     annual amounts, and the year's tax is spread over the months. The API still takes `paye_basis`, so a basis set before
     reads as set. Pending PR 9's citation; PR 11 fixes the column to what §6.16 records. The other answer offered (leave
-    the API as it was and let Switch On wait for PR 11) was not taken.
+    the API as it was and let Switch On wait for PR 11) was not taken. **Superseded 12/11/2026 (PR 11):** PAYE is
+    cumulative (§13.1 item 39, §6.12 rule 9); `paye_basis` is neither read nor written, and the API no longer takes it.
 33. **A statutory source document is its own restricted doc type** (PR 10): no type in the vault fitted a legal
     instrument, so `statutory_source` (module `payroll`, `restricted`, registered in `statutory.events.js` as
     `payslips.pdf.js` registers `payslip`) is claimed from the upload engine by the save; only `payroll` edit holders open
@@ -1635,6 +1810,33 @@ Each is LA's to change with a line in §14; each is the smallest reading that ma
 35. **`SOURCE_REQUIRED` is the contract's** (PR 10): the rule needs no data, so it is checked as the form is filled
     (FRONTEND_GUIDE §8.3). The contract's issue names its code (`params.code`), and `shared/http/validate` answers with that
     code when every rule refused names the same one, so the API's refusal reads `SOURCE_REQUIRED`, not `VALIDATION_FAILED`.
+36. **Pension's floor is the engine's** (PR 11; Pension Reform Act s.120): Compute takes the pensionable pay as at least
+    the `basic`, `housing` and `transport` components as paid, so a split marking less still saves and is neither refused
+    nor warned; the person's pension is right either way.
+37. **The bases PR 11 allows** (§6.12 rule 8): NHF on `gross` alone, the pensions on `pensionable` or `gross`, `basic` no
+    item's base. A version saved before on a base no longer allowed is not computed on another: Compute reports it missing
+    (`statutory_missing`, No Rates Set) until a version on an allowed base is entered.
+38. **A threshold about MyCity itself is not computed** (PR 11, as its request said): ITF's 25 employees outside a free
+    trade zone and pension's three employees are not counted by the engine. Operations & People enter the item only while
+    MyCity is liable, and the Statutory Items help says so.
+39. **An advanced run waits for its year's earlier runs** (PR 11): `EARLIER_RUN_OPEN`, blocking, while a run of an
+    earlier month of the same year is a Draft or Computed one. The year to date reads the advanced payslips of runs
+    Submitted, Approved or Paid, so a month is neither counted twice nor missed; a simple run deducted no PAYE and adds
+    nothing to it (its months are Prior Pay, §13.1 item 42).
+40. **The minimum wage is needed beside PAYE or NHF** (PR 11): with either in force and no minimum wage, Compute reports it
+    missing, since neither can be told without it; meanwhile PAYE is computed with no exemption and NHF is not taken.
+41. **Rent declarations are People's** (PR 11): `employee_rent_declaration` and `employee.rent.js` sit in the organisation
+    module, which owns the person's record, and payroll reads them (`yearRentsFor`). A role that hides `employee.statutory`
+    is refused the routes whole unless the record is its own; a declaration is for this year or next (422
+    `YEAR_NOT_ALLOWED`), its months must touch the year (422 `COVERS_OUTSIDE_YEAR`), and its evidence is required (the
+    Guidelines para 9.6; NTA s.32(1)).
+42. **The report reads the State of Residence when it is made** (PR 11), as it does the tax numbers: a person who moved since
+    the run prints under their State today. The remittance lines are fixed text beside each item (`statutory.report.js`),
+    the law's rather than MyCity's, with their citations.
+43. **A run keeps the method it was computed with** (PR 11): a run computed before PR 11 prints its conventions and its
+    relief from its snapshot; computed again while Draft or Computed, it takes the cumulative method.
+44. **Prior Pay is the screen's word for pay to date** (PR 11): the button is Set Prior Pay (a button is three words at
+    most), the API's `pay-to-date`; its year is this year or next, and its certificate a restricted `leaving_certificate`.
 
 ### 13.3 Still open
 
@@ -1644,17 +1846,12 @@ Each is LA's to change with a line in §14; each is the smallest reading that ma
 | 2 | Does the Nigeria Tax Act 2025 leave payroll any relief to apply, and in what shape (§6.12 rule 15)? | PR 9's research; Operations & People | PR 11 | **Answered (PR 9):** the Consolidated Relief Allowance has no source from 1 January 2026 (the Personal Income Tax Act is repealed, NTA s.196(g)); the one relief is rent relief, 20% of the year's rent paid, at most ₦500,000 (s.30(2)(a)(vi)), and the employer gives it in PAYE on the person's information and evidence (the Joint Revenue Board's Guidelines 2026, paras 7.4 and 9). No relief is entered before the register is confirmed; the item stays as built until PR 11 |
 | 3 | The ITF threshold and base, and whether NHF is mandatory for MyCity's private-sector staff (§6.16) | PR 9's research; Operations & People | PR 11 | **Answered (PR 9):** ITF is 1% of annual payroll (basic pay, allowances and other entitlements) for an employer with 25 or more employees not operating within a free trade zone (ITF Act s.6(1) as substituted by the Business Facilitation Act 2022, s.41; s.16 as inserted in 2011), due by 1 April of the next year; the 5-employee or ₦50 million test of 2011 no longer applies. NHF is voluntary for private-sector employees: such an employee "may contribute" 2.5% of monthly income (NHF Act s.4(1)(b) as substituted by the 2022 Act, s.45). The NHF base is the month's gross pay: the 2023 s.4 says "monthly income" and FMBN states the contribution as "2.5% of the monthly gross salary"; s.26's "basic monthly salaries" is the original Act's word. Neither is entered |
 | 4 | Do pension and NHF apply to staff treated as contractors and consultants (§13.1 item 14)? | PR 9's research; Operations & People | Switching the option on | **Open.** NHF through payroll is an employee's choice (NHF Act s.4(1)); a self-employed person contributes on their own (s.4(2)), not through MyCity's payroll. Pension reaches an "employee", "any person employed in" a private company, organisation or firm (Pension Reform Act 2014, s.120), of an organisation of three or more employees, as PenCom applies the Act (s.120; s.2(2) says 15), and a self-employed person may join voluntarily (s.2(3)). The ITF and Employee's Compensation Acts reach an "employee" (ITF Act s.16; ECA s.73, a contract of employment, oral or written), so whether MyCity's contractors and consultants are employees under them turns on their contracts, for Operations & People (with legal advice where they need it). PAYE is the tax on an employee's emoluments (Administration Act s.51(6)); a payment to a person who is not an employee falls under deduction at source (s.51(1)): 5% of a resident's consultancy or professional fees, twice that without a Tax Identification Number (Deduction of Tax at Source (Withholding) Regulations 2024, First Schedule and reg 3(c), kept in force by NTA s.199(b)), which MyCity deducts as a body corporate unless it is a small company within reg 4(2); the Joint Revenue Board's Guidelines 2026 name "contractors, consultants" among the non-employees this covers (para 14.1), while a temporary employee's pay is taxed through PAYE (para 13.1). Simple mode pays such a person through payroll with nothing deducted: Operations & People decide whether that stands. The option stays off |
-| 5 | When the option is switched on mid-year, does each person's year start at zero, or are earlier months' pay and tax entered? | LA with Operations & People | PR 11 | Recommended: zero unless entered, since MyCity deducted no PAYE before |
-| 6 | A joiner with no leaving certificate from a previous employer (Regulations reg 5): does their year start at zero? | LA with Operations & People | PR 11 | Recommended: zero, as item 5 |
-| 7 | Is the minimum-wage exemption tested month by month or on the year's pay? | LA with Operations & People | PR 11 | Recommended: month by month, as the Board's exempt-employee return asks about the monthly wage |
-| 8 | Is the year's rent relief given whole in the month it is declared, or scaled to the months elapsed like the bands? | LA with Operations & People | PR 11 | Recommended: scaled to the months elapsed (item 39), so each month's PAYE stays even |
-| 9 | A PAYE refund (Regulations reg 4(2)) needs a line of its own, since a line is never negative (§6.8 rule 3) | LA | PR 11 | Recommended: an earning line, PAYE Refund |
-| 10 | Does payroll produce a leaver's certificate of pay and tax to date (Regulations regs 4(3) and 5(1))? | LA | PR 11 or later | Not built until decided |
-| 11 | PAYE goes to the State where each employee lives (Guidelines para 25): each person's State of residence on People · Employees, and the statutory report split by State | LA | PR 11 | Recommended: both |
+| 10 | Does payroll produce a leaver's certificate of pay and tax to date (Regulations regs 4(3) and 5(1))? | LA | PR 11 or later | **Open.** Not built until decided: a joiner's certificate from another employer is entered (§13.1 item 42), but MyCity issues none |
 
 Items 2 and 3 carry PR 9's answers with their citations (§6.16) and need no confirmation (§13.1 item 38); item 4 is for
-Operations & People before the option is switched on. Items 5 to 11 are how MyCity applies PAYE in PR 11, each with a
-recommendation; LA settles them with Operations & People and moves each to §13.1.
+Operations & People before the option is switched on, and PR 11 leaves pension as built for it (everyone paid in an
+advanced run, whatever their employment type; NHF is now each person's choice, §13.1 item 44). Items 5 to 9 and 11 were
+answered by TB in PR 11's chat and are §13.1 items 41 to 46.
 
 Answered and moved to §13.1: the approver (item 7), a leaver's instalments and a negative net (16), recurring
 allowances (17), the ESS modal (18), staging mail (19), the statutory rates, the accountant's conventions, the pay day
@@ -1979,6 +2176,22 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
 - Done when: every line the engine can produce traces to a row of §6.16; the option still ships off; no rate in any
   seed.
 
+**Built 12/11/2026 (`m6/statutory-law`, LA's lane, built by JP).** TB answered the open points first (§13.1 items 41 to 46).
+Contract: `statutory.js` (the items `rent_relief` and `minimum_wage`, `relief` retired, the base `rent`, `AMOUNT_ITEMS`,
+Prior Pay's schemas, the report's groups and rules), `payroll.js` (`PayeBasis` and the conventions gone, `EARLIER_RUN_OPEN`),
+`payslips.js` (`paye_refund`), `organisation.js` (the Tax and Pension fields, `NigerianState`, the rent declaration's
+schemas), `common.js` (`taxYear`). Migration `6050`. The engine: `computeStatutory` cumulative with the bands scaled,
+rent relief, the minimum wage, NHF by choice, pension's floor, the PAYE Refund line, each line rounded once and employer
+lines out of the net; Compute's year to date from earlier advanced payslips and Prior Pay; `EARLIER_RUN_OPEN`; the report
+with bases, remittances, the method's rules and PAYE by State. People: the Tax and Pension step of Add Employee and Edit
+Record (Tax ID, Pension PIN, Pension Administrator, NHF Number, Contributes to NHF, State of Residence), the record's Tax and
+Pension tab with Declare Rent, and the staff import's six columns; Configurations: the eight items, Figure, Prior Pay in a
+person's sheet, the Conventions card gone. ITF's and pension's thresholds are not computed (§13.2 item 38); a split is
+never refused for its pensionable marks (§13.2 item 36). §13.3 items 4 and 10 stay open and unbuilt; withholding on
+contractors' fees is outside payroll. Tests: `statutory.test.js` (the worked example of §6.14 to the kobo, on labelled test
+figures), `payroll.test.js`, `tests/integration/payroll-advanced.test.js` (end to end on the real migrations, the report
+and the retired relief among it), the People form's and the tab's tests.
+
 ### PR 12 · Notification email links follow the reader (`m6/notification-links`) · GE
 
 - `src/jobs/handlers/notification-deliver.js` builds the email link with the recipient's own screen as the bell and
@@ -2043,14 +2256,15 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `PayslipEmailAll`; the assistant's (PR 6): `PayrollMonthQuery` (the `payroll.month` summary's month), `PayrollRunSubmission` and
   `PayrollRunAdjust` (the cards of Submit for Approval and Add Adjustment: the screen's request with the run beside it);
   `PayrollSettingsVersionParams` (PR 10, the path of the setting's Remove Change); and the
-  pieces they are made of: `RunStatus`, `AdjustmentKind`, `PayeBasis`,
-  `ProblemSeverity`, `ProblemCode`, `PayrollRunCounts`, `PayrollTrendMonth`, `PayrollSettingsVersion`.
+  pieces they are made of: `RunStatus`, `AdjustmentKind`,
+  `ProblemSeverity`, `ProblemCode` (`EARLIER_RUN_OPEN` added in PR 11), `PayrollRunCounts`, `PayrollTrendMonth`,
+  `PayrollSettingsVersion`. PR 11 removed `PayeBasis` and the conventions' three keys.
 - `payslips.js`: `Payslip`, `PayslipLine`, `PayslipDetail`, `PayslipListQuery`, `PayslipPage`, `PayslipVars`,
   `PayslipBatchVars`, `EssPayslipQuery`, `EssPayslipSummary`, `EssDeductionRow`, `EssDeductionPage`; and
   `PayslipLineItem` and `PayslipLineItemPage` (the pay items behind a grouped line, §5), `PayslipLineParams`,
   `PayslipEmailQueued` (Email All's 202), `PayslipCopySent` (Email a Copy), `PayslipReadyEmailVars` (the mail's
   variables), `PayslipPrintedLine`,
-  `PayslipStatus`, `PayslipLineKind`, `PayslipLineCode`, `EssDeductionSource`.
+  `PayslipStatus`, `PayslipLineKind`, `PayslipLineCode` (`paye_refund` added in PR 11), `EssDeductionSource`.
 - `deductions.js`: `DeductionRow`, `DeductionListQuery`, `DeductionPage`, `DeductionSummary`, `FineParams`, `DeductionAccept`,
   `DeductionWaive`, `AdvanceRecord`, `AdvanceCancel`; the assistant's (PR 6): `FineAccept` and `FineWaive` (the cards of Accept
   Deduction and Waive Fine: the sheet's request with the fine beside it); and `DeductionFigure`, `DeductionSource`, `DeductionStatus`
@@ -2064,9 +2278,16 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `StatutoryItemState`, `StatutoryItems` (`GET /statutory/items`), `StatutoryReportRow`, `StatutoryReportItem`, and the
   code lists `ITEM_KIND` and `ITEM_BASES`; PR 10 added `StatutorySource` (a version's legal source as it is read back),
   `StatutoryVersionParams` (the path of a rate's Remove Change), `SOURCE_KEYS` and `SOURCE_REQUIRED` (the code a missing
-  source is refused with).
+  source is refused with); PR 11 added `RETIRED_ITEMS` (`relief`), `AMOUNT_ITEMS` (the items whose figure is an amount),
+  `StatutoryReportGroup` (a State's PAYE lines), `StatutoryReportRule` (how PAYE was worked out), and Prior Pay's
+  `PayToDate`, `PayToDatePage`, `PayToDateParams`, `PayToDateYearParams` and `PayToDateSave`.
+- `organisation.js` (People's, PR 11): the Tax and Pension fields on `EmployeeCreate`, `EmployeeUpdate`, `Employee360` and
+  `EmployeeImportRow` (`nhf_contributes`, `state_of_residence` beside the numbers), `NigerianState`, `NIGERIAN_STATES`,
+  `STATE_LABELS`, and the rent declaration's `RentDeclaration`, `RentDeclarationPage`, `RentDeclarationParams`,
+  `RentDeclarationYearParams` and `RentDeclarationSave`.
 - Shared from `common.js`: `EmptyBody`, `PageQuery`, `money`, `isoDate`, `uuid`, `text`, and, added in PR 1,
-  `positiveMoney` (an amount above zero, the field error "Enter an amount") and `monthStart` (a month's first day).
+  `positiveMoney` (an amount above zero, the field error "Enter an amount") and `monthStart` (a month's first day), and in
+  PR 11 `taxYear` (a calendar year from 2026).
   `ExportFile` is `documents.js`'s.
 
 ## Appendix D · File map
@@ -2077,24 +2298,30 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `.controller`, `.service`, `.repo`, `.events`, `.acceptance`, `.ai`, `.search`, `.test`; `salary_structure` and
   `statutory` as in README §5.9 (`statutory.rates`, `statutory.report`). The stubs for jobs
   (`src/jobs/handlers/payroll-compute.js`, `payslip-render.js`) are deleted at the end if unused (decision 3 of §13.2).
-- **Other modules touched:** `attendance.pay.js`, `sanctions.fines.js`, `organisation` (tax and pension numbers, PR 5),
+- **Other modules touched:** `attendance.pay.js`, `sanctions.fines.js`, `organisation` (tax and pension numbers, PR 5;
+  the Tax and Pension fields, the import's columns and `employee.rent.js`, the declared rent, PR 11), `shared/places/owners.js`
+  (the rented property's address, PR 11),
   `ess` (the routes, in `ess.earnings.js`, `ess.controller.js`, `ess.routes.js`), `dashboard/sources/payroll.source.js`, `settings.service.js`, `shared/access/access.catalog.js`,
   `shared/rbac/field-mask.js`, `shared/workflow/definitions.js`, `shared/route-map.js`, `shared/search/screens.js`.
 - **Schema:** `migrations/6000_payroll.sql`, `6010_payroll_deductions.sql`, `6020_payroll_advanced.sql`,
-  `6030_leave_unpaid.sql`, `6040_statutory_sources.sql`; `seeds/reference/6099_seed_payroll.sql`; `seeds/staging/NN_payroll.js`.
+  `6030_leave_unpaid.sql`, `6040_statutory_sources.sql`, `6050_statutory_law.sql`; `seeds/reference/6099_seed_payroll.sql`;
+  `seeds/staging/NN_payroll.js`.
 - **Templates:** `templates/documents/payslip.html`, `payslip-batch.html`, `statutory-report.html`;
   `templates/email/payslip-ready.html`.
 - **Frontend:** `app/src/features/payroll/` (the files of PR 7; `Deductions.tsx` came with PR 3 and `Configurations.tsx`
   with PR 5), `app/src/features/ess/Payslips.tsx`,
   `app/src/api/mock/modules/payroll.ts`, `payslips.ts`, `app/src/shell/catalogue.ts`, `coming-soon.ts`,
-  `packages/ui/src/form/MonthField.*`.
-- **Docs:** this guide, `docs/handoff/m6-payroll.md`, `docs/manual/payroll.md`, `docs/guides/ess.md`,
+  `packages/ui/src/form/MonthField.*`; People's Tax and Pension step and tab (PR 11): `app/src/features/people/EmployeeForm.tsx`,
+  `TaxAndPension.tsx` and its test, `Employee360.tsx`, `app/src/api/mock/modules/organisation.ts`.
+- **Docs:** this guide, `docs/handoff/m6-payroll.md`, `docs/manual/payroll.md`, `docs/manual/people.md` (PR 11),
+  `docs/guides/foundation.md` and `docs/guides/addresses.md` (PR 11), `docs/guides/ess.md`,
   `docs/guides/attendance.md`, `docs/DATABASE_SCHEMA.md`, `docs/PROGRESS.md`, `README.MD`.
 
 ---
 
 ## 14 · Change log
 
+- 12/11/2026 · JP · PR 11 (the statutory engine to the research, `m6/statutory-law`) built what §6.16 confirms, every line the engine can produce tracing to a row of it; the guide meets what was built (the header, §2, §3.5, §4, §5, §6.11 rules 3, 3a and 4, §6.12, §6.14's advanced example, §6.15, §6.16's Built column, §7 to §11, §13.2 items 14, 22, 24, 28 and 32 amended and items 36 to 44 added, Appendices A, C and D). TB's answers, asked before building, are §13.1 items 41 to 46; §13.3 items 5 to 9 and 11 leave it, and items 4 and 10 stay open and unbuilt. PAYE is cumulative on the year to date with the year's bands scaled by month/12, a PAYE Refund earning line when the cumulative tax falls, the month's taxable pay kept on the payslip (`payslip.taxable_pay`) and Prior Pay for a person's year before MyCity's first statutory month; employee pension and NHF reduce taxable pay in code, so `PayeBasis`, the three conventions of the API, the Conventions card and `NO_CONVENTIONS` are gone (the columns stay, unread); the relief is retired (refused, never listed or computed, its rows kept) and rent relief built on each person's declared rent with its evidence; the minimum wage is an item, exempting PAYE at or below it on the rate of pay; NHF is a person's choice, on gross; pension's base is never below basic, housing and transport; ITF's and pension's thresholds are entered, not computed; an advanced run waits for its year's earlier runs (`EARLIER_RUN_OPEN`); the statutory report prints each item's base and remittance, how PAYE was worked out, and PAYE by State of Residence. People · Employees gained the Tax and Pension step (Tax ID, Pension PIN, Pension Administrator, NHF Number, Contributes to NHF, State of Residence), the record's Tax and Pension tab with Declare Rent, and the import's six columns. Migration `6050`. §13.1 item 42's button reads Set Prior Pay, a button being three words at most. The option still ships off and no figure is in any seed. Checked on the real API (a local database with the mock's 25 people, the API, the worker and the app in live mode, the test figures entered with a TEST SOURCE) at 1440 and 390 px: the Tax and Pension step saved through Edit Record and read on the record's tab; Declare Rent with its evidence uploaded and the address taken from the device while address search had no key; Configurations' eight items with their Figure and Source, the retired relief and a convention refused by the API; Set Prior Pay in a person's sheet; a November run blocked by an October draft ("An earlier run this year is still open") and, with October discarded, computed to the kobo (Zainab Abubakar's PAYE ₦56,700.00 on ₦418,500.00 with her Prior Pay and 11/12 of her rent relief; no PAYE for Kemi Adebayo, who had nothing to date; nothing taxed for Tolu Adeyemi below the minimum wage); submitted, approved by the CEO and its statutory report rendered. That found one fault, older than PR 11: the report's run number never printed, the document engine laying the document's own number (none, for an export) over the data's, so `StatutoryReportVars` names it `run_number`.
 - 12/11/2026 · JP · JBS Praxis's decisions after PR 9's research (§13.1 items 38 to 40). **LA owns M6 in full** (item 40): the header, §0, §13.2, §13.3 and Appendix A's lanes (PR 8, PR 10 and PR 11 are LA's) name LA where they named TB; #11 My Payslips keeps AJ. **MyCity has no accountant** and does not apply statutory deductions yet (item 38, replacing the pending accountant's confirmation): Operations & People, who run its payroll, enter each figure of §6.16 with its source on Configurations when MyCity starts, and the build waits for nothing; §0.2, §3.5, §6.11 rule 3a, §6.12 rules 7, 14 and 15, §6.16, §13.2 item 24, §13.3, Appendix A (PR 9, PR 11) and Appendix B say Operations & People where they said MyCity's accountant. **PAYE's bands are scaled to the months elapsed in the calendar year** (item 39): §6.12 rule 11, the §6.16 PAYE row and PR 11's scope state it. §13.3 gains items 5 to 11, the smaller PAYE points for PR 11 (a mid-year switch-on, a joiner without a certificate, the minimum-wage test, rent relief's timing, the refund line, the leaver's certificate, the State of residence), each with a recommendation, for LA with Operations & People.
 
 - 12/11/2026 · JP · PR 9, a fourth research pass at JBS Praxis's request, to settle the three points the third left open, from the agencies that apply the law (§6.16): the pension threshold is three or more employees (PenCom's own statement of who the Act covers, its Framework for Micro Pension Plan 2018, matching s.120; s.2(2)'s "15" is an inconsistency the regulator does not apply), so both pension rows are Confirmed; the NHF base is the month's gross pay (the 2023 s.4's "monthly income" and FMBN's own statement, "2.5% of the monthly gross salary"; FMBN's copy of Cap N45 still prints the pre-2023 wording), so NHF is Confirmed and PR 11 gives it the `gross` base; the National Minimum Wage (Amendment) Act 2024 is in force from 29 July 2024 (the National Salaries, Incomes and Wages Commission's circulars of 23 and 27 September 2024), the ₦70,000 resting on the Board's Guidelines and the Bill, so the exemption's row is Confirmed while the Act's own text stays unread. §6.12 rule 11, §13.3 items 3 and 4, Appendix A (PR 9's note, PR 11's NHF base and pension coverage) and the sources table follow.

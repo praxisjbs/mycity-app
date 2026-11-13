@@ -14,9 +14,10 @@ const { ok, created, accepted, noContent } = require("../../shared/http/respond"
 const { AppError } = require("../../shared/errors");
 const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf, assertInScope } = require("../../shared/rbac/scope");
-const { maskForUser, assertWritable } = require("../../shared/rbac/field-mask");
+const { maskForUser, assertWritable, canSee } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
 const employee360 = require("./employee-360.service");
+const rent = require("./employee.rent");
 const lagos = require("../../shared/time/lagos");
 const service = require("./organisation.service");
 
@@ -53,6 +54,16 @@ async function readable(req) {
   const record = await employee360.get(pool, id(req));
   assertInScope(scopeOf(req), record.employee_id);
   return record;
+}
+
+/**
+ * A person's declared rent is tax data (`employee.statutory`): a role that hides it is refused the routes whole, rather
+ * than handed a list of empty rows, unless the record is their own (docs/guides/payroll.md §13.1 item 41).
+ */
+async function assertSeesTax(req) {
+  if (req.user && id(req) === req.user.employee_id) return;
+  if (!(await canSee(pool, req.user, "employee.statutory")))
+    throw new AppError("FIELD_RESTRICTED", "Your role cannot see tax details.", 403);
 }
 
 module.exports = {
@@ -105,6 +116,26 @@ module.exports = {
       service.setReportingLine(client, id(req), req.validated.body, withActor(req)),
     );
     return ok(res, await maskUnlessOwn(req, await employee360.get(pool, id(req))));
+  },
+
+  rentDeclarations: async (req, res) => {
+    await readable(req);
+    await assertSeesTax(req);
+    return sendPaged(res, await rent.list(pool, id(req), req.validated.query));
+  },
+
+  saveRentDeclaration: async (req, res) => {
+    await readable(req);
+    await assertSeesTax(req);
+    const { year } = req.validated.params;
+    return ok(res, await tx((client) => rent.save(client, { employee_id: id(req), year, body: req.validated.body, actor: withActor(req) })));
+  },
+
+  removeRentDeclaration: async (req, res) => {
+    await readable(req);
+    await assertSeesTax(req);
+    await tx((client) => rent.remove(client, { employee_id: id(req), year: req.validated.params.year, actor: withActor(req) }));
+    return noContent(res);
   },
 
   history: async (req, res) => {

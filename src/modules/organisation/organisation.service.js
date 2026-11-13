@@ -1426,7 +1426,7 @@ async function importRow(client, values, ctx = {}) {
       job_title: values.job_title,
       department_id: values.department,
       ...(workEmail ? { work_email: workEmail } : {}),
-      ...optional(values, ["gender", "start_date", "date_of_birth", "phone", "bank_name"]),
+      ...optional(values, ["gender", "start_date", "date_of_birth", "phone", "bank_name", ...STATUTORY_IMPORTED]),
       ...(values.employment_type ? { employment_type: values.employment_type } : {}),
       ...(values.work_pattern ? { work_pattern: values.work_pattern } : {}),
     };
@@ -1461,7 +1461,7 @@ async function importRow(client, values, ctx = {}) {
       department_id: values.department,
       employment_type: values.employment_type || "full_time",
       work_pattern: values.work_pattern || "on_site",
-      ...optional(values, ["gender", "start_date", "date_of_birth", "phone", "bank_name"]),
+      ...optional(values, ["gender", "start_date", "date_of_birth", "phone", "bank_name", ...STATUTORY_IMPORTED]),
     },
     actor,
   );
@@ -1483,6 +1483,13 @@ function sameName(employee, name) {
     fold(employee.last_name) === fold(name.last_name)
   );
 }
+
+/**
+ * The tax and pension columns the staff import takes, as People · Employees' Tax and Pension step does
+ * (docs/guides/payroll.md §13.1 items 44 and 46; masked as employee.statutory, so the importer's preview and error file
+ * hide them from a reader who may not see them).
+ */
+const STATUTORY_IMPORTED = ["tax_id", "pension_pin", "pension_administrator", "nhf_number", "nhf_contributes", "state_of_residence"];
 
 /** The keys that carry a value, so an empty cell never writes over something. */
 function optional(values, keys) {

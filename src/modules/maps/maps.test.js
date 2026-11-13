@@ -454,6 +454,7 @@ describe("keeping a place", () => {
       "attendance_temporary_site_location.address",
       "deal.venue",
       "employee.home_address",
+      "employee_rent_declaration.property_address",
       "lead.cities",
       "onboarding_guarantor.contact_address",
       "onboarding_guarantor.residential_address",

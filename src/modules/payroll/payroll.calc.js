@@ -18,8 +18,9 @@
  *   sumTotals()        a run's totals from its payslips'
  *   payDate()          the day a month is paid: the pay day, or the month's last day when it is past
  *   componentPay()     advanced mode: a person's pay split, each component prorated, rounded once (§6.11 rule 6)
- *   computeStatutory() advanced mode: PAYE, pension, NHF, ITF and NSITF from the rates in force and the accountant's
- *                      three conventions, none of them a default (§6.12)
+ *   computeStatutory() advanced mode: PAYE on the year to date (or its refund), pension, NHF, ITF and NSITF from the
+ *                      figures in force, each rule traced to a row of §6.16, none of them a default (§6.12)
+ *   payslipOf()        a payslip's lines and, in advanced mode, the month's taxable pay its PAYE was worked from
  */
 const m = require("../../shared/money/money");
 
@@ -115,15 +116,22 @@ function instalmentShares(total, months) {
  * Advanced mode (§6.11 rule 6, §6.12): the pay split and the statutory items
  * ------------------------------------------------------------------ */
 
-/** The statutory items that become lines, in the order a payslip prints them, with their words. Relief is no line. */
+/**
+ * The statutory items that become lines, in the order a payslip prints them, with their words. PAYE Refund is an earning
+ * (§13.1 item 43); rent relief and the minimum wage are figures with no line of their own.
+ */
 const STATUTORY_LINES = Object.freeze([
   { item: "pension_employee", kind: "deduction", label: "Pension" },
   { item: "nhf", kind: "deduction", label: "NHF" },
   { item: "paye", kind: "deduction", label: "PAYE" },
+  { item: "paye_refund", kind: "earning", label: "PAYE Refund" },
   { item: "pension_employer", kind: "employer", label: "Employer Pension" },
   { item: "itf", kind: "employer", label: "ITF" },
   { item: "nsitf", kind: "employer", label: "NSITF" },
 ]);
+
+/** The components pension's base is never less than: "basic salary, housing allowance and transport allowance" (s.120). */
+const PENSION_FLOOR = Object.freeze(["basic", "housing", "transport"]);
 
 /** "7.5%" from a stored rate ("7.500000"). */
 function rateLabel(rate) {
@@ -132,17 +140,22 @@ function rateLabel(rate) {
 
 /**
  * A person's pay split for the part of the month they are paid (§6.11 rule 6): each component prorated as Monthly
- * Pay is (§6.3 rule 1) and rounded once, so a person paid the whole month is paid each component whole. Pure.
+ * Pay is (§6.3 rule 1) and rounded once, so a person paid the whole month is paid each component whole. The pensionable
+ * pay is the components marked pensionable, never less than basic, housing and transport as paid (Pension Reform Act
+ * 2014, s.120, "shall not be less than a total sum of basic salary, housing allowance and transport allowance"). Pure.
  * @param {Array<{id: string, code: string, label: string, amount: string, pensionable: boolean}>} components
  * @param {{workingDays: number, daysPaid: number, calendarDays: number, calendarPaid: number}} part
  * @returns {{lines: Array<{id: string, code: string, label: string, amount: string, pensionable: boolean}>, basic: string, pensionable: string}}
  */
 function componentPay(components, part) {
   const lines = components.map((c) => ({ ...c, amount: proratedPay(c.amount, part) }));
+  const total = (pick) => m.sum(lines.filter(pick).map((c) => c.amount));
+  const marked = total((c) => c.pensionable);
+  const floor = total((c) => PENSION_FLOOR.includes(String(c.code)));
   return {
     lines,
-    basic: m.toWire(m.sum(lines.filter((c) => c.code === "basic").map((c) => c.amount))),
-    pensionable: m.toWire(m.sum(lines.filter((c) => c.pensionable).map((c) => c.amount))),
+    basic: m.toWire(total((c) => c.code === "basic")),
+    pensionable: m.toWire(m.Decimal.max(marked, floor)),
   };
 }
 
@@ -150,7 +163,7 @@ function componentPay(components, part) {
  * Tax over ordered bands (§6.12): each band taxes the part of `amount` between its `band_from` and its `band_to` (no
  * end on the last) at its rate. Unrounded.
  * @param {string|object} amount
- * @param {Array<{band_from: string, band_to: string|null, rate: string, position: number}>} bands
+ * @param {Array<{band_from: string|object, band_to: string|object|null, rate: string, position: number}>} bands
  */
 function progressiveTax(amount, bands) {
   const taxable = m.money(amount);
@@ -164,81 +177,150 @@ function progressiveTax(amount, bands) {
   return tax;
 }
 
-const CONVENTIONS = ["paye_basis", "pension_reduces_taxable", "nhf_reduces_taxable"];
+/**
+ * A year's bands as they stand after `month` months of the calendar year (JBS Praxis, §13.1 item 39): each limit times
+ * month/12, the rates unchanged. Unrounded.
+ * @param {Array<{band_from: string, band_to: string|null, rate: string, position: number}>} bands
+ * @param {number} month  1 to 12
+ */
+function scaledBands(bands, month) {
+  const k = m.money(month).dividedBy(12);
+  return bands.map((b) => ({
+    ...b,
+    band_from: m.money(b.band_from).times(k),
+    band_to: b.band_to === null || b.band_to === undefined ? null : m.money(b.band_to).times(k),
+  }));
+}
 
 /**
- * The statutory lines of one payslip (§6.12), pure and deterministic, with no rate in the code: every figure comes
- * from `rates`, the rows in force on the run's last day, and the accountant's three conventions, none of which has a
- * default (an unset one is a defect here, refused at switch-on as NO_CONVENTIONS).
+ * A year's rent relief (Nigeria Tax Act 2025, s.30(2)(a)(vi)): its rate of the rent the person declared for the year,
+ * at most its cap; nothing without the figures in force or a declaration. Unrounded.
+ * @param {{rate: string, flat_amount: string}|undefined} row  rent relief's version in force
+ * @param {string|null} yearRent  the declared rent, pro-rated to the year
+ */
+function rentReliefOf(row, yearRent) {
+  if (!row || yearRent === null || yearRent === undefined) return m.ZERO;
+  return m.Decimal.min(m.percentOf(yearRent, row.rate), m.money(row.flat_amount));
+}
+
+/** The year to date of a person with none: a joiner with no leaving certificate, MyCity's first statutory month. */
+const NOTHING_TO_DATE = Object.freeze({ taxable_pay: "0.00", tax: "0.00" });
+
+/**
+ * The statutory lines of one payslip (§6.12), pure and deterministic, with no figure in the code: every rate, band and
+ * amount is a row of `rates` (those in force on the run's last day), and every rule traces to a row of §6.16.
  *
- *   pension_employee, pension_employer, nhf   rate × the base the row names, rounded once
- *   itf, nsitf                                 rate × the month's gross, its share of the annual payroll
- *   relief (no line)                           flat amount + rate × gross, taken off the taxable pay
- *   paye                                       progressive over the bands, on the taxable pay: gross less the relief,
- *                                              less employee pension and NHF when the conventions say so.
- *                                              `annualised`: the month's figures × 12 against annual bands (and an
- *                                              annual flat relief), the tax ÷ 12; `monthly`: against monthly bands
+ *   pension_employee, pension_employer  rate × the base its row names: the pensionable pay (never less than basic,
+ *                                        housing and transport) or the month's gross (Pension Reform Act 2014, s.4(1),
+ *                                        s.120)
+ *   nhf                                  rate × the month's gross, only for a person who chose to contribute and whose
+ *                                        rate of pay is the minimum wage or more (NHF Act s.4(1)(b) as substituted in
+ *                                        2023; §13.1 items 44 and 45)
+ *   itf, nsitf                           rate × the month's gross, its share of the payroll (ITF Act s.6(1) and s.16;
+ *                                        Employee's Compensation Act 2010, s.33(1))
+ *   paye, paye_refund                    cumulative over the calendar year (Operation of PAYE Regulations 2002, regs 3
+ *                                        and 4; Nigeria Tax Administration Act 2025, s.51(6) and (7)): the taxable pay
+ *                                        to date (each month's gross less employee pension and NHF as deducted, Nigeria
+ *                                        Tax Act 2025, s.30(2)(a)(i) and (iii)) less rent relief to date (the year's
+ *                                        relief × month/12), taxed on the year's bands × month/12 (§13.1 item 39); that
+ *                                        tax less the PAYE already deducted this year is the month's PAYE, or its PAYE
+ *                                        Refund when it has fallen (reg 4(2), §13.1 item 43). None for a person whose
+ *                                        rate of pay is the minimum wage or less (NTA s.58 and s.163(1)(t)): their month
+ *                                        stays out of the year to date (`taxable_pay` null, §13.1 item 45)
  *
- * An item with no row is not computed (§6.12 rule 3). Each line carries `base_amount`, what its rate was applied to
- * (the month's taxable pay for PAYE), for the statutory report.
+ * An item with no row is not computed (§6.12 rule 3), and nothing is defaulted; a row naming a base its item no longer
+ * allows (a version saved before PR 11 on `basic`) is not computed either, and Compute reports it missing. Each line is
+ * rounded once, half up, from full precision; a line of nothing is left off. Each carries `base_amount`, what it was
+ * worked from (for PAYE and its refund the month's taxable pay), for the statutory report.
  *
  * @param {object} p
  * @param {string} p.gross        the month's earnings: Monthly Pay or the split, overtime, earning adjustments
- * @param {string} p.basic        the basic component as paid this month (the whole Monthly Pay with no split)
- * @param {string} p.pensionable  the pensionable components as paid (the whole Monthly Pay with no split)
- * @param {Record<string, any>} p.rates  item → `{ base, rate }`, relief `{ base, rate, flat_amount }`, paye `{ base, bands }`
- * @param {{paye_basis: "annualised"|"monthly", pension_reduces_taxable: boolean, nhf_reduces_taxable: boolean}} p.conventions
- * @returns {Array<{kind: string, code: string, label: string, detail: string|null, amount: string, base_amount: string}>}
+ * @param {string} p.pensionable  the pensionable pay as paid (componentPay; the whole Monthly Pay with no split)
+ * @param {string} p.rate_of_pay  the person's monthly gross: the minimum wage's measure (§13.1 item 45)
+ * @param {boolean} p.nhf_contributes  whether the person chose to contribute to NHF (§13.1 item 44)
+ * @param {number} p.month        the period's month of the calendar year, 1 to 12
+ * @param {{taxable_pay: string, tax: string}} [p.to_date]  the year before this month: Pay to Date and the earlier
+ *                                months' advanced payslips (their taxable pay; their PAYE less PAYE Refund)
+ * @param {string|null} [p.year_rent]  the rent the person declared for the year, pro-rated to it, or null
+ * @param {Record<string, any>} p.rates  item → its row: `{ base, rate }`; paye `{ base, bands }`; rent_relief
+ *                                `{ base, rate, flat_amount }`; minimum_wage `{ base, flat_amount }`
+ * @returns {{lines: Array<{kind: string, code: string, label: string, detail: string|null, amount: string,
+ *   base_amount: string}>, taxable_pay: string|null}}
  */
-function computeStatutory({ gross, basic, pensionable, rates, conventions }) {
-  for (const c of CONVENTIONS)
-    if (!conventions || conventions[c] === null || conventions[c] === undefined)
-      throw new Error(`computeStatutory: the convention ${c} is not set`);
-  const g = m.money(gross);
-  const bases = { gross: g, annual_payroll: g, basic: m.money(basic), pensionable: m.money(pensionable) };
+function computeStatutory(p) {
+  const rates = p.rates || {};
+  const month = Number(p.month);
+  if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error("computeStatutory: month is 1 to 12");
+  const toDate = p.to_date || NOTHING_TO_DATE;
+  const g = m.money(p.gross);
+  const bases = { gross: g, annual_payroll: g, pensionable: m.money(p.pensionable) };
+  const wage = rates.minimum_wage ? m.money(rates.minimum_wage.flat_amount) : null;
   const amounts = {};
   const out = [];
+  const specOf = (item) => STATUTORY_LINES.find((s) => s.item === item);
   const line = (spec, amount, base, detail) => {
     amounts[spec.item] = m.round(amount);
     if (m.isZero(amounts[spec.item])) return;
     out.push({ kind: spec.kind, code: spec.item, label: spec.label, detail, amount: m.toWire(amount), base_amount: m.toWire(base) });
   };
 
+  // NHF is a deduction only for a person who chose it and earns the minimum wage or more; with no wage in force that
+  // cannot be told, and Compute reports the wage missing.
+  const nhfDue = p.nhf_contributes === true && wage !== null && m.compare(p.rate_of_pay, wage) >= 0;
+
   // The flat-rate items first: PAYE's taxable pay reads employee pension and NHF as deducted.
   for (const spec of STATUTORY_LINES) {
-    if (spec.item === "paye") continue;
+    if (spec.item === "paye" || spec.item === "paye_refund") continue;
     const r = rates[spec.item];
-    if (!r) continue;
-    const base = bases[r.base] ?? m.ZERO;
+    if (!r || (spec.item === "nhf" && !nhfDue)) continue;
+    const base = bases[r.base];
+    if (!base) continue;
     line(spec, m.percentOf(base, r.rate), base, rateLabel(r.rate));
   }
 
+  let taxable = null;
   const paye = rates.paye;
-  if (paye && paye.bands && paye.bands.length) {
-    const relief = rates.relief || null;
-    const pension = conventions.pension_reduces_taxable ? amounts.pension_employee || m.ZERO : m.ZERO;
-    const nhf = conventions.nhf_reduces_taxable ? amounts.nhf || m.ZERO : m.ZERO;
-    const annual = conventions.paye_basis === "annualised";
-    const k = annual ? 12 : 1;
-    const grossK = g.times(k);
-    const reliefK = relief ? m.percentOf(grossK, relief.rate || "0").plus(m.money(relief.flat_amount || "0")) : m.ZERO;
-    const taxableK = m.Decimal.max(m.ZERO, grossK.minus(reliefK).minus(pension.times(k)).minus(nhf.times(k)));
-    const tax = progressiveTax(taxableK, paye.bands).dividedBy(k);
-    const spec = STATUTORY_LINES.find((s) => s.item === "paye");
-    line(spec, tax, taxableK.dividedBy(k), null);
+  const exempt = wage !== null && m.compare(p.rate_of_pay, wage) <= 0;
+  if (paye && paye.bands && paye.bands.length && !exempt) {
+    const pension = amounts.pension_employee || m.ZERO;
+    const nhf = amounts.nhf || m.ZERO;
+    const monthTaxable = m.Decimal.max(m.ZERO, g.minus(pension).minus(nhf));
+    const relief = rentReliefOf(rates.rent_relief, p.year_rent).times(month).dividedBy(12);
+    const chargeable = m.Decimal.max(m.ZERO, m.money(toDate.taxable_pay).plus(monthTaxable).minus(relief));
+    const due = progressiveTax(chargeable, scaledBands(paye.bands, month)).minus(m.money(toDate.tax));
+    if (due.isNegative()) line(specOf("paye_refund"), due.negated(), monthTaxable, null);
+    else line(specOf("paye"), due, monthTaxable, null);
+    taxable = m.toWire(monthTaxable);
   }
 
   const order = STATUTORY_LINES.map((s) => s.item);
-  return out.sort((a, b) => order.indexOf(a.code) - order.indexOf(b.code));
+  return { lines: out.sort((a, b) => order.indexOf(a.code) - order.indexOf(b.code)), taxable_pay: taxable };
+}
+
+/**
+ * What an advanced run cannot compute without (§6.15, No Rates Set): a PAYE table; the minimum wage when PAYE or NHF is in
+ * force, since PAYE's exemption and NHF's floor read it (§13.1 item 45); and an item whose version names a base its item no
+ * longer allows (statutory.rates ratesOn `misbased`, a version saved before PR 11). The items that have their figures are
+ * computed either way, and Submit refuses the run until the missing are entered: the engine never defaults one.
+ * @param {{rates: Record<string, object>, misbased: string[]}} rated
+ * @returns {string[]}
+ */
+function statutoryMissing({ rates, misbased }) {
+  const out = [];
+  if (!rates.paye) out.push("paye");
+  if ((rates.paye || rates.nhf) && !rates.minimum_wage) out.push("minimum_wage");
+  for (const item of misbased || []) if (!out.includes(item)) out.push(item);
+  return out;
 }
 
 /**
  * The lines of one payslip, in the order the slip prints them: earnings, then deductions, then employer
- * charges, `position` counting from 1 (§4.2). A line of nothing is left off. Pure.
+ * charges, `position` counting from 1 (§4.2), and in advanced mode the month's taxable pay its PAYE was worked from
+ * (null in simple mode and in a month the minimum wage exempts). A line of nothing is left off. Pure.
  *
  * In advanced mode (`p.statutory` given) the earnings are the person's pay split when they have one (each
  * component a Monthly Pay line under its own label), and the statutory lines follow the earnings: employee items
- * as deductions before the rest, employer items last, never in the net (§6.12 rule 2).
+ * as deductions before the rest (PAYE Refund among the earnings), employer items last, never in the net (§6.12 rule 2).
  *
  * @param {object} p
  * @param {string|null} p.gross  the monthly gross; null is No Salary Set and a payslip with no lines
@@ -252,12 +334,13 @@ function computeStatutory({ gross, basic, pensionable, rates, conventions }) {
  * @param {Array<{id: string, kind: "earning"|"deduction", label: string, amount: string}>} p.adjustments
  * @param {Array<{id: string, code: string, label: string, amount: string, pensionable: boolean}>|null} [p.components]
  *   advanced mode: the person's pay split in force, when they have one
- * @param {{rates: object, conventions: object}|null} [p.statutory]  advanced mode: what computeStatutory needs
- * @returns {Array<{position: number, kind: string, code: string, label: string, detail: string|null,
- *   amount: string, source_type: string|null, source_id: string|null, base_amount: string|null}>}
+ * @param {{rates: object, month: number, nhf_contributes?: boolean, to_date?: object, year_rent?: string|null}|null} [p.statutory]
+ *   advanced mode: the figures in force, the period's month, the person's NHF choice, their year to date and declared rent
+ * @returns {{lines: Array<{position: number, kind: string, code: string, label: string, detail: string|null,
+ *   amount: string, source_type: string|null, source_id: string|null, base_amount: string|null}>, taxable_pay: string|null}}
  */
-function buildLines(p) {
-  if (p.gross === null || p.gross === undefined) return [];
+function payslipOf(p) {
+  if (p.gross === null || p.gross === undefined) return { lines: [], taxable_pay: null };
   const out = [];
   const add = (code, amount, extra = {}) => {
     if (m.isZero(amount)) return;
@@ -288,15 +371,21 @@ function buildLines(p) {
 
   // Advanced mode: the statutory items on the month's earnings, employee items first among the deductions.
   const employer = [];
+  let taxable = null;
   if (p.statutory) {
+    const st = p.statutory;
     const statutory = computeStatutory({
       gross: m.toWire(m.sum(out.map((l) => l.amount))),
-      basic: split ? split.basic : monthly,
       pensionable: split ? split.pensionable : monthly,
-      rates: p.statutory.rates,
-      conventions: p.statutory.conventions,
+      rate_of_pay: p.gross,
+      nhf_contributes: st.nhf_contributes === true,
+      month: st.month,
+      to_date: st.to_date || NOTHING_TO_DATE,
+      year_rent: st.year_rent ?? null,
+      rates: st.rates,
     });
-    for (const s of statutory) {
+    taxable = statutory.taxable_pay;
+    for (const s of statutory.lines) {
       if (s.kind === "employer") employer.push(s);
       else add(s.code, s.amount, { kind: s.kind, label: s.label, detail: s.detail, base_amount: s.base_amount });
     }
@@ -320,10 +409,16 @@ function buildLines(p) {
   for (const s of employer) add(s.code, s.amount, { kind: "employer", label: s.label, detail: s.detail, base_amount: s.base_amount });
 
   const rank = { earning: 0, deduction: 1, employer: 2 };
-  return out
+  const lines = out
     .map((line, i) => ({ line, i }))
     .sort((a, b) => rank[a.line.kind] - rank[b.line.kind] || a.i - b.i)
     .map(({ line }, i) => ({ position: i + 1, ...line }));
+  return { lines, taxable_pay: taxable };
+}
+
+/** The lines of one payslip (payslipOf without the taxable pay): what simple mode and the tests read. */
+function buildLines(p) {
+  return payslipOf(p).lines;
 }
 
 /**
@@ -399,9 +494,15 @@ module.exports = {
   LINES,
   ATTENDANCE_DEDUCTIONS,
   STATUTORY_LINES,
+  PENSION_FLOOR,
+  NOTHING_TO_DATE,
   componentPay,
   progressiveTax,
+  scaledBands,
+  rentReliefOf,
   computeStatutory,
+  statutoryMissing,
+  payslipOf,
   proratedPay,
   daysAmount,
   instalmentShares,

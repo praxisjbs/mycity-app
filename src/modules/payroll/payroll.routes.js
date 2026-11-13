@@ -22,7 +22,7 @@
  *   POST   /runs/:id/statutory-report   `payroll` export: Statutory Report of an approved or paid advanced run (202)
  *   GET    /settings                    `payroll` view: the setting today, the version in force and the next one
  *   PATCH  /settings                    `payroll` edit and `payroll.configure`: a new version from today or later (the
- *                                       pay day, Bank Details Required, Switch On or Off, the conventions)
+ *                                       pay day, Bank Details Required, Switch On or Off)
  *   DELETE /settings/versions/:effective_from   `payroll` edit and `payroll.configure`: Remove Change, a version
  *                                       still waiting for its day (204); the version before it runs on
  *

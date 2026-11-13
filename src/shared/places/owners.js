@@ -26,6 +26,9 @@ const OWNERS = Object.freeze([
   // A temporary site's addresses (attendance.md §6.11): a venue, or a Temporary Home's, which is personal.
   Object.freeze({ name: "attendance_temporary_site_location.address", module: "attendance", level: "address", personal: true }),
   Object.freeze({ name: "employee.home_address", module: "organisation", level: "address", personal: true }),
+  // The property a person declared rent for, for payroll's rent relief (docs/guides/payroll.md §13.1 item 41): personal,
+  // masked as employee.statutory with the rest of the declaration.
+  Object.freeze({ name: "employee_rent_declaration.property_address", module: "organisation", level: "address", personal: true }),
   // A vacancy's location (docs/guides/recruitment.md §4): anything from a district to a city.
   Object.freeze({ name: "vacancy.location", module: "vacancies", level: "area", personal: false }),
   // Partnerships (docs/guides/partnerships.md §6.19): a partner's headquarters is an area; a lead's or

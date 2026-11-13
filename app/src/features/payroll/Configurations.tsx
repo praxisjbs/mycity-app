@@ -56,16 +56,17 @@ import {
 
 /**
  * Payroll · Configurations (docs/guides/payroll.md §2, §3.5, §6.11, §6.12, §10): how MyCity is paid. Always: the Pay Day,
- * Bank Details Required, the Advanced Payroll switch, the Statutory Items and the PAYE Bands, so the first rates are
- * entered before the option is first switched on (§13.1 item 25). Once the option is on or has been: the accountant's
- * three conventions, the salary grades with who sits outside their band, and each person's pay split.
+ * Bank Details Required, the Advanced Payroll switch, the Statutory Items and the PAYE Bands, so the first figures are
+ * entered before the option is first switched on (§13.1 item 25). Once the option is on or has been: the salary grades
+ * with who sits outside their band, and each person's pay split and Pay to Date. The accountant's conventions left the
+ * screen in PR 11: the law settles them, so the engine fixes them (§6.12 rule 14).
  *
  * Every change is a version from today or later, made by someone holding `payroll.configure`; the screen hides the
  * controls from anyone else (the API still decides). A change still waiting for its day can be taken back (Remove
  * Change); one in force is replaced by a new version. Every statutory version names its legal source, or No Legal
  * Source with the reason (§6.12 rule 12). Every deduction is monthly, so nothing here offers a PAYE Basis (§6.12 rule
- * 11). Nothing here is hard-coded data: every rate, band and grade is one MyCity entered. The words of the seven items
- * and their bases are the code's, not figures.
+ * 11). Nothing here is hard-coded data: every rate, band, cap, wage and grade is one MyCity entered. The words of the
+ * eight items and their bases are the code's, not figures.
  */
 
 type Item = StatutoryItemState["item"];
@@ -79,7 +80,8 @@ const ITEM_WORDS: Record<Item, string> = {
   nhf: "NHF",
   itf: "ITF",
   nsitf: "NSITF",
-  relief: "Relief",
+  rent_relief: "Rent Relief",
+  minimum_wage: "Minimum Wage",
 };
 const BASE_WORDS: Record<Base, string> = {
   gross: "Gross Pay",
@@ -87,7 +89,9 @@ const BASE_WORDS: Record<Base, string> = {
   basic: "Basic Pay",
   taxable: "Taxable Pay",
   annual_payroll: "Payroll",
+  rent: "Year's Rent",
 };
+
 const POSITION: Record<NonNullable<GradePlacement["band_position"]>, { tone: Tone; text: string }> = {
   below: { tone: "warn", text: "Below Minimum" },
   within: { tone: "ok", text: "Within Band" },
@@ -104,11 +108,16 @@ const ADVANCED_HELP = "From its date, later runs compute PAYE, pension, NHF, ITF
 const BANK_HELP = "When on, a person with no bank details blocks Submit.";
 const PAY_DAY_HELP = "30 unless changed. A day past a month's end is its last day.";
 const BANDS_HELP = "Enter the bands as the law publishes them. Each is taken monthly.";
+/**
+ * Who the items reach (tier 2, §10.1): a threshold about MyCity itself is not computed, so MyCity enters an item only while
+ * it is liable (Pension Reform Act 2014, s.120 as PenCom applies it; ITF Act s.6(1)).
+ */
+const ITEMS_HELP = "Enter an item only while it applies to MyCity: pension from three employees, ITF from 25. No PAYE at or below the minimum wage.";
 const SOURCE_HELP = "The law a figure comes from. No Legal Source when none.";
 const SPLIT_HELP = "The components add up to the monthly gross.";
+const PRIOR_HELP = "This year's taxable pay and tax before MyCity's first statutory month, from a leaving certificate or earlier months.";
 
 const failed = (e: unknown, fallback: string) => toast.error(e instanceof ApiError ? e.message : fallback);
-const yesNo = (v: boolean | null) => (v === null ? "Not Set" : v ? "Yes" : "No");
 const pct = (rate: string | null) => (rate === null ? "" : `${rate}%`);
 /** The pay day stored as 31 is the month's last day, whatever its length (§6.11 rule 1). */
 const LAST_DAY = 31;
@@ -116,10 +125,6 @@ const payDayWords = (day: number) => (day === LAST_DAY ? "Last Day of Month" : S
 const DAYS: Array<readonly [string, string]> = [
   ...Array.from({ length: LAST_DAY - 1 }, (_, i) => [String(i + 1), String(i + 1)] as const),
   [String(LAST_DAY), "Last Day of Month"],
-];
-const YES_NO: Array<readonly [string, string]> = [
-  ["yes", "Yes"],
-  ["no", "No"],
 ];
 /** A version's source as a row reads it: the instrument and section, or No Legal Source. */
 const sourceWords = (v: StatutorySource | null | undefined) => (!v ? "" : v.no_legal_source ? "No Legal Source" : [v.source_title, v.source_section].filter(Boolean).join(", "));
@@ -163,7 +168,6 @@ export default function Configurations() {
       {s ? <OptionsCard settings={s} may={may} /> : <Card><LoadingRows /></Card>}
       <StatutoryItems items={items.data?.items ?? []} loading={items.loading} may={may} />
       <PayeBands may={may} />
-      {s && shown && <Conventions settings={s} may={may} />}
       {shown && <Structure may={may} />}
     </>
   );
@@ -205,7 +209,7 @@ function OptionsCard({ settings: s, may }: { settings: PayrollSettings; may: boo
     }
   };
   const openAdvanced = () =>
-    modal.open({ title: advanced ? "Switch Off Advanced Payroll" : "Switch On Advanced Payroll", body: (close) => <AdvancedForm on={!advanced} settings={s} close={close} /> });
+    modal.open({ title: advanced ? "Switch Off Advanced Payroll" : "Switch On Advanced Payroll", body: (close) => <AdvancedForm on={!advanced} close={close} /> });
   const advancedState =
     next && next.advanced_enabled !== s.advanced_enabled ? (
       <Pill tone="info">{`${next.advanced_enabled ? "On" : "Off"} from ${formatDate(next.effective_from)}`}</Pill>
@@ -306,58 +310,17 @@ function PayDayForm({ settings: s, close }: { settings: PayrollSettings; close: 
   );
 }
 
-type ConventionValues = { effective_from: string; pension_reduces_taxable: string; nhf_reduces_taxable: string };
-/** The conventions the screen asks for; PAYE Basis left it in PR 10, since every deduction is monthly (§6.12 rule 11). */
-const CONVENTION_KEYS = ["pension_reduces_taxable", "nhf_reduces_taxable"] as const;
-
-const asFlag = (v: string) => (v === "yes" ? true : v === "no" ? false : undefined);
-const fromFlag = (v: boolean | null) => (v === null ? "" : v ? "yes" : "no");
-
-/** The body of a change to the conventions, with both asked for (neither has a default, §6.12 rule 1). */
-function conventionsBody(v: ConventionValues) {
-  return {
-    effective_from: v.effective_from,
-    pension_reduces_taxable: asFlag(v.pension_reduces_taxable),
-    nhf_reduces_taxable: asFlag(v.nhf_reduces_taxable),
-  };
-}
-const conventionsCheck = (v: ConventionValues): Parsed => {
-  const r = payroll.PayrollSettingsChange.safeParse(conventionsBody(v)) as Parsed;
-  const unset: Issue[] = CONVENTION_KEYS.filter((k) => !v[k]).map((k) => ({ path: [k], message: "Pick one", code: "custom" }));
-  const issues = [...(r.success ? [] : (r.error?.issues ?? [])), ...unset];
-  return issues.length ? { success: false, error: { issues } } : { success: true };
-};
-
-/** The two conventions, asked for whenever the option is switched on or they are changed. */
-function ConventionFields({ f }: { f: ReturnType<typeof useContractForm<ConventionValues>> }) {
-  return (
-    <>
-      <Field label="Pension Reduces Taxable Pay" {...f.status("pension_reduces_taxable")}>
-        <ChoiceField options={YES_NO} {...f.field("pension_reduces_taxable")} />
-      </Field>
-      <Field label="NHF Reduces Taxable Pay" {...f.status("nhf_reduces_taxable")}>
-        <ChoiceField options={YES_NO} {...f.field("nhf_reduces_taxable")} />
-      </Field>
-    </>
-  );
-}
-
-/** Switch On (with the date and the two conventions) or Switch Off (with the date): §10.3, amendment 2. */
-function AdvancedForm({ on, settings: s, close }: { on: boolean; settings: PayrollSettings; close: () => void }) {
-  const latest = s.next ?? s.current;
-  const f = useContractForm<ConventionValues>(
-    {
-      effective_from: todayIso(),
-      pension_reduces_taxable: fromFlag(latest?.pension_reduces_taxable ?? null),
-      nhf_reduces_taxable: fromFlag(latest?.nhf_reduces_taxable ?? null),
-    },
-    { safeParse: (v: ConventionValues) => (on ? conventionsCheck(v) : payroll.PayrollSettingsChange.safeParse({ effective_from: v.effective_from, advanced_enabled: false })) },
+/** Switch On or Switch Off, from a date: §10.3, amendment 2. Nothing else is asked: the law settles the conventions. */
+function AdvancedForm({ on, close }: { on: boolean; close: () => void }) {
+  const f = useContractForm<{ effective_from: string }>(
+    { effective_from: todayIso() },
+    { safeParse: (v: { effective_from: string }) => payroll.PayrollSettingsChange.safeParse({ effective_from: v.effective_from, advanced_enabled: on }) },
   );
   const patch = useMutation("PATCH /api/v1/payroll/settings");
   const save = async () => {
     if (!f.check()) return;
     try {
-      await patch.run({ body: on ? { ...conventionsBody(f.values), advanced_enabled: true } : { effective_from: f.values.effective_from, advanced_enabled: false } });
+      await patch.run({ body: { effective_from: f.values.effective_from, advanced_enabled: on } });
       invalidate("/api/v1/payroll/settings", "/api/v1/salary-structure");
       close();
       toast(on ? "Advanced Payroll switched on" : "Advanced Payroll switched off");
@@ -370,7 +333,6 @@ function AdvancedForm({ on, settings: s, close }: { on: boolean; settings: Payro
       <Field label="Effective From" {...f.status("effective_from")}>
         <DateField {...f.field("effective_from")} min={todayIso()} />
       </Field>
-      {on && <ConventionFields f={f} />}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={save}>
@@ -385,12 +347,13 @@ function AdvancedForm({ on, settings: s, close }: { on: boolean; settings: Payro
  * Statutory Items and PAYE Bands: always on the screen (§13.1 item 25)
  * ------------------------------------------------------------------ */
 
-/** What an item's rate reads as: a percentage, the relief's amount and rate, or how many PAYE bands. */
+/** What an item's figure reads as: a percentage, rent relief's rate and cap, the minimum wage, or how many PAYE bands. */
 function rateOf(i: StatutoryItemState) {
   const v = i.current ?? i.next;
   if (!v) return "";
   if (i.item === "paye") return v.bands === 1 ? "1 band" : `${v.bands} bands`;
-  if (i.item === "relief") return [v.flat_amount && v.flat_amount !== "0.00" ? formatMoney(v.flat_amount) : null, v.rate && v.rate !== "0" ? pct(v.rate) : null].filter(Boolean).join(" + ");
+  if (i.item === "minimum_wage") return v.flat_amount ? formatMoney(v.flat_amount) : "";
+  if (i.item === "rent_relief") return [pct(v.rate), v.flat_amount ? `cap ${formatMoney(v.flat_amount)}` : null].filter(Boolean).join(", ");
   return pct(v.rate);
 }
 
@@ -410,7 +373,7 @@ function StatutoryItems({ items, loading, may }: { items: StatutoryItemState[]; 
   const columns: DataViewColumn<StatutoryItemState>[] = [
     { key: "item", label: "Item", render: (i) => <span className="font-semibold">{ITEM_WORDS[i.item]}</span> },
     { key: "kind", label: "Type", render: (i) => (i.kind === "employer" ? "Employer" : "Employee") },
-    { key: "rate", label: "Rate", render: rateOf },
+    { key: "rate", label: "Figure", render: rateOf },
     { key: "base", label: "Base", desktop: true, render: (i) => BASE_WORDS[(i.current ?? i.next)?.base ?? i.bases[0]] },
     { key: "source", label: SOURCE_LABEL, render: (i) => sourceWords(i.current ?? i.next) },
     { key: "status", label: "Status", badge: true, render: itemStatus },
@@ -418,6 +381,7 @@ function StatutoryItems({ items, loading, may }: { items: StatutoryItemState[]; 
   return (
     <DataView
       title="Statutory Items"
+      help={ITEMS_HELP}
       rows={items}
       loading={loading}
       rowKey={(i) => i.item}
@@ -573,17 +537,22 @@ function useRemoveChange(item: StatutoryItemState["item"], close: () => void) {
 
 type RateValues = SourceValues & { rate: string; flat_amount: string; base: string; effective_from: string };
 
-/** Set one item's rate (the relief its flat amount too), from a day, with its source: Save Rate. */
+/**
+ * Set one item's figure from a day, with its source: Save Rate. Rent relief takes its rate and its cap; the minimum wage
+ * a month's amount and no rate; every other item one rate (§6.12 rule 7).
+ */
 function RateForm({ state: i, close }: { state: StatutoryItemState; close: () => void }) {
   const latest = i.next ?? i.current;
   const [noLegal, setNoLegal] = useState(latest?.no_legal_source === true);
   const [held, setHeld] = useState<Held>(heldOf(latest));
+  const amountItem = i.item === "rent_relief" || i.item === "minimum_wage";
+  const rated = i.item !== "minimum_wage";
   const body = (v: RateValues) => ({
     item: i.item,
     effective_from: v.effective_from,
     ...(v.base && v.base !== i.bases[0] && { base: v.base as Base }),
-    ...(v.rate !== "" && { rate: v.rate }),
-    ...(i.item === "relief" && v.flat_amount !== "" && { flat_amount: toMoneyString(v.flat_amount) }),
+    ...(rated && v.rate !== "" && { rate: v.rate }),
+    ...(amountItem && v.flat_amount !== "" && { flat_amount: toMoneyString(v.flat_amount) }),
     ...sourceBody(v, noLegal, held),
   });
   const f = useContractForm<RateValues>(
@@ -611,14 +580,16 @@ function RateForm({ state: i, close }: { state: StatutoryItemState; close: () =>
   };
   return (
     <>
-      {i.item === "relief" && (
-        <Field label="Flat Amount" optional {...f.status("flat_amount")}>
+      {rated && (
+        <Field label="Rate" {...f.status("rate")}>
+          <NumberField decimal {...f.field("rate")} placeholder="7.5" />
+        </Field>
+      )}
+      {amountItem && (
+        <Field label={i.item === "minimum_wage" ? "Monthly Amount" : "Cap a Year"} {...f.status("flat_amount")}>
           <MoneyField {...f.field("flat_amount")} />
         </Field>
       )}
-      <Field label="Rate" optional={i.item === "relief"} {...f.status("rate")}>
-        <NumberField decimal {...f.field("rate")} placeholder="7.5" />
-      </Field>
       {i.bases.length > 1 && (
         <Field label="Base" {...f.status("base")}>
           <ChoiceField options={i.bases.map((b) => [b, BASE_WORDS[b]] as const)} {...f.field("base")} />
@@ -733,73 +704,6 @@ function BandsFields({ initial, waiting, close }: { initial: StatutoryRate[]; wa
         )}
         <Button variant="primary" onClick={submit}>
           Save Bands
-        </Button>
-      </FormFooter>
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Conventions: once the option is on or has been
- * ------------------------------------------------------------------ */
-
-function Conventions({ settings: s, may }: { settings: PayrollSettings; may: boolean }) {
-  const modal = useModal();
-  const v = s.next ?? s.current;
-  return (
-    <Card className="mt-3">
-      <CardHeader
-        title="Conventions"
-        actions={
-          may && (
-            <Button size="sm" onClick={() => modal.open({ title: "Set Conventions", body: (close) => <ConventionsForm settings={s} close={close} /> })}>
-              Set Conventions
-            </Button>
-          )
-        }
-      />
-      <KeyValue
-        items={[
-          ["Pension Reduces Taxable Pay", yesNo(v?.pension_reduces_taxable ?? null)],
-          ["NHF Reduces Taxable Pay", yesNo(v?.nhf_reduces_taxable ?? null)],
-        ]}
-      />
-    </Card>
-  );
-}
-
-function ConventionsForm({ settings: s, close }: { settings: PayrollSettings; close: () => void }) {
-  const latest = s.next ?? s.current;
-  const f = useContractForm<ConventionValues>(
-    {
-      effective_from: todayIso(),
-      pension_reduces_taxable: fromFlag(latest?.pension_reduces_taxable ?? null),
-      nhf_reduces_taxable: fromFlag(latest?.nhf_reduces_taxable ?? null),
-    },
-    { safeParse: conventionsCheck },
-  );
-  const patch = useMutation("PATCH /api/v1/payroll/settings");
-  const save = async () => {
-    if (!f.check()) return;
-    try {
-      await patch.run({ body: conventionsBody(f.values) });
-      invalidate("/api/v1/payroll/settings");
-      close();
-      toast("Conventions saved");
-    } catch (e) {
-      landed(e, f.setServerErrors, "Conventions not saved");
-    }
-  };
-  return (
-    <>
-      <ConventionFields f={f} />
-      <Field label="Effective From" {...f.status("effective_from")}>
-        <DateField {...f.field("effective_from")} min={todayIso()} />
-      </Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={save}>
-          Set Conventions
         </Button>
       </FormFooter>
     </>
@@ -971,6 +875,12 @@ function PersonCard({ placement: p, may }: { placement: GradePlacement; may: boo
   const version = set?.current ?? set?.next ?? null;
   for (const c of version?.components ?? []) items.push([c.label, <span key={c.code}>{amount(c.pay_amount)}{c.pensionable ? " · Pensionable" : ""}</span>]);
   if (set?.next) items.push(["Next Split", formatDate(set.next.effective_from)]);
+  // The year's pay and tax before MyCity's first statutory month (§13.1 item 42): where the person's PAYE year starts.
+  const prior = usePrior(p.employee.employee_id);
+  if (prior.entry) {
+    items.push([<HelpTerm key="prior" help={PRIOR_HELP}>{`Prior Pay ${prior.entry.year}`}</HelpTerm>, amount(prior.entry.taxable_pay)]);
+    items.push([`Prior Tax ${prior.entry.year}`, amount(prior.entry.tax_paid)]);
+  } else items.push([<HelpTerm key="prior" help={PRIOR_HELP}>Prior Pay</HelpTerm>, "None"]);
   return (
     <Card>
       <CardHeader record title={p.employee.display_name} right={p.has_pay_split ? <Pill tone="ok">Split Set</Pill> : <Pill tone="neutral">No Split</Pill>} />
@@ -978,6 +888,9 @@ function PersonCard({ placement: p, may }: { placement: GradePlacement; may: boo
       {may && (
         <FormFooter>
           <Button onClick={() => modal.open({ title: "Place Person", body: (close) => <PlacementForm placement={p} close={close} /> })}>Place Person</Button>
+          <Button onClick={() => modal.open({ title: "Set Prior Pay", body: (close) => <PriorPayForm employeeId={p.employee.employee_id} entry={prior.entry} close={close} /> })}>
+            Set Prior Pay
+          </Button>
           {set && (
             <Button variant="primary" onClick={() => modal.open({ title: "Set Pay Components", body: (close) => <ComponentsForm set={set} close={close} /> })}>
               Set Pay Components
@@ -986,6 +899,109 @@ function PersonCard({ placement: p, may }: { placement: GradePlacement; may: boo
         </FormFooter>
       )}
     </Card>
+  );
+}
+
+type PriorEntry = { year: number; taxable_pay: string | null; tax_paid: string | null; document_id: string | null };
+
+/** This year's Pay to Date of one person, or null: the newest of their years (GET …/pay-to-date, newest first). */
+function usePrior(employeeId: string) {
+  const list = useApi("GET /api/v1/statutory/employees/:employee_id/pay-to-date", { params: { employee_id: employeeId } });
+  const year = Number(todayIso().slice(0, 4));
+  const entry: PriorEntry | null = (list.data?.data ?? []).find((r) => r.year === year) ?? null;
+  return { entry, loading: list.loading };
+}
+
+type PriorValues = { year: string; taxable_pay: string; tax_paid: string };
+
+/**
+ * Set Prior Pay (§13.1 item 42): this year's or next year's taxable pay and tax before MyCity's first statutory month,
+ * from a previous employer's leaving certificate (Operation of PAYE Regulations 2002, reg 5) or MyCity's own months before
+ * the option was on. The certificate goes through the upload engine. A person with none starts the year at nothing.
+ */
+function PriorPayForm({ employeeId, entry, close }: { employeeId: string; entry: PriorEntry | null; close: () => void }) {
+  const confirm = useConfirm();
+  const thisYear = Number(todayIso().slice(0, 4));
+  const years: Array<readonly [string, string]> = [thisYear, thisYear + 1].map((y) => [String(y), String(y)] as const);
+  const [held, setHeld] = useState<Held>(entry?.document_id ? { id: entry.document_id, name: "Certificate on File" } : null);
+  const body = (v: PriorValues) => ({
+    taxable_pay: v.taxable_pay === "" ? "" : toMoneyString(v.taxable_pay),
+    tax_paid: v.tax_paid === "" ? "" : toMoneyString(v.tax_paid),
+    ...(held && { document_id: held.id }),
+  });
+  const f = useContractForm<PriorValues>(
+    { year: String(entry?.year ?? thisYear), taxable_pay: entry?.taxable_pay ?? "", tax_paid: entry?.tax_paid ?? "" },
+    { safeParse: (v: PriorValues) => statutory.PayToDateSave.safeParse(body(v)) },
+  );
+  const save = useMutation("PUT /api/v1/statutory/employees/:employee_id/pay-to-date/:year");
+  const drop = useMutation("DELETE /api/v1/statutory/employees/:employee_id/pay-to-date/:year");
+  const params = () => ({ employee_id: employeeId, year: Number(f.values.year) });
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: params(), body: body(f.values) });
+      invalidate("/api/v1/statutory/employees");
+      close();
+      toast("Prior pay saved");
+    } catch (e) {
+      landed(e, f.setServerErrors, "Prior pay not saved");
+    }
+  };
+  const remove = async () => {
+    if (!(await confirm({ title: "Remove Prior Pay", body: `${f.values.year} starts at nothing for this person.`, confirmLabel: "Remove Prior Pay", cancelLabel: "Keep It", destructive: true }))) return;
+    try {
+      await drop.run({ params: params() });
+      invalidate("/api/v1/statutory/employees");
+      close();
+      toast("Prior pay removed");
+    } catch (e) {
+      failed(e, "Prior pay not removed");
+    }
+  };
+  return (
+    <>
+      <Field label="Year" {...f.status("year")}>
+        <SelectField options={years} {...f.field("year")} />
+      </Field>
+      <Field label="Taxable Pay" {...f.status("taxable_pay")}>
+        <MoneyField {...f.field("taxable_pay")} />
+      </Field>
+      <Field label="Tax Paid" {...f.status("tax_paid")}>
+        <MoneyField {...f.field("tax_paid")} />
+      </Field>
+      <Field label="Certificate" optional>
+        {held ? (
+          <FileRow
+            name={held.name}
+            action={
+              <Button size="sm" onClick={() => setHeld(null)}>
+                Replace File
+              </Button>
+            }
+          />
+        ) : (
+          <UploadField
+            upload={upload}
+            purpose="document"
+            accept=".pdf,image/*"
+            multiple={false}
+            compact
+            onUploaded={(docs) => setHeld(docs[0] ? { id: docs[0].document_id, name: docs[0].file_name } : null)}
+          />
+        )}
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        {entry && (
+          <Button variant="danger" onClick={remove}>
+            Remove Prior Pay
+          </Button>
+        )}
+        <Button variant="primary" onClick={submit}>
+          Save Prior Pay
+        </Button>
+      </FormFooter>
+    </>
   );
 }
 

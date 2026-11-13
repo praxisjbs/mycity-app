@@ -17,6 +17,10 @@
  *                               once it has started, or when an advanced run sent for approval read it
  *   requestReport(actor, id)    POST /payroll/runs/:id/statutory-report: an approved or paid advanced run's report
  *   assertMayReadReport(user)   a reader whose role hides pay or tax numbers is not handed the report (403)
+ *   payToDate(id, query)        GET /statutory/employees/:employee_id/pay-to-date: a person's years, newest first
+ *   savePayToDate(actor, p, b)  PUT …/pay-to-date/:year (`payroll.configure`): the year's taxable pay and tax before
+ *                               MyCity's first statutory month, made or replaced, the leaving certificate claimed
+ *   removePayToDate(actor, p)   DELETE …/pay-to-date/:year (`payroll.configure`)
  */
 const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
@@ -27,11 +31,12 @@ const { canSee } = require("../../shared/rbac/field-mask");
 const vault = require("../../shared/documents/vault");
 const lagos = require("../../shared/time/lagos");
 const { assertNotPast } = require("../payroll/payroll.config.repo");
+const { assertTaxYear } = require("../organisation/employee.rent");
 const lock = require("../payroll/payroll.lock");
 const rates = require("./statutory.rates");
 const report = require("./statutory.report");
 const repo = require("./statutory.repo");
-const { EVENTS, SOURCE_DOC_TYPE } = require("./statutory.events");
+const { EVENTS, SOURCE_DOC_TYPE, CERTIFICATE_DOC_TYPE } = require("./statutory.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -55,8 +60,8 @@ function brief(item, rows) {
   if (!mine.length) return null;
   const r = mine[0];
   return {
-    rate: item === "paye" ? null : r.rate,
-    flat_amount: item === "relief" ? r.flat_amount : null,
+    rate: item === "paye" || item === "minimum_wage" ? null : r.rate,
+    flat_amount: c.statutory.AMOUNT_ITEMS.includes(item) ? r.flat_amount : null,
     base: r.base,
     bands: item === "paye" ? mine.length : null,
     effective_from: r.effective_from,
@@ -64,7 +69,7 @@ function brief(item, rows) {
   };
 }
 
-/** GET /statutory/items: the seven items, each with the version in force today and the next one. */
+/** GET /statutory/items: the eight items, each with the version in force today and the next one. */
 async function items() {
   const today = lagos.today();
   const [now, next] = await Promise.all([repo.inForce(pool, today), repo.nextVersions(pool, today)]);
@@ -167,4 +172,87 @@ async function assertMayReadReport(user) {
 /** POST /payroll/runs/:id/statutory-report: 202 with the file the screen waits on. */
 const requestReport = (actor, runId) => tx((client) => report.requestReport(client, runId, { actor }));
 
-module.exports = { list, items, save, removeChange, assertMayReadReport, requestReport };
+/* ------------------------------------------------------------------ *
+ * A person's Pay to Date (§6.12 rule 11, §13.1 item 42)
+ * ------------------------------------------------------------------ */
+
+/** The person exists, or 404. */
+async function assertPerson(db, employeeId) {
+  const { rows } = await db.query("SELECT 1 FROM employee WHERE employee_id = $1", [employeeId]);
+  if (!rows.length) throw new AppError("NOT_FOUND", "That person does not exist", 404);
+}
+
+/** A row as the contract's PayToDate. */
+const presentPayToDate = (r) => ({
+  employee_pay_to_date_id: r.employee_pay_to_date_id,
+  employee_id: r.employee_id,
+  year: Number(r.year),
+  taxable_pay: r.taxable_pay,
+  tax_paid: r.tax_paid,
+  document_id: r.document_id ?? null,
+  entered_by_name: r.entered_by_name ?? null,
+  updated_at: new Date(r.updated_at).toISOString(),
+});
+
+/** GET /statutory/employees/:employee_id/pay-to-date: a person's years, newest first, 25 a page. */
+async function payToDate(employeeId, query) {
+  await assertPerson(pool, employeeId);
+  const page = await repo.payToDatePage(pool, employeeId, query);
+  return { ...page, data: page.data.map(presentPayToDate) };
+}
+
+/**
+ * PUT /statutory/employees/:employee_id/pay-to-date/:year: the year's taxable pay and tax before MyCity's first statutory
+ * month, made or replaced (this year or the next, 422 YEAR_NOT_ALLOWED). A leaving certificate staged through the upload
+ * engine is claimed for the person as a restricted `leaving_certificate`; one this person's entry already holds is named
+ * again as it is. A later run reads it as the start of the person's year to date; a run already sent keeps what it read.
+ */
+async function savePayToDate(actor, { employee_id: employeeId, year }, body) {
+  assertTaxYear(year);
+  await tx(async (client) => {
+    await assertPerson(client, employeeId);
+    const row = await repo.writePayToDate(client, {
+      employee_id: employeeId,
+      year,
+      taxable_pay: body.taxable_pay,
+      tax_paid: body.tax_paid,
+      document_id: body.document_id,
+      entered_by: actor ? actor.user_id : null,
+    });
+    if (body.document_id)
+      await vault.claim(client, {
+        document_id: body.document_id,
+        doc_type: CERTIFICATE_DOC_TYPE,
+        entity: { type: "salary_structure", id: employeeId },
+        subject_employee_id: employeeId,
+        actor,
+        field: "document_id",
+        sensitivity: "restricted",
+      });
+    await emit(client, {
+      key: EVENTS.PAY_TO_DATE_SAVED,
+      entity: { type: "salary_structure", id: employeeId },
+      actor,
+      after: { year, has_certificate: Boolean(body.document_id) },
+      payload: { employee_id: employeeId, year, created: row.created === true, document_id: body.document_id || null },
+    });
+  });
+  return presentPayToDate(await repo.payToDateOf(pool, employeeId, year));
+}
+
+/** DELETE /statutory/employees/:employee_id/pay-to-date/:year: an entry made in error; 404 for a year with none. */
+async function removePayToDate(actor, { employee_id: employeeId, year }) {
+  await tx(async (client) => {
+    const gone = await repo.deletePayToDate(client, employeeId, year);
+    if (!gone) throw new AppError("NOT_FOUND", "No pay to date for that year", 404);
+    await emit(client, {
+      key: EVENTS.PAY_TO_DATE_REMOVED,
+      entity: { type: "salary_structure", id: employeeId },
+      actor,
+      before: { year },
+      payload: { employee_id: employeeId, year },
+    });
+  });
+}
+
+module.exports = { list, items, save, removeChange, assertMayReadReport, requestReport, payToDate, savePayToDate, removePayToDate };

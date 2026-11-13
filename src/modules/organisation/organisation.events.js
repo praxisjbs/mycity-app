@@ -43,6 +43,8 @@ const EVENTS = defineEvents("people", {
   "employee.restored": { summary: "An archived employee record was restored" },
   "employee.reporting_line_changed": { summary: "An employee's reporting line changed" },
   "employee.photo_updated": { summary: "An employee's photo was set or removed" },
+  "employee.rent_declared": { summary: "An employee's rent for a tax year was declared or changed", sensitive: true },
+  "employee.rent_declaration_removed": { summary: "An employee's rent declaration was removed", sensitive: true },
   "org_seat.created": { summary: "A vacant seat was added to the structure" },
   "org_seat.updated": { summary: "A vacant seat was changed" },
   "org_seat.filled": { summary: "A vacant seat was filled by a new hire" },
@@ -95,4 +97,17 @@ require("../../shared/places/owners").owner("employee.home_address", {
   rename: (client, id, line) => require("./organisation.repo").updateEmployee(client, id, { home_address: line }),
 });
 
-module.exports = { EVENTS, CHART_DOC_TYPE, CHART_EXPORT, PHOTO_DOC_TYPE, PHOTO_ENTITY };
+/**
+ * The evidence of the rent a person declared for rent relief (employee.rent.js; docs/guides/payroll.md §13.1 item 41):
+ * staged through the upload engine and claimed by the save, restricted, so only the person and `people` edit holders
+ * open it.
+ */
+const RENT_EVIDENCE_DOC_TYPE = "rent_evidence";
+defineDocumentType(RENT_EVIDENCE_DOC_TYPE, { label: "Rent Evidence", module: "people", sensitivity: "restricted" });
+
+/** A rented property's address saved while search was down is named by the places-name job (F27). */
+require("../../shared/places/owners").owner("employee_rent_declaration.property_address", {
+  rename: (client, id, line) => require("./employee.rent").setAddressLine(client, id, line),
+});
+
+module.exports = { EVENTS, CHART_DOC_TYPE, CHART_EXPORT, PHOTO_DOC_TYPE, PHOTO_ENTITY, RENT_EVIDENCE_DOC_TYPE };

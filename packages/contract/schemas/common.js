@@ -113,6 +113,12 @@ const positiveMoney = z
 const monthStart = (message = "Pick a month") => isoDate.refine((v) => v.endsWith("-01"), message);
 
 /**
+ * A tax year: 2026, the first under the Nigeria Tax Act 2025, or later. Taken from a path, so a string is read as a
+ * number (docs/guides/payroll.md §6.12 rules 11 and 15).
+ */
+const taxYear = z.coerce.number().int().min(2026, "From 2026").max(2100, "Pick a year");
+
+/**
  * An optional typed value a form may send as an empty cell.
  *
  * `optionalText()` already treats "" as "not given". A typed optional (a date, an
@@ -322,6 +328,7 @@ module.exports = {
   money,
   positiveMoney,
   monthStart,
+  taxYear,
   blank,
   recordId,
   changesBeside,

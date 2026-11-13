@@ -61,6 +61,13 @@ const INSERT_COLUMNS = [
   "bank_name",
   "account_number",
   "gross_monthly",
+  // Tax and pension, People · Employees' Tax and Pension step (docs/guides/payroll.md §13.1 items 44 and 46).
+  "tax_id",
+  "pension_pin",
+  "pension_administrator",
+  "nhf_number",
+  "nhf_contributes",
+  "state_of_residence",
 ];
 
 /** The columns PATCH /employees/:id may set (EmployeeUpdate; the reporting line has its own route). */
@@ -91,11 +98,14 @@ const UPDATE_COLUMNS = [
   "bank_name",
   "account_number",
   "gross_monthly",
-  // The tax and pension numbers payroll's statutory report reads (migration 6020, docs/guides/payroll.md §4.1).
+  // The tax and pension numbers payroll's statutory report reads (migration 6020, docs/guides/payroll.md §4.1), whether
+  // the person contributes to NHF and the State they live in (6050, §13.1 items 44 and 46).
   "tax_id",
   "pension_pin",
   "pension_administrator",
   "nhf_number",
+  "nhf_contributes",
+  "state_of_residence",
 ];
 
 /** The login a person has, as the register and the 360 name it. */
@@ -851,7 +861,8 @@ async function employeeInUse(db, employeeId) {
 function importSnapshot(db, employeeId) {
   return one(
     db,
-    `SELECT e.middle_name, e.gender, to_char(e.date_of_birth, 'YYYY-MM-DD') AS date_of_birth, e.bank_name
+    `SELECT e.middle_name, e.gender, to_char(e.date_of_birth, 'YYYY-MM-DD') AS date_of_birth, e.bank_name,
+            e.tax_id, e.pension_pin, e.pension_administrator, e.nhf_number, e.nhf_contributes, e.state_of_residence
        FROM employee e WHERE e.employee_id = $1`,
     [employeeId],
   );
@@ -916,7 +927,8 @@ function findCeoEmployee(db) {
 }
 
 function insertEmployee(db, e) {
-  const values = INSERT_COLUMNS.map((c) => (e[c] === undefined || e[c] === "" ? null : e[c]));
+  // NHF is off until the person chooses it (nhf_contributes is NOT NULL DEFAULT false, and an explicit null is no default).
+  const values = INSERT_COLUMNS.map((c) => (c === "nhf_contributes" ? e[c] === true : e[c] === undefined || e[c] === "" ? null : e[c]));
   const marks = INSERT_COLUMNS.map((_, i) => `$${i + 1}`).join(", ");
   return one(
     db,

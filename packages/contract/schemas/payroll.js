@@ -49,13 +49,6 @@ const RunStatus = z.enum(["draft", "computed", "submitted", "approved", "paid"])
 /** What a one-off adjustment does to the person's pay. */
 const AdjustmentKind = z.enum(["earning", "deduction"]);
 
-/**
- * How PAYE bands are applied (guide §6.12 rules 1 and 11). No screen offers it since PR 10, because every deduction is
- * monthly and the bands are entered as the law publishes them; unset, a run reads it as `annualised` (§13.2 item 32). The
- * API still takes it, and PR 11 fixes it to the reading the research records.
- */
-const PayeBasis = z.enum(["annualised", "monthly"]);
-
 const ProblemSeverity = z.enum(["blocking", "warning"]);
 
 /** The problems a run reports (guide §6.15). Blocking ones stop Submit; warnings never do. */
@@ -68,6 +61,7 @@ const ProblemCode = z.enum([
   "CONTRACT_ENDED",
   "NO_PAY_SPLIT",
   "FINE_WAITING",
+  "EARLIER_RUN_OPEN",
 ]);
 
 /** A reason a person types: 10 to 500 characters. */
@@ -271,9 +265,6 @@ const PayrollSettingsVersion = z
     advanced_enabled: z.boolean(),
     pay_day: z.number().int().min(1).max(31).nullable(),
     require_bank_details: z.boolean(),
-    paye_basis: PayeBasis.nullable(),
-    pension_reduces_taxable: z.boolean().nullable(),
-    nhf_reduces_taxable: z.boolean().nullable(),
     effective_from: isoDate,
     effective_to: isoDate.nullable(),
     reason: z.string().nullable(),
@@ -283,11 +274,11 @@ const PayrollSettingsVersion = z
 
 /**
  * GET /payroll/settings: the setting as it stands today. With no row the run is simple, the pay day is the
- * default 30 (`pay_day_is_default`), bank details are a warning and the conventions are unset (null). The
- * conventions, Salary Structure and Pay Components show once the option is on or has been
- * (`advanced_has_been_on`); Statutory Items and PAYE Bands always show, so the first rates are entered
- * before it is switched on (guide §13.1 item 25). `current` is the version in force and `next` the one
- * that starts later, each null when there is none.
+ * default 30 (`pay_day_is_default`) and bank details are a warning. Salary Structure and Pay Components show once
+ * the option is on or has been (`advanced_has_been_on`); Statutory Items and PAYE Bands always show, so the first
+ * rates are entered before it is switched on (guide §13.1 item 25). `current` is the version in force and `next` the
+ * one that starts later, each null when there is none. The accountant's conventions left the setting in PR 11: the law
+ * settles all three, so the engine fixes them (§6.12 rule 14); their columns stay in the table, unread.
  */
 const PayrollSettings = z
   .object({
@@ -296,9 +287,6 @@ const PayrollSettings = z
     pay_day: z.number().int().min(1).max(31),
     pay_day_is_default: z.boolean(),
     require_bank_details: z.boolean(),
-    paye_basis: PayeBasis.nullable(),
-    pension_reduces_taxable: z.boolean().nullable(),
-    nhf_reduces_taxable: z.boolean().nullable(),
     current: PayrollSettingsVersion.nullable(),
     next: PayrollSettingsVersion.nullable(),
   })
@@ -307,10 +295,8 @@ const PayrollSettings = z
 /**
  * PATCH /payroll/settings (`payroll.configure`): a new version from `effective_from` (today or later, Lagos). Only
  * what is sent changes; the rest carries over from the latest version. A second change from the same day joins that
- * day's version. The conventions are taken once the option has been on or is being switched on (409 ADVANCED_OFF
- * otherwise); switching on needs a statutory rate in force on the day (409 NO_RATES) and both conventions the screen
- * asks for (whether pension, and NHF, reduce taxable pay) set, here or before (409 NO_CONVENTIONS) (guide §6.11 rules
- * 3 and 4). `paye_basis` is no longer needed to switch on (§13.2 item 32).
+ * day's version. Switching on needs a statutory rate in force on the day (409 NO_RATES) (guide §6.11 rules 3 and 4).
+ * The conventions are not taken since PR 11 (a body naming one is refused as a key this schema does not know).
  */
 const PayrollSettingsChange = z
   .object({
@@ -318,9 +304,6 @@ const PayrollSettingsChange = z
     effective_from: isoDate,
     pay_day: z.number().int().min(1, "Pick 1 to 31").max(31, "Pick 1 to 31").optional(),
     require_bank_details: z.boolean().optional(),
-    paye_basis: PayeBasis.optional(),
-    pension_reduces_taxable: z.boolean().optional(),
-    nhf_reduces_taxable: z.boolean().optional(),
     reason: optionalText(500),
   })
   .strict()
@@ -417,7 +400,6 @@ module.exports = {
   TABLES,
   RunStatus,
   AdjustmentKind,
-  PayeBasis,
   ProblemSeverity,
   ProblemCode,
   PayrollRun,

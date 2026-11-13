@@ -1098,6 +1098,20 @@ record and M6's only source of truth.
   "confirmed by MyCity's accountant" above means entered by Operations & People.
 - **PAYE's bands are scaled to the months elapsed in the calendar year** in the cumulative calculation.
 
+### Amended 12/11/2026 (TB, PR 11)
+
+`docs/guides/payroll.md` §13.1 items 41 to 46 record these; where they differ from the lines above, they win.
+
+- **The old relief is retired; rent relief is built and ships off.** Each person's declared rent for a tax year, with its
+  evidence, is kept on People · Employees; its rate and cap are entered with their source like a rate.
+- **A person's PAYE year starts at zero** in MyCity's first statutory month unless their pay and tax to date are entered
+  (Prior Pay on Configurations, from a leaving certificate or MyCity's months before the option).
+- **A fall in the cumulative tax is paid back** on the payslip as a PAYE Refund earning line.
+- **NHF is each person's choice** (Contributes to NHF on People · Employees), taken only at or above the minimum wage.
+- **The minimum-wage exemption is tested each month on the person's rate of pay.**
+- **Each person's State of Residence is kept, and the statutory report splits PAYE by State.**
+- Built in PR 11 (12/11/2026); the definition of done below is unchanged.
+
 ### Definition of done
 
 A payroll run computes from attendance, deductions and approved consequences; payslips generate and

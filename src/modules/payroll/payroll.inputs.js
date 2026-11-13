@@ -46,7 +46,7 @@ async function peopleFor(db, first, last, only = null) {
     db,
     `SELECT e.employee_id, e.staff_number, btrim(e.first_name || ' ' || e.last_name) AS display_name,
             e.status, e.start_date::text AS start_date, e.left_on::text AS left_on, e.contract_ends_on::text AS contract_ends_on,
-            e.gross_monthly::text AS gross_monthly, e.work_pattern, e.bank_name, e.account_number
+            e.gross_monthly::text AS gross_monthly, e.work_pattern, e.bank_name, e.account_number, e.nhf_contributes
        FROM employee e
       WHERE e.start_date <= $2::date
         AND (e.left_on IS NULL OR e.left_on >= $1::date)
@@ -169,4 +169,37 @@ async function instalmentsFor(db, employeeIds, period, last) {
   return rows;
 }
 
-module.exports = { MAX_PEOPLE, peopleFor, payItemsFor, unpaidLeaveFor, unpaidSuspensionsFor, instalmentsFor };
+/**
+ * Each person's PAYE year to date before `period` from MyCity's own runs (§6.12 rule 11): the taxable pay their advanced
+ * payslips of the same calendar year kept (none for a month the minimum wage exempted, §13.1 item 45), and the PAYE those
+ * payslips deducted less any PAYE Refund, read from runs sent for approval, approved or paid. A run of an earlier month
+ * still in Draft or Computed is not counted: the run reports it (EARLIER_RUN_OPEN), so a month is never taxed twice.
+ * Pay to Date, entered on Configurations, is added by the caller (statutory.repo payToDateFor).
+ * @param {{query: Function}} db
+ * @param {string[]} employeeIds
+ * @param {string} period  the run's month, its first day
+ * @returns {Promise<Map<string, {taxable_pay: string, tax: string}>>}
+ */
+async function yearToDateFor(db, employeeIds, period) {
+  if (!employeeIds.length) return new Map();
+  // pagination:complete one sum a person paid in a month; a run reads everyone it pays
+  const { rows } = await completeQuery(
+    db,
+    `SELECT p.employee_id, COALESCE(sum(p.taxable_pay), 0)::text AS taxable_pay,
+            COALESCE(sum(t.tax), 0)::text AS tax
+       FROM payslip p
+       JOIN payroll_run r ON r.payroll_run_id = p.payroll_run_id
+       LEFT JOIN LATERAL (SELECT sum(CASE l.code WHEN 'paye' THEN l.amount ELSE -l.amount END) AS tax
+                            FROM payslip_line l
+                           WHERE l.payslip_id = p.payslip_id AND l.code IN ('paye', 'paye_refund')) t ON true
+      WHERE p.employee_id = ANY($1::uuid[]) AND p.status <> 'excluded'
+        AND r.advanced AND r.status IN ('submitted', 'approved', 'paid')
+        AND r.period >= date_trunc('year', $2::date)::date AND r.period < $2::date
+      GROUP BY p.employee_id`,
+    [employeeIds, period],
+    { label: "Each person's PAYE year to date", ceiling: MAX_PEOPLE },
+  );
+  return new Map(rows.map((r) => [r.employee_id, { taxable_pay: r.taxable_pay, tax: r.tax }]));
+}
+
+module.exports = { MAX_PEOPLE, peopleFor, payItemsFor, unpaidLeaveFor, unpaidSuspensionsFor, instalmentsFor, yearToDateFor };
