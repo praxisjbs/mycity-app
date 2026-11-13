@@ -40,6 +40,7 @@ export * from "./AddressField";
 export * from "./ChannelGrid";
 export * from "./ColorField";
 export * from "./ComboField";
+export * from "./ComboListField";
 export * from "./DocumentEditor";
 export * from "./LinesField";
 export * from "./MonthField";

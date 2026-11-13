@@ -10,6 +10,7 @@
  *   partner_contact.created   Add Contact, or a record's primary contact
  *   partner_contact.updated   Edit Contact
  *   partner_document.attached Upload Document, or the signed copy that evidences a signing
+ *   partner_document.removed  Remove Document: an upload taken off its record, its file out of the vault
  *   partnership.export_requested  Export on Partners or Leads (or their deals) in the tracker's columns,
  *                             made here after commit and downloaded where it was pressed (partners.export.js)
  *
@@ -35,6 +36,7 @@ const EVENTS = defineEvents("partnerships", {
   "partner_contact.created": { summary: "A contact was added to a lead or partner" },
   "partner_contact.updated": { summary: "A lead's or partner's contact was changed" },
   "partner_document.attached": { summary: "A document was attached to a lead or partner" },
+  "partner_document.removed": { summary: "An uploaded document was removed from a lead or partner" },
   "partnership.export_requested": { summary: "Partners, leads or deals were exported in the tracker's columns" },
 });
 

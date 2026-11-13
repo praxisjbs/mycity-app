@@ -156,7 +156,8 @@ A custom field records something the standard fields do not, such as a ticket mo
 ### Change the pipeline's lists {#partnerships-categories-settings needs="cap partnerships.configure"}
 
 Pipeline Settings holds the lists every deal uses: **Stages**, **Potential Impact**,
-**Lead Sources** and **Document Kinds**.
+**Lead Sources** and **Document Kinds**. A new impact, source or document kind typed on a form joins
+its list here, ready to rename, move or retire.
 
 1. On a computer, press **Pipeline Settings** above the categories. On a phone, press it in the list
    under the categories.
@@ -330,10 +331,18 @@ The table marks the main contact **Primary** and a signer **Signs**.
 1. Open the partner and press **Documents**.
 2. Press **Upload Document**.
    ![Upload Document](shot:partnerships-document-upload)
-3. Pick the **Kind**, then choose the **File**.
-4. Press **Upload Document**. The message reads *Document uploaded*.
+3. Type the **Kind**, or pick one of the kinds it suggests. A kind not yet on the list is added as you
+   typed it, and offered next time.
+4. Choose the **File**.
+5. Press **Upload Document**. The message reads *Document uploaded*.
 
 Signed agreements, signed copies and proposals are filed here for you.
+
+To read a document, press its row: a PDF or a picture opens in the viewer, and any other file
+downloads. Press the download button on a row to save the file.
+
+To take off a document uploaded by mistake, press the bin on its row, then **Remove Document**. The
+message reads *Document removed*. Signed copies, agreements and proposals stay.
 
 > **Tip:** You can also attach a contract or MoU in Praxis AI. It sums the document up and files it
 > here with **Add Partner Document** ([Attach a document](#praxis-ask-attach)).
@@ -413,7 +422,8 @@ that deal's stage, so you never type it.
 5. Read any warning that starts *Already here*. It names a partner or lead that looks the same. It
    never stops you.
 6. Press **Advanced** for the **Website**, **Source**, **Impact**, **Impact Rating**, **Impact Note** and
-   **Comments**.
+   **Comments**. Type a **Source** or an **Impact**, or pick one it suggests. For each **Impact**, press
+   Enter or pick it; press the cross on one to take it off. A new one is added to its list.
 7. Press **Next**. On **Contact**, fill in the **First Name** and **Last Name**. Add the **Position**,
    **Email** and **Phone** if you have them.
    ![The Contact step](shot:partnerships-lead-new-2)

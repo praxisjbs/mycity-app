@@ -24,8 +24,9 @@ export function EditLead({ lead, close }: { lead: LeadDetail; close: () => void 
       owner_id: lead.owner?.employee_id ?? "",
       owner_id_person: lead.owner ? [lead.owner] : [],
       website: lead.website ?? "",
-      source: lead.source ?? "",
-      impact: lead.impact,
+      // The source and impacts by name, as the fields show them; the server finds each again by its name.
+      source: lead.source_label ?? lead.source ?? "",
+      impact: lead.impact_labels,
       impact_rating: lead.impact_rating ?? "",
       impact_note: lead.impact_note ?? "",
       comments: lead.comments ?? "",

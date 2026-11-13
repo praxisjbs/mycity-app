@@ -1,10 +1,12 @@
-import type { Contact, CustomValues, DealDetail, Field as CustomField, Interaction, RecordHistoryLine, StageHistoryLine } from "@mycity/contract/contract.gen.ts";
+import type { Contact, CustomValues, DealDetail, Field as CustomField, Interaction, PartnerDocument, RecordHistoryLine, StageHistoryLine } from "@mycity/contract/contract.gen.ts";
 import type { ReactNode } from "react";
+import { saveFile } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useFileViewer, viewableFile } from "@/features/shared/files";
 import { PagedTable } from "@/features/shared/sections";
 import { hrefFor } from "@/lib/routes";
 import { Link } from "@/lib/router";
-import { Button, Card, CardHeader, DataView, Details, EmptyState, formatDate, formatDateTime, formatMoney, HelpTerm, KeyValue, LoadingRows, PhoneOnly, Pill, StageSwitcher, StatusPill, Timeline, toast, useModal } from "@mycity/ui";
+import { Button, Card, CardHeader, DataView, Details, EmptyState, formatDate, formatDateTime, formatMoney, HelpTerm, IconButton, KeyValue, LoadingRows, PhoneOnly, Pill, StageSwitcher, StatusPill, Timeline, toast, useConfirm, useModal } from "@mycity/ui";
 import { ContactForm } from "./forms/ContactForm";
 import { DealForm } from "./forms/DealForm";
 import { MoveStage } from "./forms/MoveStage";
@@ -208,17 +210,43 @@ export function ActivityTab({ record, history }: { record: RecordKey; history?: 
   );
 }
 
-/** Documents: every file of the record, newest first; Upload Document; a partner signed before the hub says so (§6.6). */
+/**
+ * Documents: every file of the record, newest first; Upload Document; a partner signed before the hub
+ * says so (§6.6). A row opens its file in the viewer (a file the viewer cannot show downloads); each
+ * row has Download, and an upload has Remove Document after a confirm (what the hub filed is kept).
+ */
 export function DocumentsTab({ record, readOnly, signedOutside }: { record: RecordKey; readOnly?: boolean; signedOutside?: boolean }) {
   const modal = useModal();
+  const confirm = useConfirm();
+  const files = useFileViewer();
+  const drop = useMutation("DELETE /api/v1/partnerships/documents/:id");
   const list = usePaged("GET /api/v1/partnerships/documents", { filters: record.type === "partner" ? { partner_id: record.id } : { lead_id: record.id }, sort: "-created_at" });
   const ORIGIN: Record<string, string> = { upload: "Upload", proposal: "Proposal", agreement: "Agreement", signed_copy: "Signed Copy" };
+  const urlOf = (d: PartnerDocument) => `/api/v1/documents/${d.document.document_id}/content`;
+  const download = (d: PartnerDocument) => saveFile(urlOf(d), d.document.file_name);
+  const open = async (d: PartnerDocument) => {
+    const mime = d.document.mime_type ?? "application/octet-stream";
+    if (viewableFile(mime)) files.view(urlOf(d), { name: d.document.file_name, mime, by: d.uploaded_by, at: formatDate(d.created_at) });
+    else await download(d);
+  };
+  const remove = async (d: PartnerDocument) => {
+    if (!(await confirm({ title: "Remove Document", body: `${d.document.file_name} leaves this record's documents.`, confirmLabel: "Remove Document", destructive: true }))) return;
+    try {
+      await drop.run({ params: { id: d.document.document_id } });
+      invalidate("/api/v1/partnerships/documents");
+      toast("Document removed");
+    } catch (e) {
+      fail(e);
+    }
+  };
   return (
+    <>
     <PagedTable
       title="Documents"
       list={list}
       rowKey={(d) => d.document.document_id}
       noun="document"
+      onRowClick={open}
       right={
         <span className="flex items-center gap-2">
           {signedOutside && <Pill>Signed Before the Hub</Pill>}
@@ -231,8 +259,21 @@ export function DocumentsTab({ record, readOnly, signedOutside }: { record: Reco
         { key: "k", label: "Kind", render: (d) => d.kind_label ?? ORIGIN[d.origin] },
         { key: "b", label: "By", render: (d) => d.uploaded_by ?? "None", desktop: true },
         { key: "d", label: "Added", render: (d) => formatDate(d.created_at) },
+        {
+          key: "x",
+          label: "",
+          render: (d) => (
+            // The row opens the file; Download and Remove are their own presses, so they stop here.
+            <span className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <IconButton icon="download" label={`Download ${d.document.file_name}`} onClick={() => download(d)} />
+              {!readOnly && d.origin === "upload" && <IconButton icon="trash" label={`Remove ${d.document.file_name}`} onClick={() => remove(d)} />}
+            </span>
+          ),
+        },
       ]}
     />
+    {files.viewer}
+    </>
   );
 }
 

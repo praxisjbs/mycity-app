@@ -1983,8 +1983,9 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   signed copy, after Confirm It's You; several waiting ask "Which agreement is it?"; one already
   signed, a draft, or one with no agreement on Contracts & MOUs is filed among its partner's or
   lead's documents instead; a party that matches no partner or lead the person may edit, or several,
-  asks "Whose document is it?"; a kind MyCity's list does not hold asks "What kind is it?" with
-  the list's names to tap, and a name not on the list shows Pick from the list on Kind; a reader
+  asks "Whose document is it?"; a reading whose kind MyCity's list does not hold asks "What kind
+  is it?" with the list's names to tap, and a kind the card names that the list does not hold is
+  filed as written and joins the list (an open list, partnerships.md §6.3); a reader
   with Partnerships view alone gets the summary and the terms with no card; a value in another
   currency reads in that currency, never as naira; MyCity named as a party is never matched as a
   partner; the same file attached twice is filed once (`Already attached`).
@@ -2468,6 +2469,7 @@ area and guides from B.4:
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · Add Partner Document holding a kind MyCity's list lacks (the model wrote "Service Agreement" from the document's Record) was drawn with Pick from the list and no list to pick from on Edit. Partnerships' document kinds are now an open list (`partnerships.md` §6.3): the card, unchanged, files the kind as written and it joins the list. §11's edge case reads so.
 - 13/11/2026 · JP · Charts in the Overview planned (§1.11 decisions 49 to 58, §6.13's planned tables, §6.19, Appendix B), from JBS Praxis's six answers: why a budget question left the Overview empty (12 of the 94 reads had a summary, budgets none), stacked bars, charts from a complete table, a charted answer's table in the pane, View Data and Download PDF with a designed PDF, no mechanics in an answer, money in naira, and 41 new summaries so that every read names its summary or why it needs none (gate 23 rule 9); eight PRs with their order, waves and start prompts. §2, §5, §7, §10, §11 and §13 carry the planned rows. Nothing built.
 - 13/11/2026 · TB · Documents in the chat, PR 2 built (Appendix A): Contract or MoU on Attach Document, read on `agreement-document-read` (Image Reading, chosen by TB), summarised, its terms on the pane's Record tab (`AiAnswerAttachment.record`, `AiAttachmentRecord`), and filed by a card: Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else Add Partner Document (`partner_documents.attach`) on the partner or lead it names. The build taught §6.18 five things, written there: a kind's grant may be `view` (decision 41 offers the tile to Partnerships view; the manifest refused anything but an action's grants), and a reader without edit gets no card; the card's kind reads as its name and the run turns it into MyCity's code, so the card schema `PartnerDocumentAdd` stays and its run sends `PartnerDocumentAttach`, which never had a `file:` reason (an Attach is no form gate 23 rule 6 counts, and no `not_offered` may name it); the reading carries `currency` and each signatory's party, so a dollar value is not read as naira and the partner's signer is told from MyCity's; a `file.<kind>` read is never replayed, so the pane opens Record or Sources for it and never a Table (an invoice's pane asked for the replay and got 404); staging had no document kinds, so its partnership setup enters §4.3's list.
 - 13/11/2026 · TB · A record named by its words (`shared/ai/named.js`, decision 32) reads "&" as "and": the model wrote Travel & Transport for the category Travel and Transport, nothing matched, and the New Request card read Category "Invalid uuid" with no New Request button (found filming M8; `docs/runbooks/training-videos.md` §7). Test: `ai-engine.test.js`.

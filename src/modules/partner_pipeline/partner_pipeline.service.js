@@ -134,6 +134,7 @@ async function detailOf(db, r, held) {
     close_reason: r.close_reason,
     signed_value: r.signed_value,
     impact: r.impact || [],
+    impact_labels: r.impact_labels || [],
     impact_rating: r.impact_rating,
     impact_note: r.impact_note,
     comments: r.comments,
@@ -248,7 +249,8 @@ async function createIn(client, actor, record, body, { held, field = null, allow
   const category = await categoryOf(client, record.categoryId);
   const rate = body.commission_pct ?? (category ? category.default_commission_pct : null);
   const custom = await fields.checkCustom(client, { appliesTo: "deal", categoryId: record.categoryId, values: body.custom });
-  if (body.impact && !(await lists.allActive(client, "partnership_impact", body.impact))) throw invalid(at("impact"), "Pick from the list");
+  // Impacts by name or code: a name the list does not hold joins it (§6.3).
+  const impact = body.impact === undefined || body.impact === null ? null : await lists.codesFor(client, actor, "partnership_impact", body.impact);
   const { number } = await numbering.allocate(client, "deal");
   const signedAt = signed ? new Date() : null;
   const validity = validityOf(body.validity, category);
@@ -277,7 +279,7 @@ async function createIn(client, actor, record, body, { held, field = null, allow
     next_action: body.next_action ?? null,
     next_action_on: body.next_action_on ?? null,
     owner_id: body.owner_id,
-    impact: body.impact ?? null,
+    impact,
     impact_rating: body.impact_rating ?? null,
     impact_note: body.impact_note ?? null,
     comments: body.comments ?? null,
@@ -353,7 +355,7 @@ async function update(actor, scope, id, body) {
     for (const k of ["title", "event_title", "event_starts_on", "event_ends_on", "expected_attendance", "objective", "estimated_value", "expected_close_on", "next_action", "next_action_on", "owner_id", "impact", "impact_rating", "impact_note", "comments"]) {
       if (body[k] !== undefined) changes[k] = body[k];
     }
-    if (body.impact && !(await lists.allActive(client, "partnership_impact", body.impact))) throw invalid("impact", "Pick from the list");
+    if (Array.isArray(body.impact)) changes.impact = await lists.codesFor(client, actor, "partnership_impact", body.impact);
     if (body.commission_pct !== undefined) {
       changes.commission_pct = body.commission_pct ?? (category ? category.default_commission_pct : null);
       changes.commission_deviates = options.deviates(changes.commission_pct, category && category.default_commission_pct);
@@ -479,6 +481,7 @@ module.exports = {
   updateField: fields.update,
   checkFieldValue: fields.checkValue,
   getList: lists.values,
+  listSuggestions: lists.suggestions,
   addListValue: lists.add,
   updateListValue: lists.update,
   readTracker: setup.read,

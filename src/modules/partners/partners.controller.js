@@ -4,7 +4,7 @@
  * duplicates, and the Work tab with Connect to Partner's pickers (docs/guides/partnerships.md §5,
  * §6.16). Scope comes from the `partnerships` grant (§6.1); the Work tab adds Workspace's own.
  */
-const { ok, created, accepted } = require("../../shared/http/respond");
+const { ok, created, accepted, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf } = require("../../shared/rbac/scope");
 const { withActor } = require("../../shared/events/emit");
@@ -27,6 +27,10 @@ module.exports = {
   updateContact: async (req, res) => ok(res, await service.updateContact(withActor(req), scopeOf(req), id(req), req.validated.body)),
   documents: async (req, res) => sendPaged(res, await documents.page(req.validated.query, scopeOf(req))),
   attach: async (req, res) => created(res, await documents.attach(withActor(req), scopeOf(req), req.validated.body)),
+  removeDocument: async (req, res) => {
+    await documents.remove(withActor(req), scopeOf(req), req.validated.params.id);
+    noContent(res);
+  },
   work: async (req, res) => sendPaged(res, await work.list(req.validated.query, scopeOf(req), req.user)),
   workRecords: async (req, res) => sendPaged(res, await work.records(req.validated.query, scopeOf(req))),
   workDeals: async (req, res) => sendPaged(res, await work.deals(req.validated.query, scopeOf(req))),

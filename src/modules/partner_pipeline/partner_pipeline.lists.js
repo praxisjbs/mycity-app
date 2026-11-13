@@ -4,6 +4,12 @@
  * stages, the potential impacts, the lead sources and the document kinds. They are data MyCity enters
  * (A26); only the deal health and interaction type code lists, which the code switches on, are seeded.
  *
+ * The impacts, sources and document kinds are open (JBS Praxis, 13/11/2026): a form types a name or
+ * picks one of the list's suggestions (`suggestions`), and the service turns the words into a code
+ * in its own transaction (`codeFor`, `codesFor`): the value they name, by its code or its name
+ * whatever the case, or a new value added as typed, which Pipeline Settings then renames, moves or
+ * retires like any other. The stages stay a closed list: a stage carries a meaning the rules count.
+ *
  * A stage carries a meaning, the fixed code it counts as, so MyCity may rename its stages without
  * breaking a count. The list keeps at least one active stage meaning prospect, signed and closed_lost,
  * and the last stage of any meaning a deal is at cannot change meaning or retire.
@@ -147,6 +153,54 @@ async function assertStagesComplete(db) {
 /** The four lists, each a reference_value domain of its own name (contract ListName). */
 const LISTS = Object.freeze([STAGES, "partnership_impact", "lead_source", "partner_document_kind"]);
 
+/** The lists a form types into as well as picks from (contract OpenListName). */
+const OPEN = Object.freeze(["partnership_impact", "lead_source", "partner_document_kind"]);
+
+/** A page of an open list's active names, in its order, narrowed by `q` (GET /lists/:list/suggestions). */
+function suggestions(list, query, db = pool) {
+  return repo.suggestions(db, list, query);
+}
+
+/**
+ * The code of the value a form's words name, in the caller's transaction: the value with that code or
+ * that name whatever the case (an active one first, then a retired one, which a record may keep), else
+ * a new value named as typed, added at the end of the list with `list_value.created`. Two saves that
+ * type the same new name at once add it once. Null for no words.
+ * @param {string|null|undefined} words  a name as typed or picked, or a code
+ * @returns {Promise<string|null>}
+ */
+async function codeFor(client, actor, list, words) {
+  if (!OPEN.includes(list)) throw new Error(`codeFor: ${list} is not an open list`);
+  const name = String(words ?? "").replace(/\s+/g, " ").trim();
+  if (!name) return null;
+  const found = await repo.valueByWords(client, list, name);
+  if (found) return found.code;
+  // The second of two saves typing the same new name waits here, then finds the first one's value.
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('reference_value:' || $1))", [list]);
+  const again = await repo.valueByWords(client, list, name);
+  if (again) return again.code;
+  const code = await freeCode(client, list, name);
+  await repo.insertValue(client, list, { code, label: name, position: await repo.nextValuePosition(client, list) });
+  await emit(client, {
+    key: EVENTS.LIST_VALUE_CREATED,
+    entity: { type: "list_value", id: `${list}:${code}` },
+    actor,
+    after: shaped(await repo.getValue(client, list, code)),
+    payload: { list, code, typed: true },
+  });
+  return code;
+}
+
+/** The codes of several values a form's words name (`codeFor` each), each once, in the order given. */
+async function codesFor(client, actor, list, words) {
+  const out = [];
+  for (const w of words || []) {
+    const code = await codeFor(client, actor, list, w);
+    if (code && !out.includes(code)) out.push(code);
+  }
+  return out;
+}
+
 /** The meanings a signed deal counts as: entering one signs it (§6.4, §6.5). */
 const SIGNED_MEANINGS = Object.freeze(["signed", "active"]);
 
@@ -188,17 +242,6 @@ async function labelOf(db, list, code) {
   return rows[0] ? rows[0].label : null;
 }
 
-/** Whether every code is an active value of the list. */
-async function allActive(db, list, codes) {
-  const wanted = [...new Set((codes || []).map(String))];
-  if (!wanted.length) return true;
-  const { rows } = await db.query(
-    "SELECT count(*)::int AS n FROM reference_value WHERE domain = $1 AND active AND code = ANY($2::citext[])",
-    [list, wanted],
-  );
-  return rows[0].n === wanted.length;
-}
-
 /** A stage's code from its label or its code, as a person or Praxis AI writes it; null when none or several. */
 async function stageCodeOf(db, words) {
   const w = String(words || "").trim().toLowerCase();
@@ -232,7 +275,10 @@ module.exports = {
   firstOf,
   stageOf,
   labelOf,
-  allActive,
+  OPEN,
+  suggestions,
+  codeFor,
+  codesFor,
   stageCodeOf,
   stageLabels,
 };

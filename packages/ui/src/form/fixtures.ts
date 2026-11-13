@@ -40,6 +40,19 @@ export const SAMPLE_UNITS: SampleUnit[] = [
   { unit: "partners", uses: 1 },
 ];
 
+export interface SampleImpact {
+  label: string;
+}
+
+/** A partnership's potential impacts, in MyCity's order, as a deal's Impact field suggests them. */
+export const SAMPLE_IMPACTS: SampleImpact[] = [
+  { label: "App Downloads & Visibility" },
+  { label: "Revenue Generation" },
+  { label: "Brand Visibility" },
+  { label: "User Acquisition" },
+  { label: "Vendor Acquisition" },
+];
+
 /** Climbs to 100 over about a second, so the gallery shows a real percentage. */
 export const slowUploader: Uploader = ({ file, onProgress }) =>
   new Promise<DocumentRef>((resolve) => {

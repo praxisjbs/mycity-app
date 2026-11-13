@@ -82,6 +82,7 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       post: (path, body = {}) => auth(request(app).post(`/api/v1${path}`)).send(body),
       put: (path, body = {}) => auth(request(app).put(`/api/v1${path}`)).send(body),
       patch: (path, body = {}) => auth(request(app).patch(`/api/v1${path}`)).send(body),
+      delete: (path) => auth(request(app).delete(`/api/v1${path}`)),
       upload: (name) => auth(request(app).post("/api/v1/documents")).attach("file", PDF, { filename: name, contentType: "application/pdf" }),
     };
   };
@@ -408,6 +409,83 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       // Signed deals do not go back before signing.
       const back = await as("staff").post(`/partnerships/deals/${dealId}/stage`, { stage: "negotiation", reason: "Trying to reopen the terms" });
       expect(back.body.error.fields.stage).toEqual(["Already signed"]);
+    });
+  });
+
+  describe("kinds, sources and impacts are typed or picked (§6.3)", () => {
+    const valueOf = (list, code) => one("SELECT label, active FROM reference_value WHERE domain = $1 AND code = $2", [list, code]);
+
+    test("Upload Document takes a kind by its name in any case, and a new name joins Document Kinds", async () => {
+      const lead = (await newLead("staff", "Lekki Arts Week")).lead;
+      const first = await as("staff").upload("terms.pdf");
+      const byName = await as("staff").post("/partnerships/documents", { document_id: first.body.document_id, kind: "Mou", lead_id: lead.lead_id });
+      expect([byName.status, byName.body.error]).toEqual([201, undefined]);
+      expect(byName.body).toMatchObject({ kind: "mou", kind_label: "MOU" });
+
+      const second = await as("staff").upload("merchant.pdf");
+      const typed = await as("staff").post("/partnerships/documents", { document_id: second.body.document_id, kind: "  Deal Merchant   Agreement ", lead_id: lead.lead_id });
+      expect([typed.status, typed.body.error]).toEqual([201, undefined]);
+      expect(typed.body).toMatchObject({ kind: "deal_merchant_agreement", kind_label: "Deal Merchant Agreement" });
+      expect(await valueOf("partner_document_kind", "deal_merchant_agreement")).toEqual({ label: "Deal Merchant Agreement", active: true });
+
+      // Typed again in another case, it is the same kind: the list holds it once.
+      const third = await as("staff").upload("merchant-2.pdf");
+      const again = await as("staff").post("/partnerships/documents", { document_id: third.body.document_id, kind: "deal merchant agreement", lead_id: lead.lead_id });
+      expect(again.body).toMatchObject({ kind: "deal_merchant_agreement" });
+      expect((await one("SELECT count(*)::int AS n FROM reference_value WHERE domain = 'partner_document_kind' AND lower(label) = 'deal merchant agreement'")).n).toBe(1);
+
+      const suggested = await as("staff").get("/partnerships/lists/partner_document_kind/suggestions?q=merch");
+      expect(suggested.body.data).toEqual([{ label: "Deal Merchant Agreement" }]);
+      expect((await as("staff").get("/partnerships/lists/partnership_stage/suggestions")).status).toBe(422);
+    });
+
+    test("New Lead and Edit Lead take a source and impacts by name; a retired one is kept, never added again", async () => {
+      const made = await newLead("staff", "Ikoyi Food Fair", { source: "Instagram", impact: ["App Downloads & Visibility", "Vendor Acquisition"] });
+      expect(made.lead).toMatchObject({ source: "instagram", source_label: "Instagram", impact: ["app_downloads", "vendor_acquisition"], impact_labels: ["App Downloads & Visibility", "Vendor Acquisition"] });
+      expect(await valueOf("lead_source", "instagram")).toEqual({ label: "Instagram", active: true });
+
+      await q("UPDATE reference_value SET active = false WHERE domain = 'lead_source' AND code = 'referral'");
+      try {
+        const edited = await as("staff").patch(`/partnerships/leads/${made.lead.lead_id}`, { source: "Referral", impact: ["vendor acquisition"] });
+        expect([edited.status, edited.body.error]).toEqual([200, undefined]);
+        expect(edited.body.lead).toMatchObject({ source: "referral", source_label: "Referral", impact: ["vendor_acquisition"], impact_labels: ["Vendor Acquisition"] });
+        expect((await one("SELECT count(*)::int AS n FROM reference_value WHERE domain = 'lead_source' AND lower(label) = 'referral'")).n).toBe(1);
+        // A retired source is never suggested.
+        expect((await as("staff").get("/partnerships/lists/lead_source/suggestions")).body.data).toEqual([{ label: "Instagram" }]);
+      } finally {
+        await q("UPDATE reference_value SET active = true WHERE domain = 'lead_source' AND code = 'referral'");
+      }
+    });
+
+    test("Remove Document takes an upload off its record and out of the vault; what the hub filed is kept", async () => {
+      const lead = (await newLead("staff", "Surulere Jazz Night")).lead;
+      const upload = async (name) => {
+        const file = await as("staff").upload(name);
+        const attached = await as("staff").post("/partnerships/documents", { document_id: file.body.document_id, kind: "MOU", lead_id: lead.lead_id });
+        expect([attached.status, attached.body.error]).toEqual([201, undefined]);
+        return file.body.document_id;
+      };
+      const twice = await upload("duplicate.pdf");
+      const gone = await as("staff").delete(`/partnerships/documents/${twice}`);
+      expect([gone.status, gone.body.error]).toEqual([204, undefined]);
+      expect(await one("SELECT 1 AS x FROM document WHERE document_id = $1", [twice])).toBeNull();
+      expect(await one("SELECT 1 AS x FROM partner_document WHERE document_id = $1", [twice])).toBeNull();
+      expect((await as("staff").get(`/partnerships/documents?lead_id=${lead.lead_id}`)).body.data).toEqual([]);
+      expect((await as("staff").delete(`/partnerships/documents/${twice}`)).status).toBe(404);
+
+      // A file the hub filed itself (here a signed copy) stays.
+      const signed = await upload("signed.pdf");
+      await q("UPDATE partner_document SET origin = 'signed_copy', kind = NULL WHERE document_id = $1", [signed]);
+      const kept = await as("staff").delete(`/partnerships/documents/${signed}`);
+      expect([kept.status, kept.body.error && kept.body.error.code]).toEqual([409, "DOCUMENT_KEPT"]);
+    });
+
+    test("Edit Deal takes impacts by name and reads them back by name", async () => {
+      const made = await newLead("staff", "Yaba Book Fair");
+      // A code is taken as well as a name: the importer and the cards send codes.
+      const res = await as("staff").patch(`/partnerships/deals/${made.deal.deal_id}`, { impact: ["Revenue Generation", "app_downloads"] });
+      expect([res.status, res.body.error]).toEqual([200, undefined]);
+      expect(res.body).toMatchObject({ impact: ["revenue_generation", "app_downloads"], impact_labels: ["App Downloads & Visibility", "Revenue Generation"] });
     });
   });
 

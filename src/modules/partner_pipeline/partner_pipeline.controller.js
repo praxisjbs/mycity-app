@@ -36,6 +36,7 @@ module.exports = {
   updateField: async (req, res) => ok(res, await service.updateField(withActor(req), id(req), req.validated.body)),
 
   getList: async (req, res) => ok(res, await service.getList(req.validated.params.list)),
+  listSuggestions: async (req, res) => sendPaged(res, await service.listSuggestions(req.validated.params.list, req.validated.query)),
   addListValue: async (req, res) => created(res, await service.addListValue(withActor(req), req.validated.params.list, req.validated.body)),
   updateListValue: async (req, res) => {
     const { list, code } = req.validated.params;
