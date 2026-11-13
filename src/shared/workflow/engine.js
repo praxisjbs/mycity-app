@@ -385,9 +385,13 @@ async function act(
 
 /**
  * Withdraw a pending approval. The requester or the CEO only.
+ * `sentBack`: an approver pressed Send Back and the module withdraws the approval for its opener
+ * (expenses, agreements, payroll). Nobody is told it was withdrawn: the approver chose it, and the
+ * requester is told of the Send Back with its reason (found filming M8, 13/11/2026: the approver
+ * read "The requester withdrew this before it was decided").
  * @param {import("pg").PoolClient} client  inside atomically()
  */
-async function cancel(client, { instance_id: id, actor, reason = null }) {
+async function cancel(client, { instance_id: id, actor, reason = null, sentBack = false }) {
   mustBeInTransaction(client, "cancel");
   const instance = await lock(client, id);
   assertPending(instance);
@@ -414,7 +418,8 @@ async function cancel(client, { instance_id: id, actor, reason = null }) {
   const closed = await close(client, instance, "cancelled");
   await record(client, closed, def, WORKFLOW.WORKFLOW_CANCELLED, actor, {
     reason,
-    withdrawn_from: instance.stage_approvers,
+    withdrawn_from: sentBack ? [] : instance.stage_approvers,
+    ...(sentBack ? { sent_back: true } : {}),
   });
   return closed;
 }

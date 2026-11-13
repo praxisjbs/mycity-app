@@ -256,6 +256,8 @@ describeDb("expenses against the real migrations", () => {
     // The withdrawal's own copy changes nothing: the request stays with its requester.
     await drain();
     expect(await status(r.expense_request_id)).toBe("sent_back");
+    // The withdrawal is the Send Back's: nobody is told the requester withdrew it.
+    expect((await one("SELECT count(*)::int AS n FROM notification WHERE title LIKE 'Withdrawn:%'")).n).toBe(0);
 
     const fixed = await h.as("other").patch(`/expenses/mine/${r.expense_request_id}`).send(body({ purpose: "Ikeja activation water, invoice coming" }));
     expect(fixed.body.status).toBe("sent_back");

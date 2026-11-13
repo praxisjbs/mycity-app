@@ -154,7 +154,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       project_id: existing?.project_id ?? project ?? "",
       department_id: existing?.department_id ?? "",
       needed_on: "",
-      lines: existing ? existing.lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unit_price })) : [{ ...EMPTY_LINE }],
+      lines: existing ? existing.lines.map((l) => ({ description: l.description, quantity: l.quantity.replace(/\.00$/, ""), unit_price: asTyped(l.unit_price) })) : [{ ...EMPTY_LINE }],
       payee_type: existing?.payee_type ?? ("vendor" as ExpenseRow["payee_type"]),
       uses_profile_account: existing?.uses_profile_account ?? false,
       payee_name: existing?.uses_profile_account ? "" : (existing?.payee_name ?? ""),
