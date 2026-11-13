@@ -11,6 +11,7 @@ import { useAddressPrefill } from "@/shell/screen-action";
 import {
   Banner,
   Button,
+  CheckboxField,
   ChoiceField,
   DateField,
   Field,
@@ -42,6 +43,10 @@ import {
  *
  * No login without an employee record (CLAUDE.md): Add Employee makes the record, and Send
  * Invite gives that person a login afterwards.
+ *
+ * The Tax and Pension step holds what payroll reads in advanced mode (docs/guides/payroll.md §6.12, §13.1 items 44 and
+ * 46): the tax and pension numbers, whether the person contributes to NHF (their own choice) and the State they live in.
+ * Every one is masked as employee.statutory, so a role that hides them never sees the step.
  */
 
 const EMPLOYMENT: Array<[string, string]> = [
@@ -62,6 +67,10 @@ const GENDER: Array<[string, string]> = [
 ];
 /** The patterns that come to a worksite (the contract's ON_SITE_PATTERNS). */
 const ON_SITE: readonly string[] = organisation.ON_SITE_PATTERNS;
+/** Nigeria's 36 states and the FCT, by name (the contract's list; the State a person's PAYE goes to). */
+const STATES: Array<[string, string]> = (organisation.NIGERIAN_STATES as string[]).map((code) => [code, (organisation.STATE_LABELS as Record<string, string>)[code]]);
+/** A yes or no the form holds as text: "yes" when ticked. */
+const YES = "yes";
 
 /** Every field the two forms may show, as the person types them. */
 const ALL = {
@@ -84,6 +93,12 @@ const ALL = {
   gross_monthly: "",
   bank_name: "",
   account_number: "",
+  tax_id: "",
+  pension_pin: "",
+  pension_administrator: "",
+  nhf_number: "",
+  nhf_contributes: "",
+  state_of_residence: "",
   next_of_kin_name: "",
   next_of_kin_phone: "",
   next_of_kin_relationship: "",
@@ -97,6 +112,7 @@ const STEPS: Array<{ title: string; keys: Key[] }> = [
   { title: "Person", keys: ["first_name", "middle_name", "last_name", "work_email", "phone", "gender", "date_of_birth"] },
   { title: "Job", keys: ["job_title", "department_id", "start_date", "employment_type", "work_pattern", "worksite_id", "contract_ends_on", "confirmation_due_on", "line_manager_id"] },
   { title: "Pay and Bank", keys: ["gross_monthly", "bank_name", "account_number"] },
+  { title: "Tax and Pension", keys: ["tax_id", "pension_pin", "pension_administrator", "nhf_number", "nhf_contributes", "state_of_residence"] },
   { title: "Next of Kin", keys: ["next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship"] },
 ];
 /** Fields Edit shows; the reporting line has its own form (Change Reporting Line). */
@@ -108,10 +124,11 @@ function useShown(keys: Key[]) {
   return useMemo(() => keys.filter((k) => !hidden.includes(k)), [keys, hidden]);
 }
 
-/** What the form holds as the API reads it: the amount as a two-place string, empties left for the contract. */
+/** What the form holds as the API reads it: the amount as a two-place string, NHF as a yes or no, empties left for the contract. */
 const toWire = (v: Values): Values => ({
   ...v,
   ...(v.gross_monthly !== undefined ? { gross_monthly: toMoneyString(v.gross_monthly) } : {}),
+  ...(v.nhf_contributes !== undefined ? { nhf_contributes: (v.nhf_contributes === YES) as unknown as string } : {}),
 });
 
 /** The contract, read through toWire, so a salary typed as "350,000" is checked as the API will see it. */
@@ -210,6 +227,12 @@ function Fields({ keys, f, departments, setDepartments, worksites, setWorksites,
       <TextField {...f.field("account_number")} inputMode="numeric" onChange={(t: string) => f.set("account_number", t.replace(/\D/g, "").slice(0, 10))} />
     </Field>,
   );
+  add("tax_id", <Field label="Tax ID" optional {...f.status("tax_id")}><TextField {...f.field("tax_id")} autoComplete="off" /></Field>);
+  add("pension_pin", <Field label="Pension PIN" optional {...f.status("pension_pin")}><TextField {...f.field("pension_pin")} autoComplete="off" /></Field>);
+  add("pension_administrator", <Field label="Pension Administrator" optional {...f.status("pension_administrator")}><TextField {...f.field("pension_administrator")} /></Field>);
+  add("nhf_number", <Field label="NHF Number" optional {...f.status("nhf_number")}><TextField {...f.field("nhf_number")} autoComplete="off" /></Field>);
+  add("nhf_contributes", <CheckboxField label="Contributes to NHF" value={v.nhf_contributes === YES} onChange={(x) => f.set("nhf_contributes", x ? YES : "")} />);
+  add("state_of_residence", <Field label="State of Residence" optional {...f.status("state_of_residence")}><SelectField options={STATES} {...f.field("state_of_residence")} /></Field>);
   add("next_of_kin_name", <Field label="Next of Kin" optional {...f.status("next_of_kin_name")}><TextField {...f.field("next_of_kin_name")} /></Field>);
   add("next_of_kin_phone", <Field label="Next of Kin Phone" optional {...f.status("next_of_kin_phone")}><PhoneField {...f.field("next_of_kin_phone")} /></Field>);
   add("next_of_kin_relationship", <Field label="Relationship" optional {...f.status("next_of_kin_relationship")}><TextField {...f.field("next_of_kin_relationship")} /></Field>);
@@ -293,8 +316,9 @@ function AddWizard({ close, onRefused }: { close: () => void; onRefused: () => v
 export function EditEmployee({ employee, close }: { employee: Employee360; close: () => void }) {
   const shown = useShown(EDIT_KEYS);
   const start = useMemo<Values>(() => {
-    const record = employee as unknown as Record<string, string | null | undefined>;
-    return Object.fromEntries(shown.map((k) => [k, record[k] ?? ""])) as Values;
+    const record = employee as unknown as Record<string, string | boolean | null | undefined>;
+    // NHF is a yes or no on the record; the form holds it as text so a change is seen as one.
+    return Object.fromEntries(shown.map((k) => [k, k === "nhf_contributes" ? (record[k] === true ? YES : "") : (record[k] ?? "")])) as Values;
   }, [employee, shown]);
   /* Only the fields the person changed are checked and sent: a stored value from an old import
      never blocks a correction somewhere else, and a field emptied here is cleared. */

@@ -23,6 +23,9 @@ const {
   isoDate,
   isoDateTime,
   money,
+  positiveMoney,
+  monthStart,
+  taxYear,
   blank,
   listQuery,
   Paged,
@@ -30,7 +33,7 @@ const {
   changesBeside,
   nothingOn,
 } = require("./common");
-const { PlaceInput } = require("./maps");
+const { PlaceInput, PlaceView } = require("./maps");
 
 /**
  * PROPOSED values, to confirm with MyCity (Cynthia). Most MyCity staff are
@@ -54,6 +57,54 @@ const GENDERS = ["female", "male"];
 const EmploymentType = z.enum(EMPLOYMENT_TYPES);
 const WorkPattern = z.enum(WORK_PATTERNS);
 const Gender = z.enum(GENDERS);
+
+/**
+ * Nigeria's 36 states and the Federal Capital Territory, by the names people read. Where a person lives decides which
+ * State's Internal Revenue Service their PAYE goes to (docs/guides/payroll.md §13.1 item 46; the Joint Revenue Board's
+ * Guidelines 2026, para 25). A fixed list the code knows, not MyCity's data; employee_state_of_residence_check holds the
+ * same codes (migration 6050).
+ */
+const STATE_LABELS = Object.freeze({
+  abia: "Abia",
+  adamawa: "Adamawa",
+  akwa_ibom: "Akwa Ibom",
+  anambra: "Anambra",
+  bauchi: "Bauchi",
+  bayelsa: "Bayelsa",
+  benue: "Benue",
+  borno: "Borno",
+  cross_river: "Cross River",
+  delta: "Delta",
+  ebonyi: "Ebonyi",
+  edo: "Edo",
+  ekiti: "Ekiti",
+  enugu: "Enugu",
+  fct: "Federal Capital Territory",
+  gombe: "Gombe",
+  imo: "Imo",
+  jigawa: "Jigawa",
+  kaduna: "Kaduna",
+  kano: "Kano",
+  katsina: "Katsina",
+  kebbi: "Kebbi",
+  kogi: "Kogi",
+  kwara: "Kwara",
+  lagos: "Lagos",
+  nasarawa: "Nasarawa",
+  niger: "Niger",
+  ogun: "Ogun",
+  ondo: "Ondo",
+  osun: "Osun",
+  oyo: "Oyo",
+  plateau: "Plateau",
+  rivers: "Rivers",
+  sokoto: "Sokoto",
+  taraba: "Taraba",
+  yobe: "Yobe",
+  zamfara: "Zamfara",
+});
+const NIGERIAN_STATES = Object.freeze(Object.keys(STATE_LABELS));
+const NigerianState = z.enum(NIGERIAN_STATES);
 
 /**
  * Staff number as issued by numbering: MyCity's five digits ("00001") by default, or whatever
@@ -131,6 +182,21 @@ const employeeRestricted = {
   bank_name: optionalText(100),
   account_number: blank(accountNumber),
   gross_monthly: blank(pay),
+};
+
+/**
+ * Tax and pension, masked as `employee.statutory` (field-mask.js) and read by payroll in advanced mode
+ * (docs/guides/payroll.md §6.12): the numbers the statutory report prints, whether the person contributes to the
+ * National Housing Fund (their choice in the private sector, NHF Act s.4(1)(b); §13.1 item 44) and the State they live in
+ * (§13.1 item 46). Optional on create, as on People · Employees' Tax and Pension step.
+ */
+const employeeStatutory = {
+  tax_id: blank(statutoryNumber),
+  pension_pin: blank(statutoryNumber),
+  pension_administrator: optionalText(100),
+  nhf_number: blank(statutoryNumber),
+  nhf_contributes: z.boolean().optional(),
+  state_of_residence: blank(NigerianState),
 };
 
 /**
@@ -357,6 +423,10 @@ const Employee360 = z
     pension_pin: z.string().nullable(),
     pension_administrator: z.string().nullable(),
     nhf_number: z.string().nullable(),
+    /** Whether they contribute to the National Housing Fund (their choice, §13.1 item 44); null when masked. */
+    nhf_contributes: z.boolean().nullable(),
+    /** The State they live in, where their PAYE goes (§13.1 item 46); null when not set or masked. */
+    state_of_residence: NigerianState.nullable(),
     created_at: isoDateTime,
     /** Their photo at a profile's size (384 px, shared/db/person.js); null shows their initials. */
     photo_url: z.string().nullable(),
@@ -401,11 +471,13 @@ const EmployeeUpdateFields = z
     bank_name: clearable(z.string().trim().max(100)),
     account_number: clearable(accountNumber),
     gross_monthly: clearable(pay),
-    /** Tax and pension numbers (`employee.statutory`), read by payroll's statutory report (docs/guides/payroll.md §6.12). */
+    /** Tax and pension (`employee.statutory`), read by payroll in advanced mode (docs/guides/payroll.md §6.12). */
     tax_id: clearable(statutoryNumber),
     pension_pin: clearable(statutoryNumber),
     pension_administrator: clearable(z.string().trim().max(100)),
     nhf_number: clearable(statutoryNumber),
+    nhf_contributes: z.boolean(),
+    state_of_residence: clearable(NigerianState),
   })
   .partial()
   .strict();
@@ -532,6 +604,8 @@ const EMPLOYEE_FIELD_LABELS = Object.freeze({
   pension_pin: "Pension PIN",
   pension_administrator: "Pension Administrator",
   nhf_number: "NHF Number",
+  nhf_contributes: "Contributes to NHF",
+  state_of_residence: "State of Residence",
   next_of_kin_name: "Next of Kin",
   next_of_kin_phone: "Next of Kin Phone",
   next_of_kin_relationship: "Relationship",
@@ -847,6 +921,13 @@ const EmployeeImportRow = z
     employment_type: EmploymentType.optional(),
     work_pattern: WorkPattern.optional(),
     bank_name: optionalText(100),
+    /** Tax and pension, as People · Employees' Tax and Pension step takes them (`employee.statutory`). */
+    tax_id: statutoryNumber.optional(),
+    pension_pin: statutoryNumber.optional(),
+    pension_administrator: optionalText(100),
+    nhf_number: statutoryNumber.optional(),
+    nhf_contributes: z.boolean().optional(),
+    state_of_residence: NigerianState.optional(),
   })
   .strict();
 
@@ -859,6 +940,7 @@ const EmployeeCreate = z
   .object({
     ...employeeCore,
     ...employeeRestricted,
+    ...employeeStatutory,
     department_id: uuid,
     line_manager_id: blank(uuid),
     dotted_manager_id: blank(uuid),
@@ -896,6 +978,79 @@ const EmployeePrefill = z
     contract_ends_on: isoDate.optional(),
   })
   .strict();
+
+/* ------------------------------------------------------------------ *
+ * Rent relief: a person's declared rent for a tax year (docs/guides/payroll.md §6.12 rule 15, §13.1 item 41)
+ * ------------------------------------------------------------------ */
+
+/** A National Identification Number: eleven digits. */
+const nin = z
+  .string()
+  .trim()
+  .regex(/^\d{11}$/, "Eleven digits");
+
+/** GET /employees/:id/rent-declarations: a person's declared rent, newest year first. */
+const RentDeclarationParams = z.object({ id: uuid }).strict();
+
+/** PUT and DELETE /employees/:id/rent-declarations/:year. */
+const RentDeclarationYearParams = z.object({ id: uuid, year: taxYear }).strict();
+
+/**
+ * One person's declared rent for one tax year, as the Joint Revenue Board's Guidelines 2026 ask for it (paras 9.2 to 9.6):
+ * the rent the person paid (their own share, in a shared tenancy) and the months it covers, the legal tenant, the landlord
+ * with a mobile number, Tax ID or NIN, the property's address and the evidence of payment. `year_rent` is the rent
+ * pro-rated to the year by months (para 9.5: two years' rent gives half to each), which payroll's rent relief reads.
+ * Every field is masked as `employee.statutory`; `property_address_place` is the address as an edit form reads it.
+ */
+const RentDeclaration = z
+  .object({
+    employee_rent_declaration_id: uuid,
+    employee_id: uuid,
+    year: z.number().int(),
+    rent_paid: money.nullable(),
+    year_rent: money.nullable(),
+    covers_from: isoDate,
+    covers_to: isoDate,
+    tenant_name: z.string().nullable(),
+    landlord_name: z.string().nullable(),
+    landlord_phone: z.string().nullable(),
+    landlord_tax_id: z.string().nullable(),
+    landlord_nin: z.string().nullable(),
+    property_address: z.string().nullable(),
+    property_address_place: PlaceView.nullable(),
+    evidence_document_id: uuid.nullable(),
+    entered_by_name: z.string().nullable(),
+    updated_at: isoDateTime,
+  })
+  .strict();
+const RentDeclarationPage = Paged(RentDeclaration);
+
+/**
+ * PUT /employees/:id/rent-declarations/:year (`people` edit, a role that sees `employee.statutory`): the year's
+ * declaration, made or replaced. The months covered run from one month's first day to another's and include at least one
+ * month of the year (422 COVERS_OUTSIDE_YEAR); the year is this one or the next in Lagos (422 YEAR_NOT_ALLOWED). The
+ * address is picked (F27); the evidence is a file staged through POST /documents and claimed by the save.
+ */
+const RentDeclarationSave = z
+  .object({
+    rent_paid: positiveMoney,
+    covers_from: monthStart("Pick a month"),
+    covers_to: monthStart("Pick a month"),
+    tenant_name: text(200),
+    landlord_name: text(200),
+    landlord_phone: blank(phone),
+    landlord_tax_id: blank(statutoryNumber),
+    landlord_nin: blank(nin),
+    property_address: PlaceInput,
+    evidence_document_id: uuid,
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.covers_from && v.covers_to && v.covers_to < v.covers_from)
+      ctx.addIssue({ code: "custom", path: ["covers_to"], message: "Not before From" });
+    if (!v.landlord_phone && !v.landlord_tax_id && !v.landlord_nin)
+      ctx.addIssue({ code: "custom", path: ["landlord_phone"], message: "Give one landlord ID" });
+  });
 
 /**
  * scripts/db/create-admin.js input. The same employee fields as
@@ -979,6 +1134,18 @@ const TABLES = {
       is_ceo: "whether this is the CEO's own record (a login holding the ceo role), which cannot be archived",
     },
   },
+  RentDeclaration: {
+    table: "employee_rent_declaration",
+    virtual: {
+      year_rent: "the rent pro-rated to the year by the months it covers (organisation.rent.js)",
+      property_address_place: "the address as a place, from place (owner employee_rent_declaration.property_address)",
+      entered_by_name: "who entered it, from app_user and employee",
+    },
+  },
+  RentDeclarationPage: { table: null, reason: "a page of a person's declared rent" },
+  RentDeclarationParams: { table: null, reason: "the person's :id path parameter" },
+  RentDeclarationYearParams: { table: null, reason: "the person's :id and the :year path parameters" },
+  RentDeclarationSave: { table: "employee_rent_declaration" },
   EmployeeHistoryEntry: {
     table: "audit_ledger",
     virtual: { summary: "the line the History tab reads, written from action and changed_fields" },
@@ -1069,6 +1236,9 @@ module.exports = {
   LOGIN_STATES,
   SEAT_STATUSES,
   EmploymentType,
+  NigerianState,
+  NIGERIAN_STATES,
+  STATE_LABELS,
   WorkPattern,
   Gender,
   EmployeeStatus,
@@ -1119,5 +1289,10 @@ module.exports = {
   OrgChartExportRequest,
   OrgChartDocumentVars,
   EmployeeImportRow,
+  RentDeclaration,
+  RentDeclarationPage,
+  RentDeclarationParams,
+  RentDeclarationYearParams,
+  RentDeclarationSave,
   AdminBootstrap,
 };

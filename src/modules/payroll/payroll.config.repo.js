@@ -22,21 +22,22 @@ const lagos = require("../../shared/time/lagos");
 /** The pay day when MyCity has set none (§13.1 item 24): shown on Configurations as "30 (default)". */
 const DEFAULT_PAY_DAY = 30;
 
-/** What "no setting" means: simple mode, the default pay day, bank details a warning, no conventions. */
+/** What "no setting" means: simple mode, the default pay day, bank details a warning. */
 const DEFAULTS = Object.freeze({
   payroll_setting_id: null,
   advanced_enabled: false,
   pay_day: null,
   require_bank_details: false,
-  paye_basis: null,
-  pension_reduces_taxable: null,
-  nhf_reduces_taxable: null,
   effective_from: null,
   effective_to: null,
 });
 
-const COLUMNS = `payroll_setting_id, advanced_enabled, pay_day, require_bank_details, paye_basis,
-  pension_reduces_taxable, nhf_reduces_taxable, effective_from::text AS effective_from,
+/*
+ * The setting's columns the code reads. Its three convention columns (paye_basis, pension_reduces_taxable,
+ * nhf_reduces_taxable) stay in the table, unread and unwritten since PR 11: the law settles all three, so the engine
+ * fixes them (docs/guides/payroll.md §6.12 rules 11 and 14); a merged migration is never edited.
+ */
+const COLUMNS = `payroll_setting_id, advanced_enabled, pay_day, require_bank_details, effective_from::text AS effective_from,
   effective_to::text AS effective_to`;
 
 /**
@@ -97,31 +98,6 @@ async function nextPayDate(db, today, isPaid) {
  * Configurations (PR 5): the setting's versions, and the rule every configuration change keeps
  * ------------------------------------------------------------------ */
 
-/** The three conventions of §6.12 rule 1: the accountant's choices, stored on the setting. */
-const CONVENTIONS = Object.freeze(["paye_basis", "pension_reduces_taxable", "nhf_reduces_taxable"]);
-
-/**
- * The conventions switching on needs (409 NO_CONVENTIONS) and a run needs set: whether pension, and NHF, reduce taxable
- * pay. PAYE Basis left the screen in PR 10 (§6.12 rule 11), so it is not among them (§13.2 item 32).
- */
-const REQUIRED_CONVENTIONS = Object.freeze(["pension_reduces_taxable", "nhf_reduces_taxable"]);
-
-/** How an unset PAYE basis is read (§13.2 item 32): the bands as the law publishes them, annual amounts, the tax ÷ 12. */
-const UNSET_PAYE_BASIS = "annualised";
-
-/**
- * The conventions a run computes with, from a setting: the two flags as set (null when not), and the PAYE basis as set
- * or, unset, `annualised`.
- * @param {object} setting  a version of the setting, or the defaults
- */
-function conventionsOf(setting) {
-  return {
-    paye_basis: setting.paye_basis ?? UNSET_PAYE_BASIS,
-    pension_reduces_taxable: setting.pension_reduces_taxable ?? null,
-    nhf_reduces_taxable: setting.nhf_reduces_taxable ?? null,
-  };
-}
-
 /**
  * A configuration change starts today or later in Lagos, never earlier (§6.11 rule 3): the setting, a statutory rate,
  * a grade, a placement, a pay split. A locked run never changes, and a month already computed keeps its snapshot.
@@ -133,9 +109,8 @@ function assertNotPast(date) {
 }
 
 /** A version with who made it and why, as Configurations shows it. */
-const VERSION = `s.payroll_setting_id, s.advanced_enabled, s.pay_day, s.require_bank_details, s.paye_basis,
-  s.pension_reduces_taxable, s.nhf_reduces_taxable, s.effective_from::text AS effective_from,
-  s.effective_to::text AS effective_to, s.reason,
+const VERSION = `s.payroll_setting_id, s.advanced_enabled, s.pay_day, s.require_bank_details,
+  s.effective_from::text AS effective_from, s.effective_to::text AS effective_to, s.reason,
   CASE WHEN e.employee_id IS NULL THEN NULL ELSE btrim(e.first_name || ' ' || e.last_name) END AS changed_by_name`;
 const VERSION_JOINS = `LEFT JOIN app_user u ON u.user_id = s.changed_by LEFT JOIN employee e ON e.employee_id = u.employee_id`;
 
@@ -171,7 +146,7 @@ async function hasBeenOn(db) {
 }
 
 /** The columns a version of the setting may write. */
-const WRITABLE = [...CONVENTIONS, "advanced_enabled", "pay_day", "require_bank_details", "changed_by", "reason"];
+const WRITABLE = ["advanced_enabled", "pay_day", "require_bank_details", "changed_by", "reason"];
 
 /**
  * A new version of the setting from a day, or the change joined onto that day's version (shared/db/effective-dated
@@ -198,10 +173,6 @@ function removeVersion(client, from) {
 module.exports = {
   DEFAULT_PAY_DAY,
   DEFAULTS,
-  CONVENTIONS,
-  REQUIRED_CONVENTIONS,
-  UNSET_PAYE_BASIS,
-  conventionsOf,
   settingOn,
   payDayOf,
   payDateOf,

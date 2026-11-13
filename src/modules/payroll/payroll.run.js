@@ -21,6 +21,8 @@ const m = require("../../shared/money/money");
 const engine = require("../../shared/workflow/engine");
 const attendancePay = require("../attendance/attendance.pay");
 const statutoryRates = require("../statutory/statutory.rates");
+const statutoryRepo = require("../statutory/statutory.repo");
+const rentDeclarations = require("../organisation/employee.rent");
 const structure = require("../salary_structure/salary_structure.repo");
 const calc = require("./payroll.calc");
 const settings = require("./payroll.config.repo");
@@ -60,8 +62,32 @@ const emptyRow = (person, number, extra = {}) => ({
   employer_total: ZERO,
   bank_name: person.bank_name || null,
   account_last4: last4(person.account_number),
+  taxable_pay: null,
   ...extra,
 });
+
+/**
+ * Each person's PAYE year to date before the run's month (§6.12 rule 11, §13.1 item 42): what MyCity's advanced runs of
+ * the year sent for approval, approved or paid kept and deducted (payroll.inputs yearToDateFor), plus the Pay to Date
+ * entered for the year (a leaving certificate, or MyCity's own months before the option was on). A person with neither
+ * starts at nothing.
+ * @returns {Promise<Map<string, {taxable_pay: string, tax: string}>>}
+ */
+async function yearToDate(client, ids, period) {
+  const ran = await inputs.yearToDateFor(client, ids, period);
+  const entered = await statutoryRepo.payToDateFor(client, ids, Number(period.slice(0, 4)));
+  const out = new Map();
+  for (const id of ids) {
+    const a = ran.get(id);
+    const b = entered.get(id);
+    if (!a && !b) continue;
+    out.set(id, {
+      taxable_pay: m.toWire(m.sum([a ? a.taxable_pay : "0", b ? b.taxable_pay : "0"])),
+      tax: m.toWire(m.sum([a ? a.tax : "0", b ? b.tax : "0"])),
+    });
+  }
+  return out;
+}
 
 /**
  * One person's month into a payslip row and its lines (§6.3 to §6.8). Pure but for the person's working
@@ -130,15 +156,23 @@ async function buildPayslip(client, person, number, month) {
   }));
 
   // Advanced mode (§6.11 rule 6): the person's pay split, used only while it adds up to their gross as it stands; with
-  // none, their Monthly Pay is the whole base and the run warns No Pay Split.
+  // none, their Monthly Pay is the whole base and the run warns No Pay Split. The statutory items read the person's NHF
+  // choice, their year to date and their declared rent for the year (§6.12 rules 11 and 15).
   let components = null;
+  let statutory = null;
   if (month.statutory) {
     const split = month.splits.get(person.employee_id) || [];
     if (split.length && m.compare(m.sum(split.map((c) => c.amount)), person.gross_monthly) === 0)
       components = split.map((c) => ({ id: c.employee_pay_component_id, code: c.code, label: c.label, amount: c.amount, pensionable: c.pensionable === true }));
+    statutory = {
+      ...month.statutory,
+      nhf_contributes: person.nhf_contributes === true,
+      to_date: month.toDate.get(person.employee_id) || calc.NOTHING_TO_DATE,
+      year_rent: month.rents.get(person.employee_id) ?? null,
+    };
   }
 
-  const lines = calc.buildLines({
+  const { lines, taxable_pay: taxablePay } = calc.payslipOf({
     gross: person.gross_monthly,
     part,
     overtime,
@@ -148,11 +182,12 @@ async function buildPayslip(client, person, number, month) {
     instalments,
     adjustments,
     components,
-    statutory: month.statutory,
+    statutory,
   });
   const row = emptyRow(person, number, {
     working_days: part.workingDays,
     working_days_paid: part.daysPaid,
+    taxable_pay: taxablePay,
     ...calc.totalsOf(lines),
   });
   return { row, lines, ...mine };
@@ -174,15 +209,13 @@ async function computeInto(client, run) {
   const ids = people.map((p) => p.employee_id);
   const prior = new Map((await repo.payslipsOf(client, runId)).map((p) => [p.employee_id, p]));
 
-  // The mode is the setting's on the month's first day; the rates and the splits are those in force on its last day
-  // (§6.11 rule 2, §6.12). With no PAYE table, or the conventions unset, the run says what is missing (No Rates Set):
-  // the items that have rates are computed, PAYE is not, and Submit refuses it.
+  // The mode is the setting's on the month's first day; the figures and the splits are those in force on its last day
+  // (§6.11 rule 2, §6.12). What is missing is listed (No Rates Set): the items that have figures are computed, and Submit
+  // refuses the run. PAYE is cumulative over the calendar year (§6.12 rule 11): the run's month of the year scales the
+  // bands, and each person's year to date and declared rent are read for it.
   const advanced = setting.advanced_enabled === true;
-  // An unset PAYE basis reads as annualised (§13.2 item 32); the two flags have no default.
-  const conventions = settings.conventionsOf(setting);
-  const conventionsSet = settings.REQUIRED_CONVENTIONS.every((c) => conventions[c] !== null);
-  const rated = advanced ? await statutoryRates.ratesOn(client, last) : { rates: {}, rows: [] };
-  const missing = advanced ? [...(rated.rates.paye ? [] : ["paye"]), ...(conventionsSet ? [] : ["conventions"])] : [];
+  const rated = advanced ? await statutoryRates.ratesOn(client, last) : { rates: {}, rows: [], misbased: [] };
+  const missing = advanced ? calc.statutoryMissing(rated) : [];
 
   const items = await inputs.payItemsFor(client, ids, last);
   const unpriced = items.filter((i) => i.amount === null);
@@ -196,8 +229,10 @@ async function computeInto(client, run) {
     suspensions: groupBy(await inputs.unpaidSuspensionsFor(client, ids, first, last), "employee_id"),
     instalments: groupBy(await inputs.instalmentsFor(client, ids, run.period, last), "employee_id"),
     adjustments: groupBy(await repo.adjustmentsOf(client, runId), "employee_id"),
-    statutory: advanced && conventionsSet ? { rates: rated.rates, conventions } : null,
+    statutory: advanced ? { rates: rated.rates, month: Number(run.period.slice(5, 7)) } : null,
     splits: advanced ? groupBy(await structure.splitsFor(client, ids, last), "employee_id") : new Map(),
+    toDate: advanced ? await yearToDate(client, ids, run.period) : new Map(),
+    rents: advanced ? await rentDeclarations.yearRentsFor(client, ids, Number(run.period.slice(0, 4))) : new Map(),
   };
 
   const rows = [];
@@ -243,9 +278,10 @@ async function computeInto(client, run) {
       require_bank_details: setting.require_bank_details === true,
       pay_day: settings.payDayOf(setting),
       pay_day_is_default: !setting.pay_day,
-      // The rates and conventions an advanced run was computed with, so a locked run is explained after they change.
+      // The figures an advanced run was computed with and how PAYE was worked out, so a locked run is explained after
+      // they change (the report prints them). `cumulative`: on the year to date, the bands scaled to the months elapsed.
       ...(advanced && {
-        conventions,
+        paye_method: "cumulative",
         statutory_missing: missing,
         statutory_rates: rated.rows.map((r) => ({
           item: r.item,

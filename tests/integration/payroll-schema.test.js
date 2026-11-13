@@ -160,7 +160,8 @@ describeDb("M6 payroll schema and reference data against the real migrations", (
     test("a status or type CHECK holds exactly the contract's values", async () => {
       const checks = [
         ["payroll_run", "status", c.payroll.RunStatus.options],
-        ["payroll_setting", "paye_basis", c.payroll.PayeBasis.options],
+        // The PAYE basis left the contract in PR 11 (the law settles it, guide §6.12 rule 14); its column and CHECK stay unread.
+        ["payroll_setting", "paye_basis", ["annualised", "monthly"]],
         ["payslip", "status", c.payslips.PayslipStatus.options],
         ["payslip_line", "kind", c.payslips.PayslipLineKind.options],
         ["payslip_line", "code", c.payslips.PayslipLineCode.options],
@@ -511,6 +512,73 @@ describeDb("M6 payroll schema and reference data against the real migrations", (
         await expect(effectiveDated.removeVersion(cl, { table: "statutory_rate", key: { item: "paye" }, from: "2026-12-01", today: "2026-12-15" })).rejects.toMatchObject({
           code: "VERSION_IN_FORCE",
         });
+      });
+    });
+  });
+
+  describe("6050, the statutory engine to the law (PR 11)", () => {
+    const SOURCE = "'TEST SOURCE, not a law', 'Test section 1', '2026-11-01'";
+    const insert = (cl, item, base, flat, from = "2026-12-01") =>
+      cl.query(
+        `INSERT INTO statutory_rate (item, kind, base, rate, flat_amount, effective_from, source_title, source_section, source_checked_on)
+         VALUES ($1, 'employee', $2, 10, $3, $4, ${SOURCE})`,
+        [item, base, flat, from],
+      );
+    const checkValues = async (cl, table, name) => {
+      const { rows } = await cl.query("SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conrelid = $1::regclass AND conname = $2", [table, name]);
+      return [...rows[0].def.matchAll(/'([a-z_]+)'::text/g)].map((m) => m[1]).sort();
+    };
+
+    test("the CHECK lists are the contract's: the items (the retired relief kept for its rows), the bases, the line codes, the States", async () => {
+      await rolledBack(async (cl) => {
+        expect(await checkValues(cl, "statutory_rate", "statutory_rate_item_check")).toEqual([...c.statutory.StatutoryItem.options, ...c.statutory.RETIRED_ITEMS].sort());
+        expect(await checkValues(cl, "statutory_rate", "statutory_rate_base_check")).toEqual([...c.statutory.StatutoryBase.options].sort());
+        expect(await checkValues(cl, "statutory_rate", "statutory_rate_flat_check")).toEqual([...c.statutory.AMOUNT_ITEMS, ...c.statutory.RETIRED_ITEMS].sort());
+        expect(await checkValues(cl, "payslip_line", "payslip_line_code_check")).toEqual([...c.payslips.PayslipLineCode.options].sort());
+        expect(await checkValues(cl, "employee", "employee_state_of_residence_check")).toEqual([...c.organisation.NIGERIAN_STATES].sort());
+      });
+    });
+
+    test("rent relief and the minimum wage carry an amount, nothing else does; a refund is a line; a payslip keeps its taxable pay", async () => {
+      await rolledBack(async (cl) => {
+        await insert(cl, "rent_relief", "rent", "300000.00");
+        await insert(cl, "minimum_wage", "gross", "50000.00");
+        await refusedHere(cl, () => insert(cl, "nhf", "gross", "5.00", "2026-12-02"), "23514", "statutory_rate_flat_check");
+        await refusedHere(cl, () => insert(cl, "levy", "gross", null), "23514", "statutory_rate_item_check");
+        await refusedHere(cl, () => insert(cl, "nhf", "salary", null, "2026-12-03"), "23514", "statutory_rate_base_check");
+        const def = (await cl.query("SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'payslip_taxable_pay_check'")).rows[0].def;
+        expect(def).toBe("CHECK (((taxable_pay IS NULL) OR (taxable_pay >= (0)::numeric)))");
+      });
+    });
+
+    test("NHF is off until chosen, a State is one of the 37, and a declaration and a Pay to Date are one a person a year", async () => {
+      await rolledBack(async (cl) => {
+        const person = (await cl.query("SELECT employee_id FROM employee LIMIT 1")).rows[0];
+        if (!person) return;
+        expect((await cl.query("SELECT nhf_contributes FROM employee WHERE employee_id = $1", [person.employee_id])).rows[0].nhf_contributes).toBe(false);
+        await refusedHere(cl, () => cl.query("UPDATE employee SET state_of_residence = 'atlantis' WHERE employee_id = $1", [person.employee_id]), "23514", "employee_state_of_residence_check");
+        const declare = () =>
+          cl.query(
+            `INSERT INTO employee_rent_declaration (employee_id, year, rent_paid, covers_from, covers_to, tenant_name, landlord_name, landlord_nin, property_address)
+             VALUES ($1, 2026, 1200000, '2026-01-01', '2026-12-01', 'A Tester', 'A Landlord', '12345678901', '12 Test Street')`,
+            [person.employee_id],
+          );
+        await declare();
+        await refusedHere(cl, declare, "23505", "employee_rent_declaration_year_uq");
+      });
+    });
+
+    test("it comes off and goes back", async () => {
+      await rolledBack(async (cl) => {
+        const file = FILES["6050_statutory_law"];
+        await cl.query(file.down);
+        const has = async (sql) => (await cl.query(sql)).rows[0].n;
+        expect(await has("SELECT count(*)::int AS n FROM pg_class WHERE relname IN ('employee_rent_declaration', 'employee_pay_to_date')")).toBe(0);
+        expect(await has("SELECT count(*)::int AS n FROM information_schema.columns WHERE (table_name, column_name) IN (('employee', 'nhf_contributes'), ('employee', 'state_of_residence'), ('payslip', 'taxable_pay'))")).toBe(0);
+        await cl.query(file.up);
+        await cl.query(file.up); // idempotent
+        expect(await has("SELECT count(*)::int AS n FROM pg_class WHERE relname IN ('employee_rent_declaration', 'employee_pay_to_date')")).toBe(2);
+        expect(await has("SELECT count(*)::int AS n FROM pg_trigger WHERE tgname IN ('employee_rent_declaration_set_updated_at', 'employee_pay_to_date_set_updated_at')")).toBe(2);
       });
     });
   });

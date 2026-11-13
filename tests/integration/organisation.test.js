@@ -1091,6 +1091,32 @@ describeDb("the organisation module against the real migrations", () => {
       expect(batch.stats.rows).toBe(6);
     });
 
+    test("the tax and pension columns land on the record, as People · Employees' Tax and Pension step takes them", async () => {
+      // docs/guides/payroll.md §13.1 items 44 and 46: the numbers, NHF by the person's choice, the State they live in.
+      const headers = ["S/N", "Staff ID", "Name", "Designation", "Team", "Gender", "DOJ", "DOB", "Line Manager", "Email", "Phone", "Emploment Type", "Work Arrangement", "Work Hours", "Bank Name", "Tax ID", "Pension PIN", "PFA", "NHF Number", "Contributes to NHF", "State of Residence"];
+      const zainab = ["T0606", "Zainab Musa", "Trading Officer", "Trading Desk", "Female", new Date(Date.UTC(2026, 6, 1)), "", "Head of Settlement", "zainab.musa@mycity.test", "", "FTE", "Remote", "Mon - Fri", "", "23456789-0001", "PEN100123456789", "Pension Managers Limited", "NHF0012345678", "Yes", "Lagos"];
+      const file = path.join(temp, "tax.xlsx");
+      fs.writeFileSync(file, await sheet([zainab], { headers }));
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(result.status).toBe("loaded");
+      expect(result.stats.create).toBe(1);
+      expect(
+        await one(
+          `SELECT tax_id, pension_pin, pension_administrator, nhf_number, nhf_contributes, state_of_residence
+             FROM employee WHERE staff_number = 'T0606'`,
+        ),
+      ).toEqual({
+        tax_id: "23456789-0001",
+        pension_pin: "PEN100123456789",
+        pension_administrator: "Pension Managers Limited",
+        nhf_number: "NHF0012345678",
+        nhf_contributes: true,
+        state_of_residence: "lagos",
+      });
+      const fields = require("../../src/modules/organisation/employee.import").FIELDS;
+      expect(fields.filter((f) => f.mask === "employee.statutory").map((f) => f.key)).toEqual(["tax_id", "pension_pin", "pension_administrator", "nhf_number", "nhf_contributes", "state_of_residence"]);
+    });
+
     test("a row the sheet gets wrong is reported and does not stop the others", async () => {
       const broken = [
         ["T0101", "Kemi Alabi", "Trading Officer", "Trading Desk", "Female", new Date(Date.UTC(2026, 1, 2)), "", "Nobody At All", "kemi@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],

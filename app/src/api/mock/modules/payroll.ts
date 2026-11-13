@@ -12,6 +12,8 @@ import type {
   PayrollSettings,
   PayrollSettingsChange,
   PayrollSettingsVersion,
+  PayToDate,
+  PayToDateSave,
   SalaryGrade,
   StatutoryItemState,
   StatutoryRate,
@@ -729,19 +731,12 @@ function settingsView(): PayrollSettings {
     pay_day: current?.pay_day ?? 30,
     pay_day_is_default: !current?.pay_day,
     require_bank_details: current?.require_bank_details ?? false,
-    paye_basis: current?.paye_basis ?? null,
-    pension_reduces_taxable: current?.pension_reduces_taxable ?? null,
-    nhf_reduces_taxable: current?.nhf_reduces_taxable ?? null,
     current,
     next,
   };
 }
 
 route("GET /api/v1/payroll/settings", (req) => (canRun(req.user!) ? ok(settingsView()) : forbiddenRead()));
-
-const CONVENTION_KEYS = ["paye_basis", "pension_reduces_taxable", "nhf_reduces_taxable"] as const;
-/** What switching on needs: PAYE Basis is not asked since PR 10, and an unset one reads as annualised. */
-const REQUIRED_CONVENTIONS = ["pension_reduces_taxable", "nhf_reduces_taxable"] as const;
 
 route("PATCH /api/v1/payroll/settings", (req) => {
   if (!configures(req.user!)) return notConfigurer();
@@ -752,17 +747,10 @@ route("PATCH /api/v1/payroll/settings", (req) => {
       advanced_enabled: b.advanced_enabled ?? latest?.advanced_enabled ?? false,
       pay_day: b.pay_day ?? latest?.pay_day ?? null,
       require_bank_details: b.require_bank_details ?? latest?.require_bank_details ?? false,
-      paye_basis: b.paye_basis ?? latest?.paye_basis ?? null,
-      pension_reduces_taxable: b.pension_reduces_taxable ?? latest?.pension_reduces_taxable ?? null,
-      nhf_reduces_taxable: b.nhf_reduces_taxable ?? latest?.nhf_reduces_taxable ?? null,
     };
-    const conventionsSent = CONVENTION_KEYS.some((k) => b[k] !== undefined);
-    if (conventionsSent && b.advanced_enabled !== true && !hasBeenOn()) return fail(409, "ADVANCED_OFF", "Conventions are set when Advanced Payroll is switched on");
-    if (b.advanced_enabled === true && latest?.advanced_enabled !== true) {
-      if (!RATES.some((r) => inForce(r, b.effective_from))) return fail(409, "NO_RATES", "Enter a statutory rate in force from this date first", { effective_from: ["No rate that day"] });
-      const unset = REQUIRED_CONVENTIONS.filter((k) => merged[k] === null);
-      if (unset.length) return fail(409, "NO_CONVENTIONS", "Set the conventions to switch on", Object.fromEntries(unset.map((k) => [k, ["Pick one"]])));
-    }
+    // The law settles the conventions (guide §6.12 rule 14): switching on needs only a figure in force that day.
+    if (b.advanced_enabled === true && latest?.advanced_enabled !== true && !RATES.some((r) => inForce(r, b.effective_from)))
+      return fail(409, "NO_RATES", "Enter a statutory rate in force from this date first", { effective_from: ["No rate that day"] });
     const row: PayrollSettingsVersion = {
       payroll_setting_id: sid(`setting:${b.effective_from}`),
       ...merged,
@@ -782,8 +770,10 @@ route("DELETE /api/v1/payroll/settings/versions/:effective_from", (req) => {
 
 /* Statutory rates */
 
-const ITEMS: StatutoryRate["item"][] = ["paye", "pension_employee", "pension_employer", "nhf", "itf", "nsitf", "relief"];
-const ORDER: StatutoryRate["item"][] = ["paye", "pension_employee", "pension_employer", "nhf", "relief", "itf", "nsitf"];
+/** The eight items, in the contract's order (the retired relief is not among them, guide §13.1 item 41). */
+const ITEMS = statutorySchemas.StatutoryItem.options as StatutoryRate["item"][];
+const ORDER = ITEMS;
+const AMOUNT_ITEMS = statutorySchemas.AMOUNT_ITEMS as readonly string[];
 const byItem = (a: StatutoryRate, b: StatutoryRate) =>
   ORDER.indexOf(a.item) - ORDER.indexOf(b.item) || a.effective_from.localeCompare(b.effective_from) || (a.position ?? 0) - (b.position ?? 0);
 
@@ -792,8 +782,8 @@ function brief(item: StatutoryRate["item"], rows: StatutoryRate[]): StatutoryIte
   if (!mine.length) return null;
   const r = mine[0];
   return {
-    rate: item === "paye" ? null : r.rate,
-    flat_amount: item === "relief" ? r.flat_amount : null,
+    rate: item === "paye" || item === "minimum_wage" ? null : r.rate,
+    flat_amount: AMOUNT_ITEMS.includes(item) ? r.flat_amount : null,
     base: r.base,
     bands: item === "paye" ? mine.length : null,
     effective_from: r.effective_from,
@@ -878,7 +868,7 @@ route("POST /api/v1/statutory/rates", (req) => {
     const rows: StatutoryRate[] =
       b.item === "paye"
         ? (b.bands ?? []).map((band, i) => ({ ...common, statutory_rate_id: sid(`rate:paye:${b.effective_from}:${i}`), rate: band.rate, band_from: band.band_from, band_to: band.band_to, flat_amount: null, position: i + 1 }))
-        : [{ ...common, statutory_rate_id: sid(`rate:${b.item}:${b.effective_from}`), rate: b.rate ?? "0", band_from: null, band_to: null, flat_amount: b.item === "relief" ? (b.flat_amount ?? "0.00") : null, position: null }];
+        : [{ ...common, statutory_rate_id: sid(`rate:${b.item}:${b.effective_from}`), rate: b.rate ?? "0", band_from: null, band_to: null, flat_amount: AMOUNT_ITEMS.includes(b.item) ? (b.flat_amount ?? null) : null, position: null }];
     const refused = addVersion(RATES, (r) => r.item === b.item, b.effective_from, rows);
     if (refused) return refused;
     return created({ data: rows, page: { number: 1, size: __CONTRACT_PAGE_SIZE__, total: rows.length, pages: 1, has_next: false } });
@@ -1036,4 +1026,47 @@ route("PUT /api/v1/salary-structure/employees/:employee_id/components", (req) =>
     const rows: SplitRow[] = b.components.map((c) => ({ employee_id: p.employee_id, ...c, effective_from: b.effective_from, effective_to: null }));
     return addVersion(SPLITS, (s) => s.employee_id === p.employee_id, b.effective_from, rows) ?? ok(splitView(p));
   });
+});
+
+/* A person's Pay to Date (guide §13.1 item 42): the year's taxable pay and tax before MyCity's first statutory month. */
+
+const PRIOR: PayToDate[] = [];
+
+route("GET /api/v1/statutory/employees/:employee_id/pay-to-date", (req) => {
+  if (!canRun(req.user!)) return forbiddenRead();
+  if (!byId(req.params.employee_id)) return notFound();
+  const mine = PRIOR.filter((r) => r.employee_id === req.params.employee_id).sort((a, b) => b.year - a.year);
+  return paged(mine, req);
+});
+
+route("PUT /api/v1/statutory/employees/:employee_id/pay-to-date/:year", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  if (!byId(req.params.employee_id)) return notFound();
+  const year = Number(req.params.year);
+  const now = Number(todayIso().slice(0, 4));
+  if (year !== now && year !== now + 1) return fail(422, "YEAR_NOT_ALLOWED", "Pick this year or next", { year: ["This year or next"] });
+  return checked<PayToDateSave>(statutorySchemas.PayToDateSave, req.body, (b) => {
+    const at = PRIOR.findIndex((r) => r.employee_id === req.params.employee_id && r.year === year);
+    const row: PayToDate = {
+      employee_pay_to_date_id: sid(`prior:${req.params.employee_id}:${year}`),
+      employee_id: req.params.employee_id,
+      year,
+      taxable_pay: b.taxable_pay,
+      tax_paid: b.tax_paid,
+      document_id: b.document_id ?? null,
+      entered_by_name: operatorName(req.user!),
+      updated_at: new Date().toISOString(),
+    };
+    if (at >= 0) PRIOR[at] = row;
+    else PRIOR.push(row);
+    return ok(row);
+  });
+});
+
+route("DELETE /api/v1/statutory/employees/:employee_id/pay-to-date/:year", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  const at = PRIOR.findIndex((r) => r.employee_id === req.params.employee_id && r.year === Number(req.params.year));
+  if (at < 0) return notFound();
+  PRIOR.splice(at, 1);
+  return noContent();
 });

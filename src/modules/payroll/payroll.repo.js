@@ -230,19 +230,20 @@ async function upsertPayslips(client, runId, rows) {
   const col = (name) => rows.map((r) => r[name] ?? null);
   const { rows: written } = await client.query(
     `INSERT INTO payslip (payroll_run_id, employee_id, number, status, excluded_reason, gross_monthly, working_days,
-                          working_days_paid, earnings_total, deductions_total, net_pay, employer_total, bank_name, account_last4)
+                          working_days_paid, earnings_total, deductions_total, net_pay, employer_total, bank_name, account_last4,
+                          taxable_pay)
      SELECT $1, x.employee_id, x.number, x.status, x.excluded_reason, x.gross_monthly, x.working_days, x.working_days_paid,
-            x.earnings_total, x.deductions_total, x.net_pay, x.employer_total, x.bank_name, x.account_last4
+            x.earnings_total, x.deductions_total, x.net_pay, x.employer_total, x.bank_name, x.account_last4, x.taxable_pay
        FROM unnest($2::uuid[], $3::text[], $4::text[], $5::text[], $6::numeric[], $7::int[], $8::int[], $9::numeric[],
-                   $10::numeric[], $11::numeric[], $12::numeric[], $13::text[], $14::text[])
+                   $10::numeric[], $11::numeric[], $12::numeric[], $13::text[], $14::text[], $15::numeric[])
             AS x(employee_id, number, status, excluded_reason, gross_monthly, working_days, working_days_paid,
-                 earnings_total, deductions_total, net_pay, employer_total, bank_name, account_last4)
+                 earnings_total, deductions_total, net_pay, employer_total, bank_name, account_last4, taxable_pay)
      ON CONFLICT (payroll_run_id, employee_id) DO UPDATE
         SET status = EXCLUDED.status, excluded_reason = EXCLUDED.excluded_reason, gross_monthly = EXCLUDED.gross_monthly,
             working_days = EXCLUDED.working_days, working_days_paid = EXCLUDED.working_days_paid,
             earnings_total = EXCLUDED.earnings_total, deductions_total = EXCLUDED.deductions_total,
             net_pay = EXCLUDED.net_pay, employer_total = EXCLUDED.employer_total, bank_name = EXCLUDED.bank_name,
-            account_last4 = EXCLUDED.account_last4
+            account_last4 = EXCLUDED.account_last4, taxable_pay = EXCLUDED.taxable_pay
      RETURNING payslip_id, employee_id`,
     [
       runId,
@@ -259,6 +260,7 @@ async function upsertPayslips(client, runId, rows) {
       col("employer_total"),
       col("bank_name"),
       col("account_last4"),
+      col("taxable_pay"),
     ],
   );
   return new Map(written.map((r) => [r.employee_id, r.payslip_id]));
@@ -517,6 +519,14 @@ const PROBLEMS = `
       FROM payroll_run r
      WHERE r.payroll_run_id = ANY($1::uuid[]) AND r.advanced AND r.status IN ('draft', 'computed')
        AND jsonb_array_length(COALESCE(r.config_snapshot->'statutory_missing', '[]'::jsonb)) > 0
+    UNION ALL
+    -- An advanced run reads the PAYE its year's earlier runs deducted, so it waits until each has been sent (§6.15).
+    SELECT 'EARLIER_RUN_OPEN', 'blocking', 0, r.payroll_run_id, NULL::uuid, NULL::uuid, o.n::int
+      FROM payroll_run r
+      JOIN LATERAL (SELECT count(*) AS n FROM payroll_run x
+                     WHERE x.period < r.period AND x.period >= date_trunc('year', r.period)::date
+                       AND x.status IN ('draft', 'computed')) o ON o.n > 0
+     WHERE r.payroll_run_id = ANY($1::uuid[]) AND r.advanced AND r.status IN ('draft', 'computed')
   )`;
 
 /** GET /payroll/runs/:id/problems: blocking first, then the warnings, each naming the person. */

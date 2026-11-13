@@ -71,13 +71,15 @@ describe("the contract's field messages", () => {
 
   test("a setting change names a date and at least one thing to change; the pay day is 1 to 31", () => {
     expect(c.payroll.PayrollSettingsChange.safeParse({ effective_from: "2026-12-01", pay_day: 28 }).success).toBe(true);
-    expect(c.payroll.PayrollSettingsChange.safeParse({ effective_from: "2026-12-01", advanced_enabled: true, paye_basis: "monthly", pension_reduces_taxable: false, nhf_reduces_taxable: true, require_bank_details: true, reason: "Rates confirmed" }).success).toBe(true);
+    expect(c.payroll.PayrollSettingsChange.safeParse({ effective_from: "2026-12-01", advanced_enabled: true, require_bank_details: true, reason: "Rates confirmed" }).success).toBe(true);
+    // The conventions are the law's since PR 11 (§6.12 rule 14): a change naming one is refused.
+    expect(c.payroll.PayrollSettingsChange.safeParse({ effective_from: "2026-12-01", advanced_enabled: true, paye_basis: "monthly" }).success).toBe(false);
     expect(errors(c.payroll.PayrollSettingsChange, { effective_from: "2026-12-01" })).toEqual(["effective_from: Nothing to change"]);
     expect(errors(c.payroll.PayrollSettingsChange, { effective_from: "2026-12-01", reason: "Why" })).toEqual(["effective_from: Nothing to change"]);
     expect(errors(c.payroll.PayrollSettingsChange, { effective_from: "2026-12-01", pay_day: 0 })).toEqual(["pay_day: Pick 1 to 31"]);
     expect(errors(c.payroll.PayrollSettingsChange, { effective_from: "2026-12-01", pay_day: 32 })).toEqual(["pay_day: Pick 1 to 31"]);
     expect(errors(c.payroll.PayrollSettingsChange, { advanced_enabled: true })).toHaveLength(1);
-    expect(errors(c.payroll.PayrollSettingsChange, { effective_from: "2026-12-01", paye_basis: "weekly" })).toHaveLength(1);
+    expect(errors(c.payroll.PayrollSettingsChange, { effective_from: "2026-12-01", paye_basis: "weekly" })).toContain("(body): Unrecognized key(s) in object: 'paye_basis'");
   });
 
   test("every field message in these schemas is four words or fewer", () => {
@@ -128,9 +130,9 @@ describe("the lists", () => {
 });
 
 describe("a statutory CHECK list is the contract's", () => {
-  test("a payslip line's codes are the sixteen the guide lists, the statutory six among them", () => {
-    expect(c.payslips.PayslipLineCode.options).toHaveLength(17);
-    expect(c.payslips.PayslipLineCode.options).toEqual(expect.arrayContaining(["paye", "pension_employee", "pension_employer", "nhf", "itf", "nsitf"]));
+  test("a payslip line's codes are the eighteen the guide lists, the statutory seven among them", () => {
+    expect(c.payslips.PayslipLineCode.options).toHaveLength(18);
+    expect(c.payslips.PayslipLineCode.options).toEqual(expect.arrayContaining(["paye", "paye_refund", "pension_employee", "pension_employer", "nhf", "itf", "nsitf"]));
     expect(c.payroll.RunStatus.options).toEqual(["draft", "computed", "submitted", "approved", "paid"]);
     expect(c.deductions.InstalmentStatus.options).toEqual(["scheduled", "in_run", "applied", "cancelled"]);
   });

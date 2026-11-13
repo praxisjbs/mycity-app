@@ -10,6 +10,8 @@
   .sr-h { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; color: #014339; margin: 5mm 0 0.5mm 0; }
   .sr-sub { font-size: 9pt; color: #71717A; margin: 0 0 1.5mm 0; }
   .sr-source { font-size: 8.5pt; color: #3F3F46; margin: 0 0 1.5mm 0; }
+  .sr-group { font-size: 9pt; font-weight: 700; color: #3F3F46; margin: 2mm 0 1mm 0; }
+  .sr-lines tr.sr-subtotal td { font-weight: 600; color: #3F3F46; }
   .sr-lines { margin: 0; width: 100%; }
   .sr-lines th { font-size: 9pt; }
   .sr-lines tr { page-break-inside: avoid; }
@@ -21,14 +23,11 @@
 </style>
 <div class="sr-body">
   <h1 class="sr-title">{{ title }}</h1>
-  <p class="sr-period">{{ period_label }} · {{ number }} · {{ status_label }}</p>
+  <p class="sr-period">{{ period_label }} · {{ run_number }} · {{ status_label }}</p>
 
   <div class="sr-conventions">
     <table>
-      <tr><td class="sr-key">PAYE Basis</td><td class="sr-val">{{ paye_basis_label }}</td></tr>
-      <tr><td class="sr-key">Pension Reduces Taxable Pay</td><td class="sr-val">{{ pension_reduces_label }}</td></tr>
-      <tr><td class="sr-key">NHF Reduces Taxable Pay</td><td class="sr-val">{{ nhf_reduces_label }}</td></tr>
-      {{#if relief_source_label}}<tr><td class="sr-key">Relief Source</td><td class="sr-val">{{ relief_source_label }}</td></tr>{{/if}}
+      {{#each rules}}<tr><td class="sr-key">{{ label }}</td><td class="sr-val">{{ value }}</td></tr>{{/each}}
     </table>
   </div>
 
@@ -37,6 +36,9 @@
     <h2 class="sr-h">{{ label }}</h2>
     <p class="sr-sub">{{ kind_label }} · {{ rate_label }} of {{ base_label }}</p>
     <p class="sr-source">Source: {{ source_label }}{{#if source_link}} · {{ source_link }}{{/if}}</p>
+    <p class="sr-source">Remit: {{ remit_label }}</p>
+    {{#each groups}}
+    {{#if label}}<p class="sr-group">{{ label }}</p>{{/if}}
     <table class="sr-lines">
       <thead>
         <tr>
@@ -46,6 +48,12 @@
       </thead>
       <tbody>
         {{#each rows}}<tr><td>{{ employee_name }}</td><td>{{ staff_number }}</td>{{#if number_label}}<td>{{#if statutory_number}}{{ statutory_number }}{{else}}Not Set{{/if}}</td>{{/if}}<td class="amount">{{ base }}</td><td class="amount">{{ amount }}</td></tr>{{/each}}
+        {{#if total}}<tr class="sr-subtotal"><td>{{ label }}</td><td></td>{{#if number_label}}<td></td>{{/if}}<td></td><td class="amount">{{ total }}</td></tr>{{/if}}
+      </tbody>
+    </table>
+    {{/each}}
+    <table class="sr-lines">
+      <tbody>
         <tr class="sr-total"><td>Total</td><td></td>{{#if number_label}}<td></td>{{/if}}<td></td><td class="amount">{{ total }}</td></tr>
       </tbody>
     </table>

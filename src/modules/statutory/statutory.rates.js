@@ -59,23 +59,30 @@ function present(row) {
 }
 
 /**
- * The rows in force on a day, shaped for computeStatutory: `paye` with its bands in order, `relief` with its flat
- * amount and rate, every other item its base and rate. An item with no row is absent, and is not computed.
+ * The rows in force on a day, shaped for computeStatutory: `paye` with its bands in order, `rent_relief` with its rate
+ * and its cap, `minimum_wage` with its month's amount, every other item its base and rate. An item with no row is
+ * absent, and is not computed. `misbased` names the items whose version names a base its item no longer allows (one saved
+ * before PR 11 on `basic`): Compute reports them missing rather than compute them on a base §6.16 does not cite.
  * @param {{query: Function}} db
  * @param {string} date
- * @returns {Promise<{rates: Record<string, object>, rows: object[]}>}
+ * @returns {Promise<{rates: Record<string, object>, rows: object[], misbased: string[]}>}
  */
 async function ratesOn(db, date) {
   const rows = (await repo.inForce(db, date)).map(present);
   const rates = {};
+  const misbased = new Set();
   for (const r of rows) {
+    if (!c.statutory.ITEM_BASES[r.item].includes(r.base)) {
+      misbased.add(r.item);
+      continue;
+    }
     if (r.item === "paye") {
       rates.paye ||= { base: r.base, bands: [] };
       rates.paye.bands.push({ band_from: r.band_from, band_to: r.band_to, rate: r.rate, position: r.position });
-    } else if (r.item === "relief") rates.relief = { base: r.base, rate: r.rate, flat_amount: r.flat_amount || "0.00" };
+    } else if (c.statutory.AMOUNT_ITEMS.includes(r.item)) rates[r.item] = { base: r.base, rate: r.rate, flat_amount: r.flat_amount };
     else rates[r.item] = { base: r.base, rate: r.rate };
   }
-  return { rates, rows };
+  return { rates, rows, misbased: [...misbased] };
 }
 
 /** Whether any statutory rate is in force on a day. */
@@ -111,9 +118,9 @@ function sourceColumns(body) {
 }
 
 /**
- * The rows of a version as they are written: a PAYE table one row a band in its place, the relief its flat amount and
- * rate, every other item one rate, each with the version's source. The side an item falls on is code (`ITEM_KIND`); its
- * base is the one named, or the item's own.
+ * The rows of a version as they are written: a PAYE table one row a band in its place; rent relief its rate and its cap;
+ * the minimum wage its month's amount (and no rate); every other item one rate; each with the version's source. The side
+ * an item falls on is code (`ITEM_KIND`); its base is the one named, or the item's own.
  * @param {object} body  a StatutoryRatesSave
  * @param {string|null} userId  who entered it
  */
@@ -123,7 +130,7 @@ function rowsOf(body, userId) {
   const common = { item: body.item, kind, base, ...sourceColumns(body), created_by: userId };
   if (body.item === "paye")
     return body.bands.map((b, i) => ({ ...common, rate: b.rate, band_from: b.band_from, band_to: b.band_to, position: i + 1 }));
-  if (body.item === "relief") return [{ ...common, rate: body.rate || "0", flat_amount: body.flat_amount || "0.00" }];
+  if (c.statutory.AMOUNT_ITEMS.includes(body.item)) return [{ ...common, rate: body.rate || "0", flat_amount: body.flat_amount }];
   return [{ ...common, rate: body.rate }];
 }
 

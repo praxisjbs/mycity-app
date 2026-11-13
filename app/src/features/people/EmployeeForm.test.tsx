@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import organisation from "@mycity/contract/schemas/organisation.js";
 import { ModalProvider } from "@mycity/ui";
@@ -11,7 +11,8 @@ import type { Employee360 } from "@/api/types/organisation";
  * Add Employee and Edit (docs/guides/foundation.md §6.16): nothing is refused only at the end.
  * Every step checks what it shows, a refusal from the server goes back to the step that holds
  * its field or says so above the footer, a field the role hides is left out, and someone who
- * may only view the register is told so on the first step.
+ * may only view the register is told so on the first step. The Tax and Pension step (payroll
+ * guide §13.1 items 44 and 46) is left out whole for a role that hides employee.statutory.
  */
 
 const DEPT = "7d1b0b9e-1d2b-4b8e-9b1e-1a2b3c4d5e6f";
@@ -53,6 +54,8 @@ import { ApiError } from "@/api/client";
 import { AddEmployee, EditEmployee } from "./EmployeeForm";
 
 installMatchMedia();
+// The select's menu scrolls its picked option into view, which jsdom does not do.
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => undefined;
 if (!("ResizeObserver" in window)) {
   (window as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
     observe() {}
@@ -67,6 +70,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  m.run.mockReset();
+  m.run.mockImplementation(async () => ({ employee_id: "e1", display_name: "Ada Obi", staff_number: "00042" }));
 });
 
 const open = (node: React.ReactNode) => render(<ModalProvider>{node}</ModalProvider>);
@@ -77,6 +82,13 @@ async function person(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Last Name"), "Obi");
   await user.type(screen.getByLabelText("Work Email"), "ada@mycityapp.io");
   await user.type(screen.getByLabelText("Phone"), "803 123 4567");
+  await user.click(screen.getByRole("button", { name: "Next" }));
+}
+
+/** Moves past Pay and Bank and Tax and Pension, left as they are, to the last step. */
+async function toLastStep(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  expect(screen.getByRole("heading", { name: "Tax and Pension" })).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Next" }));
 }
 
@@ -137,7 +149,7 @@ describe("Add Employee", { timeout: 20000 }, () => {
     await person(user);
     await job(user);
     await user.type(screen.getByLabelText("Gross Monthly"), "350,000");
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await toLastStep(user);
     await user.click(screen.getByRole("button", { name: "Add Employee" }));
     await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
     const { body } = m.run.mock.calls[0]![0] as { body: Record<string, unknown> };
@@ -161,7 +173,7 @@ describe("Add Employee", { timeout: 20000 }, () => {
     await user.clear(pay);
     await user.type(pay, "0");
     await waitFor(() => expect(screen.queryByText("Not below zero")).toBeNull());
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await toLastStep(user);
     await user.click(screen.getByRole("button", { name: "Add Employee" }));
     await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
     expect((m.run.mock.calls[0]![0] as { body: Record<string, unknown> }).body.gross_monthly).toBe("0.00");
@@ -173,7 +185,7 @@ describe("Add Employee", { timeout: 20000 }, () => {
     open(<AddEmployee close={vi.fn()} />);
     await person(user);
     await job(user);
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await toLastStep(user);
     await user.click(screen.getByRole("button", { name: "Add Employee" }));
     expect(await screen.findByRole("heading", { name: "Person" })).toBeTruthy();
     expect(await screen.findByText("Already in use")).toBeTruthy();
@@ -185,7 +197,7 @@ describe("Add Employee", { timeout: 20000 }, () => {
     open(<AddEmployee close={vi.fn()} />);
     await person(user);
     await job(user);
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await toLastStep(user);
     await user.click(screen.getByRole("button", { name: "Add Employee" }));
     expect((await screen.findByRole("alert")).textContent).toContain("Not saved. Check your connection and try again.");
   });
@@ -196,7 +208,7 @@ describe("Add Employee", { timeout: 20000 }, () => {
     open(<AddEmployee close={vi.fn()} />);
     await person(user);
     await job(user);
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await toLastStep(user);
     await user.click(screen.getByRole("button", { name: "Add Employee" }));
     expect(await screen.findByText(/You can view employees but not add them/)).toBeTruthy();
     expect(m.refreshMe).toHaveBeenCalled();
@@ -207,6 +219,32 @@ describe("Add Employee", { timeout: 20000 }, () => {
     open(<AddEmployee close={vi.fn()} />);
     expect(screen.queryByLabelText("Date of Birth")).toBeNull();
     expect(screen.queryByText("Pay and Bank")).toBeNull();
+  });
+
+  it("asks for the tax and pension numbers on their own step, and sends NHF as a yes or no and the State as its code", async () => {
+    const user = userEvent.setup();
+    open(<AddEmployee close={vi.fn()} />);
+    await person(user);
+    await job(user);
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("heading", { name: "Tax and Pension" })).toBeTruthy();
+    await user.type(screen.getByLabelText("Tax ID"), "23456789-0001");
+    await user.type(screen.getByLabelText("Pension PIN"), "pen100123456789");
+    await user.click(screen.getByRole("checkbox", { name: "Contributes to NHF" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "State of Residence" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Lagos" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Add Employee" }));
+    await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
+    const { body } = m.run.mock.calls[0]![0] as { body: Record<string, unknown> };
+    expect(body).toMatchObject({ tax_id: "23456789-0001", pension_pin: "pen100123456789", nhf_contributes: true, state_of_residence: "lagos" });
+    expect(organisation.EmployeeAdd.parse(body)).toMatchObject({ pension_pin: "PEN100123456789", nhf_contributes: true });
+  });
+
+  it("leaves out the whole Tax and Pension step for a role that hides tax and pension (employee.statutory)", () => {
+    m.hidden = ["tax_id", "tin", "pension_pin", "pension_administrator", "nhf_number", "nsitf_number", "nhf_contributes", "state_of_residence"];
+    open(<AddEmployee close={vi.fn()} />);
+    expect(screen.queryByText("Tax and Pension")).toBeNull();
   });
 });
 
@@ -267,6 +305,17 @@ describe("Edit Employee", { timeout: 20000 }, () => {
     await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
     const { body } = m.run.mock.calls[0]![0] as { body: Record<string, unknown> };
     expect(body).toEqual({ work_pattern: "on_site", worksite_id: "8d1b0b9e-1d2b-4b8e-9b1e-1a2b3c4d5e6f" });
+  });
+
+  it("sends NHF only when it changed, as a yes or no", async () => {
+    const user = userEvent.setup();
+    open(<EditEmployee employee={{ ...employee, nhf_contributes: true } as Employee360} close={vi.fn()} />);
+    expect((screen.getByRole("checkbox", { name: "Contributes to NHF" }) as HTMLInputElement).getAttribute("aria-checked") ?? "").not.toBe("false");
+    await user.click(screen.getByRole("checkbox", { name: "Contributes to NHF" }));
+    await user.click(screen.getByRole("button", { name: "Save Record" }));
+    await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
+    const { body } = m.run.mock.calls[0]![0] as { body: Record<string, unknown> };
+    expect(body).toEqual({ nhf_contributes: false });
   });
 
   it("names the person as saved in its toast", async () => {
