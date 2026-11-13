@@ -159,7 +159,7 @@ function RequisitionCard({ id, close }: { id: string; close: () => void }) {
         rows={q.items}
         rowKey={(r) => r.expense_request_id}
         onRowClick={open}
-        columns={requestColumns(q.can_decide ? [{ key: "x", label: "Remove", render: (r) => (
+        columns={requestColumns(q.can_decide ? [{ key: "x", label: "", render: (r) => (
               // The row opens the request; Remove is its own press, so it stops here.
               <span onClick={(e) => e.stopPropagation()}>
                 <Button size="sm" onClick={async () => remove(r)}>Remove</Button>
