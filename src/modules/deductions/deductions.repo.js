@@ -11,6 +11,7 @@
  */
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
+const { scopeClause } = require("../../shared/rbac/scope");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -159,6 +160,78 @@ async function summary(db, recoveredFrom) {
   return r;
 }
 
+/**
+ * The assistant's deductions summary (docs/guides/praxis-ai.md §6.13, Finance and pay) in one statement over
+ * the union the tab lists, with its filters and within the reader's `payroll` scope on the person: the count,
+ * the amount, waiting and waived; the instalments scheduled ahead, recovered since `yearStart` and an active
+ * advance's still to recover (these follow `employee_id` and the scope alone); by source, by status, by the
+ * person's department (cut to 20 by row_number()) and by month (the newest 60). Figures, never a row.
+ * @param {{query: Function}} db
+ * @param {{status?: string, source?: string, employee_id?: string, month?: string, yearStart: string}} q
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.status || null, q.source || null, q.employee_id || null, q.month || null, q.yearStart];
+  const s = scopeClause(scope, { column: "v.employee_id" }, params);
+  const i = scopeClause(scope, { column: "dd.employee_id" }, params);
+  const r = await one(
+    db,
+    `WITH v AS (
+       SELECT u.source, u.status, u.amount, left(u.period, 7) AS month, u.employee_id, e.department_id, d.name AS department
+         FROM (${UNION}
+         ) u
+         JOIN employee e ON e.employee_id = u.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+     ), f AS (
+       SELECT * FROM v
+        WHERE ($1::text IS NULL OR v.status = $1)
+          AND ($2::text IS NULL OR v.source = $2)
+          AND ($3::uuid IS NULL OR v.employee_id = $3::uuid)
+          AND ($4::text IS NULL OR v.month = $4)
+          ${s.and}
+     ), instalments AS (
+       SELECT i.amount, i.status, i.period, dd.source
+         FROM payroll_deduction_instalment i
+         JOIN payroll_deduction dd ON dd.payroll_deduction_id = i.payroll_deduction_id
+        WHERE dd.status <> 'cancelled' AND ($3::uuid IS NULL OR dd.employee_id = $3::uuid) ${i.and}
+     ), by_department AS (
+       SELECT COALESCE(department_id::text, 'none') AS key, COALESCE(min(department), 'No department') AS label, count(*)::int AS n,
+              COALESCE(sum(amount), 0)::numeric(18,2) AS amount,
+              row_number() OVER (ORDER BY COALESCE(sum(amount), 0) DESC, count(*) DESC, min(department), department_id) AS rank
+         FROM f GROUP BY department_id
+     ), by_month AS (
+       SELECT month AS at, count(*)::int AS n, COALESCE(sum(amount), 0)::numeric(18,2) AS amount,
+              row_number() OVER (ORDER BY month DESC) AS newest
+         FROM f GROUP BY month
+     )
+     SELECT (SELECT json_build_object(
+               'deductions', count(*)::int, 'amount', COALESCE(sum(amount), 0)::numeric(18,2),
+               'waiting', count(*) FILTER (WHERE status = 'pending')::int,
+               'waived', count(*) FILTER (WHERE status = 'waived')::int) FROM f) AS figures,
+            (SELECT json_build_object(
+               'scheduled', COALESCE(sum(amount) FILTER (WHERE status = 'scheduled'), 0)::numeric(18,2),
+               'recovered', COALESCE(sum(amount) FILTER (WHERE status = 'applied' AND period >= $5::date), 0)::numeric(18,2),
+               'advances', COALESCE(sum(amount) FILTER (WHERE source = 'salary_advance' AND status IN ('scheduled', 'in_run')), 0)::numeric(18,2))
+               FROM instalments) AS instalments,
+            (SELECT json_agg(json_build_object('key', source, 'count', n, 'amount', amount) ORDER BY source)
+               FROM (SELECT source, count(*)::int AS n, COALESCE(sum(amount), 0)::numeric(18,2) AS amount FROM f GROUP BY source) x) AS by_source,
+            (SELECT json_agg(json_build_object('key', status, 'count', n, 'amount', amount) ORDER BY status)
+               FROM (SELECT status, count(*)::int AS n, COALESCE(sum(amount), 0)::numeric(18,2) AS amount FROM f GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'count', n, 'amount', amount) ORDER BY rank)
+               FROM by_department WHERE rank <= 20) AS by_department,
+            (SELECT json_agg(json_build_object('at', at, 'count', n, 'amount', amount) ORDER BY at) FROM by_month WHERE newest <= 60) AS by_month`,
+    params,
+  );
+  return {
+    figures: (r && r.figures) || {},
+    instalments: (r && r.instalments) || {},
+    by_source: (r && r.by_source) || [],
+    by_status: (r && r.by_status) || [],
+    by_department: (r && r.by_department) || [],
+    by_month: (r && r.by_month) || [],
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * A fine, for its acceptance
  * ------------------------------------------------------------------ */
@@ -272,6 +345,7 @@ module.exports = {
   list,
   rowOf,
   summary,
+  aiSummary,
   lockFine,
   fineOfSanction,
   employeeOf,

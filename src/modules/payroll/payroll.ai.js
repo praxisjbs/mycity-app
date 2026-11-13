@@ -5,7 +5,9 @@
  *
  * Reads, a page of 25 at a time: the runs (their month and status and, for a reader with the salary grant,
  * their headcount and totals; the engine masks the amounts for anyone else, as the screen shows them Restricted).
- * A summary, figures and never rows: a month's headcount, gross, deductions and net.
+ * Summaries, figures and never rows: a month's headcount, gross, deductions and net, with its payslips by
+ * department and by status; and the runs over a year by month (praxis-ai.md §6.13, Finance and pay). Money
+ * only for a reader with the salary grant.
  *
  * Cards the person confirms (praxis-ai.md §6.11, decision 33), each through the service function the screen's own
  * button calls, each risk `payroll` so Confirm It's You comes first (decision 11): New Run, Submit for Approval
@@ -38,6 +40,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "payroll.runs",
+      summary: "payroll.trend",
       description: "List payroll runs, newest month first: the month, its status (draft, computed, submitted, approved, paid), and with the salary grant the headcount, gross, deductions and net pay",
       params: c.payroll.PayrollRunListQuery,
       permission: ["payroll", "view"],
@@ -48,10 +51,19 @@ module.exports = defineManifest({
   summaries: [
     {
       key: "payroll.month",
-      description: "A month's payroll in figures: people paid and, with the salary grant, gross pay, deductions and net pay. Without a month, the run the screen shows first",
+      description:
+        "A month's payroll in figures: people paid, with the salary grant gross, deductions and net; payslips by department (gross as net and deductions, stacked) and by status. Default: the latest run",
       params: c.payroll.PayrollMonthQuery,
       permission: ["payroll", "view"],
       run: (client, params, actor) => service.monthSummary(client, params, actor),
+    },
+    {
+      key: "payroll.trend",
+      description:
+        "Payroll over a year or up to 24 months: runs, months paid, the latest run and its status, runs by status, people paid by month and, with the salary grant, gross, deductions and net by month",
+      params: c.payroll.PayrollTrendQuery,
+      permission: ["payroll", "view"],
+      run: (client, params, actor) => service.trendSummary(client, params, actor),
     },
   ],
   actions: [

@@ -9,6 +9,7 @@
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+const expensesRepo = require("../expenses/expenses.repo");
 
 const ROWS = `
   SELECT ds.disbursement_id, ds.number, ds.expense_request_id, er.number AS request_number, er.purpose,
@@ -49,6 +50,81 @@ function list(db, query, scope) {
     params,
     q,
   );
+}
+
+/** The groupings the assistant's disbursements summary offers: the SQL of each row's key and words. */
+const SUMMARY_DIMS = Object.freeze({
+  category: { key: "d.expense_category_id::text", label: "d.category" },
+  department: { key: "COALESCE(d.department_id::text, 'none')", label: "COALESCE(d.department, 'No department')" },
+  payee_type: { key: "d.payee_type", label: "d.payee_type" },
+});
+
+/** A series' bucket: a day, the Monday of a week, or a month. */
+const BUCKETS = Object.freeze({
+  day: "d.paid_day::text",
+  week: "to_char(date_trunc('week', d.paid_day), 'YYYY-MM-DD')",
+  month: "to_char(d.paid_day, 'YYYY-MM')",
+});
+
+/**
+ * The assistant's disbursements summary (docs/guides/praxis-ai.md §6.13, Finance and pay) in one
+ * statement, within the reader's scope on the request's requester as list() applies it: the transfers
+ * paid within the period (the day paid), with or without a reference if asked; their figures, by
+ * `dim`, and amount paid by `bucket`; and the requests authorised and not yet paid, whenever authorised
+ * (the status worked out with the CEO's approval, as the requests list does). Groups cut to 20 and the
+ * series to its newest 60 buckets by row_number(). Figures, never a row.
+ * @param {{query: Function}} db
+ * @param {{reference_missing?: boolean, from: string, to: string, dim: string, bucket: string}} q
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(db, q, scope) {
+  const dim = SUMMARY_DIMS[q.dim] || SUMMARY_DIMS.category;
+  const bucket = BUCKETS[q.bucket] || BUCKETS.month;
+  const params = [q.reference_missing === undefined ? null : q.reference_missing, q.from, q.to];
+  const s = scopeClause(scope, { column: "er.employee_id" }, params);
+  const { rows } = await db.query(
+    `WITH d AS (
+       SELECT ds.disbursement_id, ds.amount, (ds.payment_reference IS NULL) AS reference_missing,
+              COALESCE(ds.paid_on, (ds.paid_at AT TIME ZONE 'Africa/Lagos')::date) AS paid_day,
+              extract(epoch FROM ds.paid_at - er.authorised_at) / 86400 AS days_to_pay,
+              er.expense_category_id, ec.name AS category, er.department_id, rd.name AS department, er.payee_type
+         FROM disbursement ds
+         JOIN expense_request er ON er.expense_request_id = ds.expense_request_id
+         JOIN expense_category ec ON ec.expense_category_id = er.expense_category_id
+         LEFT JOIN department rd ON rd.department_id = er.department_id
+        WHERE COALESCE(ds.paid_on, (ds.paid_at AT TIME ZONE 'Africa/Lagos')::date) BETWEEN $2::date AND $3::date
+          AND ($1::boolean IS NULL OR (ds.payment_reference IS NULL) = $1)
+          ${s.and}
+     ), waiting AS (
+       SELECT count(*)::int AS n, COALESCE(sum(er.amount), 0)::numeric(18,2) AS amount
+         FROM expense_request er
+         LEFT JOIN requisition r ON r.requisition_id = er.requisition_id
+         LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = er.workflow_instance_id
+         LEFT JOIN workflow_instance rwi ON rwi.workflow_instance_id = r.workflow_instance_id
+        WHERE er.status IN ('in_requisition', 'authorised') AND ${expensesRepo.STATUS} = 'authorised'
+          ${s.and}
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, min(${dim.label}) AS label, count(*)::int AS n, sum(d.amount)::numeric(18,2) AS amount,
+              row_number() OVER (ORDER BY sum(d.amount) DESC, count(*) DESC, min(${dim.label}), ${dim.key}) AS rank
+         FROM d GROUP BY ${dim.key}
+     ), points AS (
+       SELECT ${bucket} AS at, sum(d.amount)::numeric(18,2) AS value,
+              row_number() OVER (ORDER BY ${bucket} DESC) AS newest
+         FROM d GROUP BY ${bucket}
+     )
+     SELECT (SELECT json_build_object(
+               'payments', count(*)::int,
+               'paid', COALESCE(sum(amount), 0)::numeric(18,2),
+               'reference_missing', count(*) FILTER (WHERE reference_missing)::int,
+               'average_days', round(avg(days_to_pay)::numeric, 1)) FROM d) AS figures,
+            (SELECT row_to_json(w) FROM waiting w) AS waiting,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', amount, 'count', n) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM points WHERE newest <= 60) AS points`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, waiting: row.waiting || {}, by_dim: row.by_dim || [], points: row.points || [] };
 }
 
 /** One disbursement, with the requester's id for scope and the mask, or null. */
@@ -136,4 +212,4 @@ async function requestsPaidBy(db, receipt, scope, statuses) {
 }
 
 module.exports = {
-  requestsPaidBy, list, get, lock, insert, addReference };
+  requestsPaidBy, list, aiSummary, get, lock, insert, addReference };

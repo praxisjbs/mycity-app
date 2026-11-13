@@ -1825,7 +1825,8 @@
       "bulk": null,
       "schema": "deductions.DeductionListQuery",
       "schema_sha": "a94c4bedb9c46c38",
-      "screen": null
+      "screen": null,
+      "summary": "deductions.summary"
     },
     {
       "key": "deductions.mine",
@@ -1836,7 +1837,8 @@
       "bulk": null,
       "schema": "common.PageQuery",
       "schema_sha": "463693b1b2726c8c",
-      "screen": null
+      "screen": null,
+      "summary": "my_pay.summary"
     },
     {
       "key": "departments.list",
@@ -1882,7 +1884,8 @@
       "bulk": null,
       "schema": "disbursements.DisbursementListQuery",
       "schema_sha": "f1423a29e38f7e45",
-      "screen": null
+      "screen": null,
+      "summary": "disbursements.summary"
     },
     {
       "key": "employees.list",
@@ -1905,7 +1908,8 @@
       "bulk": null,
       "schema": "expense_categories.ExpenseCategoryListQuery",
       "schema_sha": "87ad86edfdf739ab",
-      "screen": null
+      "screen": null,
+      "summary": "expenses.summary"
     },
     {
       "key": "expenses.approvals",
@@ -1916,7 +1920,8 @@
       "bulk": null,
       "schema": "expenses.ExpenseListQuery",
       "schema_sha": "cce0a68b30379ee4",
-      "screen": null
+      "screen": null,
+      "summary": "expenses.summary"
     },
     {
       "key": "expenses.list",
@@ -1927,7 +1932,8 @@
       "bulk": null,
       "schema": "expenses.ExpenseListQuery",
       "schema_sha": "cce0a68b30379ee4",
-      "screen": null
+      "screen": null,
+      "summary": "expenses.summary"
     },
     {
       "key": "expenses.mine",
@@ -1938,7 +1944,8 @@
       "bulk": null,
       "schema": "expenses.ExpenseListQuery",
       "schema_sha": "cce0a68b30379ee4",
-      "screen": null
+      "screen": null,
+      "summary": "expenses.summary"
     },
     {
       "key": "goals.analytics",
@@ -2204,7 +2211,8 @@
       "bulk": null,
       "schema": "payroll.PayrollRunListQuery",
       "schema_sha": "e0a1e3678758cbce",
-      "screen": null
+      "screen": null,
+      "summary": "payroll.trend"
     },
     {
       "key": "payslips.list",
@@ -2227,7 +2235,8 @@
       "bulk": null,
       "schema": "payslips.EssPayslipQuery",
       "schema_sha": "7574dc91de985edc",
-      "screen": null
+      "screen": null,
+      "summary": "my_pay.summary"
     },
     {
       "key": "policies.list",
@@ -2330,7 +2339,8 @@
       "bulk": null,
       "schema": "requisitions.RequisitionListQuery",
       "schema_sha": "d7ba07ceee2c9e7e",
-      "screen": null
+      "screen": null,
+      "summary": "requisitions.summary"
     },
     {
       "key": "reviews.list",
@@ -4106,6 +4116,28 @@
       "screen": null
     },
     {
+      "key": "deductions.summary",
+      "kind": "summary",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "deductions.DeductionSummaryQuery",
+      "schema_sha": "95aac431e38c22d2",
+      "screen": null
+    },
+    {
+      "key": "disbursements.summary",
+      "kind": "summary",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "disbursements.DisbursementSummaryQuery",
+      "schema_sha": "5db509dd85943153",
+      "screen": null
+    },
+    {
       "key": "employees.summary",
       "kind": "summary",
       "module_key": "people",
@@ -4114,6 +4146,17 @@
       "bulk": null,
       "schema": "organisation.EmployeeSummaryQuery",
       "schema_sha": "751f1790163d2ef0",
+      "screen": null
+    },
+    {
+      "key": "expenses.summary",
+      "kind": "summary",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "expenses.ExpenseSummaryQuery",
+      "schema_sha": "b7a086843ce6e66b",
       "screen": null
     },
     {
@@ -4136,6 +4179,17 @@
       "bulk": null,
       "schema": "leave.LeaveSummaryQuery",
       "schema_sha": "69b79fd857991372",
+      "screen": null
+    },
+    {
+      "key": "my_pay.summary",
+      "kind": "summary",
+      "module_key": "payroll",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payslips.MyPaySummaryQuery",
+      "schema_sha": "9d91cce2198180dc",
       "screen": null
     },
     {
@@ -4168,7 +4222,29 @@
       "risk": null,
       "bulk": null,
       "schema": "payroll.PayrollMonthQuery",
-      "schema_sha": "de1924c7adf48630",
+      "schema_sha": "ad68a7a3b7726da6",
+      "screen": null
+    },
+    {
+      "key": "payroll.trend",
+      "kind": "summary",
+      "module_key": "payroll",
+      "permission": "payroll.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "payroll.PayrollTrendQuery",
+      "schema_sha": "f60e7abd9631009c",
+      "screen": null
+    },
+    {
+      "key": "requisitions.summary",
+      "kind": "summary",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "requisitions.RequisitionSummaryQuery",
+      "schema_sha": "77fd701032a1746c",
       "screen": null
     },
     {

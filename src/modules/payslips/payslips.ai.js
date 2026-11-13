@@ -6,6 +6,9 @@
  *   payslips.mine   the asking person's own published payslips: the month, gross, net and deductions, a page of 25
  *   payslips.list   the payslips of a run or a month within a Payroll reader's reach, draft and published alike
  *
+ *   my_pay.summary  the asking person's own published payslips of a year in figures (praxis-ai.md §6.13), by month
+ *                   and their deductions by reason
+ *
  * `payslips.mine` is the asker's own whatever their grant says, so its amounts are never masked from them and it
  * is read by their own employee id and nobody else's (payslips.service `ownPayslipsForAssistant`); a person
  * finds a payslip of someone else's only through `payslips.list`, which needs `payroll` view and which the engine
@@ -23,6 +26,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "payslips.mine",
+      summary: "my_pay.summary",
       description: "List my own payslips of a year, newest month first: the month, my gross pay, deductions and net pay, and whether the run is paid. Only payslips already published to me",
       params: c.payslips.EssPayslipQuery,
       permission: ["ess", "view"],
@@ -38,6 +42,17 @@ module.exports = defineManifest({
       permission: ["payroll", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite: (row) => ({ type: "payslip", id: row.payslip_id, label: `${row.number}, ${row.employee.display_name}` }),
+    },
+  ],
+  summaries: [
+    {
+      key: "my_pay.summary",
+      description:
+        "My own pay for a year in figures: payslips, gross, deductions and net to date, fines and advance repayments, my deductions by reason, and gross, deductions and net by month",
+      params: c.payslips.MyPaySummaryQuery,
+      permission: ["ess", "view"],
+      // The asker's own, read by their employee id alone and never masked from them, as payslips.mine is.
+      run: (client, params, actor) => service.myPaySummary(client, params, actor),
     },
   ],
   not_offered: {},

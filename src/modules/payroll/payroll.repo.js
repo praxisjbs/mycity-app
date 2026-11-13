@@ -16,6 +16,7 @@
  */
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
+const { scopeClause } = require("../../shared/rbac/scope");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -191,6 +192,66 @@ async function trend(db, fromPeriod) {
     { label: "The last twelve months' net", ceiling: 12 },
   );
   return rows;
+}
+
+/**
+ * The groupings of a run's payslips for the assistant's month summary (docs/guides/praxis-ai.md §6.13,
+ * Finance and pay), in one statement within the reader's `payroll` scope as Payroll · Payslips applies
+ * it: the payslips paid (not excluded) by the person's department, with their gross, deductions and net,
+ * cut to 20 by row_number(); and every payslip by status. Figures, never a row.
+ * @param {{query: Function}} db
+ * @param {string} runId
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function monthGroups(db, runId, scope) {
+  const params = [runId];
+  const s = scopeClause(scope, { column: "p.employee_id" }, params);
+  const r = await one(
+    db,
+    `WITH p AS (
+       SELECT p.payslip_id, p.status, p.earnings_total, p.deductions_total, p.net_pay, e.department_id, d.name AS department
+         FROM payslip p
+         JOIN employee e ON e.employee_id = p.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+        WHERE p.payroll_run_id = $1 ${s.and}
+     ), by_department AS (
+       SELECT COALESCE(department_id::text, 'none') AS key, COALESCE(min(department), 'No department') AS label, count(*)::int AS n,
+              sum(earnings_total)::numeric(18,2) AS gross, sum(deductions_total)::numeric(18,2) AS deductions, sum(net_pay)::numeric(18,2) AS net,
+              row_number() OVER (ORDER BY sum(earnings_total) DESC, count(*) DESC, min(department), department_id) AS rank
+         FROM p WHERE status <> 'excluded' GROUP BY department_id
+     )
+     SELECT (SELECT json_agg(json_build_object('key', key, 'label', label, 'count', n, 'gross', gross, 'deductions', deductions, 'net', net) ORDER BY rank)
+               FROM by_department WHERE rank <= 20) AS by_department,
+            (SELECT json_agg(json_build_object('key', status, 'count', n) ORDER BY status)
+               FROM (SELECT status, count(*)::int AS n FROM p GROUP BY status) x) AS by_status`,
+    params,
+  );
+  return { by_department: (r && r.by_department) || [], by_status: (r && r.by_status) || [] };
+}
+
+/**
+ * The runs of a span of months for the assistant's payroll trend (docs/guides/praxis-ai.md §6.13), in one
+ * statement: how many, how many paid, the newest run's month and status, the runs by status, and each
+ * approved or paid run's headcount and totals, oldest first (24 months at most, as the span is).
+ * @param {{query: Function}} db
+ * @param {string} from  the first day of the first month
+ * @param {string} to    the first day of the last month
+ */
+async function trendOf(db, from, to) {
+  const r = await one(
+    db,
+    `WITH r AS (SELECT * FROM payroll_run WHERE period BETWEEN $1::date AND $2::date)
+     SELECT (SELECT json_build_object('runs', count(*)::int, 'paid', count(*) FILTER (WHERE status = 'paid')::int,
+                                      'latest_period', (array_agg(period::text ORDER BY period DESC))[1],
+                                      'latest_status', (array_agg(status ORDER BY period DESC))[1]) FROM r) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'count', n) ORDER BY status)
+               FROM (SELECT status, count(*)::int AS n FROM r GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('at', to_char(period, 'YYYY-MM'), 'headcount', headcount, 'gross', earnings_total,
+                                               'deductions', deductions_total, 'net', net_total) ORDER BY period)
+               FROM r WHERE status IN ('approved', 'paid')) AS points`,
+    [from, to],
+  );
+  return { figures: (r && r.figures) || {}, by_status: (r && r.by_status) || [], points: (r && r.points) || [] };
 }
 
 /* ------------------------------------------------------------------ *
@@ -575,6 +636,8 @@ function approverOf(db, instanceId) {
 
 module.exports = {
   listRuns,
+  monthGroups,
+  trendOf,
   getRun,
   lockRun,
   runOfPeriod,

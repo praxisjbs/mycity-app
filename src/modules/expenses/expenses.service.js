@@ -147,6 +147,78 @@ async function mineSummary(employeeId) {
   };
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Finance and pay)
+ * ------------------------------------------------------------------ */
+
+/** A request's status as the list's pill reads it, for a summary's group rows. */
+const STATUS_WORDS = Object.freeze({
+  draft: "Draft",
+  submitted: "Waiting",
+  sent_back: "Sent Back",
+  approved: "Approved",
+  in_requisition: "With the CEO",
+  authorised: "Authorised",
+  disbursed: "Paid",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+});
+
+/** A payee type as New Request's form names it. */
+const PAYEE_WORDS = Object.freeze({ staff: "Staff", vendor: "Vendor", partner: "Partner", task_team: "Dedicated Task Team" });
+
+const DIM_WORDS = Object.freeze({ category: "category", department: "department", project: "project", payee_type: "payee type" });
+
+/**
+ * The requests in figures for the assistant, within the reader's audience: their own (`mine`), those
+ * waiting on them now (`waiting_on_me`, whenever sent unless a period is asked), else everything in
+ * their `expenses` scope. A period on the day sent, this Lagos month to today when none is asked. Each
+ * row of the chosen grouping is a stacked bar of what is paid, approved and waiting.
+ * @param {{query: Function}} client
+ * @param {object} params  ExpenseSummaryQuery, parsed
+ * @param {object} actor   the asking person with their `expenses` scope
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, part, group, top, series, periodOf } = require("../../shared/ai/summary");
+  const asked = params.from || params.to || params.month;
+  const period = params.waiting_on_me && !asked ? {} : periodOf(params, now);
+  const dim = DIM_WORDS[params.by] ? params.by : "category";
+  const r = await repo.aiSummary(client, { ...params, ...period, dim }, actor, actor.scope);
+  const f = r.figures;
+  const money = (v) => m.toWire(v || "0.00");
+  const rows = r.by_dim.map((x) => ({
+    key: x.key,
+    label: dim === "payee_type" ? PAYEE_WORDS[x.label] || x.label : x.label,
+    value: m.toWire(m.sum([x.paid || "0.00", x.approved || "0.00", x.waiting || "0.00"])),
+    count: x.count,
+    parts: [part("paid", "Paid", money(x.paid)), part("approved", "Approved", money(x.approved)), part("waiting", "Waiting", money(x.waiting))],
+  }));
+  return {
+    figures: [
+      figure("requests", "Requests", f.requests || 0),
+      figure("asked", "Amount asked", money(f.asked), "ngn"),
+      figure("approved", "Approved, not yet paid", money(f.approved), "ngn"),
+      figure("paid", "Paid", money(f.paid), "ngn"),
+      figure("waiting", "Waiting", f.waiting || 0),
+      figure("waiting_amount", "Waiting amount", money(f.waiting_amount), "ngn"),
+      figure("sent_back", "Sent back", f.sent_back || 0),
+      figure("rejected", "Rejected", f.rejected || 0),
+      figure("over_budget", "Over budget", f.over_budget || 0),
+      figure("oldest_waiting", "Oldest waiting", f.oldest_waiting_days || 0, "days"),
+    ],
+    groups: [
+      group("status", "Requests by status", r.by_status.map((x) => ({ key: x.key, label: STATUS_WORDS[x.key] || x.key, value: money(x.value), count: x.count }))),
+      group(dim, `Requests by ${DIM_WORDS[dim]}`, rows),
+      top("requester", "Top requesters", r.requesters.map((x) => ({ ...x, value: money(x.value) }))),
+    ],
+    series: [
+      series("asked", "Amount asked by month", r.asked.map((p) => ({ at: p.at, value: money(p.value) }))),
+      series("paid", "Amount paid by month", r.paid.map((p) => ({ at: p.at, value: money(p.value) }))),
+    ],
+    total: f.requests || 0,
+  };
+}
+
 /** What only the service reads, taken off before a request leaves. */
 const INTERNAL = ["employee_id", "invoice_document_id", "approval_state", "approval_opened_by", "budget_line_id"];
 
@@ -784,6 +856,7 @@ module.exports = {
   approvals,
   approvalsSummary,
   mineSummary,
+  aiSummary,
   getFor,
   getOwn,
   checkDuplicate,

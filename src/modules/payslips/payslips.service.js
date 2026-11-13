@@ -241,6 +241,55 @@ async function ownPayslipsForAssistant(employeeId, query) {
   };
 }
 
+/** A deduction line's code in words, for `my_pay.summary`'s deductions by reason. */
+const DEDUCTION_WORDS = Object.freeze({
+  lateness: "Lateness",
+  early_departure: "Early departure",
+  absence: "Absence",
+  unpaid_leave: "Unpaid leave",
+  unpaid_suspension: "Unpaid suspension",
+  fine: "Fines",
+  advance: "Advance repayments",
+  adjustment_deduction: "Adjustments",
+  paye: "PAYE",
+  pension_employee: "Pension",
+  nhf: "NHF",
+});
+
+/**
+ * `my_pay.summary` (docs/guides/praxis-ai.md §6.13, Finance and pay): the asking person's own published payslips of
+ * a year (this Lagos year unless asked) in figures, read by the session's employee id and nobody else's. A summary
+ * is never masked (only a read's rows are), and this one is the person's own pay, so it is given whatever their role
+ * hides from others (§6.13 rule 3). Someone with no employee record has no payslips and gets no figures.
+ * @param {{query: Function}} client
+ * @param {object} params  MyPaySummaryQuery, parsed
+ * @param {object} actor
+ */
+async function myPaySummary(client, params, actor, now = new Date()) {
+  if (!actor.employee_id) return { figures: [], groups: [], series: [], total: 0 };
+  const { figure, group, series } = require("../../shared/ai/summary");
+  const m = require("../../shared/money/money");
+  const year = params.year || Number(lagos.today(now).slice(0, 4));
+  const r = (await repo.myPay(client, actor.employee_id, year)) || {};
+  const f = r.figures || {};
+  const taken = r.taken || {};
+  const money = (v) => m.toWire(v || "0.00");
+  const points = (key) => (r.points || []).map((p) => ({ at: p.at, value: money(p[key]) }));
+  return {
+    figures: [
+      figure("payslips", `Payslips in ${year}`, f.payslips || 0),
+      figure("gross", "Gross to date", money(f.gross), "ngn"),
+      figure("deductions", "Deductions to date", money(f.deductions), "ngn"),
+      figure("net", "Net to date", money(f.net), "ngn"),
+      figure("fines", "Fines", money(taken.fines), "ngn"),
+      figure("advances", "Advance repayments", money(taken.advances), "ngn"),
+    ],
+    groups: [group("reason", "Deductions by reason", (r.by_reason || []).map((x) => ({ key: x.key, label: DEDUCTION_WORDS[x.key] || x.key, value: money(x.value), count: x.count })))],
+    series: [series("gross", "Gross by month", points("gross")), series("deductions", "Deductions by month", points("deductions")), series("net", "Net by month", points("net"))],
+    total: f.payslips || 0,
+  };
+}
+
 /** The person's own instalments for the assistant, under the same names (above): the month, the reason, "1 of 3", the amount. */
 async function ownDeductionsForAssistant(employeeId, query) {
   const page = await ownDeductions(employeeId, query);
@@ -460,6 +509,7 @@ module.exports = {
   ownDeductions,
   ownPayslipsForAssistant,
   ownDeductionsForAssistant,
+  myPaySummary,
   requestEmailAll,
   requestRunExport,
   emailOwnCopy,

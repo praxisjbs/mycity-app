@@ -847,7 +847,7 @@ date, the branch and the PR when it merges.
 - [x] 13/11/2026 · PR 1 · Stacked bars, Budgets' summary and every read naming its summary, gate 23 rule 9 with `scripts/check/ai-summary-gaps.json`, money in naira, no mechanics in an answer (built in the planning chat on `claude/bold-hawking-byligf`)
 - [x] 13/11/2026 · PR 2 · Charts from a complete table: the draft's `read` Overview drawn by the server from the rows (`overviewOfRows`), `AiRowFigure`, `AiOverview.read`, `AiOverviewChart.unit`, prompt version 12 (built in its own chat on the session's branch `claude/brave-cori-1cd0l4` rather than `m10/overview-tables`, praxisjbs/mycity-app#150)
 - [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
-- [ ] PR 4 · Finance and pay summaries (`m10/summaries-finance`)
+- [x] 13/11/2026 · PR 4 · Finance and pay summaries: `expenses.summary`, `requisitions.summary`, `disbursements.summary`, `payroll.month` by department and status, `payroll.trend`, `deductions.summary`, `my_pay.summary`; ten reads off the gaps file (built in its own chat on `claude/serene-shannon-ek7yft`)
 - [ ] PR 5 · Recruitment and onboarding summaries (`m10/summaries-recruitment`)
 - [ ] PR 6 · Partnerships summaries (`m10/summaries-partnerships`)
 - [ ] PR 7 · People, performance and queries summaries (`m10/summaries-people`)
@@ -868,6 +868,21 @@ date, the branch and the PR when it merges.
 
 ## 8 · Log
 
+- 13/11/2026 · JP · Charts in the Overview, PR 4 built (§6.12): the seven finance and pay summaries of
+  `praxis-ai.md` §6.13, each one SQL in its module's repo with the reader's scope or the list's own audience
+  (`expenses.summary`'s `mine` and `waiting_on_me` as `expenses.mine` and `expenses.approvals` read), pay left
+  out for a reader whose role hides it and a person's own never hidden from them; ten reads name their
+  summary and leave `scripts/check/ai-summary-gaps.json` (38 left); `tests/integration/ai-summaries-finance.test.js`
+  and eight evaluation cases. Found on the way, written into §6.13: `payroll.month` gave its money as `NGN`,
+  which the Overview does not read as naira (it reads `ngn`), so it is `ngn` now; a summary carries no
+  capability of its own, so requisitions' and disbursements' answer a reader without `expenses.finance` with
+  no figures, as their reads answer an empty page; the model writes a yes-or-no filter as a JSON boolean, so
+  the summaries take `true` and `false` where the lists take the query string's words; `waiting_on_me` counts
+  what waits now whenever it was sent unless a period is asked. Staff now see `expenses.summary`,
+  `requisitions.summary`, `disbursements.summary` and `my_pay.summary` offered, so `ai-summaries.test.js`'s
+  list of the summaries offered to staff gains them. The container's PostgreSQL lacked pgvector again
+  (installed by hand, `postgresql-16-pgvector`), and the image had no Node 20 under `/opt` (installed into a
+  scratch folder).
 - 13/11/2026 · JP · Charts in the Overview, PR 2 built (§6.12), in its own chat, as praxisjbs/mycity-app#150: an Overview from a
   read whose rows are its whole list, the engine's `overviewOfRows` pure (gate 24) with the table's
   `cell` and the money rule handed in by `answer.js`, the summary's Overview chosen first. Found on
