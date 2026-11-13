@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { axe } from "../testing/axe";
 import { NoteTaker, type NoteTakerProps } from "./NoteTaker";
@@ -65,8 +65,22 @@ describe("NoteTaker", () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
+  it("offers Download Word only when the screen can make the file, and waits for it", async () => {
+    let finish: (v: unknown) => void = () => undefined;
+    const onDownload = vi.fn(() => new Promise((done) => (finish = done)));
+    const { rerender } = render(<Harness />);
+    expect(screen.queryByRole("button", { name: "Download Word" })).toBeNull();
+    rerender(<Harness onDownload={onDownload} />);
+    const button = screen.getByRole("button", { name: "Download Word" });
+    fireEvent.click(button);
+    expect(onDownload).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(button).toHaveAttribute("aria-busy", "true"));
+    finish(true);
+    await waitFor(() => expect(button).not.toHaveAttribute("aria-busy", "true"));
+  });
+
   it("has no accessibility violations", async () => {
-    const { container } = render(<Harness />);
+    const { container } = render(<Harness onDownload={async () => true} />);
     expect(await axe(container)).toHaveNoViolations();
   });
 });

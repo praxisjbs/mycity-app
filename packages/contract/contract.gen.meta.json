@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "2c1f56711cd9e4b7b1b64615ede74ba4804e04007b8e5979349bb9f3e7318d42",
+  "source_hash": "70401bd7d39480b8d6f0b5d55319693610e2e4c4d032d03893e925806b3eb773",
   "schemas": 2161,
-  "endpoints": 1013,
+  "endpoints": 1014,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "bd0c841b66fd87d133084a1d57db9f572a13ef5e1d6f3de41081b6f154646a9d",
@@ -145,7 +145,7 @@
     "src/modules/targets/targets.routes.js": "e7c6091372ecf23ae3ff46ddc1678a33475548d0dadad04f078a7533dc3e2031",
     "src/modules/tasks/tasks.routes.js": "c9d2d773299b1b4b754f850b95ea661b15fb837fa70f57f5d2c6ce2ffc9a27a1",
     "src/modules/templates/templates.routes.js": "4dc159605fd892f5003d7f57afdac92131ec4a2e40ab3d3c3173b67fae2ddcc9",
-    "src/modules/training/training.routes.js": "645b7b06c4bd5f0544e4999d032df86db15b1fee34df68970cc2eb07579a0db8",
+    "src/modules/training/training.routes.js": "9b0c511b1ab17e33f26d84d7ef5385ce81962a9cba56653e19d416aee6811031",
     "src/modules/user_guide/user_guide.public.routes.js": "7be5f10945c7e37408e6c2e48eb96e9b626a6162e2f7a5f71c168c8ea044e76e",
     "src/modules/user_guide/user_guide.routes.js": "c1a679cf2b6339a9d9f474f59834026bc8752c84f3e83106726e40307b73d2aa",
     "src/modules/users/users.routes.js": "7ae43569a5eba7045ba4e0da675f395051f0a576ca2002dd5885cd9c1f1651df",

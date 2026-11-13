@@ -14,6 +14,7 @@ function Notes({ start = "", saved = "saved" as NoteSave, loading = false }) {
       saved={saved}
       onRetry={() => undefined}
       loading={loading}
+      onDownload={() => new Promise((done) => setTimeout(done, 600))}
     />
   );
 }

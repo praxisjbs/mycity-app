@@ -4,10 +4,10 @@
  * @summary A small notes panel that floats over a page while the person keeps working: moved by its bar, minimised to that bar, or closed. Nothing behind it is blocked.
  * @use A person's own notes beside what they read or watch (ESS · My Training's My Notes on a course), saved by the screen as they type.
  * @avoid A form saved with a button (Modal); a comment others read (a thread); anything that must stop the person until it is answered (ConfirmDialog).
- * @phone Docked full width at the foot of the screen or the sheet, with a 44 px Move to Top (Move to Bottom) in its bar instead of dragging (F19); minimised, it is its bar alone.
+ * @phone Docked full width at the foot of the screen or the sheet, with a 44 px Move to Top (Move to Bottom) in its bar instead of dragging (F19); minimised, it is its bar alone. Download Word sits under the note.
  * @a11y A labelled region, not a dialog: focus moves into the note when it opens and is never trapped. On desktop Move Notes drags it, or the arrow keys move it while that button has focus. Saving, Saved and Not saved are announced politely.
  * @status beta
- * @example <NoteTaker open={open} onClose={() => setOpen(false)} subject={course.title} value={body} onChange={setBody} saved="saved" />
+ * @example <NoteTaker open={open} onClose={() => setOpen(false)} subject={course.title} value={body} onChange={setBody} saved="saved" onDownload={() => saveExport(api.call("POST /api/v1/training/me/courses/:id/note/export", { params: { id }, body: {} }))} />
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { cn } from "../lib/cn";
@@ -15,6 +15,7 @@ import { content } from "../lib/slots";
 import { useIsPhone } from "../lib/media";
 import { IconButton } from "../actions/Button";
 import { TextAreaField } from "../form/TextField";
+import { ExportButton } from "../data/ExportButton";
 
 /** Where the note's last save stands: under way, done, refused, or nothing typed yet. */
 export type NoteSave = "saving" | "saved" | "failed" | null;
@@ -40,6 +41,11 @@ export interface NoteTakerProps {
   loading?: boolean;
   /** The panel's name; My Notes. */
   label?: string;
+  /**
+   * Download Word under the note: the screen saves what is typed, asks the server for the note as
+   * a Word file and saves it on this device (an export, as ExportButton's onExport). Absent, no button.
+   */
+  onDownload?: () => Promise<unknown>;
 }
 
 /** Room kept between the panel and the window's edges, and one arrow key's move, in px. */
@@ -49,7 +55,7 @@ const SAVED: Record<Exclude<NoteSave, null>, string> = { saving: "Saving", saved
 
 type At = { x: number; y: number };
 
-export function NoteTaker({ open, onClose, subject, value, onChange, saved = null, onRetry, maxLength, loading, label = "My Notes" }: NoteTakerProps) {
+export function NoteTaker({ open, onClose, subject, value, onChange, saved = null, onRetry, maxLength, loading, label = "My Notes", onDownload }: NoteTakerProps) {
   const phone = useIsPhone();
   const [small, setSmall] = useState(false);
   const [atTop, setAtTop] = useState(false);
@@ -170,6 +176,13 @@ export function NoteTaker({ open, onClose, subject, value, onChange, saved = nul
             rows={phone ? 6 : 12}
             className="min-h-0 resize-none border-0 shadow-none"
           />
+          {onDownload && (
+            <div className="flex justify-end pt-2">
+              <ExportButton onExport={onDownload} message="Notes downloaded">
+                Download Word
+              </ExportButton>
+            </div>
+          )}
         </div>
       )}
     </section>

@@ -447,6 +447,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · ESS · My Training (#110): Download Word under My Notes saves the note and downloads it as a Word file, the person's alone (`knowledge.md` §6.13, §5).
 - 12/11/2026 · TB · ESS · My Training (#110): Take Notes opens My Notes, the person's own running note on the course, floating over it (`knowledge.md` §6.13, §10).
 - 11/11/2026 · TB · ESS · My Training (#110): a PDF grows to its pages, so the course scrolls through it to the item's actions and back; All Items at the item's foot too; an item, or the way back, starts at the course's top (`knowledge.md` §10, §14).
 - 11/11/2026 · TB · ESS · My Training (#110) built on the contract (M10 PR 5, `knowledge.md` §10): To Do,

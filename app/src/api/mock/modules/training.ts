@@ -835,6 +835,15 @@ route("PUT /api/v1/training/me/courses/:id/note", (req) => {
   return ok({ training_course_id: o.c.training_course_id, ...n });
 });
 
+/** Download Word on My Notes: an export of the note as saved; nothing to download while it is empty. */
+route("POST /api/v1/training/me/courses/:id/note/export", (req) => {
+  const o = openable(req, req.params.id);
+  if (!o) return notFound();
+  const n = NOTES.get(noteKey(req, o.c));
+  if (!n || !n.body.trim()) return fail(409, "NOTE_EMPTY", "Write a note first");
+  return exportFile(req.user!, `my-notes-${o.c.number}`, "docx");
+});
+
 route("POST /api/v1/training/me/courses/:id/certificate", (req) => {
   const o = openable(req, req.params.id);
   if (!o?.e?.certificate_number) return notFound();

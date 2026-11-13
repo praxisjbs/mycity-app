@@ -27,6 +27,8 @@
  *   training.reminder_due          the reminder engine's `training_due`, or Remind Overdue
  *   training.note_saved            a person saved their own note on a course: audit only, its
  *                                  length and never its text (§6.13)
+ *   training.note_export_requested Download Word on My Notes: the file reserved in the request,
+ *                                  made by `training.note_export` in the worker (§6.13)
  *
  * New joiners are enrolled by `training.enrol_joiners` on employee.created, employee.updated and
  * access.roles_set, and by the `training-joiners` job every morning at 06:00 Lagos as a backstop.
@@ -61,6 +63,7 @@ const EVENTS = defineEvents("knowledge", {
   "training.certificate_ready": { summary: "A certificate of completion was issued" },
   "training.enrolment_closed": { summary: "A leaver's course was closed" },
   "training.note_saved": { summary: "Someone saved their own notes on a course" },
+  "training.note_export_requested": { summary: "Someone downloaded their own notes on a course" },
   "training.reminder_due": { summary: "Someone was reminded of a course" },
 });
 
@@ -71,6 +74,8 @@ const COURSE_ENTITY = "training_course";
 const REMINDER_KEY = "training_due";
 /** The certificate of completion's PDF (§6.9). */
 const CERTIFICATE_DOC_TYPE = "training_certificate";
+/** My Notes as a Word file (§6.13): an export, the person's alone, kept a day like every export. */
+const NOTE_EXPORT = "training_note_export";
 
 /** An item's file: read by everyone who may take the course (the `knowledge` grant). */
 defineDocumentType("training_material", { label: "Training material", module: "knowledge", sensitivity: "normal" });
@@ -78,6 +83,8 @@ defineDocumentType("training_material", { label: "Training material", module: "k
 defineDocumentType("training_signature", { label: "Training signature", module: "knowledge", sensitivity: "normal" });
 /** A person's proof of an outside course: theirs and `training.manage`'s. */
 defineDocumentType("training_proof", { label: "Training proof", module: "knowledge", sensitivity: "personal" });
+/** Download Word on My Notes: read by the person who asked and nobody else (the uploader's rule). */
+defineDocumentType(NOTE_EXPORT, { label: "My Notes (Word)", module: "knowledge", sensitivity: "restricted", export: true });
 
 /*
  * The certificate: one A4 landscape page it draws itself (training.certificate.js), its number the
@@ -105,6 +112,12 @@ vault.defineAccess(ENROLMENT_ENTITY, async (client, user, doc) => {
   if (doc.subject_employee_id && user.employee_id && doc.subject_employee_id === user.employee_id) return true;
   return (await grantsCache.getCapabilities(client, user.user_id)).includes("training.manage");
 });
+
+/**
+ * My Notes as a Word file is the person's alone, as the note is (§6.13): no manager, no
+ * `training.manage` holder, not the CEO.
+ */
+vault.defineAccess(NOTE_EXPORT, async (client, user, doc) => Boolean(user && doc.uploaded_by && doc.uploaded_by === user.user_id));
 
 defineNotification(EVENTS.TRAINING_CERTIFICATE_READY, {
   to: [{ subject: true }],
@@ -153,6 +166,9 @@ outbox.register(vault.EVENTS.DOCUMENT_GENERATED, "training.certificate_ready", (
   event.payload && event.payload.doc_type === CERTIFICATE_DOC_TYPE ? require("./training.certificate").ready(event.payload.document_id) : null,
 );
 
+/** Download Word: the note as it was saved, made into the file the request reserved (§6.13). */
+outbox.register(EVENTS.TRAINING_NOTE_EXPORT_REQUESTED, "training.note_export", (event, ctx) => service().buildNoteExport(event, ctx));
+
 /** The task closes itself when the course completes (§6.7). */
 outbox.register(EVENTS.TRAINING_COMPLETED, "training.close_task", (event) =>
   service().closeTask(event.payload.training_enrolment_id, event.actor_user_id || null),
@@ -173,4 +189,4 @@ outbox.register("employee.archived", "training.close_leaver", (event) =>
   service().closeLeaver((event.payload && event.payload.employee_id) || event.entity.id),
 );
 
-module.exports = { EVENTS, ENROLMENT_ENTITY, COURSE_ENTITY, REMINDER_KEY, CERTIFICATE_DOC_TYPE };
+module.exports = { EVENTS, ENROLMENT_ENTITY, COURSE_ENTITY, REMINDER_KEY, CERTIFICATE_DOC_TYPE, NOTE_EXPORT };
