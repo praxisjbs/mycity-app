@@ -57,7 +57,7 @@
   },
   "ess-payslip": {
     "spec": "4410c5f37f29eef7",
-    "source": "544b30f60de49343",
+    "source": "18f3a0d59bddd883",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "ess-payslips": {
     "spec": "b0d23438c791af40",
-    "source": "544b30f60de49343",
+    "source": "18f3a0d59bddd883",
     "devices": [
       "desktop",
       "phone"
