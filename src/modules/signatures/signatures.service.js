@@ -256,8 +256,9 @@ async function endFor(client, actor, { subject_type: subjectType, subject_id: su
 async function endOne(client, actor, r, status, reason) {
   if (!(await repo.endRequest(client, r.signature_request_id, status, reason))) return false;
   await repo.markSignatureEnded(client, r.signature_request_id, "expired");
-  for (const s of await repo.signaturesOf(client, r.signature_request_id))
-    await publicToken.revokeFor(client, { subject_type: SIGNATURE_ENTITY, subject_id: s.signature_id, scope: SCOPE });
+  // The links stay, read only: each opens on how it ended (Offer Withdrawn, This Offer Has Expired),
+  // without the document (viewOf, documentFor), and nothing on it can be signed or declined
+  // (assertMayAct). A link replaced by Resend is still revoked (issueLinks). AJ, 13/11/2026.
   await emit(client, {
     key: EVENTS.SIGNATURE_ENDED,
     entity: { type: "signature_request", id: r.signature_request_id },
@@ -402,13 +403,17 @@ async function blocksOf(db, adapter, subjectId) {
   return Array.isArray(blocks) && blocks.length > 0 ? blocks : null;
 }
 
+/** A link whose request ended unsigned: it says how, and shows nothing of the document. */
+const ENDED = new Set(["withdrawn", "expired", "declined", "void"]);
+
 /** SigningView for one signer's link. */
 async function viewOf(db, r, s) {
   const adapter = adapterOf(r.subject_type);
+  const ended = ENDED.has(stateOf(r, s));
   // One after another: inside a write, `db` is one client.
   const org = await profile.readProfile(db);
-  const letter = await adapter.letter(db, r.subject_id);
-  const blocks = await blocksOf(db, adapter, r.subject_id);
+  const letter = ended ? [] : await adapter.letter(db, r.subject_id);
+  const blocks = ended ? null : await blocksOf(db, adapter, r.subject_id);
   const all = await repo.signaturesOf(db, r.signature_request_id);
   const signedAt = s.signed_at ? new Date(s.signed_at).toISOString() : null;
   return {
@@ -632,7 +637,9 @@ async function decline(token, reason) {
 
 /** GET /sign/:token/document: the sealed copy once there is one, else the document to sign. */
 async function documentFor(token) {
-  const { r } = await opened(pool, token);
+  const { r, s } = await opened(pool, token);
+  // Ended unsigned: the link still says so (view), but the document is no longer given out.
+  if (!r.sealed_at && ENDED.has(stateOf(r, s))) throw notFound();
   const doc = await vault.get(pool, r.sealed_at ? r.sealed_document_id : r.document_id);
   if (!doc) throw notFound();
   return doc;

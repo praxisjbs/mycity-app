@@ -111,6 +111,9 @@ describe("SignOffer", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Agree to Sign Electronically" }));
     fireEvent.click(screen.getByRole("button", { name: "Accept and Sign" }));
     expect(await screen.findByRole("heading", { name: "Offer Signed" })).toBeTruthy();
+    // The aside no longer says it waits to be signed (found in the M5 click-through, 13/11/2026).
+    expect(within(aside()).getByText("Your offer, signed.")).toBeTruthy();
+    expect(within(aside()).queryByText("Your offer, ready to sign.")).toBeNull();
     expect(screen.getByText("We emailed you a signed copy.")).toBeTruthy();
     expect(screen.getByText("OFF-0018")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Verify This Document" }));

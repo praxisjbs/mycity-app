@@ -448,6 +448,20 @@ describeDb("Recruitment · Onboarding to the documentation gate, against the rea
     await signs(signToken(lastTo("contract-sent", hire.email)), hire.name);
     kase = (await h.as("ops").get(`/recruitment/onboarding/${hire.onboarding_case_id}`)).body;
     expect(kase).toMatchObject({ status: "pre_onboarding", waiting_on: [] });
+    // The hire's Documents tab (Employee 360): the signed offer and the signed contract, once each,
+    // each sealed copy the next version of the copy it was signed on (AJ, 13/11/2026).
+    const filed = await pool.query(
+      `SELECT doc_type, version, supersedes_id IS NOT NULL AS follows FROM document
+        WHERE subject_employee_id = $1 AND is_current AND doc_type IN ('offer_letter', 'employment_contract') ORDER BY doc_type`,
+      [hire.employee_id],
+    );
+    expect(filed.rows).toEqual([
+      { doc_type: "employment_contract", version: 2, follows: true },
+      { doc_type: "offer_letter", version: 2, follows: true },
+    ]);
+    const mine = await h.as("ops").get(`/employees/${hire.employee_id}/documents`);
+    expect(mine.status).toBe(200);
+    expect(mine.body.data.filter((d) => d.status === "signed")).toHaveLength(2);
     expect(kase.documentation_completed_at).toBeTruthy();
     expect(await one("SELECT stage, status FROM application WHERE application_id = $1", [hire.application_id])).toEqual({ stage: "pre_onboarding", status: "active" });
 

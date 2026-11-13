@@ -440,6 +440,9 @@ async function sealIn(client, ctx) {
     date: vars.date,
     template_version: t.ct.terms_version,
   });
+  // The sealed copy takes the place of the copy made at acceptance, kept as its first version, so the
+  // hire's Documents tab lists the contract once.
+  await vault.follow(client, { document_id: doc.document_id, supersedes_id: ctx.request.document_id, sealed: true });
   await repo.stamp(client, t.ct.employment_contract_id, { document_id: doc.document_id });
   return doc;
 }

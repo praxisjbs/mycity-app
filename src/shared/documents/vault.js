@@ -427,10 +427,12 @@ async function setTitle(client, documentId, title) {
  * onboarding case). The older one stays, in the newer one's versions, and leaves the lists that show
  * current documents only, so a person's record shows one entry for one requirement. Both must be on
  * the same record. Nothing changes when they are the same file, or the older one is no longer
- * current (already replaced). Refused for a locked document, as supersede() is.
+ * current (already replaced). Refused for a locked document, as supersede() is, except with `sealed`:
+ * the sealed copy of a signed document (its signatures, certificate and QR) taking the place of the
+ * copy it was made from, which stays locked and unchanged, only no longer current.
  * @returns {Promise<boolean>} whether the older file was replaced now
  */
-async function follow(client, { document_id: newId, supersedes_id: oldId, actor = null }) {
+async function follow(client, { document_id: newId, supersedes_id: oldId, actor = null, sealed = false }) {
   if (!inTransaction(client))
     throw new Error("vault.follow must run inside atomically()");
   if (!oldId || !newId || oldId === newId) return false;
@@ -446,7 +448,7 @@ async function follow(client, { document_id: newId, supersedes_id: oldId, actor 
     throw new Error("vault.follow: both files must be on the same record");
   if (next.supersedes_id || !next.is_current)
     throw new Error("vault.follow: the newer file already follows another");
-  if (old.locked_at)
+  if (old.locked_at && !sealed)
     throw new AppError("DOCUMENT_LOCKED", "This document is locked and cannot be replaced", 409);
   await client.query("UPDATE document SET is_current = false WHERE document_id = $1", [oldId]);
   await client.query(

@@ -461,7 +461,8 @@ describeDb("partnerships: agreements, approval, signing and verification", () =>
     const token = tokenOf(mails("agreement-sign")[0].data.sign_url);
     const closed = ok(await as("staff").post(`/partnerships/agreements/${a.partnership_agreement_id}/close`, { reason: "The festival was called off this year." }));
     expect(closed).toMatchObject({ status: "closed", close_reason: "The festival was called off this year.", signing: { status: "revoked" } });
-    expect((await pub().get(`/sign/${token}`)).status).toBe(404);
+    // The link opens on Agreement Withdrawn, read only, without the agreement (AJ, 13/11/2026).
+    expect((await pub().get(`/sign/${token}`)).body).toMatchObject({ state: "withdrawn", letter: [], blocks: null });
     expect((await as("staff").post(`/partnerships/agreements/${a.partnership_agreement_id}/close`, { reason: "Again, to be very sure." })).body.error.code).toBe("CLOSED");
 
     const lost = await newLead("Abuja Night Market");

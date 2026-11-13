@@ -189,6 +189,11 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
+- 13/11/2026 · AJ · `m5/onboarding-fixes`, from the click-through of 12/11/2026 (guide §13): the signed
+  offer on the hire's Documents tab and the contract there once; ended signing links read only on how
+  they ended (the agreements' too, for TB); the signing page's heading by state; Document Rejected's
+  guarantor wording; the video runbook's §6.18.
+
 - 12/11/2026 · AJ · The two left by filming, decided (guide §13): Upload Documents' writes counted per
   link, 60 a minute (`onboardLimiter` in `middleware/rate-limit.js`); a file sent again on an item or
   as a guarantor's form or ID becomes the next version of the one before (`vault.follow`, new); the
