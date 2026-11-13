@@ -18,6 +18,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M5 Offers and Onboarding, part 2: Documentation and Onboarding (6:41, 11 chapters) | `m5-onboarding-2.js` | Made and uploaded 12/11/2026 | [Part 2](https://drive.google.com/file/d/1QehhMb7Q3N4-sDeIteZroX3u8YeTy_q5/view?usp=drivesdk) |
 | M6 Payroll, part 1: Payroll Runs and Payslips (about 7 min) | `m6-payroll-1.js`, to write | Planned 13/11/2026 (§8) | |
 | M6 Payroll, part 2: Deductions, Configurations and My Payslips (about 6 min) | `m6-payroll-2.js`, to write | Planned 13/11/2026 (§8) | |
+| M8 Expenses, part 1: Raising and Approving (about 7:50, 9 chapters) | `m8-expenses-1.js` | Made 13/11/2026 (§8) | |
+| M8 Expenses, part 2: Paying and Budgets (about 6:30, 10 chapters) | `m8-expenses-2.js` | Made 13/11/2026 (§8) | |
 | M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 | M10 Praxis AI, part 2: Praxis AI and AI Control (7:00, 10 chapters) | `m10-praxis-ai.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 
@@ -133,6 +135,12 @@ node scripts/db/load-staff.js        # MyCity's real staff, as each deploy loads
 node scripts/db/seed.js --staging    # the demonstration records every screen needs
 npm run fe:build                     # the release build: no mock (F12)
 ```
+
+A scene with a `prepare` step (M8's: `node scripts/video/make.js m8-expenses-1 prepare`) films on its
+own ground instead of `seed.js --staging`: it runs the staging seed itself, leaving out what the scene
+replaces (M8: the Implementation Team's demonstration requests), then sets up what MyCity's people
+would have done before the camera rolls, through the modules' services. Run it once, on a fresh
+database, after load-staff.
 
 `.env` for filming: `STAFF_ORIGIN=http://hub.mycityapp.io` and `PUBLIC_ORIGIN=http://go.mycityapp.io`,
 `PASSWORD_BREACH_CHECK=false`, `SEED_PASSWORD` (the filming password), no SMTP (nothing is mailed).
@@ -284,6 +292,18 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
     the new one arrives is the last one sent: read the code before pressing Send Code and wait for a
     different one (`codeAfter()` in `m5-onboarding-2.js`).
 
+22. **The offer to clock in.** A working day's first screen opens Clock In over it; filming answers
+    **Not Now** (`film.js`), as it answers Later to a policy.
+23. **A confirmation's button carries its verb and noun.** Reject's dialog reads **Reject Request**,
+    Remove's **Remove Request**, Deactivate's confirm **Deactivate** beside **Keep Category**: probe
+    the dialog (§6.14) before scripting the press.
+24. **A form's lines are LinesField.** New Request shows each line's own amount under the line
+    (#144): a change to a shared field between two takes is a reason to film both parts again, so
+    one part never shows the hub as it was.
+25. **Real staff carry no account numbers.** The roster loader never loads one (the repository is
+    public), so Use My Company Account is refused; M8's `prepare` gives the people the videos pay
+    into their own account a number on the filming database only, made from their name.
+
 ## 7 · Bugs found while filming
 
 Each is fixed on the video's branch, in the screen's own code, its guide and chapter with it, and
@@ -317,6 +337,26 @@ listed here and in `docs/PROGRESS.md`.
 | 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opened in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say; once beside it, its section headings skipped a level and its two small cards broke words | Fixed the same day: `ListDetail` on a wide desktop (the first role shown until another is pressed), its forms return to it in place; the dialog stays on a phone and where two columns do not fit; headings `h3`; the cards stack in the pane. Tests and the User Guide's pictures follow |
 
 ## 8 · Where the work stands
+
+**13/11/2026 · TB (with Claude).** Both Milestone 8 videos written, filmed and assembled on one
+development database, the same day, from M8's own `prepare` (§4.1): part 1, Raising and Approving
+(9 chapters) and part 2, Paying and Budgets (10 chapters). Decided by TB: two videos; MyCity's real
+staff throughout ("Use real employees. Make it feel so real"); every AI feature; JBS Praxis's real
+invoice INV-202611-9525, which TB shared, read by Read Invoice. Aaron Agama raises a request on his
+phone (Suggest Category, Use My Company Account); Bode Oluwasanmi raises the invoice (Read Invoice: six
+lines, a discount and the deposit paid as minus lines, ₦150,000.00); Chinyere Elechi approves Aaron's
+and sends Similoluwa Michael's back, who sends it again; Cynthia Osakunih checks a possible duplicate
+(Oladotun Shola-Adido had raised the same invoice), approves Bode's and rejects the copy; Bassey Ekpe
+raises one from Praxis AI. In part 2 Cynthia groups REQ-0002, Ifeoma Mbonu removes the MyLagosApp
+flyers on her phone and approves the rest, Cynthia pays (with the bank's reference, and Save Without
+Reference? then Add Reference), sets a project's budget, edits a budget (examples, said so, A25), adds
+and deactivates a category, and shows the chain on Settings · Approvals. Nine findings, every one
+fixed and merged (§7: praxisjbs/mycity-app#143 and #145); #144 (documents in the chat) built the same
+minus lines in parallel and the branches were joined. The tooling learnt §6.22 to §6.25, `make.js`
+`prepare`, and EXP-, REQ-, DSB-, JBS, PDF, DTT and an invoice's number in `SAID`.
+
+- [x] Write, film and check both M8 videos (13/11/2026).
+- [ ] Upload both to Drive (§5) and add their links to the table at the top.
 
 **13/11/2026 · JP (with Claude). The Milestone 6 plan**, written once the screens were final (`docs/guides/payroll.md`
 Appendix A, PR 8). Nothing filmed yet. Two videos, as M4, M5 and M10. The chapter list follows the guide's demo
