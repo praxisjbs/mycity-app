@@ -828,6 +828,10 @@ lead ("It should always ask for required fields, so we never see an error. We ca
 
 ## 8 · Log
 
+- 13/11/2026 · TB · Documents in the chat planned: `praxis-ai.md` §1.10 (decisions 41 to 48),
+  §6.18 and Appendix A (two PRs, each in a fresh chat). The engine side PR 1 builds: the manifest's
+  `files` key, the ask's reading step as one read, and `draftCard` laying the reader's fields over
+  the model's values.
 - 13/11/2026 · TB · The engine gains `cards.shape` (a value in the form its field's JSON Schema
   takes: the model's 700000 is "700000.00", 1 is "1"), run by `authorise.checkAction` on every card;
   `kindOf` draws figures sent as text as `number`. The manifest gains an ask's `also` (one turn, one
