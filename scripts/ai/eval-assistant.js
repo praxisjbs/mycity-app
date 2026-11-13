@@ -155,6 +155,8 @@ const CASES = Object.freeze([
   // Charts in the Overview, PR 1: budgets (praxis-ai.md §6.19, Appendix B). The question that started the plan.
   { id: "chart.budgets-department", as: "ceo", question: "I want us to study our budget for each department. Share data in a way we can see charts in overview.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar", never_words: ["summary endpoint", "endpoint", "database", "generated", "summary read", "tool"] },
   { id: "chart.budgets-category", as: "operations_people", question: "Show this year's budget by category as a chart.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar" },
+  // Charts in the Overview, PR 2: a short list with no summary, charted from its own rows (praxis-ai.md §6.19 item 6).
+  { id: "chart.worksites", as: "operations_people", question: "How many people work at each worksite?", reads: ["worksites.list"], shows: ["pane"], chart: "bar", never_words: ["summary", "endpoint", "database", "generated", "tool"] },
   { id: "payroll.payslips", as: "operations_people", question: "Which payslips are in the latest payroll run?", reads: ["payslips.list"] },
   { id: "payroll.deductions", as: "operations_people", question: "Which fines are waiting for payroll to accept or waive?", reads: ["deductions.list"] },
   { id: "payroll.my-payslip", as: "employee", question: "What was my net pay on my latest payslip?", reads: ["payslips.mine"] },

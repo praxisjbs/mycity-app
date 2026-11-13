@@ -845,7 +845,7 @@ order: PR 1 first, PR 3 after PR 2, PR 8 after PRs 4 to 7 (Appendix B.2). Tick a
 date, the branch and the PR when it merges.
 
 - [x] 13/11/2026 · PR 1 · Stacked bars, Budgets' summary and every read naming its summary, gate 23 rule 9 with `scripts/check/ai-summary-gaps.json`, money in naira, no mechanics in an answer (built in the planning chat on `claude/bold-hawking-byligf`)
-- [ ] PR 2 · Charts from a complete table (`m10/overview-tables`)
+- [x] 13/11/2026 · PR 2 · Charts from a complete table: the draft's `read` Overview drawn by the server from the rows (`overviewOfRows`), `AiRowFigure`, `AiOverview.read`, `AiOverviewChart.unit`, prompt version 12 (built in its own chat on the session's branch `claude/brave-cori-1cd0l4` rather than `m10/overview-tables`; the pull request is named in §8)
 - [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
 - [ ] PR 4 · Finance and pay summaries (`m10/summaries-finance`)
 - [ ] PR 5 · Recruitment and onboarding summaries (`m10/summaries-recruitment`)
@@ -868,6 +868,14 @@ date, the branch and the PR when it merges.
 
 ## 8 · Log
 
+- 13/11/2026 · JP · Charts in the Overview, PR 2 built (§6.12), in its own chat: an Overview from a
+  read whose rows are its whole list, the engine's `overviewOfRows` pure (gate 24) with the table's
+  `cell` and the money rule handed in by `answer.js`, the summary's Overview chosen first. Found on
+  the way and written into `praxis-ai.md` §6.19 item 6: a chart of amounts read as plain numbers, so
+  `AiOverviewChart` gained `unit`; the plan named no labels for the server's figures, nor how the
+  model's kind fits rows that cannot draw it. The container again lacked Node 20, `node_modules` and
+  pgvector (installed by hand: `npm install node@20` linked at `/opt/node20`, `npm ci`,
+  `postgresql-16-pgvector`).
 - 13/11/2026 · JP · Charts in the Overview, PR 1 built (§6.12): `AiSummaryPart` and a group row's
   `parts`, `engine/pane.js` drawing them as one series a part, `budgets.summary`, a read's `summary`
   in the manifest, the snapshot and the description the model is offered, gate 23 rule 9 with its

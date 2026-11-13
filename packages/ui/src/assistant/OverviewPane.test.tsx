@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { axe } from "../testing/axe";
-import { figureText, OverviewPane } from "./OverviewPane";
+import { chartValue, figureText, OverviewPane } from "./OverviewPane";
 
 const OVERVIEW = {
   title: "Seven late arrivals this month, most in Operations.",
@@ -54,6 +54,15 @@ describe("OverviewPane", () => {
     expect(figureText({ value: 12, unit: "days" })).toBe("12 days");
     expect(figureText({ value: 1240, unit: "count" })).toBe("1,240");
     expect(figureText({ value: 40, unit: "percent" })).toBe("40%");
+  });
+
+  it("reads a chart's values in naira when its unit is ngn, a short list's own amounts", async () => {
+    const chart = { kind: "bar" as const, title: "Allocated by department", labels: ["Programmes", "Operations"], series: [{ label: "Allocated", values: [3500000, 2000000] }], unit: "ngn" };
+    render(<OverviewPane overview={{ title: null, figures: [{ key: "rows", label: "Budgets", value: 2, unit: "count" }], chart }} />);
+    expect(await screen.findByText("Programmes: ₦3,500,000.00")).toBeInTheDocument();
+    expect(chartValue({ unit: "ngn" })(750000.5)).toBe("₦750,000.50");
+    expect(chartValue({ unit: null })(1240)).toBe("1,240");
+    expect(chartValue({})(12)).toBe("12");
   });
 
   it("draws a stacked bar with a key of its parts and reads each part and the total", async () => {

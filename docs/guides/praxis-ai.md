@@ -366,7 +366,7 @@ the summaries, and Appendix B the build plan.
 | Every module's manifest | Backend | | The reads, summaries and actions Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9), summaries for its big tables (§6.13, PR3) and actions for the changes people ask for (§6.11, PR4) |
 | An action card | Inside an answer, on the full screen and in the phone's chat | The person who asked, for an action their grant allows | The action's name, the fields its form offers as it will receive them (as a person reads them: people, departments and projects by name, decision 31), the records it acts on named and linked, a problem on its field, the buttons; the result line after the press, one line per record; Expired with Draw It Again | Press the verb (with the count when it acts on several; Confirm It's You first for a sensitive class; not offered while a field shows a problem, Edit standing in its place), Edit (the fields through the form system, people, departments and projects with the screen's own pickers, Save Changes), Cancel; a suggested card reads as a question with Not Now |
 | Praxis AI · Ask, Attach Document (Appendix A: invoices and payment receipts built in PR 1, contracts and MoUs in PR 2) | Staff app: beside the question box, on the full screen and in the phone's chat | `praxis_ai` create, and the grant each kind needs (decision 41) | A modal: the kinds the person may attach as tiles, then the file; the question's bubble then carries the file; a contract's terms on the pane's Record tab | Attach an invoice, a payment receipt, or a contract or MoU, and get its card (§6.18) |
-| Praxis AI · Ask, the Overview's charts and foot (Appendix B, planned) | Staff app: the pane's Overview on the full screen, the Figures sheet on a phone | `praxis_ai` view; each figure through the grant of the summary or read it came from | Up to three figures and one chart, a stacked bar with its legend where a summary's rows carry parts (§6.19 item 1), or a chart of a whole list's own columns (item 6); a charted answer's table in the pane rather than the chat (item 7) | View Data, Download PDF (item 8) |
+| Praxis AI · Ask, the Overview's charts and foot (Appendix B: stacked bars built in PR 1, a whole list's chart in PR 2; the foot planned) | Staff app: the pane's Overview on the full screen, the Figures sheet on a phone | `praxis_ai` view; each figure through the grant of the summary or read it came from | Up to three figures and one chart, a stacked bar with its legend where a summary's rows carry parts (§6.19 item 1), or a chart of a whole list's own columns, amounts in naira (item 6); a charted answer's table in the pane rather than the chat (item 7, planned) | View Data, Download PDF (item 8, planned) |
 
 ## 3 · How the screens relate
 
@@ -1299,7 +1299,9 @@ The pane is built by the server from the turn (`engine/pane.js`): **Sources** fr
 (name, filters, rows, total, outcome, masks); **Table** from the read the draft names, paged through
 §6.12; **Record** from a chip or a row, shown through the person's masks; **Overview** from the
 summary the draft names (`AiAnswerDraft.overview`: which summary, up to three figures by key, one
-chart of bar, stacked bar, line or donut over one of its groups or series, and a sentence title). A
+chart of bar, stacked bar, line or donut over one of its groups or series, and a sentence title), or
+from a read whose rows are its whole list (`read`, §6.19 item 6: the rows' own columns and the
+server's sums and counts). A
 figure, group or series the summary does not hold is dropped; a chart title that names a number the
 summary holds nowhere (not a figure, a group's value or count, a point or the total; a year or a date
 is not a figure) is dropped for the group's or series' own label. The prompt (version 5) says how to
@@ -1655,7 +1657,7 @@ naming `file.<kind>` and an evaluation case with `file: "<kind>"` (a made-up sam
 
 ### 6.19 Charts in the Overview (decisions 49 to 58; Appendix B)
 
-**Items 1 to 5 built (Appendix B PR 1, 13/11/2026); items 6 to 9 planned.** Each PR of Appendix B
+**Items 1 to 5 built (Appendix B PR 1, 13/11/2026), item 6 built (PR 2, 13/11/2026); items 7 to 9 planned.** Each PR of Appendix B
 writes what it built here as built. Where the build shows the design wrong, the change goes here and in the Change log, never
 silently.
 
@@ -1717,22 +1719,41 @@ how the pane works, and the model repeated that to the person.
    evaluation set gains a case that asks the question that started this plan and fails an answer
    whose words name summaries, reads, endpoints, databases or how charts are generated (the grader
    gains `never_words` if it has none).
-6. **Charts from a complete table (PR 2).**
-   - **Contract**: `AiAnswerDraft.overview` takes `read` (one of the turn's reads, by `n`) in place
-     of `summary`. With `read`, `chart` names `label` (a field of the rows, as a table's field is
-     named: `name`, `department.name`) and either `values` (up to 6 number or money fields: one draws
-     a `bar`, several a `stacked_bar` when they are parts of one whole, a `line` over a date label)
-     or `count` (a code field, such as `status`, whose rows are counted, drawn as a `donut` or a
-     `bar`). `figures` are up to three of `{ of: "rows" }`, `{ of: "sum", field }` or
-     `{ of: "count", field, value }`. `AiOverview` gains `read` beside `summary`; one of them is set.
-   - **The server** (`engine/pane.js`, `overviewOfRows`): only for a read that returned, on its
-     first page, whose rows are its whole list (`rows.length === total`, at most 25). Fields must be
-     ones the rows hold; values must be numbers or two-place strings (a money field's unit is
-     `ngn`); labels are drawn as the table draws them (a record's name, a code's words, a date day
-     first); the figures are the server's sums and counts; the title check runs against the rows'
-     values and those figures. Anything else is dropped and the Overview stays empty.
-   - **The prompt**: when a list's whole answer is on one page and no summary fits, the Overview may
-     chart that read's own columns; a longer list is charted from its summary.
+6. **Charts from a complete table (PR 2, built 13/11/2026).**
+   - **Contract** (`assistant.js`): `AiAnswerDraft.overview` takes `read` (one of the turn's reads,
+     by `n`) in place of `summary`; both are nullable and the server reads `summary` first. With
+     `read`, `chart` names `label` (a field of the rows, as a table's field is named: `name`,
+     `department.name`) and either `values` (up to 6 number or money fields) or `count` (a code
+     field, such as `status`, whose rows are counted). `figures` are up to three of
+     `{ of: "rows" }`, `{ of: "sum", field }` or `{ of: "count", field, value }` (`AiRowFigure`), a
+     summary's being its figure keys as before. `AiOverview` gains `read` beside `summary`, each
+     nullable, one of them set. `AiOverviewChart` gains `unit` (`ngn` when every value is money,
+     else null), so the chart reads naira as its figures do (decision 56); a summary's chart carries
+     null, as its groups name no unit.
+   - **The server** (`engine/pane.js`, `overviewOfRows`; `answer.build` chooses: the summary's
+     Overview when the draft names one that answered, else the rows'): only for a list read that
+     returned, on its first page, whose rows are its whole list (`page.number` 1, no next page,
+     `rows.length === total`, at most 25). One record, a document's reading (`file.<kind>`) and a
+     summary never chart from rows. Fields must be ones every row holds; values must be numbers or
+     two-place strings, so a field the person's role masks (emptied to null, §6.3 step 5) is never
+     charted; a two-place string in a field named like money (`MONEY_FIELD`) is `ngn`. Labels are
+     drawn by the table's own cell (`answer.cell`, handed in by the adapter, so the engine stays
+     pure, gate 24): a record's name, a code's words, a date day first; a label no person reads (an
+     id) drops the chart. The figures are the server's: `rows` the list's count (labelled by the
+     read's words, "Worksites"), `sum` the field's total (money summed by `shared/money`, handed
+     in as `sumMoney`, labelled by the field's words, "Allocated"), `count` the rows whose field holds the value, written as its
+     code or its words (labelled by the value's words, "Active"); a figure over a field that is not
+     all numbers is dropped. The title check runs against the rows' values and those figures.
+     Anything else is dropped; with no figure and no chart left the Overview stays empty.
+   - **The chart's kind** (the model's, fitted to what the rows can draw): one value field draws a
+     `bar`, a `donut` when asked, or a `line` when asked over a date label (the rows ordered by
+     the date); several values draw a `stacked_bar` when asked (parts of one whole), several lines
+     over a date label, and otherwise the first value alone as a `bar`; `count` draws a `donut`
+     when asked, else a `bar`, its groups ordered by how many, most first. A bar, stacked bar or
+     donut with a value below zero is not drawn (decision 51: never a negative bar).
+   - **The prompt** (version 12, and the system turn's pane line): when a list's whole answer is on
+     one page and no summary fits, the Overview may chart that read's own columns; a longer list is
+     charted from its summary.
 7. **The chat and the Overview's foot (PR 3).**
    - **The bubble**: an answer that carries an Overview chart shows its words, From, its screen
      button and Open Figures. Its table, Showing 25 of 312 and Show Next 25 are left out of the
@@ -1860,7 +1881,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Praxis AI · Ask (`ask`) | Praxis AI as the title; Back (on desktop the screen it returns to under the title, "From People · Leave"; opened from the menu, ⌘K or History it goes to History and the line is left out); Recent, a toggle that shows the person's conversations as a column beside the chat (titles and when last asked, newest first, 25 a page; empty, No Questions Yet); New Conversation once a conversation is open; on a phone opened from the menu, the conversations first (title, questions, when last asked; Search Conversations; No Conversations Yet, "Start one with New Conversation.") with New Conversation always, and the chat full screen over them with Back, Conversations and New Conversation; the conversation (on desktop about two fifths, on the left): empty, an illustration and Try Asking with up to 6 questions to tap; Show Earlier when older questions remain, each question as the person's bubble, each answer with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, Open Figures on an answer with a table or figures whose pane is not the one shown (none under an answer of words alone, whose chips still open the pane), From with the kinds of record read as chips ("partnership ×4", "employee ×2"; a chip shows those records in the pane; the one record, named, when the answer rests on one, shown on Record), Helpful and Not Helpful (pressed again, taken back); a question Praxis AI asks before a card ("What is the task?", "When is it due?", "Which Tunde?", "Which leave type?"; decisions 28, 29 and 32), its words alone with no From and no Open Figures, with its answers as buttons under it on the newest answer (Today, Tomorrow, Friday, No Due Day; Low, Normal, High, Urgent; 30 Minutes, 1 Hour, 2 Hours; Just Me; each person by name and job title; each leave type with the days left, "Annual Leave, 12 days left"), a tap asking it; an answer's card (§6.11): the action's name (a suggested card's as a question, "Send Message?"), each field's label and value as a person reads it (people, departments, projects and leave types by name, never an id, "For: JBS Praxis Team", "Watchers: Tobiloba Dada, Bassey Ekpe"), a problem beside its value ("Say why", "Fill the gap"; Pick one alone where an id names nothing), the records as chips ("Ayo Bello, Annual, 3 days"), the buttons (the verb with the count, "Approve Leave ×4", a lock on one that asks Confirm It's You, none while a field shows a problem; Edit, the primary button then, with Save Changes and Cancel on its fields, people, departments, projects and leave types picked as on the screen's own form; Cancel, or Not Now on a suggested card), a refusal under the card in the server's words with Open Mailbox where the mailbox is not connected, then Done or Could Not Finish with a line per record and Open, or Expired with "This card has expired." and Draw It Again; Confirm It's You (`identity.md` §10) before a sensitive card, and the toast "Set a passkey for next time" with Set Passkey once; while waiting, Reading Your Records, then Reading leave requests · 2 of 5 as each read runs; a refused answer in plain words; a failed one with its reason and Try Again; the pane (on desktop about three fifths, on the right) for the latest answer that read records or has figures (a conversation opened from Recent or History shows its own; an answer with neither, such as a card drawn from what was said, leaves the pane as it was, never blank), or the one whose chip or Open Figures was pressed (drawn in the accent): tabs Overview, Table, Record and Sources, an empty one disabled; Overview: up to three figures and one chart when a summary read answered (§6.13); Table: the read's rows, 25 a page (Previous, Next, Page 1 of 13), Export (every row of the read as an Excel file, made for the person and saved on this device, §6.16; toast "Export downloaded"), a row opening the Record, past 200 rows "Showing the first 200 of 1,240 rows"; Record: the row's or the record's fields and Open Record; Sources: each read numbered and named ("1. Leave Requests"), Read, Not Available, Not Run, Failed or Too Much (the read covered more than the database allows at once, §6.3 step 8), "25 of 312 rows", its filters, Masked with the fields emptied, Open Table; before any answer, No Answer Yet, "Ask a question to fill this pane."; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them; a chip opens them in the pane) | How reads, the context, permissions, redaction, the loop, the progress events and a card's re-check work: §1.1, §6 here and the manual |
 | Praxis AI · History (`history`) | History as the title, Export and Clear History; for AI Control: Questions This Month (everyone's), Your Questions, Spend and Monthly Cap, each captioned with the month or All AI; for everyone else: Questions This Month, Your Questions (all time) and Your Spend; Your Questions, 25 a page: Question, Asked, Sources Read, Tokens, Cost, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog; Search Questions; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Spend per Month, Naira (six months; for AI Control, "Against a ₦25,000 monthly cap" when one is set); Questions by Module; toasts "Conversation deleted", "History cleared", the export's own | Help terms on Spend (what Praxis AI's questions cost this month, priced as AI Control prices them) and Monthly Cap (the most all AI may spend in a month, set in AI Control) | Where everyone's spend by action is (AI Control · Spend), what deleting keeps: §6.5 |
 | Praxis AI · Ask, Attach Document (Appendix A) | Attach Document, a paperclip icon button with its Tooltip, left of the question box; its modal, Attach Document: What Is It? with three tiles (**Invoice**, **Payment Receipt**, **Contract or MoU**, each with its icon and a caption of at most four words: Bill to pay, Proof of a transfer, Signed or to sign), only those the person may use; then the file through `UploadField` (PDF, JPEG, PNG, WebP, HEIC, HEIF; at most 10 MB), its name and size with Remove; Question, Optional, filled with the kind's own question; Cancel and **Read Document** in the footer. While reading is off, Attach Document is off with the Tooltip Reading Documents Is Off. The question's bubble carries a chip with the file's name that opens it. The answer: its card, or one sentence when the file cannot be read. A contract or MoU: a summary of at most five sentences; its terms on the pane's Record tab, titled by the document's title (Kind, Parties, Signed On, Starts On, Ends On, Notice, Value, Renewal, each party's obligations under its name, Signed By), opened first and again from the file's From chip; its card, **Record Signed Copy** (the agreement as its chip, a lock for Confirm It's You) or **Add Partner Document**; for a reader without Partnerships edit, the summary and the terms alone | help on the modal's file field: "PDF or a photo, up to 10 MB." | why the kinds are picked first, how the server checks the figures, the jobs: decisions 41 to 48, §6.18 here, the manual |
-| Praxis AI · Ask, the Overview's charts and foot (Appendix B: stacked bars built in PR 1; the rest planned) | On Overview: up to three figures and one chart; a stacked bar with its legend (Spent, Committed, Remaining, Over Budget for budgets); at its foot **View Data** and **Download PDF**; a charted answer's bubble: its words, From, its screen button and Open Figures, its table on the pane's Table; Table for an answer drawn from a summary alone: the chart's figures, a row for each label, a column for each series or part, Total for a stacked bar; toast "PDF downloaded"; a failed file's reason | none | How the Overview is drawn, which summary answered, why a chart is missing: §6.13 and §6.19 here and the manual; never in an answer's words (decision 55) |
+| Praxis AI · Ask, the Overview's charts and foot (Appendix B: stacked bars built in PR 1, a whole list's chart in PR 2; the rest planned) | On Overview: up to three figures and one chart; a stacked bar with its legend (Spent, Committed, Remaining, Over Budget for budgets); a short list's chart from its own columns (people at each worksite), its amounts in naira (₦3,500,000.00); at its foot **View Data** and **Download PDF**; a charted answer's bubble: its words, From, its screen button and Open Figures, its table on the pane's Table; Table for an answer drawn from a summary alone: the chart's figures, a row for each label, a column for each series or part, Total for a stacked bar; toast "PDF downloaded"; a failed file's reason | none | How the Overview is drawn, which summary answered, why a chart is missing: §6.13 and §6.19 here and the manual; never in an answer's words (decision 55) |
 
 ### 10.2 Phone layout
 
@@ -1892,7 +1913,12 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   adds a summary read when its questions need one; Appendix B adds one for every list that can
   grow (decision 49, §6.13's planned tables).
 - **A list longer than a page whose summary is not built yet** (until Appendix B's PRs land): no
-  chart; the Overview stays disabled and the answer says nothing about charts (decision 55).
+  chart; the Overview stays disabled and the answer says nothing about charts (decision 55). A list
+  of 30 whose first 25 came back is never charted from those 25 (decision 50).
+- **A short list with no summary** (the worksites, a person's leave balances, the roles): charted
+  from its own rows when they are the whole list (§6.19 item 6); a field the person's role masks is
+  never charted, and a chart whose fields the rows do not hold is dropped, leaving Overview greyed
+  out.
 - **A stacked bar with an overspend**: Remaining is 0 and Over Budget is its own part, so no bar
   goes below zero (decision 51).
 - **A figure a role half sees** (pay without the salary grant): left out of that reader's figures,
@@ -2341,6 +2367,9 @@ summary that is built, 50 by the 41 summaries this plan adds, and 32 that need n
 
 #### PR 2 · Charts from a complete table (`m10/overview-tables`)
 
+Built 13/11/2026 on the session's branch, as §6.19 item 6 now says; the handoff (§6.12 there) names
+the pull request.
+
 - **Contract first:** `AiAnswerDraft.overview.read`, the chart's `label`, `values` and `count`, the
   figures' `of`; `AiOverview.read`; `npm run gen:contract`.
 - **Backend:** `engine/pane.js` `overviewOfRows` (the engine stays pure, gate 24: the adapter hands
@@ -2475,6 +2504,7 @@ area and guides from B.4:
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · Charts in the Overview, PR 2 built (Appendix B; §6.19 item 6): an Overview from a read whose rows are its whole list (`AiAnswerDraft.overview.read`, the chart's `label` with `values` or `count`, figures as `AiRowFigure`; `AiOverview.read`), drawn by `engine/pane.js` `overviewOfRows` with the table's own cells handed in by the adapter, chosen by `answer.build` after a summary's; the prompt at version 12. The build taught §6.19 four things the plan was silent on, written there: the chart carries `unit` (`ngn`), so a short list's amounts read in naira on the chart as on the figures; the server names each figure (the read's words, the field's, the code's); how the model's kind is fitted to what the rows can draw (a donut of one value, several values a stacked bar only when asked, a line only over dates, never a negative bar); one record and a document's reading never chart from rows. §2, §6.13, §10.1, §11.
 - 13/11/2026 · JP · Charts in the Overview, PR 1 built (Appendix B; §6.13 Finance: Budgets, §6.19 items 1 to 5): a summary row's `parts` (`AiSummaryPart`, `part()`, `group()` summing and checking them) drawn as a stacked bar by the pane and `BarChart`, `budgets.summary` (by department and category, by project for scope all, Over Budget as its own part, paid by month), every read naming its summary or why it needs none with gate 23 rule 9 and `scripts/check/ai-summary-gaps.json` (48 reads waiting on PRs 4 to 8), a read's description naming its summary to the model, budget and pay columns read as naira, the prompt (version 11) never saying how Praxis AI works, and the evaluation set's `chart` and `never_words`. The build taught §6.13 and §6.19 three things, written there: Over Budget is a part only in a grouping where some row went past; a member of staff holds `expenses` view (their own requests), so `budgets.summary` is offered to them over no budgets, as Budgets shows them; the catalogue snapshot, not `catalogue()`, carries a read's `summary`.
 - 13/11/2026 · JP · Charts in the Overview planned (§1.11 decisions 49 to 58, §6.13's planned tables, §6.19, Appendix B), from JBS Praxis's six answers: why a budget question left the Overview empty (12 of the 94 reads had a summary, budgets none), stacked bars, charts from a complete table, a charted answer's table in the pane, View Data and Download PDF with a designed PDF, no mechanics in an answer, money in naira, and 41 new summaries so that every read names its summary or why it needs none (gate 23 rule 9); eight PRs with their order, waves and start prompts. §2, §5, §7, §10, §11 and §13 carry the planned rows. Nothing built.
 - 13/11/2026 · TB · Documents in the chat, PR 2 built (Appendix A): Contract or MoU on Attach Document, read on `agreement-document-read` (Image Reading, chosen by TB), summarised, its terms on the pane's Record tab (`AiAnswerAttachment.record`, `AiAttachmentRecord`), and filed by a card: Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else Add Partner Document (`partner_documents.attach`) on the partner or lead it names. The build taught §6.18 five things, written there: a kind's grant may be `view` (decision 41 offers the tile to Partnerships view; the manifest refused anything but an action's grants), and a reader without edit gets no card; the card's kind reads as its name and the run turns it into MyCity's code, so the card schema `PartnerDocumentAdd` stays and its run sends `PartnerDocumentAttach`, which never had a `file:` reason (an Attach is no form gate 23 rule 6 counts, and no `not_offered` may name it); the reading carries `currency` and each signatory's party, so a dollar value is not read as naira and the partner's signer is told from MyCity's; a `file.<kind>` read is never replayed, so the pane opens Record or Sources for it and never a Table (an invoice's pane asked for the replay and got 404); staging had no document kinds, so its partnership setup enters §4.3's list.

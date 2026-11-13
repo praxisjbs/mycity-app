@@ -529,7 +529,7 @@ describe("the pane (engine/pane.js)", () => {
   test("Overview: the figures by key and a chart over a group, drawn from the summary's own rows; a figure or group it lacks is dropped", () => {
     const o = pane.overviewOf({ summary: "attendance.summary", figures: ["late", "nope", "minutes"], chart: { kind: "bar", title: "Late arrivals by department", group: "department", series: null } }, [summary]);
     expect(o.figures.map((f) => f.key)).toEqual(["late", "minutes"]);
-    expect(o.chart).toEqual({ kind: "bar", title: "Late arrivals by department", labels: ["Operations", "IT"], series: [{ label: "By department", values: [7, 5] }] });
+    expect(o.chart).toEqual({ kind: "bar", title: "Late arrivals by department", labels: ["Operations", "IT"], series: [{ label: "By department", values: [7, 5] }], unit: null });
     expect(pane.overviewOf({ summary: "attendance.summary", figures: [], chart: { kind: "bar", title: "x", group: "site", series: null } }, [summary]).chart).toBeNull();
     expect(pane.overviewOf({ summary: "other.summary", figures: [] }, [summary])).toBeNull();
     expect(pane.overviewOf(null, [summary])).toBeNull();
@@ -537,7 +537,7 @@ describe("the pane (engine/pane.js)", () => {
 
   test("Overview: a chart over series, and a title that names a number the chart does not carry is replaced", () => {
     const o = pane.overviewOf({ summary: "attendance.summary", figures: [], chart: { kind: "line", title: "Late by day", group: null, series: ["by_day"] } }, [summary]);
-    expect(o.chart).toEqual({ kind: "line", title: "Late by day", labels: ["2026-11-01", "2026-11-02"], series: [{ label: "Late by day", values: [3, 9] }] });
+    expect(o.chart).toEqual({ kind: "line", title: "Late by day", labels: ["2026-11-01", "2026-11-02"], series: [{ label: "Late by day", values: [3, 9] }], unit: null });
     const made = pane.overviewOf({ summary: "attendance.summary", figures: ["late"], chart: { kind: "line", title: "48 late this month", group: null, series: ["by_day"] } }, [summary]);
     expect(made.chart.title).toBe("Late by day");
     const kept = pane.overviewOf({ summary: "attendance.summary", figures: ["late"], chart: { kind: "line", title: "12 late this month", group: null, series: ["by_day"] } }, [summary]);
