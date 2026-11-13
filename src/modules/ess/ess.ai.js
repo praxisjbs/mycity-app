@@ -8,6 +8,9 @@
  * never edited once sent. Never another person's record; every read is given the caller's own
  * employee id and nothing else.
  *
+ * Summary: the person's own leave in figures, by leave type as stacked bars
+ * (docs/guides/praxis-ai.md §6.13, People, performance and queries).
+ *
  * The rest of ESS (the latest payslip, open queries, docs/guides/ess.md §9) joins
  * this manifest as each of those tabs lands.
  */
@@ -128,6 +131,17 @@ module.exports = defineManifest({
       labels: { employee_query_id: "Query", body: "Response" },
     },
   ],
+  summaries: [
+    {
+      key: "my_leave.summary",
+      description: "My own leave in figures: requests, days entitled, taken, booked, waiting and left this year; by leave type as stacked bars, days taken by month",
+      params: c.ess.MyLeaveSummaryQuery,
+      permission: ["ess", "view"],
+      run: (client, params, actor) => leave.aiMine(client, params, actor),
+      // The asker's own request is counted, an outsider's never (praxis-ai.md §6.17).
+      matrix: leaveProbe,
+    },
+  ],
   reads: [
     {
       key: "my_profile.get",
@@ -158,6 +172,7 @@ module.exports = defineManifest({
     },
     {
       key: "my_leave.list",
+      summary: "my_leave.summary",
       description: "List my own leave requests, with their dates, working days and status",
       params: c.ess.EssLeaveListQuery,
       permission: ["ess", "view"],

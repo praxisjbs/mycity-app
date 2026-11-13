@@ -66,6 +66,19 @@ const DeviceListQuery = listQuery(
 const DeviceRemove = z.object({ removal_reason: text(300) }).strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's device summary (docs/guides/praxis-ai.md §6.13, People, performance and queries):
+ * the devices in the reader's `people` scope by status or department, and who has none registered.
+ * Figures, never a row: never a device's identifier.
+ */
+const DeviceSummaryBy = z.enum(["status", "department"]);
+const DeviceSummaryQuery = z
+  .object({
+    status: DeviceStatus.optional(),
+    by: DeviceSummaryBy.default("status"),
+  })
+  .strict();
+
 const TABLES = {
   MyDevice: {
     table: "attendance_device",
@@ -86,6 +99,7 @@ const TABLES = {
   },
   DevicePage: { table: null, reason: "a page of devices" },
   DeviceListQuery: { table: null, reason: "list controls for the devices" },
+  DeviceSummaryQuery: { table: null, reason: "the filter and grouping of the assistant's device summary; figures, never a row" },
   DeviceRemove: { table: "attendance_device" },
 };
 
@@ -99,5 +113,7 @@ module.exports = {
   Device,
   DevicePage,
   DeviceListQuery,
+  DeviceSummaryBy,
+  DeviceSummaryQuery,
   DeviceRemove,
 };

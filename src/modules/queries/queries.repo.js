@@ -292,7 +292,75 @@ async function employeeOf(db, employeeId) {
   return rows[0] || null;
 }
 
+/** The assistant summary's second grouping: the column and name each `by` maps to (never the caller's words). */
+const AI_BY = Object.freeze({
+  department: { key: "COALESCE(department_id::text, 'none')", label: "COALESCE(department, 'No department')" },
+  rule: { key: "rule_key", label: "rule" },
+  raised_by: { key: "COALESCE(raised_by::text, 'rules')", label: "COALESCE(raiser, 'A Rule')" },
+});
+
+/**
+ * The queries the reader may see (guide §6.1, visibility.clause), in figures for the assistant
+ * (docs/guides/praxis-ai.md §6.13, People, performance and queries), in one statement: by status, those
+ * past their response time, closed and sanctioned, the average days to close; by department, rule or
+ * who raised them with each one's statuses for a stacked bar; raised by Lagos month. A period (the
+ * Lagos day raised) narrows it only when given. Figures, never a row: never a query's words.
+ * @param {{status?, department_id?, from?, to?, by: string}} q
+ */
+async function aiSummary(db, q, reader) {
+  const dim = AI_BY[q.by] || AI_BY.department;
+  const params = [q.status || null, q.department_id || null, q.from || null, q.to || null];
+  const v = visibility.clause(reader, params, "q.raised_by");
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT q.status, q.outcome, q.created_at, q.reviewed_at, q.response_due_at, q.raised_by,
+              e.department_id, d.name AS department,
+              COALESCE(r.name, CASE WHEN q.source = 'attendance' THEN 'Attendance Policy' END, 'Raised by a Person') AS rule,
+              COALESCE(q.query_rule_id::text, CASE WHEN q.source = 'attendance' THEN 'attendance' END, 'person') AS rule_key,
+              ${NAME("re")} AS raiser
+         FROM employee_query q
+         JOIN employee e ON e.employee_id = q.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+         LEFT JOIN query_rule r ON r.query_rule_id = q.query_rule_id
+         LEFT JOIN app_user ru ON ru.user_id = q.raised_by
+         LEFT JOIN employee re ON re.employee_id = ru.employee_id
+        WHERE ($1::text IS NULL OR q.status = $1)
+          AND ($2::uuid IS NULL OR e.department_id = $2)
+          AND ($3::date IS NULL OR (q.created_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $3::date AND $4::date)
+          ${v.and}
+     ), figures AS (
+       SELECT count(*)::int AS queries,
+              count(*) FILTER (WHERE status = 'awaiting_response')::int AS awaiting_response,
+              count(*) FILTER (WHERE status = 'awaiting_response' AND response_due_at < now())::int AS overdue,
+              count(*) FILTER (WHERE status = 'under_review')::int AS under_review,
+              count(*) FILTER (WHERE status = 'resolved')::int AS resolved,
+              count(*) FILTER (WHERE outcome = 'sanctioned')::int AS sanctioned,
+              round((avg(date_part('epoch', reviewed_at - created_at) / 86400)
+                     FILTER (WHERE status = 'resolved' AND reviewed_at IS NOT NULL))::numeric, 1)::float AS days_to_close
+         FROM x
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, min(${dim.label}) AS label,
+              count(*) FILTER (WHERE status = 'awaiting_response')::int AS awaiting_response,
+              count(*) FILTER (WHERE status = 'under_review')::int AS under_review,
+              count(*) FILTER (WHERE status = 'resolved')::int AS resolved,
+              row_number() OVER (ORDER BY count(*) DESC, min(${dim.label}), ${dim.key}) AS rank
+         FROM x GROUP BY ${dim.key}
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM x GROUP BY status) s) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'awaiting_response', awaiting_response, 'under_review', under_review, 'resolved', resolved) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'value', n) ORDER BY at)
+               FROM (SELECT to_char(created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS n FROM x GROUP BY 1) m) AS by_month`,
+    params,
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, by_status: r.by_status || [], by_dim: r.by_dim || [], by_month: r.by_month || [] };
+}
+
 module.exports = {
+  aiSummary,
+
   list,
   get,
   lock,

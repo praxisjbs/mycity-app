@@ -4,7 +4,8 @@
  * result, 25 at a time (docs/guides/performance.md §9); and, as cards the person confirms
  * (docs/guides/praxis-ai.md §6.11, decisions 33 and 40), New KPI and Edit KPI, each through the
  * service function the screen's own button calls, held to `goals.function` as their routes are. It
- * never records an actual: Record Actual and Report Month stay on KPIs and Goals.
+ * never records an actual: Record Actual and Report Month stay on KPIs and Goals. Summary: the KPIs
+ * in figures by their latest result (docs/guides/praxis-ai.md §6.13, People, performance and queries).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -73,9 +74,19 @@ module.exports = defineManifest({
   not_offered: {
     KpiEdit: "via kpis.edit: Edit KPI's own form, which never names its KPI; the card is KpiChange",
   },
+  summaries: [
+    {
+      key: "kpis.summary",
+      description: "The functions' KPIs in figures by their latest result: met, not met, N/A, not entered, met as a per cent; by function as stacked bars, by result, met by month",
+      params: c.kpis.KpiResultSummaryQuery,
+      permission: ["performance", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "kpis.list",
+      summary: "kpis.summary",
       description: "List the functions' KPIs with their target and latest monthly result (Met, Not Met or N/A)",
       params: c.kpis.KpiListQuery,
       permission: ["performance", "view"],

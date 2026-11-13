@@ -27,6 +27,7 @@ const {
   listQuery,
   Paged,
   money,
+  summaryPeriod,
 } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
 const { PlaceInput, PlaceToken } = require("./maps");
@@ -266,6 +267,22 @@ const TemporarySiteListQuery = listQuery(
   },
   ["starts_on"],
 );
+
+/**
+ * The assistant's temporary site summary (praxis-ai.md §6.13): the sites with anyone in the reader's
+ * scope on them, by purpose, state and the month they start, with the people on them. A period (the
+ * sites whose days meet it) narrows it only when asked. Figures, never a row: never an address.
+ */
+const TemporarySiteSummaryBy = z.enum(["purpose", "state", "month"]);
+const TemporarySiteSummaryQuery = z
+  .object({
+    purpose: TemporarySitePurpose.optional(),
+    state: TemporarySiteState.optional(),
+    employee_id: uuid.optional(),
+    ...summaryPeriod,
+    by: TemporarySiteSummaryBy.default("purpose"),
+  })
+  .strict();
 
 /** GET /attendance/me/temporary-sites: the person's own, waiting and current first. */
 const MyTemporarySiteListQuery = listQuery({ state: TemporarySiteState.optional() }, ["starts_on"]);
@@ -712,6 +729,36 @@ const RegisterSummary = z
     on_leave: z.number().int().min(0),
     not_in: z.number().int().min(0),
     open_exceptions: z.number().int().min(0),
+  })
+  .strict();
+
+/**
+ * The assistant's exception summary (docs/guides/praxis-ai.md §6.13, People, performance and queries):
+ * Attendance's exceptions in figures by type, status, department or person, by day or week. A period
+ * (the work date) narrows it only when asked. Figures, never a row.
+ */
+const ExceptionSummaryBy = z.enum(["type", "status", "person", "department", "day", "week"]);
+const ExceptionSummaryQuery = z
+  .object({
+    status: ExceptionStatus.optional(),
+    exception_type: ExceptionType.optional(),
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    ...summaryPeriod,
+    by: ExceptionSummaryBy.default("type"),
+  })
+  .strict();
+
+/**
+ * The assistant's summary of the person's own month (praxis-ai.md §6.13): their days by week or month
+ * as On Time, Late, Absent and On Leave, minutes late by day, their pending deductions. This month in
+ * Lagos unless a period is asked.
+ */
+const MyAttendanceSummaryBy = z.enum(["week", "month"]);
+const MyAttendanceSummaryQuery = z
+  .object({
+    ...summaryPeriod,
+    by: MyAttendanceSummaryBy.default("week"),
   })
   .strict();
 
@@ -1398,6 +1445,23 @@ const MyPayItemListQuery = listQuery(
   ["work_date"],
 );
 
+/**
+ * The assistant's pay item summary (praxis-ai.md §6.13): the deductions and overtime in figures by
+ * kind, status, department or person, minutes by month; naira only for a reader who sees pay. A period
+ * (the work date, or `month`) narrows it only when asked. Figures, never a row.
+ */
+const PayItemSummaryBy = z.enum(["kind", "status", "person", "department", "month"]);
+const PayItemSummaryQuery = z
+  .object({
+    kind: PayItemKind.optional(),
+    status: PayItemStatus.optional(),
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    ...summaryPeriod,
+    by: PayItemSummaryBy.default("kind"),
+  })
+  .strict();
+
 /** POST /attendance/pay-items/waive: up to 25 deductions at once, with the reason the person reads. */
 const PayItemWaive = z
   .object({
@@ -1639,6 +1703,10 @@ const TABLES = {
   },
   RegisterQuery: { table: null, reason: "list controls for the register" },
   AttendanceSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's attendance summary; figures, never a row" },
+  ExceptionSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's exception summary; figures, never a row" },
+  MyAttendanceSummaryQuery: { table: null, reason: "the period and grouping of the assistant's summary of the person's own days; figures, never a row" },
+  PayItemSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's pay item summary; figures, never a row" },
+  TemporarySiteSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's temporary site summary; figures, never a row" },
   RegisterRow: {
     table: null,
     reason: "one person on one day, from employee, attendance_day and the day's latest punch",
@@ -1804,6 +1872,14 @@ module.exports = {
   ExceptionDecision,
   RegisterQuery,
   AttendanceSummaryQuery,
+  ExceptionSummaryBy,
+  ExceptionSummaryQuery,
+  MyAttendanceSummaryBy,
+  MyAttendanceSummaryQuery,
+  PayItemSummaryBy,
+  PayItemSummaryQuery,
+  TemporarySiteSummaryBy,
+  TemporarySiteSummaryQuery,
   RegisterRow,
   RegisterPage,
   RegisterSummaryQuery,

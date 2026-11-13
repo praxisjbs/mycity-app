@@ -200,6 +200,21 @@ const KpiImportRow = z
   .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's KPI summary (docs/guides/praxis-ai.md §6.13, People, performance and queries): the
+ * active KPIs of the functions the reader reaches by their latest result to a quarter's end, by
+ * function or result, met as a per cent by month. KpiSummaryQuery is the screen's own month's figures.
+ * Figures, never a row.
+ */
+const KpiResultSummaryBy = z.enum(["function", "result"]);
+const KpiResultSummaryQuery = z
+  .object({
+    period_id: uuid.optional(),
+    department_id: uuid.optional(),
+    by: KpiResultSummaryBy.default("function"),
+  })
+  .strict();
+
 const TABLES = {
   KpiMonth: {
     table: "kpi_month",
@@ -218,6 +233,7 @@ const TABLES = {
   KpiUnit: { table: null, reason: "a unit in use on KPIs, key results or scorecard lines, and how many carry it" },
   KpiUnitPage: { table: null, reason: "a page of the units in use" },
   KpiSummaryQuery: { table: null, reason: "which function and month the KPIs figures count" },
+  KpiResultSummaryQuery: { table: null, reason: "the quarter, function and grouping of the assistant's KPI summary; figures, never a row" },
   KpiSummary: { table: null, reason: "the KPIs figures, counted over the active KPIs" },
   KpiLineRef: {
     table: "employee_target",
@@ -255,6 +271,8 @@ module.exports = {
   KpiUnit,
   KpiUnitPage,
   KpiSummaryQuery,
+  KpiResultSummaryBy,
+  KpiResultSummaryQuery,
   KpiSummary,
   KpiLineRef,
   KpiDetail,

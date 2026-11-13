@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #9 My Attendance, #87 Work Location Requests, #88 My Devices, #25 Attendance, #27 Devices, #28 Worksites, the Work Schedule tab of the employee record (#24 Employees), Home · Overview's Add Work Site (#1), and the Attendance policy's worksheet on Knowledge Hub · Policies (#62, `policies.md`). #89 Policy Updates moved to `policies.md`; #73 Settings · Attendance Policy is dropped (TB, 20/10/2026) |
 | Status | Agreed |
-| Last changed | 26/10/2026 |
+| Last changed | 13/11/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): TB's decisions of 20/10/2026 (§1.1);
 MILESTONES §6.2 and A22, A26; REUSE_MAP §2.2 (the policy model and the donor files); the 12 and 13
@@ -1339,6 +1339,24 @@ never leave identity, and no log line carries them.
   department or site the late days (20), most minutes late (10) and absent days (20); by day, week
   or month the same as series of the newest 60 buckets. One SQL over `attendance_day`
   (`attendance.repo.summary`), figures never rows, inside the assistant's 3 second read timeout.
+- **AI summaries of the lists** (`attendance.ai.js`, `devices.ai.js`; `praxis-ai.md` §6.13, People,
+  performance and queries; Appendix B PR 7, built 13/11/2026), each one SQL with its list's own
+  reach, figures never rows. `exceptions.summary` (`people` view, the reader's scope): exceptions by
+  type and by department stacked Open, Accepted, Rejected and Corrected (the last two only where some
+  row has one), or by person; by status; by day or week (`attendance.repo.aiExceptions`).
+  `pay_items.summary`: the deductions and overtime by kind stacked by status, by status, by
+  department stacked by kind or by person (minutes), minutes deducted (not waived) and overtime
+  minutes kept by month; their naira only for a reader whose role sees pay, left out otherwise as
+  `pay_amount` is masked (`attendance.pay.aiSummary`). `temporary_sites.summary`: the sites with
+  anyone in scope on them by purpose, state and the month they start, the people on a site today and
+  the person-days, never an address (`attendance.sites.aiSummary`). `devices.summary`: devices by
+  status and by department stacked Registered, New and Removed, the people with one registered and
+  the active staff with none (`devices.repo.aiSummary`). `my_attendance.summary` (`ess` view, the
+  person's own): this month unless asked, days by week or month stacked On Time, Late, Absent and On
+  Leave, minutes late by day, deductions pending. A period narrows the three lists' summaries only
+  when asked, as the lists show every record. The reads name them (`attendance.exceptions`,
+  `attendance.pay_items`, `attendance.temporary_sites`, `devices.list`; `attendance.my_days` and
+  `attendance.my_pay_items` name `my_attendance.summary`).
 - **AI reads** (`attendance.ai.js`): `attendance.my_days` (ess view, own), `attendance.register`
   and `attendance.exceptions` (`people` view, the caller's scope; the register's description tells
   the model that Not In is a working day still open with no clock-in and Absent a closed one, so
@@ -1665,6 +1683,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · §9: Praxis AI's summaries of the exceptions, the pay items, the temporary sites, the devices and the person's own month (`praxis-ai.md` Appendix B PR 7), each within its list's own scope, pay items' naira only for a reader who sees pay. No screen of Attendance changed.
 - 09/11/2026 · JP · M6 PR 2 (`payroll.md` §4.4, §6.9): the functions payroll calls are built in `attendance.pay.js`. `takeIntoRun(client, { run_id, items, actor })` freezes the pending deductions and confirmed overtime a run counted (`in_run`, the run's id), pricing an item that had no amount; it freezes all or none (409 `RUN_CHANGED` when one was waived, cut or taken since). `releaseFromRun(client, run_id, actor)` gives them back (a deduction to `pending`, overtime to `confirmed`), safe twice. `monthRates(db, person, date, shared)` and `monthContext` expose the working-days loop `ratesFor` prices a day with (which now calls it), so payroll and attendance count a month the same way; `pricesOf` prices items that have none. Two events, `attendance.pay_items_taken` and `attendance.pay_items_released`, one per call with a count and never an amount (§7). No screen and no rule of attendance changed.
 - 08/11/2026 · JP · §6.17: payroll takes a pending item `in_run` at the run's Submit (it read "until the run is locked" in T4), and the new functions payroll will call (`takeIntoRun`, `releaseFromRun`, `monthRates`) are named in `docs/guides/payroll.md` §4.4. No behaviour of attendance changed yet.
 - 03/11/2026 · JP · Approve Overtime and Add Work Site are Praxis AI cards (`attendance.ai.js`, §9;

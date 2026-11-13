@@ -25,6 +25,7 @@ const {
   Paged,
   textOfHtml,
   recordId,
+  summaryPeriod,
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { RichTextBlock, SignaturePng } = require("./policies");
@@ -358,6 +359,21 @@ const QueryDraftOutput = z
   .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's query summary (docs/guides/praxis-ai.md §6.13, People, performance and queries): the
+ * queries the reader may see (guide §6.1) by status, department, rule or who raised them, raised by
+ * month. A period (raised) narrows it only when asked. Figures, never a row: never a query's words.
+ */
+const QuerySummaryBy = z.enum(["status", "rule", "department", "raised_by", "month"]);
+const QuerySummaryQuery = z
+  .object({
+    status: QueryStatus.optional(),
+    department_id: uuid.optional(),
+    ...summaryPeriod,
+    by: QuerySummaryBy.default("status"),
+  })
+  .strict();
+
 const TABLES = {
   LetterSignature: { table: "letter_signature", virtual: { signature: "the vault document's PNG, as a data URL" } },
   LetterSignatureSave: { table: "letter_signature", virtual: { signature: "stored through the vault as document_id" } },
@@ -395,6 +411,7 @@ const TABLES = {
     },
   },
   QueryListQuery: { table: null, reason: "list controls and filters for the Queries list" },
+  QuerySummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's query summary; figures, never a row" },
   QueryCreate: {
     table: "employee_query",
     virtual: {
@@ -462,6 +479,8 @@ module.exports = {
   QueryPage,
   QueryDetail,
   QueryListQuery,
+  QuerySummaryBy,
+  QuerySummaryQuery,
   QueryCreate,
   QueryRaise,
   QueryDecision,

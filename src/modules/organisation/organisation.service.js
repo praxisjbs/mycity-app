@@ -1616,7 +1616,48 @@ async function aiSummary(client, params, scope, now = new Date()) {
   };
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's seat summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A seat's status as the Organogram reads it. */
+const SEAT_WORDS = Object.freeze({ filled: "Filled", vacant: "Open", closed: "Closed" });
+
+/**
+ * The structure's roles in figures, the whole structure as seats.list reads it: open and filled by
+ * department as stacked bars, by status, the people reporting to an open role and the departments
+ * whose head role is open. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   SeatSummaryQuery, parsed
+ */
+async function aiSeats(client, params) {
+  const { figure, group, stacked } = require("../../shared/ai/summary");
+  const r = await repo.aiSeats(client, { department_id: params.department_id });
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const groups = [
+    group("department", "Roles by department", stacked(r.by_dept, [{ key: "filled", label: "Filled" }, { key: "open", label: "Open" }])),
+    group("status", "Roles by status", Object.keys(SEAT_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: SEAT_WORDS[k], value: counted.get(k) }))),
+  ];
+  if (params.by === "status") groups.reverse();
+  return {
+    figures: [
+      figure("seats", "Roles", f.seats || 0),
+      figure("filled", "Filled", f.filled || 0),
+      figure("open", "Open", f.open || 0),
+      figure("closed", "Closed", f.closed || 0),
+      figure("reporting_to_open", "Reporting to an open role", f.reporting_to_open || 0),
+      figure("acting", "Departments with an acting head", f.acting || 0),
+    ],
+    groups,
+    series: [],
+    total: f.seats || 0,
+  };
+}
+
 module.exports = {
+  aiSeats,
+
   aiSummary,
   setBirthday,
   setBvnIn,

@@ -517,7 +517,52 @@ async function statusesOf(db, ids) {
   return rows;
 }
 
+/**
+ * The person's own leave in figures for the assistant (docs/guides/praxis-ai.md §6.13, People,
+ * performance and queries), in one statement over their own requests only: their requests (every one,
+ * or the year's when `asked`) and those waiting; each leave type's year as balances() reads it (the
+ * allowance, taken, booked ahead and waiting); and the days taken by Lagos month of the year.
+ * @param {string} employeeId
+ * @param {{year: number, asked: boolean, today: string}} q
+ */
+async function aiMine(db, employeeId, q) {
+  const { rows } = await db.query(
+    `WITH r AS (
+       SELECT v.leave_request_id, v.leave_type_id, v.status, v.days, v.starts_on
+         FROM (${ROWS}) v WHERE v.employee_id = $1
+     ), types AS (
+       SELECT t.leave_type_id::text AS key, t.name AS label,
+              COALESCE(b.entitled, (t.policy ->> 'days_per_year')::numeric)::float8 AS entitled,
+              COALESCE(sum(r.days) FILTER (WHERE r.status = 'approved' AND r.starts_on <= $3::date), 0)::int AS taken,
+              COALESCE(sum(r.days) FILTER (WHERE r.status = 'approved' AND r.starts_on > $3::date), 0)::int AS booked,
+              COALESCE(sum(r.days) FILTER (WHERE r.status = 'submitted'), 0)::int AS waiting
+         FROM leave_type t
+         LEFT JOIN (
+           SELECT leave_type_id, sum(opening + accrued + adjusted) AS entitled
+             FROM leave_balance
+            WHERE employee_id = $1 AND period_start >= make_date($2, 1, 1) AND period_end <= make_date($2, 12, 31)
+            GROUP BY leave_type_id
+         ) b ON b.leave_type_id = t.leave_type_id
+         LEFT JOIN r ON r.leave_type_id = t.leave_type_id AND date_part('year', r.starts_on)::int = $2
+        GROUP BY t.leave_type_id, t.name, t.policy, t.active, b.entitled
+       HAVING t.active OR count(r.leave_request_id) > 0
+     )
+     SELECT (SELECT count(*)::int FROM r WHERE NOT $4::boolean OR date_part('year', r.starts_on)::int = $2) AS requests,
+            (SELECT count(*)::int FROM r WHERE r.status = 'submitted' AND (NOT $4::boolean OR date_part('year', r.starts_on)::int = $2)) AS waiting,
+            (SELECT json_agg(row_to_json(x) ORDER BY x.label, x.key) FROM types x) AS types,
+            (SELECT json_agg(json_build_object('at', at, 'value', d) ORDER BY at)
+               FROM (SELECT to_char(r.starts_on, 'YYYY-MM') AS at, sum(r.days)::int AS d FROM r
+                      WHERE r.status = 'approved' AND r.starts_on <= $3::date AND date_part('year', r.starts_on)::int = $2
+                      GROUP BY 1) m) AS taken_by_month`,
+    [employeeId, q.year, q.today, q.asked],
+  );
+  const r = rows[0] || {};
+  return { requests: r.requests || 0, waiting: r.waiting || 0, types: r.types || [], taken_by_month: r.taken_by_month || [] };
+}
+
 module.exports = {
+  aiMine,
+
   statusesOf,
   list,
   aiSummary,

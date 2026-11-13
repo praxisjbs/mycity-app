@@ -1618,7 +1618,8 @@
       "bulk": null,
       "schema": "attendance.ExceptionListQuery",
       "schema_sha": "e385bd9773e5818d",
-      "screen": null
+      "screen": null,
+      "summary": "exceptions.summary"
     },
     {
       "key": "attendance.my_days",
@@ -1629,7 +1630,8 @@
       "bulk": null,
       "schema": "attendance.MyDayListQuery",
       "schema_sha": "f84e159555392eb2",
-      "screen": null
+      "screen": null,
+      "summary": "my_attendance.summary"
     },
     {
       "key": "attendance.my_pay_items",
@@ -1640,7 +1642,8 @@
       "bulk": null,
       "schema": "attendance.MyPayItemListQuery",
       "schema_sha": "e69f44089201b42d",
-      "screen": null
+      "screen": null,
+      "summary": "my_attendance.summary"
     },
     {
       "key": "attendance.pay_items",
@@ -1651,7 +1654,8 @@
       "bulk": null,
       "schema": "attendance.PayItemListQuery",
       "schema_sha": "58c20ade3bcb55aa",
-      "screen": null
+      "screen": null,
+      "summary": "pay_items.summary"
     },
     {
       "key": "attendance.register",
@@ -1674,7 +1678,8 @@
       "bulk": null,
       "schema": "attendance.TemporarySiteListQuery",
       "schema_sha": "a076152dc7907a08",
-      "screen": null
+      "screen": null,
+      "summary": "temporary_sites.summary"
     },
     {
       "key": "budgets.list",
@@ -1792,7 +1797,8 @@
       "bulk": null,
       "schema": "targets.CommitmentListQuery",
       "schema_sha": "9d407b52eab925fc",
-      "screen": null
+      "screen": null,
+      "summary": "commitments.summary"
     },
     {
       "key": "deals.get",
@@ -1863,7 +1869,8 @@
       "bulk": null,
       "schema": "devices.DeviceListQuery",
       "schema_sha": "0c1f7a51b222c5fb",
-      "screen": null
+      "screen": null,
+      "summary": "devices.summary"
     },
     {
       "key": "devices.mine",
@@ -2052,7 +2059,8 @@
       "bulk": null,
       "schema": "kpis.KpiListQuery",
       "schema_sha": "50148826c2b69825",
-      "screen": null
+      "screen": null,
+      "summary": "kpis.summary"
     },
     {
       "key": "leads.get",
@@ -2122,7 +2130,8 @@
       "bulk": null,
       "schema": "ess.EssLeaveListQuery",
       "schema_sha": "1669d3b6f847ca71",
-      "screen": null
+      "screen": null,
+      "summary": "my_leave.summary"
     },
     {
       "key": "my_profile.get",
@@ -2321,7 +2330,8 @@
       "bulk": null,
       "schema": "queries.QueryListQuery",
       "schema_sha": "1d2f14b107fa5a33",
-      "screen": null
+      "screen": null,
+      "summary": "queries.summary"
     },
     {
       "key": "reports.mine",
@@ -2403,7 +2413,8 @@
       "bulk": null,
       "schema": "sanctions.SanctionListQuery",
       "schema_sha": "ee303cd9a1e6b74e",
-      "screen": null
+      "screen": null,
+      "summary": "sanctions.summary"
     },
     {
       "key": "sanctions.standing",
@@ -2426,7 +2437,8 @@
       "bulk": null,
       "schema": "targets.ScorecardListQuery",
       "schema_sha": "446ff7a90e26b28d",
-      "screen": null
+      "screen": null,
+      "summary": "scorecards.summary"
     },
     {
       "key": "seats.list",
@@ -2437,7 +2449,8 @@
       "bulk": null,
       "schema": "organisation.OrgSeatListQuery",
       "schema_sha": "464d12461114e149",
-      "screen": null
+      "screen": null,
+      "summary": "seats.summary"
     },
     {
       "key": "sops.list",
@@ -4145,6 +4158,17 @@
       "screen": null
     },
     {
+      "key": "commitments.summary",
+      "kind": "summary",
+      "module_key": "performance",
+      "permission": "performance.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "targets.CommitmentStateSummaryQuery",
+      "schema_sha": "dd0a0c4f6dd01ddf",
+      "screen": null
+    },
+    {
       "key": "deductions.summary",
       "kind": "summary",
       "module_key": "payroll",
@@ -4153,6 +4177,17 @@
       "bulk": null,
       "schema": "deductions.DeductionSummaryQuery",
       "schema_sha": "95aac431e38c22d2",
+      "screen": null
+    },
+    {
+      "key": "devices.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "people.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "devices.DeviceSummaryQuery",
+      "schema_sha": "f8ede1bde80980e0",
       "screen": null
     },
     {
@@ -4175,6 +4210,17 @@
       "bulk": null,
       "schema": "organisation.EmployeeSummaryQuery",
       "schema_sha": "751f1790163d2ef0",
+      "screen": null
+    },
+    {
+      "key": "exceptions.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "people.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "attendance.ExceptionSummaryQuery",
+      "schema_sha": "e1d02aa466ef587b",
       "screen": null
     },
     {
@@ -4211,6 +4257,17 @@
       "screen": null
     },
     {
+      "key": "kpis.summary",
+      "kind": "summary",
+      "module_key": "performance",
+      "permission": "performance.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "kpis.KpiResultSummaryQuery",
+      "schema_sha": "5de4390b38917ea4",
+      "screen": null
+    },
+    {
       "key": "leave.summary",
       "kind": "summary",
       "module_key": "people",
@@ -4219,6 +4276,28 @@
       "bulk": null,
       "schema": "leave.LeaveSummaryQuery",
       "schema_sha": "69b79fd857991372",
+      "screen": null
+    },
+    {
+      "key": "my_attendance.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "attendance.MyAttendanceSummaryQuery",
+      "schema_sha": "60c1467774b53fc7",
+      "screen": null
+    },
+    {
+      "key": "my_leave.summary",
+      "kind": "summary",
+      "module_key": "ess",
+      "permission": "ess.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "ess.MyLeaveSummaryQuery",
+      "schema_sha": "2dcf13d32ccf292a",
       "screen": null
     },
     {
@@ -4277,6 +4356,17 @@
       "screen": null
     },
     {
+      "key": "pay_items.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "people.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "attendance.PayItemSummaryQuery",
+      "schema_sha": "66aa524787792ab5",
+      "screen": null
+    },
+    {
       "key": "payroll.month",
       "kind": "summary",
       "module_key": "payroll",
@@ -4296,6 +4386,17 @@
       "bulk": null,
       "schema": "payroll.PayrollTrendQuery",
       "schema_sha": "f60e7abd9631009c",
+      "screen": null
+    },
+    {
+      "key": "queries.summary",
+      "kind": "summary",
+      "module_key": "queries",
+      "permission": "queries.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "queries.QuerySummaryQuery",
+      "schema_sha": "30f36cd34729f34b",
       "screen": null
     },
     {
@@ -4321,6 +4422,39 @@
       "screen": null
     },
     {
+      "key": "sanctions.summary",
+      "kind": "summary",
+      "module_key": "queries",
+      "permission": "queries.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "sanctions.SanctionSummaryQuery",
+      "schema_sha": "b70249e34f472d91",
+      "screen": null
+    },
+    {
+      "key": "scorecards.summary",
+      "kind": "summary",
+      "module_key": "performance",
+      "permission": "performance.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "targets.ScorecardSummaryQuery",
+      "schema_sha": "ae0544a28fcdd2c6",
+      "screen": null
+    },
+    {
+      "key": "seats.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "people.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "organisation.SeatSummaryQuery",
+      "schema_sha": "8b33a64f843bea78",
+      "screen": null
+    },
+    {
       "key": "talent_pool.summary",
       "kind": "summary",
       "module_key": "recruitment",
@@ -4340,6 +4474,17 @@
       "bulk": null,
       "schema": "tasks.TaskCountsQuery",
       "schema_sha": "815712491b73aed2",
+      "screen": null
+    },
+    {
+      "key": "temporary_sites.summary",
+      "kind": "summary",
+      "module_key": "people",
+      "permission": "people.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "attendance.TemporarySiteSummaryQuery",
+      "schema_sha": "675518355527e7c1",
       "screen": null
     },
     {

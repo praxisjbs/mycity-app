@@ -219,6 +219,15 @@ const MyReviewPage = Paged(MyReview);
 const MyReviewListQuery = listQuery({}, ["month"]);
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's summary of the person's own leave (docs/guides/praxis-ai.md §6.13): their requests,
+ * and a year's days entitled, taken, booked, waiting and left by leave type, days taken by month. The
+ * year is this one unless asked; the requests are every one unless a year is asked, as My Leave lists them.
+ */
+const MyLeaveSummaryQuery = z
+  .object({ year: z.coerce.number().int().min(2000).max(2100).optional() })
+  .strict();
+
 const TABLES = {
   MyPerformance: { table: null, reason: "the caller's quarter: scorecard, check-in, commitments and an open PIP" },
   MyReview: {
@@ -259,6 +268,7 @@ const TABLES = {
     reason: "list controls for the caller's own leave requests",
   },
   EssLeaveBalanceQuery: { table: null, reason: "which year of the caller's leave to read" },
+  MyLeaveSummaryQuery: { table: null, reason: "which year the assistant's summary of the person's own leave counts; figures, never a row" },
   EssLeaveCalendarQuery: { table: null, reason: "the month the leave calendar shows" },
 };
 
@@ -271,6 +281,7 @@ module.exports = {
   EssPhotoUpload,
   EssLeaveListQuery,
   EssLeaveBalanceQuery,
+  MyLeaveSummaryQuery,
   EssLeaveCalendarQuery,
   MyPerformance,
   MyReview,

@@ -1387,7 +1387,51 @@ async function namesOf(db, ids) {
   return new Map(rows.map((r) => [r.employee_id, { display_name: r.display_name, status: r.status }]));
 }
 
+/**
+ * The structure's roles in figures for the assistant (docs/guides/praxis-ai.md §6.13, People,
+ * performance and queries), in one statement over the whole structure as seats() lists it: open,
+ * filled and closed, by department with each one's filled and open roles for a stacked bar, the
+ * people reporting to an open role, and the departments in use whose head role is open (an acting
+ * head stands in). Figures, never a row.
+ * @param {{department_id?: string}} q
+ */
+async function aiSeats(db, q) {
+  const { rows } = await db.query(
+    `WITH v AS (
+       SELECT s.org_seat_id, s.status, s.department_id, d.name AS department,
+              (SELECT count(*) FROM employee r WHERE r.line_manager_seat_id = s.org_seat_id AND r.status <> 'archived')::int AS reports
+         FROM org_seat s
+         JOIN department d ON d.department_id = s.department_id
+        WHERE ($1::uuid IS NULL OR s.department_id = $1)
+     ), figures AS (
+       SELECT count(*) FILTER (WHERE status <> 'closed')::int AS seats,
+              count(*) FILTER (WHERE status = 'filled')::int AS filled,
+              count(*) FILTER (WHERE status = 'vacant')::int AS open,
+              count(*) FILTER (WHERE status = 'closed')::int AS closed,
+              COALESCE(sum(reports) FILTER (WHERE status = 'vacant'), 0)::int AS reporting_to_open
+         FROM v
+     ), by_dept AS (
+       SELECT department_id::text AS key, min(department) AS label,
+              count(*) FILTER (WHERE status = 'filled')::int AS filled,
+              count(*) FILTER (WHERE status = 'vacant')::int AS open,
+              row_number() OVER (ORDER BY count(*) FILTER (WHERE status <> 'closed') DESC, min(department), department_id) AS rank
+         FROM v WHERE status <> 'closed' GROUP BY department_id
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT count(*)::int FROM department d JOIN org_seat hs ON hs.org_seat_id = d.head_seat_id
+              WHERE d.active AND hs.status = 'vacant' AND ($1::uuid IS NULL OR d.department_id = $1)) AS acting,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM v GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'filled', filled, 'open', open) ORDER BY rank)
+               FROM by_dept WHERE rank <= 20) AS by_dept`,
+    [q.department_id || null],
+  );
+  const r = rows[0] || {};
+  return { figures: { ...(r.figures || {}), acting: r.acting || 0 }, by_status: r.by_status || [], by_dept: r.by_dept || [] };
+}
+
 module.exports = {
+  aiSeats,
+
   EMPLOYEE_COLUMNS,
   namesOf,
   setBirthday,

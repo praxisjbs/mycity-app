@@ -6,7 +6,8 @@
  *
  * As cards the person confirms (docs/guides/praxis-ai.md §6.11, decisions 33 and 40): New Scorecard,
  * a line added or changed on Edit Lines, and Change Reviewer, each through the service function the
- * screen's own button calls; a scorecard is named by its person, a line by its words.
+ * screen's own button calls; a scorecard is named by its person, a line by its words. Summaries: both
+ * lists in figures (docs/guides/praxis-ai.md §6.13, People, performance and queries).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -165,9 +166,26 @@ module.exports = defineManifest({
     ScorecardLinesSave: "via scorecards.add_line: Edit Lines saves every line of its scorecard at once; the cards add or change one, ScorecardLineAdd and ScorecardLineChange",
     ScorecardEdit: "via scorecards.edit: Change Reviewer's own form, which never names its scorecard; the card is ScorecardChange",
   },
+  summaries: [
+    {
+      key: "scorecards.summary",
+      description: "Scorecards in figures: draft, awaiting agreement, agreed, closed, rated, the average score to date; by status, by department or reviewer, by rating",
+      params: c.targets.ScorecardSummaryQuery,
+      permission: ["performance", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+    },
+    {
+      key: "commitments.summary",
+      description: "Commitments in figures: due, on time, late, missed, rescoped, the on-time rate; by state, by department or person as stacked bars, due and on time by week",
+      params: c.targets.CommitmentStateSummaryQuery,
+      permission: ["performance", "view"],
+      run: (client, params, actor) => commitments.aiSummary(client, params, actor.scope),
+    },
+  ],
   reads: [
     {
       key: "scorecards.list",
+      summary: "scorecards.summary",
       description: "List scorecards in my scope: person, department, reviewer, status, score to date and rating",
       params: c.targets.ScorecardListQuery,
       permission: ["performance", "view"],
@@ -176,6 +194,7 @@ module.exports = defineManifest({
     },
     {
       key: "commitments.list",
+      summary: "commitments.summary",
       description: "List a month's commitments in my scope: who, what, original date, date now and state (due, on time, late, missed, rescoped)",
       params: c.targets.CommitmentListQuery,
       permission: ["performance", "view"],

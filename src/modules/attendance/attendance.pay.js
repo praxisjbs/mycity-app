@@ -765,7 +765,83 @@ async function assertCardOvertime(db, { employee_id: employeeId }, actor) {
   if (person.status !== "active") throw new AppError("NOT_EMPLOYED", "Only people who work here now are approved overtime.", 422, { employee_id: ["Not active"] });
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+const KIND_WORDS = Object.freeze({ late: "Late", early_departure: "Early Departure", absence: "Absence", overtime: "Overtime" });
+const STATUS_WORDS = Object.freeze({ pending: "Pending", waived: "Waived", confirmed: "Confirmed", cut: "Cut", in_run: "In Payroll" });
+/** A stacked bar's parts, each drawn only where some row has one. */
+const STATUS_PARTS = Object.freeze(Object.entries(STATUS_WORDS).map(([key, label]) => ({ key, label, optional: true })));
+const KIND_PARTS = Object.freeze(Object.entries(KIND_WORDS).map(([key, label]) => ({ key, label, optional: true })));
+
+/**
+ * The deductions and overtime in the reader's `people` scope, in figures: every item unless a period
+ * (the work date, or a `month`) is asked, as the list shows them; by kind stacked by status, by status,
+ * by department stacked by kind or by person (top 10, minutes) when asked, minutes by month. The naira
+ * figures only for a reader whose role sees pay, left out (never zero) for anyone else, as the list
+ * masks `pay_amount` (decision 58). Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   PayItemSummaryQuery, parsed
+ * @param {object} actor    the asking person with their `people` scope
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, top, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const { canSee } = require("../../shared/rbac/field-mask");
+  const period = askedPeriod(params, now);
+  const [r, pay] = await Promise.all([
+    repo.aiPayItems(
+      client,
+      {
+        kind: params.kind,
+        status: params.status,
+        department_id: params.department_id,
+        employee_id: params.employee_id,
+        from: period && period.from,
+        to: period && period.to,
+        by: params.by,
+      },
+      actor.scope,
+    ),
+    canSee(client, actor, "employee.salary"),
+  ]);
+  const f = r.figures;
+  const figures = [
+    figure("items", "Items", f.items || 0),
+    figure("late", "Late", f.late || 0),
+    figure("early_departure", "Early departure", f.early_departure || 0),
+    figure("absence", "Absence", f.absence || 0),
+    figure("overtime", "Overtime", f.overtime || 0),
+    figure("deducted_minutes", "Minutes deducted", f.deducted_minutes || 0, "minutes"),
+    figure("overtime_minutes", "Overtime minutes", f.overtime_minutes || 0, "minutes"),
+    figure("pending", "Pending", f.pending || 0),
+    figure("waived", "Waived", f.waived || 0),
+    figure("confirmed", "Confirmed", f.confirmed || 0),
+  ];
+  if (pay) figures.push(figure("deducted_amount", "Deductions", m.toWire(f.deducted_amount || "0.00"), "ngn"), figure("overtime_amount", "Overtime pay", m.toWire(f.overtime_amount || "0.00"), "ngn"));
+  const groups = {
+    kind: group("kind", "Items by kind", stacked(r.by_kind.map((x) => ({ ...x, label: KIND_WORDS[x.key] || x.key })), STATUS_PARTS)),
+    status: group("status", "Items by status", r.by_status.map((x) => ({ key: x.key, label: STATUS_WORDS[x.key] || x.key, value: x.value }))),
+    dim:
+      params.by === "person"
+        ? top("person", "Minutes by person", r.by_minutes)
+        : group("department", "Items by department", stacked(r.by_dim, KIND_PARTS)),
+  };
+  const first = params.by === "status" ? "status" : params.by === "person" || params.by === "department" ? "dim" : "kind";
+  return {
+    figures,
+    groups: [groups[first], ...Object.keys(groups).filter((k) => k !== first).map((k) => groups[k])],
+    series: [
+      series("deducted_minutes", "Minutes deducted by month", r.by_month.map((p) => ({ at: p.at, value: p.deducted }))),
+      series("overtime_minutes", "Overtime minutes by month", r.by_month.map((p) => ({ at: p.at, value: p.overtime }))),
+    ],
+    total: f.items || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
+
   DEDUCTIONS,
   KINDS,
   NO_LONGER,

@@ -30,6 +30,7 @@ const {
   recordId,
   changesBeside,
   nothingOn,
+  summaryPeriod,
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { EvidenceItem } = require("./queries");
@@ -254,6 +255,22 @@ const SanctionIssuedEmailVars = z
   .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's sanction summary (docs/guides/praxis-ai.md §6.13, People, performance and queries):
+ * the sanctions whose query the reader may see by step of the chain, status or department, issued by
+ * month; fines in naira only for a reader who sees pay. A period (proposed) narrows it only when asked.
+ * Figures, never a row.
+ */
+const SanctionSummaryBy = z.enum(["step", "status", "department", "month"]);
+const SanctionSummaryQuery = z
+  .object({
+    status: SanctionStatus.optional(),
+    department_id: uuid.optional(),
+    ...summaryPeriod,
+    by: SanctionSummaryBy.default("step"),
+  })
+  .strict();
+
 const TABLES = {
   ConsequenceStep: {
     table: "consequence_step",
@@ -290,6 +307,7 @@ const TABLES = {
     },
   },
   SanctionListQuery: { table: null, reason: "list controls and filters for Sanction History" },
+  SanctionSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's sanction summary; figures, never a row" },
   SanctionApprove: {
     table: "sanction",
     virtual: { signature: "the drawn PNG, stored through the vault as signature_document_id, signed_by the approver" },
@@ -330,6 +348,8 @@ module.exports = {
   SanctionApprove,
   SanctionReject,
   SanctionListQuery,
+  SanctionSummaryBy,
+  SanctionSummaryQuery,
   SanctionsSummary,
   SanctionStandingQuery,
   SanctionStanding,

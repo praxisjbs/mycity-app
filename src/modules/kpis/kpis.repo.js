@@ -198,4 +198,63 @@ const inUse = async (db, id) =>
 /** A KPI gone with an import that is reverted; its months and former codes go with it (ON DELETE CASCADE). */
 const remove = (client, id) => client.query("DELETE FROM kpi_definition WHERE kpi_definition_id = $1", [id]);
 
-module.exports = { list, summary, units, get, ofDepartment, months, lines, codesWithPrefix, insert, update, upsertMonth, month, findByCode, inUse, remove };
+/**
+ * The active KPIs in figures for the assistant (docs/guides/praxis-ai.md §6.13, People, performance and
+ * queries), in one statement over the functions the reader reaches (§6.23): each KPI's latest result on
+ * or before `until` (a quarter's end; the latest of all when null), as the list reads it: met, not met,
+ * N/A or not entered; by function with each one's results for a stacked bar; and the results recorded
+ * by month, met of those met or not met. Figures, never a row.
+ * @param {{until: string|null, department_id?: string}} q
+ */
+async function aiSummary(db, q, reach = visibility.EVERYTHING) {
+  const params = [q.until || null, q.department_id || null];
+  const readable = visibility.departmentReadable(reach, "k.department_id", params);
+  const { rows } = await db.query(
+    `WITH k AS (
+       SELECT k.kpi_definition_id, k.department_id, d.name AS department,
+              (SELECT m.result FROM kpi_month m
+                WHERE m.kpi_definition_id = k.kpi_definition_id
+                  AND m.month = (SELECT max(m2.month) FROM kpi_month m2
+                                  WHERE m2.kpi_definition_id = k.kpi_definition_id
+                                    AND ($1::date IS NULL OR m2.month <= $1::date))) AS result
+         FROM kpi_definition k
+         LEFT JOIN department d ON d.department_id = k.department_id
+        WHERE k.department_id IS NOT NULL AND k.active
+          AND ($2::uuid IS NULL OR k.department_id = $2)
+          AND ${readable}
+     ), figures AS (
+       SELECT count(*)::int AS kpis,
+              count(*) FILTER (WHERE result = 'met')::int AS met,
+              count(*) FILTER (WHERE result = 'not_met')::int AS not_met,
+              count(*) FILTER (WHERE result = 'na')::int AS na,
+              count(*) FILTER (WHERE result IS NULL)::int AS not_entered
+         FROM k
+     ), by_function AS (
+       SELECT department_id::text AS key, min(department) AS label,
+              count(*) FILTER (WHERE result = 'met')::int AS met,
+              count(*) FILTER (WHERE result = 'not_met')::int AS not_met,
+              count(*) FILTER (WHERE result = 'na')::int AS na,
+              count(*) FILTER (WHERE result IS NULL)::int AS not_entered,
+              row_number() OVER (ORDER BY count(*) DESC, min(department), department_id) AS rank
+         FROM k GROUP BY department_id
+     ), by_month AS (
+       SELECT to_char(m.month, 'YYYY-MM') AS at,
+              count(*) FILTER (WHERE m.result = 'met')::int AS met,
+              count(*) FILTER (WHERE m.result IN ('met', 'not_met'))::int AS judged
+         FROM kpi_month m JOIN k ON k.kpi_definition_id = m.kpi_definition_id
+        WHERE $1::date IS NULL OR m.month <= $1::date
+        GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'met', met, 'not_met', not_met, 'na', na, 'not_entered', not_entered) ORDER BY rank)
+               FROM by_function WHERE rank <= 20) AS by_function,
+            (SELECT json_agg(row_to_json(x) ORDER BY x.at) FROM by_month x) AS by_month`,
+    params,
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, by_function: r.by_function || [], by_month: r.by_month || [] };
+}
+
+module.exports = {
+  aiSummary,
+ list, summary, units, get, ofDepartment, months, lines, codesWithPrefix, insert, update, upsertMonth, month, findByCode, inUse, remove };

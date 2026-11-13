@@ -850,7 +850,7 @@ date, the branch and the PR when it merges.
 - [x] 13/11/2026 · PR 4 · Finance and pay summaries: `expenses.summary`, `requisitions.summary`, `disbursements.summary`, `payroll.month` by department and status, `payroll.trend`, `deductions.summary`, `my_pay.summary`; ten reads off the gaps file (built in its own chat on `claude/serene-shannon-ek7yft`)
 - [x] 13/11/2026 · PR 5 · Recruitment and onboarding summaries: vacancies, candidates, interviews, assessments, offers, onboarding and the talent pool, the matrix's summary probes (built on `claude/affectionate-sagan-vxaysr`)
 - [ ] PR 6 · Partnerships summaries (`m10/summaries-partnerships`)
-- [ ] PR 7 · People, performance and queries summaries (`m10/summaries-people`)
+- [x] 13/11/2026 · PR 7 · People, performance and queries summaries: exceptions, pay items, temporary sites, devices, seats, my attendance, my leave, KPIs, scorecards, commitments, queries and sanctions; thirteen reads off the gaps file (built in its own chat on the session's branch `ccr-3a67294a-v7s2ck` rather than `m10/summaries-people`)
 - [ ] PR 8 · Workspace, Knowledge Hub, Community, Home and Settings summaries; the gaps file deleted (`m10/summaries-close`)
 - [ ] On staging: the budget question by department draws stacked bars, and its Download PDF opens on the letterhead
 
@@ -867,6 +867,21 @@ date, the branch and the PR when it merges.
 ---
 
 ## 8 · Log
+
+- 13/11/2026 · JP · Charts in the Overview, PR 7 built (§6.12): twelve summaries, each one SQL with its
+  list's own reach (Attendance's and Devices' on the employee, the whole structure for Seats, the
+  person's own for the two `my_` summaries, the functions reached for KPIs, the scorecards and
+  commitments in scope, `queries.md` §6.1 for queries and sanctions); thirteen reads named and off
+  `scripts/check/ai-summary-gaps.json` (18 left, PR 6's and PR 8's); twelve evaluation cases;
+  `tests/integration/ai-summaries-people.test.js`. Found on the way and written into `praxis-ai.md`
+  §6.13 before the code: the planned table's states were not the data's (an exception is Open or
+  Accepted, Rejected or Corrected; a device Registered, New or Removed; a seat has no acting state,
+  a department does); a scorecard's score is a fraction; `KpiSummaryQuery` and
+  `CommitmentSummaryQuery` were the screens' (`KpiResultSummaryQuery`, `CommitmentStateSummaryQuery`).
+  `my_leave.summary` carries its list's probe, which doubled the matrix's leave requests and ran the
+  outsider out of Annual days, so the matrix probes with Unpaid leave. Staff are offered seven more
+  summaries, so `ai-summaries.test.js`'s list gains them. The container again lacked pgvector
+  (installed by hand after `apt-get update`), Node 20 (`node@20` in the scratchpad) and `node_modules`.
 
 - 13/11/2026 · JP · Charts in the Overview, PR 5 built (§6.12): seven summaries in the recruitment
   modules' repos, their seven reads off the gaps file, `askedPeriod` and `stacked` in

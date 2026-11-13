@@ -528,7 +528,58 @@ async function assertCardRespond(db, employeeId, id) {
   if (!row.can_respond) throw new AppError("QUERY_NOT_OPEN", "This query no longer takes a response", 409, { employee_query_id: ["Already answered"] });
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A query's status as its pill reads, and a grouping's parts. */
+const STATUS_WORDS = Object.freeze({ awaiting_response: "Awaiting Response", under_review: "Under Review", resolved: "Closed" });
+const STATUS_PARTS = Object.freeze([
+  { key: "awaiting_response", label: "Awaiting Response" },
+  { key: "under_review", label: "Under Review" },
+  { key: "resolved", label: "Closed" },
+]);
+const DIM_WORDS = Object.freeze({ department: "Queries by department", rule: "Queries by rule", raised_by: "Queries by who raised them" });
+
+/**
+ * The queries the reader may see (§6.1), in figures: every one unless a period (raised) is asked, as
+ * the list shows them; by status, by department, rule or who raised them as stacked bars, raised by
+ * month. Never a query's subject, details or response. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   QuerySummaryQuery, parsed
+ * @param {object} actor    the asking person with their `queries` scope
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const by = DIM_WORDS[params.by] ? params.by : "department";
+  const r = await repo.aiSummary(
+    client,
+    { status: params.status, department_id: params.department_id, from: period && period.from, to: period && period.to, by },
+    visibility.readerOf(actor.scope, actor),
+  );
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const groups = [
+    group("status", "Queries by status", Object.keys(STATUS_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATUS_WORDS[k], value: counted.get(k) }))),
+    group(by, DIM_WORDS[by], stacked(r.by_dim, STATUS_PARTS)),
+  ];
+  if (params.by !== "status" && params.by !== "month") groups.reverse();
+  const figures = [
+    figure("queries", "Queries", f.queries || 0),
+    figure("awaiting_response", "Awaiting response", f.awaiting_response || 0),
+    figure("overdue", "Past the response time", f.overdue || 0),
+    figure("under_review", "Under review", f.under_review || 0),
+    figure("resolved", "Closed", f.resolved || 0),
+    figure("sanctioned", "Sanctioned", f.sanctioned || 0),
+  ];
+  if (f.days_to_close !== null && f.days_to_close !== undefined) figures.push(figure("days_to_close", "Average days to close", f.days_to_close, "days"));
+  return { figures, groups, series: [series("raised", "Queries raised by month", r.by_month)], total: f.queries || 0 };
+}
+
 module.exports = {
+  aiSummary,
+
   RESPONSE_HOURS,
   list,
   summary,
