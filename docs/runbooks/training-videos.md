@@ -269,9 +269,9 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
 17. **A tab's name carries its count.** Once a case waits, the Onboarding tab reads "Onboarding 1":
     match a tab by its start (`{ name: /^Onboarding/ }`), never exactly.
 18. **The public pages' write limit.** go.mycityapp.io allows 20 writes a minute from one address
-    (`RATE_LIMIT_PUBLIC_WRITES_PER_MIN`), and Upload Documents spends two a document. A phone shot that
-    writes starts in a fresh minute (`freshMinute()` in `m5-onboarding-2.js`); the signing page's code
-    also waits a minute between sends. A retake inside the minute meets "Too many requests".
+    (`RATE_LIMIT_PUBLIC_WRITES_PER_MIN`). Upload Documents no longer counts against it: its writes have a
+    limit of their own, 60 a minute a link (AJ, 12/11/2026), so `freshMinute()` in `m5-onboarding-2.js`
+    is no longer needed for it. The signing page's code still waits a minute between sends.
 19. **One real day.** A record's dates are stamped by the server, so a scene never runs a job "as"
     another day: the steps would read Done today under a start date weeks away. M5's hire starts on
     the filming day, and the morning's dispatch is run by hand that day (`morningRun()`); film both

@@ -439,7 +439,7 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     expect((await h.as("ops").post("/recruitment/offers").send(terms(appId))).status).toBe(201);
   }, 60_000);
 
-  test("Withdraw stops the link; Not Progressing withdraws the application's open offer", async () => {
+  test("Withdraw ends the link (read only, on Offer Withdrawn); Not Progressing withdraws the application's open offer", async () => {
     const appId = await applicant("Kemi");
     const offer = (await h.as("ops").post("/recruitment/offers").send(terms(appId))).body;
     await approved(offer.offer_id);
@@ -448,7 +448,8 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     const out = await h.as("ops").post(`/recruitment/offers/${offer.offer_id}/withdraw`).send({ reason: "The role was put on hold." });
     expect(out.status).toBe(200);
     expect(out.body).toMatchObject({ status: "withdrawn", end_reason: "The role was put on hold." });
-    expect((await pub().get(`/sign/${t}`)).status).toBe(404);
+    // The link opens on Offer Withdrawn, read only, without the letter (AJ, 13/11/2026).
+    expect((await pub().get(`/sign/${t}`)).body).toMatchObject({ state: "withdrawn", letter: [] });
     expect(await one("SELECT stage FROM application WHERE application_id = $1", [appId])).toEqual({ stage: "shortlist" });
 
     const other = await applicant("Femi");

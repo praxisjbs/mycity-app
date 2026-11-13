@@ -9,7 +9,7 @@ format: markdown
 
 [Send Your Documents]({{ documents_url }})
 
-{{#if due_on}}Please send it by {{ longdate due_on }}. {{/if}}The link is for you alone.
+{{#if due_on}}Please {{#if guarantor_name}}do this{{else}}send it{{/if}} by {{ longdate due_on }}. {{/if}}The link is for you alone.
 
 If the link does not open, copy this address into your browser: {{ documents_url }}
 

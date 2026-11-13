@@ -691,14 +691,20 @@ async function sealIn(client, ctx) {
       reference: ctx.verify_reference,
     },
   });
+  // Filed on the hire: acceptance made their employee record in the signing transaction, so the
+  // signed offer is on their Documents tab (Employee 360) with the contract and what they sent.
+  const kase = await onboarding.caseForOffer(client, o.offer_id);
   const doc = await documents.generate(client, {
     doc_type: DOC_TYPE,
     entity: { type: SUBJECT, id: o.offer_id },
+    subject_employee_id: (kase && kase.employee_id) || null,
     data: vars,
     actor: null,
     date: vars.date,
     template_version: o.terms_version,
   });
+  // The sealed copy takes the place of the letter it was signed on, kept as its first version.
+  await vault.follow(client, { document_id: doc.document_id, supersedes_id: ctx.request.document_id, sealed: true });
   await repo.stamp(client, o.offer_id, { document_id: doc.document_id });
   return doc;
 }

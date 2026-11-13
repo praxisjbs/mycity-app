@@ -38,10 +38,10 @@ type DocumentType = SigningView["document_type"];
  * The page's words follow the document it signs (docs/guides/partnerships.md §13.2): an offer of
  * employment or a contract for a candidate, a partnership agreement for a partner's signatory.
  */
-const WORDS: Record<DocumentType, { heading: string; read: string; ready: string; label: string; sign: string; decline: string; reason: string; back: string; signed: string; declined: string; expired: string; withdrawn: string; told: string }> = {
-  offer_letter: { heading: "Offer of Employment", read: "Read the Letter", ready: "Your offer, ready to sign.", label: "The offer letter", sign: "Accept and Sign", decline: "Decline the Offer", reason: "Reason for Declining", back: "Back to the Offer", signed: "Offer Signed", declined: "Offer Declined", expired: "This Offer Has Expired", withdrawn: "Offer Withdrawn", told: "We told the hiring team. Thank you for letting us know." },
-  employment_contract: { heading: "Employment Contract", read: "Read the Contract", ready: "Your contract, ready to sign.", label: "The contract", sign: "Accept and Sign", decline: "Decline to Sign", reason: "Reason for Declining", back: "Back to the Contract", signed: "Contract Signed", declined: "Contract Declined", expired: "This Contract Has Expired", withdrawn: "Contract Withdrawn", told: "We told the People team. Thank you for letting us know." },
-  agreement: { heading: "Partnership Agreement", read: "Read the Agreement", ready: "Your agreement, ready to sign.", label: "The agreement", sign: "Sign Agreement", decline: "Decline to Sign", reason: "Reason for Declining", back: "Back to the Agreement", signed: "Agreement Signed", declined: "Agreement Declined", expired: "This Link Has Expired", withdrawn: "Agreement Withdrawn", told: "We told the partnerships team. Thank you for letting us know." },
+const WORDS: Record<DocumentType, { heading: string; read: string; ready: string; done: string; closed: string; label: string; sign: string; decline: string; reason: string; back: string; signed: string; declined: string; expired: string; withdrawn: string; told: string }> = {
+  offer_letter: { heading: "Offer of Employment", read: "Read the Letter", ready: "Your offer, ready to sign.", done: "Your offer, signed.", closed: "This offer is closed.", label: "The offer letter", sign: "Accept and Sign", decline: "Decline the Offer", reason: "Reason for Declining", back: "Back to the Offer", signed: "Offer Signed", declined: "Offer Declined", expired: "This Offer Has Expired", withdrawn: "Offer Withdrawn", told: "We told the hiring team. Thank you for letting us know." },
+  employment_contract: { heading: "Employment Contract", read: "Read the Contract", ready: "Your contract, ready to sign.", done: "Your contract, signed.", closed: "This contract is closed.", label: "The contract", sign: "Accept and Sign", decline: "Decline to Sign", reason: "Reason for Declining", back: "Back to the Contract", signed: "Contract Signed", declined: "Contract Declined", expired: "This Contract Has Expired", withdrawn: "Contract Withdrawn", told: "We told the People team. Thank you for letting us know." },
+  agreement: { heading: "Partnership Agreement", read: "Read the Agreement", ready: "Your agreement, ready to sign.", done: "Your agreement, signed.", closed: "This agreement is closed.", label: "The agreement", sign: "Sign Agreement", decline: "Decline to Sign", reason: "Reason for Declining", back: "Back to the Agreement", signed: "Agreement Signed", declined: "Agreement Declined", expired: "This Link Has Expired", withdrawn: "Agreement Withdrawn", told: "We told the partnerships team. Thank you for letting us know." },
 };
 
 /** The three steps in the aside: the document is read, the email confirmed, then signed. */
@@ -74,7 +74,7 @@ export function SignOffer({ token }: { token: string }) {
       layout="split"
       name={name}
       line={d ? `${w.heading}, ${d.reference}` : undefined}
-      text={w.ready}
+      text={!d || d.state === "awaiting" ? w.ready : d.state === "signed" ? w.done : w.closed}
       paragraph={d ? `For ${d.signer_name}, from ${d.company}.${d.expires_at ? ` It expires on ${formatDate(d.expires_at)}.` : ""}` : undefined}
       steps={{ items: stepsOf(d?.document_type ?? "offer_letter"), at: d?.code_verified ? 2 : sent ? 1 : 0, complete: d != null && d.state === "signed" }}
     >

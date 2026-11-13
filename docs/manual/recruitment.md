@@ -768,7 +768,7 @@ If one rejects it, it comes back as **Draft** with their reason under **Approval
 
 ### Approve or reject an offer {#recruitment-offers-approve}
 
-You approve an offer only when it waits for you. It is also on My Approvals.
+You approve an offer only when it waits for you. The bell tells you when it does.
 
 1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
 2. Read the pay and the reason if it is outside the range. Press **View Letter** to read the letter.
@@ -827,7 +827,7 @@ the address with them and use **Change Email** or **Resend Offer**.
 1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
 2. Press **Withdraw Offer**, type the **Reason** and press **Withdraw Offer**.
 
-Its link stops working. An offer still **With Approval** can be withdrawn only by who submitted it,
+Its link now only says *Offer Withdrawn*. An offer still **With Approval** can be withdrawn only by who submitted it,
 or the CEO. An accepted offer cannot be withdrawn.
 
 ### Offer settings {#recruitment-offers-settings needs="recruitment edit"}

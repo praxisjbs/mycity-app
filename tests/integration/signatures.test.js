@@ -283,16 +283,22 @@ describeDb("Signatures against the real migrations", () => {
     expect((await pub().get(`/sign/${resent[0].token}`)).status).toBe(200);
   });
 
-  test("withdrawn and lapsed requests end, and their links stop working", async () => {
+  test("withdrawn and lapsed requests end: their links say so, read only, without the document", async () => {
     const withdrawn = await sendForSignature({ reference: "OFF-0904" });
     await tx((client) => signatures.endFor(client, { user_id: h.people.ops.user_id }, { subject_type: SUBJECT, subject_id: withdrawn.subjectId, reason: "Role closed" }));
-    expect((await pub().get(`/sign/${withdrawn.token}`)).status).toBe(404);
+    // Opens on Offer Withdrawn (AJ, 13/11/2026), shows nothing of the letter, and takes nothing.
+    const ended = await pub().get(`/sign/${withdrawn.token}`);
+    expect(ended.status).toBe(200);
+    expect(ended.body).toMatchObject({ state: "withdrawn", letter: [], blocks: null });
+    expect((await pub().post(`/sign/${withdrawn.token}/code`).send({})).body.error.code).toBe("NOT_OPEN");
+    expect((await pub().post(`/sign/${withdrawn.token}/decline`).send({ reason: "Too late now" })).body.error.code).toBe("NOT_OPEN");
+    expect((await pub().get(`/sign/${withdrawn.token}/document`)).status).toBe(404);
 
     const lapsed = await sendForSignature({ reference: "OFF-0905" });
     await pool.query("UPDATE signature_request SET expires_at = now() - interval '1 minute' WHERE signature_request_id = $1", [lapsed.signature_request_id]);
     const out = await signatures.expireLapsed();
     expect(out.ended).toBeGreaterThanOrEqual(1);
     expect((await one("SELECT status FROM signature_request WHERE signature_request_id = $1", [lapsed.signature_request_id])).status).toBe("expired");
-    expect((await pub().get(`/sign/${lapsed.token}`)).status).toBe(404);
+    expect((await pub().get(`/sign/${lapsed.token}`)).body).toMatchObject({ state: "expired", letter: [] });
   });
 });

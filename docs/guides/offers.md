@@ -279,7 +279,7 @@ employee record (masked, never sent to an AI model).
 - The company signs an offer when it is approved, before it is sent; the candidate signs second.
 - An offer is approved before it is sent; the flow is the one active when the offer was submitted (the instance keeps its definition).
 - Withdrawing an offer still with its approval withdraws the approval too, which only its submitter or the CEO may do (the approval engine's rule); Not Progressing withdraws it as its submitter.
-- An unsigned offer lapses at `expires_at`: `signature-reminders` ends its signature request and the offer becomes `expired`; the link stops working. Default expiry 15 days; a link lives at most 90 days. There is no offer job of its own.
+- An unsigned offer lapses at `expires_at`: `signature-reminders` ends its signature request and the offer becomes `expired`; the link then opens only on *This Offer Has Expired*, read only, without the letter. Default expiry 15 days; a link lives at most 90 days. There is no offer job of its own.
 - Declined, expired or withdrawn ends the offer; a new offer may be made for the same application.
 - Not Progressing (M4) or Close Vacancy revokes every open `offer.sign` and `onboarding.upload` token of that application (an outbox handler on `application.not_progressed`); Not Progress All never touches an application at `offer` or later (GE).
 - Every signature row holds `content_hash` (over the canonical payload, recomputable) and `artifact_hash` (over the stored bytes the vault returns). The verify page reports both verdicts (A12).
@@ -339,7 +339,7 @@ employee record (masked, never sent to an AI model).
 | `signature.completed` | the last signer signed | outbox: the sealed copy generated with the signatures, the certificate and the QR (`signatures.signed-pdf`) |
 | `document.generated` (a sealed copy) | the worker rendered it | its stored bytes' hash on every signature row (`artifact_hash`); `signature.sealed` |
 | `signature.sealed` | | every signer mailed the sealed copy (`signature-completed`), except where the signed record's module words its own: the candidate of an offer gets `offer-signed` with the copy |
-| `offer.declined`, `offer.expired`, `offer.withdrawn` | the candidate declines; the request lapses; Withdraw or Not Progressing | declined and expired tell the owner; the links stop working |
+| `offer.declined`, `offer.expired`, `offer.withdrawn` | the candidate declines; the request lapses; Withdraw or Not Progressing | declined and expired tell the owner; the links open read only on how it ended (*Offer Declined*, *This Offer Has Expired*, *Offer Withdrawn*), without the letter, and take nothing |
 | `onboarding.opened` | at acceptance, in the signing transaction | tells the owner; the outbox makes the Upload Documents link and mails `onboarding-documents` |
 | `onboarding.link_sent` | Send Reminder | audit (the link is made and mailed by the same step) |
 | `onboarding.privacy_acknowledged`, `.bvn_entered`, `.address_entered` | the hire on their page | audit (never the number or the address) |
@@ -355,7 +355,7 @@ employee record (masked, never sent to an AI model).
 | `onboarding.step_overdue` | a step past its due day (`onboarding-dispatch`), once a step | tells its owner, or the case's owner when the owner has no login |
 | `onboarding.completed` | Complete Onboarding | tells the case's owner; the login's invitation is mailed by identity's own outbox step in the same transaction (`users.inviteIn`), and `application.hired` and the vacancy's events follow from `hireIn` |
 | `onboarding.cancelled` | Withdraw | tells the case's owner; `contract.cancelled` (when unsigned), `employee.archived` and `application.withdrawn` in the same transaction |
-| `signature-reminders` job | daily, 06:17 Lagos | ends requests past their end; their links stop working |
+| `signature-reminders` job | daily, 06:17 Lagos | ends requests past their end; their links then open read only on how they ended |
 | `onboarding-dispatch` job | daily, 06:43 Lagos (`jobs/schedulers/onboarding-dispatch.js`) | move cases to `onboarding` on their start date with their plan's steps; remind owners of overdue steps, once a step. Each case its own transaction; at most 200 cases and 500 reminders a run, the rest the next |
 
 ## 8 · Permissions and visibility by role
@@ -509,6 +509,20 @@ Decided 12/11/2026 (AJ), the audit of #122:
 - **The hire's home address** is picked at documentation and is a gate condition; MyCity's Guarantor
   Form's fields are on each guarantor, and the signed form and ID copy are needed to pass.
 
+Decided 13/11/2026 (AJ), found in the M5 click-through of 12/11/2026 (`testing/`):
+
+- **The signed offer is filed on the hire** (Employee 360 · Documents): its sealed copy carries the
+  hire's employee record, made at acceptance in the signing transaction.
+- **A sealed copy replaces the copy it was signed on**, offer and contract alike, as its next version
+  (`vault.follow` with `sealed`: the signed original stays locked and unchanged, only no longer
+  current), so the Documents tab lists one signed offer and one signed contract.
+- **An ended signing link says how it ended**: withdrawn, lapsed or declined, the link stays and opens
+  read only on *Offer Withdrawn*, *This Offer Has Expired* or *Offer Declined* (the agreement's and
+  the contract's words for theirs), with no letter and no PDF; nothing on it can be signed or
+  declined. A link replaced by Resend or Change Email still stops (`issueLinks`, `stopLinksFor`).
+- **The signing page's heading follows the state**: *Your offer, signed.* once signed, *This offer is
+  closed.* once ended, *Your offer, ready to sign.* only while it waits.
+
 Decided 11/11/2026 (AJ), for PR 6b:
 
 - **Withdraw also withdraws the application**: `candidates.withdrawnIn`, new in M4's service (status
@@ -541,6 +555,12 @@ Decided 12/11/2026 (AJ), found filming the Milestone 5 video:
   own and stops none: the hire may have the page open, sending the rest.
 
 ## 14 · Change log
+
+- 13/11/2026 · AJ · The click-through's findings (§3, §6, §7, §13): the sealed offer filed on the hire
+  and both sealed copies the next version of what was signed (`vault.follow` `sealed`); ended signing
+  links read only on how they ended (signatures `endOne` keeps the link; `viewOf` and `documentFor`
+  give nothing of the document); the signing page's heading by state (`SignOffer.tsx`); the guarantor
+  wording of `onboarding-document-rejected`.
 
 - 12/11/2026 · AJ · The two questions left from filming (§3 step 6, §5, §7, §11, §13): Upload
   Documents' writes counted per link, 60 a minute (`onboardLimiter`); a file sent again becomes the
