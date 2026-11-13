@@ -193,6 +193,7 @@ describeDb("Recruitment · the hand-over to M5 against the real migrations", () 
       "offer-signed",
       "contract-sent",
       "onboarding-documents",
+      "onboarding-document-rejected",
     ]);
     const offer = list.body.data.find((e) => e.key === "offer-sent");
     expect(offer).toMatchObject({ name: "Offer Sent", is_default: true });

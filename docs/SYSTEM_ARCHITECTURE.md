@@ -93,7 +93,7 @@ host, and nothing prevents one: sessions are in Redis, jobs are in BullMQ, outbo
 | API prefix | `/api/v1/*` | `/api/public/v1/*` |
 | Auth | Bearer access token (memory) + refresh cookie `HttpOnly; Secure; SameSite=Strict; Host-only` on `hub.` | None. Opaque per-person token in the URL |
 | CORS | Origin `hub.` only | Origin `go.` only, no credentials |
-| Rate limit | Per user | Per IP, stricter on writes |
+| Rate limit | Per user | Per IP, stricter on writes; the hire's Upload Documents page's writes per link, 60 a minute (AJ, 12/11/2026; `offers.md` §13) |
 
 **The API process allow-lists the path per host** (`src/http/static.js`). On `go.` only
 `/api/public/` and the public build are served; `/api/v1/` and `/socket.io/` are a 404. On `hub.`,

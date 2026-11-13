@@ -9,7 +9,8 @@
  *   acknowledge()           the privacy notice, accepted before anything is sent
  *   file()                  a file, stored on the hire's employee record and scanned (a stranger's
  *                           upload); named next on an item or as a guarantor's form
- *   item()                  an item: the file, the typed value or both, as its requirement asks
+ *   item()                  an item: the file, the typed value or both, as its requirement asks; a
+ *                           file sent again becomes the next version of the one before (vault.follow)
  *   guarantor()             a guarantor entered or corrected; a correction waits for its check again
  *   bvn()                   the BVN, kept masked on the employee record (organisation.setBvnIn);
  *                           the hire may correct it until documentation completes (AJ, 12/11/2026)
@@ -17,6 +18,8 @@
  *   sendLink()              the link, made from the outbox when the case opens and on Send Reminder,
  *                           mailed as `onboarding-documents`; stopped when the case ends
  *                           (onboarding.service endIn: Withdraw and Not Progressing)
+ *   sendRejected()          a fresh link mailed as `onboarding-document-rejected` when an item is
+ *                           rejected or a guarantor fails their check, with what to send again
  *
  * Only a case at documentation takes anything. The link is never kept: only its hash is, and it is
  * made in a transaction of its own and handed straight to the mail queue.
@@ -177,6 +180,9 @@ async function item(caseId, itemId, body) {
     if (needsFile) await ownFile(client, row, body.document_id, "document_id");
     // On the hire's record it reads as what it is ("Valid ID"), not as the file's own name.
     if (needsFile) await vault.setTitle(client, body.document_id, it.title);
+    // A file sent again (the first rejected, or changed before its check) replaces the one before it:
+    // the record keeps one entry for the item, the earlier file in its versions (AJ, 12/11/2026).
+    if (needsFile) await vault.follow(client, { document_id: body.document_id, supersedes_id: it.document_id });
     await repo.itemUploaded(client, itemId, {
       document_id: needsFile ? body.document_id : null,
       entered_value: needsValue ? body.entered_value : null,
@@ -210,6 +216,11 @@ async function guarantor(caseId, body) {
     // Filed on the hire's record under the guarantor's name, not the file's.
     if (body.form_document_id) await vault.setTitle(client, body.form_document_id, `Guarantor Form, ${body.full_name}`);
     if (body.id_document_id) await vault.setTitle(client, body.id_document_id, `ID Copy, ${body.full_name}`);
+    // A corrected guarantor's new form or ID replaces the earlier file, kept in its versions.
+    if (same && body.form_document_id)
+      await vault.follow(client, { document_id: body.form_document_id, supersedes_id: same.form_document_id });
+    if (same && body.id_document_id)
+      await vault.follow(client, { document_id: body.id_document_id, supersedes_id: same.id_document_id });
     const id = await repo.saveGuarantor(client, caseId, {
       ...body,
       contact_address_line: places.lineOf(body.contact_address),
@@ -268,15 +279,17 @@ function ttlHours(startsOn, now = new Date()) {
 }
 
 /**
- * Make the hire a fresh link, stopping every earlier one, and mail it as `onboarding-documents`.
- * From the outbox when the case opens, and on Send Reminder. A case past documentation, or a hire
- * with no address, gets nothing. Each run makes its own link, so a run again sends a working one.
+ * Make the hire a fresh link and mail it; `revoke` stops every earlier one first. A case past
+ * documentation, or a hire with no address, gets nothing; nor does a mail whose `extra` answers null
+ * (what it was about has changed since). Each run makes its own link, so a run again sends a working one.
  */
-async function sendLink(caseId, actorUserId = null, { reminder = false } = {}) {
+async function mailLink(caseId, actorUserId, { template, revoke = true, reminder = false, extra = async () => ({}) }) {
   const made = await tx(async (client) => {
     const row = await repo.get(client, caseId, { lock: true });
     if (!row || row.status !== "documentation" || !row.employee_email) return null;
-    await publicToken.revokeFor(client, { subject_type: SUBJECT, subject_id: caseId, scope: SCOPE });
+    const more = await extra(client, row);
+    if (!more) return null;
+    if (revoke) await publicToken.revokeFor(client, { subject_type: SUBJECT, subject_id: caseId, scope: SCOPE });
     const link = await publicToken.issue(client, {
       scope: SCOPE,
       subject_type: SUBJECT,
@@ -291,26 +304,60 @@ async function sendLink(caseId, actorUserId = null, { reminder = false } = {}) {
         actor: actorUserId ? { user_id: actorUserId } : null,
         payload: payload(row),
       });
-    return { row, token: link.token, id: link.public_token_id };
+    return { row, more, token: link.token, id: link.public_token_id };
   });
   if (!made) return false;
   const { row } = made;
   await require("../../jobs/queues").enqueue(
     "email-send",
-    EMAILS.documents,
+    template,
     {
       to: { name: row.employee_name, email: row.employee_email },
       recipient: { first_name: row.employee_first_name, last_name: row.employee_last_name, email: row.employee_email },
-      template: EMAILS.documents,
+      template,
       data: {
         vacancy_title: row.job_title,
         documents_url: `${origin()}/onboard/${made.token}`,
         due_on: row.starts_on && String(row.starts_on).slice(0, 10) >= lagos.today() ? String(row.starts_on).slice(0, 10) : null,
+        ...made.more,
       },
     },
-    { jobId: `onboarding-documents-${made.id}` },
+    { jobId: `${template}-${made.id}` },
   );
   return true;
 }
 
-module.exports = { DOC_TYPE, privacyNotice, ttlHours, pack, acknowledge, file, item, guarantor, bvn, address, sendLink };
+/**
+ * The link mailed as `onboarding-documents`, every earlier one stopped: from the outbox when the case
+ * opens, and on Send Reminder.
+ */
+function sendLink(caseId, actorUserId = null, { reminder = false } = {}) {
+  return mailLink(caseId, actorUserId, { template: EMAILS.documents, reminder });
+}
+
+/**
+ * `onboarding-document-rejected`, from the outbox (AJ, 12/11/2026): an item Operations & People
+ * rejected, with the reason they gave, or a guarantor whose reference check failed (never the check's
+ * note, which stays with Operations & People), and a fresh link to send it again. Nothing when the
+ * hire has already sent it again, or the guarantor's check is no longer failed, by the time it runs.
+ * Earlier links keep working: the hire may have the page open, sending the rest, when it is rejected.
+ * Send Reminder, and the case ending, still stop them all.
+ */
+function sendRejected(caseId, actorUserId = null, { itemId = null, guarantorId = null } = {}) {
+  return mailLink(caseId, actorUserId, {
+    template: EMAILS.rejected,
+    revoke: false,
+    extra: async (client, row) => {
+      if (itemId) {
+        const it = await repo.item(client, row.onboarding_case_id, itemId);
+        if (!it || it.status !== "rejected") return null;
+        return { document_title: it.title, guarantor_name: null, reason: it.rejected_reason || null };
+      }
+      const g = guarantorId ? await repo.guarantor(client, row.onboarding_case_id, guarantorId) : null;
+      if (!g || g.check_status !== "failed") return null;
+      return { document_title: null, guarantor_name: g.full_name, reason: null };
+    },
+  });
+}
+
+module.exports = { DOC_TYPE, privacyNotice, ttlHours, pack, acknowledge, file, item, guarantor, bvn, address, sendLink, sendRejected };

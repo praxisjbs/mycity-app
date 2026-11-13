@@ -10,9 +10,12 @@
  *   onboarding.link_sent               Send Reminder: a fresh link, every earlier one stopped
  *   onboarding.privacy_acknowledged    the hire accepted the privacy notice on the upload page
  *   onboarding.item_uploaded           the hire sent an item (a file, a typed value or both)
- *   onboarding.item_verified, .item_rejected        Operations & People checked it
+ *   onboarding.item_verified, .item_rejected        Operations & People checked it; a rejection is
+ *                                      mailed to the hire as `onboarding-document-rejected`, with a
+ *                                      fresh link (onboarding.upload.js sendRejected)
  *   onboarding.guarantor_saved         the hire entered or corrected a guarantor
- *   onboarding.guarantor_checked       a guarantor's reference check was recorded Passed or Failed
+ *   onboarding.guarantor_checked       a guarantor's reference check was recorded Passed or Failed;
+ *                                      Failed is mailed as a rejection is, without the check's note
  *   onboarding.bvn_entered             the hire entered their BVN (kept on the employee, masked)
  *   onboarding.documentation_completed every required item verified, both guarantors passed, the BVN
  *                                      entered and the contract signed: the case is at pre-onboarding
@@ -68,8 +71,8 @@ const ENTITY = "onboarding";
 const SCOPE = "onboarding.upload";
 const SUBJECT = "onboarding_case";
 
-/** The Candidate Email this module sends; its variables are declared by candidates.events.js. */
-const EMAILS = Object.freeze({ documents: "onboarding-documents" });
+/** The Candidate Emails this module sends; their variables are declared by candidates.events.js. */
+const EMAILS = Object.freeze({ documents: "onboarding-documents", rejected: "onboarding-document-rejected" });
 
 const owner = (e) => (e.payload.owner_user_id ? [e.payload.owner_user_id] : []);
 
@@ -124,6 +127,21 @@ defineNotification(EVENTS.ONBOARDING_CANCELLED, {
 outbox.register(EVENTS.ONBOARDING_OPENED, "onboarding.mail_documents", (event) =>
   require("./onboarding.upload").sendLink(event.payload.onboarding_case_id, event.actor_user_id || null),
 );
+
+// The hire is told what to send again, with a fresh link (AJ, 12/11/2026): a rejected item, a
+// guarantor whose check failed. A passed check is nothing to tell.
+outbox.register(EVENTS.ONBOARDING_ITEM_REJECTED, "onboarding.mail_rejected", (event) =>
+  require("./onboarding.upload").sendRejected(event.payload.onboarding_case_id, event.actor_user_id || null, {
+    itemId: event.payload.onboarding_checklist_item_id,
+  }),
+);
+
+outbox.register(EVENTS.ONBOARDING_GUARANTOR_CHECKED, "onboarding.mail_guarantor_failed", async (event) => {
+  if (event.payload.check_status !== "failed") return;
+  await require("./onboarding.upload").sendRejected(event.payload.onboarding_case_id, event.actor_user_id || null, {
+    guarantorId: event.payload.onboarding_guarantor_id,
+  });
+});
 
 outbox.register("application.not_progressed", "onboarding.end_for_application", (event) =>
   require("./onboarding.service").endForApplication(event.payload.application_id, event.actor_user_id || null),

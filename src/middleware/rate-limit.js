@@ -7,7 +7,8 @@
  *   staffLimiter        /api/v1        per signed-in user (per IP before sign-in), RATE_LIMIT_STAFF_PER_MIN, uploads aside
  *   uploadLimiter       /api/v1        uploads only (a multipart POST), per signed-in user, 60 per minute
  *   publicLimiter       /api/public    per IP, RATE_LIMIT_PUBLIC_PER_MIN
- *   publicWriteLimiter  /api/public    per IP, writes only, RATE_LIMIT_PUBLIC_WRITES_PER_MIN
+ *   publicWriteLimiter  /api/public    per IP, writes only, RATE_LIMIT_PUBLIC_WRITES_PER_MIN, Upload Documents aside
+ *   onboardLimiter      /api/public    Upload Documents' writes (/onboard/<token>), per link, 60 per minute
  *   signInLimiter       sign-in        per IP, failed attempts only, 10 per 15 minutes
  *   refreshLimiter      token refresh  per IP, failed attempts only, 60 per 15 minutes
  *   forgotLimiter       reset request  per IP, every request, 5 per 15 minutes
@@ -33,6 +34,7 @@
  * The staff key is the VERIFIED user id: keying on an unverified token would let
  * anyone spend a colleague's budget by forging a token with their id.
  */
+const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const { MemoryStore } = rateLimit;
 const { config } = require("../config/env");
@@ -167,10 +169,32 @@ const publicLimiter = makeLimiter({
   max: config.RATE_LIMIT_PUBLIC_PER_MIN,
 });
 
+/**
+ * The link of a write on the hire's Upload Documents page (/api/public/v1/onboard/<token>/...), or
+ * null. The page spends two writes a document (the file, then naming it on its item) and thirty or
+ * more in all, so it is counted per link, as staff uploads are per person, not against the address's
+ * public write budget (AJ, 12/11/2026; docs/guides/offers.md §13). The key is the token's hash: a
+ * link is never kept as it is. The address's own budget for every request (publicLimiter) still holds.
+ */
+const ONBOARD = /\/onboard\/([^/?#]+)/;
+function onboardLink(req) {
+  if (!WRITE.has(req.method)) return null;
+  const m = ONBOARD.exec(req.originalUrl || req.url || "");
+  return m ? crypto.createHash("sha256").update(m[1], "utf8").digest("hex") : null;
+}
+
 const publicWriteLimiter = makeLimiter({
   name: "public-write",
   max: config.RATE_LIMIT_PUBLIC_WRITES_PER_MIN,
-  skip: (req) => !WRITE.has(req.method),
+  skip: (req) => !WRITE.has(req.method) || Boolean(onboardLink(req)),
+});
+
+/** Upload Documents' writes: 60 a minute a link, the whole New Joiner list sent briskly. */
+const onboardLimiter = makeLimiter({
+  name: "onboard",
+  max: 60,
+  key: (req) => `link:${onboardLink(req)}`,
+  skip: (req) => !onboardLink(req),
 });
 
 const signInLimiter = makeLimiter({
@@ -337,6 +361,7 @@ module.exports = {
   uploadLimiter,
   publicLimiter,
   publicWriteLimiter,
+  onboardLimiter,
   signInLimiter,
   refreshLimiter,
   forgotLimiter,

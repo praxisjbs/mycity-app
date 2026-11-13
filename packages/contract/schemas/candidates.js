@@ -35,9 +35,9 @@ const CvState = z.enum(["none", "checking", "clean", "infected"]);
 const M4Stage = z.enum(M4_STAGES);
 
 /**
- * The candidate emails Operations & People may edit (guide §6.8): M4's five, then the four M5 sends
- * (offer-sent, offer-signed, contract-sent, onboarding-documents), kept in the same store so one
- * screen words them all.
+ * The candidate emails Operations & People may edit (guide §6.8): M4's five, then the five M5 sends
+ * (offer-sent, offer-signed, contract-sent, onboarding-documents, onboarding-document-rejected), kept
+ * in the same store so one screen words them all.
  */
 const CandidateEmailKey = z.enum([
   "application-received",
@@ -49,6 +49,7 @@ const CandidateEmailKey = z.enum([
   "offer-signed",
   "contract-sent",
   "onboarding-documents",
+  "onboarding-document-rejected",
 ]);
 
 /* ------------------------------------------------------------------ *
@@ -397,6 +398,23 @@ const OnboardingDocumentsEmailVars = z
   .object({ vacancy_title: z.string(), documents_url: z.string(), due_on: isoDate.nullable() })
   .strict();
 
+/**
+ * onboarding-document-rejected (M5, AJ 12/11/2026): something the hire sent is to be sent again, with
+ * a fresh link. `document_title`: the item Operations & People rejected ("Valid ID"), with `reason`,
+ * what they typed; or `guarantor_name`: the guarantor whose reference check failed (no reason: the
+ * check's note stays with Operations & People). One of the two is set.
+ */
+const OnboardingDocumentRejectedEmailVars = z
+  .object({
+    vacancy_title: z.string(),
+    document_title: z.string().nullable(),
+    guarantor_name: z.string().nullable(),
+    reason: z.string().nullable(),
+    documents_url: z.string(),
+    due_on: isoDate.nullable(),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   Candidate: {
@@ -500,6 +518,7 @@ const TABLES = {
   OfferSignedEmailVars: { table: null, reason: "the variables of templates/email/offer-signed.html" },
   ContractSentEmailVars: { table: null, reason: "the variables of templates/email/contract-sent.html" },
   OnboardingDocumentsEmailVars: { table: null, reason: "the variables of templates/email/onboarding-documents.html" },
+  OnboardingDocumentRejectedEmailVars: { table: null, reason: "the variables of templates/email/onboarding-document-rejected.html" },
 };
 
 module.exports = {
@@ -543,4 +562,5 @@ module.exports = {
   OfferSignedEmailVars,
   ContractSentEmailVars,
   OnboardingDocumentsEmailVars,
+  OnboardingDocumentRejectedEmailVars,
 };

@@ -297,7 +297,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
     expect((await h.as("ops").post("/recruitment/candidates/invitations").send({ first_name: "Tobi", last_name: "Lawal", email: "tobi.lawal@example.test", vacancy_id: vacancyId })).status).toBe(422);
   });
 
-  test("Candidate Emails: nine (M4's five and M5's four), each saved as the next version and checked against its variables; Restore Default keeps the history", async () => {
+  test("Candidate Emails: ten (M4's five and M5's five), each saved as the next version and checked against its variables; Restore Default keeps the history", async () => {
     const list = await h.as("ops").get("/recruitment/candidates/emails");
     expect(list.body.data.every((e) => e.can_edit === true)).toBe(true);
     expect(list.body.data.map((e) => [e.key, e.version, e.is_default])).toEqual([
@@ -310,6 +310,7 @@ describeDb("Recruitment · Candidates against the real migrations", () => {
       ["offer-signed", 0, true],
       ["contract-sent", 0, true],
       ["onboarding-documents", 0, true],
+      ["onboarding-document-rejected", 0, true],
     ]);
     const typo = await h.as("ops").put("/recruitment/candidates/emails/application-received").send({ subject: "We have your application", body: "Thank you. Your reference is {{ referance }}." });
     expect(typo.status).toBe(422);

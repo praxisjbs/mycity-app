@@ -583,7 +583,7 @@ The design is `docs/guides/offers.md`; the build plan and its log `docs/handoff/
 
 Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Templates: `offer-letter`,
 `offer-packet`, `employment-contract`, `signature-certificate`, and the offer and onboarding mails
-(`offer-sent`, `offer-signed`, `contract-sent`, `onboarding-documents`: their wording and variables are
+(`offer-sent`, `offer-signed`, `contract-sent`, `onboarding-documents`, `onboarding-document-rejected`: their wording and variables are
 M4's, built and edited on Candidate Emails, and M5 sends them; the five recruitment mails are M4's,
 built).
 

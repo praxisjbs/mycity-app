@@ -1905,6 +1905,12 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 13/11/2026 · AJ · The signing service (§6.9), from M5's click-through: a request that ends unsigned
+  (Close, a lapse, a decline) keeps its links, read only, so the signer reads *Agreement Withdrawn*,
+  *This Link Has Expired* or *Agreement Declined* instead of *This Link Does Not Open*; the page shows
+  nothing of the agreement then (no blocks, no PDF) and takes nothing. Send Again still stops every
+  earlier link (`stopLinksFor`). For TB to review.
+
 - 10/11/2026 · TB · The approver's buttons (§6.9, §10.1, §13.2): `approval.can_decide`, Approve and Reject on the
   agreement's card, the demo's approval and its Write Draft steps.
 - 10/11/2026 · TB · PR 9, the Partnerships User Guide chapter (`m7/user-guide`): `docs/manual/partnerships.md` with a

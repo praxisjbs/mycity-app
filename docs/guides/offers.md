@@ -139,7 +139,11 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    `vault.setTitle`), so the Documents tab never shows a file's own name. Operations & People verify
    each once its scan is clean, which verifies the same document on the hire's record
    (`documents.verifiedIn`, as People's Verify Document), or reject it with a reason the hire reads
-   beside the item and send it again. The hire enters their BVN (a masked
+   beside the item and in the mail that tells them (`onboarding-document-rejected`, with a fresh link;
+   a failed guarantor check is mailed the same way, without its note), and send it again. A file sent
+   again on an item, or as a guarantor's form or ID, becomes the next version of the one before it
+   (`vault.follow`): the Documents tab keeps one entry for it, the earlier file in its versions (AJ,
+   12/11/2026). The hire enters their BVN (a masked
    number on the employee record, no upload; they may correct it until documentation completes, AJ
    12/11/2026, since nobody else ever sees it to catch a slip), picks their **home address**
    (`AddressField`, kept as the employee record's home address) and enters their **two guarantors**:
@@ -261,7 +265,7 @@ employee record (masked, never sent to an AI model).
 | `GET/PUT /api/v1/recruitment/contracts/settings/template`, `POST .../template/restore` | `ContractTemplate`, `ContractTemplateSave` | `recruitment` edit, scope all | | the standard contract wording, a `template_version` of `employment-contract` |
 | `GET /api/public/v1/onboard/:token` | → `UploadPack` | public token `onboarding.upload` (the case its subject) | | the checklist as the hire sees it, the privacy notice's sentences; a guarantor's check note is left out |
 | `POST /api/public/v1/onboard/:token/privacy` | `PrivacyAcknowledge` → `UploadPack` | public token | | first; every write below is 409 `PRIVACY_FIRST` before it |
-| `POST /api/public/v1/onboard/:token/files` | multipart `file` (`UploadFile`) → `DocumentRef` | public token | | at most 15 MB (purpose `document`); stored on the hire's employee record, quarantined and scanned |
+| `POST /api/public/v1/onboard/:token/files` | multipart `file` (`UploadFile`) → `DocumentRef` | public token | | at most 15 MB (purpose `document`); stored on the hire's employee record, quarantined and scanned. The page's writes have a limit of their own, 60 a minute a link (`onboardLimiter`), not the public write limit per address (AJ, 12/11/2026) |
 | `POST /api/public/v1/onboard/:token/items/:item_id` | `UploadItem` → `UploadPack` | public token | | the file sent on this link, the typed value, or both, as the requirement's kind asks |
 | `POST /api/public/v1/onboard/:token/guarantors` | `GuarantorInput` → `UploadPack` | public token | | by position (1, 2); two of different kinds (422 `SAME_KIND`); a passed one stays (409 `ALREADY_CHECKED`); MyCity's Guarantor Form: date of birth, the two addresses (`PlaceInput`), the conviction and recommendation answers (what happened, when convicted), the signed form and the ID copy (each a file sent on this link) |
 | `POST /api/public/v1/onboard/:token/bvn` | `BvnEnter` → `UploadPack` | public token | | eleven digits, correctable until documentation completes, kept on `employee.bvn`; then the gate. After documentation every write is 409 `DOCUMENTATION_DONE` |
@@ -275,7 +279,7 @@ employee record (masked, never sent to an AI model).
 - The company signs an offer when it is approved, before it is sent; the candidate signs second.
 - An offer is approved before it is sent; the flow is the one active when the offer was submitted (the instance keeps its definition).
 - Withdrawing an offer still with its approval withdraws the approval too, which only its submitter or the CEO may do (the approval engine's rule); Not Progressing withdraws it as its submitter.
-- An unsigned offer lapses at `expires_at`: `signature-reminders` ends its signature request and the offer becomes `expired`; the link stops working. Default expiry 15 days; a link lives at most 90 days. There is no offer job of its own.
+- An unsigned offer lapses at `expires_at`: `signature-reminders` ends its signature request and the offer becomes `expired`; the link then opens only on *This Offer Has Expired*, read only, without the letter. Default expiry 15 days; a link lives at most 90 days. There is no offer job of its own.
 - Declined, expired or withdrawn ends the offer; a new offer may be made for the same application.
 - Not Progressing (M4) or Close Vacancy revokes every open `offer.sign` and `onboarding.upload` token of that application (an outbox handler on `application.not_progressed`); Not Progress All never touches an application at `offer` or later (GE).
 - Every signature row holds `content_hash` (over the canonical payload, recomputable) and `artifact_hash` (over the stored bytes the vault returns). The verify page reports both verdicts (A12).
@@ -335,14 +339,14 @@ employee record (masked, never sent to an AI model).
 | `signature.completed` | the last signer signed | outbox: the sealed copy generated with the signatures, the certificate and the QR (`signatures.signed-pdf`) |
 | `document.generated` (a sealed copy) | the worker rendered it | its stored bytes' hash on every signature row (`artifact_hash`); `signature.sealed` |
 | `signature.sealed` | | every signer mailed the sealed copy (`signature-completed`), except where the signed record's module words its own: the candidate of an offer gets `offer-signed` with the copy |
-| `offer.declined`, `offer.expired`, `offer.withdrawn` | the candidate declines; the request lapses; Withdraw or Not Progressing | declined and expired tell the owner; the links stop working |
+| `offer.declined`, `offer.expired`, `offer.withdrawn` | the candidate declines; the request lapses; Withdraw or Not Progressing | declined and expired tell the owner; the links open read only on how it ended (*Offer Declined*, *This Offer Has Expired*, *Offer Withdrawn*), without the letter, and take nothing |
 | `onboarding.opened` | at acceptance, in the signing transaction | tells the owner; the outbox makes the Upload Documents link and mails `onboarding-documents` |
 | `onboarding.link_sent` | Send Reminder | audit (the link is made and mailed by the same step) |
 | `onboarding.privacy_acknowledged`, `.bvn_entered`, `.address_entered` | the hire on their page | audit (never the number or the address) |
 | `onboarding.item_uploaded` | the hire sent an item | tells the owner |
-| `onboarding.item_verified`, `.item_rejected` | Operations & People | audit; the hire reads a rejection's reason on their page |
+| `onboarding.item_verified`, `.item_rejected` | Operations & People | audit; a rejection: the outbox mails the hire `onboarding-document-rejected` with the item, the reason and a link of its own, earlier links still working (`onboarding.mail_rejected`), nothing when they have sent it again by then; they also read the reason on their page |
 | `onboarding.guarantor_saved` | the hire entered or corrected a guarantor | tells the owner |
-| `onboarding.guarantor_checked` | a reference check recorded | audit |
+| `onboarding.guarantor_checked` | a reference check recorded | audit; Failed: the outbox mails the hire `onboarding-document-rejected` naming the guarantor (never the note) with a fresh link (`onboarding.mail_guarantor_failed`) |
 | `onboarding.documentation_completed` | the gate, in the transaction of whatever came last | tells the owner; the application at Pre-Onboarding |
 | `onboarding.requirement_saved`, `.plan_saved` | the Checklist and Plans settings | audit |
 | `application.not_progressed` (M4) | Not Progressing | its open case ends as Withdraw ends it: the contract while unsigned, the links, the employee archived, the case `cancelled` with the application's reason (`onboarding.end_for_application`); an ended case only has its links stopped again |
@@ -351,7 +355,7 @@ employee record (masked, never sent to an AI model).
 | `onboarding.step_overdue` | a step past its due day (`onboarding-dispatch`), once a step | tells its owner, or the case's owner when the owner has no login |
 | `onboarding.completed` | Complete Onboarding | tells the case's owner; the login's invitation is mailed by identity's own outbox step in the same transaction (`users.inviteIn`), and `application.hired` and the vacancy's events follow from `hireIn` |
 | `onboarding.cancelled` | Withdraw | tells the case's owner; `contract.cancelled` (when unsigned), `employee.archived` and `application.withdrawn` in the same transaction |
-| `signature-reminders` job | daily, 06:17 Lagos | ends requests past their end; their links stop working |
+| `signature-reminders` job | daily, 06:17 Lagos | ends requests past their end; their links then open read only on how they ended |
 | `onboarding-dispatch` job | daily, 06:43 Lagos (`jobs/schedulers/onboarding-dispatch.js`) | move cases to `onboarding` on their start date with their plan's steps; remind owners of overdue steps, once a step. Each case its own transaction; at most 200 cases and 500 reminders a run, the rest the next |
 
 ## 8 · Permissions and visibility by role
@@ -409,6 +413,11 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 - A file over the upload engine's limit: refused, with the limit named.
 - A file still being scanned cannot be verified (Wait for the virus scan to finish); one that failed it is rejected, and the hire sends another.
 - The hire's link has lapsed or was lost: Send Reminder makes a fresh one and stops the rest.
+- Several items rejected one after another: one mail each, each with a link of its own. Earlier links
+  keep working, since the hire may have the page open sending the rest; Send Reminder still stops them
+  all. An item the hire sent again before its mail went gets none.
+- A guarantor replaced by another person at the same position: the new person's form and ID become the
+  next versions of the old ones, under the new name.
 - A department with no active plan of its own: its hires follow the company's default plan.
 - No document requirements set: Send Offer is refused until the checklist has at least one required item.
 - The hire leaves before the start date: Withdraw on the case ends it; the employee is archived and
@@ -500,6 +509,20 @@ Decided 12/11/2026 (AJ), the audit of #122:
 - **The hire's home address** is picked at documentation and is a gate condition; MyCity's Guarantor
   Form's fields are on each guarantor, and the signed form and ID copy are needed to pass.
 
+Decided 13/11/2026 (AJ), found in the M5 click-through of 12/11/2026 (`testing/`):
+
+- **The signed offer is filed on the hire** (Employee 360 · Documents): its sealed copy carries the
+  hire's employee record, made at acceptance in the signing transaction.
+- **A sealed copy replaces the copy it was signed on**, offer and contract alike, as its next version
+  (`vault.follow` with `sealed`: the signed original stays locked and unchanged, only no longer
+  current), so the Documents tab lists one signed offer and one signed contract.
+- **An ended signing link says how it ended**: withdrawn, lapsed or declined, the link stays and opens
+  read only on *Offer Withdrawn*, *This Offer Has Expired* or *Offer Declined* (the agreement's and
+  the contract's words for theirs), with no letter and no PDF; nothing on it can be signed or
+  declined. A link replaced by Resend or Change Email still stops (`issueLinks`, `stopLinksFor`).
+- **The signing page's heading follows the state**: *Your offer, signed.* once signed, *This offer is
+  closed.* once ended, *Your offer, ready to sign.* only while it waits.
+
 Decided 11/11/2026 (AJ), for PR 6b:
 
 - **Withdraw also withdraws the application**: `candidates.withdrawnIn`, new in M4's service (status
@@ -516,19 +539,34 @@ Decided 11/11/2026 (AJ), for PR 6b:
 Open, for MyCity: the privacy notice's wording (`onboarding.upload.privacyNotice`) is written from
 what the system does; Operations & People to confirm it before go-live.
 
-Open, for AJ (found filming the Milestone 5 video, 12/11/2026): the Upload Documents page shares the
-public write limit, 20 a minute from one address (`RATE_LIMIT_PUBLIC_WRITES_PER_MIN`), and each
-document costs two writes (the file, then naming it on its item). A hire who sends the New Joiner list
-briskly is told "Too many requests. Wait a moment and try again." within the minute; the whole page is
-30 writes or more. A limit of its own for `/onboard/<token>`, counted per link as staff uploads are
-counted per person, is a security setting (SYSTEM_ARCHITECTURE §3, §4) and is not changed here.
+Decided 12/11/2026 (AJ), found filming the Milestone 5 video:
 
-Open, for AJ (the same filming): a file the hire sent that Operations & People rejected stays on their
-Employee 360 Documents tab as Awaiting Check, under the requirement's title beside the file that
-replaced it. Rejected is not a state of a person's document; whether it is removed, marked or kept as
-the record of what was sent is AJ's to decide.
+- **Upload Documents has a write limit of its own**, 60 a minute a link (`onboardLimiter`, keyed by
+  the token's hash), as staff uploads are counted per person; its writes no longer spend the public
+  write limit of 20 a minute an address, which the page (two writes a document, 30 or more in all)
+  met within the minute. The address's limit for every public request (120 a minute) still holds.
+  SYSTEM_ARCHITECTURE §3 records it.
+- **A file sent again replaces the one before it** as its next version (`vault.follow`), on an item
+  and on a guarantor's form and ID: Employee 360's Documents tab shows one entry, the rejected file
+  kept in its versions. Rejected does not become a state of a person's document.
+- **The hire is mailed when something is to be sent again**: an item rejected (its title and the
+  reason) or a guarantor whose check failed (their name, never the note), with a fresh link, as
+  `onboarding-document-rejected`, a tenth Candidate Email beside the rest. The mail adds a link of its
+  own and stops none: the hire may have the page open, sending the rest.
 
 ## 14 · Change log
+
+- 13/11/2026 · AJ · The click-through's findings (§3, §6, §7, §13): the sealed offer filed on the hire
+  and both sealed copies the next version of what was signed (`vault.follow` `sealed`); ended signing
+  links read only on how they ended (signatures `endOne` keeps the link; `viewOf` and `documentFor`
+  give nothing of the document); the signing page's heading by state (`SignOffer.tsx`); the guarantor
+  wording of `onboarding-document-rejected`.
+
+- 12/11/2026 · AJ · The two questions left from filming (§3 step 6, §5, §7, §11, §13): Upload
+  Documents' writes counted per link, 60 a minute (`onboardLimiter`); a file sent again becomes the
+  next version of the one before (`vault.follow`, new), so a rejected file no longer stays on the
+  Documents tab as Awaiting Check; the hire mailed `onboarding-document-rejected` (new, a Candidate
+  Email) with a fresh link when an item is rejected or a guarantor's check fails.
 
 - 12/11/2026 · GE · Found filming the Milestone 5 videos (`docs/runbooks/training-videos.md` §7), fixed (§3 step 6, §6, §10): a hire's files read on their Documents tab by their file's name and as Awaiting Check after Operations & People had verified them on the case; now each is titled by its requirement or guarantor when named (`vault.setTitle`, new) and verified on the record with the item or the guarantor's pass (`documents.verifiedIn`, new, which People's Verify Document now uses too). A previous employer's Years Known, never asked, was saved as 0 (`blank(z.coerce.number())` reads "" as 0); `GuarantorInput.years_known` is `optionalWhole`. The offer's details read Expired On for an accepted, declined or withdrawn offer; now Expires while it is with the candidate and Expired On only once it lapsed. Every Markdown email's written-out link now wraps on a phone (the email layout).
 

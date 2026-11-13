@@ -52,17 +52,18 @@ const EMAILS = Object.freeze({
   invite: "apply-invite",
   notProgressed: "candidate-not-progressed",
 });
-/** The four M5 sends (offers, contracts and onboarding), worded on Candidate Emails with the rest. */
+/** The five M5 sends (offers, contracts and onboarding), worded on Candidate Emails with the rest. */
 const M5_EMAILS = Object.freeze({
   offerSent: "offer-sent",
   offerSigned: "offer-signed",
   contractSent: "contract-sent",
   onboardingDocuments: "onboarding-documents",
+  onboardingDocumentRejected: "onboarding-document-rejected",
 });
 defineVariables("email", EMAILS.received, c.candidates.ApplicationReceivedEmailVars);
 defineVariables("email", EMAILS.invite, c.candidates.ApplyInviteEmailVars);
 defineVariables("email", EMAILS.notProgressed, c.candidates.CandidateNotProgressedEmailVars);
-// Candidate Emails edits all nine (guide §6.8), so the nine are declared here, once; the assessments
+// Candidate Emails edits all ten (guide §6.8), so the ten are declared here, once; the assessments
 // and interviews modules, and M5's offers and onboarding, send theirs with these variables and do not
 // declare them again.
 defineVariables("email", "assessment-invite", c.assessments.AssessmentInviteEmailVars);
@@ -71,6 +72,7 @@ defineVariables("email", M5_EMAILS.offerSent, c.candidates.OfferSentEmailVars);
 defineVariables("email", M5_EMAILS.offerSigned, c.candidates.OfferSignedEmailVars);
 defineVariables("email", M5_EMAILS.contractSent, c.candidates.ContractSentEmailVars);
 defineVariables("email", M5_EMAILS.onboardingDocuments, c.candidates.OnboardingDocumentsEmailVars);
+defineVariables("email", M5_EMAILS.onboardingDocumentRejected, c.candidates.OnboardingDocumentRejectedEmailVars);
 
 defineNotification(EVENTS.APPLICATION_RECEIVED, {
   // The vacancy's hiring manager (payload.subject_employee_id).
