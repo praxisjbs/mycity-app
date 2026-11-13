@@ -303,6 +303,57 @@ are below. §6.18 is the design and Appendix A the build plan.
 48. **Two pull requests, each in a fresh chat** (Appendix A): the attach control with invoices and
     payment receipts first, then contracts and MoUs.
 
+### 1.11 Decisions (JBS Praxis, 13/11/2026, binding): charts in the Overview
+
+JBS Praxis asked on Ask: "I want us to study our budget for each department. Share data in a way we
+can see charts in overview." The answer was a long table of four budgets with the amounts as
+3500000.00, and a sentence about how the Overview is made ("chart overviews are generated
+exclusively from database summary endpoints, which are currently available for attendance, tasks,
+reviews, leave, partnerships, and headcount, rather than departmental budgets"). The Overview tab
+stayed greyed out. Asked why, and how to ask for a chart, the code was checked: the Overview draws
+only from a summary read (§6.13), and of the registry's 94 reads only 12 are answered by one.
+Budgets is not among them, so no wording could have drawn a chart. Six questions were put, each
+with a recommendation first; the answers are below. §6.19 is the design, §6.13's planned tables
+the summaries, and Appendix B the build plan.
+
+49. **A summary for every list that can grow** ("Let us try to get summaries as much as we can").
+    Every read in a manifest names the summary that answers its counts and totals, or says why it
+    needs none (§6.19 item 3): one record, a search, configuration, a person's own short list, a
+    picker's list. 41 new summaries answer 50 more reads (Appendix B.3); gate 23 holds the rule with
+    a list of gaps that only shrinks.
+50. **A complete table charts too.** An answer whose read returned its whole list on one page (25
+    rows or fewer, nothing after) may chart that list: the model names the columns, the server draws
+    from the rows and computes the figures. A list longer than a page is charted only from its
+    summary, never from its first 25 rows.
+51. **Stacked bars.** A summary's group row may carry parts, drawn as stacked bars with a legend.
+    Budgets by department: Spent, Committed and Remaining stacked to Allocated; an overspent budget
+    shows Over Budget as its own part, never a negative bar. The stacked bar stops drawing only its
+    first series.
+52. **A charted answer keeps its words in the chat.** When an answer carries a chart, the bubble
+    shows its words, From, its screen button and Open Figures; its table is the pane's Table. An
+    answer with no chart keeps its table in the bubble.
+53. **The Overview's foot: View Data and Download PDF.** View Data opens the Table (the read's rows,
+    or for an answer drawn from a summary alone, the chart's figures as a table). Download PDF makes
+    the Overview a PDF on the one export path.
+54. **The PDF is a designed document.** On the letterhead, A4 portrait: the question as its title,
+    who asked and when, the answer's words, the figures as tiles, the chart drawn as a vector with its
+    figures as a table under it, then every other grouping and series the summary holds, each with its
+    own chart and table, and About This File. Built after commit as the person who asked, with their
+    rights at the build (as Download Excel is), kept 24 hours, never emailed.
+55. **An answer never explains how Praxis AI works.** No summaries, reads, endpoints, databases or
+    "charts are generated from" in an answer's words (the three tiers, FRONTEND_GUIDE §5). Where no
+    chart can be drawn the answer says nothing about charts.
+56. **Money reads as money.** A column of amounts (allocated, committed, spent, remaining, gross,
+    net, due, paid and the rest) reads "₦3,500,000.00" in the bubble, the Table, the Excel file and
+    the PDF.
+57. **Eight pull requests, each in a fresh chat** (Appendix B), reviewed from the planning chat: the
+    stacked drawing with Budgets first; then charts from a complete table and the Overview's foot
+    with the PDF; and the summaries area by area, several at once.
+58. **The same rights everywhere** (decision 16 stands). A summary runs with the reader's grant and
+    scope in its SQL. A figure a role does not see on screen (pay without the salary grant,
+    commission without See Commission and Returns, an offer's pay) is left out of that reader's
+    figures, groups, parts and series. The PDF checks the rights again when it is built.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -315,6 +366,7 @@ are below. §6.18 is the design and Appendix A the build plan.
 | Every module's manifest | Backend | | The reads, summaries and actions Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9), summaries for its big tables (§6.13, PR3) and actions for the changes people ask for (§6.11, PR4) |
 | An action card | Inside an answer, on the full screen and in the phone's chat | The person who asked, for an action their grant allows | The action's name, the fields its form offers as it will receive them (as a person reads them: people, departments and projects by name, decision 31), the records it acts on named and linked, a problem on its field, the buttons; the result line after the press, one line per record; Expired with Draw It Again | Press the verb (with the count when it acts on several; Confirm It's You first for a sensitive class; not offered while a field shows a problem, Edit standing in its place), Edit (the fields through the form system, people, departments and projects with the screen's own pickers, Save Changes), Cancel; a suggested card reads as a question with Not Now |
 | Praxis AI · Ask, Attach Document (Appendix A: invoices and payment receipts built in PR 1, contracts and MoUs in PR 2) | Staff app: beside the question box, on the full screen and in the phone's chat | `praxis_ai` create, and the grant each kind needs (decision 41) | A modal: the kinds the person may attach as tiles, then the file; the question's bubble then carries the file; a contract's terms on the pane's Record tab | Attach an invoice, a payment receipt, or a contract or MoU, and get its card (§6.18) |
+| Praxis AI · Ask, the Overview's charts and foot (Appendix B, planned) | Staff app: the pane's Overview on the full screen, the Figures sheet on a phone | `praxis_ai` view; each figure through the grant of the summary or read it came from | Up to three figures and one chart, a stacked bar with its legend where a summary's rows carry parts (§6.19 item 1), or a chart of a whole list's own columns (item 6); a charted answer's table in the pane rather than the chat (item 7) | View Data, Download PDF (item 8) |
 
 ## 3 · How the screens relate
 
@@ -407,6 +459,7 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 | `POST /ask` | `AiAsk` (`question` up to 500 characters, empty only beside an `attachment` (`{ document_id, kind }`, §6.18), `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`, `attachment` (the file the question carried), and `choices`, the answers to tap under a question asked before a card; `reads` carry `n`, `module_key`, `params`, `outcome` (`read`, `refused`, `invalid`, `failed` or `timed_out`) and `masked`; a `table` names the `read` it was drawn from) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed, with `ai:progress` on the person's realtime room before each read (§6.1.8). The full screen sends `context` and `shows: ["pane"]`. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
 | `GET /answers/:id/reads/:n` (`page`) | `PageQuery` → `AiReadRows` | `praxis_ai` view · own | yes, 25 | Read `n` of the answer run again with its stored parameters and the caller's rights now (§6.12): the Table's later pages, the Sources tab and Excel come from here. 404 for a summary or a read that was refused or timed out |
 | `POST /answers/:id/reads/:n/export` | `EmptyBody` → `documents.ExportFile`, 202 | `praxis_ai` view · own | | Download Excel (§6.16): every row of read `n`, replayed in the worker with the caller's rights and masks as they stand then, at most 25,000 rows, with an About This File sheet; the screen waits on `GET /exports/:id` and downloads as every export does (`foundation.md` §6.12). 404 as the replay is |
+| `POST /answers/:id/overview/export` (planned, Appendix B PR 3) | `EmptyBody` → `documents.ExportFile`, 202 | `praxis_ai` view · own | | Download PDF (§6.19 item 8): the answer's Overview as a PDF, made in the worker with the caller's rights at the build; 404 for an answer that is not the caller's or has no Overview |
 | `GET /cards/:id` | → `AiActionCard` | `praxis_ai` view · own | | The card as the person sees it (§6.11): its fields (`AiCardField`, each with its kind, whether it is `long`, a box of several lines, and `picks`, the picker an id field is chosen with on Edit), its records (what a press acts on) and its `names` (the ids its fields hold, by name), named through the module's own repo, its problems; a status past `shown` is read only |
 | `PUT /cards/:id` | `AiActionEdit` (`values`) → `AiActionCard` | `praxis_ai` create · own | | The person's edits, re-validated with the action's schema; problems and names updated; a value for a field the card does not carry is dropped; 409 `CARD_NOT_OPEN` past `shown` |
 | `POST /cards/:id/confirm` | `AiActionConfirm` (`values` optional) → `AiActionResult` | `praxis_ai` create · own; the action's own grant inside | | `Idempotency-Key`. 403 `REAUTH_REQUIRED` for a sensitive class without Confirm It's You in the last 5 minutes; 403 `ACTION_FORBIDDEN` when the grant or scope is gone; 409 `CARD_EXPIRED`, `CARD_DONE`, `CARD_RUNNING`, `CARD_CANCELLED`; 422 on the fields; 422 `TOO_MANY_RECORDS` past 25 |
@@ -1155,6 +1208,85 @@ figures, groups and series are named through `shared/ai/summary.js` (`figure`, `
 | `employees.summary` | `people` view | `EmployeeSummaryQuery`: the register's filters, `by` department, status, work pattern, employment type, manager or confirmation | People, active, confirmed, on probation, confirmation due within 30 days or overdue, contracts ending within 30 days, no line manager, departments; by department and by status always, then by the dimension asked (managers 20, confirmation bands) |
 | `audit.summary` | `settings` view with scope `all` and the CEO (anyone else is told it is not available, as the log refuses them) | `AuditSummaryQuery`: the log's filters (the last 30 days unless `from` or `to` says), `by` module or entity type | Entries, sensitive, people who acted, days, modules; by action (the catalogue's words, 20), by person (20), by module or record type; entries by day as a series |
 
+**Planned summaries (decision 49; §6.19; Appendix B).** One table for each pull request, so PRs
+built side by side never edit the same lines. A PR changes its own table's heading from planned to
+built with the date, and its rows to what it built; the tables stay apart. Every summary takes a
+period as above (`from` and `to`, or a `month`, else this Lagos month to today, at most a year)
+unless its row says otherwise. "Parts" are a stacked bar's parts (§6.19 item 1), each group row
+summing them.
+
+*Finance: Budgets (planned, PR 1)*
+
+| Summary | Module, grant | Params | Figures, groups and series |
+|---|---|---|---|
+| `budgets.summary` | `expenses` view, the reader's `expenses` scope as Budgets applies it; `by` project only for scope `all`, as Expenses · Projects | `BudgetSummaryQuery`: `year` (this year), `department_id`, `by` department, category or project | Allocated, committed, spent and remaining in naira, used as a per cent, budgets, lines over budget, lines past 80 per cent; by department or by category (20), each row Allocated with parts Spent, Committed, Remaining and Over Budget; by project: its budget with the same parts (a project with no budget shows Spent and Committed only); spent by month this year as a series |
+
+*Finance and pay (planned, PR 4)*
+
+| Summary | Module, grant | Params | Figures, groups and series |
+|---|---|---|---|
+| `expenses.summary` | `expenses` view; the list's own audience: `mine` the reader's requests, `waiting_on_me` those at their stage, otherwise the requests within their scope as Expense Requests | `ExpenseSummaryQuery`: the list's filters (`status`, `expense_category_id`, `project_id`, `department_id`, `payee_type`, `over_budget`), `mine`, `waiting_on_me`, a period (submitted), `by` status, category, department, project, payee type or month | Requests, amount asked, approved, paid, waiting with its amount, sent back, rejected, over budget, the oldest waiting in days; by status always (count and amount); then by category, department, project or payee type (20) with parts Paid, Approved, Waiting; top requesters (10); amount asked and amount paid by month as series |
+| `requisitions.summary` | `expenses` view, the readers Requisitions shows (`expenses.finance`, the CEO) | `RequisitionSummaryQuery`: `status`, a period, `by` status or month | Requisitions, requests in them, their total, waiting on the CEO, approved, declined; by status (count and total); total by month as a series |
+| `disbursements.summary` | `expenses` view, the readers Disbursements shows | `DisbursementSummaryQuery`: `reference_missing`, a period (day paid), `by` category, department, payee type or month | Payments, amount paid, reference missing, requests authorised and not yet paid with their amount, the average days from authorised to paid; by category, department or payee type (20, amount); amount paid by day, week or month as a series |
+| `payroll.month` (widened) | as built; money with the salary grant | `PayrollMonthQuery` gains `by` department or status | As built, plus by department (20): with the salary grant, Gross with parts Net Pay and Deductions; without it, people paid; payslips by status (preview, published) |
+| `payroll.trend` | `payroll` view; money with the salary grant | `PayrollTrendQuery`: `year`, or `from` and `to` months (at most 24) | Runs, months paid, the latest run's month and status; runs by status; people paid, gross, deductions and net by month as series (money only with the salary grant) |
+| `deductions.summary` | `payroll` view, the readers Deductions shows | `DeductionSummaryQuery`: `status`, `source`, `employee_id`, `month`, `by` source, status, department or month | Deductions, their amount, scheduled ahead, waived, recovered this year, advances outstanding; by source and by status (amount), then by department (20); amount by month as a series |
+| `my_pay.summary` | `ess` view, the person's own payslips and deductions, never masked from them | `MyPaySummaryQuery`: `year` (this year) | Payslips this year, gross, deductions and net to date, fines and advance repayments; deductions by reason; gross, deductions and net by month as series (published payslips only) |
+
+*Recruitment and onboarding (planned, PR 5)*
+
+| Summary | Module, grant | Params | Figures, groups and series |
+|---|---|---|---|
+| `vacancies.summary` | `recruitment` view, the vacancies the reader may list | `VacancySummaryQuery`: `status`, `department_id`, a period (opened), `by` status, department or hiring manager | Vacancies, open, paused, closed, applicants, the average days open, closing within 7 days; by status; by department or hiring manager (20) with parts Open, Paused, Closed; applicants per vacancy (top 10); vacancies opened by month |
+| `candidates.summary` | `recruitment` view, the candidates the reader may list | `CandidateSummaryQuery`: `vacancy_id`, `status`, a period (applied), `by` stage, vacancy, source or month | Candidates, active, hired, rejected, withdrawn, the average score; by stage in the pipeline's order (the funnel); by vacancy (20) with parts by stage group (Screening, Assessment, Interview, Offer, Hired); by source; applications by week or month |
+| `interviews.summary` | `recruitment` view, as Interviews lists them (`mine` the reader's own) | `InterviewSummaryQuery`: `status`, `mine`, a period, `by` status, outcome, interviewer or week | Interviews, scheduled, held, missed, cancelled, outcomes; by status and by outcome; by interviewer (20); interviews by week |
+| `assessments.summary` | `recruitment` view, the sittings the reader may list | `SittingSummaryQuery`: `status`, a period, `by` assessment, status or month | Sittings, not started, done, waiting to be marked, the average score; by assessment (20: sittings, the average score as its value); by status; sittings by month |
+| `offers.summary` | `recruitment` view; pay only with the salary grant | `OfferSummaryQuery`: `status`, `vacancy_id`, a period (sent), `by` status, vacancy, department or month | Offers, sent, accepted, declined, expired, the acceptance rate, outside the pay range; by status; by department or vacancy (20) with parts Accepted, Declined, Waiting; offers by month |
+| `onboarding.summary` | `recruitment` view, as Onboarding lists them | `OnboardingSummaryQuery`: `status`, `department_id`, `by` status, department or month | Cases, in progress, done, starting within 14 days, documents outstanding; by status; by department (20) with parts Done, In Progress, Not Started; starts by month |
+| `talent_pool.summary` | `recruitment` view | `PoolSummaryQuery`: `invited`, `by` role, reason or month | People kept, invited back, leaving the pool within 30 days, the average score; by role applied for (20); by why kept; kept by month |
+
+*Partnerships (planned, PR 6)*
+
+| Summary | Module, grant | Params | Figures, groups and series |
+|---|---|---|---|
+| `leads.summary` | `partnerships` view, the leads the reader may list | `LeadSummaryQuery`: the list's filters (`status`, `partner_category_id`, `owner_id`, `source`, `stage`, `health`), a period (created), `by` status, stage, category, region, owner, source or month | Leads, new, contacted, qualified, converted, lost, the conversion rate; by status always; then by stage, category, region, owner or source (20) with parts by status; created and converted by month as series |
+| `partners.summary` | `partnerships` view, the partners the reader may list | `PartnerSummaryQuery`: the list's filters (`status`, `partner_category_id`, `owner_id`, `stage`, `health`, `quiet`), `by` status, category, region, owner or health | Partners, active, dormant, closed, quiet, with a live deal; by status; by category, region or owner (20) with parts Active, Dormant, Closed; partners added by month |
+| `proposals.summary` | `partnerships` view, the proposals the reader may list | `ProposalSummaryQuery`: `status`, `owner_id`, a period (sent), `by` status, owner or month | Proposals, sent, viewed, accepted, declined, expired, the acceptance rate, value sent and accepted; by status (count and value); by owner (20) with parts Accepted, Waiting, Declined; sent and accepted by month as series |
+| `agreements.summary` | `partnerships` view, the agreements the reader may list | `AgreementSummaryQuery`: `status`, `kind`, `owner_id`, `by` status, kind, owner or renewal month | Agreements, waiting for signature, signed, active, expiring within 60 days, renewed, closed; by status and by kind; by owner (20); renewals due by month over the next 12 months as a series |
+| `interactions.summary` | `partnerships` view, the interactions of the partners and leads the reader sees | `InteractionSummaryQuery`: `partner_id`, `lead_id`, `interaction_type`, a period, `by` type, person, partner or week | Interactions, calls, meetings, emails, visits, notes, people who logged them, partners and leads reached; by type; by person (20) with parts by type; by partner or lead (top 10); interactions by week or month |
+
+*People, performance and queries (planned, PR 7)*
+
+| Summary | Module, grant | Params | Figures, groups and series |
+|---|---|---|---|
+| `exceptions.summary` | `people` view, as Attendance's exceptions | `ExceptionSummaryQuery`: `status`, `exception_type`, `department_id`, a period, `by` type, status, person, department or day | Exceptions, waiting, approved, rejected; by type (outside the worksite, unknown device, missing clock-out) with parts by status; by person (top 10) or department (20); exceptions by day or week |
+| `pay_items.summary` | `people` view, as Attendance's pay items; naira only where the reader sees pay | `PayItemSummaryQuery`: `kind`, `status`, `month`, `department_id`, `by` kind, status, person, department or month | Items, late, early departure, absence and overtime with their minutes (and amounts), pending, waived, confirmed, cut; by kind with parts by status; by person (top 10) or department (20); minutes by month as a series |
+| `temporary_sites.summary` | `people` view | `TemporarySiteSummaryQuery`: `purpose`, `state`, a period, `by` purpose, state or month | Sites, active, people on them, person-days; by purpose; by state; sites by month |
+| `devices.summary` | `people` view, as Devices | `DeviceSummaryQuery`: `status`, `by` status or department | Devices, registered, waiting, refused, people with none registered; by status; by department (20) with parts Registered, Waiting |
+| `seats.summary` | `people` view, as the structure | `SeatSummaryQuery`: `department_id`, `by` department or status | Seats, filled, open, acting; by department (20) with parts Filled, Acting, Open |
+| `my_attendance.summary` | `ess` view, the person's own days and pay items | `MyAttendanceSummaryQuery`: a period (this month), `by` week or month | Days worked, on time, late, absent, on leave, minutes late, overtime minutes, deductions pending; by week or month with parts On Time, Late, Absent, On Leave; minutes late by day as a series |
+| `my_leave.summary` | `ess` view, the person's own leave | `MyLeaveSummaryQuery`: `year` (this year) | Days entitled, taken, booked, waiting and left; by leave type with parts Taken, Booked, Waiting, Left; days taken by month as a series |
+| `kpis.summary` | `performance` view, the functions the reader reaches (`performance.md` §6.23) | `KpiSummaryQuery`: `period_id`, `department_id`, `by` function or result | KPIs, met, not met, not applicable, not entered, met as a per cent; by function (20) with parts Met, Not Met, N/A, Not Entered; met as a per cent by month as a series |
+| `scorecards.summary` | `performance` view, the scorecards the reader may list | `ScorecardSummaryQuery`: `period_id`, `department_id`, `status`, `by` status, department, reviewer or rating | Scorecards, draft, agreed, scored, the average score to date; by status; by department or reviewer (20, the average score as its value); by rating |
+| `commitments.summary` | `performance` view, as Commitments lists them | `CommitmentSummaryQuery`: `month`, `department_id`, `employee_id`, `by` state, person, department or week | Commitments, due, on time, late, missed, rescoped, the on-time rate; by state; by person (20) or department with parts On Time, Late, Missed, Rescoped; by week as series |
+| `queries.summary` | `queries` view, the queries the reader may list | `QuerySummaryQuery`: `status`, `department_id`, a period (raised), `by` status, rule, department, raised by or month | Queries, waiting for a response, past the response time, under review, closed, the average days to close; by status; by rule or department (20) with parts by status; raised by month |
+| `sanctions.summary` | `queries` view, the sanctions the reader may list; fines in naira where the reader sees pay | `SanctionSummaryQuery`: `status`, `department_id`, a period, `by` step, status, department or month | Sanctions, issued, waiting for approval, fines and their total; by step of the chain; by department (20) with parts Issued, Waiting; issued by month |
+
+*Workspace, Knowledge Hub, Community, Home and Settings (planned, PR 8)*
+
+| Summary | Module, grant | Params | Figures, groups and series |
+|---|---|---|---|
+| `projects.summary` | `workspace` view, the projects the reader sees, counting only tasks they can see | `ProjectSummaryQuery`: `status`, `partner_id`, `by` project or status | Projects, active, completed, tasks open, done and overdue; by project (20) with parts Done, Open, Overdue; by status |
+| `calendar.summary` | `workspace` view, the person's own calendar | `CalendarSummaryQuery`: `month` (this month), `by` kind or week | Meetings, invitations waiting, deadlines, leave days, hours in meetings; by kind; by week with parts by kind |
+| `training.summary` | `knowledge` view, the readers Training's management shows | `TrainingSummaryQuery`: `state`, `department_id`, a period, `by` course, department or month | Courses, people assigned, completed, in progress, overdue, the completion rate, certificates issued; by course or department (20) with parts Completed, In Progress, Overdue, Not Started; completions by month |
+| `policies.summary` | `knowledge` view, the policy writers Policies shows | `PolicySummaryQuery`: `kind`, `state`, `by` policy, department or state | Policies, in force, drafts, acknowledgements due and overdue, acknowledged as a per cent; by policy or department (20) with parts Acknowledged, Waiting, Overdue; by state |
+| `sops.summary` | `knowledge` view, the SOPs the reader may read | `SopSummaryQuery`: `department_id`, `state`, `by` department or state | SOPs, in force, drafts, archived, updated within 90 days; by department (20) with parts In Force, Draft; by state |
+| `announcements.summary` | `community` view, the announcements the reader's audience receives | `AnnouncementSummaryQuery`: a period, `by` announcement or month | Published, scheduled, read as a per cent; by announcement (top 10) with parts Read, Not Read; published by month |
+| `activity.summary` | `home` view, the reader's Activity reach | `HomeActivitySummaryQuery`: `date` or a period, `employee_id`, `by` module, person or day | Events, people acting, modules; by module (20); by person (top 10); events by hour of the day or by day |
+| `alerts.summary` | `home` view, the alerts the reader may clear | `HomeAlertSummaryQuery`: `category`, `severity`, `state`, `by` category, severity, rule or age | Open alerts, overdue, cleared this week, the oldest in days; by category with parts by severity; by rule (20); opened by day |
+| `runs.summary` | `home` view, the person's own report files | `HomeReportRunSummaryQuery`: `saved_report_id`, `status`, a period, `by` status, report, format or month | Files, done, waiting, failed, skipped; by status; by report (20); files by month |
+| `imports.summary` | `settings` view, as Import History | `ImportSummaryQuery`: `importer`, `status`, a period, `by` importer, status or month | Imports, rows imported, rows refused, failed; by importer (20) with parts Imported, Refused; imports by month |
+
 **The summary cache** (`shared/ai/summary-cache.js`): the same summary with the same parameters
 and the same scope asked again within 60 seconds is served from Redis, keyed by the asking person's
 login and their scope, so a manager's figures never reach another person and a changed grant is a
@@ -1521,6 +1653,132 @@ naming `file.<kind>` and an evaluation case with `file: "<kind>"` (a made-up sam
   lists (Proposal, MOU, Service Agreement, Contract, Brief, Invoice, Media, Other), so Upload
   Document and the card have kinds to pick there.
 
+### 6.19 Charts in the Overview (decisions 49 to 58; Appendix B)
+
+**Planned (13/11/2026); nothing here is built yet.** Each PR of Appendix B writes what it built here
+as built. Where the build shows the design wrong, the change goes here and in the Change log, never
+silently.
+
+**Why the Overview stayed empty.** The pane's Overview is drawn by the server from a summary the
+draft names (§6.13); a read's rows never become a chart, and summaries covered 12 of the 94 reads.
+A question about anything else got a table and a disabled Overview. The system turn tells the model
+how the pane works, and the model repeated that to the person.
+
+1. **Stacked parts (PR 1).**
+   - **Contract** (`assistant.js`): `AiSummaryPart` (`key`, `label`, `value`); `AiSummaryGroupRow`
+     gains `parts`, optional, up to 6. A row with parts carries their sum as its `value`. No part
+     is negative: a repo names an overspend as its own part (`over`, Over Budget) and sets the
+     remaining part to 0. `AiOverviewChart` keeps its shape (labels and up to 6 series).
+   - **Helpers** (`shared/ai/summary.js`): `part(key, label, value)`; `group()` passes a row's parts
+     through, sums them when the row gives no `value`, and throws when a given `value` and its parts
+     disagree (so a repo's mistake fails a test, never a screen).
+   - **The pane** (`engine/pane.js`): a `stacked_bar` over a group whose rows carry parts is one
+     series per part (in the order of the first row's parts, the part's label as the series'), the
+     rows as labels; a `bar` or `donut` over the same group draws the rows' totals; a `stacked_bar`
+     over a group without parts is drawn as a `bar`. `valuesOf` counts every part's value, so a
+     title may name one.
+   - **The drawing** (`packages/ui`): `BarChart` takes stacked bars (each bar's parts, a legend of
+     the series, each bar read out as its label, each part and the total). Its gallery page shows a
+     stacked chart; its test covers the drawing and the read-out; `docs/COMPONENTS.md` regenerated.
+     `OverviewPane` draws `stacked_bar` through it, and its comment "the rest wait on PR3's own
+     drawing" goes.
+   - **The prompt** (its version up by one): a group whose rows carry parts suits a stacked bar.
+2. **Budgets' summary (PR 1).** `budgets.summary` (§6.13, Finance) in `budgets.ai.js`, one SQL in
+   `budgets.repo.js` with the reader's `expenses` scope as `budgets.list` applies it. The question
+   that started this plan is an evaluation case: it reads `budgets.summary` by department and draws
+   a stacked bar.
+3. **Every read names its summary (PR 1; gate 23 rule 9).**
+   - A read in a manifest says `summary: "<summary key>"` (the summary that answers its counts and
+     totals) or `summary: "none: <reason>"`. The reasons used: `one record`, `a search`,
+     `configuration`, `my own short list`, `a picker's list`, and a few of their own (Appendix B.3).
+     `defineManifest` refuses any other value; the registry carries it into the catalogue snapshot.
+   - A read's description, as the model is offered it, names the summary that answers it, so the
+     model reaches for the summary when a question counts, totals or compares.
+   - Rule 9 of `scripts/check/ai-awareness.js` fails a read with no `summary`, a `summary` naming a
+     summary that does not exist, and a read in `scripts/check/ai-summary-gaps.json` that now names
+     one. The gaps file lists each read still waiting for its summary with the PR that brings it
+     (PR 1 writes it from Appendix B.3). A waiting read carries no `summary` and stands in the gaps
+     file; `none:` never means "not yet". The file only shrinks: an entry the change's base did not
+     hold fails, as rule 6's list does. PR 8 deletes it once it is empty.
+4. **Money reads as money (PR 1).** `MONEY_FIELD` (`assistant/answer.js`) takes allocated,
+   committed, spent, remaining, gross, net, due, paid, owed, outstanding, commission, sales and fine
+   as well. A two-place string in such a column reads "₦3,500,000.00" in the bubble's table, the
+   pane's Table, the Excel file (`buildReadExport` draws as the Table does) and the PDF. A unit test
+   holds each name.
+5. **No mechanics in an answer (PR 1).** The system turn adds: "Never tell the person how answers,
+   reads, summaries, charts or the pane work. When no chart fits, say nothing about charts." The
+   evaluation set gains a case that asks the question that started this plan and fails an answer
+   whose words name summaries, reads, endpoints, databases or how charts are generated (the grader
+   gains `never_words` if it has none).
+6. **Charts from a complete table (PR 2).**
+   - **Contract**: `AiAnswerDraft.overview` takes `read` (one of the turn's reads, by `n`) in place
+     of `summary`. With `read`, `chart` names `label` (a field of the rows, as a table's field is
+     named: `name`, `department.name`) and either `values` (up to 6 number or money fields: one draws
+     a `bar`, several a `stacked_bar` when they are parts of one whole, a `line` over a date label)
+     or `count` (a code field, such as `status`, whose rows are counted, drawn as a `donut` or a
+     `bar`). `figures` are up to three of `{ of: "rows" }`, `{ of: "sum", field }` or
+     `{ of: "count", field, value }`. `AiOverview` gains `read` beside `summary`; one of them is set.
+   - **The server** (`engine/pane.js`, `overviewOfRows`): only for a read that returned, on its
+     first page, whose rows are its whole list (`rows.length === total`, at most 25). Fields must be
+     ones the rows hold; values must be numbers or two-place strings (a money field's unit is
+     `ngn`); labels are drawn as the table draws them (a record's name, a code's words, a date day
+     first); the figures are the server's sums and counts; the title check runs against the rows'
+     values and those figures. Anything else is dropped and the Overview stays empty.
+   - **The prompt**: when a list's whole answer is on one page and no summary fits, the Overview may
+     chart that read's own columns; a longer list is charted from its summary.
+7. **The chat and the Overview's foot (PR 3).**
+   - **The bubble**: an answer that carries an Overview chart shows its words, From, its screen
+     button and Open Figures. Its table, Showing 25 of 312 and Show Next 25 are left out of the
+     bubble (the pane's Table pages them). An answer without a chart is unchanged.
+   - **Where the pane opens**: on Overview for such an answer, on desktop as today (`defaultTab`);
+     on a phone Open Figures opens the sheet on Overview.
+   - **The foot**, under the chart: **View Data** opens Table. For an answer with a read's rows,
+     Table shows them as today. For an answer drawn from a summary alone, Table shows the chart's
+     figures: its labels down the side and a column for each series or part, with a total column
+     for a stacked bar, and no Export (the PDF carries them). **Download PDF** makes the file (item
+     8). On a phone both are full width, 44 px, View Data first.
+   - `PaneTabs` enables Table for an answer with an Overview even when no read returned rows.
+8. **Download PDF (PR 3).**
+   1. `POST /ai/answers/:id/overview/export` (`EmptyBody` → `documents.ExportFile`, 202; `praxis_ai`
+      view · own) finds the caller's answer with an Overview (404 otherwise), reserves an
+      `ai_answer_overview` document pending in the request's transaction (`documents.generate()`, as
+      §6.12 says of a PDF) and emits `assistant.overview_export_requested` (the asker, the document,
+      the answer; never the words).
+   2. The outbox handler (`assistant.export.js`, `buildOverviewPdf`) runs in the worker after commit.
+      The asker must still be active and the answer still theirs. The summary runs again through
+      `authorise.runSummary` with the asker's rights now, and the Overview is drawn again from the
+      stored spec. A table Overview runs its read's first page again through `authorise.runRead`; it
+      is charted only while that page is still the whole list, otherwise the file carries the
+      figures and the rows with "The list now has 312 rows." in place of the chart.
+   3. The document (`templates/documents/ai-overview.html` on `letterhead.html`, A4 portrait): the
+      question as the title; Asked By, Asked On and As At (Lagos, day first); the answer's words; the
+      figures as tiles (money through the template's `money`); the chart, with its figures as a
+      table under it; then each other group and series of the summary, a section each, a chart with
+      its table; last, About This File: each read and summary with its filters, the masked fields by
+      name, and the environment (a staging file says so in its name and its header). A page break
+      never parts a chart from its table.
+   4. **A chart in a document** (`src/shared/documents/chart.js`, the one place a document draws a
+      chart). The renderer gains a chart block, a value the code built
+      (`{ chart: { kind, title, labels, series } }`), as a grid and a signature already are. It is
+      drawn as SVG from its numbers with every label escaped, so nothing a template or a person
+      writes reaches the markup (`render.js` keeps "there is no raw output"). Bar, stacked bar, line
+      and donut, with a legend for a stacked bar or several lines. The series colours are read once
+      from the light theme's series tokens in `packages/ui/src/styles/tokens.css`, so a colour still
+      lives in one place.
+   5. The screen waits on `GET /exports/:id` and downloads `GET /documents/:id/content`
+      (`app/src/api/exports.ts`); the toast reads "PDF downloaded". The vault keeps the file 24 hours
+      (`export-cleanup`). Only the asker, and the CEO as for every document, may open it.
+   6. A person who lost the summary's grant between the press and the build gets a failed file; one
+      who lost part of their scope gets the figures their scope holds now.
+9. **Summaries everywhere (PRs 4 to 8).** Each summary in §6.13's planned tables follows §6.13: one
+   SQL in its module's repo with the reader's scope (or the list's own audience), the `by` values
+   allow-listed in the contract and mapped to SQL in the repo, groups cut to 20 rows and top lists to
+   10 by `row_number()`, a series to its newest 60 points, everything named through
+   `shared/ai/summary.js`, a period of at most a year (`periodOf`), and `npm run gen:ai-catalogue`.
+   A summary over a list whose read carries a `matrix` probe carries one too. Each has an
+   integration case in its PR's own test file and an evaluation case. Each module's guide gains its
+   summary in §9.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -1531,6 +1789,7 @@ naming `file.<kind>` and an evaluation case with `file: "<kind>"` (a made-up sam
 | `assistant.feedback_given` | Helpful or Not Helpful | Audit only |
 | `assistant.export_requested` | Export on History | Outbox: the workbook of the person's questions, made after commit (`assistant.export_history`); a person no longer active gets a failed file |
 | `assistant.read_export_requested` | Download Excel on an answer's Table (§6.16) | Outbox: every row of the read, replayed with the asker's rights now, into the file the request reserved (`assistant.export_read`); at most 25,000 rows; a person no longer active, or an answer that is gone, gets a failed file |
+| `assistant.overview_export_requested` (planned, Appendix B PR 3) | Download PDF on an answer's Overview (§6.19 item 8) | Outbox: the summary, or the read of a table Overview, run again with the asker's rights now and drawn into the PDF the request reserved (`assistant.export_overview`); a person no longer active, or an answer that is gone, gets a failed file |
 | `assistant.card_drafted` | An answer carried a card (§6.11) | Audit only: the card, the action key, the records; never the words |
 | `assistant.action_confirmed` | A card pressed and its action run (§6.11 step 6) | Audit only: the card, the run, how it was confirmed, the result lines; the module's own event carries the change |
 | `assistant.action_failed` | A press whose action refused or failed | Audit only: the card, the error code |
@@ -1594,6 +1853,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Praxis AI · Ask (`ask`) | Praxis AI as the title; Back (on desktop the screen it returns to under the title, "From People · Leave"; opened from the menu, ⌘K or History it goes to History and the line is left out); Recent, a toggle that shows the person's conversations as a column beside the chat (titles and when last asked, newest first, 25 a page; empty, No Questions Yet); New Conversation once a conversation is open; on a phone opened from the menu, the conversations first (title, questions, when last asked; Search Conversations; No Conversations Yet, "Start one with New Conversation.") with New Conversation always, and the chat full screen over them with Back, Conversations and New Conversation; the conversation (on desktop about two fifths, on the left): empty, an illustration and Try Asking with up to 6 questions to tap; Show Earlier when older questions remain, each question as the person's bubble, each answer with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, Open Figures on an answer with a table or figures whose pane is not the one shown (none under an answer of words alone, whose chips still open the pane), From with the kinds of record read as chips ("partnership ×4", "employee ×2"; a chip shows those records in the pane; the one record, named, when the answer rests on one, shown on Record), Helpful and Not Helpful (pressed again, taken back); a question Praxis AI asks before a card ("What is the task?", "When is it due?", "Which Tunde?", "Which leave type?"; decisions 28, 29 and 32), its words alone with no From and no Open Figures, with its answers as buttons under it on the newest answer (Today, Tomorrow, Friday, No Due Day; Low, Normal, High, Urgent; 30 Minutes, 1 Hour, 2 Hours; Just Me; each person by name and job title; each leave type with the days left, "Annual Leave, 12 days left"), a tap asking it; an answer's card (§6.11): the action's name (a suggested card's as a question, "Send Message?"), each field's label and value as a person reads it (people, departments, projects and leave types by name, never an id, "For: JBS Praxis Team", "Watchers: Tobiloba Dada, Bassey Ekpe"), a problem beside its value ("Say why", "Fill the gap"; Pick one alone where an id names nothing), the records as chips ("Ayo Bello, Annual, 3 days"), the buttons (the verb with the count, "Approve Leave ×4", a lock on one that asks Confirm It's You, none while a field shows a problem; Edit, the primary button then, with Save Changes and Cancel on its fields, people, departments, projects and leave types picked as on the screen's own form; Cancel, or Not Now on a suggested card), a refusal under the card in the server's words with Open Mailbox where the mailbox is not connected, then Done or Could Not Finish with a line per record and Open, or Expired with "This card has expired." and Draw It Again; Confirm It's You (`identity.md` §10) before a sensitive card, and the toast "Set a passkey for next time" with Set Passkey once; while waiting, Reading Your Records, then Reading leave requests · 2 of 5 as each read runs; a refused answer in plain words; a failed one with its reason and Try Again; the pane (on desktop about three fifths, on the right) for the latest answer that read records or has figures (a conversation opened from Recent or History shows its own; an answer with neither, such as a card drawn from what was said, leaves the pane as it was, never blank), or the one whose chip or Open Figures was pressed (drawn in the accent): tabs Overview, Table, Record and Sources, an empty one disabled; Overview: up to three figures and one chart when a summary read answered (§6.13); Table: the read's rows, 25 a page (Previous, Next, Page 1 of 13), Export (every row of the read as an Excel file, made for the person and saved on this device, §6.16; toast "Export downloaded"), a row opening the Record, past 200 rows "Showing the first 200 of 1,240 rows"; Record: the row's or the record's fields and Open Record; Sources: each read numbered and named ("1. Leave Requests"), Read, Not Available, Not Run, Failed or Too Much (the read covered more than the database allows at once, §6.3 step 8), "25 of 312 rows", its filters, Masked with the fields emptied, Open Table; before any answer, No Answer Yet, "Ask a question to fill this pane."; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them; a chip opens them in the pane) | How reads, the context, permissions, redaction, the loop, the progress events and a card's re-check work: §1.1, §6 here and the manual |
 | Praxis AI · History (`history`) | History as the title, Export and Clear History; for AI Control: Questions This Month (everyone's), Your Questions, Spend and Monthly Cap, each captioned with the month or All AI; for everyone else: Questions This Month, Your Questions (all time) and Your Spend; Your Questions, 25 a page: Question, Asked, Sources Read, Tokens, Cost, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog; Search Questions; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Spend per Month, Naira (six months; for AI Control, "Against a ₦25,000 monthly cap" when one is set); Questions by Module; toasts "Conversation deleted", "History cleared", the export's own | Help terms on Spend (what Praxis AI's questions cost this month, priced as AI Control prices them) and Monthly Cap (the most all AI may spend in a month, set in AI Control) | Where everyone's spend by action is (AI Control · Spend), what deleting keeps: §6.5 |
 | Praxis AI · Ask, Attach Document (Appendix A) | Attach Document, a paperclip icon button with its Tooltip, left of the question box; its modal, Attach Document: What Is It? with three tiles (**Invoice**, **Payment Receipt**, **Contract or MoU**, each with its icon and a caption of at most four words: Bill to pay, Proof of a transfer, Signed or to sign), only those the person may use; then the file through `UploadField` (PDF, JPEG, PNG, WebP, HEIC, HEIF; at most 10 MB), its name and size with Remove; Question, Optional, filled with the kind's own question; Cancel and **Read Document** in the footer. While reading is off, Attach Document is off with the Tooltip Reading Documents Is Off. The question's bubble carries a chip with the file's name that opens it. The answer: its card, or one sentence when the file cannot be read. A contract or MoU: a summary of at most five sentences; its terms on the pane's Record tab, titled by the document's title (Kind, Parties, Signed On, Starts On, Ends On, Notice, Value, Renewal, each party's obligations under its name, Signed By), opened first and again from the file's From chip; its card, **Record Signed Copy** (the agreement as its chip, a lock for Confirm It's You) or **Add Partner Document**; for a reader without Partnerships edit, the summary and the terms alone | help on the modal's file field: "PDF or a photo, up to 10 MB." | why the kinds are picked first, how the server checks the figures, the jobs: decisions 41 to 48, §6.18 here, the manual |
+| Praxis AI · Ask, the Overview's charts and foot (Appendix B, planned) | On Overview: up to three figures and one chart; a stacked bar with its legend (Spent, Committed, Remaining, Over Budget for budgets); at its foot **View Data** and **Download PDF**; a charted answer's bubble: its words, From, its screen button and Open Figures, its table on the pane's Table; Table for an answer drawn from a summary alone: the chart's figures, a row for each label, a column for each series or part, Total for a stacked bar; toast "PDF downloaded"; a failed file's reason | none | How the Overview is drawn, which summary answered, why a chart is missing: §6.13 and §6.19 here and the manual; never in an answer's words (decision 55) |
 
 ### 10.2 Phone layout
 
@@ -1602,6 +1862,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Praxis AI · Ask (`ask`) | Opened from a screen (⌘K on a screen, a link with `from`): Back and Praxis AI as the title, New Conversation once a conversation is open, the conversation full width with the box pinned at the foot (the microphone and Send as 44 px targets); a question's answers one under the other, full width (44 px); an answer's card inside the bubble, its fields one under the other, the verb full width at its foot with Edit and Cancel above it (44 px), Edit's pickers full width, Confirm It's You as a sheet; Open Figures under an answer with a table or figures opens the pane as a sheet, Figures, with the four tabs: the Table as cards (44 px rows, Previous and Next full width), Open Record full width. Opened from the menu or History: Praxis AI as the title with New Conversation, then the person's conversations, newest first (title; questions and when last asked), Search Conversations, 25 a page; empty, No Conversations Yet. A conversation, or New Conversation, opens the chat full screen over the list: Back, Praxis AI as the title, Conversations (the other conversations as a sheet, as a channel's switcher is) and New Conversation; the conversation fills the screen; empty, Try Asking as a tap list; an answer's table as cards | The pane beside the chat (a sheet from Open Figures instead); Recent and its toggle (the list is the landing page instead); the screen's name under the title | New Conversation under the title and in the floating button; inside a chat, Conversations and New Conversation in its header; Open Figures under an answer | The floating button's Praxis AI opens this screen from any other, with that screen as the question's context and where Back returns (§3 step 8, decision 27); More, then Praxis AI; tabs Ask and History; Back, the phone's own Back and Escape return to the screen it was opened from |
 | Praxis AI · History (`history`) | The figure cards two to a row, then your questions as cards (question, asked, cost) | Sources Read and Tokens on each question; Spend per Month; Questions by Module | Tap a card to open its conversation on Ask; Delete Conversation in its menu's sheet; Export and Clear History in the page's menu | As above |
 | Praxis AI · Ask, Attach Document (Appendix A) | Attach Document as a 44 px icon button left of the box; the modal as a full sheet: the three tiles one under the other, full width, then the file field (the phone's picker offers the camera); a contract's terms on Record in the Figures sheet that Open Figures opens, label above value | the file's size | **Read Document**, full width at the foot of the sheet | the sheet's Back or Cancel returns to the chat |
+| Praxis AI · Ask, the Overview's charts and foot (Appendix B, planned) | Open Figures under a charted answer opens the sheet on Overview: the figures two to a row, the chart full width with a stacked bar's legend under it, then **View Data** and **Download PDF** full width, 44 px, one under the other | the chart's caption | **Download PDF** | View Data moves to Table in the same sheet; Close or a swipe down returns to the chat |
 
 ## 11 · Edge cases
 
@@ -1621,7 +1882,16 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   the module's summary read (§6.13: attendance, tasks, leave, approvals, performance, reviews,
   employees, the Audit Log); where a module has none, the answer gives the total, says it looked at
   the first 25 and names the screen (the prompt says so and never to estimate the rest). A module
-  adds a summary read when its questions need one.
+  adds a summary read when its questions need one; Appendix B adds one for every list that can
+  grow (decision 49, §6.13's planned tables).
+- **A list longer than a page whose summary is not built yet** (until Appendix B's PRs land): no
+  chart; the Overview stays disabled and the answer says nothing about charts (decision 55).
+- **A stacked bar with an overspend**: Remaining is 0 and Over Budget is its own part, so no bar
+  goes below zero (decision 51).
+- **A figure a role half sees** (pay without the salary grant): left out of that reader's figures,
+  parts and series, never shown as zero (decision 58).
+- **A complete table that grows before Download PDF**: the PDF carries the figures and the rows
+  with "The list now has 312 rows." in place of the chart (§6.19 item 8).
 - **A read that would scan too much** (a year of attendance by person for the whole company on a
   slow night): the database cuts it at 3 seconds (§6.3 step 8); the model is told "too much" and
   asks for a shorter period, a department or a person, or uses a summary; the Sources tab shows the
@@ -1761,6 +2031,9 @@ to this repository's rules, and ported code never names where it came from.
    Decided in that repository; nothing here changes until it is.
 6. **The job of the action draft** (decision 25): everything runs on Data Answers. If drafting a
    card wants a stronger model, it is one `chain` line on a registered action, chosen by the owner.
+7. **More than one chart on Overview**: the pane draws one chart and the PDF every grouping
+   (decision 54). Revisit once Appendix B's PR 3 is on staging, if people ask for a second chart on
+   screen.
 
 ## Appendix A · The build plan: documents in the chat (TB, 13/11/2026)
 
@@ -1857,8 +2130,345 @@ request.
 > Finish as CLAUDE.md step 5 says, log the handoff, open the PR ready for review, and merge it once
 > GitHub's CI is green.
 
+## Appendix B · The build plan: charts in the Overview (JBS Praxis, 13/11/2026)
+
+Planned in one chat on the most capable model at high effort (decision 57; CLAUDE.md, Working
+conventions). Each PR is built in a **fresh chat** from its start prompt (B.5), which opens the PR
+ready for review and drives GitHub's CI to green; the planning chat then reviews it, merges it, and
+gives the next prompt. "Most capable, high" means the most capable model the team has, at high
+effort, and "extra high" the effort above it; no prompt or plan names a model by its product name
+in the repository.
+
+### B.1 The pull requests
+
+| PR | Scope | Lane, owner | Size | Model and effort | Needs merged first | Runs in parallel with |
+|---|---|---|---|---|---|---|
+| 1 | Stacked bars (the parts in the contract and the pane, `BarChart`'s stacked bars, `OverviewPane`), `budgets.summary`, every read naming its summary with gate 23 rule 9 and the gaps file, money as naira, no mechanics in an answer | Full stack, TB (Expenses' code and `BarChart` reviewed by AJ) | L | Most capable, extra high | this plan's docs PR | nothing |
+| 2 | Charts from a complete table: the draft's `read` Overview, drawn by the server from the rows | Full stack, TB with GE | M | Most capable, high | PR 1 | PR 4, PR 5, PR 6, PR 7 |
+| 3 | A charted answer's table in the pane, the Overview's foot (View Data, Download PDF), the chart's figures on Table, the PDF with `shared/documents/chart.js` | Full stack, TB (the document renderer reviewed by GE) | L | Most capable, extra high | PR 2 | PR 4, PR 5, PR 6, PR 7, PR 8 |
+| 4 | Finance and pay summaries: expenses, requisitions, disbursements, deductions, my pay, payroll's trend, `payroll.month` by department | Backend, TB (Expenses' reviewed by AJ, Payroll's by LA) | M | Most capable, high | PR 1 | PR 2, PR 3, PR 5, PR 6, PR 7 |
+| 5 | Recruitment and onboarding summaries: vacancies, candidates, interviews, assessments, offers, onboarding, the talent pool | Backend, TB (Recruitment's reviewed by GE, offers and onboarding by AJ) | M | Most capable, high | PR 1 | PR 2, PR 3, PR 4, PR 6, PR 7 |
+| 6 | Partnerships summaries: leads, partners, proposals, agreements, interactions | Backend, TB (reviewed by GE and LA) | M | Most capable, high | PR 1 | PR 2, PR 3, PR 4, PR 5, PR 7 |
+| 7 | People, performance and queries summaries: exceptions, pay items, temporary sites, devices, seats, my attendance, my leave, KPIs, scorecards, commitments, queries, sanctions | Backend, TB (attendance reviewed by LA, queries and sanctions by GE) | L | Most capable, high | PR 1 | PR 2, PR 3, PR 4, PR 5, PR 6 |
+| 8 | Workspace, Knowledge Hub, Community, Home and Settings summaries: projects, calendar, training, policies, SOPs, announcements, activity, alerts, report files, imports; the gaps file deleted; Try Asking and the User Guide's chart examples for every area | Backend and docs, TB (Workspace's reviewed by AJ, Community's by GE) | L | Most capable, high | PR 4, PR 5, PR 6, PR 7 | PR 3 |
+
+### B.2 Order, waves and conflicts
+
+**Merge order.** PR 1 first. PR 3 after PR 2 (the PDF draws both kinds of Overview). PR 8 last of
+the summaries, after PRs 4 to 7 (it deletes the gaps file they shrink). The rest merge in any order.
+
+**Waves for one reviewer** (each wave starts when the PRs it needs have merged):
+
+| Wave | Chats open together | Starts when |
+|---|---|---|
+| 1 | PR 1 | this plan merges |
+| 2 | PR 2, PR 4, PR 5 | PR 1 merges |
+| 3 | PR 3, PR 6, PR 7 | PR 2 merges (PR 3); PR 6 and PR 7 need only PR 1, so they may start in wave 2 if there is time to review them |
+| 4 | PR 8 | PRs 4, 5, 6 and 7 merge |
+
+**Files more than one PR touches, and how a conflict is settled** (rebase on `main` before marking
+ready, and again before merging):
+
+- Generated files: `src/shared/ai/catalogue.snapshot.json` (`npm run gen:ai-catalogue`),
+  `contract.gen.ts` and `contract.gen.meta.json` (`npm run gen:contract`), `docs/COMPONENTS.md`
+  (`npm run gen:components`). Take either side and run the generator; never merge one by hand.
+- `scripts/check/ai-summary-gaps.json`: each PR deletes only its own entries (the file keeps them
+  in read-key order, one a line). On a conflict keep both sides' deletions.
+- `scripts/ai/eval-assistant.js`: each PR adds its cases in its own block after the summary cases,
+  headed with its PR ("Charts in the Overview, PR 4: finance and pay"). Keep both blocks.
+- §6.13's planned tables: each PR edits its own table only, and its own PR's checklist in
+  `docs/handoff/praxis-ai-engine.md` §6.12.
+- `docs/PROGRESS.md` notes, this guide's Change log and the handoff's log: keep both lines, newest
+  first.
+- The User Guide's Praxis AI chapter: PR 1 writes See figures as a chart, PR 2 adds a short list
+  to it, PR 3 changes Read an answer and Read the pane; PRs 4 to 7 do not touch the chapter (each
+  area's example question arrives with PR 8 in one edit).
+- The prompt changes only in PR 1 and PR 2, which never run together. Integration tests: each PR
+  writes its own file (`tests/integration/ai-summaries-<area>.test.js`,
+  `ai-overview-tables.test.js`, `ai-overview-export.test.js`), never `ai-summaries.test.js`.
+
+Every PR follows CLAUDE.md steps 1 to 5: the type stated, the reading done, contract first, the
+rules never broken, `npm run ci` green, `docs/PROGRESS.md` with a dated note under Praxis AI (and
+under each module whose code it changes), this guide, each module's guide (§9 for its summary), the
+User Guide where a screen changes with its pictures, and `README.MD` matching; the handoff
+`docs/handoff/praxis-ai-engine.md` §6.12 ticked and logged. Branches are `m10/<short-name>`; titles
+are Conventional Commits.
+
+### B.3 Coverage: every read and its summary
+
+The source of `scripts/check/ai-summary-gaps.json` (PR 1 writes it from the rows marked PR 4 to PR
+8 that are still waiting) and of each read's `summary` (§6.19 item 3). 94 reads: 12 answered by a
+summary that is built, 50 by the 41 summaries this plan adds, and 32 that need none. A read marked
+"(built)" or "none" gets its `summary` in PR 1; a read marked with a PR gets it in that PR.
+
+| Read | Module | Its summary, or why none |
+|---|---|---|
+| `announcements.list` | community | `announcements.summary` (PR 8) |
+| `channels.list` | community | none: a short list; messages are never read (decision 19) |
+| `colleagues.list` | community | none: a directory search; headcount is `employees.summary` |
+| `my_documents.list` | ess | none: my own short list |
+| `my_leave.balances` | ess | none: one row a leave type; charted from its table (decision 50) |
+| `my_leave.list` | ess | `my_leave.summary` (PR 7) |
+| `my_profile.get` | ess | none: one record |
+| `budgets.list` | expenses | `budgets.summary` (PR 1) |
+| `budgets.projects` | expenses | `budgets.summary` (PR 1) |
+| `disbursements.list` | expenses | `disbursements.summary` (PR 4) |
+| `expense_categories.list` | expenses | `expenses.summary` (PR 4) |
+| `expenses.approvals` | expenses | `expenses.summary` (PR 4) |
+| `expenses.list` | expenses | `expenses.summary` (PR 4) |
+| `expenses.mine` | expenses | `expenses.summary` (PR 4) |
+| `requisitions.list` | expenses | `requisitions.summary` (PR 4) |
+| `activity.list` | home | `activity.summary` (PR 8) |
+| `alerts.mine` | home | `alerts.summary` (PR 8) |
+| `cards.mine` | home | none: my own Home cards, already figures |
+| `reports.mine` | home | none: my own short list |
+| `runs.mine` | home | `runs.summary` (PR 8) |
+| `team.today` | home | `attendance.summary` (built) |
+| `guide.search` | knowledge | none: a search |
+| `policies.list` | knowledge | `policies.summary` (PR 8) |
+| `policies.mine` | knowledge | none: my own short list |
+| `policies.read` | knowledge | none: one record |
+| `sops.list` | knowledge | `sops.summary` (PR 8) |
+| `sops.read` | knowledge | none: one record |
+| `training.library` | knowledge | `training.summary` (PR 8) |
+| `training.mine` | knowledge | none: my own short list |
+| `training.overdue` | knowledge | `training.summary` (PR 8) |
+| `training.progress` | knowledge | `training.summary` (PR 8) |
+| `agreements.list` | partnerships | `agreements.summary` (PR 6) |
+| `agreements.renewals` | partnerships | `agreements.summary` (PR 6) |
+| `categories.list` | partnerships | none: configuration; charted from its table (decision 50) |
+| `deals.get` | partnerships | none: one record |
+| `deals.list` | partnerships | `partnerships.summary` (built) |
+| `interactions.list` | partnerships | `interactions.summary` (PR 6) |
+| `leads.get` | partnerships | none: one record |
+| `leads.list` | partnerships | `leads.summary` (PR 6) |
+| `partners.get` | partnerships | none: one record |
+| `partners.list` | partnerships | `partners.summary` (PR 6) |
+| `proposals.list` | partnerships | `proposals.summary` (PR 6) |
+| `deductions.list` | payroll | `deductions.summary` (PR 4) |
+| `deductions.mine` | payroll | `my_pay.summary` (PR 4) |
+| `payroll.runs` | payroll | `payroll.trend` (PR 4) |
+| `payslips.list` | payroll | `payroll.month` (built) |
+| `payslips.mine` | payroll | `my_pay.summary` (PR 4) |
+| `attendance.exceptions` | people | `exceptions.summary` (PR 7) |
+| `attendance.my_days` | people | `my_attendance.summary` (PR 7) |
+| `attendance.my_pay_items` | people | `my_attendance.summary` (PR 7) |
+| `attendance.pay_items` | people | `pay_items.summary` (PR 7) |
+| `attendance.register` | people | `attendance.summary` (built) |
+| `attendance.temporary_sites` | people | `temporary_sites.summary` (PR 7) |
+| `departments.list` | people | `employees.summary` (built) |
+| `devices.list` | people | `devices.summary` (PR 7) |
+| `devices.mine` | people | none: my own short list |
+| `employees.list` | people | `employees.summary` (built) |
+| `leave.requests` | people | `leave.summary` (built) |
+| `seats.list` | people | `seats.summary` (PR 7) |
+| `worksites.list` | people | none: configuration; charted from its table (decision 50) |
+| `commitments.list` | performance | `commitments.summary` (PR 7) |
+| `goals.analytics` | performance | `goals.summary` (built) |
+| `goals.okrs` | performance | `goals.summary` (built) |
+| `goals.trace` | performance | none: one key result's chain |
+| `kpis.list` | performance | `kpis.summary` (PR 7) |
+| `reviews.list` | performance | `reviews.summary` (built) |
+| `scorecards.list` | performance | `scorecards.summary` (PR 7) |
+| `queries.get` | queries | none: one record |
+| `queries.list` | queries | `queries.summary` (PR 7) |
+| `sanctions.list` | queries | `sanctions.summary` (PR 7) |
+| `sanctions.standing` | queries | none: one person's chain |
+| `assessments.list` | recruitment | none: configuration; charted from its table (decision 50) |
+| `assessments.sittings` | recruitment | `assessments.summary` (PR 5) |
+| `candidates.get` | recruitment | none: one record |
+| `candidates.list` | recruitment | `candidates.summary` (PR 5) |
+| `interviews.list` | recruitment | `interviews.summary` (PR 5) |
+| `offers.list` | recruitment | `offers.summary` (PR 5) |
+| `onboarding.list` | recruitment | `onboarding.summary` (PR 5) |
+| `talent_pool.list` | recruitment | `talent_pool.summary` (PR 5) |
+| `vacancies.get` | recruitment | none: one record |
+| `vacancies.hiring_managers` | recruitment | none: a picker's list |
+| `vacancies.list` | recruitment | `vacancies.summary` (PR 5) |
+| `approvals.mine` | settings | `approvals.summary` (built) |
+| `holidays.list` | settings | none: configuration |
+| `imports.history` | settings | `imports.summary` (PR 8) |
+| `numbering.list` | settings | none: configuration |
+| `organisation.get` | settings | none: one record |
+| `roles.get` | settings | none: one record |
+| `roles.list` | settings | none: configuration; charted from its table (decision 50) |
+| `working_week.get` | settings | none: one record |
+| `calendar.month` | workspace | `calendar.summary` (PR 8) |
+| `projects.list` | workspace | `projects.summary` (PR 8) |
+| `tasks.get` | workspace | none: one record |
+| `tasks.list` | workspace | `tasks.summary` (built) |
+
+### B.4 Each PR
+
+#### PR 1 · Stacked bars, Budgets and every read naming its summary (`m10/overview-stacked`)
+
+- **Contract first:** `AiSummaryPart` and `AiSummaryGroupRow.parts` (`assistant.js`);
+  `BudgetSummaryQuery` with `BudgetSummaryBy` (`budgets.js`); each with its `TABLES` entry;
+  `npm run gen:contract`.
+- **Backend:** `shared/ai/summary.js` `part()` and parts in `group()`; `engine/pane.js` (parts as
+  series, `valuesOf`); `shared/ai/manifest.js` takes a read's `summary` (a summary's key or
+  `none: <reason>`), the registry carries it into `catalogue()` and into the read's description as
+  the model is offered it; every read given its `summary` from B.3 (a waiting read is left without one and listed
+  in the gaps file); `budgets.summary` (the manifest, one SQL in `budgets.repo.js`, the service);
+  rule 9 in `scripts/check/ai-awareness.js` and `scripts/check/ai-summary-gaps.json` (48 entries);
+  `MONEY_FIELD` widened; the prompt's two lines and its version; `npm run gen:ai-catalogue`.
+- **Frontend:** `BarChart` with stacked bars (its gallery page, its test, `docs/COMPONENTS.md`),
+  `OverviewPane` drawing them with a legend; the in-browser mock answers a budget question with a
+  stacked Overview.
+- **Tests:** unit (parts and their sum, a disagreeing sum thrown, parts as series, the title check
+  over parts, each new money name, rule 9 on a fixture: no `summary`, a summary that does not exist,
+  a gap that is now answered, a gap the base did not hold); integration on the real migrations,
+  `tests/integration/ai-summaries-budgets.test.js` (the CEO's departments with parts that sum to
+  each allocation; an overspent line as Over Budget and Remaining 0; a head of department's figures
+  are their department's; a role without `expenses` view refused; `by` project empty below scope
+  `all`); frontend (`BarChart`'s stacked drawing and read-out, `OverviewPane`'s stacked chart; the
+  a11y gate on the gallery page); evaluation cases (the question that started this plan reads
+  `budgets.summary` by department with a stacked bar; no mechanics in its words).
+- **Docs:** this guide (§6.13's Budgets table built, §6.19 items 1 to 5 as built, the Change log),
+  `expenses.md` §9; the User Guide's Praxis AI chapter: Read the pane (stacked bars and their
+  legend) and a new section, See figures as a chart (ask for figures "by department" or "by
+  month"; the budget example), pictures taken (`npm run guide:shots -- --stale`).
+- **Done when** the question that started this plan, asked on the demo as the CEO, draws the
+  departments as stacked bars on Overview with three figures, the bubble's and the Table's amounts
+  read in naira, and the answer's words say nothing of how charts are made.
+
+#### PR 2 · Charts from a complete table (`m10/overview-tables`)
+
+- **Contract first:** `AiAnswerDraft.overview.read`, the chart's `label`, `values` and `count`, the
+  figures' `of`; `AiOverview.read`; `npm run gen:contract`.
+- **Backend:** `engine/pane.js` `overviewOfRows` (the engine stays pure, gate 24: the adapter hands
+  in the table's own cell formatter from `assistant/answer.js`, so a label reads as its cell does);
+  `answer.js` choosing the summary's Overview or the rows'; the prompt's line and its version.
+- **Frontend:** `OverviewPane` takes a figure's unit from a money field; the mock answers a short
+  list with a chart.
+- **Tests:** unit (a whole list charted; 26 rows of a total of 30 never; a field the rows do not
+  hold dropped; a money field's unit; a code field counted and read in words; the title check over
+  rows and computed figures); integration, `tests/integration/ai-overview-tables.test.js` (the
+  budgets of four departments read with `budgets.list` and charted from the rows; a 30-row list not
+  charted; a masked field never charted for a role that does not see it); evaluation (a short list
+  charted: "How many people work at each worksite?").
+- **Docs:** §6.19 item 6 as built, §11; the User Guide's See figures as a chart (a short list
+  charts too), pictures retaken.
+- **Done when** a question over a short list with no summary draws its chart and a list longer
+  than a page never does.
+
+#### PR 3 · The chat, the Overview's foot and Download PDF (`m10/overview-pdf`)
+
+- **Contract first:** the route's contract (`EmptyBody` → `documents.ExportFile`, 202) in the
+  route contracts; the document kind `ai_answer_overview`; `npm run gen:contract`.
+- **Backend:** `POST /ai/answers/:id/overview/export` (`praxis_ai` view · own) reserving the file
+  with `documents.generate()`; `assistant.overview_export_requested` and its outbox handler
+  `buildOverviewPdf`; `src/shared/documents/chart.js` and the renderer's chart block (`render.js`);
+  `templates/documents/ai-overview.html`; the series colours read from `tokens.css`.
+- **Frontend:** a charted answer's bubble without its table (the screen stops passing `table`);
+  the Overview's foot (`OverviewPane` takes `onViewData` and `onDownload`, the buttons in an
+  `ActionGroup`, one press one request, F26); Table showing the chart's figures for an answer from a
+  summary alone (`TablePane` given rows the screen builds from `overview.chart`), with no Export;
+  `PaneTabs` enabling Table for it; the phone's sheet with the foot full width at 44 px; the mock
+  answers the export.
+- **Tests:** unit (`chart.js` draws a bar, a stacked bar, a line and a donut, escapes a label of
+  `<script>`, takes its colours from `tokens.css`; the renderer's chart block); integration,
+  `tests/integration/ai-overview-export.test.js` (reserved at once and made after commit with the
+  asker's rights; the summary run again; a lost grant fails the file; another person's answer 404;
+  the PDF's text holds the figures, each grouping and About This File; a table Overview that grew
+  says so); frontend (the bubble without its table when charted and with it when not; View Data
+  opens Table with the chart's figures; Download PDF one press; the phone's sheet); the a11y gate
+  on Ask at both sizes.
+- **Docs:** §5's route, §6.19 items 7 and 8 as built, §7's event, §10.1 and §10.2 as built, §11;
+  the User Guide's Read an answer and Read the pane (View Data, Download PDF), pictures retaken.
+- **Done when** Download PDF on the budget answer saves a PDF on the letterhead with the stacked
+  chart and its table, each other grouping with its chart and table, and About This File; View Data
+  opens the chart's figures; a charted answer's table sits in the pane, not the chat.
+
+#### PRs 4 to 8 · The summaries (one pattern)
+
+- **Contract first:** each summary's query schema (`<Thing>SummaryQuery`, its `by` enum, the list's
+  own filters, a period) in its module's contract file, with its `TABLES` entry ("figures, never a
+  row"); `npm run gen:contract`.
+- **Backend:** each summary in its module's `.ai.js` `summaries`, one SQL in its repo with the
+  reader's scope (§6.19 item 9); the reads it answers given their `summary` and taken off the gaps
+  file; `npm run gen:ai-catalogue`.
+- **Tests:** `tests/integration/ai-summaries-<area>.test.js` on the real migrations: each summary
+  answers the CEO with figures and never a row; a manager's or a head's figures are their scope's; a
+  role without the grant is refused; a figure a role does not see on screen is left out for it,
+  never shown as zero; a series stops at 60 points; the matrix's probes where the list has them; an
+  evaluation case for each summary in the PR's own block.
+- **Docs:** §6.13's own table as built; each module's guide §9; PROGRESS notes under each module
+  and Praxis AI; the handoff.
+- **Done when** each of the PR's summaries answers its evaluation question with a chart on the demo
+  as the role its §8 names, and the gaps file holds none of its reads.
+
+Each summary PR's own points:
+
+- **PR 4 · Finance and pay (`m10/summaries-finance`).** `payroll.month` keeps its key and its
+  figures (its evaluation case stays as it is) and gains `by`; `my_pay.summary` counts published
+  payslips only and is never masked from the person; `expenses.summary`'s `waiting_on_me` uses the
+  workflow's stage as `expenses.approvals` does. Guides: `expenses.md`, `payroll.md`.
+- **PR 5 · Recruitment and onboarding (`m10/summaries-recruitment`).** Stages in `M4_STAGES` order;
+  an offer's pay only with the salary grant. Guides: `recruitment.md`, `offers.md`.
+- **PR 6 · Partnerships (`m10/summaries-partnerships`).** Values as the lists show them to the
+  reader; a quiet partner is the partners list's own `quiet` rule, never a new one. Guide: `partnerships.md`.
+- **PR 7 · People, performance and queries (`m10/summaries-people`).** Pay items' and sanctions'
+  naira only for a reader who sees pay; `my_attendance.summary` and `my_leave.summary` are the
+  person's own (the matrix gives them every role). Guides: `attendance.md`, `organogram.md`,
+  `ess.md`, `performance.md`, `queries.md`.
+- **PR 8 · Workspace, Knowledge Hub, Community, Home and Settings (`m10/summaries-close`).**
+  `projects.summary` counts only the tasks the reader may see; `calendar.summary` is the person's
+  own; then the gaps file is deleted and rule 9 runs with no list; a Try Asking line for a chart in
+  each area the person's reads reach (gate 23 rule 5); the User Guide's See figures as a chart gains
+  an example question for every area; the handoff's §6.12 closed. Guides: `workspace.md`,
+  `knowledge.md`, `policies.md`, `community.md`, `home.md`, `foundation.md` (imports).
+
+### B.5 Start prompts
+
+Each is pasted into a new chat on this repository once the PRs it needs have merged (B.1). Every
+prompt ends the same way: the chat opens the PR ready for review, drives GitHub's CI to green,
+reports the PR's link and stops; the planning chat reviews and merges it.
+
+**PR 1** (once this plan merges):
+
+> This is a full-stack change to Praxis AI, PR 1 of `docs/guides/praxis-ai.md` Appendix B:
+> stacked bars, Budgets' summary and every read naming its summary. Read `docs/guides/praxis-ai.md`
+> in full, decisions 49 to 58, §6.13 and §6.19 above all (they are not re-opened), then
+> `docs/guides/expenses.md`, `docs/handoff/praxis-ai-engine.md` and what CLAUDE.md step 2 asks for
+> a full-stack task. Build only PR 1, contract first. If the guide is wrong or silent, change it
+> first in the same PR. Finish as CLAUDE.md step 5 says, tick and log the handoff's §6.12, open the
+> PR ready for review, drive GitHub's CI to green, then report the PR's link and stop.
+
+**PR 2** (once PR 1 merges):
+
+> This is a full-stack change to Praxis AI, PR 2 of `docs/guides/praxis-ai.md` Appendix B: charts
+> from a complete table. Read `docs/guides/praxis-ai.md` in full, decisions 49 to 58 and §6.19 above
+> all (not re-opened), then `docs/handoff/praxis-ai-engine.md` and what CLAUDE.md step 2 asks for a
+> full-stack task. Build only PR 2, contract first. If the guide is wrong or silent, change it first
+> in the same PR. Finish as CLAUDE.md step 5 says, tick and log the handoff's §6.12, open the PR
+> ready for review, drive GitHub's CI to green, then report the PR's link and stop.
+
+**PR 3** (once PR 2 merges):
+
+> This is a full-stack change to Praxis AI, PR 3 of `docs/guides/praxis-ai.md` Appendix B: a
+> charted answer's table in the pane, the Overview's View Data and Download PDF. Read
+> `docs/guides/praxis-ai.md` in full, decisions 49 to 58 and §6.19 items 7 and 8 above all (not
+> re-opened), then `docs/guides/foundation.md` §6.12, `docs/handoff/praxis-ai-engine.md` and what
+> CLAUDE.md step 2 asks for a full-stack task. Build only PR 3, contract first. If the guide is
+> wrong or silent, change it first in the same PR. Finish as CLAUDE.md step 5 says, tick and log the
+> handoff's §6.12, open the PR ready for review, drive GitHub's CI to green, then report the PR's
+> link and stop.
+
+**PRs 4 to 8** (once PR 1 merges; PR 8 once PRs 4 to 7 merge). The same prompt with the PR's number,
+area and guides from B.4:
+
+> This is a backend change to Praxis AI and its modules, PR `<n>` of `docs/guides/praxis-ai.md`
+> Appendix B: the `<area>` summaries. Read `docs/guides/praxis-ai.md` in full, decisions 49 to 58,
+> §6.13 (its PR `<n>` table) and §6.19 item 9 above all (not re-opened), then the module guides B.4
+> names for PR `<n>`, `docs/handoff/praxis-ai-engine.md` and what CLAUDE.md step 2 asks for a
+> backend task. Build only PR `<n>`, contract first. If the guide is wrong or silent, change it
+> first in the same PR. Finish as CLAUDE.md step 5 says, tick and log the handoff's §6.12, open the
+> PR ready for review, drive GitHub's CI to green, then report the PR's link and stop.
+
 ## 14 · Change log
 
+- 13/11/2026 · JP · Charts in the Overview planned (§1.11 decisions 49 to 58, §6.13's planned tables, §6.19, Appendix B), from JBS Praxis's six answers: why a budget question left the Overview empty (12 of the 94 reads had a summary, budgets none), stacked bars, charts from a complete table, a charted answer's table in the pane, View Data and Download PDF with a designed PDF, no mechanics in an answer, money in naira, and 41 new summaries so that every read names its summary or why it needs none (gate 23 rule 9); eight PRs with their order, waves and start prompts. §2, §5, §7, §10, §11 and §13 carry the planned rows. Nothing built.
 - 13/11/2026 · TB · Documents in the chat, PR 2 built (Appendix A): Contract or MoU on Attach Document, read on `agreement-document-read` (Image Reading, chosen by TB), summarised, its terms on the pane's Record tab (`AiAnswerAttachment.record`, `AiAttachmentRecord`), and filed by a card: Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else Add Partner Document (`partner_documents.attach`) on the partner or lead it names. The build taught §6.18 five things, written there: a kind's grant may be `view` (decision 41 offers the tile to Partnerships view; the manifest refused anything but an action's grants), and a reader without edit gets no card; the card's kind reads as its name and the run turns it into MyCity's code, so the card schema `PartnerDocumentAdd` stays and its run sends `PartnerDocumentAttach`, which never had a `file:` reason (an Attach is no form gate 23 rule 6 counts, and no `not_offered` may name it); the reading carries `currency` and each signatory's party, so a dollar value is not read as naira and the partner's signer is told from MyCity's; a `file.<kind>` read is never replayed, so the pane opens Record or Sources for it and never a Table (an invoice's pane asked for the replay and got 404); staging had no document kinds, so its partnership setup enters §4.3's list.
 - 13/11/2026 · TB · A record named by its words (`shared/ai/named.js`, decision 32) reads "&" as "and": the model wrote Travel & Transport for the category Travel and Transport, nothing matched, and the New Request card read Category "Invalid uuid" with no New Request button (found filming M8; `docs/runbooks/training-videos.md` §7). Test: `ai-engine.test.js`.
 - 13/11/2026 · TB · Documents in the chat, PR 1 built (Appendix A): Attach Document on Ask with Invoice and Payment Receipt, `GET /ai/attachment-kinds`, `AiAsk.attachment`, the reading as read 1 (`file.<kind>`), the manifest's `files`, `my_expenses.from_invoice` with its `lines`, Record Disbursement from a receipt with the request matched in SQL, `LinesField` and `MoneyField` `signed`. The build taught §6.18 five things, written there: the reader's values are laid over the model's before the ask guard and again on later questions of the conversation (a tapped answer keeps the file's figures); an action drawn only from a file says `from_file: { kind, fills }`, offered only with that file and its `fills` counted as asked by gate 23 rule 7, and a new rule 8 holds each kind to a test and an evaluation case; the card names the file on its field rather than as a record, which would count on the verb; a receipt that matches none asks which request (decision 34) rather than leaving Pick one; Expenses' negative line needs migration 8030 (8010's CHECKs on a line's price and amount), and `ExpenseInvoiceRead` gains `subject` and `currency` for the purpose and Naira only.
