@@ -99,7 +99,8 @@ export function NoteTaker({ open, onClose, subject, value, onChange, saved = nul
     return r ? { x: r.left, y: r.top } : { x: GAP, y: GAP };
   };
   const startDrag = (e: PointerEvent<HTMLElement>) => {
-    if (phone || e.button !== 0) return;
+    // A press on one of the bar's buttons is that button's: capturing it here would send its click to the bar.
+    if (phone || e.button !== 0 || (e.target as Element).closest("button:not([data-grip])")) return;
     const p = here();
     grab.current = { x: e.clientX - p.x, y: e.clientY - p.y };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -159,7 +160,7 @@ export function NoteTaker({ open, onClose, subject, value, onChange, saved = nul
         {phone ? (
           <IconButton icon={atTop ? "down" : "up"} label={atTop ? "Move to Bottom" : "Move to Top"} size="sm" onClick={() => setAtTop((t) => !t)} />
         ) : (
-          <IconButton icon="drag" label="Move Notes" size="sm" className="cursor-grab" onKeyDown={nudge} />
+          <IconButton icon="drag" label="Move Notes" size="sm" className="cursor-grab" data-grip onKeyDown={nudge} />
         )}
         <IconButton icon={small ? "expand" : "minus"} label={small ? "Open Notes" : "Minimise Notes"} size="sm" onClick={() => setSmall((s) => !s)} />
         <IconButton icon="x" label="Close Notes" size="sm" onClick={onClose} />
