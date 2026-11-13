@@ -106,6 +106,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "reports.mine",
+      summary: "none: my own short list",
       description: "List the reports I own or receive, with each one's schedule, formats and recipients",
       params: c.reports.HomeReportQuery,
       permission: ["home", "view"],

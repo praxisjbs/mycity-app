@@ -126,6 +126,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "holidays.list",
+      summary: "none: configuration",
       description: "List the public holidays, by date, optionally for one year",
       params: c.settings.HolidayListQuery,
       permission: ["ess", "view"],
@@ -134,6 +135,7 @@ module.exports = defineManifest({
     },
     {
       key: "working_week.get",
+      summary: "none: one record",
       description: "The working week: which days are worked and the hours of each",
       params: c.common.EmptyBody,
       permission: ["ess", "view"],
@@ -142,6 +144,7 @@ module.exports = defineManifest({
     },
     {
       key: "organisation.get",
+      summary: "none: one record",
       description: "The organisation's own details: legal name, trading name, address and contacts",
       params: c.common.EmptyBody,
       permission: ["ess", "view"],
@@ -150,6 +153,7 @@ module.exports = defineManifest({
     },
     {
       key: "numbering.list",
+      summary: "none: configuration",
       description: "List the numbering scheme of each numbered document type, with the next number",
       params: c.settings.NumberingListQuery,
       permission: ["settings", "view"],

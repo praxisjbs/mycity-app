@@ -231,6 +231,8 @@ function snapshot() {
     schema: r.kind === "action" ? contractNameOf(action(r.key).input) : r.kind === "summary" ? contractNameOf(summary(r.key).params) : r.kind === "read" ? contractNameOf(read(r.key).params) : null,
     schema_sha: r.params_schema ? sha(r.params_schema) : null,
     screen: r.screen,
+    // The summary that answers a read's counts and totals, or why it needs none (praxis-ai.md §6.19 item 3).
+    ...(r.kind === "read" && read(r.key).summary ? { summary: read(r.key).summary } : {}),
     // An authority held on top of the grant is part of who may press it (praxis-ai.md §6.11).
     ...(r.kind === "action" && action(r.key).capability ? { capability: action(r.key).capability } : {}),
     ...(r.kind === "action" && action(r.key).capabilities ? { capabilities: [...action(r.key).capabilities] } : {}),

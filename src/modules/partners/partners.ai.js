@@ -195,6 +195,7 @@ module.exports = defineManifest({
     },
     {
       key: "partners.get",
+      summary: "none: one record",
       description: "One partner's whole picture: signed value, returns and downloads this year, active deals, days since contact, its deals, contacts and latest interactions",
       params: c.common.IdParams,
       permission: ["partnerships", "view"],

@@ -35,6 +35,7 @@ module.exports = defineManifest({
     },
     {
       key: "sops.read",
+      summary: "none: one record",
       description: "Read one department procedure (SOP) in force: its purpose, scope, roles and numbered steps with who does each",
       params: c.common.IdParams,
       permission: ["knowledge", "view"],

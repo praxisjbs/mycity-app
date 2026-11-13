@@ -6,6 +6,9 @@
  * spent and remaining), within the reader's `expenses` scope, and each project's budget and spend
  * for a reader whose scope is all (as Expenses · Projects), an empty page for anyone else. 25 a page.
  *
+ * Summary: a year's budgets in figures, by department and by category (by project for scope all),
+ * each row a stacked bar of Spent, Committed, Remaining and Over Budget (praxis-ai.md §6.13, §6.19).
+ *
  * Cards a holder of `expenses.finance` confirms, through the service functions the tabs' own
  * buttons call: New Budget (a department's year by category), Edit Budget (the lines again, whole)
  * and Set Budget on a project (or none).
@@ -22,6 +25,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "budgets.list",
+      summary: "budgets.summary",
       description: "List the departments' budgets for a year: each one's allocation, committed (approved, not yet paid), spent and remaining, and the same by category",
       params: c.budgets.BudgetListQuery,
       permission: ["expenses", "view"],
@@ -30,11 +34,21 @@ module.exports = defineManifest({
     },
     {
       key: "budgets.projects",
+      summary: "budgets.summary",
       description: "List the projects with their optional budget and what their expense requests have committed and spent, and what is left",
       params: c.budgets.ProjectSpendListQuery,
       permission: ["expenses", "view"],
       run: (_client, params, actor) => (actor.scope && actor.scope.scope === "all" ? service.projects(params, actor.scope) : envelope([], 1, 0)),
       cite: (row) => ({ type: "project", id: row.project_id, label: `${row.number} ${row.name}`.trim() }),
+    },
+  ],
+  summaries: [
+    {
+      key: "budgets.summary",
+      description: "A year's budgets in figures: allocated, committed, spent and remaining by department, category or project, each split for a stacked bar, and what was paid by month",
+      params: c.budgets.BudgetSummaryQuery,
+      permission: ["expenses", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
   ],
   actions: [

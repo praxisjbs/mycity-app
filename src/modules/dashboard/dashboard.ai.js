@@ -48,6 +48,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "cards.mine",
+      summary: "none: my own Home cards, already figures",
       description: "Read the cards on my own Home and their figures today, in the order my Overview shows them",
       params: c.common.EmptyBody,
       permission: ["home", "view"],
@@ -56,6 +57,7 @@ module.exports = defineManifest({
     },
     {
       key: "team.today",
+      summary: "attendance.summary",
       description: "List today's roster on my Team tab: each person's status, clock-in, clock-out and any missing clock-out yesterday",
       params: c.dashboard.HomeTeamQuery,
       permission: ["home", "view"],

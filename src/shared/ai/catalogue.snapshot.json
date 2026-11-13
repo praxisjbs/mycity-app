@@ -1582,7 +1582,8 @@
       "bulk": null,
       "schema": "workflow.ApprovalMineQuery",
       "schema_sha": "cedee0f3495723f9",
-      "screen": null
+      "screen": null,
+      "summary": "approvals.summary"
     },
     {
       "key": "assessments.list",
@@ -1593,7 +1594,8 @@
       "bulk": null,
       "schema": "assessments.AssessmentListQuery",
       "schema_sha": "b9413bd41ed8ab7a",
-      "screen": null
+      "screen": null,
+      "summary": "none: configuration; charted from its table (decision 50)"
     },
     {
       "key": "assessments.sittings",
@@ -1659,7 +1661,8 @@
       "bulk": null,
       "schema": "attendance.RegisterQuery",
       "schema_sha": "9b002e7831c509b0",
-      "screen": null
+      "screen": null,
+      "summary": "attendance.summary"
     },
     {
       "key": "attendance.temporary_sites",
@@ -1681,7 +1684,8 @@
       "bulk": null,
       "schema": "budgets.BudgetListQuery",
       "schema_sha": "8f58085ac320b408",
-      "screen": null
+      "screen": null,
+      "summary": "budgets.summary"
     },
     {
       "key": "budgets.projects",
@@ -1692,7 +1696,8 @@
       "bulk": null,
       "schema": "budgets.ProjectSpendListQuery",
       "schema_sha": "8de6d8d4fd152f43",
-      "screen": null
+      "screen": null,
+      "summary": "budgets.summary"
     },
     {
       "key": "calendar.month",
@@ -1714,7 +1719,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "candidates.list",
@@ -1736,7 +1742,8 @@
       "bulk": null,
       "schema": "common.EmptyBody",
       "schema_sha": "32062bdb9024160d",
-      "screen": null
+      "screen": null,
+      "summary": "none: my own Home cards, already figures"
     },
     {
       "key": "categories.list",
@@ -1747,7 +1754,8 @@
       "bulk": null,
       "schema": "partner_pipeline.CategoryListQuery",
       "schema_sha": "7d89061a9ab84adf",
-      "screen": null
+      "screen": null,
+      "summary": "none: configuration; charted from its table (decision 50)"
     },
     {
       "key": "channels.list",
@@ -1758,7 +1766,8 @@
       "bulk": null,
       "schema": "community.ChannelListQuery",
       "schema_sha": "463693b1b2726c8c",
-      "screen": null
+      "screen": null,
+      "summary": "none: a short list; messages are never read (decision 19)"
     },
     {
       "key": "colleagues.list",
@@ -1769,7 +1778,8 @@
       "bulk": null,
       "schema": "community.ColleagueListQuery",
       "schema_sha": "c7a6bd698a6fd04a",
-      "screen": null
+      "screen": null,
+      "summary": "none: a directory search; headcount is employees.summary"
     },
     {
       "key": "commitments.list",
@@ -1791,7 +1801,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "deals.list",
@@ -1802,7 +1813,8 @@
       "bulk": null,
       "schema": "partner_pipeline.DealListQuery",
       "schema_sha": "38ed60dff143fdf3",
-      "screen": null
+      "screen": null,
+      "summary": "partnerships.summary"
     },
     {
       "key": "deductions.list",
@@ -1835,7 +1847,8 @@
       "bulk": null,
       "schema": "organisation.DepartmentListQuery",
       "schema_sha": "679c0db6710dc19d",
-      "screen": null
+      "screen": null,
+      "summary": "employees.summary"
     },
     {
       "key": "devices.list",
@@ -1857,7 +1870,8 @@
       "bulk": null,
       "schema": "common.PageQuery",
       "schema_sha": "463693b1b2726c8c",
-      "screen": null
+      "screen": null,
+      "summary": "none: my own short list"
     },
     {
       "key": "disbursements.list",
@@ -1879,7 +1893,8 @@
       "bulk": null,
       "schema": "organisation.EmployeeListQuery",
       "schema_sha": "6189341a0eea358a",
-      "screen": null
+      "screen": null,
+      "summary": "employees.summary"
     },
     {
       "key": "expense_categories.list",
@@ -1934,7 +1949,8 @@
       "bulk": null,
       "schema": "goals.PerformanceAnalyticsQuery",
       "schema_sha": "e3943c914dd6c906",
-      "screen": null
+      "screen": null,
+      "summary": "goals.summary"
     },
     {
       "key": "goals.okrs",
@@ -1945,7 +1961,8 @@
       "bulk": null,
       "schema": "goals.OkrListQuery",
       "schema_sha": "96bde35b0278f0bb",
-      "screen": null
+      "screen": null,
+      "summary": "goals.summary"
     },
     {
       "key": "goals.trace",
@@ -1956,7 +1973,8 @@
       "bulk": null,
       "schema": "goals.TraceQuery",
       "schema_sha": "24a718cc7f58e8d6",
-      "screen": null
+      "screen": null,
+      "summary": "none: one key result's chain"
     },
     {
       "key": "guide.search",
@@ -1967,7 +1985,8 @@
       "bulk": null,
       "schema": "common.PageQuery",
       "schema_sha": "463693b1b2726c8c",
-      "screen": null
+      "screen": null,
+      "summary": "none: a search"
     },
     {
       "key": "holidays.list",
@@ -1978,7 +1997,8 @@
       "bulk": null,
       "schema": "settings.HolidayListQuery",
       "schema_sha": "3195ef866f2e1050",
-      "screen": null
+      "screen": null,
+      "summary": "none: configuration"
     },
     {
       "key": "imports.history",
@@ -2033,7 +2053,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "leads.list",
@@ -2055,7 +2076,8 @@
       "bulk": null,
       "schema": "leave.LeaveListQuery",
       "schema_sha": "61eab9545696ca98",
-      "screen": null
+      "screen": null,
+      "summary": "leave.summary"
     },
     {
       "key": "my_documents.list",
@@ -2066,7 +2088,8 @@
       "bulk": null,
       "schema": "documents.DocumentListQuery",
       "schema_sha": "ab79dc30ba0b2e21",
-      "screen": null
+      "screen": null,
+      "summary": "none: my own short list"
     },
     {
       "key": "my_leave.balances",
@@ -2077,7 +2100,8 @@
       "bulk": null,
       "schema": "ess.EssLeaveBalanceQuery",
       "schema_sha": "2dcf13d32ccf292a",
-      "screen": null
+      "screen": null,
+      "summary": "none: one row a leave type; charted from its table (decision 50)"
     },
     {
       "key": "my_leave.list",
@@ -2099,7 +2123,8 @@
       "bulk": null,
       "schema": "common.EmptyBody",
       "schema_sha": "32062bdb9024160d",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "numbering.list",
@@ -2110,7 +2135,8 @@
       "bulk": null,
       "schema": "settings.NumberingListQuery",
       "schema_sha": "8ecadf8c0ec5c318",
-      "screen": null
+      "screen": null,
+      "summary": "none: configuration"
     },
     {
       "key": "offers.list",
@@ -2143,7 +2169,8 @@
       "bulk": null,
       "schema": "common.EmptyBody",
       "schema_sha": "32062bdb9024160d",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "partners.get",
@@ -2154,7 +2181,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "partners.list",
@@ -2187,7 +2215,8 @@
       "bulk": null,
       "schema": "payslips.PayslipListQuery",
       "schema_sha": "fea82298cf644b4f",
-      "screen": null
+      "screen": null,
+      "summary": "payroll.month"
     },
     {
       "key": "payslips.mine",
@@ -2220,7 +2249,8 @@
       "bulk": null,
       "schema": "policies.MyPolicyListQuery",
       "schema_sha": "64bf91ec9d153b04",
-      "screen": null
+      "screen": null,
+      "summary": "none: my own short list"
     },
     {
       "key": "policies.read",
@@ -2231,7 +2261,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "projects.list",
@@ -2264,7 +2295,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "queries.list",
@@ -2286,7 +2318,8 @@
       "bulk": null,
       "schema": "reports.HomeReportQuery",
       "schema_sha": "a7a6a19617a81e73",
-      "screen": null
+      "screen": null,
+      "summary": "none: my own short list"
     },
     {
       "key": "requisitions.list",
@@ -2308,7 +2341,8 @@
       "bulk": null,
       "schema": "reviews.ReviewListQuery",
       "schema_sha": "6fd258ea6525c380",
-      "screen": null
+      "screen": null,
+      "summary": "reviews.summary"
     },
     {
       "key": "roles.get",
@@ -2319,7 +2353,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "roles.list",
@@ -2330,7 +2365,8 @@
       "bulk": null,
       "schema": "access.RoleRowListQuery",
       "schema_sha": "335f1a07277bf37d",
-      "screen": null
+      "screen": null,
+      "summary": "none: configuration; charted from its table (decision 50)"
     },
     {
       "key": "runs.mine",
@@ -2363,7 +2399,8 @@
       "bulk": null,
       "schema": "sanctions.SanctionStandingQuery",
       "schema_sha": "897c5e1a8302f64d",
-      "screen": null
+      "screen": null,
+      "summary": "none: one person's chain"
     },
     {
       "key": "scorecards.list",
@@ -2407,7 +2444,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "talent_pool.list",
@@ -2429,7 +2467,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "tasks.list",
@@ -2440,7 +2479,8 @@
       "bulk": null,
       "schema": "tasks.TaskListQuery",
       "schema_sha": "f0e4156454d0c367",
-      "screen": null
+      "screen": null,
+      "summary": "tasks.summary"
     },
     {
       "key": "team.today",
@@ -2451,7 +2491,8 @@
       "bulk": null,
       "schema": "dashboard.HomeTeamQuery",
       "schema_sha": "2349da853e18a360",
-      "screen": null
+      "screen": null,
+      "summary": "attendance.summary"
     },
     {
       "key": "training.library",
@@ -2473,7 +2514,8 @@
       "bulk": null,
       "schema": "training.MyTrainingQuery",
       "schema_sha": "707307568ddee42c",
-      "screen": null
+      "screen": null,
+      "summary": "none: my own short list"
     },
     {
       "key": "training.overdue",
@@ -2506,7 +2548,8 @@
       "bulk": null,
       "schema": "common.IdParams",
       "schema_sha": "0561cbbe892217e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "vacancies.hiring_managers",
@@ -2517,7 +2560,8 @@
       "bulk": null,
       "schema": "vacancies.HiringManagerListQuery",
       "schema_sha": "463693b1b2726c8c",
-      "screen": null
+      "screen": null,
+      "summary": "none: a picker's list"
     },
     {
       "key": "vacancies.list",
@@ -2539,7 +2583,8 @@
       "bulk": null,
       "schema": "common.EmptyBody",
       "schema_sha": "32062bdb9024160d",
-      "screen": null
+      "screen": null,
+      "summary": "none: one record"
     },
     {
       "key": "worksites.list",
@@ -2550,7 +2595,8 @@
       "bulk": null,
       "schema": "worksites.WorksiteListQuery",
       "schema_sha": "a5189d2932dbd8e1",
-      "screen": null
+      "screen": null,
+      "summary": "none: configuration; charted from its table (decision 50)"
     },
     {
       "key": "community.route.message_someone",
@@ -4046,6 +4092,17 @@
       "bulk": null,
       "schema": "audit.AuditSummaryQuery",
       "schema_sha": "f85cb839fdfb61b4",
+      "screen": null
+    },
+    {
+      "key": "budgets.summary",
+      "kind": "summary",
+      "module_key": "expenses",
+      "permission": "expenses.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "budgets.BudgetSummaryQuery",
+      "schema_sha": "8e444ad9e1840897",
       "screen": null
     },
     {

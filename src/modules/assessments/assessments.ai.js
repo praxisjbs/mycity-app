@@ -25,6 +25,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "assessments.list",
+      summary: "none: configuration; charted from its table (decision 50)",
       description: "List assessments: each one's type, whether it is timed, how many questions, whether it is on, how often it was sent and its average score",
       params: c.assessments.AssessmentListQuery,
       permission: ["recruitment", "view"],

@@ -19,6 +19,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "roles.list",
+      summary: "none: configuration; charted from its table (decision 50)",
       description: "List the roles, with how many people hold each and the modules each opens",
       params: c.access.RoleRowListQuery,
       permission: ["settings", "view"],
@@ -27,6 +28,7 @@ module.exports = defineManifest({
     },
     {
       key: "roles.get",
+      summary: "none: one record",
       description: "One role: what it grants on each module, the fields it sees and its capabilities",
       params: c.common.IdParams,
       permission: ["settings", "view"],

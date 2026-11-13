@@ -195,6 +195,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "reviews.list",
+      summary: "reviews.summary",
       description: "List reviews in my scope: person, reviewer, month, stage, due date, score and rating",
       params: c.reviews.ReviewListQuery,
       permission: ["performance", "view"],

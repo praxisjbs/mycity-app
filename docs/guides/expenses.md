@@ -447,10 +447,13 @@ requester always sees theirs.
   matching ask "Which request was paid?". Read Invoice on New Request fills the payee's bank too, and
   a line takes a minus (`LinesField`, `MoneyField` `signed`).
 
-- **Charts in the Overview (planned; `praxis-ai.md` decisions 49 to 58, §6.13, §6.19, Appendix B).**
-  `budgets.summary` (PR 1): allocated, committed, spent and remaining by department, category or
-  project, each bar stacked Spent, Committed, Remaining and Over Budget to its allocation, within
-  the reader's `expenses` scope (by project only for scope all, as Expenses · Projects).
+- **Charts in the Overview (`praxis-ai.md` decisions 49 to 58, §6.13, §6.19, Appendix B).**
+  `budgets.summary` (built 13/11/2026, PR 1; `budgets.ai.js`, `budgets.service.js` `aiSummary`, one
+  SQL in `budgets.repo.js`): a year's allocated, committed, spent and remaining by department and
+  by category, by project too for scope all (as Expenses · Projects), each row stacked as Spent and
+  Committed within its allocation, Remaining, and Over Budget past it, within the reader's `expenses`
+  scope as Budgets applies it (a head their department's, staff none), and paid by month.
+  `budgets.list` and `budgets.projects` name it as their summary.
   `expenses.summary`, `requisitions.summary` and `disbursements.summary` (PR 4) answer the
   requests, requisitions, disbursements and categories reads. Each read names its summary.
 
@@ -522,6 +525,7 @@ None.
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · `budgets.summary` built (`praxis-ai.md` Appendix B PR 1, §9): Praxis AI charts a year's budgets by department or category as stacked bars (Spent, Committed, Remaining, Over Budget), by project for scope all, and reads budget amounts in naira.
 - 13/11/2026 · JP · Charts in the Overview planned (`praxis-ai.md` decisions 49 to 58, Appendix B): Budgets' summary with stacked bars in PR 1, the requests', requisitions' and disbursements' summaries in PR 4 (§9). Nothing built yet.
 - 13/11/2026 · TB · Documents in the chat built (`praxis-ai.md` Appendix A PR 1, §9): an invoice on Praxis AI becomes a New Request card for its balance due, a receipt a Record Disbursement card. §6.1 rule 1: a line may carry a negative unit price and a request's total is above zero, `EXPENSE_TOTAL_NOT_POSITIVE` replacing `AMOUNT_REQUIRED`, with migration 8030 dropping 8010's CHECKs on a line's price and amount (§4). Read Invoice fills the payee's bank (§5). New Request's lines are the shared `LinesField` (§10.1: a minus taken on a unit price, the total under the lines).
 - 13/11/2026 · TB · Found filming the M8 handover video: Read Invoice read a real invoice with a discount and a deposit already paid as ₦550,000.00, where it asked for ₦150,000.00; the prompt left discounts out, and the database refused a line below zero, so nobody could enter one. A line may now take money off (§6.1 rule 1, migration 8030 (`8030_expense_line_discount.sql`, already on `main`), Unit Price's `MoneyField signed`), the request's amount still above zero; Read Invoice reads every addition and deduction as a line and the amount due beside them (`amount_due`, §9), and the form warns when they differ. The staging seed's sent-back and rejected requests are decided by whoever their stage names (a requester who manages people goes straight to Operations & People).

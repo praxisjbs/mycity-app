@@ -156,7 +156,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
 | Charts | [AreaChart](#areachart) | `AreaChart` | A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter. | stable |
 | Charts | [BandChart](#bandchart) | `BandChart` | Salary bands: each grade's range on one scale, with its midpoint marked and its figures beside it. | stable |
-| Charts | [BarChart](#barchart) | `BarChart` | Figures side by side as bars: headcount by department, claims by month, spend by day. | stable |
+| Charts | [BarChart](#barchart) | `BarChart` | Figures side by side as bars, or each bar as its parts stacked: headcount by department, claims by month, budgets by department. | stable |
 | Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
@@ -200,7 +200,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
 | Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
 | Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
-| Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary. | beta |
+| Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read (a bar, a stacked bar with its key, a line or a ring); nothing until a question reads a summary. | beta |
 | Assistant | [PaneSheet](#panesheet) | `PaneSheet` | The phone's pane: a full-height sheet that holds the four views (PaneTabs) for one answer, opened from Open Figures under it. | beta |
 | Assistant | [PaneTabs](#panetabs) | `PaneTabs` | The pane's four views, Overview, Table, Record and Sources, as tabs; a view with nothing to show stays, disabled, so the layout never jumps. | beta |
 | Assistant | [ProgressLine](#progressline) | `ProgressLine` | What Praxis AI is doing while a question runs: Reading leave requests, 2 of 5; nothing is streamed, the answer lands whole. | beta |
@@ -5233,14 +5233,14 @@ Salary bands: each grade's range on one scale, with its midpoint marked and its 
 
 ### BarChart
 
-Figures side by side as bars: headcount by department, claims by month, spend by day.
+Figures side by side as bars, or each bar as its parts stacked: headcount by department, claims by month, budgets by department.
 
 | | |
 |---|---|
-| Use | Comparing a handful of categories, or each day of a month, where each figure matters as much as the shape. |
-| Avoid | A run of days where only the shape matters (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars). |
-| Phone | No caption. Up to 12 bars every label shows and a narrow card scrolls the drawing inside it; past 12 (a month of days) labels that would touch are left off, never the first or the last. The page never scrolls sideways. |
-| Accessibility | The drawing is hidden from screen readers and the frame reads every bar as a label and a figure instead. |
+| Use | Comparing a handful of categories, or each day of a month, where each figure matters as much as the shape. Stacked parts where what each bar is made of matters too (Spent, Committed, Remaining). |
+| Avoid | A run of days where only the shape matters (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars); a negative part (name it as a part of its own, Over Budget); more than six parts. |
+| Phone | No caption. Up to 12 bars every label shows and a narrow card scrolls the drawing inside it; past 12 (a month of days) labels that would touch are left off, never the first or the last. A stacked chart's key wraps under the title. The page never scrolls sideways. |
+| Accessibility | The drawing is hidden from screen readers and the frame reads every bar as a label and a figure instead; a stacked bar as its label, each part's name and figure, then its total. |
 | Status | stable |
 | Exports | `BarChart` |
 | Import | `import { BarChart } from "@mycity/ui";` |
@@ -5253,6 +5253,7 @@ Figures side by side as bars: headcount by department, claims by month, spend by
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `bars` | `BarChartBar[]` | yes | The bars, left to right. |
+| `parts` | `string[]` |  | The names of the stacked parts, bottom to top, at most 6 (Spent, Committed, Remaining): each bar is drawn as its parts in series 1 to 6, with a key of these names under the title. `series` and `colourPerBar` do nothing then. |
 | `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
 | `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
 | `actions` | `ReactNode` |  | What sits at the right of the title row (a period filter). |
@@ -5265,6 +5266,7 @@ Figures side by side as bars: headcount by department, claims by month, spend by
 
 ```tsx
 <BarChart title="Claims by Month" bars={months} caption="Approved claims only" />
+<BarChart title="Budget by Department" parts={["Spent", "Committed", "Remaining"]} bars={[{ label: "Finance", value: 2500000, parts: [1250000, 400000, 850000] }]} />
 ```
 
 ### ChartFrame
@@ -6847,14 +6849,14 @@ The full-screen Praxis AI: Back to the screen it was opened from, the title and 
 
 ### OverviewPane
 
-The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary.
+The pane's Overview: up to three figures and one chart the server drew from a summary read (a bar, a stacked bar with its key, a line or a ring); nothing until a question reads a summary.
 
 | | |
 |---|---|
 | Use | In PaneTabs' overview slot with the answer's `overview` (AiAnswer.overview); the tab is disabled while it is null. The figures and the chart come from the server (docs/guides/praxis-ai.md §6.13; the summary reads land with PR3 of the Praxis AI Engine). |
 | Avoid | Figures a screen worked out itself; a dashboard (Home's KpiGrid and its charts); a table (TablePane). |
 | Phone | The figures two to a row, the chart below, inside the pane sheet; no chart caption. |
-| Accessibility | The figures are KpiCards (a named figure each); the chart is one of the shared charts, read out as a list of label and figure. |
+| Accessibility | The figures are KpiCards (a named figure each); the chart is one of the shared charts, read out as a list of label and figure, a stacked bar as each part and its total. |
 | Status | beta |
 | Exports | `OverviewPane` |
 | Import | `import { OverviewPane } from "@mycity/ui";` |

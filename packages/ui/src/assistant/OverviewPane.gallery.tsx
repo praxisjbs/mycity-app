@@ -1,4 +1,5 @@
 import type { GalleryEntry } from "../testing/gallery";
+import { BUDGET_PARTS, BUDGETS } from "../charts/fixtures";
 import { OverviewPane } from "./OverviewPane";
 
 const figures = [
@@ -9,10 +10,21 @@ const figures = [
 const byDepartment = { label: "By Department", values: [5, 1, 1] };
 const labels = ["Operations", "Finance", "People"];
 
+/** Departments' budgets as the server draws them: Allocated, Spent and Remaining in naira, each part a series. */
+const budgetFigures = [
+  { key: "allocated", label: "Allocated", value: "9000000.00", unit: "ngn" },
+  { key: "spent", label: "Spent", value: "5650000.00", unit: "ngn" },
+  { key: "remaining", label: "Remaining", value: "1400000.00", unit: "ngn" },
+];
+const byDepartmentParts = BUDGET_PARTS.map((label, k) => ({ label, values: BUDGETS.map((b) => b.parts[k] ?? 0) }));
+
 export default {
   component: "OverviewPane",
   states: {
     "Bar Chart": () => <OverviewPane overview={{ title: "Seven late arrivals this month, most in Operations.", figures, chart: { kind: "bar", title: "Late arrivals by department", labels, series: [byDepartment] } }} />,
+    "Stacked Bar": () => (
+      <OverviewPane overview={{ title: null, figures: budgetFigures, chart: { kind: "stacked_bar", title: "Budget by department", labels: BUDGETS.map((b) => b.label), series: byDepartmentParts } }} />
+    ),
     Donut: () => <OverviewPane overview={{ title: null, figures: figures.slice(0, 2), chart: { kind: "donut", title: "Who was late", labels, series: [byDepartment] } }} />,
     Line: () => (
       <OverviewPane

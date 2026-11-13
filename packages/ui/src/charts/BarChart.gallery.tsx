@@ -1,6 +1,7 @@
 import type { GalleryEntry } from "../testing/gallery";
+import { formatNumber } from "../lib/format";
 import { BarChart } from "./BarChart";
-import { CLAIMS, DEPARTMENTS, MONTH_OF_DAYS, MONTHS } from "./fixtures";
+import { BUDGET_PARTS, BUDGETS, CLAIMS, DEPARTMENTS, MONTH_OF_DAYS, MONTHS } from "./fixtures";
 
 export default {
   component: "BarChart",
@@ -12,5 +13,6 @@ export default {
     ),
     "Single Bar": () => <BarChart title="Open Queries" bars={[{ label: "Open", value: 4 }]} />,
     "Month of Days": () => <BarChart title="Spend by Day" bars={MONTH_OF_DAYS} />,
+    "Stacked Parts": () => <BarChart title="Budget by Department" parts={BUDGET_PARTS} bars={BUDGETS} format={(v) => formatNumber(v, "₦")} caption="This year's budgets" />,
   },
 } satisfies GalleryEntry;

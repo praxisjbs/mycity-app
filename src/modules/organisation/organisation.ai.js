@@ -266,6 +266,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "employees.list",
+      summary: "employees.summary",
       description:
         "List staff, by department, status, work arrangement, employment type or line manager",
       params: c.organisation.EmployeeListQuery,
@@ -276,6 +277,7 @@ module.exports = defineManifest({
     },
     {
       key: "departments.list",
+      summary: "employees.summary",
       description: "List departments with their codes, heads (or who acts for an open head role), how many people and open roles each has, and whether it is in use",
       params: c.organisation.DepartmentListQuery,
       permission: ["people", "view"],

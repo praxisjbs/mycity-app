@@ -38,6 +38,22 @@ const read = (key: string, rows: number, total: number | null, first: number | n
 /** A table as the server sends it: each row's record link, or null where a row has none. */
 const tbl = (columns: string[], rows: string[][], numeric: number[], links: Array<string | null> = rows.map(() => null)) => ({ columns, rows, numeric, links, read: 1 });
 
+/** Naira as the server's table reads a two-place amount (decision 56): ₦3,400,000.00, a minus before an overspend. */
+const naira = (v: string) => `${v.startsWith("-") ? "-" : ""}₦${v.replace(/^-/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+/**
+ * This year's budgets by department, as budgets.summary groups them (praxis-ai.md §6.19 item 2): each row's
+ * parts Spent, Committed, Remaining and Over Budget, which sum to what it has spent and committed or to what
+ * it was given. Engineering has committed ₦230,000.00 more than it has left, its own part, never a negative.
+ */
+const BUDGET_PARTS = ["Spent", "Committed", "Remaining", "Over Budget"];
+const BUDGET_ROWS: Array<{ department: string; allocated: string; committed: string; spent: string; remaining: string; parts: number[] }> = [
+  { department: "Marketing & Sales", allocated: "3400000.00", committed: "1020000.00", spent: "1650000.00", remaining: "730000.00", parts: [1650000, 1020000, 730000, 0] },
+  { department: "Content", allocated: "1750000.00", committed: "312000.00", spent: "980000.00", remaining: "458000.00", parts: [980000, 312000, 458000, 0] },
+  { department: "Operations & People", allocated: "1700000.00", committed: "236000.00", spent: "1240000.00", remaining: "224000.00", parts: [1240000, 236000, 224000, 0] },
+  { department: "Engineering", allocated: "1200000.00", committed: "490000.00", spent: "940000.00", remaining: "-230000.00", parts: [940000, 260000, 0, 230000] },
+];
+
 /** A record type as From names it (shared/ai/cite.js typeLabel). */
 const typeLabel = (type: string) => ({ home_alert: "alert", policy_version: "policy" })[type] ?? type.replace(/_/g, " ");
 
@@ -242,6 +258,33 @@ function answerFor(question: string, view: string): Draft {
   if (PRIORITY_CHOICES.some((w) => w.toLowerCase() === l.trim())) return said("Here is the task to create for Cynthia, with Tobi and Bashir watching.", { declined: "change", link: changeLink("task") });
   if (/\b(create|add|delete|approve|send|update|raise|book|tell|message|email|mail)\b/.test(l))
     return said("Here it is as a card. Check the fields and press it, or make the change on its screen.", { declined: "change", link: changeLink(l) });
+  if (l.includes("budget")) {
+    if (view === "staff") return said("Budgets are not available to you.", { declined: "not_available", reads: [read("budgets.list", 0, null, null)] });
+    return said("Engineering has committed ₦230,000.00 more than its budget. The other three departments have money left.", {
+      table: tbl(
+        ["Department", "Allocated", "Committed", "Spent", "Remaining"],
+        BUDGET_ROWS.map((b) => [b.department, naira(b.allocated), naira(b.committed), naira(b.spent), naira(b.remaining)]),
+        [1, 2, 3, 4],
+      ),
+      reads: [read("budgets.list", BUDGET_ROWS.length, BUDGET_ROWS.length, 1), { ...read("budgets.summary", 0, BUDGET_ROWS.length, null, 2), kind: "summary", params: { by: "department" } }],
+      overview: {
+        summary: "budgets.summary",
+        title: null,
+        figures: [
+          { key: "allocated", label: "Allocated", value: "8050000.00", unit: "ngn" },
+          { key: "spent", label: "Spent", value: "4810000.00", unit: "ngn" },
+          { key: "remaining", label: "Remaining", value: "1182000.00", unit: "ngn" },
+        ],
+        chart: {
+          kind: "stacked_bar",
+          title: "Budget by department",
+          labels: BUDGET_ROWS.map((b) => b.department),
+          series: BUDGET_PARTS.map((label, k) => ({ label, values: BUDGET_ROWS.map((b) => b.parts[k] ?? 0) })),
+        },
+      },
+      link: { label: "Open Budgets", path: "/expenses?tab=budgets" },
+    });
+  }
   if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {
     if (view === "staff") return said("Partnership records are not available to you.", { declined: "not_available", reads: [read("partners.list", 0, null, null)] });
     const quiet = PARTNERS.filter((p) => p.quiet_days > 30).sort((x, y) => y.quiet_days - x.quiet_days);
@@ -542,7 +585,7 @@ route("GET /api/v1/ai/history/summary", (req) => {
   });
   const byModule = new Map<string, number>();
   for (const t of counted) byModule.set(t.reads[0]?.key.split(".")[0] ?? "", (byModule.get(t.reads[0]?.key.split(".")[0] ?? "") ?? 0) + 1);
-  const LABEL: Record<string, [string | null, string]> = { partners: ["partnerships", "Partnerships"], employees: ["people", "People"], attendance: ["attendance", "Attendance"], activity: ["home", "Home"], my_leave: ["ess", "Self-Service"], "": [null, "Other"] };
+  const LABEL: Record<string, [string | null, string]> = { partners: ["partnerships", "Partnerships"], employees: ["people", "People"], attendance: ["attendance", "Attendance"], activity: ["home", "Home"], my_leave: ["ess", "Self-Service"], budgets: ["expenses", "Expenses"], "": [null, "Other"] };
   const summary: AiHistorySummary = {
     month,
     view: company ? "company" : "own",

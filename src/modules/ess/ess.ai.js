@@ -131,6 +131,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "my_profile.get",
+      summary: "none: one record",
       description: "Read my own record: job, department, line manager, contact details, next of kin, bank and the working week",
       params: c.common.EmptyBody,
       permission: ["ess", "view"],
@@ -140,6 +141,7 @@ module.exports = defineManifest({
     },
     {
       key: "my_documents.list",
+      summary: "none: my own short list",
       description:
         "List my own documents and the ones People have asked me for",
       params: c.documents.DocumentListQuery,
@@ -170,6 +172,7 @@ module.exports = defineManifest({
     },
     {
       key: "my_leave.balances",
+      summary: "none: one row a leave type; charted from its table (decision 50)",
       description: "How many leave days I am entitled to this year, per leave type, and how many are taken, booked, waiting and left",
       params: c.ess.EssLeaveBalanceQuery,
       permission: ["ess", "view"],

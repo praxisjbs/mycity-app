@@ -2,7 +2,7 @@
 "use strict";
 /**
  * Gate 23: the Praxis AI Engine is told when a form, a payload or a schema changes
- * (docs/guides/praxis-ai.md §6.15; decision 22). Six rules:
+ * (docs/guides/praxis-ai.md §6.15; decision 22). Nine rules:
  *
  *  1. The committed snapshot src/shared/ai/catalogue.snapshot.json equals what the manifests
  *     declare now (every read, summary, action and route with its module, permission, risk and
@@ -33,6 +33,13 @@
  *  7. Every field a card needs is asked before it is drawn (decision 34): each field an action's
  *     input requires (its JSON Schema's `required`, among the fields the card carries, with no
  *     default) has an ask without `when`.
+ *  8. Every kind of document a module reads is exercised by an integration test and the evaluation set.
+ *  9. Every read names the summary that answers its counts and totals, or why it needs none
+ *     (praxis-ai.md §6.19 item 3): `summary: "<a summary's key>"` (which must exist) or
+ *     `summary: "none: <reason>"`; or it waits on the list scripts/check/ai-summary-gaps.json with
+ *     the PR of Appendix B that brings its summary. That list only shrinks: a read that now names a
+ *     summary, or that no manifest declares, fails until it is taken off, and one the change's base
+ *     did not hold fails.
  *
  * Usage: node scripts/check/ai-awareness.js [--list]     exit 0 ok, 1 problems
  *        --list prints the sweep: each Create schema, and each create and edit form, and how it
@@ -53,6 +60,8 @@ const SUGGESTIONS = path.join(ROOT, "src", "modules", "assistant", "assistant.su
 const SCHEMAS = path.join(ROOT, "packages", "contract", "schemas");
 const MODULES = path.join(ROOT, "src", "modules");
 const GAPS = path.join(ROOT, "scripts", "check", "ai-forms-gaps.json");
+const SUMMARY_GAPS_FILE = "scripts/check/ai-summary-gaps.json";
+const SUMMARY_GAPS = path.join(ROOT, SUMMARY_GAPS_FILE);
 const coverage = require("./ai-manifest-coverage");
 
 /** A create or edit form's request, by its schema's name (decision 33). */
@@ -157,6 +166,54 @@ function gapsLists() {
       const b = changes.base();
       const text = b ? changes.git(["show", `${b}:scripts/check/ai-forms-gaps.json`], { allowFail: true }) : null;
       return text ? JSON.parse(text).gaps || {} : null;
+    } catch {
+      return null;
+    }
+  })();
+  return { now, then };
+}
+
+/**
+ * Rule 9 (praxis-ai.md §6.19 item 3): every read names its summary, or why it needs none, or waits on
+ * the summary gaps list, which only shrinks.
+ * @param {{reads: Array<{key: string, summary?: string}>, summaryKeys: Set<string>,
+ *          gaps: Record<string, {summary: string, pr: number}>, baseGaps: Record<string, object>|null}} q
+ *        `baseGaps` is the list as the change's base held it; null when the base had none
+ * @returns {string[]} problems
+ */
+function summariesNamed({ reads, summaryKeys, gaps, baseGaps }) {
+  const problems = [];
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const readKeys = new Set(reads.map((r) => r.key));
+  for (const r of reads) {
+    if (r.summary) {
+      if (!r.summary.startsWith("none:") && !summaryKeys.has(r.summary)) problems.push(`${r.key}: its summary ${r.summary} is declared by no manifest`);
+      if (has(gaps, r.key)) problems.push(`${r.key} names its summary now: take it off ${SUMMARY_GAPS_FILE} (the list only shrinks)`);
+    } else if (!has(gaps, r.key)) {
+      problems.push(`${r.key}: say which summary answers its counts and totals (summary: "<key>"), or why it needs none (summary: "none: <reason>")`);
+    }
+  }
+  for (const [key, gap] of Object.entries(gaps)) {
+    if (!readKeys.has(key)) problems.push(`${SUMMARY_GAPS_FILE} names ${key}, which no manifest declares: take it off`);
+    if (!gap || typeof gap.summary !== "string" || !Number.isInteger(gap.pr)) problems.push(`${SUMMARY_GAPS_FILE}: ${key} needs the summary it waits on and the PR that brings it ({ summary, pr })`);
+    if (baseGaps && !has(baseGaps, key)) problems.push(`${SUMMARY_GAPS_FILE} gained ${key}: the list only shrinks, so a read comes with its summary or its reason`);
+  }
+  return problems;
+}
+
+/** The summary gaps list as this tree holds it ({} once it is deleted) and as the change's base held it. */
+function summaryGapsLists() {
+  const read = (text) => {
+    const list = JSON.parse(text).gaps || [];
+    return Object.fromEntries(list.map((g) => [g.read, { summary: g.summary, pr: g.pr }]));
+  };
+  const now = fs.existsSync(SUMMARY_GAPS) ? read(fs.readFileSync(SUMMARY_GAPS, "utf8")) : {};
+  const then = (() => {
+    try {
+      const changes = require("./lib/changes");
+      const b = changes.base();
+      const text = b ? changes.git(["show", `${b}:${SUMMARY_GAPS_FILE}`], { allowFail: true }) : null;
+      return text ? read(text) : null;
     } catch {
       return null;
     }
@@ -316,6 +373,10 @@ function check() {
     if (!new RegExp(`file:\\s*["']${f.kind}["']`).test(evalText)) problems.push(`file ${f.kind}: the evaluation set (scripts/ai/eval-assistant.js) has no case with file: "${f.kind}"`);
   }
 
+  // 9. Every read names the summary that answers its counts and totals, or why it needs none (§6.19 item 3).
+  const summaryLists = summaryGapsLists();
+  problems.push(...summariesNamed({ reads: registry.reads(), summaryKeys: new Set(registry.summaries().map((x) => x.key)), gaps: summaryLists.now, baseGaps: summaryLists.then }));
+
   return { problems, actions: actions.length, sweep, forms: six.sweep, counts: six.counts };
 }
 
@@ -346,4 +407,4 @@ if (require.main === module) {
   process.exit(1);
 }
 
-module.exports = { check, formCalls, built, formsAccountedFor, requiredAsked, reasonOf, NEVER, FORM_SCHEMA };
+module.exports = { check, formCalls, built, formsAccountedFor, requiredAsked, summariesNamed, reasonOf, NEVER, FORM_SCHEMA };

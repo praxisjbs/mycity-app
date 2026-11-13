@@ -844,7 +844,7 @@ ready for review with GitHub's CI green, then reviewed and merged from the plann
 order: PR 1 first, PR 3 after PR 2, PR 8 after PRs 4 to 7 (Appendix B.2). Tick an item with the
 date, the branch and the PR when it merges.
 
-- [ ] PR 1 · Stacked bars, Budgets' summary and every read naming its summary, gate 23 rule 9 with `scripts/check/ai-summary-gaps.json`, money in naira, no mechanics in an answer (`m10/overview-stacked`)
+- [x] 13/11/2026 · PR 1 · Stacked bars, Budgets' summary and every read naming its summary, gate 23 rule 9 with `scripts/check/ai-summary-gaps.json`, money in naira, no mechanics in an answer (built in the planning chat on `claude/bold-hawking-byligf`)
 - [ ] PR 2 · Charts from a complete table (`m10/overview-tables`)
 - [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
 - [ ] PR 4 · Finance and pay summaries (`m10/summaries-finance`)
@@ -868,6 +868,12 @@ date, the branch and the PR when it merges.
 
 ## 8 · Log
 
+- 13/11/2026 · JP · Charts in the Overview, PR 1 built (§6.12): `AiSummaryPart` and a group row's
+  `parts`, `engine/pane.js` drawing them as one series a part, `budgets.summary`, a read's `summary`
+  in the manifest, the snapshot and the description the model is offered, gate 23 rule 9 with its
+  gaps file, `MONEY_FIELD` widened, the prompt at version 11, the evaluation set's `chart` and
+  `never_words`. Found on the way: staff hold `expenses` view, so `ai-summaries.test.js`'s list of
+  the summaries offered to staff gains `budgets.summary` (over no budgets).
 - 13/11/2026 · JP · Charts in the Overview planned: `praxis-ai.md` §1.11 (decisions 49 to 58),
   §6.13's planned tables, §6.19 and Appendix B (eight PRs, each in a fresh chat; §6.12 here). The
   engine side: a summary group row's `parts` drawn as a stacked bar (`engine/pane.js`), an

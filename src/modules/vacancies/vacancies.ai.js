@@ -126,6 +126,7 @@ module.exports = defineManifest({
     {
       // Who the hiring manager may be, by the save's own rule: New Vacancy's question offers and matches only them.
       key: "vacancies.hiring_managers",
+      summary: "none: a picker's list",
       description: "List the people who may be a vacancy's hiring manager: active, holding Recruitment, in the asker's reach",
       params: c.vacancies.HiringManagerListQuery,
       permission: ["recruitment", "view"],
@@ -144,6 +145,7 @@ module.exports = defineManifest({
     },
     {
       key: "vacancies.get",
+      summary: "none: one record",
       description: "One vacancy: its description, requirements, questions and traits, scorecard parts and how many candidates are at each stage",
       params: c.common.IdParams,
       permission: ["recruitment", "view"],
