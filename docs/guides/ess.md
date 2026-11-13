@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #56 My Requests (M8), #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
-| Last changed | 11/11/2026 |
+| Last changed | 13/11/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -106,8 +106,8 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    cover (who, when, what each sheet holds, the NDPA line) → the vault as a restricted
    `data_export` the person and the CEO alone may open → downloaded on the device that asked, which
    waits for it (`docs/guides/foundation.md` §6.12); nothing is emailed → removed from the vault a
-   day later (`export-cleanup`). The file is not listed in My Documents. Payslips join it with
-   Payroll (M6).
+   day later (`export-cleanup`). The file is not listed in My Documents. Payslips are not in it: My
+   Payslips' Download All hands the person a year's payslips as one PDF (`docs/guides/payroll.md` §13.2 item 45).
 
 ## 4 · Data
 
@@ -118,7 +118,7 @@ services, always for the caller's own `employee_id`.
 |---|---|---|
 | `employee` (organisation) | `employee_id`, `phone`, `address`, `next_of_kin`, `bank`, `photo_document_id` | The editable fields are written through the organisation service |
 | attendance tables (LA) | see the attendance guide | Read for the work schedule |
-| `payslip` (M6) | `payslip_id`, `employee_id`, `period`, `gross`, `net`, `locked_at` | Only locked payslips are returned |
+| `payslip` (M6, payroll) | `payslip_id`, `payroll_run_id` (its `period`), `employee_id`, `status`, `earnings_total`, `deductions_total`, `net_pay`, `published_at` | Only `published` payslips are returned: those of a run the CEO approved (`docs/guides/payroll.md` §4.2) |
 | `leave_type` (leave) | `code`, `name`, `policy.days_per_year`, `active` | The types People offer and each one's yearly allowance. Four are seeded (`1290`: Annual 20, Compassionate 5, Sick 12, Unpaid), by the team lead's decision of 17/10/2026; People add, change, retire and delete the rest on People · Leave |
 | `leave_request`, `leave_balance` (leave) | `employee_id`, `leave_type_id`, `starts_on`, `ends_on`, `amount` (working days), `status`, `workflow_instance_id`, `recorded_by` | `leave_balance` holds People's figure for one person and year; without one the type's allowance applies. `1200` checks the status and indexes the lists |
 | `query`, `sanction` (M3) | `employee_id`, `status`, `outcome`, `deduction` | |
@@ -251,7 +251,7 @@ check ownership, not the `settings` grant (README §5.2).
 - Download My Data holds what the person can already see about themselves in the app, nothing
   more: the bank account by its last four digits, punches with their location check and the
   device's label but never coordinates or a device identifier, the documents as a list without the
-  files, no salary or pay (Payroll adds payslips in M6). At most one file a day for a person,
+  files, no salary or pay (a person's payslips are My Payslips' Download All). At most one file a day for a person,
   counting the CEO's Download Their Data for them; the limit is per Lagos day. Whoever asked
   pressing again that day gets the same file again, so a download that failed can be done again;
   anyone else is refused until tomorrow, and a file that failed does not count. The file is
@@ -260,7 +260,7 @@ check ownership, not the `settings` grant (README §5.2).
 - Every list that shows a person shows their photo at 192 px (`shared/db/person.js` chooses the
   sizes once, `organisation.photo.js` exports both); a person with none shows initials.
 - Coming Soon: a tab whose module is not yet delivered shows a Coming Soon page naming the milestone
-  and date (My Performance M2, My Queries M3, My Payslips M6). What each milestone delivers is in
+  and date (My Performance until M2, My Queries until M3, My Payslips until M6). What each milestone delivers is in
   MILESTONES, not on the page. The demo has a Prototype View switch for it, on desktop only.
 - Copy a person reads: Title Case chrome, no em dashes, day-first dates, 25 per page.
 - No footnote at the bottom of a page and no page subtitle that describes the page. Support text is
@@ -276,7 +276,7 @@ check ownership, not the `settings` grant (README §5.2).
 | `employee.photo_updated` | After a photo is set or removed (organisation, 19/10/2026) | Shell and Community pick up the new avatar |
 | `employee.data_export_requested` (`ess.events.js`) | Download My Data or Download Their Data, at once | On the person's record with who asked (audit), with the restricted `data_export` file it reserved; after commit `ess.data_export` builds the workbook into that file, which the screen that asked downloads; nothing is emailed |
 | `export-cleanup` (scheduler, every hour) | A file is a day old | Removes it from the vault (`vault.remove`, `document.removed`), as every export (`docs/guides/foundation.md` §6.12) |
-| `payroll.run_approved` (M6) | Run approved | Payslips become visible; notification "Your payslip is ready" |
+| `payslip.published` (payroll, M6) | The CEO approves the run, which locks it | The payslip shows on My Payslips; "Your payslip is ready" in the bell and by email, opening My Payslips (`docs/guides/payroll.md` §7) |
 | `query.raised` (M3) | Query raised against the employee | Notification opening My Queries |
 | `document.requested` | People request a document | Notification opening My Documents |
 | `auth.two_step_*`, `auth.passkey_*`, `auth.pin_*`, `auth.recovery_code*` | A way in added, changed, removed or used from My Security | Notice to the person, bell and email (`docs/guides/identity.md` §7) |
@@ -447,6 +447,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · M6 PR 8: the stale payroll lines brought to what M6 built (the `payslip` row's columns and `published` rule, the `payslip.published` event in place of `payroll.run_approved`, the Coming Soon examples as past); Download My Data keeps no payslips, which My Payslips' Download All hands over (`docs/guides/payroll.md` §13.2 item 45).
 - 12/11/2026 · TB · ESS · My Training (#110): Take Notes opens My Notes, the person's own running note on the course, floating over it (`knowledge.md` §6.13, §10).
 - 11/11/2026 · TB · ESS · My Training (#110): a PDF grows to its pages, so the course scrolls through it to the item's actions and back; All Items at the item's foot too; an item, or the way back, starts at the course's top (`knowledge.md` §10, §14).
 - 11/11/2026 · TB · ESS · My Training (#110) built on the contract (M10 PR 5, `knowledge.md` §10): To Do,

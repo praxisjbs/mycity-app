@@ -16,6 +16,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M4 Recruitment, part 2: Assessments and Interviews (6:54, 11 chapters) | `m4-recruitment-2.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
 | M5 Offers and Onboarding, part 1: Offers (7:08, 10 chapters) | `m5-offers-1.js` | Made and uploaded 12/11/2026 | [Part 1](https://drive.google.com/file/d/1U9ybR4Xb1KTsRBtn5YNeI_3ZLZvLYTcp/view?usp=drivesdk) |
 | M5 Offers and Onboarding, part 2: Documentation and Onboarding (6:41, 11 chapters) | `m5-onboarding-2.js` | Made and uploaded 12/11/2026 | [Part 2](https://drive.google.com/file/d/1QehhMb7Q3N4-sDeIteZroX3u8YeTy_q5/view?usp=drivesdk) |
+| M6 Payroll, part 1: Payroll Runs and Payslips (about 7 min) | `m6-payroll-1.js`, to write | Planned 13/11/2026 (§8) | |
+| M6 Payroll, part 2: Deductions, Configurations and My Payslips (about 6 min) | `m6-payroll-2.js`, to write | Planned 13/11/2026 (§8) | |
 | M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 | M10 Praxis AI, part 2: Praxis AI and AI Control (7:00, 10 chapters) | `m10-praxis-ai.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 
@@ -308,6 +310,45 @@ listed here and in `docs/PROGRESS.md`.
 | 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opened in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say; once beside it, its section headings skipped a level and its two small cards broke words | Fixed the same day: `ListDetail` on a wide desktop (the first role shown until another is pressed), its forms return to it in place; the dialog stays on a phone and where two columns do not fit; headings `h3`; the cards stack in the pane. Tests and the User Guide's pictures follow |
 
 ## 8 · Where the work stands
+
+**13/11/2026 · JP (with Claude). The Milestone 6 plan**, written once the screens were final (`docs/guides/payroll.md`
+Appendix A, PR 8). Nothing filmed yet. Two videos, as M4, M5 and M10. The chapter list follows the guide's demo
+(Appendix B) and the User Guide's Payroll chapter, whose bold names are the screens' own words.
+
+Cast: Cynthia Osakunih (Operations & People) runs the payroll; Ifeoma Mbonu, the CEO, approves on her phone from the
+bell's link. The people paid are the staging seed's invented ones (`seeds/staging/58_payroll.js`, `@example.test`), never
+MyCity's staff, whom the seed leaves out of every run: Adaeze Okonkwo (an advance over two months), Chiamaka Nwosu (a
+joiner, prorated) and Segun Alabi (a joiner with No Salary Set). The seed gives them no login, so My Payslips is filmed as
+Adaeze after People invite her on the filming database and `people.js` gives her the filming password. The seed's only
+fine is the queries seed's, on an Implementation Team account; Deductions' chapter needs two more waiting, raised through
+Queries & Sanctions before filming, or the chapter shows one. No AI chapter: M6 registers no AI job of its own.
+
+Part 1, Payroll Runs and Payslips (`m6-payroll-1.js`, about 7 minutes):
+
+1. Welcome: the card, the four tabs, who sees what, invented people only.
+2. A Month's Run: the seed's computed run, its figures, the chain, Run History; New Run on the next month in one line.
+3. Problems: the problem line, Run Problems, No Salary Set; Segun's pay set on People · Employees; Compute Run again.
+4. Adjustments and Left Out: Add Adjustment (an earning with its reason), Exclude Person, Include.
+5. To the CEO: Submit for Approval, Waiting On; the CEO's notice on her phone, Approve and Approve Run; Send Back
+   in one line.
+6. Payslips: the Month select, Preview then Published, a payslip in the modal, Download PDF.
+7. Email and Download All: Email All Payslips (only once mail reaches the invented people's new addresses, the guide's
+   Appendix B item 9; until then shown as pressed and left), Download All.
+8. Mark Paid: Paid On, Payment Reference; Home's Payroll In Progress card counts one fewer.
+
+Part 2, Deductions, Configurations and My Payslips (`m6-payroll-2.js`, about 6 minutes):
+
+1. Deductions: the four figures, the chips and the source switch; an attendance deduction opening People · Attendance.
+2. Fines: Accept This Month, Spread Over Months with Spread Fine, Waive with Waive Fine; Release in one line.
+3. An Advance: Record Advance (Employee, Amount, Paid On, Months, Start Month, Reason); its share on the run.
+4. Configurations: Pay Day and Set Pay Day with Last Day of Month; Bank Details Required.
+5. Statutory Items and PAYE Bands: each item Not Set, the Source fields and No Legal Source, Remove Change for a change
+   still to come. Advanced Payroll stays off: no figure is entered without its source (§13.1 item 38).
+6. My Payslips on a phone (Adaeze): the year, the months, a payslip, Download PDF, Email a Copy, Salary Deductions with
+   the advance, Download All.
+
+- [x] Plan both M6 videos (13/11/2026).
+- [ ] Write and film both once PR 8 is merged and staging's mail is resumed (Appendix B item 9).
 
 **12/11/2026 · GE (with Claude).** Both Milestone 5 videos written, filmed and assembled on one
 development database, the same day, with the staging seed: part 1, Offers (7:08, 10 chapters,

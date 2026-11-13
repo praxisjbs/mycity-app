@@ -55,6 +55,22 @@
       "phone"
     ]
   },
+  "ess-payslip": {
+    "spec": "4410c5f37f29eef7",
+    "source": "544b30f60de49343",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-payslips": {
+    "spec": "b0d23438c791af40",
+    "source": "544b30f60de49343",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "ess-policies": {
     "spec": "3cfe5a1b37968e4d",
     "source": "80ca098ec46251be",
