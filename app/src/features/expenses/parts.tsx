@@ -367,8 +367,9 @@ export function RequestCard({ id, actions }: { id: string; actions?: (r: Expense
         columns={[
           { key: "d", label: "Item", render: (l) => l.description },
           { key: "q", label: "Quantity", align: "n", render: (l) => l.quantity },
-          { key: "u", label: "Unit Price", align: "n", render: (l) => <Money value={l.unit_price} />, desktop: true },
-          { key: "a", label: "Amount", align: "n", render: (l) => <Money value={l.amount} /> },
+          // A line that takes money off (a discount, an amount paid) reads "less", short enough for the modal.
+          { key: "u", label: "Unit Price", align: "n", render: (l) => <Money value={l.unit_price} negLabel="less" />, desktop: true },
+          { key: "a", label: "Amount", align: "n", render: (l) => <Money value={l.amount} negLabel="less" /> },
         ]}
       />
       <div className="mt-3">
