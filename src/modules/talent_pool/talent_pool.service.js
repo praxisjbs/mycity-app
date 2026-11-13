@@ -84,6 +84,33 @@ async function summary(scope) {
   return { in_pool: r.in_pool, invited_back: r.invited_back, hired_from_pool: r.hired_from_pool, average_score: num(r.average_score) };
 }
 
+/**
+ * The people kept that the reader may list, in figures (docs/guides/praxis-ai.md §6.13, Recruitment and
+ * onboarding): everyone kept unless a period (added) is asked; by role applied for, by why kept, and
+ * kept by month. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   PoolSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, top, series, askedPeriod } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const r = await repo.aiSummary(client, { invited: params.invited, from: period && period.from, to: period && period.to }, scope);
+  const f = r.figures;
+  return {
+    figures: [
+      figure("kept", "People kept", f.kept || 0),
+      figure("invited", "Invited back", f.invited || 0),
+      figure("hired", "Hired from the pool", f.hired || 0),
+      figure("leaving_soon", "Leaving within 30 days", f.leaving_soon || 0),
+      figure("average_score", "Average score", f.average_score || 0),
+    ],
+    groups: [group("role", "People kept by role applied for", r.by_role), top("reason", "People kept by why", r.by_reason)],
+    series: [series("kept", "People kept by month", r.months)],
+    total: f.kept || 0,
+  };
+}
+
 /** One live entry of the reader's scope (a ⌘K link to a person past the list's first page), or 404. */
 async function get(id, scope) {
   const row = await repo.get(pool, id);
@@ -207,4 +234,4 @@ async function gather(filters, scope) {
   return { rows: rows.slice(0, EXPORT_CEILING), total: page.page.total, capped: page.page.total > EXPORT_CEILING };
 }
 
-module.exports = { list, summary, get, add, invite, remove, requestExport, gather, entry };
+module.exports = { list, summary, aiSummary, get, add, invite, remove, requestExport, gather, entry };

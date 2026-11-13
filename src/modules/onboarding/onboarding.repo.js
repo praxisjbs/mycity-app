@@ -106,6 +106,66 @@ async function summary(db, scope, today) {
   return rows[0];
 }
 
+/**
+ * The cases in figures for the assistant (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding), in
+ * one statement with the reader's scope (the case's owner, as list() applies it): the counts by status,
+ * those starting within 14 days of `today`, the required items not yet verified on cases at
+ * documentation (as the list counts them outstanding); by status; by the offer's department, each row's
+ * statuses for a stacked bar (20); starts by month. A period (starts) narrows it only when `from` and
+ * `to` are given. Figures, never a row; no document, guarantor or BVN is read.
+ * @param {{status?: string, department_id?: string, from?: string, to?: string, today: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.status || null, q.department_id || null, q.from || null, q.to || null, q.today];
+  const s = scopeClause(scope, { column: "oc.owner_id" }, params);
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT oc.onboarding_case_id, oc.status, oc.starts_on, o.department_id, d.name AS department
+         FROM onboarding_case oc
+         JOIN offer o ON o.offer_id = oc.offer_id
+         LEFT JOIN department d ON d.department_id = o.department_id
+        WHERE ($1::text IS NULL OR oc.status = $1)
+          AND ($2::uuid IS NULL OR o.department_id = $2)
+          AND ($3::date IS NULL OR oc.starts_on BETWEEN $3::date AND $4::date)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS cases,
+              count(*) FILTER (WHERE status = 'documentation')::int AS documentation,
+              count(*) FILTER (WHERE status = 'pre_onboarding')::int AS pre_onboarding,
+              count(*) FILTER (WHERE status = 'onboarding')::int AS onboarding,
+              count(*) FILTER (WHERE status = 'completed')::int AS completed,
+              count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
+              count(*) FILTER (WHERE status IN ('documentation', 'pre_onboarding', 'onboarding')
+                                 AND starts_on BETWEEN $5::date AND $5::date + 14)::int AS starting_soon,
+              (SELECT count(*)::int FROM onboarding_checklist_item i
+                 JOIN x c ON c.onboarding_case_id = i.onboarding_case_id AND c.status = 'documentation'
+                 LEFT JOIN document_requirement r ON r.document_requirement_id = i.document_requirement_id
+                WHERE COALESCE(r.required, true) AND i.status <> 'verified') AS outstanding
+         FROM x
+     ), by_department AS (
+       SELECT COALESCE(department_id::text, 'none') AS key, COALESCE(min(department), 'No department') AS label,
+              count(*) FILTER (WHERE status = 'documentation')::int AS documentation,
+              count(*) FILTER (WHERE status = 'pre_onboarding')::int AS pre_onboarding,
+              count(*) FILTER (WHERE status = 'onboarding')::int AS onboarding,
+              count(*) FILTER (WHERE status = 'completed')::int AS completed,
+              count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
+              row_number() OVER (ORDER BY count(*) DESC, min(department), department_id) AS rank
+         FROM x GROUP BY department_id
+     ), starts AS (
+       SELECT to_char(starts_on, 'YYYY-MM') AS at, count(*)::int AS value FROM x WHERE starts_on IS NOT NULL GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM x GROUP BY status) z) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'documentation', documentation, 'pre_onboarding', pre_onboarding,
+                                               'onboarding', onboarding, 'completed', completed, 'cancelled', cancelled) ORDER BY rank)
+               FROM by_department WHERE rank <= 20) AS by_department,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM starts) AS starts`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_status: row.by_status || [], by_department: row.by_department || [], starts: row.starts || [] };
+}
+
 async function insertCase(client, row) {
   const { rows } = await client.query(
     `INSERT INTO onboarding_case (application_id, offer_id, employee_id, owner_id, status, starts_on)
@@ -691,6 +751,7 @@ module.exports = {
   byApplication,
   list,
   summary,
+  aiSummary,
   insertCase,
   setStatus,
   setCompleted,

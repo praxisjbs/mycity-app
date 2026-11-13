@@ -3,7 +3,7 @@
  * What the assistant may read about the Talent Pool (docs/guides/recruitment.md §9): the people kept
  * for later, as the asker may see them (the hiring manager of the vacancy each applied for), one page
  * of 25 at a time. It takes no action here: who is kept, invited back or let go is a person's
- * judgement of a person, made on the screen.
+ * judgement of a person, made on the screen. Its summary counts the pool in figures (praxis-ai.md §6.13).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -19,6 +19,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "talent_pool.list",
+      summary: "talent_pool.summary",
       description: "List the Talent Pool: each person, the role they applied for, their score (and whether provisional), why they were kept, until when, and whether invited back",
       params: c.talent_pool.PoolListQuery,
       permission: ["recruitment", "view"],
@@ -27,6 +28,21 @@ module.exports = defineManifest({
       // Someone pooled from a role the asker manages is listed; someone from the outsider's role never is.
       matrix: probeFor(async (v, ctx) => {
         const a = await applicationFor(v, `Pool ${ctx.role}`);
+        const added = await service.add(ctx.actor, { scope: "all", scope_ids: null }, { application_id: a.application_id, reason: "Kept by the access matrix" });
+        return { type: "talent_pool_entry", id: added.talent_pool_entry_id };
+      }),
+    },
+  ],
+  summaries: [
+    {
+      key: "talent_pool.summary",
+      description: "The Talent Pool in figures: people kept, invited back, hired, leaving within 30 days; by role applied for, by why kept, kept by month",
+      params: c.talent_pool.PoolSummaryQuery,
+      permission: ["recruitment", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+      // Someone pooled from a role the asker manages is counted; someone from the outsider's role never is (praxis-ai.md §6.17).
+      matrix: probeFor(async (v, ctx) => {
+        const a = await applicationFor(v, `Pool summary ${ctx.role}`);
         const added = await service.add(ctx.actor, { scope: "all", scope_ids: null }, { application_id: a.application_id, reason: "Kept by the access matrix" });
         return { type: "talent_pool_entry", id: added.talent_pool_entry_id };
       }),

@@ -39,7 +39,7 @@
  * invited with the Staff role.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, phone, blank, isoDate, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, email, phone, blank, isoDate, isoDateTime, listQuery, Paged, summaryPeriod } = require("./common");
 const { DocumentRef } = require("./documents");
 const { EmploymentContractView } = require("./employment_contracts");
 const { PlaceInput } = require("./maps");
@@ -419,6 +419,21 @@ const ROW = {
   department: "department.name, through offer",
   items_outstanding: "required checklist items not yet verified",
 };
+/**
+ * The assistant's onboarding summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding): the
+ * cases the reader may list in figures, by status, by department stacked by status, and starts by
+ * month. A period (starts) narrows it only when asked. Figures, never a row.
+ */
+const OnboardingSummaryBy = z.enum(["status", "department", "month"]);
+const OnboardingSummaryQuery = z
+  .object({
+    status: OnboardingStatus.optional(),
+    department_id: uuid.optional(),
+    ...summaryPeriod,
+    by: OnboardingSummaryBy.default("department"),
+  })
+  .strict();
+
 const TABLES = {
   DocumentRequirement: { table: "document_requirement" },
   DocumentRequirementCreate: { table: "document_requirement" },
@@ -483,6 +498,7 @@ const TABLES = {
   OnboardingListQuery: { table: null, reason: "list controls and filters for the cases" },
   OnboardingPage: { table: null, reason: "a page of cases" },
   OnboardingSummary: { table: null, reason: "counts over the cases, their items and steps" },
+  OnboardingSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's onboarding summary; figures, never a row" },
   ChecklistItemReject: { table: null, reason: "the reason, kept as rejected_reason" },
   OnboardingCancel: { table: null, reason: "the reason, kept as end_reason" },
   OnboardingComplete: { table: "employee" },
@@ -546,6 +562,8 @@ module.exports = {
   OnboardingListQuery,
   OnboardingPage,
   OnboardingSummary,
+  OnboardingSummaryBy,
+  OnboardingSummaryQuery,
   ChecklistItemReject,
   OnboardingCancel,
   OnboardingComplete,

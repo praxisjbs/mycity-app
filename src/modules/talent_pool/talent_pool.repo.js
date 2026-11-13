@@ -130,6 +130,52 @@ async function summary(db, scope) {
   return rows[0];
 }
 
+/**
+ * The pool in figures for the assistant (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding), in
+ * one statement over the live entries the reader may list (the hiring manager of the vacancy each
+ * applied for, as list() applies it): the counts, those leaving within 30 days and the average shown
+ * score; by role applied for (20); by why kept, the reason as written (top 10); kept by Lagos month. A
+ * period (added) narrows it only when `from` and `to` are given. Figures, never a row.
+ * @param {{invited?: string, from?: string, to?: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.invited === undefined ? null : q.invited === "true", q.from || null, q.to || null];
+  const s = scopeClause(scope, { column: "x.hiring_manager_id" }, params);
+  const { rows } = await db.query(
+    `WITH y AS (
+       SELECT x.* FROM (${ROWS}) x
+        WHERE ($1::boolean IS NULL OR (x.invited_at IS NOT NULL) = $1)
+          AND ($2::date IS NULL OR (x.created_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $2::date AND $3::date)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS kept,
+              count(*) FILTER (WHERE invited_at IS NOT NULL)::int AS invited,
+              count(*) FILTER (WHERE hired_from_pool)::int AS hired,
+              count(*) FILTER (WHERE expires_at <= now() + interval '30 days')::int AS leaving_soon,
+              round(avg(score), 1)::float AS average_score
+         FROM y
+     ), by_role AS (
+       SELECT COALESCE(applied_vacancy_id::text, 'none') AS key,
+              COALESCE(min(applied_number) || ', ' || min(applied_title), 'No role') AS label, count(*)::int AS value,
+              row_number() OVER (ORDER BY count(*) DESC, min(applied_title), applied_vacancy_id) AS rank
+         FROM y GROUP BY applied_vacancy_id
+     ), by_reason AS (
+       SELECT lower(btrim(reason)) AS key, min(btrim(reason)) AS label, count(*)::int AS value,
+              row_number() OVER (ORDER BY count(*) DESC, lower(btrim(reason))) AS rank
+         FROM y GROUP BY lower(btrim(reason))
+     ), months AS (
+       SELECT to_char(created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value FROM y GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank) FROM by_role WHERE rank <= 20) AS by_role,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank) FROM by_reason WHERE rank <= 10) AS by_reason,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM months) AS months`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_role: row.by_role || [], by_reason: row.by_reason || [], months: row.months || [] };
+}
+
 /** One entry still in the pool, held, whatever its time: the purge reads it so (the list hides it once past). */
 async function lockLive(client, id) {
   const { rows } = await client.query(
@@ -150,4 +196,4 @@ async function expired(db) {
   return rows;
 }
 
-module.exports = { list, get, liveFor, insert, renew, setInvited, remove, summary, lockLive, expired };
+module.exports = { list, get, liveFor, insert, renew, setInvited, remove, summary, aiSummary, lockLive, expired };

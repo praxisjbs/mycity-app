@@ -2,7 +2,8 @@
 /**
  * What the assistant may read and do about offers (docs/guides/offers.md §9): the offers the asker
  * may see, by the same scope the screen keeps (the vacancy's hiring manager), a page of 25 at a time,
- * with each offer's status, role and expiry; never the letter.
+ * with each offer's status, role and expiry; never the letter. Its summary counts them in figures, the
+ * pay only for a reader whose role shows pay (praxis-ai.md §6.13, decision 58).
  *
  *   offers.create   New Offer as a card the person confirms: a shortlisted candidate, the start date
  *                   and the monthly basic salary (with the reason, when it sits outside the vacancy's
@@ -57,11 +58,21 @@ module.exports = defineManifest({
   reads: [
     {
       key: "offers.list",
+      summary: "offers.summary",
       description: "List offers: the candidate, role, status, monthly pay outside the range or not, when sent and when it expires",
       params: c.offers.OfferListQuery,
       permission: ["recruitment", "view"],
       run: (_client, params, actor) => service.list(params, actor, actor.scope),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "offers.summary",
+      description: "Offers in figures: sent, accepted, declined, expired, the acceptance rate; by status, offers sent by department or vacancy as stacked bars, sent and accepted by month",
+      params: c.offers.OfferSummaryQuery,
+      permission: ["recruitment", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
     },
   ],
   routes: [

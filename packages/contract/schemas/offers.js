@@ -28,7 +28,7 @@
  * string, NGN only.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, email, isoDate, isoDateTime, money, blank, listQuery, Paged, summaryPeriod } = require("./common");
 const { DocumentRef } = require("./documents");
 const { InterviewDecision } = require("./interviews");
 const { EmploymentType, WorkPattern, PersonRef } = require("./organisation");
@@ -363,6 +363,22 @@ const FIELDS = {
   benefits: "kept in terms",
   pay_lines: "written to offer_pay_line; annual_compensation is twelve times their sum",
 };
+/**
+ * The assistant's offer summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding): the offers
+ * the reader may list in figures, by status, the offers sent by department or vacancy, and sent and
+ * accepted by month; pay only for a reader whose role shows it. A period (sent) narrows it only when
+ * asked. Figures, never a row.
+ */
+const OfferSummaryBy = z.enum(["status", "vacancy", "department", "month"]);
+const OfferSummaryQuery = z
+  .object({
+    status: OfferStatus.optional(),
+    vacancy_id: uuid.optional(),
+    ...summaryPeriod,
+    by: OfferSummaryBy.default("department"),
+  })
+  .strict();
+
 const TABLES = {
   OfferPayLine: { table: "offer_pay_line" },
   OfferPayLineInput: { table: "offer_pay_line" },
@@ -396,6 +412,7 @@ const TABLES = {
   OfferListQuery: { table: null, reason: "list controls and filters for the offers" },
   OfferPage: { table: null, reason: "a page of offers" },
   OffersSummary: { table: null, reason: "counts over the offers" },
+  OfferSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's offer summary; figures, never a row" },
   OfferFields: { table: "offer", virtual: FIELDS },
   OfferCreate: { table: "offer", virtual: FIELDS },
   OfferEdit: { table: "offer", virtual: FIELDS },
@@ -425,6 +442,8 @@ module.exports = {
   OfferListQuery,
   OfferPage,
   OffersSummary,
+  OfferSummaryBy,
+  OfferSummaryQuery,
   OfferFields,
   OfferCreate,
   OfferEdit,

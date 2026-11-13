@@ -4,7 +4,8 @@
  * sittings as the asker may see them (the vacancy's hiring manager, guide §8), one page of 25 at a
  * time, with those waiting to be marked found by `marking`. It never reads an answer or a key, and
  * takes no action here: questions are designed whole, a sitting is a person's decision about a
- * candidate, and a mark is a person's judgement.
+ * candidate, and a mark is a person's judgement. Its summary counts the sittings in figures (praxis-ai.md
+ * §6.13), never an answer.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -34,6 +35,7 @@ module.exports = defineManifest({
     },
     {
       key: "assessments.sittings",
+      summary: "assessments.summary",
       description: "List assessment sittings: candidate, role, assessment, status, start-by day, score, and how many answers wait to be marked (marking=true for those)",
       params: c.assessments.SittingListQuery,
       permission: ["recruitment", "view"],
@@ -45,6 +47,20 @@ module.exports = defineManifest({
       }),
       // The sitting itself: it opens on Assessments · Sittings (route map application_assessment).
       cite: (row) => ({ type: "application_assessment", id: row.application_assessment_id, label: `${row.assessment_name}, ${row.candidate_name}` }),
+    },
+  ],
+  summaries: [
+    {
+      key: "assessments.summary",
+      description: "Assessment sittings in figures: not started, in progress, waiting to be marked, scored; the average score by assessment, by status, sent by month",
+      params: c.assessments.SittingSummaryQuery,
+      permission: ["recruitment", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+      // A sitting for a role the asker manages is counted; one for the outsider's role never is (praxis-ai.md §6.17).
+      matrix: probeFor(async (v, ctx) => {
+        const { sitting } = await sittingFor(v, ctx);
+        return { type: "application_assessment", id: sitting.application_assessment_id };
+      }),
     },
   ],
   routes: [

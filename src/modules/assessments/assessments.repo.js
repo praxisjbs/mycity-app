@@ -332,6 +332,56 @@ async function due(db, today) {
   return rows;
 }
 
+/**
+ * The sittings in figures for the assistant (docs/guides/praxis-ai.md §6.13, Recruitment and
+ * onboarding), in one statement with the reader's scope (the vacancy's hiring manager, as sittings()
+ * applies it): the counts by state and the average score of scored ones; the average score by
+ * assessment over its scored sittings (20; one with none scored is left out, never 0); by status;
+ * sittings sent by Lagos month. A period (sent) narrows it only when `from` and `to` are given. Figures,
+ * never a row; no answer or key is read.
+ * @param {{status?: string, from?: string, to?: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.status || null, q.from || null, q.to || null];
+  const s = scopeClause(scope, { column: "v.hiring_manager_id" }, params);
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT s.application_assessment_id, s.status, s.score, s.created_at, d.assessment_definition_id, d.name
+         FROM application_assessment s
+         JOIN assessment_definition d ON d.assessment_definition_id = s.assessment_definition_id
+         JOIN application a ON a.application_id = s.application_id
+         JOIN vacancy v ON v.vacancy_id = a.vacancy_id
+        WHERE ($1::text IS NULL OR s.status = $1)
+          AND ($2::date IS NULL OR (s.created_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $2::date AND $3::date)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS sittings,
+              count(*) FILTER (WHERE status = 'sent')::int AS not_started,
+              count(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+              count(*) FILTER (WHERE status IN ('submitted', 'timed_out'))::int AS to_mark,
+              count(*) FILTER (WHERE status = 'scored')::int AS scored,
+              count(*) FILTER (WHERE status IN ('expired', 'cancelled'))::int AS ended,
+              round(avg(score) FILTER (WHERE status = 'scored'), 1)::float AS average_score
+         FROM x
+     ), by_assessment AS (
+       SELECT assessment_definition_id::text AS key, min(name) AS label, round(avg(score), 1)::float AS value, count(*)::int AS count,
+              row_number() OVER (ORDER BY count(*) DESC, min(name), assessment_definition_id) AS rank
+         FROM x WHERE status = 'scored' AND score IS NOT NULL
+        GROUP BY assessment_definition_id
+     ), months AS (
+       SELECT to_char(created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value FROM x GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value, 'count', count) ORDER BY rank)
+               FROM by_assessment WHERE rank <= 20) AS by_assessment,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM x GROUP BY status) z) AS by_status,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM months) AS months`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_assessment: row.by_assessment || [], by_status: row.by_status || [], months: row.months || [] };
+}
+
 module.exports = {
   list,
   get,
@@ -342,6 +392,7 @@ module.exports = {
   keysOf,
   replaceQuestions,
   summary,
+  aiSummary,
   sittings,
   sitting,
   lockLinks,

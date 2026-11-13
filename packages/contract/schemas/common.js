@@ -106,6 +106,17 @@ const positiveMoney = z
   .refine((v) => /[1-9]/.test(v), "Enter an amount");
 
 /**
+ * The period an assistant summary is asked for (docs/guides/praxis-ai.md §6.13): `from` and `to`, or a
+ * `month` as YYYY-MM. Spread into a summary's query schema; the server reads it with
+ * shared/ai/summary.js (`periodOf`, or `askedPeriod` where the list shows every record).
+ */
+const summaryPeriod = Object.freeze({
+  from: isoDate.optional(),
+  to: isoDate.optional(),
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Pick a month").optional(),
+});
+
+/**
  * The first day of a month, as ISO: a period is stored and sent that way (`2026-10-01` is October
  * 2026). `message` is the field's error, at most four words.
  * @param {string} [message]
@@ -317,6 +328,7 @@ const textOfHtml = (html) =>
 
 module.exports = {
   TABLES,
+  summaryPeriod,
   textOfHtml,
   uuid,
   text,

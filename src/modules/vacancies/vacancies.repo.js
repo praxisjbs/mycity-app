@@ -363,6 +363,78 @@ async function summary(db, scope) {
   };
 }
 
+/** The assistant summary's second grouping: the column and name each `by` maps to (never the caller's words). */
+const SUMMARY_BY = Object.freeze({
+  department: { key: "v.department_id", label: "v.department", none: "No department" },
+  hiring_manager: { key: "v.hiring_manager_id", label: "v.hiring_manager", none: "No hiring manager" },
+});
+
+/**
+ * The vacancies in figures for the assistant (docs/guides/praxis-ai.md §6.13, Recruitment and
+ * onboarding), in one statement with the reader's scope (the hiring manager, as list() applies it): the
+ * counts by status, applicants (every application, as the list's column counts them), the average days
+ * open, those closing within a week; by status; by department or hiring manager, each row's statuses for
+ * a stacked bar (20); applicants per vacancy (top 10); vacancies opened by Lagos month. A period (opened:
+ * published, or made for a draft) narrows it only when `from` and `to` are given. Figures, never a row.
+ * @param {{status?: string, department_id?: string, from?: string, to?: string, by: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const dim = SUMMARY_BY[q.by] || SUMMARY_BY.department;
+  const params = [q.status || null, q.department_id || null, q.from || null, q.to || null, dim.none];
+  const s = scopeClause(scope, { column: "x.hiring_manager_id" }, params);
+  const { rows } = await db.query(
+    `WITH v AS (
+       SELECT x.vacancy_id, x.number::text AS number, x.title, x.status, x.department_id, d.name AS department,
+              x.hiring_manager_id, NULLIF(btrim(COALESCE(hm.first_name, '') || ' ' || COALESCE(hm.last_name, '')), '') AS hiring_manager,
+              x.published_at, x.closed_at, x.closes_at,
+              (SELECT count(*)::int FROM application a WHERE a.vacancy_id = x.vacancy_id) AS applicants
+         FROM vacancy x
+         LEFT JOIN department d ON d.department_id = x.department_id
+         LEFT JOIN employee hm ON hm.employee_id = x.hiring_manager_id
+        WHERE ($1::text IS NULL OR x.status = $1)
+          AND ($2::uuid IS NULL OR x.department_id = $2)
+          AND ($3::date IS NULL OR (COALESCE(x.published_at, x.created_at) AT TIME ZONE 'Africa/Lagos')::date BETWEEN $3::date AND $4::date)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS vacancies,
+              count(*) FILTER (WHERE status = 'open')::int AS open,
+              count(*) FILTER (WHERE status = 'paused')::int AS paused,
+              count(*) FILTER (WHERE status = 'closed')::int AS closed,
+              count(*) FILTER (WHERE status = 'draft')::int AS draft,
+              COALESCE(sum(applicants), 0)::int AS applicants,
+              round(avg(GREATEST(0, (COALESCE(closed_at, now()) AT TIME ZONE 'Africa/Lagos')::date
+                                     - (published_at AT TIME ZONE 'Africa/Lagos')::date))
+                    FILTER (WHERE published_at IS NOT NULL), 1)::float AS days_open,
+              count(*) FILTER (WHERE status = 'open' AND closes_at > now() AND closes_at <= now() + interval '7 days')::int AS closing_soon
+         FROM v
+     ), by_dim AS (
+       SELECT COALESCE(${dim.key}::text, 'none') AS key, COALESCE(min(${dim.label}), $5) AS label,
+              count(*) FILTER (WHERE status = 'open')::int AS open,
+              count(*) FILTER (WHERE status = 'paused')::int AS paused,
+              count(*) FILTER (WHERE status = 'closed')::int AS closed,
+              count(*) FILTER (WHERE status = 'draft')::int AS draft,
+              row_number() OVER (ORDER BY count(*) DESC, min(${dim.label}), ${dim.key}) AS rank
+         FROM v GROUP BY ${dim.key}
+     ), applied AS (
+       SELECT vacancy_id::text AS key, number || ', ' || title AS label, applicants AS value,
+              row_number() OVER (ORDER BY applicants DESC, number) AS rank
+         FROM v WHERE applicants > 0
+     ), opened AS (
+       SELECT to_char(published_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value
+         FROM v WHERE published_at IS NOT NULL GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM v GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'open', open, 'paused', paused, 'closed', closed, 'draft', draft) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank) FROM applied WHERE rank <= 10) AS applied,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM opened) AS opened`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_status: row.by_status || [], by_dim: row.by_dim || [], applied: row.applied || [], opened: row.opened || [] };
+}
+
 /* ------------------------------------------------------------------ *
  * Suggested From Organogram
  * ------------------------------------------------------------------ */
@@ -616,6 +688,7 @@ module.exports = {
   saveScorecard,
   stageCounts,
   summary,
+  aiSummary,
   suggested,
   seat,
   activeEmployee,

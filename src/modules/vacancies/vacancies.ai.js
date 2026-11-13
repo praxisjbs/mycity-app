@@ -4,7 +4,8 @@
  * the asker may see, by the same scope the screen keeps (the hiring manager, guide §8), one page of 25
  * at a time, and one vacancy with its questions and scorecard; and, as cards the person confirms
  * (docs/guides/praxis-ai.md §6.11, decision 33; TB, 04/11/2026), New Vacancy and Save Vacancy, each
- * through the function the screen's own button calls. The vacancy's location is picked as every
+ * through the function the screen's own button calls. Summary: the vacancies in figures, by status and
+ * by department or hiring manager as stacked bars (praxis-ai.md §6.13, Recruitment and onboarding). The vacancy's location is picked as every
  * place is (F27, decision 37): the model writes it in words, our search signs the one area it finds,
  * and anything else is left for the person to pick on Edit.
  *
@@ -135,6 +136,7 @@ module.exports = defineManifest({
     },
     {
       key: "vacancies.list",
+      summary: "vacancies.summary",
       description: "List vacancies: the role, its department and hiring manager, status (draft, open, paused, closed), applicants, days open and the closing date",
       params: c.vacancies.VacancyListQuery,
       permission: ["recruitment", "view"],
@@ -151,6 +153,17 @@ module.exports = defineManifest({
       permission: ["recruitment", "view"],
       run: (_client, params, actor) => service.get(params.id, actor, actor.scope),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "vacancies.summary",
+      description: "Vacancies in figures: open, paused, closed, applicants, days open; by status, by department or hiring manager as stacked bars, applicants per vacancy, opened by month",
+      params: c.vacancies.VacancySummaryQuery,
+      permission: ["recruitment", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+      // A vacancy the asker manages is counted; one the matrix's outsider manages never is (praxis-ai.md §6.17).
+      matrix: probeFor(async (v) => ({ type: "vacancy", id: v.vacancy_id })),
     },
   ],
   routes: [

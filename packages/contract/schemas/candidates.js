@@ -15,7 +15,7 @@
  * application is write-only: the answer is a reference, never a score or a stage.
  */
 const { z } = require("zod");
-const { uuid, text, email, phone, isoDate, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, email, phone, isoDate, isoDateTime, listQuery, Paged, summaryPeriod } = require("./common");
 const { DocumentRef } = require("./documents");
 const { AssessmentType, SittingStatus } = require("./assessments");
 const { InterviewStatus, RoundStatus } = require("./interviews");
@@ -416,6 +416,22 @@ const OnboardingDocumentRejectedEmailVars = z
   .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's candidate summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding): the
+ * applications the reader may list in figures, the funnel by stage, each vacancy by stage group, by
+ * source, and applications by month or week. `CandidateSummaryQuery` is the board's own figures, so
+ * this one is named for the application it counts. A period (applied) narrows it only when asked.
+ */
+const ApplicationSummaryBy = z.enum(["stage", "vacancy", "source", "week", "month"]);
+const ApplicationSummaryQuery = z
+  .object({
+    vacancy_id: uuid.optional(),
+    status: ApplicationStatus.optional(),
+    ...summaryPeriod,
+    by: ApplicationSummaryBy.default("stage"),
+  })
+  .strict();
+
 const TABLES = {
   Candidate: {
     table: "application",
@@ -468,6 +484,7 @@ const TABLES = {
   CandidateListQuery: { table: null, reason: "list controls and filters for Candidates" },
   CandidateSummaryQuery: { table: null, reason: "the vacancy filter of the summary" },
   CandidatesSummary: { table: null, reason: "counts over application within the reader's scope" },
+  ApplicationSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's candidate summary; figures, never a row" },
   CandidateMove: {
     table: "application",
     virtual: { reason: "kept on the entity_state_history row of the move" },
@@ -538,6 +555,8 @@ module.exports = {
   CandidateListQuery,
   CandidateSummaryQuery,
   CandidatesSummary,
+  ApplicationSummaryBy,
+  ApplicationSummaryQuery,
   CandidateMove,
   CandidateNotProgressed,
   ScoreAll,

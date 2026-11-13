@@ -499,10 +499,88 @@ async function actorOf(db, userId) {
   return rows[0] || null;
 }
 
+/**
+ * The interviews in figures for the assistant (docs/guides/praxis-ai.md §6.13, Recruitment and
+ * onboarding), in one statement over the interviews the reader may list (visible(): the vacancy's
+ * hiring manager in scope, or a seat on the panel; `mine` their seats alone): each by its state now
+ * (upcoming, awaiting feedback once past its end with the round open, held once the round closed,
+ * cancelled), the held ones by their round's reported decision, each interviewer's cards submitted and
+ * waiting over the interviews not called off (who has submitted is never blind, a rating always is,
+ * guide §6.6), and interviews by week. A period (scheduled) narrows it only when `from` and `to` are
+ * given. Figures, never a row; no card's rating, decision or note is read.
+ * @param {{status?: string, mine?: string, from?: string, to?: string}} q
+ * @param {string|null} employeeId  the reader's employee id
+ */
+async function aiSummary(db, q, scope, employeeId) {
+  const params = [employeeId || null, q.status || null, q.mine === "true", q.from || null, q.to || null];
+  const s = visible(scope, params);
+  const { rows } = await db.query(
+    `WITH y AS (
+       SELECT x.* FROM (
+         SELECT i.interview_id, i.status, i.scheduled_start, i.scheduled_end, r.decision, v.hiring_manager_id,
+                EXISTS (SELECT 1 FROM interview_panelist p WHERE p.interview_id = i.interview_id AND p.employee_id = $1::uuid) AS on_panel,
+                CASE WHEN i.status = 'cancelled' THEN 'cancelled'
+                     WHEN i.status = 'done' OR r.status = 'closed' THEN 'held'
+                     WHEN i.scheduled_end >= now() THEN 'upcoming'
+                     ELSE 'awaiting_feedback' END AS state
+           FROM interview i
+           JOIN interview_round r ON r.interview_round_id = i.interview_round_id
+           JOIN application a ON a.application_id = r.application_id
+           JOIN vacancy v ON v.vacancy_id = a.vacancy_id
+       ) x
+       WHERE ($2::text IS NULL OR x.status = $2)
+         AND (NOT $3 OR x.on_panel)
+         AND ($4::date IS NULL OR (x.scheduled_start AT TIME ZONE 'Africa/Lagos')::date BETWEEN $4::date AND $5::date)
+         ${s}
+     ), figures AS (
+       SELECT count(*)::int AS interviews,
+              count(*) FILTER (WHERE state = 'upcoming')::int AS upcoming,
+              count(*) FILTER (WHERE state = 'awaiting_feedback')::int AS awaiting_feedback,
+              count(*) FILTER (WHERE state = 'held')::int AS held,
+              count(*) FILTER (WHERE state = 'cancelled')::int AS cancelled,
+              count(*) FILTER (WHERE state = 'held' AND decision = 'select')::int AS selected,
+              count(*) FILTER (WHERE state = 'held' AND decision = 'on_hold')::int AS on_hold,
+              count(*) FILTER (WHERE state = 'held' AND decision = 'reject')::int AS rejected
+         FROM y
+     ), seats AS (
+       SELECT p.employee_id::text AS key,
+              min(NULLIF(btrim(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')), '')) AS label,
+              count(*) FILTER (WHERE p.submitted_at IS NOT NULL)::int AS submitted,
+              count(*) FILTER (WHERE p.submitted_at IS NULL)::int AS waiting,
+              row_number() OVER (ORDER BY count(*) DESC, min(e.first_name), min(e.last_name), p.employee_id) AS rank
+         FROM y
+         JOIN interview_panelist p ON p.interview_id = y.interview_id
+         LEFT JOIN employee e ON e.employee_id = p.employee_id
+        WHERE y.state <> 'cancelled'
+        GROUP BY p.employee_id
+     ), weeks AS (
+       SELECT to_char(date_trunc('week', scheduled_start AT TIME ZONE 'Africa/Lagos'), 'YYYY-MM-DD') AS at, count(*)::int AS value
+         FROM y GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', state, 'value', n)) FROM (SELECT state, count(*)::int AS n FROM y GROUP BY state) z) AS by_state,
+            (SELECT json_agg(json_build_object('key', d, 'value', n))
+               FROM (SELECT COALESCE(decision, 'none') AS d, count(*)::int AS n FROM y WHERE state = 'held' GROUP BY 1) z) AS by_outcome,
+            (SELECT json_agg(json_build_object('key', key, 'label', COALESCE(label, 'Unnamed'), 'submitted', submitted, 'waiting', waiting) ORDER BY rank)
+               FROM seats WHERE rank <= 20) AS by_interviewer,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM weeks) AS weeks`,
+    params,
+  );
+  const row = rows[0] || {};
+  return {
+    figures: row.figures || {},
+    by_state: row.by_state || [],
+    by_outcome: row.by_outcome || [],
+    by_interviewer: row.by_interviewer || [],
+    weeks: row.weeks || [],
+  };
+}
+
 module.exports = {
   BLIND,
   maySit,
   list,
+  aiSummary,
   get,
   scheduledFor,
   panel,
