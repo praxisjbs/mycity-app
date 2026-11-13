@@ -158,6 +158,80 @@ const SignedCopyRecord = z
   })
   .strict();
 
+/**
+ * Record Signed Copy as a Praxis AI card (docs/guides/praxis-ai.md §6.18; partnerships.md §9): the
+ * screen's form sits on the agreement it records and never names it, so the card names it beside
+ * the form's own fields. Drawn only from a contract or MoU attached on Ask; its run sends the form's
+ * own request (`SignedCopyRecord`) for that agreement.
+ */
+const AgreementSignedCopyAdd = z
+  .object({
+    partnership_agreement_id: uuid,
+    document_id: uuid,
+    signed_on: isoDate,
+    signed_by_name: text(120),
+    signed_by_title: optionalText(120),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
+ * A contract or MoU attached on Praxis AI (praxis-ai.md §1.10 decisions 43, 44 and 47, §6.18)
+ * ------------------------------------------------------------------ */
+
+/** What the reading says the document is; `other` for anything else. */
+const AgreementDocumentKind = z.enum(["mou", "service_agreement", "contract", "other"]);
+
+/** A party to the document as it names itself, and its role in it ("Partner", "Organiser"). */
+const AgreementDocumentParty = z
+  .object({
+    name: z.string().min(1).max(200),
+    role: z.string().max(100).nullable(),
+  })
+  .strict();
+
+/** One of a party's main obligations, in one sentence. */
+const AgreementDocumentObligation = z
+  .object({
+    party: z.string().min(1).max(200),
+    obligation: z.string().min(1).max(300),
+  })
+  .strict();
+
+/** Someone who signed it, their title, and the party they signed for. */
+const AgreementDocumentSignatory = z
+  .object({
+    name: z.string().min(1).max(120),
+    title: z.string().max(120).nullable(),
+    party: z.string().max(200).nullable(),
+  })
+  .strict();
+
+/**
+ * What the model reads off a contract or MoU (`agreement-document-read`, Image Reading, chosen by
+ * TB): never kept as a record. The answer summarises it, the pane's Record tab shows its terms, and
+ * the server matches its parties among the partners and leads the person may edit to file it.
+ */
+const AgreementDocumentRead = z
+  .object({
+    title: z.string().max(200).nullable(),
+    kind: AgreementDocumentKind.nullable(),
+    parties: z.array(AgreementDocumentParty).max(6),
+    signed_on: isoDate.nullable(),
+    starts_on: isoDate.nullable(),
+    ends_on: isoDate.nullable(),
+    notice_days: z.number().int().min(0).max(3650).nullable(),
+    /** The value it states, two places; in `currency`, which is not always naira. */
+    value: money.nullable(),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .nullable(),
+    renewal: z.string().max(300).nullable(),
+    obligations: z.array(AgreementDocumentObligation).max(8),
+    signatories: z.array(AgreementDocumentSignatory).max(6),
+  })
+  .strict();
+
 /** Renew: the next agreement drafted from this one, dates moved, and a new deal for the term if asked. */
 const AgreementRenew = z
   .object({
@@ -331,6 +405,11 @@ const TABLES = {
   SignerInput: { table: null, reason: "a signer confirmed for the signature request" },
   AgreementSend: { table: null, reason: "the signers and message the signature request is made with" },
   SignedCopyRecord: { table: null, reason: "a paper signature: signed_document_id, signed_at, signed_outside and the signer" },
+  AgreementSignedCopyAdd: { table: null, reason: "Record Signed Copy's request with the agreement it records, a Praxis AI card" },
+  AgreementDocumentParty: { table: null, reason: "a party a model read off an attached contract, never kept" },
+  AgreementDocumentObligation: { table: null, reason: "an obligation a model read off an attached contract, never kept" },
+  AgreementDocumentSignatory: { table: null, reason: "a signatory a model read off an attached contract, never kept" },
+  AgreementDocumentRead: { table: null, reason: "a model's reading of a contract or MoU attached on Praxis AI, never kept" },
   AgreementRenew: { table: null, reason: "the next agreement's dates, drafted from this one" },
   AgreementClose: { table: null, reason: "the reason, kept as close_reason" },
   Signer: { table: null, reason: "a signer of the signature request, and where they are" },
@@ -376,6 +455,12 @@ module.exports = {
   SignerInput,
   AgreementSend,
   SignedCopyRecord,
+  AgreementSignedCopyAdd,
+  AgreementDocumentKind,
+  AgreementDocumentParty,
+  AgreementDocumentObligation,
+  AgreementDocumentSignatory,
+  AgreementDocumentRead,
   AgreementRenew,
   AgreementClose,
   Signer,
