@@ -447,6 +447,13 @@ requester always sees theirs.
   matching ask "Which request was paid?". Read Invoice on New Request fills the payee's bank too, and
   a line takes a minus (`LinesField`, `MoneyField` `signed`).
 
+- **Charts in the Overview (planned; `praxis-ai.md` decisions 49 to 58, §6.13, §6.19, Appendix B).**
+  `budgets.summary` (PR 1): allocated, committed, spent and remaining by department, category or
+  project, each bar stacked Spent, Committed, Remaining and Over Budget to its allocation, within
+  the reader's `expenses` scope (by project only for scope all, as Expenses · Projects).
+  `expenses.summary`, `requisitions.summary` and `disbursements.summary` (PR 4) answer the
+  requests, requisitions, disbursements and categories reads. Each read names its summary.
+
 ## 10 · On screen and mobile
 
 Every list is 25 a page. A request, a requisition and a disbursement open in the shared Modal on
@@ -515,6 +522,7 @@ None.
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · Charts in the Overview planned (`praxis-ai.md` decisions 49 to 58, Appendix B): Budgets' summary with stacked bars in PR 1, the requests', requisitions' and disbursements' summaries in PR 4 (§9). Nothing built yet.
 - 13/11/2026 · TB · Documents in the chat built (`praxis-ai.md` Appendix A PR 1, §9): an invoice on Praxis AI becomes a New Request card for its balance due, a receipt a Record Disbursement card. §6.1 rule 1: a line may carry a negative unit price and a request's total is above zero, `EXPENSE_TOTAL_NOT_POSITIVE` replacing `AMOUNT_REQUIRED`, with migration 8030 dropping 8010's CHECKs on a line's price and amount (§4). Read Invoice fills the payee's bank (§5). New Request's lines are the shared `LinesField` (§10.1: a minus taken on a unit price, the total under the lines).
 - 13/11/2026 · TB · Found filming the M8 handover video: Read Invoice read a real invoice with a discount and a deposit already paid as ₦550,000.00, where it asked for ₦150,000.00; the prompt left discounts out, and the database refused a line below zero, so nobody could enter one. A line may now take money off (§6.1 rule 1, migration 8030 (`8030_expense_line_discount.sql`, already on `main`), Unit Price's `MoneyField signed`), the request's amount still above zero; Read Invoice reads every addition and deduction as a line and the amount due beside them (`amount_due`, §9), and the form warns when they differ. The staging seed's sent-back and rejected requests are decided by whoever their stage names (a requester who manages people goes straight to Operations & People).
 - 13/11/2026 · TB · Documents in the chat planned (`praxis-ai.md` decisions 41 to 48, Appendix A PR 1): an invoice attached on Praxis AI becomes a New Request card for its balance due, itemised, and a payment receipt a Record Disbursement card (§9). Nothing built yet; §6.1's negative line and total above zero come with PR 1.

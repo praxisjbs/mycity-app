@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144 (§6.11) (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B (§6.12) (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -830,12 +830,29 @@ PR 1, the attach control with invoices and payment receipts, built on the branch
 - [ ] On staging: the sample invoice into a request of ₦150,000.00 its line manager opens with its invoice, and a receipt recorded from the chat (`eval-assistant.js --only=file`)
 - [ ] PR 2 · Contracts and MoUs (`praxis-ai.md` Appendix A), in a fresh chat from its start prompt
 
+### 6.12 Charts in the Overview (decisions 49 to 58, JBS Praxis, 13/11/2026; `praxis-ai.md` Appendix B)
+
+Planned in one chat; each PR is built in a fresh chat from its start prompt (Appendix B.5), opened
+ready for review with GitHub's CI green, then reviewed and merged from the planning chat. Merge
+order: PR 1 first, PR 3 after PR 2, PR 8 after PRs 4 to 7 (Appendix B.2). Tick an item with the
+date, the branch and the PR when it merges.
+
+- [ ] PR 1 · Stacked bars, Budgets' summary and every read naming its summary, gate 23 rule 9 with `scripts/check/ai-summary-gaps.json`, money in naira, no mechanics in an answer (`m10/overview-stacked`)
+- [ ] PR 2 · Charts from a complete table (`m10/overview-tables`)
+- [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
+- [ ] PR 4 · Finance and pay summaries (`m10/summaries-finance`)
+- [ ] PR 5 · Recruitment and onboarding summaries (`m10/summaries-recruitment`)
+- [ ] PR 6 · Partnerships summaries (`m10/summaries-partnerships`)
+- [ ] PR 7 · People, performance and queries summaries (`m10/summaries-people`)
+- [ ] PR 8 · Workspace, Knowledge Hub, Community, Home and Settings summaries; the gaps file deleted (`m10/summaries-close`)
+- [ ] On staging: the budget question by department draws stacked bars, and its Download PDF opens on the letterhead
+
 ## 7 · Gates this work adds
 
 | Gate | Script | Refuses |
 |---|---|---|
 | 19 (rewritten) · AI manifests: reads and declared actions only | `scripts/check/ai-no-writes.js` | A manifest key that is a write by another name (`write`, `writes`, `executor`, `execute`, `mutations`, `sql`, `query`); an `.ai.js` that holds SQL or calls `.query(`; an action whose `run` or `check` is not a function; a manifest that does not load through `defineManifest` |
-| 23 · AI awareness | `scripts/check/ai-awareness.js` | (1) `src/shared/ai/catalogue.snapshot.json` differs from `registry.catalogue()` (keys, kinds, modules, permissions, risk, the hash of each parameter, input and prefill schema): run `npm run gen:ai-catalogue` and review the diff. (2) An action's `input` is not a schema the module's own feature folder validates a form with (`useContractForm(..., <schema>)`), unless the action says `form: "none: <reason>"`. (3) An action key that no integration test exercises, or that the evaluation set (`scripts/ai/eval-assistant.js`) does not grade. (4) A module that declares `actions` and leaves a `<Thing>Create` schema of its contract neither offered nor in `not_offered` with a reason (PR5 makes this rule universal). (5) A Try Asking line (`assistant.suggestions.js`) naming a read that does not exist |
+| 23 · AI awareness | `scripts/check/ai-awareness.js` | (1) `src/shared/ai/catalogue.snapshot.json` differs from `registry.catalogue()` (keys, kinds, modules, permissions, risk, the hash of each parameter, input and prefill schema): run `npm run gen:ai-catalogue` and review the diff. (2) An action's `input` is not a schema the module's own feature folder validates a form with (`useContractForm(..., <schema>)`), unless the action says `form: "none: <reason>"`. (3) An action key that no integration test exercises, or that the evaluation set (`scripts/ai/eval-assistant.js`) does not grade. (4) A module that declares `actions` and leaves a `<Thing>Create` schema of its contract neither offered nor in `not_offered` with a reason (PR5 makes this rule universal). (5) A Try Asking line (`assistant.suggestions.js`) naming a read that does not exist. Planned in `praxis-ai.md` Appendix B PR 1: (9) a read with no `summary` that is not in `scripts/check/ai-summary-gaps.json`, a `summary` naming no summary, and a gap that is now answered or that the change's base did not hold |
 | 24 · AI engine boundary | `scripts/check/ai-engine-boundary.js` | A file under `src/services/ai/engine/` that requires anything but Node's builtins and its sibling files; a file outside it that reaches into the engine's internals rather than its `index.js` |
 | The matrix | `tests/integration/ai-matrix.test.js` | Any read, summary or action a role may run that `scopeFor` would refuse, or the reverse; a scoped person's rows that the CEO's do not contain; a masked field reaching a person without the field grant; a probe's outside record returned or acted on (PR5) |
 | The attack suite | `tests/integration/ai-cards.test.js` (PR1), `ai-attacks.test.js` (PR5), nightly `scripts/ai/attack-assistant.js` through `deploy-gate attack` and `.github/workflows/ai-nightly.yml` (PR5) | A card run twice, expired, after a grant was removed, over 25 records, or sensitive without a fresh confirm; and from PR5 every attack of §5's PR5 prompt: another person's pay, a guessed id, instructions planted in a message, a note and a policy, an action outside scope, self-approval, a card after the grant went, a bulk card over 25, a mail outside from a suggested card, a read never offered. With the real model a leak fails the nightly and is an urgent notice; AI Control · Spend shows the last run |
@@ -844,6 +861,11 @@ PR 1, the attach control with invoices and payment receipts, built on the branch
 
 ## 8 · Log
 
+- 13/11/2026 · JP · Charts in the Overview planned: `praxis-ai.md` §1.11 (decisions 49 to 58),
+  §6.13's planned tables, §6.19 and Appendix B (eight PRs, each in a fresh chat; §6.12 here). The
+  engine side: a summary group row's `parts` drawn as a stacked bar (`engine/pane.js`), an
+  Overview from a whole list's rows (`overviewOfRows`), each read's `summary` in the manifest and
+  the catalogue, gate 23 rule 9, and a chart in a document (`shared/documents/chart.js`).
 - 13/11/2026 · TB · Documents in the chat, PR 1 built (§6.11): Attach Document with Invoice and
   Payment Receipt; the reading as read 1 and its values over the model's card before the ask guard,
   kept on the answer so a later question keeps the file's figures; New Request from an invoice for
