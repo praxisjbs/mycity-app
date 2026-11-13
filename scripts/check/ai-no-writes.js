@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Gate 19: the AI manifests declare reads, summaries, actions and routes, and nothing else
- * (MILESTONES A23 as amended 01/11/2026; docs/guides/praxis-ai.md §1.2 decision 10, §6.11).
+ * Gate 19: the AI manifests declare reads, summaries, actions, routes and the documents they read
+ * (`files`), and nothing else (MILESTONES A23 as amended 01/11/2026; docs/guides/praxis-ai.md §1.2
+ * decision 10, §6.11, §6.18). A document's reader returns data: the card it draws is pressed by a
+ * person like any other.
  *
  * The assistant never executes anything itself: a change is an action the module declares on
  * its own service function and a person confirms, or a route to the screen. Three checks, so
@@ -14,8 +16,9 @@
  *  2. Static. No SQL and no query call inside a manifest: an action's `run` is the module's
  *     service function, never INSERT, UPDATE, DELETE or `.query(` of its own.
  *  3. Loaded. Every manifest goes through shared/ai/registry.js, where defineManifest refuses
- *     a malformed read, summary, action or route (an action's `run` not a function, a risk
- *     outside the five classes, a `view` grant on an action, a summary that takes a page),
+ *     a malformed read, summary, action, route or file (an action's `run` not a function, a risk
+ *     outside the five classes, a `view` grant on an action, a summary that takes a page, a file
+ *     whose `read` is not a function or that names a write),
  *     exactly as the API and the worker do at boot.
  *
  * Usage: node scripts/check/ai-no-writes.js     exit 0 ok, 1 on a write or a bad manifest

@@ -124,15 +124,34 @@ export function AnswerBubble({ text, table, paging, onNext, link, from, onPane, 
 export interface QuestionBubbleProps {
   /** The person's words. */
   words: string;
+  /** The document the question carried (praxis-ai.md §6.18): its name as a chip that opens it. */
+  file?: { name: string; onOpen?: () => void } | null;
   /** Layout classes only (spacing). */
   className?: string;
 }
 
-/** The person's question, as their own bubble at the right. */
-export function QuestionBubble({ words, className }: QuestionBubbleProps) {
+/** The person's question, as their own bubble at the right, with the file it carried above the words. */
+export function QuestionBubble({ words, file = null, className }: QuestionBubbleProps) {
+  if (!file)
+    return (
+      <p data-copy="content" className={cn("ml-auto w-fit max-w-4/5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm wrap-any", className)}>
+        {words}
+      </p>
+    );
   return (
-    <p data-copy="content" className={cn("ml-auto w-fit max-w-4/5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm wrap-any", className)}>
-      {words}
-    </p>
+    <div className={cn("ml-auto flex w-fit max-w-4/5 flex-col items-end gap-1.5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm", className)}>
+      {file.onOpen ? (
+        <Button size="sm" variant="ghost" icon="clip" onClick={file.onOpen}>
+          <span data-copy="content" className="wrap-any text-foreground">{file.name}</span>
+        </Button>
+      ) : (
+        <span data-copy="content" className="flex items-center gap-1 text-xs text-foreground wrap-any">
+          {file.name}
+        </span>
+      )}
+      <p data-copy="content" className="m-0 wrap-any">
+        {words}
+      </p>
+    </div>
   );
 }

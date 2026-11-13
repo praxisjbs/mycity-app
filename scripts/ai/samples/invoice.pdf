@@ -1,0 +1,53 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1290 >>
+stream
+BT /F1 11 Tf 50 790 Td 15 TL
+/F1 18 Tf (Sample Studio Ltd \(a made-up vendor for testing\)) Tj T*
+/F1 10 Tf (12 Example Close, Lagos) Tj T*
+/F1 11 Tf ( ) Tj T*
+/F1 16 Tf (INVOICE  INV-TEST-0001) Tj T*
+/F1 11 Tf (Date: 10/11/2026        Bill to: MyCity App Ltd) Tj T*
+/F1 11 Tf (Subject: Website ticket payments, three switchable gateways) Tj T*
+/F1 11 Tf ( ) Tj T*
+/F1 11 Tf (Item                                  Qty   Unit price        Amount) Tj T*
+/F1 11 Tf (Payment gateway integration \(three\)     1   NGN 250,000.00  NGN 250,000.00) Tj T*
+/F1 11 Tf (Ticket checkout pages                    1   NGN 150,000.00  NGN 150,000.00) Tj T*
+/F1 11 Tf (Refund and reconciliation tools          1   NGN 100,000.00  NGN 100,000.00) Tj T*
+/F1 11 Tf (Testing and go-live support              1    NGN 50,000.00   NGN 50,000.00) Tj T*
+/F1 11 Tf (Discount                                 1  -NGN 100,000.00 -NGN 100,000.00) Tj T*
+/F1 11 Tf ( ) Tj T*
+/F1 12 Tf (Total: NGN 450,000.00) Tj T*
+/F1 12 Tf (Paid to date: NGN 300,000.00) Tj T*
+/F1 12 Tf (Balance due: NGN 150,000.00) Tj T*
+/F1 11 Tf ( ) Tj T*
+/F1 11 Tf (Pay to: Sample MFB, account name Sample Studio Ltd, account number 0000012345) Tj T*
+/F1 9 Tf (A made-up invoice for MyCity's evaluation set. Not a real business or account.) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001583 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1680
+%%EOF

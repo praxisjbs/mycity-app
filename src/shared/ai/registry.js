@@ -11,6 +11,9 @@
  *   registry.actions()           every action the assistant may draft as a card (§6.11)
  *   registry.action("tasks.create")
  *   registry.routes()            every "where to make this change" route
+ *   registry.files()             every kind of document a module reads when attached on Ask (§6.18)
+ *   registry.file("invoice")     one kind, with the module that declared it
+ *   registry.filesFor(actor)     the kinds this person may attach: the grant, and the capability
  *   registry.manifests()         each manifest with its file, for the gates
  *   registry.catalogue()         rows for ai_catalogue (catalogue-sync.js): what the
  *                                assistant is told it can read and do, with each one's
@@ -66,6 +69,7 @@ function load({ dir = MODULES_DIR, extra = [] } = {}) {
   const manifests = [];
   const keyMap = new Map();
   const routeList = [];
+  const fileMap = new Map();
   const take = (folder, rel, m) => {
     if (!isManifest(m)) throw new Error(`${rel}: export defineManifest({ ... }) from shared/ai/manifest.js`);
     manifests.push({ folder, file: rel, manifest: m });
@@ -77,6 +81,10 @@ function load({ dir = MODULES_DIR, extra = [] } = {}) {
       }
     }
     for (const r of m.routes) routeList.push({ ...r, owner: m.module, file: rel });
+    for (const f of m.files || []) {
+      if (fileMap.has(f.kind)) throw new Error(`AI file kind "${f.kind}" is declared by both ${fileMap.get(f.kind).file} and ${rel}`);
+      fileMap.set(f.kind, { ...f, module: m.module, file: rel });
+    }
   };
   for (const { folder, file } of discover(dir)) {
     const rel = path.relative(path.resolve(dir, ".."), file).split(path.sep).join("/");
@@ -84,8 +92,26 @@ function load({ dir = MODULES_DIR, extra = [] } = {}) {
   }
   for (const { folder, manifest } of extra) take(folder, `${folder}/${folder}.ai.js (test)`, manifest);
   checkAskReads(keyMap);
-  loaded = { dir, manifests, keys: keyMap, routes: routeList };
+  checkFileActions(keyMap, fileMap);
+  loaded = { dir, manifests, keys: keyMap, routes: routeList, files: fileMap };
   return loaded;
+}
+
+/**
+ * A kind of document draws cards some manifest declares (praxis-ai.md §6.18), and an action drawn
+ * only from a file names a kind a manifest reads and is among that kind's cards.
+ */
+function checkFileActions(keyMap, fileMap) {
+  for (const f of fileMap.values())
+    for (const key of f.actions) {
+      const a = keyMap.get(key);
+      if (!a || a.kind !== "action") throw new Error(`${f.file}: file ${f.kind} draws "${key}", which no manifest declares as an action`);
+    }
+  for (const a of keyMap.values()) {
+    if (a.kind !== "action" || !a.from_file) continue;
+    const f = fileMap.get(a.from_file.kind);
+    if (!f || !f.actions.includes(a.key)) throw new Error(`${a.file}: action ${a.key} is drawn from a ${a.from_file.kind}, whose file does not list it`);
+  }
 }
 
 /**
@@ -134,6 +160,21 @@ const tool = (key) => current().keys.get(key) || null;
 const routes = () => current().routes.slice();
 /** Every manifest with its folder and file, in load order. */
 const manifests = () => current().manifests.slice();
+/** Every kind of document a module reads, in load order. */
+const files = () => [...current().files.values()];
+/** One kind of document, or null. */
+const file = (kind) => current().files.get(kind) || null;
+/**
+ * The kinds this person may attach (decision 41): those whose grant they hold, and the capability on
+ * top when the kind names one, as a card's own check would hold them.
+ * @param {object} actor  req.user
+ */
+async function filesFor(actor) {
+  const { scopedFor } = require("./authorise");
+  const out = [];
+  for (const f of files()) if (await scopedFor(actor, f)) out.push(f);
+  return out;
+}
 
 const slug = (s) =>
   s
@@ -215,6 +256,9 @@ module.exports = {
   tool,
   routes,
   manifests,
+  files,
+  file,
+  filesFor,
   catalogue,
   snapshot,
   reset,

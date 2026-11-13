@@ -2,7 +2,7 @@ import type { AiActionCard, AiActionResult, AiAnswer, AiCitation, AiConversation
 import { at, fail, invalid, noContent, ok, paged, route, sid } from "../core";
 import { byKey, grantsFor, SIGN_INS } from "../data/people";
 import { PARTNERS } from "../data/partners";
-import { ON_UPLOAD } from "../uploads";
+import { ON_UPLOAD, UPLOADS } from "../uploads";
 import { exportFile } from "./shared";
 import { stale } from "./security";
 
@@ -306,8 +306,72 @@ route("GET /api/v1/ai/suggestions", (req) => {
   return ok({ questions: view === "staff" ? ["What happened today?", "How many leave days do I have left?", "Which of my tasks are overdue?", "Was I late at all this month?", "When is the next public holiday?"] : all });
 });
 
+/** The kinds of document a person may attach (praxis-ai.md decision 41): Payment Receipt for a holder of expenses.finance. */
+const KIND_LABEL = { invoice: "Invoice", payment_receipt: "Payment Receipt", contract: "Contract or MoU" } as const;
+const KIND_QUESTION = { invoice: "Raise an expense request from this invoice", payment_receipt: "Record the payment on this receipt", contract: "Summarise this contract and file it" } as const;
+type Kind = keyof typeof KIND_LABEL;
+const kindsFor = (user: string): Kind[] => ((SIGN_INS[user]?.view ?? "staff") === "staff" ? ["invoice"] : ["invoice", "payment_receipt"]);
+route("GET /api/v1/ai/attachment-kinds", (req) => ok({ kinds: kindsFor(req.user!).map((kind) => ({ kind, label: KIND_LABEL[kind], question: KIND_QUESTION[kind] })), available: true }));
+
+/** New Request from an attached invoice (§6.18), as the server draws it: every line, the discount and the payment already made as minus lines. */
+function invoiceCard(messageId: string, document: { document_id: string; file_name: string }): AiActionCard {
+  return {
+    ai_action_draft_id: sid(`card:${messageId}`),
+    ai_message_id: messageId,
+    problems: {},
+    suggested: false,
+    status: "shown",
+    expires_at: inHalfAnHour(),
+    result: null,
+    created_at: nowIso(),
+    action_key: "my_expenses.from_invoice",
+    module_key: "expenses",
+    label: "New Request",
+    description: "Raise an expense request of my own from the invoice I attached",
+    schema: "expenses.ExpenseRequestFromInvoice",
+    risk: "standard",
+    confirm: "press",
+    bulk: 1,
+    values: {
+      purpose: "Website ticket payments, INV-202611-9525",
+      lines: [
+        { description: "Payment gateway integration", quantity: "1", unit_price: "250000.00" },
+        { description: "Ticket checkout pages", quantity: "1", unit_price: "150000.00" },
+        { description: "Refunds and reconciliation", quantity: "1", unit_price: "100000.00" },
+        { description: "Testing and go-live support", quantity: "1", unit_price: "50000.00" },
+        { description: "Discount", quantity: "1", unit_price: "-100000.00" },
+        { description: "Paid to date on INV-202611-9525", quantity: "1", unit_price: "-300000.00" },
+      ],
+      payee_type: "vendor",
+      payee_name: "Sample Studio Ltd",
+      bank_name: "Sample MFB",
+      account_name: "Sample Studio Ltd",
+      account_number: "0000012345",
+      invoice_document_id: document.document_id,
+      submit: true,
+    },
+    records: [],
+    names: [{ type: "document", id: document.document_id, label: document.file_name, link: null }],
+    fields: [
+      field("purpose", "Purpose", "text", { required: true }),
+      field("lines", "Lines", "lines", { required: true }),
+      field("payee_type", "Payee Type", "choice", { required: true, options: ["staff", "vendor", "partner", "task_team"] }),
+      field("payee_name", "Payee", "text"),
+      field("bank_name", "Bank", "text"),
+      field("account_name", "Account Name", "text"),
+      field("account_number", "Account Number", "number"),
+      field("invoice_document_id", "Invoice", "id", { required: true }),
+      field("submit", "Send Now", "boolean"),
+    ],
+  };
+}
+
 route("POST /api/v1/ai/ask", async (req) => {
-  const question = String(req.body.question ?? "").trim();
+  const attached = req.body.attachment as { document_id?: string; kind?: Kind } | undefined;
+  if (attached && (!attached.kind || !kindsFor(req.user!).includes(attached.kind))) return fail(403, "ATTACHMENT_FORBIDDEN", "You cannot attach that kind of document");
+  const document = attached ? (UPLOADS.get(String(attached.document_id)) ?? null) : null;
+  if (attached && !document) return fail(404, "NOT_FOUND", "Upload the file again");
+  const question = String(req.body.question ?? "").trim() || (attached?.kind ? KIND_QUESTION[attached.kind] : "");
   if (!question) return invalid({ question: ["Ask a question"] });
   const user = req.user!;
   let k: Kept | undefined;
@@ -321,15 +385,15 @@ route("POST /api/v1/ai/ask", async (req) => {
     k = { owner: user, conversation: { ai_conversation_id: sid(`conv:${user}:${KEPT.length}:${now}`), title: question.slice(0, 120), last_asked_at: now, questions: 0, rows_read: 0 }, turns: [] };
     KEPT.unshift(k);
   }
-  const d = answerFor(question, SIGN_INS[user]?.view ?? "staff");
+  const d = attached?.kind === "invoice" ? said("This invoice from Sample Studio Ltd asks for the balance of ₦150,000.00.") : attached ? said("This transfer of ₦150,000.00 matches no request waiting to be paid. Which request was paid?") : answerFor(question, SIGN_INS[user]?.view ?? "staff");
   // The screen the question was asked from travels back with the answer (decision 12).
   const context = (req.body.context as AiAnswer["context"] | undefined) ?? null;
   const messageId = sid(`answer:${now}:${k.turns.length}`);
   // A card only for a screen that draws one (§6.11), and only for a change the mock offers; otherwise the screen button stands.
   const shows = Array.isArray(req.body.shows) ? (req.body.shows as string[]) : [];
-  const card = d.declined === "change" && shows.includes("cards") ? cardFor(question, messageId) : null;
+  const card = document && attached?.kind === "invoice" && shows.includes("cards") ? invoiceCard(messageId, document) : d.declined === "change" && shows.includes("cards") ? cardFor(question, messageId) : null;
   if (card) CARDS.push({ owner: user, card });
-  const answer: AiAnswer = { ...d, card, link: card ? null : d.link, declined: card ? null : d.declined, context, sources: sourcesOf(d.citations), ai_message_id: messageId, ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, feedback: null, created_at: now, provisional: true };
+  const answer: AiAnswer = { ...d, card, link: card ? null : d.link, declined: card ? null : d.declined, context, sources: sourcesOf(d.citations), ai_message_id: messageId, ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, attachment: document && attached?.kind ? { document, kind: attached.kind } : null, feedback: null, created_at: now, provisional: true };
   const tokens = 900 + question.length * 7 + d.reads.length * 600;
   COSTS.set(answer.ai_message_id, { tokens, cost_ngn: (tokens * 0.0076).toFixed(2) });
   k.turns.unshift(answer);

@@ -308,6 +308,28 @@ screens: it opens the screen, and you save there with its own button.
 > **Important:** A card only ever does what your own screens let you do. A request you may not
 > decide, or a task that is not on your board, is refused when you press.
 
+### Attach a document {#praxis-ask-attach needs="praxis_ai create"}
+
+Praxis AI can read an invoice or a payment receipt and draw the card that records it. You check
+the card and press it; nothing is saved before.
+
+1. Press **Attach Document**, the paperclip to the left of the question box.
+   ![Attach Document](shot:praxis-attach)
+2. Under **What Is It?**, press what the document is. Only the kinds you may use are shown.
+3. {needs="expenses create"} Press **Invoice** for a bill to pay. It becomes **New Request** for what is still owed.
+4. {needs="expenses create, cap expenses.finance"} Press **Payment Receipt** for proof of a transfer. It becomes **Record Disbursement** for the request it paid.
+5. Choose the file: a PDF or a photo, up to 10 MB. On a phone you can take a photo of it.
+6. Leave **Question** empty, or write your own question about the document.
+7. Press **Read Document**. Your question shows the file's name; press it to open the file.
+8. {needs="expenses create"} For an invoice, check the card's lines: each item, a discount as a minus, and what was already paid as a minus line. The **Total** is the balance due.
+9. {needs="expenses create, cap expenses.finance"} For a receipt, check the request it paid. If it matches several, or none, Praxis AI asks **Which request was paid?**; press the right one.
+10. Press **Edit** to change anything, then press the card's button.
+
+> **Tip:** A Word file or a spreadsheet is refused. Save it as a PDF, or take a photo of it.
+
+> **Important:** If the answer says **This file cannot be read. Try a clearer copy.**, attach a
+> sharper photo or the PDF the business sent. An invoice already paid in full draws no card.
+
 ### Confirm it is you for an approval {#praxis-ask-confirm needs="praxis_ai create"}
 
 1. Approving or rejecting a request, approving overtime, recording leave, changing a leave type,
@@ -441,6 +463,21 @@ marks:
   2: label "Ask a Question" | Type your question
   3: button "Record Question" | Ask with your voice
   4: button "Send" | Send it
+```
+
+```shot praxis-attach
+open: /praxis-ai?tab=ask
+as: operations
+do:
+  - phone click: button "New Conversation"
+  - click: button "Attach Document"
+  - wait: text "What Is It?"
+crop: modal
+sources:
+  - app/src/features/assistant/Attach.tsx
+marks:
+  1: text "What Is It?" | What the document is
+  2: button "Read Document" | Read it
 ```
 
 ```shot praxis-card

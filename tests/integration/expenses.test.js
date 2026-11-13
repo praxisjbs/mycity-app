@@ -168,7 +168,12 @@ describeDb("expenses against the real migrations", () => {
     const retired = await h.as("staff").post("/expenses/mine").send(body({ expense_category_id: cat.retired }));
     expect([retired.status, retired.body.error.fields]).toEqual([422, { expense_category_id: ["Not offered"] }]);
     const zero = await h.as("staff").post("/expenses/mine").send(body({ lines: [{ description: "Nothing", unit_price: "0.00" }] }));
-    expect(zero.body.error.code).toBe("AMOUNT_REQUIRED");
+    expect([zero.body.error.code, zero.body.error.fields]).toEqual(["EXPENSE_TOTAL_NOT_POSITIVE", { lines: ["Total above zero"] }]);
+    // A discount is a negative line (praxis-ai.md decision 45); the request's total is still above zero.
+    const discounted = await h.as("staff").post("/expenses/mine").send(body({ bank_name: "Moniepoint", lines: [{ description: "Banner", unit_price: "50000.00" }, { description: "Discount", unit_price: "-10000.00" }] }));
+    expect([discounted.status, discounted.body.amount, discounted.body.lines.map((l) => l.amount)]).toEqual([201, "40000.00", ["50000.00", "-10000.00"]]);
+    const below = await h.as("staff").post("/expenses/mine").send(body({ lines: [{ description: "Banner", unit_price: "5000.00" }, { description: "Discount", unit_price: "-10000.00" }] }));
+    expect([below.status, below.body.error.code]).toEqual([422, "EXPENSE_TOTAL_NOT_POSITIVE"]);
     const cancelled = await h.as("staff").post(`/expenses/mine/${draft.expense_request_id}/cancel`).send({});
     expect(cancelled.body).toMatchObject({ status: "cancelled", can_cancel: false, can_edit: false });
   });
@@ -201,7 +206,7 @@ describeDb("expenses against the real migrations", () => {
       { description: "Ticket platform", quantity: "1", unit_price: "100000.00" },
       { description: "Paid to date", quantity: "1", unit_price: "-100000.00" },
     ] }));
-    expect([overCredited.status, overCredited.body.error.code]).toEqual([422, "AMOUNT_REQUIRED"]);
+    expect([overCredited.status, overCredited.body.error.code]).toEqual([422, "EXPENSE_TOTAL_NOT_POSITIVE"]);
   });
 
   test("sent: the line manager, then Operations & People, each from Expenses · Approvals; nobody else decides it", async () => {

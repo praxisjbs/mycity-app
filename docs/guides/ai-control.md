@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | AI Control · Actions, Models and Spend (#98 to #100) |
 | Status | Built |
-| Last changed | 22/10/2026 |
+| Last changed | 13/11/2026 |
 
 Sources: TB's answers of 20/10/2026 on AI providers, transcription and AI Control (§1.1, with
 `integrations.md` §1.2), MILESTONES §15 (M10: governance, spend caps, model configuration, per-module
@@ -447,10 +447,11 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
    whether it goes on AI Control.
 2. **Actions registered later**: JD draft, CV screening, proposal draft, MOU draft and image
    reading are registered by the build that makes each one, asking the person which job
-   (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5); Queries' two (`query-draft` on Default, `letter-draft` on Deep Reasoning, chosen by GE) on 26/10/2026 (`queries.md` §9). Expenses' three (`expense-invoice-read` on Image Reading, `expense-duplicate-check` and `expense-category-suggest` on Default, chosen by AJ) on 05/11/2026 (`expenses.md` §9).
+   (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5); Queries' two (`query-draft` on Default, `letter-draft` on Deep Reasoning, chosen by GE) on 26/10/2026 (`queries.md` §9). Expenses' three (`expense-invoice-read` on Image Reading, `expense-duplicate-check` and `expense-category-suggest` on Default, chosen by AJ) on 05/11/2026 (`expenses.md` §9). Praxis AI's `disbursement-receipt-read` (Image Reading, personal data, chosen by TB) on 13/11/2026, a payment receipt attached on Ask read for Record Disbursement's card; an attached invoice reuses `expense-invoice-read` (`praxis-ai.md` §6.18).
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · §13: `disbursement-receipt-read` registered on Image Reading, personal data, chosen by TB (`praxis-ai.md` decision 43, §6.18). `complete()`'s files take HEIC and HEIF too (a phone's photos, which Gemini reads).
 - 08/11/2026 · JP · §6.5: the Proposal Studio's four registered (`partnerships.md` §6.10, §9): `proposal-questions`, `proposal-draft` and `proposal-rewrite` on Top Tier (JP, 05/11/2026, with their reason and their own chain, Anthropic Sonnet then Gemini Pro) and `proposal-message` on Default (TB, 07/11/2026; Fast is not for a draft a person reads), all personal data, so DeepSeek is never in their chains.
 - 06/11/2026 · JP · §13: Tidy With AI on Partnerships' agreement templates registered, `template-tidy` (Default), personal data, chosen by JP (`partnerships.md` §6.8, §9).
 - 05/11/2026 · AJ · Files (M8 audit F9, F19): a turn with files goes to Gemini through its native `generateContent`, each file as `inline_data` (the system prompt as `systemInstruction`, JSON by `responseMimeType`), since its OpenAI-compatible endpoint may refuse a PDF data URL; a turn without files stays on the compatible endpoint. Only an Image Reading action that declares `personal_data: true` may send files (a file is never redacted, so it never reaches DeepSeek); any other is refused before a call.

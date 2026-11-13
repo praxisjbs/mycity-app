@@ -21,6 +21,27 @@ describe("MoneyField", () => {
     expect(onChange).toHaveBeenLastCalledWith("5");
   });
 
+  it("signed keeps a minus and takes it (a discount), reading the figures after it as any amount", async () => {
+    for (const typed of ["-100", "₦-100", "\u2212100", "(100)"]) expect(readMoney(typed, { signed: true })).toEqual({ text: "-100" });
+    expect(readMoney("-100,000.50", { signed: true })).toEqual({ text: "-100,000.50" });
+    expect(readMoney("-1.234", { signed: true })).toEqual({ text: "-1.234", problem: "Two decimals at most", final: true });
+    expect(readMoney("250", { signed: true })).toEqual({ text: "250" });
+    const user = userEvent.setup();
+    function Signed() {
+      const [v, set] = useState("");
+      return (
+        <Field label="Unit Price">
+          <MoneyField signed value={v} onChange={set} />
+        </Field>
+      );
+    }
+    render(<Signed />);
+    await user.type(screen.getByLabelText("Unit Price"), "-5000");
+    expect(screen.getByLabelText("Unit Price")).toHaveValue("-5000");
+    expect(screen.getByLabelText("Unit Price")).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByLabelText("Unit Price").className).toContain("text-destructive");
+  });
+
   it("toMoneyString turns what was typed into the wire string, never a float", () => {
     expect(toMoneyString("250,000")).toBe("250000.00");
     expect(toMoneyString("250000.5")).toBe("250000.50");

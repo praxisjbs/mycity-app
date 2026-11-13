@@ -41,6 +41,7 @@ export * from "./ChannelGrid";
 export * from "./ColorField";
 export * from "./ComboField";
 export * from "./DocumentEditor";
+export * from "./LinesField";
 export * from "./MonthField";
 export * from "./MoreFields";
 export * from "./PlacesField";

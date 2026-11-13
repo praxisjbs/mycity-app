@@ -40,5 +40,11 @@ export default {
         <AnswerBubble text="When is it due?" choices={["Today", "Tomorrow", "Friday", "No Due Day"]} onChoose={() => Promise.resolve()} feedback={null} onFeedback={() => undefined} />
       </div>
     ),
+    "A Document": () => (
+      <div className="flex max-w-2xl flex-col gap-3.5">
+        <QuestionBubble words="Raise an expense request from this invoice" file={{ name: "INV-202611-9525.pdf", onOpen: () => undefined }} />
+        <AnswerBubble text="This invoice from JBS Praxis asks for the balance of ₦150,000.00." feedback={null} onFeedback={() => undefined} />
+      </div>
+    ),
   },
 } satisfies GalleryEntry;
