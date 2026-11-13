@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144 (§6.11) (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 on `claude/pensive-darwin-sa4pn0` (§6.11) (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -817,7 +817,8 @@ lead ("It should always ask for required fields, so we never see an error. We ca
 ### 6.11 Documents in the chat (decisions 41 to 48, TB, 13/11/2026; `praxis-ai.md` Appendix A)
 
 PR 1, the attach control with invoices and payment receipts, built on the branch
-`claude/praxis-ai-docs-pr-1-2akyek`, praxisjbs/mycity-app#144. PR 2 (contracts and MoUs) starts in a fresh chat once PR 1 merges.
+`claude/praxis-ai-docs-pr-1-2akyek`, praxisjbs/mycity-app#144, merged 13/11/2026. PR 2 (contracts and MoUs) built on
+`claude/pensive-darwin-sa4pn0` the same day, in its own chat, once PR 1 had merged.
 
 - [x] 13/11/2026 · `praxis-ai.md` §6.18 rewritten as built first (the overlay before the ask guard and on later questions, `from_file`, gate 23 rule 8, the file named on its field, a receipt matching none asks which request, migration 8030), §2, §5, §6.15, §10, §11, §14; `expenses.md` §4, §5, §6.1, §9, §10, §14; `foundation.md` §14
 - [x] 13/11/2026 · Contract: `AiAttachmentKind`, `AiAttachment`, `AiAsk.attachment` (an empty question with a document), `AiAttachmentKinds`, `AiAnswer.attachment`, the card field kind `lines`; `ExpenseInvoiceRead` and `ExpenseInvoiceSuggestion` widened, `ExpenseRequestFromInvoice`; `DisbursementReceiptRead`; the upload purpose `ai_attachment`
@@ -828,7 +829,13 @@ PR 1, the attach control with invoices and payment receipts, built on the branch
 - [x] 13/11/2026 · Tests: `tests/integration/ai-files.test.js` (the four cases of Appendix A and an unreadable file, a paid-up invoice, a Word file), `expenses.test.js` (a discount line, a total below zero), `expenses-ai.test.js` (the bank), the components' and `Assistant.test.tsx`'s; two evaluation cases with made-up samples under `scripts/ai/samples/`
 - [x] 13/11/2026 · The User Guide: Praxis AI's Attach a document with its picture, Expenses' Raise a request, its pictures retaken; PROGRESS (#67, #56, #59), README
 - [ ] On staging: the sample invoice into a request of ₦150,000.00 its line manager opens with its invoice, and a receipt recorded from the chat (`eval-assistant.js --only=file`)
-- [ ] PR 2 · Contracts and MoUs (`praxis-ai.md` Appendix A), in a fresh chat from its start prompt
+- [x] 13/11/2026 · PR 2 · `praxis-ai.md` §6.18's Contract or MoU rewritten as built first (a kind's grant may be `view`, the card's kind by name with `PartnerDocumentAdd` kept, `PartnerDocumentAttach` in no `not_offered`, the reading's `currency` and each signatory's party, the pane never a Table of a file read), §2, §6.11, §8, §10, §11, Appendix A, §14; `partnerships.md` §9, §14; `ai-control.md` §13, §14; `user-guide.md` §14
+- [x] 13/11/2026 · PR 2 · Contract: `AgreementDocumentRead` (and its parts) and `AgreementSignedCopyAdd` (agreements.js), `PartnerDocumentAdd` (partners.js), `AiAttachmentRecord` on `AiAnswerAttachment.record` (assistant.js)
+- [x] 13/11/2026 · PR 2 · Backend: `agreement-document-read` on Image Reading (chosen by TB) and its prompt; `agreements.document-ai.js` (the terms, the parties matched among the records the person may edit, MyCity set aside, the agreement waiting for its signature); the kind `contract` in Agreements' manifest for Partnerships view (`FILE_GRANTS`); `agreements.record_signed_copy` (risk approval) and `partner_documents.attach` (its kind by name), each through the route's own service; `assistant.files` and the service carry the terms; the chat's prompt version 11; the staging setup's document kinds
+- [x] 13/11/2026 · PR 2 · Screens: the pane opens a contract's terms on Record (first, from its file's From chip, from Open Figures on a phone) and never offers a Table of a `file.<kind>` read; the in-browser mock's Contract or MoU
+- [x] 13/11/2026 · PR 2 · Tests: `tests/integration/ai-contracts.test.js` (a signed MoU sealed on its agreement in Sent after Confirm It's You, the lead converted; an MoU filed on its partner, kind MOU; a party nobody may edit asks whose; view alone, no card), `ai-files.test.js` and `ai-control.test.js` and the staging seed's test updated, `tests/unit/foundation/ai-contracts.test.js`, `Assistant.test.tsx`, the User Guide parser's; two evaluation cases with made-up MoUs (`scripts/ai/samples/mou.pdf`, `mou-signed.pdf`)
+- [x] 13/11/2026 · PR 2 · The User Guide: Praxis AI's Attach a document with a contract's picture (`praxis-attach-contract`, taken with the new `upload:` step) and `praxis-attach` retaken with its third tile; Partnerships' two tips; PROGRESS (#67, #54), README
+- [ ] On staging: a contract read with the real model (`eval-assistant.js --only=file.contract`); send Lagoon Youth Fest's agreement for signature there to run `file.contract-signed`
 
 ## 7 · Gates this work adds
 
@@ -843,6 +850,17 @@ PR 1, the attach control with invoices and payment receipts, built on the branch
 ---
 
 ## 8 · Log
+
+- 13/11/2026 · TB · Documents in the chat, PR 2 built (§6.11): Contract or MoU read, summarised with its terms on
+  the pane's Record tab, and filed by Record Signed Copy on the agreement waiting for its signature or by Add
+  Partner Document on its partner or lead. Found on the way and written into `praxis-ai.md` §6.18: the
+  manifest refused a `view` grant on a file kind, which decision 41 asks for, so files take any grant
+  (`FILE_GRANTS`); gate 23 refuses a `not_offered` naming a schema that is no create or edit form, so
+  `PartnerDocumentAttach` is in none; a file read is never replayed, yet the pane opened it as a Table and
+  asked for its replay (404 for every invoice and receipt answer), so it opens Record or Sources; the
+  in-browser mock's upload is beaten by a press at once, so the picture tool's new `upload:` step pauses as a
+  person does; staging had no document kinds. The container's PostgreSQL lacked pgvector again (installed by
+  hand, `postgresql-16-pgvector`).
 
 - 13/11/2026 · TB · Documents in the chat, PR 1 built (§6.11): Attach Document with Invoice and
   Payment Receipt; the reading as read 1 and its values over the model's card before the ask guard,

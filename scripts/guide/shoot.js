@@ -23,7 +23,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { ensureAppBuild, ensurePublicBuild, serve, appSettle, launch, WIDTHS, APP_DIST, PUBLIC_DIST } = require("../check/lib/screens");
-const { IMG, readChapters, hashesOf, readShots } = require("./lib");
+const { ROOT, IMG, readChapters, hashesOf, readShots } = require("./lib");
 
 /** The demo's accounts (app/src/api/mock/data): who each `as` signs in as. */
 const ACCOUNTS = {
@@ -235,6 +235,17 @@ async function doStep(page, step) {
       c.postMessage({ t: "locked", reason });
       c.close();
     }, step.reason);
+  // A made-up sample chosen in a file field (packages/contract/guide.js keeps it to scripts/ai/samples/).
+  // A file input is hidden behind its field's button, so it is found without waiting for it to show.
+  if (step.action === "upload") {
+    const modal = page.locator("[data-ui=modal]");
+    const scope = (await modal.count()) ? modal.last() : page;
+    const selector = step.target.kind === "css" ? step.target.selector : "input[type=file]";
+    await scope.locator(selector).first().setInputFiles(path.join(ROOT, step.file));
+    // A person pauses once a file is chosen: the upload settles and the form checks its fields
+    // (useContractForm's pause) before the next press, which a press at once would beat.
+    return page.waitForTimeout(1500);
+  }
   const l = await find(page, step.target);
   if (step.action === "click") return l.click();
   if (step.action === "fill") return l.fill(step.value);

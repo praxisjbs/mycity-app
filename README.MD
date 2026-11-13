@@ -176,8 +176,9 @@ mycity-app/
 │   │                         attack-assistant.js: its attack suite, asked of the real model on staging
 │   │                         nightly through deploy-gate attack (docs/guides/praxis-ai.md §6.17)
 │   │                         with a real key before a change to its prompt or loop ships (not in CI);
-│   │                         samples/invoice.pdf and samples/payment-receipt.pdf: made-up documents
-│   │                         the evaluation set attaches (praxis-ai.md §6.18), no real business or account
+│   │                         samples/invoice.pdf, samples/payment-receipt.pdf, samples/mou.pdf and
+│   │                         samples/mou-signed.pdf: made-up documents the evaluation set attaches, and
+│   │                         a User Guide picture uploads (praxis-ai.md §6.18), no real business or account
 │   ├── ops/                  health-brief.js: the Status brief made on the server (npm run health:brief),
 │   │                         and with --watch the health watch that mails it when something is down
 │   └── deploy/               deploy-gate, check-gate, release-manifest, verify-staging, rollback
@@ -644,7 +645,7 @@ files included (`.ai`, `.search`).
 | `leads` | `.360` (the Lead 360, renders correctly with zero data) (PR 3); a lead's status is `partner_pipeline.lists`' `leadStatusOf`, kept in step by `leads.service`; conversion is `partners.convert`; `.views` (PR 8); `.events` registers `lead.cities` (PR 1) |
 | `interactions` | `.mail` (with `mailbox/binding/`, PR 8) |
 | `proposals` | `.studio` (the brief, its sources and the kit's context), `.questions` (the cards, answer, skip, reshuffle), `.draft` (the jobs' work: the draft, the figure check asked once more), `.content` (validation per layout, the figure check, Build by Hand's starter), `.kit` (the design kit's HTML for web and PDF), `.charts` (the seven charts as SVG), `.send` (Send with confirmation, the link, `proposal-sent`), `.public` with `.public.routes` (the private link and its views), `.proof` (proof points, PR 2); saved templates in `.service` (PR 7). `.ai` and `.search` are PR 8's |
-| `agreements` | `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`), `.renewals`, `.views` (PR 6; `.tidy` with PR 2) |
+| `agreements` | `.generate`, `.tidy`, `.lifecycle`, `.approval`, `.signing` (calls `signatures`), `.renewals`, `.views` (PR 6; `.tidy` with PR 2); `.document-ai` (a contract or MoU attached on Praxis AI read on `agreement-document-read`, prompt `services/ai/prompts/agreement-document-read.md`: its terms and the card that files it, Record Signed Copy or Add Partner Document; praxis-ai.md §6.18, Appendix A PR 2) |
 | `partnership_analytics` | `.queries` (per lead owner, A21; PR 8) |
 | `signatures` (shared with M5) | built by M5 (§5.8): M7's agreements declare themselves with `defineSignable` and send with `requestIn`; the stamping is each signable's template, given the signatures by `.signed-pdf` |
 | `mailbox/binding/` | `intake.service`, `mail-context.service`, `context-tabs`, `convert.service` (PR 8) |

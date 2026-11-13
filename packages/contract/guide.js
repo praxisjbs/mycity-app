@@ -231,9 +231,9 @@ function parseShot(id, lines, at) {
       if (list === "do") {
         // A step may name one device ("phone click: ..."): the phone reaches some controls another
         // way, through a menu or Quick Actions, while the picture shows the same thing.
-        const m = /^(?:(desktop|phone) )?(click|fill|press|wait|scroll|lock):\s*(.+)$/.exec(body);
+        const m = /^(?:(desktop|phone) )?(click|fill|upload|press|wait|scroll|lock):\s*(.+)$/.exec(body);
         if (!m) {
-          problems.push(`${where}: a do step reads "click: <target>", "fill: <target> = <text>", "press: <key>", "wait: <target>", "scroll: <target>" or "lock: <reason>", after "phone " or "desktop " for one device only`);
+          problems.push(`${where}: a do step reads "click: <target>", "fill: <target> = <text>", "upload: <target> = <file>", "press: <key>", "wait: <target>", "scroll: <target>" or "lock: <reason>", after "phone " or "desktop " for one device only`);
           continue;
         }
         const [, only, act, arg] = m;
@@ -249,6 +249,12 @@ function parseShot(id, lines, at) {
           const target = f && parseTarget(f[1]);
           if (!target) problems.push(`${where}: fill reads "fill: <target> = <text>"`);
           else spec.do.push({ action: "fill", target, value: f[2] });
+        } else if (act === "upload") {
+          // A made-up file of the repository's samples, chosen in a file field as a person picks one.
+          const f = /^(.+?)\s+=\s+(scripts\/ai\/samples\/[\w.-]+)$/.exec(arg);
+          const target = f && parseTarget(f[1]);
+          if (!target) problems.push(`${where}: upload reads "upload: <target> = scripts/ai/samples/<file>"`);
+          else spec.do.push({ action: "upload", target, file: f[2] });
         } else {
           const target = parseTarget(arg);
           if (!target) problems.push(`${where}: "${arg}" is not a target (button "X", label "X", text "X", css ...)`);
