@@ -1905,6 +1905,8 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · Send Back on an agreement's approval no longer tells its approvers "Withdrawn: The requester withdrew this before it was decided": the handler withdraws the approval with `engine.cancel(..., sentBack: true)`, which tells nobody (the requester is told of the Send Back with its reason). Found filming M8 on Expenses, the same handler (`docs/runbooks/training-videos.md` §7).
+
 - 13/11/2026 · AJ · The signing service (§6.9), from M5's click-through: a request that ends unsigned
   (Close, a lapse, a decline) keeps its links, read only, so the signer reads *Agreement Withdrawn*,
   *This Link Has Expired* or *Agreement Declined* instead of *This Link Does Not Open*; the page shows

@@ -2342,6 +2342,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · Send Back on a run's approval no longer tells its approvers "Withdrawn: The requester withdrew this before it was decided": the handler withdraws the approval with `engine.cancel(..., sentBack: true)`, which tells nobody (the requester is told of the Send Back with its reason). Found filming M8 on Expenses, the same handler (`docs/runbooks/training-videos.md` §7).
+
 - 13/11/2026 · JP · PR 8 (the staging seed, the User Guide and the release check, `m6/release`), after PR 11 merged. §13.2
   item 45 (Download My Data keeps no payslips) and item 46 (the staging seed's invented people, the CEO's login approving
   its locked run, everyone else left out; asked in PR 8's chat); §7 and §13.2 item 3 say the job stubs are deleted;
