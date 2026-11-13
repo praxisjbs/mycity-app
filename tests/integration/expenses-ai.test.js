@@ -94,6 +94,10 @@ describeDb("expenses' AI features against the real migrations", () => {
             { description: "Crates of water", quantity: "2", unit_price: "4500.00" },
             { description: "Ice", quantity: "1.5", unit_price: "1000.00" },
           ],
+          // The payee's bank fills the form too (praxis-ai.md §6.18); an account number as printed, its spaces taken out.
+          bank_name: "Zenith Bank",
+          account_name: "Chuks Stores Ltd",
+          account_number: "0123 456 789",
         },
         run_id: null,
       };
@@ -111,6 +115,9 @@ describeDb("expenses' AI features against the real migrations", () => {
         { description: "Crates of water", quantity: "2", unit_price: "4500.00" },
         { description: "Ice", quantity: "1.5", unit_price: "1000.00" },
       ],
+      bank_name: "Zenith Bank",
+      account_name: "Chuks Stores Ltd",
+      account_number: "0123456789",
     });
     expect(asked).toMatchObject({ purpose: "expense-invoice-read", module: "expenses", files: [expect.objectContaining({ mime_type: "application/pdf" })] });
     expect(asked.input.categories).toContain("Events and Activations");

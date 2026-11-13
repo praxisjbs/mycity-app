@@ -267,6 +267,17 @@ const ExpenseLineAdd = z
 /** Send Request's card: a draft or sent-back request of the person's own, sent as the modal's Send Request sends it. */
 const ExpenseSend = z.object({ expense_request_id: uuid }).strict();
 
+/**
+ * New Request's card from an invoice attached on Praxis AI (praxis-ai.md §6.18, decision 45): the
+ * request's fields with every line (a discount and a payment already made as negative lines, so the
+ * request totals the balance due) and the invoice it was read from; sent at once unless the person
+ * keeps a draft.
+ */
+const ExpenseRequestFromInvoice = ExpenseFields.extend({
+  invoice_document_id: uuid,
+  submit: z.boolean().default(true),
+}).strict();
+
 const TABLES = {
   ExpenseBankListQuery: { table: null, reason: "list controls for the banks New Request suggests" },
   ExpenseBank: { table: null, reason: "a bank New Request suggests: a common bank, or one a request named, and how many name it" },
@@ -335,6 +346,10 @@ const TABLES = {
   ExpenseChange: { table: "expense_request" },
   ExpenseLineAdd: { table: "expense_request_line" },
   ExpenseSend: { table: "expense_request" },
+  ExpenseRequestFromInvoice: {
+    table: "expense_request",
+    virtual: { lines: "written to expense_request_line", submit: "sends it at once" },
+  },
 };
 
 /* ------------------------------------------------------------------ *
@@ -360,7 +375,12 @@ const ExpenseHistoryPage = Paged(ExpenseHistoryEntry);
 /** Read Invoice: the invoice staged for New Request, by its document id. */
 const ExpenseInvoiceReading = z.object({ document_id: uuid }).strict();
 
-/** What the model reads off an invoice (Image Reading): never kept, a suggestion for the form. */
+/**
+ * What the model reads off an invoice (Image Reading): never kept, a suggestion for the form, and
+ * for Praxis AI's card from an attached invoice (praxis-ai.md §6.18). A line's unit price is
+ * negative for a discount; the totals and the payee's bank are as the invoice prints them, and the
+ * server counts the lines again through shared/money.
+ */
 const ExpenseInvoiceRead = z
   .object({
     payee_name: z.string().max(150).nullable(),
@@ -375,7 +395,19 @@ const ExpenseInvoiceRead = z
           })
           .strict(),
       )
-      .max(25),
+      .max(40),
+    /** What the invoice is for, in a few words ("Website ticket payments"). */
+    subject: z.string().max(150).nullable(),
+    invoice_number: z.string().max(60).nullable(),
+    issued_on: isoDate.nullable(),
+    /** The currency's code as printed (NGN, USD), or null when it shows only ₦ or none. */
+    currency: z.string().max(10).nullable(),
+    total: money.nullable(),
+    paid_to_date: money.nullable(),
+    balance_due: money.nullable(),
+    bank_name: z.string().max(100).nullable(),
+    account_name: z.string().max(150).nullable(),
+    account_number: z.string().max(30).nullable(),
   })
   .strict();
 
@@ -389,6 +421,10 @@ const ExpenseInvoiceSuggestion = z
     category: z.string().nullable(),
     lines: z.array(ExpenseLineInput),
     amount: money.nullable(),
+    /** The payee's bank as the invoice prints it; an account number only when it is ten digits. */
+    bank_name: z.string().nullable(),
+    account_name: z.string().nullable(),
+    account_number: z.string().nullable(),
     ai_run_id: uuid.nullable(),
   })
   .strict();
@@ -456,6 +492,7 @@ module.exports = {
   ExpenseChange,
   ExpenseLineAdd,
   ExpenseSend,
+  ExpenseRequestFromInvoice,
   ExpenseDuplicateRef,
   ExpenseHistoryEntry,
   ExpenseHistoryPage,

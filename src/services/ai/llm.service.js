@@ -167,7 +167,8 @@ const resets = (err) => Boolean(err) && (err.status === 402 || (err.kind === "ra
 
 /** The most one picture or scan may weigh before it is sent: providers refuse larger inline files. */
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
-const FILE_TYPES = Object.freeze(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
+/** What an Image Reading model reads itself; HEIC and HEIF are a phone's photos (docs/guides/praxis-ai.md §6.18). */
+const FILE_TYPES = Object.freeze(["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "application/pdf"]);
 
 /** Files go only to an Image Reading action, only of a kind a model reads, never too large. */
 function assertFiles(purpose, files) {

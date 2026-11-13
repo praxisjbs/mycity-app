@@ -11,8 +11,8 @@ import { hasCapability } from "@/shell/access";
 import { paging } from "@/features/shared/wire";
 import type { Tone } from "@/api/types/common";
 import {
-  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, IconButton, KeyValue,
-  LoadingRows, Money, MoneyField, Pager, Pill, plural, Popover, RecordPicker, SelectField, Sub, TextAreaField, TextField, Timeline, toast, toMoneyString, useConfirm, useContractForm, useModal, UploadField, type ComboFieldProps,
+  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, EMPTY_LINE, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LinesField,
+  LoadingRows, Money, Pager, Pill, plural, Popover, RecordPicker, SelectField, Sub, TextAreaField, TextField, Timeline, toast, toMoneyString, useConfirm, useContractForm, useModal, UploadField, type ComboFieldProps, type LineValue,
 } from "@mycity/ui";
 
 /*
@@ -113,21 +113,13 @@ function BankField(binding: Omit<ComboFieldProps<ExpenseBank>, "list" | "option"
   return <ComboField<ExpenseBank> {...binding} list={banks} option={(b) => b.bank_name} sub={(b) => (b.uses ? plural(b.uses, "request") : undefined)} placeholder="Zenith Bank" />;
 }
 
-/* Money in kobo for a total on the form, never in floating point. */
-const kobo = (v: string) => {
-  const [w, f = ""] = (toMoneyString(String(v || "")) || "0").split(".");
-  return Number(w || "0") * 100 + Number((f + "00").slice(0, 2));
-};
-const naira = (k: number) => `${Math.trunc(k / 100)}.${String(k % 100).padStart(2, "0")}`;
 
 /* ------------------------------------------------------------------ *
  * New Request and Edit
  * ------------------------------------------------------------------ */
 
-type LineValue = { description: string; quantity: string; unit_price: string };
-/** The lines as the contract takes them: a unit price as typed ("4,500") sent as a two-place string ("4500.00"). */
+/** The lines as the contract takes them: a unit price as typed ("4,500", "-100,000") sent as a two-place string ("4500.00", "-100000.00"). */
 const linesOnWire = (lines: LineValue[]) => lines.map((l) => ({ ...l, unit_price: toMoneyString(l.unit_price) }));
-const EMPTY_LINE: LineValue = { description: "", quantity: "1", unit_price: "" };
 
 /**
  * New Request, and Edit of a draft or sent-back request (`existing`): Purpose, Category, Project,
@@ -165,7 +157,6 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
   const suggest = useMutation("POST /api/v1/expenses/mine/category-suggestion");
   const lines = f.values.lines as LineValue[];
   const setLines = (next: LineValue[]) => f.set("lines", next);
-  const total = naira(lines.reduce((a, l) => a + Math.round(Number(l.quantity || "0") * kobo(l.unit_price)), 0));
   const profile = f.values.payee_type === "staff" && f.values.uses_profile_account;
 
   const save = (send: boolean) => async () => {
@@ -196,6 +187,12 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
         setCategory(null);
       }
       if (got.lines.length) setLines(got.lines.map((l) => ({ description: l.description, quantity: l.quantity ?? "1", unit_price: l.unit_price })));
+      // The payee's bank, from the same reading, for a payee who is not on Use My Company Account.
+      if (!profile) {
+        if (got.bank_name) f.set("bank_name", got.bank_name);
+        if (got.account_name) f.set("account_name", got.account_name);
+        if (got.account_number) f.set("account_number", got.account_number);
+      }
       toast("Invoice read. Check every line");
     } catch (e) {
       say(e);
@@ -232,32 +229,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
         <SelectField placeholder="My Department" options={[["", "My Department"], ...depts.rows.map((d) => [d.department_id, d.name] as [string, string])]} {...paging(depts)} {...f.field("department_id")} />
       </Field>
       <Field label="Lines" {...f.status("lines")}>
-        <div className="flex flex-col gap-2">
-          {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-6 items-end gap-2 max-md:grid-cols-2">
-              <span className="col-span-3 max-md:col-span-2">
-                <Field label={`Item ${i + 1}`}>
-                  <TextField name={`line-${i}-description`} value={l.description} onChange={(v) => setLines(lines.map((x, j) => (j === i ? { ...x, description: v } : x)))} placeholder="Crates of water" />
-                </Field>
-              </span>
-              <Field label="Quantity">
-                <TextField name={`line-${i}-quantity`} inputMode="decimal" value={l.quantity} onChange={(v) => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: v.replace(/[^\d.]/g, "") } : x)))} />
-              </Field>
-              <Field label="Unit Price">
-                <MoneyField name={`line-${i}-unit_price`} value={l.unit_price} onChange={(v) => setLines(lines.map((x, j) => (j === i ? { ...x, unit_price: v } : x)))} />
-              </Field>
-              {lines.length > 1 && (
-                <span className="flex min-h-tap items-center">
-                  <IconButton icon="trash" label={`Remove Item ${i + 1}`} onClick={() => setLines(lines.filter((_, j) => j !== i))} />
-                </span>
-              )}
-            </div>
-          ))}
-          <span className="flex flex-wrap items-center justify-between gap-2">
-            {lines.length < 25 && <Button size="sm" icon="plus" onClick={() => setLines([...lines, { ...EMPTY_LINE }])}>Add Line</Button>}
-            <b className="text-sm">Total <Money value={total} /></b>
-          </span>
-        </div>
+        <LinesField name="lines" value={lines} onChange={setLines} />
       </Field>
       <Field label="Payee" {...f.status("payee_type")}>
         <SelectField options={PAYEES} value={f.values.payee_type} onChange={(v) => { f.set("payee_type", v as ExpenseRow["payee_type"]); if (v !== "staff") f.set("uses_profile_account", false); }} />

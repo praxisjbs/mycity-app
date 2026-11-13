@@ -75,4 +75,11 @@ describe("AnswerBubble", () => {
     );
     expect(await axe(container)).toHaveNoViolations();
   });
+  it("QuestionBubble carries the file a question was asked about, as a chip that opens it", async () => {
+    const onOpen = vi.fn();
+    render(<QuestionBubble words="Raise an expense request from this invoice" file={{ name: "INV-202611-9525.pdf", onOpen }} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "INV-202611-9525.pdf" }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Raise an expense request from this invoice")).toBeInTheDocument();
+  });
 });

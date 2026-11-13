@@ -72,7 +72,25 @@ const DisbursementReferenceAdd = z
   })
   .strict();
 
+/**
+ * What the model reads off a payment receipt attached on Praxis AI (praxis-ai.md §6.18, decision
+ * 46; Image Reading, `disbursement-receipt-read`): never kept. The server matches the authorised
+ * request it pays in SQL and draws Record Disbursement's card from it.
+ */
+const DisbursementReceiptRead = z
+  .object({
+    payment_reference: z.string().max(100).nullable(),
+    paid_on: isoDate.nullable(),
+    amount: money.nullable(),
+    beneficiary_name: z.string().max(150).nullable(),
+    beneficiary_account_number: z.string().max(30).nullable(),
+    beneficiary_bank: z.string().max(100).nullable(),
+    narration: z.string().max(300).nullable(),
+  })
+  .strict();
+
 const TABLES = {
+  DisbursementReceiptRead: { table: null, reason: "a model's reading of a payment receipt, never kept" },
   DisbursementReferenceAdd: { table: "disbursement" },
   Disbursement: {
     table: "disbursement",
@@ -100,4 +118,5 @@ module.exports = {
   DisbursementCreate,
   DisbursementReference,
   DisbursementReferenceAdd,
+  DisbursementReceiptRead,
 };

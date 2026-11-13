@@ -99,4 +99,41 @@ async function addReference(client, id, reference, receiptId) {
   return rows[0] || null;
 }
 
-module.exports = { list, get, lock, insert, addReference };
+/** At most this many requests a receipt is offered against: the answers to tap under one question. */
+const MATCHES_SHOWN = 6;
+
+/**
+ * The requests a payment receipt attached on Praxis AI may have paid (praxis-ai.md §6.18, decision
+ * 46), in the reader's scope: of `statuses`, for the receipt's amount, whose account number equals the
+ * beneficiary's, or (when none does) whose payee's name equals it, case and accents set aside. A paid
+ * one carries its disbursement's number.
+ * @param {{query: Function}} db
+ * @param {{account_number: string|null, beneficiary_name: string|null, amount: string}} receipt
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {string[]} statuses
+ */
+async function requestsPaidBy(db, receipt, scope, statuses) {
+  const run = async (by) => {
+    const params = [statuses, receipt.amount, by === "account" ? receipt.account_number : receipt.beneficiary_name];
+    const s = scopeClause(scope, { column: "er.employee_id" }, params);
+    const match = by === "account" ? "er.account_number = $3::text" : "er.payee_name IS NOT NULL AND search_fold(er.payee_name) = search_fold($3::text)";
+    const { rows } = await db.query(
+      `SELECT er.expense_request_id, er.number, er.purpose, er.status, d.number AS disbursement_number, d.paid_on
+         FROM expense_request er
+         LEFT JOIN disbursement d ON d.expense_request_id = er.expense_request_id
+        WHERE er.status = ANY($1::text[]) AND er.amount = $2::numeric AND ${match} ${s.and}
+        ORDER BY er.submitted_at DESC NULLS LAST, er.expense_request_id
+        LIMIT ${MATCHES_SHOWN} -- pagination:batch the few requests one receipt is offered against`,
+      params,
+    );
+    return rows;
+  };
+  if (receipt.account_number) {
+    const byAccount = await run("account");
+    if (byAccount.length) return byAccount;
+  }
+  return receipt.beneficiary_name ? run("name") : [];
+}
+
+module.exports = {
+  requestsPaidBy, list, get, lock, insert, addReference };

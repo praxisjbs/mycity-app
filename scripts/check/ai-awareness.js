@@ -139,7 +139,8 @@ function requiredAsked(actions, schemaOf) {
     const props = js.properties || {};
     const carried = (f) => !a.fields || a.fields.includes(f);
     const required = (js.required || []).filter((f) => carried(f) && !(props[f] && props[f].default !== undefined));
-    const asked = new Set((a.asks || []).filter((q) => !q.when).map((q) => q.field));
+    // A field a document's reader fills (an action drawn only from a file, praxis-ai.md §6.18) is given, never asked.
+    const asked = new Set([...(a.asks || []).filter((q) => !q.when).map((q) => q.field), ...((a.from_file && a.from_file.fills) || [])]);
     for (const f of required)
       if (!asked.has(f))
         out.push(`${a.key}: its input requires ${f}, which no ask asks before the card is drawn; add an ask (its question, answers to tap, \`read\` when it names a record) (praxis-ai.md decision 34)`);
@@ -307,6 +308,13 @@ function check() {
   // 7. Every field a card needs is asked before it is drawn (decision 34).
   const { jsonSchemaOf } = require(path.join(ROOT, "src", "services", "ai", "structured"));
   problems.push(...requiredAsked(actions, jsonSchemaOf));
+
+  // 8. Every kind of document a module reads is exercised by an integration test (`file.<kind>`, the
+  //    read the turn records) and read by a case of the evaluation set (`file: "<kind>"`) (§6.18).
+  for (const f of registry.files()) {
+    if (!word(testText, `"file.${f.kind}"`) && !word(testText, `'file.${f.kind}'`)) problems.push(`file ${f.kind}: no integration test names "file.${f.kind}" (tests/integration)`);
+    if (!new RegExp(`file:\\s*["']${f.kind}["']`).test(evalText)) problems.push(`file ${f.kind}: the evaluation set (scripts/ai/eval-assistant.js) has no case with file: "${f.kind}"`);
+  }
 
   return { problems, actions: actions.length, sweep, forms: six.sweep, counts: six.counts };
 }

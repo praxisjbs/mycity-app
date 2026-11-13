@@ -9,6 +9,11 @@
  * its document type is transient, so one whose removal never ran goes with the vault's sweep
  * (vault.purgeTransient).
  *
+ * A document attached to the question (§6.18) is read once by its kind's reader before the model is
+ * asked (assistant.files.js): its reading is the question's read 1, its values laid over the model's
+ * card before the ask guard, and it is kept on the answer so later questions in the conversation see
+ * it again. A file that cannot be read is answered in one sentence, with no model asked.
+ *
  * Progress (§1.2 decision 23): the answer arrives whole, never streamed; while the question runs,
  * each read is announced on the person's realtime room (`ai:progress`) before it runs, best
  * effort, so the screen can say "Reading leave requests" and "Reading 2 of 5". The event carries
@@ -29,6 +34,7 @@ const transcription = require("../../services/ai/transcription");
 const repo = require("./assistant.repo");
 const history = require("./assistant.history");
 const suggestions = require("./assistant.suggestions");
+const files = require("./assistant.files");
 const { EVENTS, VOICE_QUESTION, PROGRESS_EVENT } = require("./assistant.events");
 
 async function tx(fn) {
@@ -54,7 +60,7 @@ function readWords(key) {
   const words = String(key || "")
     .split(".")
     .map((s) => s.replace(/_/g, " ").trim())
-    .filter((s) => s && s !== "list" && s !== "get");
+    .filter((s, i) => s && s !== "list" && s !== "get" && !(i === 0 && s === "file"));
   return words.join(" ") || String(key || "");
 }
 
@@ -74,9 +80,15 @@ function progressFor(actor, askKey) {
   };
 }
 
+/** An answer of words alone, with nothing read: a document that could not be read (§6.18 step 5). */
+function plainAnswer(text) {
+  const metadata = { table: null, link: null, reads: [], declined: null, more: false, overview: null, ask: null };
+  return { content: text, table: null, link: null, citations: [], citations_total: 0, sources: [], reads: [], declined: null, more: false, overview: null, choices: [], rows_read: 0, module_key: null, metadata, stored_citations: [], stored_reads: [] };
+}
+
 /**
  * POST /ai/ask.
- * @param {{question: string, ai_conversation_id?: string, context?: object, shows?: string[]}} body
+ * @param {{question: string, ai_conversation_id?: string, context?: object, shows?: string[], attachment?: {document_id: string, kind: string}}} body
  * @param {object} actor  req.user (withActor)
  * @param {string|null} [askKey]  the request's Idempotency-Key, carried on the progress events
  */
@@ -89,24 +101,51 @@ async function ask(body, actor, askKey = null) {
   const context = body.context || null;
   const shows = Array.isArray(body.shows) ? body.shows : [];
   const past = conversation ? await history.replay(conversation.ai_conversation_id, actor.user_id) : [];
-  const out = await orchestrator.answer({ db: pool, actor, question: body.question, history: past, context, shows, onRead: progressFor(actor, askKey) });
-  // A card the action cannot be drawn without asks for what it lacks first (§1.3 decision 29; every
-  // field it needs, decision 34), the screen's own record filling its field, with answers read from
-  // the person's own records where the ask reads them (decisions 32 and 34).
-  const drafted = (out.draft && out.draft.action && out.draft.action.values) || {};
-  const asked = await answer.withOptions(answer.askFirst({ draft: out.draft, actions: out.actions, history: past, shows, context }), out.actions, { actor, db: pool, values: drafted });
-  const shown = answer.build({ draft: asked, reads: out.reads, routes: out.routes, screens: out.screens, shows });
-  // The card (§6.11 step 2): only for a screen that draws one, checked against the person's rights now.
-  const card = shows.includes("cards") ? await answer.draftCard({ draft: asked, actions: out.actions, actor, context, db: pool }) : null;
+  const onRead = progressFor(actor, askKey);
+  // A document attached to this question is read once, before the model is asked (§6.18 steps 1 to 3).
+  let attached = null;
+  if (body.attachment) {
+    onRead({ n: 1, key: `file.${body.attachment.kind}`, kind: "read", of: orchestrator.MAX_READS });
+    attached = await files.read(actor, body.attachment);
+  }
+  const typed = String(body.question || "").trim();
+  const question = typed || (attached ? attached.question : "");
+  // The conversation's document: this question's, else the newest an earlier question carried (step 6).
+  const file = attached ? { ...files.kept(attached), fresh: true } : files.latestOf(past);
+
+  let out = { run_id: null };
+  let shown;
+  let card = null;
+  if (attached && attached.outcome !== "read") {
+    // Unreadable, off or out of budget: one sentence, no model asked, nothing more spent (step 5).
+    shown = plainAnswer(attached.said);
+  } else {
+    out = await orchestrator.answer({ db: pool, actor, question, history: past, context, shows, file, onRead });
+    // The reader's values over the model's (decision 44), before the ask guard, so a field the file gave is never asked.
+    const read = answer.withReading(out.draft, file, { fresh: Boolean(attached), own: !attached || !typed || typed === attached.question });
+    // A card the action cannot be drawn without asks for what it lacks first (§1.3 decision 29; every
+    // field it needs, decision 34), the screen's own record filling its field, with answers read from
+    // the person's own records where the ask reads them (decisions 32 and 34), or the document's own.
+    const drafted = (read && read.action && read.action.values) || {};
+    const asked = await answer.withOptions(answer.readingChoices(answer.askFirst({ draft: read, actions: out.actions, history: past, shows, context }), file), out.actions, { actor, db: pool, values: drafted });
+    shown = answer.build({ draft: asked, reads: out.reads, routes: out.routes, screens: out.screens, shows });
+    // The server's own sentences about the document (paid in full, a possible duplicate), one each.
+    // Before a question the server asks ("Which request was paid?"), after the model's own words otherwise.
+    if (attached && attached.notes.length) shown.content = asked && asked.ask ? `${attached.notes.join(" ")} ${shown.content.trim()}` : `${shown.content.trim()} ${attached.notes.join(" ")}`;
+    // The card (§6.11 step 2): only for a screen that draws one, checked against the person's rights now.
+    card = shows.includes("cards") ? await answer.draftCard({ draft: asked, actions: out.actions, actor, context, db: pool, file }) : null;
+  }
+  // The file the question carried, kept for its bubble and for the questions after it (step 6).
+  if (attached) shown.metadata = { ...shown.metadata, attachment: files.kept(attached) };
 
   const saved = await tx(async (client) => {
     // Deleted in another tab meanwhile: the question opens a new conversation.
     let conv = conversation ? await repo.touchConversation(client, conversation.ai_conversation_id, actor.user_id) : null;
-    if (!conv) conv = await repo.insertConversation(client, { userId: actor.user_id, title: titleOf(body.question), openedFrom: context });
+    if (!conv) conv = await repo.insertConversation(client, { userId: actor.user_id, title: titleOf(question), openedFrom: context });
     const q = await repo.insertMessage(client, {
       ai_conversation_id: conv.ai_conversation_id,
       role: "user",
-      content: body.question,
+      content: question,
       context,
     });
     const a = await repo.insertMessage(client, {
@@ -146,6 +185,7 @@ async function ask(body, actor, askKey = null) {
         reads: shown.reads.map((r) => r.key),
         declined: shown.declined,
         card: draft ? draft.action_key : null,
+        attachment: attached ? { kind: attached.kind, document_id: attached.document.document_id, outcome: attached.outcome } : null,
       },
     });
     return { a, draft };
@@ -154,7 +194,7 @@ async function ask(body, actor, askKey = null) {
   return {
     ai_message_id: saved.a.ai_message_id,
     ai_conversation_id: saved.a.ai_conversation_id,
-    question: body.question,
+    question,
     content: shown.content,
     table: shown.table,
     link: shown.link,
@@ -168,6 +208,7 @@ async function ask(body, actor, askKey = null) {
     choices: shown.choices,
     overview: shown.overview,
     context,
+    attachment: attached ? { document: attached.document, kind: attached.kind } : null,
     feedback: null,
     created_at: new Date(saved.a.created_at).toISOString(),
     provisional: true,
@@ -235,4 +276,7 @@ async function transcribe(file, actor) {
   }
 }
 
-module.exports = { ask, suggestionsFor, feedback, transcribe, titleOf, readWords, progressFor };
+/** GET /ai/attachment-kinds. */
+const attachmentKinds = (actor) => files.kinds(actor);
+
+module.exports = { ask, suggestionsFor, attachmentKinds, feedback, transcribe, titleOf, readWords, progressFor, plainAnswer };
