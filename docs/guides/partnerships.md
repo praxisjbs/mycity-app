@@ -10,7 +10,7 @@
 | Capabilities | `partnerships.configure` (the Categories tab: categories, their agreement templates, delivery checklists and custom fields; pipeline stages and lists; proof points; saved proposal templates); `partnerships.money` (see and enter commission, the merchant's take and returns; import returns) |
 | Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026; PR 1 registers them in the next two free PROGRESS rows, #104 and #105 while free, and corrects this guide if another milestone took one first); changes to My Workspace (#4 Today, #5 Tasks, #6 Calendar, #101 Projects), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
 | Status | Built |
-| Last changed | 08/11/2026 |
+| Last changed | 13/11/2026 |
 
 ---
 
@@ -1124,6 +1124,14 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   (`proposals.search.js`: number, title, partner and deal, the newest version of each), `proposal` off
   `search:none`, and `partnership_proposal`, the type its events and notices name, opening Proposals.
 
+- **Contracts and MoUs in the chat (planned; `praxis-ai.md` decisions 41 to 48, §6.18, Appendix A
+  PR 2).** A contract or MoU attached on Praxis AI · Ask is read (`agreement-document-read`, Image
+  Reading), summarised on the answer and the pane's Record tab, then filed by a card: Record Signed
+  Copy (`agreements.record_signed_copy`, risk `approval`) when it matches an agreement in `sent` or
+  `viewed`, otherwise Add Partner Document (`partner_documents.attach`) on the partner or lead it
+  names. Each runs the route's own service; `not_offered` then reaches `SignedCopyRecord` and
+  `PartnerDocumentAttach` through these cards instead of `file:`.
+
 ## 10 · On screen and mobile
 
 **§3 and §6 are for engineers: nothing in them reaches a screen unless it is listed here as tier 1 or tier
@@ -1906,7 +1914,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 ## 14 · Change log
 
 - 13/11/2026 · TB · Send Back on an agreement's approval no longer tells its approvers "Withdrawn: The requester withdrew this before it was decided": the handler withdraws the approval with `engine.cancel(..., sentBack: true)`, which tells nobody (the requester is told of the Send Back with its reason). Found filming M8 on Expenses, the same handler (`docs/runbooks/training-videos.md` §7).
-
+- 13/11/2026 · TB · Contracts and MoUs in the chat planned (`praxis-ai.md` decisions 41 to 48, Appendix A PR 2): read, summarised, and filed as Record Signed Copy or Add Partner Document (§9). Nothing built yet.
 - 13/11/2026 · AJ · The signing service (§6.9), from M5's click-through: a request that ends unsigned
   (Close, a lapse, a decline) keeps its links, read only, so the signer reads *Agreement Withdrawn*,
   *This Link Has Expired* or *Agreement Declined* instead of *This Link Does Not Open*; the page shows
