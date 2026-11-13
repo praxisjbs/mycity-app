@@ -23,6 +23,9 @@
  *   picks      with `action`: fields the card may leave for the person to pick (Pick one), as a
  *              typed address is when our search does not find exactly one place (decision 37)
  *   given      records the question needs without naming them, as its placeholders do
+ *   file       the kind of document attached to the question (praxis-ai.md §6.18): `sample`, a
+ *              made-up file under scripts/ai/samples/, is uploaded as the person, read by the kind's
+ *              reader as Ask reads it, and removed once the question is graded
  *
  * A question names staging's own records, as the person asking holds them: `{person}` is someone
  * in their reach, `{<action>#<field>}` the first answer that card's own question offers them (its
@@ -121,6 +124,11 @@ const CASES = Object.freeze([
   { id: "card.expense-category-edit", as: "operations_people", question: "Deactivate the {expense_categories.edit#expense_category_id} expense category.", shows: ["cards"], action: "expense_categories.edit" },
   { id: "card.requisition", as: "operations_people", question: "Group the approved expense requests into a requisition for the CEO.", shows: ["cards"], action: "requisitions.create", given: ["requisitions.create#expense_request_ids"] },
   { id: "card.disbursement", as: "operations_people", question: "Record the payment for {disbursements.create#expense_request_id}, paid today, bank reference GT2611050042.", shows: ["cards"], action: "disbursements.create" },
+  // Documents in the chat (praxis-ai.md §6.18): a made-up invoice of the sample's shape becomes New
+  // Request for its balance due; a made-up receipt asks which authorised request it paid, since
+  // staging holds none of its amount.
+  { id: "file.invoice", as: "employee", question: "Raise an expense request from this invoice", file: "invoice", sample: "invoice.pdf", shows: ["cards"], action: "my_expenses.from_invoice" },
+  { id: "file.receipt", as: "operations_people", question: "Record the payment on this receipt", file: "payment_receipt", sample: "payment-receipt.pdf", shows: ["cards"], ask: { action: "disbursements.create", field: "expense_request_id" } },
   { id: "card.budget", as: "operations_people", question: "Set the {departments.edit#department_id} budget for 2027: 2,000,000 naira for {expense_categories.edit#expense_category_id}.", shows: ["cards"], action: "budgets.create" },
   { id: "card.budget-edit", as: "operations_people", question: "Change the {budgets.edit#budget_id} budget to 2,500,000 naira for {expense_categories.edit#expense_category_id}.", shows: ["cards"], action: "budgets.edit" },
   { id: "card.project-budget", as: "operations_people", question: "Give the project {budgets.set_project#project_id} a budget of 1,500,000 naira.", shows: ["cards"], action: "budgets.set_project" },
@@ -513,6 +521,27 @@ async function main(argv) {
   const grantsCache = require("../../src/shared/rbac/grants-cache");
   const orchestrator = require("../../src/services/ai/assistant/orchestrator");
   const answer = require("../../src/services/ai/assistant/answer");
+  const files = require("../../src/modules/assistant/assistant.files");
+  const documents = require("../../src/modules/documents/documents.service");
+  const vault = require("../../src/shared/documents/vault");
+  const { atomically } = require("../../src/shared/db/tx");
+
+  /** A made-up sample uploaded as the person, as the modal uploads it (purpose ai_attachment). */
+  const stageSample = (actor, name) => {
+    const buffer = require("node:fs").readFileSync(require("node:path").join(__dirname, "samples", name));
+    return documents.stage({ buffer, originalname: name, size: buffer.length, declared_type: "application/pdf", purpose: "ai_attachment" }, { purpose: "ai_attachment" }, actor);
+  };
+  /** The sample removed once its question is graded: an evaluation keeps nothing. */
+  const unstage = async (documentId, actor) => {
+    const client = await pool.connect();
+    let keys;
+    try {
+      keys = await atomically(client, () => vault.remove(client, documentId, { actor, reason: "an evaluation's sample was read" }));
+    } finally {
+      client.release();
+    }
+    if (keys) await vault.removeFiles(keys);
+  };
 
   const people = new Map();
   async function personFor(role) {
@@ -565,13 +594,28 @@ async function main(argv) {
       }
       const question = filled.question;
       let out;
+      // A document attached as Ask attaches it (§6.18): uploaded, read once, removed after.
+      let file = null;
+      let staged = null;
       try {
-        out = await orchestrator.answer({ db: pool, actor, question, shows: kase.shows || [] });
+        if (kase.file) {
+          staged = await stageSample(actor, kase.sample);
+          const read = await files.read(actor, { document_id: staged.document_id, kind: kase.file });
+          if (read.outcome !== "read") {
+            report({ id: kase.id, result: "cannot run", why: `the sample was not read (${read.outcome})` });
+            exit = 2;
+            continue;
+          }
+          file = { ...files.kept(read), fresh: true };
+        }
+        out = await orchestrator.answer({ db: pool, actor, question, shows: kase.shows || [], file });
       } catch (err) {
         report({ id: kase.id, result: "cannot run", why: `${err.code || "error"}: ${err.message}` });
         exit = 2;
         if (["AI_DISABLED", "AI_MODULE_DISABLED", "AI_CAP_REACHED"].includes(err.code)) break;
         continue;
+      } finally {
+        if (staged) await unstage(staged.document_id, actor).catch(() => undefined);
       }
       if (out.stub) {
         report({ id: kase.id, result: "cannot run", why: "only the stub answered: set up a provider in AI Control" });
@@ -579,10 +623,12 @@ async function main(argv) {
         break;
       }
       // As Ask does it: a card its action cannot be drawn without becomes that question first (decision 29).
-      const draft = await answer.withOptions(answer.askFirst({ draft: out.draft, actions: out.actions, history: [], shows: kase.shows || [] }), out.actions, { actor, db: pool });
+      // The document's values over the model's first, as Ask lays them (decision 44).
+      const read = answer.withReading(out.draft, file, { fresh: Boolean(file), own: true });
+      const draft = await answer.withOptions(answer.readingChoices(answer.askFirst({ draft: read, actions: out.actions, history: [], shows: kase.shows || [] }), file), out.actions, { actor, db: pool });
       const shown = answer.build({ draft, reads: out.reads, routes: out.routes, screens: out.screens, shows: kase.shows || [] });
       // A card is drafted and checked, never stored: nothing is written by an evaluation.
-      const card = kase.action || kase.no_action || kase.ask ? await answer.draftCard({ draft, actions: out.actions, actor, db: pool }) : null;
+      const card = kase.action || kase.no_action || kase.ask ? await answer.draftCard({ draft, actions: out.actions, actor, db: pool, file }) : null;
       const g = grade(kase, { reads: out.reads, shown, card, ask: answer.askOf(draft.ask) });
       if (!g.pass) failed += 1;
       report({

@@ -146,4 +146,8 @@ describe("RadioCards", () => {
     );
     expect(await axe(container)).toHaveNoViolations();
   });
+  it("shows a caption under an option's words, read with them", () => {
+    render(<RadioCards label="What Is It?" value={null} onChange={() => undefined} options={[{ value: "invoice", label: "Invoice", caption: "Bill to pay" }, { value: "payment_receipt", label: "Payment Receipt", caption: "Proof of a transfer" }]} />);
+    expect(screen.getByRole("radio", { name: /Invoice/ })).toHaveTextContent("Bill to pay");
+  });
 });

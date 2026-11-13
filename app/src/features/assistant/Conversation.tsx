@@ -3,10 +3,12 @@ import { api, ApiError } from "@/api/client";
 import { useApi, useInfinite } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
-import type { AiAnswer, AiFeedbackValue, AiScreenContext, AiShows, AiTranscript } from "@mycity/contract/contract.gen.ts";
+import type { AiAnswer, AiAttachmentKind, AiFeedbackValue, AiScreenContext, AiShows, AiTranscript, DocumentRef } from "@mycity/contract/contract.gen.ts";
 import { useRouter } from "@/lib/router";
 import { AnswerBubble, Button, DataView, EmptyState, ErrorState, Form, Icon, IconButton, InlineInput, LoadingRows, ProgressLine, QuestionBubble, SourceChip, TapList, toast, VoiceField, type DataViewColumn } from "@mycity/ui";
+import { useFileViewer } from "@/features/shared/files";
 import { AnswerCard } from "./Card";
+import { AttachDocument, type Attached } from "./Attach";
 import { paneHas, pickForSource, type PanePick } from "./Pane";
 
 /** Praxis AI's conversation (docs/guides/praxis-ai.md §10): what is asked, what came back, and the box. */
@@ -17,7 +19,10 @@ const NEXT_PAGE = "Show the next 25.";
 const QUESTION_MAX = 500;
 
 /** The question waiting for its answer, or the one that failed. Try Again sends it with the same key (§11). */
-type Pending = { question: string; key: string; error: string | null; reference?: string };
+type Pending = { question: string; key: string; error: string | null; reference?: string; attachment?: Attachment | null };
+
+/** A document sent with a question (§6.18): what it is and the staged file. */
+type Attachment = { kind: AiAttachmentKind; document: DocumentRef };
 
 /** What the server says it is reading while a question runs (`ai:progress`, decision 23). */
 type Progress = { words: string; step: { n: number; of: number } };
@@ -90,6 +95,10 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
   const end = useRef<HTMLDivElement>(null);
   /* The conversation whose latest answer was handed up: once each, as its saved turns first land. */
   const latestFor = useRef<string | null>(null);
+  /* The file a question carried opens in the viewer, fetched with the session (§6.18). */
+  const files = useFileViewer();
+  const fileOf = (attachment: Attachment | null | undefined) =>
+    attachment ? { name: attachment.document.file_name, onOpen: () => files.view(`/api/v1/documents/${attachment.document.document_id}/content`, { name: attachment.document.file_name, mime: attachment.document.mime_type }) } : null;
 
   useEffect(() => {
     live.current = true;
@@ -144,28 +153,31 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
     end.current?.scrollIntoView({ block: "end" });
   }, [newest, pending, progress]);
 
-  const ask = (words: string, key: string = crypto.randomUUID()): Promise<void> | undefined => {
+  const ask = (words: string, key: string = crypto.randomUUID(), attachment: Attachment | null = null): Promise<void> | undefined => {
     if (asking.current) return inflight.current ?? undefined;
-    const work = asked(words, key);
+    const work = asked(words, key, attachment);
     inflight.current = work;
     return work;
   };
 
-  const asked = async (words: string, key: string) => {
+  /** Read Document: the question asked with the file it is about (§6.18). */
+  const read = (a: Attached) => ask(a.question, crypto.randomUUID(), { kind: a.kind, document: a.document });
+
+  const asked = async (words: string, key: string, attachment: Attachment | null = null) => {
     const question = words.trim();
-    if (!question) return;
+    if (!question && !attachment) return;
     const from = showing.current;
     const move = moves.current;
     /** Still where this question was asked: the screen open and no other conversation picked since (an answer opening its own conversation is not a move). */
     const here = () => live.current && moves.current === move;
     asking.current = true;
     askKey.current = key;
-    setPending({ question, key, error: null });
+    setPending({ question, key, error: null, attachment });
     setProgress(null);
     const { context: ctx, shows: draws } = calls.current;
     try {
       const a = await api.call("POST /api/v1/ai/ask", {
-        body: { question, ...(from ? { ai_conversation_id: from } : {}), ...(ctx ? { context: ctx } : {}), shows: draws },
+        body: { question, ...(from ? { ai_conversation_id: from } : {}), ...(ctx ? { context: ctx } : {}), shows: draws, ...(attachment ? { attachment: { document_id: attachment.document.document_id, kind: attachment.kind } } : {}) },
         idempotencyKey: key,
       });
       calls.current.onAnswered(a);
@@ -193,7 +205,7 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
         setText(question);
         toast.error(err.fields?.question?.[0] ?? err.message);
       } else {
-        setPending({ question, key, error: err.message || "Could not reach the server", reference: err.reference });
+        setPending({ question, key, error: err.message || "Could not reach the server", reference: err.reference, attachment });
       }
     } finally {
       if (here()) {
@@ -255,7 +267,7 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
             {id && turns.error && !gone && answers.length === 0 && <ErrorState error={turns.error} onRetry={turns.reload} />}
             {answers.map((a) => (
               <div key={a.ai_message_id} className="flex flex-col gap-3.5">
-                <QuestionBubble words={a.question} />
+                <QuestionBubble words={a.question} file={fileOf(a.attachment)} />
                 <Answer
                   a={a}
                   feedback={a.ai_message_id in feedback ? feedback[a.ai_message_id] : a.feedback}
@@ -271,13 +283,13 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
             ))}
             {pending && (
               <div className="flex flex-col gap-3.5">
-                <QuestionBubble words={pending.question} />
+                <QuestionBubble words={pending.question} file={fileOf(pending.attachment)} />
                 {pending.error ? (
                   <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive">
                     <Icon name="alert" size="s" />
                     {pending.error}
                     {pending.reference && <span data-copy="content">Reference {pending.reference}</span>}
-                    <Button size="sm" onClick={() => ask(pending.question, pending.key)}>
+                    <Button size="sm" onClick={() => ask(pending.question, pending.key, pending.attachment ?? null)}>
                       Try Again
                     </Button>
                   </div>
@@ -290,8 +302,10 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
         )}
         <div ref={end} />
       </div>
+      {files.viewer}
       {/* The microphone sits outside the form, so a question being sent never holds its Stop. */}
       <div className="flex flex-none items-center gap-1.5 border-t border-border p-3 max-md:p-2">
+        <AttachDocument onRead={read} />
         <Form id={formId} onSubmit={send} className="min-w-0 flex-1">
           <InlineInput
             className="h-control w-full min-w-0 rounded-full border border-input bg-background px-4 text-sm outline-none focus:border-ring phone:text-base"

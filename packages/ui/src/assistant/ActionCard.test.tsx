@@ -181,4 +181,34 @@ describe("ActionCard", () => {
     const { container } = render(<ActionCard label="Approve Leave" fields={fields} values={{ leave_request_ids: ["l1", "l2"] }} problems={{}} records={records} status="shown" confirm="fresh_sign_in" schema={schema} onConfirm={() => undefined} onCancel={() => undefined} onSave={() => undefined} onOpen={() => undefined} />);
     expect(await axe(container)).toHaveNoViolations();
   });
+  it("draws a lines field as its items with each amount and the total, a minus line taking away; Edit gives the shared lines field", async () => {
+    const lines = [
+      { description: "Payment gateway integration", quantity: "1", unit_price: "250000.00" },
+      { description: "Discount", quantity: "1", unit_price: "-100000.00" },
+    ];
+    const onSave = vi.fn(async () => undefined);
+    render(
+      <ActionCard
+        label="New Request"
+        fields={[{ name: "lines", label: "Lines", kind: "lines", required: true, options: null, long: false }, { name: "invoice_document_id", label: "Invoice", kind: "id", required: true, options: null, long: false }]}
+        values={{ lines, invoice_document_id: "d1" }}
+        problems={{}}
+        records={[]}
+        names={[{ type: "document", id: "d1", label: "INV-202611-9525.pdf", link: null }]}
+        status="shown"
+        confirm="press"
+        schema={{ safeParse: (v: unknown) => ({ success: true, data: v }) }}
+        onConfirm={() => undefined}
+        onSave={onSave}
+      />,
+    );
+    expect(screen.getAllByText("Payment gateway integration").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("₦150,000.00").length).toBeGreaterThan(0);
+    expect(screen.getByText("INV-202611-9525.pdf")).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("Item 2")).toHaveValue("Discount");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ lines: [expect.objectContaining({ unit_price: "250000.00" }), expect.objectContaining({ unit_price: "-100000.00" })] }));
+  });
 });

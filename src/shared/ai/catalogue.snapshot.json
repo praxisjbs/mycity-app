@@ -777,6 +777,17 @@
       "screen": null
     },
     {
+      "key": "my_expenses.from_invoice",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expenses.ExpenseRequestFromInvoice",
+      "schema_sha": "da6ca1881c731bdd",
+      "screen": null
+    },
+    {
       "key": "my_expenses.submit",
       "kind": "action",
       "module_key": "expenses",

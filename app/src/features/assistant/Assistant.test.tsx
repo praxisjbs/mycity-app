@@ -113,6 +113,7 @@ const answer = (over: Partial<AiAnswer> = {}): AiAnswer => ({
   card: null,
   overview: null,
   context: null,
+  attachment: null,
   feedback: null,
   created_at: "2026-10-22T09:30:00.000Z",
   provisional: true,
@@ -817,6 +818,110 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
     ui("ask", CONV);
     const group = screen.getByRole("group", { name: "Create Task" });
     expect(within(group).getByRole("button", { name: "Create Task" }).className).toContain("phone:w-full");
+  });
+});
+
+describe("Attach Document (docs/guides/praxis-ai.md §6.18)", () => {
+  const KINDS = "GET /api/v1/ai/attachment-kinds";
+  const INVOICE_DOC = { document_id: "00000000-0000-4000-8000-0000000000f1", file_name: "INV-202611-9525.pdf", size_bytes: 52_000, mime_type: "application/pdf" };
+  const withKinds = (kinds: Array<"invoice" | "payment_receipt">, available = true) => {
+    m.data[KINDS] = {
+      kinds: kinds.map((k) => (k === "invoice" ? { kind: k, label: "Invoice", question: "Raise an expense request from this invoice" } : { kind: k, label: "Payment Receipt", question: "Record the payment on this receipt" })),
+      available,
+    };
+  };
+
+  it("offers only the kinds the person may attach, as tiles; Read Document asks the kind's question with the file, and the bubble carries it", async () => {
+    const user = userEvent.setup();
+    withKinds(["invoice", "payment_receipt"]);
+    const { upload } = await import("@/api/upload");
+    vi.mocked(upload).mockResolvedValue(INVOICE_DOC as never);
+    const lines = [
+      { description: "Payment gateway integration", quantity: "1", unit_price: "250000.00" },
+      { description: "Discount", quantity: "1", unit_price: "-100000.00" },
+      { description: "Paid to date on INV-202611-9525", quantity: "1", unit_price: "-300000.00" },
+    ];
+    m.call.mockImplementation(async (key: unknown) =>
+      key === "POST /api/v1/ai/ask"
+        ? answer({
+            question: "Raise an expense request from this invoice",
+            content: "This invoice from JBS Praxis asks for the balance.",
+            table: null,
+            attachment: { kind: "invoice", document: INVOICE_DOC },
+            card: {
+              ai_action_draft_id: "00000000-0000-4000-8000-0000000000d9",
+              ai_message_id: "00000000-0000-4000-8000-0000000000a1",
+              action_key: "my_expenses.from_invoice",
+              module_key: "expenses",
+              label: "New Request",
+              description: "Raise an expense request of my own from the invoice I attached",
+              schema: "expenses.ExpenseRequestFromInvoice",
+              risk: "standard",
+              confirm: "press",
+              bulk: 1,
+              values: { lines },
+              problems: {},
+              records: [],
+              names: [],
+              fields: [{ name: "lines", label: "Lines", kind: "lines", required: true, options: null, long: false, picks: null }],
+              suggested: false,
+              status: "shown",
+              expires_at: "2026-10-22T10:00:00.000Z",
+              result: null,
+              created_at: "2026-10-22T09:30:00.000Z",
+            } satisfies AiActionCard,
+          })
+        : {},
+    );
+    ui("ask");
+    await user.click(await screen.findByRole("button", { name: "Attach Document" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("radio", { name: /Invoice/ }).textContent).toContain("Bill to pay");
+    expect(within(dialog).getByRole("radio", { name: /Payment Receipt/ }).textContent).toContain("Proof of a transfer");
+    // Nothing goes without a kind and a file: each says so on its field.
+    await user.click(within(dialog).getByRole("button", { name: "Read Document" }));
+    expect(await within(dialog).findByText("Pick one")).toBeTruthy();
+    expect(await within(dialog).findByText("Attach a file")).toBeTruthy();
+    await user.click(within(dialog).getByRole("radio", { name: /Invoice/ }));
+    fireEvent.change(dialog.querySelector("input[type=file]") as HTMLInputElement, { target: { files: [new File(["%PDF"], "INV-202611-9525.pdf", { type: "application/pdf" })] } });
+    expect(await within(dialog).findByText("INV-202611-9525.pdf")).toBeTruthy();
+    expect(vi.mocked(upload).mock.calls[0]![0]).toMatchObject({ fields: { purpose: "ai_attachment" } });
+    await user.click(within(dialog).getByRole("button", { name: "Read Document" }));
+    await waitFor(() => expect(asked()).toHaveLength(1));
+    expect(asked()[0]!.body).toMatchObject({ question: "Raise an expense request from this invoice", attachment: { document_id: INVOICE_DOC.document_id, kind: "invoice" }, shows: ["cards", "pane"] });
+    // The question's bubble carries the file as a chip; the card draws its lines with the total.
+    expect(await screen.findByRole("button", { name: "INV-202611-9525.pdf" })).toBeTruthy();
+    expect(screen.getAllByText("Paid to date on INV-202611-9525").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Total").length).toBeGreaterThan(0);
+  });
+
+  it("a member of staff is offered the Invoice alone; a Word file is refused at upload", async () => {
+    const user = userEvent.setup();
+    withKinds(["invoice"]);
+    const { upload } = await import("@/api/upload");
+    vi.mocked(upload).mockRejectedValue(new Error("This file type is not accepted here. Accepted: PDF, JPG, PNG, WEBP, HEIC."));
+    ui("ask");
+    await user.click(await screen.findByRole("button", { name: "Attach Document" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getAllByRole("radio")).toHaveLength(1);
+    expect(within(dialog).getByRole("radio", { name: /Invoice/ }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.change(dialog.querySelector("input[type=file]") as HTMLInputElement, { target: { files: [new File(["x"], "invoice.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })] } });
+    expect(await within(dialog).findByText(/not accepted here/)).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Read Document" }));
+    expect(await within(dialog).findByText("Attach a file")).toBeTruthy();
+    expect(asked()).toHaveLength(0);
+  });
+
+  it("while reading is off the paperclip says so and opens nothing; with no kind it is not there", async () => {
+    const user = userEvent.setup();
+    withKinds(["invoice"], false);
+    ui("ask");
+    await user.click(await screen.findByRole("button", { name: "Reading Documents Is Off" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    cleanup();
+    m.data[KINDS] = { kinds: [], available: true };
+    ui("ask");
+    expect(screen.queryByRole("button", { name: "Attach Document" })).toBeNull();
   });
 });
 

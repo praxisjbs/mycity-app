@@ -20,6 +20,7 @@ const { sourcesOf, typeLabel } = require("../../shared/ai/cite");
 const money = require("../../shared/money/money");
 const repo = require("./assistant.repo");
 const cards = require("./assistant.cards");
+const files = require("./assistant.files");
 const { EVENTS } = require("./assistant.events");
 
 /** The route whose replies the idempotency layer keeps for a repeated press. */
@@ -91,6 +92,7 @@ function present(row, citations = [], groups = [], card = {}) {
     choices: (md.ask && Array.isArray(md.ask.choices) ? md.ask.choices : []).slice(0, 6),
     overview: md.overview || null,
     context: row.context || null,
+    attachment: files.shownOf(md),
     feedback: row.feedback || null,
     created_at: iso(row.created_at),
     provisional: true,
@@ -139,7 +141,7 @@ async function replay(id, userId, limit = 10) {
   return page.data
     .slice(0, limit)
     .reverse()
-    .map((r) => ({ question: r.question || "", answer: r.content, reads: (r.metadata && r.metadata.reads) || [], ask: (r.metadata && r.metadata.ask) || null }));
+    .map((r) => ({ question: r.question || "", answer: r.content, reads: (r.metadata && r.metadata.reads) || [], ask: (r.metadata && r.metadata.ask) || null, attachment: (r.metadata && r.metadata.attachment) || null }));
 }
 
 /** DELETE /ai/conversations/:id. */

@@ -413,7 +413,7 @@ route("POST /api/v1/expenses/:id/withdraw", (req) => {
   return ok(detail(r, req.user!));
 });
 // The AI features answer as the API does with no provider set up: off (docs/guides/expenses.md §9).
-route("POST /api/v1/expenses/mine/invoice-reading", () => ok({ available: false, reason: "off", payee_name: null, expense_category_id: null, category: null, lines: [], amount: null, amount_due: null, ai_run_id: null }));
+route("POST /api/v1/expenses/mine/invoice-reading", () => ok({ available: false, reason: "off", payee_name: null, expense_category_id: null, category: null, lines: [], amount: null, amount_due: null, bank_name: null, account_name: null, account_number: null, ai_run_id: null }));
 route("POST /api/v1/expenses/mine/category-suggestion", () => ok({ available: false, reason: "off", expense_category_id: null, category: null, ai_run_id: null }));
 route("POST /api/v1/expenses/:id/duplicate-check", (req) => {
   const r = find(req.params.id);

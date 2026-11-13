@@ -49,9 +49,17 @@ function nodeOf(p) {
   return p || {};
 }
 
+/** An array of items that each carry a description, a quantity and a unit price: a request's lines (praxis-ai.md §6.18). */
+function isLines(node) {
+  const item = node && node.type === "array" ? nodeOf(node.items) : null;
+  const props = (item && item.type === "object" && item.properties) || {};
+  return ["description", "quantity", "unit_price"].every((k) => Object.prototype.hasOwnProperty.call(props, k));
+}
+
 function kindOf(name, p) {
   const node = nodeOf(p);
   if (node.enum) return "choice";
+  if (isLines(node)) return "lines";
   if (node.type === "array") return "list";
   if (node.type === "boolean") return "boolean";
   if (node.type === "number" || node.type === "integer") return "number";
@@ -92,6 +100,8 @@ function shapeOne(p, v) {
   const node = nodeOf(p);
   const types = typesOf(p);
   if (node.type === "array" && Array.isArray(v) && node.items) return v.map((x) => shapeOne(node.items, x));
+  // An item of a list of objects (a request's line): each of its fields in the form it takes.
+  if (node.type === "object" && node.properties && v && typeof v === "object" && !Array.isArray(v)) return shape(node, v);
   const money = node.type === "string" && typeof node.pattern === "string" && TWO_PLACES.test(node.pattern);
   if (money && (typeof v === "number" || typeof v === "string")) {
     const text = typeof v === "number" ? (Number.isFinite(v) ? String(v) : "") : v.trim();

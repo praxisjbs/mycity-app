@@ -175,7 +175,9 @@ mycity-app/
 │   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging;
 │   │                         attack-assistant.js: its attack suite, asked of the real model on staging
 │   │                         nightly through deploy-gate attack (docs/guides/praxis-ai.md §6.17)
-│   │                         with a real key before a change to its prompt or loop ships (not in CI)
+│   │                         with a real key before a change to its prompt or loop ships (not in CI);
+│   │                         samples/invoice.pdf and samples/payment-receipt.pdf: made-up documents
+│   │                         the evaluation set attaches (praxis-ai.md §6.18), no real business or account
 │   ├── ops/                  health-brief.js: the Status brief made on the server (npm run health:brief),
 │   │                         and with --watch the health watch that mails it when something is down
 │   └── deploy/               deploy-gate, check-gate, release-manifest, verify-staging, rollback

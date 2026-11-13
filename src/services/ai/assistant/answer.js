@@ -414,6 +414,53 @@ function askFirst({ draft, actions, history = [], shows = [], now = new Date(), 
   return { ...given, text: q.question, action: null, ask: { action: q.action, field: q.field, choices: q.choices }, table: null, route: null, prefill: null, more: false, overview: null };
 }
 
+/**
+ * An attached document's card (docs/guides/praxis-ai.md §6.18 step 4, decision 44): the reader's
+ * values laid over the model's, so every field the file gave is the file's and never the model's
+ * words, before the ask guard runs (a field the file gave is never asked). When the model drafted
+ * no card and asked nothing, the kind's card is drawn anyway (as asked when the question was the
+ * kind's own, else as suggested); a question for a field the file gives becomes the card. Any other
+ * draft is returned as it came.
+ * @param {object} draft
+ * @param {{card?: {action: string, values: object, defaults?: object}|null}|null} file  the conversation's attachment, as assistant.files keeps it
+ * @param {{fresh?: boolean, own?: boolean}} [how]  fresh: this question carried the file; own: its question is the kind's own
+ */
+function withReading(draft, file, { fresh = false, own = true } = {}) {
+  const card = file && file.card;
+  if (!draft || !card || !card.action) return draft;
+  const values = card.values && typeof card.values === "object" ? card.values : {};
+  // What the reader matched rather than read (a category among those offered, the person's own department) gives way to the person's words.
+  const defaults = card.defaults && typeof card.defaults === "object" ? card.defaults : {};
+  const want = draft.action;
+  if (want && want.key === card.action) return { ...draft, action: { ...want, values: { ...defaults, ...(want.values || {}), ...values } } };
+  if (want) return draft;
+  const ask = draft.ask;
+  const asksFilled = ask && ask.action === card.action && ask.field && Object.prototype.hasOwnProperty.call(values, ask.field);
+  if (ask && ask.action && !asksFilled) return draft;
+  if (!fresh && !asksFilled) return draft;
+  return { ...draft, ask: null, action: { key: card.action, values: { ...defaults, ...values }, suggested: fresh && !own && !asksFilled } };
+}
+
+/**
+ * A question the reading answers with its own choices (several requests a receipt matches, §6.18):
+ * those, in place of the ask's own. Any other draft is returned as it came.
+ */
+function readingChoices(draft, file) {
+  const ask = draft && draft.ask;
+  const card = file && file.card;
+  if (!ask || !card || ask.action !== card.action || !ask.field || !card.choices) return draft;
+  const choices = Array.isArray(card.choices[ask.field]) ? card.choices[ask.field].map((c) => String(c).trim()).filter((c) => c && c.length <= 60) : [];
+  return choices.length ? { ...draft, ask: { ...ask, choices: [...new Set(choices)].slice(0, MAX_CHOICES) } } : draft;
+}
+
+/** The reader's own problems on a card drawn from its document (`Check the lines`), on the fields still as it read them. */
+function readingProblems(draft, file, values) {
+  const card = file && file.card;
+  if (!draft || !draft.action || !card || draft.action.key !== card.action || !card.problems) return {};
+  const same = (k) => JSON.stringify((values || {})[k]) === JSON.stringify((card.values || {})[k]);
+  return Object.fromEntries(Object.entries(card.problems).filter(([k, v]) => Array.isArray(v) && v.length && same(k)));
+}
+
 /** A field problem the person fixes on the card, at most four words (gate 12). */
 const FILL_THE_GAP = "Fill the gap";
 
@@ -447,7 +494,7 @@ function gapsIn(values, action = null) {
  * What comes back is the row to store (ai_action_draft) and the fields the card shows.
  * @param {{draft: object, actions: Array<object>, actor: object, context?: object|null, db?: {query: Function}|null, now?: number}} q
  */
-async function draftCard({ draft, actions, actor, context = null, db = null, now = Date.now() }) {
+async function draftCard({ draft, actions, actor, context = null, db = null, now = Date.now(), file = null }) {
   const want = draft && draft.action;
   if (!want || !want.key) return null;
   const action = (actions || []).find((a) => a.key === want.key);
@@ -467,7 +514,7 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
     }
     throw err;
   }
-  const gaps = gapsIn(checked.values, action);
+  const gaps = { ...gapsIn(checked.values, action), ...readingProblems(draft, file, checked.values) };
   if (Object.keys(gaps).length) checked = { ...checked, ok: false, problems: { ...checked.problems, ...gaps } };
   const card = engine.cards.draft({ action, fieldNames, values, suggested: want.suggested === true, checked, now });
   return {
@@ -490,4 +537,4 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
   };
 }
 
-module.exports = { build, draftCard, askFirst, withChoices, withOptions, recordChoices, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };
+module.exports = { build, draftCard, withReading, readingChoices, readingProblems, askFirst, withChoices, withOptions, recordChoices, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };
