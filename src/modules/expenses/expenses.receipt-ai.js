@@ -16,7 +16,9 @@
  * What the model is given: the invoice itself (Read Invoice), the form's purpose and line
  * descriptions (Suggest Category), and the names of the categories offered on a request. Nothing
  * about the person. A category the model names is matched among those offered; one it made up is
- * left empty. Amounts are worked out here through shared/money, never by the model's sum.
+ * left empty. Amounts are worked out here through shared/money, never by the model's sum; a
+ * discount is a line below zero, what was already paid becomes one more, and the amount the invoice
+ * asks to be paid now comes back beside the lines' sum, so the form can say when the two differ.
  */
 const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
@@ -32,7 +34,7 @@ const { formatDate } = require("../../shared/time/day-first");
 
 const MODULE = "expenses";
 
-const offInvoice = (reason) => ({ available: false, reason, payee_name: null, expense_category_id: null, category: null, lines: [], amount: null, bank_name: null, account_name: null, account_number: null, ai_run_id: null });
+const offInvoice = (reason) => ({ available: false, reason, payee_name: null, expense_category_id: null, category: null, lines: [], amount: null, amount_due: null, bank_name: null, account_name: null, account_number: null, ai_run_id: null });
 /** An account number a request takes: ten digits, as printed with its spaces taken out. */
 const accountOf = (v) => {
   const digits = String(v || "").replace(/[\s-]/g, "");
@@ -99,8 +101,11 @@ async function readInvoice(user, body) {
   const out = got.run.output;
   // The stub cannot read an invoice: with no provider set up, Read Invoice is off.
   if (!out) return offInvoice("off");
-  const lines = out.lines.map((l) => ({ description: l.description.trim(), quantity: l.quantity, unit_price: m.toWire(l.unit_price) }));
-  const amount = lines.length ? m.toWire(m.sum(lines.map((l) => m.money(l.quantity).times(m.money(l.unit_price))))) : null;
+  // The lines as the request asks for the invoice's balance due, built as Praxis AI builds them: each
+  // item (a discount below zero), then what was already paid as one line below zero (praxis-ai.md decision 45).
+  const { lines, total } = invoiceLines(out);
+  const amount = lines.length ? total : null;
+  const due = out.balance_due || out.total;
   const categoryId = idOf(out.category);
   return {
     available: true,
@@ -110,6 +115,7 @@ async function readInvoice(user, body) {
     category: categoryId ? out.category.trim() : null,
     lines,
     amount,
+    amount_due: due ? m.toWire(due) : null,
     // The payee's bank as the invoice prints it, so the form fills it from the same reading (praxis-ai.md §6.18).
     bank_name: out.bank_name ? out.bank_name.trim() : null,
     account_name: out.account_name ? out.account_name.trim() : null,

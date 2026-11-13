@@ -226,7 +226,12 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
     name: String(k),
     value: values[k],
     onChange: (v: T[K]) => set(k, v),
+    // Leaving a field marks it once the person has typed in it. One they only passed through (a
+    // form's first field, focused as it opens) waits for Save: marked on leaving, its message would
+    // push down what the pointer is pressing, and the press would land off it (found filming M8:
+    // Read Invoice and Pick Category did nothing on a New Request whose Purpose was still empty).
     onBlur: () => {
+      if (!touched[k] && !form.getFieldState(k as Path<FieldValues>).isDirty) return;
       touch(k);
       void form.trigger(k as Path<FieldValues>);
     },

@@ -16,7 +16,7 @@ import {
   ActionGroup, Button, Card, CardHeader, DataView, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, HelpTerm,
   KeyValue, KpiCard, ListDetail, LoadingRows, Money, MoneyField, PageHeader, Pager, Pill, SelectField, TextAreaField, TextField, toast, todayIso, toMoneyString, useConfirm, useContractForm, useModal, UploadField,
 } from "@mycity/ui";
-import { DecisionForm, OwnActions, refreshAll, RequestCard, say, stagePill, useFinance, useRaise } from "./parts";
+import { asTyped, DecisionForm, OwnActions, refreshAll, RequestCard, say, stagePill, useFinance, useRaise } from "./parts";
 import { Projects } from "./Projects";
 
 /**
@@ -159,7 +159,7 @@ function RequisitionCard({ id, close }: { id: string; close: () => void }) {
         rows={q.items}
         rowKey={(r) => r.expense_request_id}
         onRowClick={open}
-        columns={requestColumns(q.can_decide ? [{ key: "x", label: "Remove", render: (r) => (
+        columns={requestColumns(q.can_decide ? [{ key: "x", label: "", render: (r) => (
               // The row opens the request; Remove is its own press, so it stops here.
               <span onClick={(e) => e.stopPropagation()}>
                 <Button size="sm" onClick={async () => remove(r)}>Remove</Button>
@@ -492,6 +492,7 @@ function BudgetsTab() {
       <Field label="Year"><SelectField options={YEARS} value={year} onChange={setYear} /></Field>
       <ListDetail
         layout="modal"
+        size="wide"
         className="mt-3"
         open={picked !== null}
         onClose={() => setPicked(null)}
@@ -574,7 +575,7 @@ function BudgetForm({ close, year, budget }: { close: () => void; year?: string;
   const start = {
     department_id: budget?.department_id ?? "",
     year: Number(budget ? budget.starts_on.slice(0, 4) : year),
-    lines: (budget?.lines.map((l) => ({ expense_category_id: l.expense_category_id, amount: l.amount })) ?? [{ expense_category_id: "", amount: "" }]) as BudgetLineValue[],
+    lines: (budget?.lines.map((l) => ({ expense_category_id: l.expense_category_id, amount: asTyped(l.amount) })) ?? [{ expense_category_id: "", amount: "" }]) as BudgetLineValue[],
   };
   // An amount as typed ("20,000,000") is read and sent as the contract's two-place string.
   const onWire = (ls: BudgetLineValue[]) => ls.map((l) => ({ ...l, amount: toMoneyString(l.amount) }));

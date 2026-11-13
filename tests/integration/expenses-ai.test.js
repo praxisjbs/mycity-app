@@ -94,6 +94,11 @@ describeDb("expenses' AI features against the real migrations", () => {
             { description: "Crates of water", quantity: "2", unit_price: "4500.00" },
             { description: "Ice", quantity: "1.5", unit_price: "1000.00" },
           ],
+          // What was already paid is read on its own; the server makes it the minus line (praxis-ai.md decision 45).
+          invoice_number: "INV-77",
+          total: "10500.00",
+          paid_to_date: "500.00",
+          balance_due: "10000.00",
           // The payee's bank fills the form too (praxis-ai.md §6.18); an account number as printed, its spaces taken out.
           bank_name: "Zenith Bank",
           account_name: "Chuks Stores Ltd",
@@ -110,10 +115,12 @@ describeDb("expenses' AI features against the real migrations", () => {
       available: true,
       payee_name: "Chuks Stores",
       expense_category_id: cat["Events and Activations"],
-      amount: "10500.00",
+      amount: "10000.00",
+      amount_due: "10000.00",
       lines: [
         { description: "Crates of water", quantity: "2", unit_price: "4500.00" },
         { description: "Ice", quantity: "1.5", unit_price: "1000.00" },
+        { description: "Paid to date on INV-77", quantity: "1", unit_price: "-500.00" },
       ],
       bank_name: "Zenith Bank",
       account_name: "Chuks Stores Ltd",

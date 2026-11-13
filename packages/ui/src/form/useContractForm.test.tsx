@@ -49,6 +49,20 @@ describe("useContractForm", () => {
     expect(email).toHaveAttribute("aria-invalid", "true");
   });
 
+  it("leaves a field the person only passed through unmarked until Save, so nothing below it moves under the pointer", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<EmployeeForm onSave={onSave} pauseMs={60_000} />);
+    await user.click(screen.getByLabelText("First Name"));
+    await user.tab();
+    await user.tab();
+    expect(screen.queryByText("Required")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("First Name")).not.toHaveAttribute("aria-invalid");
+    await user.click(screen.getByRole("button", { name: "Create Employee" }));
+    expect((await screen.findAllByText(/Required|Enter/)).length).toBeGreaterThan(0);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it("clears the mark on the key that fixes it", async () => {
     const user = userEvent.setup();
     render(<EmployeeForm onSave={vi.fn()} />);

@@ -557,7 +557,7 @@ async function sentBack(id, payload) {
     const row = await repo.lock(client, id);
     if (!row || row.status !== "submitted" || (payload.instance_id && row.workflow_instance_id !== payload.instance_id)) return null;
     const instance = await engine.findOpenInstance(client, { type: "expense", id });
-    if (instance) await engine.cancel(client, { instance_id: instance.workflow_instance_id, actor: { user_id: instance.opened_by }, reason: payload.reason || null });
+    if (instance) await engine.cancel(client, { instance_id: instance.workflow_instance_id, actor: { user_id: instance.opened_by }, reason: payload.reason || null, sentBack: true });
     await repo.move(client, id, ["submitted"], "sent_back", { sent_back_at: "now" });
     await emit(client, {
       key: EVENTS.EXPENSE_REQUEST_SENT_BACK,

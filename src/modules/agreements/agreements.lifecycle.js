@@ -165,7 +165,7 @@ async function sentBack(id, payload) {
     const a = await repo.get(client, id, null, { lock: true });
     if (!a || !["review", "approval"].includes(a.status) || (payload.instance_id && a.workflow_instance_id !== payload.instance_id)) return null;
     const instance = await engine.findOpenInstance(client, { type: ENTITY, id });
-    if (instance) await engine.cancel(client, { instance_id: instance.workflow_instance_id, actor: { user_id: instance.opened_by }, reason: payload.reason || null });
+    if (instance) await engine.cancel(client, { instance_id: instance.workflow_instance_id, actor: { user_id: instance.opened_by }, reason: payload.reason || null, sentBack: true });
     return returnIn(client, a, "Changes asked for", payload.reason || null);
   });
 }

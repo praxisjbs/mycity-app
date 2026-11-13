@@ -5,7 +5,7 @@ import { ApiError } from "@/api/client";
 import { useMutation, usePaged } from "@/api/hooks";
 import { PagedTable } from "@/features/shared/sections";
 import { ActionGroup, Button, Card, CardHeader, EmptyState, Field, FormFooter, HelpTerm, KeyValue, ListDetail, Meter, Money, MoneyField, PageHeader, toast, toMoneyString, useConfirm, useContractForm, useModal } from "@mycity/ui";
-import { OwnActions, refreshAll, RequestCard, RequestForm, say, stagePill, useFinance } from "./parts";
+import { asTyped, OwnActions, refreshAll, RequestCard, RequestForm, say, stagePill, useFinance } from "./parts";
 
 /**
  * Expenses · Projects (`projects`, M8): each Workspace project's optional budget, what its
@@ -98,7 +98,7 @@ function ProjectCard({ p, close }: { p: ProjectSpend; close: () => void }) {
 
 function BudgetForm({ p, close }: { p: ProjectSpend; close: () => void }) {
   // The amount as typed ("1,500,000") is read and sent as the contract's two-place string.
-  const f = useContractForm({ budget_amount: p.budget_amount ?? "" }, { safeParse: (v: { budget_amount: string }) => budgets.ProjectBudget.safeParse({ budget_amount: toMoneyString(v.budget_amount) || null }) });
+  const f = useContractForm({ budget_amount: p.budget_amount ? asTyped(p.budget_amount) : "" }, { safeParse: (v: { budget_amount: string }) => budgets.ProjectBudget.safeParse({ budget_amount: toMoneyString(v.budget_amount) || null }) });
   const save = useMutation("PATCH /api/v1/budgets/projects/:id");
   const confirm = useConfirm();
   const submit = (clear: boolean) => async () => {
