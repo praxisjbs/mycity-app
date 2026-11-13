@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 on `claude/pensive-darwin-sa4pn0` (§6.11) (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11) (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -818,7 +818,7 @@ lead ("It should always ask for required fields, so we never see an error. We ca
 
 PR 1, the attach control with invoices and payment receipts, built on the branch
 `claude/praxis-ai-docs-pr-1-2akyek`, praxisjbs/mycity-app#144, merged 13/11/2026. PR 2 (contracts and MoUs) built on
-`claude/pensive-darwin-sa4pn0` the same day, in its own chat, once PR 1 had merged.
+`claude/pensive-darwin-sa4pn0` the same day, in its own chat, once PR 1 had merged: praxisjbs/mycity-app#146.
 
 - [x] 13/11/2026 · `praxis-ai.md` §6.18 rewritten as built first (the overlay before the ask guard and on later questions, `from_file`, gate 23 rule 8, the file named on its field, a receipt matching none asks which request, migration 8030), §2, §5, §6.15, §10, §11, §14; `expenses.md` §4, §5, §6.1, §9, §10, §14; `foundation.md` §14
 - [x] 13/11/2026 · Contract: `AiAttachmentKind`, `AiAttachment`, `AiAsk.attachment` (an empty question with a document), `AiAttachmentKinds`, `AiAnswer.attachment`, the card field kind `lines`; `ExpenseInvoiceRead` and `ExpenseInvoiceSuggestion` widened, `ExpenseRequestFromInvoice`; `DisbursementReceiptRead`; the upload purpose `ai_attachment`
