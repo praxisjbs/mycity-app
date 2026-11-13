@@ -217,6 +217,7 @@ async function cardAgreement(db, id, scope) {
 async function agreementIdOf(db, words, scope) {
   if (UUID.test(String(words || ""))) return words;
   if (!words || !scope) return words;
+  db = db || pool;
   const { oneNamed } = require("../../shared/ai/named");
   const found = oneNamed(await awaitingSignature(db, { q: String(words).slice(0, 100) }, scope), String(words), (a) => [cardLabel(a), a.number, a.title]);
   if (found) return found.partnership_agreement_id;
