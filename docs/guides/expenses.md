@@ -419,6 +419,16 @@ requester always sees theirs.
   Category of its own and ⌘K holds each label once; the header button stays New Category (TB,
   06/11/2026; `partnerships.md` §13.2).
 
+- **Documents in the chat (planned; `praxis-ai.md` decisions 41 to 48, §6.18, Appendix A PR 1).**
+  An invoice attached on Praxis AI · Ask becomes New Request's card from the file
+  (`my_expenses.from_invoice`): its balance due itemised, a discount and a payment already made as
+  negative lines, the invoice number in the purpose, the file as the request's invoice. A payment
+  receipt attached by an `expenses.finance` holder becomes Record Disbursement's card, the
+  authorised request matched by the disbursements service and the receipt attached. Read Invoice's
+  reading gains the invoice number, dates, totals and the payee's bank (the form fills the bank too).
+  When PR 1 lands, §6.1 gains a rule: a line may carry a negative unit price, and a request's total
+  is above zero (`EXPENSE_TOTAL_NOT_POSITIVE`).
+
 ## 10 · On screen and mobile
 
 Every list is 25 a page. A request, a requisition and a disbursement open in the shared Modal on
@@ -487,6 +497,7 @@ None.
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · Documents in the chat planned (`praxis-ai.md` decisions 41 to 48, Appendix A PR 1): an invoice attached on Praxis AI becomes a New Request card for its balance due, itemised, and a payment receipt a Record Disbursement card (§9). Nothing built yet; §6.1's negative line and total above zero come with PR 1.
 - 13/11/2026 · TB · New Request on Expenses · Requisitions and Expenses · Approvals, the presser's own request through New Request's own form (§2, §3 step 7, §10.1, §10.2), not on the other tabs. Praxis AI: the New Request and Add Line cards ask for their item in one turn ("What are you paying for? How many? How much is each?"), read the model's figures as the contract takes them (Quantity and Unit Price were refused "Expected string, received number"), and a draft offers Add Another Item and Send Request once pressed; Send Request is a new card, `my_expenses.submit` (§9, §5 unchanged: it calls `submit`).
 - 11/11/2026 · AJ · From the Milestones Review of 11/11/2026 (TB): Category on New Request is a popover with a type filter and a server search (§3, §10.1), not a dropdown, since thirty or forty categories are searched, not scrolled; Bank is typed or picked from `GET /expenses/banks` with Add for a bank it does not know (§3, §5, §6.1); Payee Name's example is a name, not the reader's own; a paid disbursement shows Open Receipt (§10.1). Staff asking from their own department only was checked at the review and holds (§8).
 

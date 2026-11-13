@@ -251,6 +251,58 @@ recommendation first; three recommendations were taken and the fourth chosen.
     `mailbox.signature`. Neither signature form carries an image: the logo and the icons are the
     company's brand files on Settings · Organisation.
 
+### 1.10 Decisions (TB, 13/11/2026, binding): a document in the chat
+
+TB asked whether a person could attach an invoice or a receipt to the chat and have Praxis AI make
+the record from it, with JBS Praxis's invoice INV-202611-9525 as the sample (four items, a discount
+line of -₦100,000.00, a total of ₦450,000.00, ₦300,000.00 paid to date and ₦150,000.00 due, payable
+to Nombank MFB 5589994089). Eight questions were put, each with a recommendation first; the answers
+are below. §6.18 is the design and Appendix A the build plan.
+
+41. **Three kinds of document, picked before the file.** Attach Document opens a modal: the person
+    picks what the document is (**Invoice**, **Payment Receipt**, **Contract or MoU**), then the
+    file. The three tiles are what tells a person what may be attached; nothing else can be. A kind
+    is offered only to someone who may make what it becomes: Invoice to `expenses` create, Payment
+    Receipt to a holder of `expenses.finance` (it records a disbursement), Contract or MoU to
+    `partnerships` view (its filing card needs `partnerships` edit, as the screen's own buttons do).
+    The kind tells the server which reading to run, so a guess never decides it.
+42. **PDF and images, no Word.** PDF, JPEG, PNG, WebP, HEIC and HEIF (a phone's photos): every kind
+    the Image Reading model reads itself, "as many as we can build for". Word, spreadsheets and
+    anything else are refused at upload. One file a question, at most 10 MB (the AI client's
+    `FILE_MAX_BYTES`).
+43. **Read on Image Reading, chosen by TB.** Each kind's reading is a registered action on Image
+    Reading (`ai-control.md` §6.2), `personal_data: true` (an invoice names people and bank
+    accounts, so DeepSeek never reads one), `chosen_by: "TB"`, `chosen_at: "2026-11-13"`. An
+    invoice reuses Read Invoice's own action, `expense-invoice-read` (AJ's), widened; a payment
+    receipt is `disbursement-receipt-read`; a contract or MoU is `agreement-document-read`.
+44. **The model reads; the server decides the figures.** The kind's reader returns structured
+    fields, never free text to act on. The chat's model sees that result as a read (cited as the
+    document) and drafts the card; the server then sets every field the file gave from the
+    reader's result, not from the model's words: amounts through `shared/money` and totals counted
+    again, a category among those offered, an account number of ten digits, a partner, agreement or
+    request matched among the person's own. The person checks the card, the file one press away,
+    and presses. Nothing is saved before (A23 as amended).
+45. **An invoice asks for its balance due, itemised.** Each item is a line, a discount a line with
+    a negative unit price, and a payment already made one more negative line ("Paid to date on
+    INV-202611-9525"), so the request totals the balance due and the approvers see the whole
+    invoice. A request's line may therefore carry a negative unit price; its total is always above
+    zero. The invoice number is written into the purpose, and the file becomes the request's
+    invoice.
+46. **A payment receipt records a disbursement.** Its bank reference, day paid, amount and
+    beneficiary are read; the server matches the authorised request it pays (by the beneficiary's
+    account number, else the payee's name, and the amount) among those the person may pay. One
+    match fills the card, several ask which, none leaves the request to pick. The receipt becomes
+    the disbursement's receipt. Record Disbursement keeps its risk class `money`, so its press asks
+    Confirm It's You.
+47. **A contract or MoU is summarised, then filed.** The answer summarises the parties, the dates
+    (signed, start, end, notice), the money, renewal and each side's main obligations, and shows
+    them on the pane's Record tab; a card under it files the document: Record Signed Copy when it
+    matches an agreement on Partnerships · Contracts & MOUs that waits for its signature, otherwise
+    Add Partner Document on the partner or lead it names. Nothing else is made from it: no agreement
+    is drafted and no partner created.
+48. **Two pull requests, each in a fresh chat** (Appendix A): the attach control with invoices and
+    payment receipts first, then contracts and MoUs.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -262,6 +314,7 @@ recommendation first; three recommendations were taken and the fourth chosen.
 | AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; Data Answers' chain takes any text model as first choice or fallback | As built (`ai-control.md`) |
 | Every module's manifest | Backend | | The reads, summaries and actions Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9), summaries for its big tables (§6.13, PR3) and actions for the changes people ask for (§6.11, PR4) |
 | An action card | Inside an answer, on the full screen and in the phone's chat | The person who asked, for an action their grant allows | The action's name, the fields its form offers as it will receive them (as a person reads them: people, departments and projects by name, decision 31), the records it acts on named and linked, a problem on its field, the buttons; the result line after the press, one line per record; Expired with Draw It Again | Press the verb (with the count when it acts on several; Confirm It's You first for a sensitive class; not offered while a field shows a problem, Edit standing in its place), Edit (the fields through the form system, people, departments and projects with the screen's own pickers, Save Changes), Cancel; a suggested card reads as a question with Not Now |
+| Praxis AI · Ask, Attach Document (Appendix A; not built yet) | Staff app: beside the question box, on the full screen and in the phone's chat | `praxis_ai` create, and the grant each kind needs (decision 41) | A modal: the three kinds as tiles, then the file; the question's bubble then carries the file | Attach an invoice, a payment receipt, or a contract or MoU, and get its card (§6.18) |
 
 ## 3 · How the screens relate
 
@@ -1257,6 +1310,135 @@ to whoever holds `ai_control` edit, pushed to every device, closed only on Ackno
 Spend (`ai-control.md` §7, §10). The workflow fails loudly on a leak and warns on a run that could
 not run. Production is refused, as the evaluation set is.
 
+### 6.18 Documents in the chat (decisions 41 to 48; Appendix A)
+
+**Not built yet.** This section is the design Appendix A's two pull requests build; each changes it
+first where the code teaches it otherwise, and says so in the Change log.
+
+**The contract** (`packages/contract/schemas/assistant.js`, PR 1):
+
+- `AiAttachmentKind`: `invoice`, `payment_receipt`, `contract` (the tile reads Contract or MoU).
+- `AiAttachment`: `{ document_id, kind }`; `AiAsk.attachment` takes one, optional. With an
+  attachment the question may be left empty: the server asks the kind's own question ("Raise an
+  expense request from this invoice", "Record the payment on this receipt", "Summarise this contract
+  and file it").
+- `GET /api/v1/ai/attachment-kinds` → `AiAttachmentKinds`: the kinds this person may attach
+  (`kind`, `label`), the order the modal shows them, and `available` (false while reading is off:
+  AI switched off, Praxis AI's switch off, no Image Reading model set up, or the month's cap
+  reached). Not paged: at most three rows, a fixed list.
+- `AiAnswer.attachment`: `{ document, kind }` or null (`documents.DocumentRef`), kept in
+  `ai_message.metadata.attachment` and replayed with the conversation, so the question's bubble
+  shows the file it was asked about. No new table and no migration.
+
+**The upload.** The modal uploads through the upload engine (`POST /api/v1/documents`, gate 18) with the purpose `ai_attachment`: `shared/files/mime-policy.js` gains it with PDF,
+JPEG, PNG, WebP, HEIC and HEIF; the AI client's `FILE_TYPES` gains `image/heic` and `image/heif`,
+which Gemini reads. The file is a staged upload (`staged_upload`): its uploader's alone, and nobody
+else's until a record claims it. The card the person presses claims it (`vault.claim`), as the
+screen's own form does: the request's invoice (`expense_invoice`), the disbursement's receipt
+(`disbursement_receipt`), the agreement's signed copy, the partner's document. A file never claimed
+stays staged under the upload engine's own rule.
+
+**The ask** (`assistant.service`, PR 1). With an attachment, before the model is asked:
+
+1. The kind must be among the person's `attachment-kinds`, and the document their own staged upload
+   (else 404, `document_id: Upload it again`), of a readable kind, its scan neither pending nor
+   infected (else the answer says the file cannot be read).
+2. Governance as for any question (§6.1), then the kind's reader runs once, outside any transaction,
+   on its own action and job. Its spend is that action's in AI Control.
+3. The reader's result goes into the turn as one read, `file.<kind>`, its rows the result and its
+   citation the document (`entity_type: "document"`), and it is shown on Sources like any read. The
+   file itself never goes to the chat's model; only the reader's fields do, so words written in a
+   document are data and never instructions.
+4. The model answers from it and drafts one of the actions the kind offers (§6.11). `draftCard`
+   then lays the reader's fields over the model's values (decision 44) before
+   `authorise.checkAction` checks them, and fills the card's document field from the attachment.
+   The card names the file as a record chip that opens it.
+5. A reader that cannot read the file (`unreadable`), is off (`off`) or has no budget left
+   (`limit`) answers that in one sentence, draws no card, and spends nothing more. A later question
+   in the conversation sees the reading again from the replay; the file is not read twice.
+
+**Where a kind lives.** A module's manifest declares the documents it reads beside its reads,
+checked by `defineManifest` and refused anything that writes (gate 19):
+
+```js
+files: [{
+  kind: "invoice",                                   // an AiAttachmentKind
+  label: "Invoice",
+  permission: ["expenses", "create"],                // who is offered the tile; `capability` beside it when one is needed
+  question: "Raise an expense request from this invoice",
+  read: (actor, doc, db) => receiptAi.readForChat(actor, doc, db),   // the module's own reader; returns data, writes nothing
+  actions: ["my_expenses.from_invoice"],             // the cards it may draw
+}],
+```
+
+The registry lists the kinds a person may use (`registry.filesFor(actor)`), and gate 23 rule 7
+holds them to tests and evaluation cases as it holds actions (an evaluation case gains `file:`, a
+sample under `scripts/ai/samples/`; the set uploads it as the person before it asks).
+
+**Invoice** (PR 1, Expenses' own code):
+
+- The reader is Read Invoice's, widened: `ExpenseInvoiceRead` (the model's output) gains
+  `invoice_number`, `issued_on`, `total`, `paid_to_date`, `balance_due`, `bank_name`,
+  `account_name` and `account_number`, and its lines may carry a negative unit price (a discount).
+  `ExpenseInvoiceSuggestion` (what New Request's own Read Invoice returns) gains the bank fields
+  too, so the form fills the payee's bank from the same reading.
+- The server builds the lines (decision 45): the items as read, then, when `paid_to_date` is above
+  zero, one line `Paid to date on <invoice number>`, quantity 1, its unit price the amount paid,
+  negative. It counts the lines through `shared/money`; when the invoice gives `balance_due` and
+  the lines do not come to it, the card shows the problem `Check the lines` on its lines. A total
+  of zero or less draws no card: the answer says the invoice is paid. A currency other than naira
+  shows `Naira only`.
+- The card is a new action, `my_expenses.from_invoice` (label New Request), on a new card schema
+  `ExpenseRequestFromInvoice`: the request's fields (`ExpenseFields`) with every line and
+  `invoice_document_id` required, and `submit` (on by default, as New Request's card). Its purpose
+  is the invoice's subject with its number ("Website ticket payments: three switchable gateways,
+  INV-202611-9525"); its payee Vendor unless the payee is a partner the person sees (Partner) or the
+  person themself (Staff); its category among those offered, else asked; its project by name among
+  the running projects, else left empty; its department the person's own. A request still a draft
+  offers Add Another Item and Send Request once pressed (`then`, §6.11), as New Request's card does.
+- The card's lines are a new card field kind, `lines`: a table (Item, Qty, Unit Price, Amount) with
+  the total under it, and on Edit a `LinesField` from `packages/ui/src/form/` (made with `npm run
+  new:component`), the same field New Request's form then uses. `MoneyField` gains `signed`: a
+  leading minus is kept and accepted (a discount, a payment already made), shown in the destructive
+  token; without `signed` a minus is refused as today.
+- Expenses' service (§6.1 of `expenses.md`): a line may carry a negative unit price; the request's
+  total must be above zero, else 422 `EXPENSE_TOTAL_NOT_POSITIVE` on `lines` ("Total above zero").
+- Before drafting, the server asks the expenses service for a possible duplicate (§6.8 of
+  `expenses.md`: the same payee and amount within 30 days, only those the person may open), and the
+  answer names it in one sentence ("EXP-0012 asked the same payee for the same amount on
+  12/11/2026"); the card is still drawn.
+
+**Payment Receipt** (PR 1, Disbursements' own code):
+
+- The reader, `disbursement-receipt-read`, returns `DisbursementReceiptRead`: `payment_reference`,
+  `paid_on`, `amount`, `beneficiary_name`, `beneficiary_account_number`, `beneficiary_bank`,
+  `narration`.
+- The match is the disbursements service's, in SQL through its repo, never the model's: authorised
+  requests the person may pay, whose account number equals the beneficiary's (else whose payee name
+  equals it, case and accents set aside) and whose amount equals the receipt's. One fills
+  `expense_request_id`; several make the card's ask "Which request?" offer them; none leaves it to
+  pick (Pick one). A request already paid is named in the answer ("Paid as DSB-0004").
+- The card is Record Disbursement's own, `disbursements.create`, carrying `receipt_document_id`
+  from the attachment and the reference and day from the reading; its risk stays `money`.
+
+**Contract or MoU** (PR 2, Partnerships' own code):
+
+- The reader, `agreement-document-read`, returns `AgreementDocumentRead`: `title`, `kind` (`mou`,
+  `service_agreement`, `contract`, `other`), `parties` (name, role), `signed_on`, `starts_on`,
+  `ends_on`, `notice_days`, `value` (money or null), `renewal` (a sentence), `obligations` (party and
+  one sentence each, at most eight), `signatories` (name, title).
+- The answer summarises it in at most five sentences, and the pane's Record tab shows every field
+  (the Record tab's own layout, `RecordPane`).
+- The filing card: when one of the parties is a partner the person sees with an agreement in
+  `sent` or `viewed`, a new card `agreements.record_signed_copy` (`AgreementSignedCopyAdd`: the
+  agreement, the document, `signed_on`, `signed_by_name`, `signed_by_title`, from the reading),
+  through the route's own service, risk `approval` (it seals and locks the agreement); several
+  agreements ask which. Otherwise a new card `partner_documents.attach` (`PartnerDocumentAdd`: the
+  document, its kind among the `partner_document_kind` codes (MOU or Service Agreement as the
+  reading names it, else picked on Edit), the partner or lead matched by name among the person's
+  own, the deal optional), through Upload Document's own service, risk `standard`. `not_offered` loses its
+  `file:` reasons for `SignedCopyRecord` and `PartnerDocumentAttach`: each is reached `via` its card.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -1328,6 +1510,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 |---|---|---|---|
 | Praxis AI · Ask (`ask`) | Praxis AI as the title; Back (on desktop the screen it returns to under the title, "From People · Leave"; opened from the menu, ⌘K or History it goes to History and the line is left out); Recent, a toggle that shows the person's conversations as a column beside the chat (titles and when last asked, newest first, 25 a page; empty, No Questions Yet); New Conversation once a conversation is open; on a phone opened from the menu, the conversations first (title, questions, when last asked; Search Conversations; No Conversations Yet, "Start one with New Conversation.") with New Conversation always, and the chat full screen over them with Back, Conversations and New Conversation; the conversation (on desktop about two fifths, on the left): empty, an illustration and Try Asking with up to 6 questions to tap; Show Earlier when older questions remain, each question as the person's bubble, each answer with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, Open Figures on an answer with a table or figures whose pane is not the one shown (none under an answer of words alone, whose chips still open the pane), From with the kinds of record read as chips ("partnership ×4", "employee ×2"; a chip shows those records in the pane; the one record, named, when the answer rests on one, shown on Record), Helpful and Not Helpful (pressed again, taken back); a question Praxis AI asks before a card ("What is the task?", "When is it due?", "Which Tunde?", "Which leave type?"; decisions 28, 29 and 32), its words alone with no From and no Open Figures, with its answers as buttons under it on the newest answer (Today, Tomorrow, Friday, No Due Day; Low, Normal, High, Urgent; 30 Minutes, 1 Hour, 2 Hours; Just Me; each person by name and job title; each leave type with the days left, "Annual Leave, 12 days left"), a tap asking it; an answer's card (§6.11): the action's name (a suggested card's as a question, "Send Message?"), each field's label and value as a person reads it (people, departments, projects and leave types by name, never an id, "For: JBS Praxis Team", "Watchers: Tobiloba Dada, Bassey Ekpe"), a problem beside its value ("Say why", "Fill the gap"; Pick one alone where an id names nothing), the records as chips ("Ayo Bello, Annual, 3 days"), the buttons (the verb with the count, "Approve Leave ×4", a lock on one that asks Confirm It's You, none while a field shows a problem; Edit, the primary button then, with Save Changes and Cancel on its fields, people, departments, projects and leave types picked as on the screen's own form; Cancel, or Not Now on a suggested card), a refusal under the card in the server's words with Open Mailbox where the mailbox is not connected, then Done or Could Not Finish with a line per record and Open, or Expired with "This card has expired." and Draw It Again; Confirm It's You (`identity.md` §10) before a sensitive card, and the toast "Set a passkey for next time" with Set Passkey once; while waiting, Reading Your Records, then Reading leave requests · 2 of 5 as each read runs; a refused answer in plain words; a failed one with its reason and Try Again; the pane (on desktop about three fifths, on the right) for the latest answer that read records or has figures (a conversation opened from Recent or History shows its own; an answer with neither, such as a card drawn from what was said, leaves the pane as it was, never blank), or the one whose chip or Open Figures was pressed (drawn in the accent): tabs Overview, Table, Record and Sources, an empty one disabled; Overview: up to three figures and one chart when a summary read answered (§6.13); Table: the read's rows, 25 a page (Previous, Next, Page 1 of 13), Export (every row of the read as an Excel file, made for the person and saved on this device, §6.16; toast "Export downloaded"), a row opening the Record, past 200 rows "Showing the first 200 of 1,240 rows"; Record: the row's or the record's fields and Open Record; Sources: each read numbered and named ("1. Leave Requests"), Read, Not Available, Not Run, Failed or Too Much (the read covered more than the database allows at once, §6.3 step 8), "25 of 312 rows", its filters, Masked with the fields emptied, Open Table; before any answer, No Answer Yet, "Ask a question to fill this pane."; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them; a chip opens them in the pane) | How reads, the context, permissions, redaction, the loop, the progress events and a card's re-check work: §1.1, §6 here and the manual |
 | Praxis AI · History (`history`) | History as the title, Export and Clear History; for AI Control: Questions This Month (everyone's), Your Questions, Spend and Monthly Cap, each captioned with the month or All AI; for everyone else: Questions This Month, Your Questions (all time) and Your Spend; Your Questions, 25 a page: Question, Asked, Sources Read, Tokens, Cost, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog; Search Questions; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Spend per Month, Naira (six months; for AI Control, "Against a ₦25,000 monthly cap" when one is set); Questions by Module; toasts "Conversation deleted", "History cleared", the export's own | Help terms on Spend (what Praxis AI's questions cost this month, priced as AI Control prices them) and Monthly Cap (the most all AI may spend in a month, set in AI Control) | Where everyone's spend by action is (AI Control · Spend), what deleting keeps: §6.5 |
+| Praxis AI · Ask, Attach Document (Appendix A) | Attach Document, a paperclip icon button with its Tooltip, left of the question box; its modal, Attach Document: What Is It? with three tiles (**Invoice**, **Payment Receipt**, **Contract or MoU**, each with its icon and a caption of at most four words: Bill to pay, Proof of a transfer, Signed or to sign), only those the person may use; then the file through `UploadField` (PDF, JPEG, PNG, WebP, HEIC, HEIF; at most 10 MB), its name and size with Remove; Question, Optional, filled with the kind's own question; Cancel and **Read Document** in the footer. While reading is off, Attach Document is off with the Tooltip Reading Documents Is Off. The question's bubble carries a chip with the file's name that opens it. The answer: its card, or one sentence when the file cannot be read | help on the modal's file field: "PDF or a photo, up to 10 MB." | why the kinds are picked first, how the server checks the figures, the jobs: decisions 41 to 48, §6.18 here, the manual |
 
 ### 10.2 Phone layout
 
@@ -1335,6 +1518,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 |---|---|---|---|---|
 | Praxis AI · Ask (`ask`) | Opened from a screen (⌘K on a screen, a link with `from`): Back and Praxis AI as the title, New Conversation once a conversation is open, the conversation full width with the box pinned at the foot (the microphone and Send as 44 px targets); a question's answers one under the other, full width (44 px); an answer's card inside the bubble, its fields one under the other, the verb full width at its foot with Edit and Cancel above it (44 px), Edit's pickers full width, Confirm It's You as a sheet; Open Figures under an answer with a table or figures opens the pane as a sheet, Figures, with the four tabs: the Table as cards (44 px rows, Previous and Next full width), Open Record full width. Opened from the menu or History: Praxis AI as the title with New Conversation, then the person's conversations, newest first (title; questions and when last asked), Search Conversations, 25 a page; empty, No Conversations Yet. A conversation, or New Conversation, opens the chat full screen over the list: Back, Praxis AI as the title, Conversations (the other conversations as a sheet, as a channel's switcher is) and New Conversation; the conversation fills the screen; empty, Try Asking as a tap list; an answer's table as cards | The pane beside the chat (a sheet from Open Figures instead); Recent and its toggle (the list is the landing page instead); the screen's name under the title | New Conversation under the title and in the floating button; inside a chat, Conversations and New Conversation in its header; Open Figures under an answer | The floating button's Praxis AI opens this screen from any other, with that screen as the question's context and where Back returns (§3 step 8, decision 27); More, then Praxis AI; tabs Ask and History; Back, the phone's own Back and Escape return to the screen it was opened from |
 | Praxis AI · History (`history`) | The figure cards two to a row, then your questions as cards (question, asked, cost) | Sources Read and Tokens on each question; Spend per Month; Questions by Module | Tap a card to open its conversation on Ask; Delete Conversation in its menu's sheet; Export and Clear History in the page's menu | As above |
+| Praxis AI · Ask, Attach Document (Appendix A) | Attach Document as a 44 px icon button left of the box; the modal as a full sheet: the three tiles one under the other, full width, then the file field (the phone's picker offers the camera) | the file's size | **Read Document**, full width at the foot of the sheet | the sheet's Back or Cancel returns to the chat |
 
 ## 11 · Edge cases
 
@@ -1431,6 +1615,16 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   declined, the card stays open.
 - **A card left for half an hour**: Expired, with Draw It Again.
 
+- **A document in the chat (§6.18, Appendix A):** a blurred photo, a password-protected PDF or a
+  file the model refuses answers "This file cannot be read. Try a clearer copy." with no card; a
+  Word file or anything outside the six kinds is refused at upload; a file over 10 MB is refused at
+  upload; another person's upload, or one already claimed by a record, is refused `Upload it again`;
+  an invoice already paid in full draws no card and says so; an invoice in another currency shows
+  Naira only; lines that do not come to the balance due show Check the lines; a receipt matching no
+  authorised request leaves the request to pick, and one already paid is named; a document whose
+  words try to instruct the assistant changes nothing, since only the reader's fields reach the
+  model and every card still waits for the person's press and the server's checks.
+
 ## 12 · Donor code
 
 Ideas, not files: what follows informed the design. Nothing is copied across; the code is written
@@ -1474,8 +1668,100 @@ to this repository's rules, and ported code never names where it came from.
 6. **The job of the action draft** (decision 25): everything runs on Data Answers. If drafting a
    card wants a stronger model, it is one `chain` line on a registered action, chosen by the owner.
 
+## Appendix A · The build plan: documents in the chat (TB, 13/11/2026)
+
+Planned in one chat (decision 48); each PR is built in a **fresh chat** from its start prompt below,
+and the planning chat is asked for the next prompt when one merges (CLAUDE.md, Working conventions).
+"Most capable, high" means the most capable model the team has, at high effort; no prompt or plan
+names a model by its product name in the repository.
+
+| PR | Scope | Lane, owner | Size | Model and effort | Needs merged first | Runs in parallel with |
+|---|---|---|---|---|---|---|
+| 1 | The attach control and its modal, the contract and the upload purpose, the ask's reading step, the `files` manifest key; Invoice (New Request from an invoice, lines with a negative price, `LinesField`, `MoneyField` `signed`) and Payment Receipt (Record Disbursement from a receipt) | Full stack, TB (Expenses' code reviewed by AJ) | L | Most capable, high | this plan's docs PR | nothing |
+| 2 | Contract or MoU: the reading, the summary on the answer and the Record tab, Record Signed Copy and Add Partner Document as cards | Full stack, TB (Partnerships' code reviewed by GE) | M | Most capable, high | PR 1 | nothing |
+
+**Merge order:** PR 1, then PR 2. They never run in parallel: PR 2 adds a kind to what PR 1 builds
+(the modal, the contract, the reading step, the manifest's `files`).
+
+Every PR follows CLAUDE.md steps 1 to 5: the type stated, the reading done, contract first, the
+rules never broken, `npm run ci` green, `docs/PROGRESS.md` with a dated note under Praxis AI (and
+under Expenses or Partnerships for their cards), this guide, `expenses.md` or `partnerships.md`,
+the User Guide chapters with their pictures, and `README.MD` matching, the handoff
+`docs/handoff/praxis-ai-engine.md` logged. Branches are `m10/<short-name>`; titles are Conventional
+Commits.
+
+### PR 1 · The attach control, invoices and payment receipts (`m10/chat-documents`)
+
+- **Contract first:** `AiAttachmentKind`, `AiAttachment`, `AiAsk.attachment`, `AiAttachmentKinds`,
+  `AiAnswer.attachment` (assistant.js); `ExpenseInvoiceRead` and `ExpenseInvoiceSuggestion` widened,
+  `ExpenseRequestFromInvoice` (expenses.js); `DisbursementReceiptRead` (disbursements.js); the card
+  field kind `lines` (`AiCardField`); each with its `TABLES`; `npm run gen:contract`.
+- **Backend:** the upload purpose `ai_attachment` and `FILE_TYPES` with HEIC and HEIF; `GET
+  /ai/attachment-kinds`; the ask's reading step (§6.18 steps 1 to 5) and `ai_message.metadata.attachment`;
+  the manifest key `files` (`defineManifest`, the registry's `filesFor`, gate 19 and gate 23 rule 7
+  taught it); the readers (Read Invoice widened; `disbursement-receipt-read` registered in
+  `services/ai/actions.js` on Image Reading, `chosen_by: "TB"`, its prompt in
+  `services/ai/prompts/`); the overlay in `draftCard`; `my_expenses.from_invoice`; Record
+  Disbursement's card carrying the receipt; the request match in the disbursements service; a
+  negative line and `EXPENSE_TOTAL_NOT_POSITIVE` in the expenses service; the duplicate sentence.
+- **Frontend:** Attach Document beside the question box (desktop and the phone's chat), the modal
+  of §10, the file chip on the question's bubble, `LinesField` and `MoneyField` `signed` in
+  `packages/ui` (gallery pages, tests, `docs/COMPONENTS.md`), the card's `lines` kind, New
+  Request's form taking a negative line and the bank from Read Invoice; the in-browser mock in
+  contract shapes.
+- **Tests:** unit (the overlay, the lines with paid to date, the match, the manifest's `files`),
+  integration on the real migrations (JBS's sample invoice read by a stubbed reader into a request
+  of ₦150,000.00 in six lines with its invoice claimed; a receipt matched to one authorised request
+  and recorded after Confirm It's You; a kind refused to someone without its grant; another
+  person's upload refused), frontend (the modal's three tiles, a Word file refused, the chip, the
+  lines on the card), evaluation cases with `file:` samples (a made-up invoice and receipt of the sample's shape under
+  `scripts/ai/samples/`, never a real document or a real bank account).
+- **Docs:** this guide (§6.18 as built, §10, the Change log), `expenses.md` §6.1, §9, §10;
+  the User Guide's Praxis AI chapter (a new section, Attach a document) and Expenses' Raise a
+  request, their pictures taken.
+- Done when the four integration cases pass, `npm run ci` is green, and on staging the sample
+  invoice becomes a request of ₦150,000.00 that a line manager can open with its invoice.
+
+### PR 2 · Contracts and MoUs (`m10/chat-contracts`)
+
+- **Contract first:** `contract` in the kinds' list is offered; `AgreementDocumentRead`,
+  `AgreementSignedCopyAdd` (agreements.js); `PartnerDocumentAdd` (partners.js).
+- **Backend:** `agreement-document-read` registered on Image Reading (`chosen_by: "TB"`) with its
+  prompt; the kind in Partnerships' manifest; the summary on the answer and the Record tab's fields;
+  the cards `agreements.record_signed_copy` (risk `approval`) and `partner_documents.attach`, each
+  through the route's own service; `not_offered` updated; the agreement and partner match.
+- **Frontend:** the third tile, the Record tab's terms.
+- **Tests:** integration (a signed MoU filed on its agreement in `sent`, sealed; an MoU with no
+  agreement filed on its partner; a reader without `partnerships` edit drawn no filing card),
+  evaluation cases with a sample MoU.
+- **Docs:** this guide, `partnerships.md` §9 and §10, the User Guide's Praxis AI chapter and
+  Partnerships' Contracts & MOUs, pictures taken.
+
+### Start prompts
+
+**PR 1** (paste into a new chat on this repository):
+
+> This is a full-stack change to Praxis AI, PR 1 of `docs/guides/praxis-ai.md` Appendix A:
+> documents in the chat, with invoices and payment receipts. Read `docs/guides/praxis-ai.md` in
+> full, decisions 41 to 48 and §6.18 above all (they are not re-opened), then `docs/guides/expenses.md`,
+> then `docs/handoff/praxis-ai-engine.md`, then what CLAUDE.md step 2 asks for a full-stack task.
+> Build only PR 1; contract first. If the guide is wrong or silent, change it first in the same PR.
+> Finish as CLAUDE.md step 5 says, log the handoff, open the PR ready for review, and merge it once
+> GitHub's CI is green.
+
+**PR 2** (once PR 1 has merged):
+
+> This is a full-stack change to Praxis AI, PR 2 of `docs/guides/praxis-ai.md` Appendix A:
+> contracts and MoUs in the chat. Read `docs/guides/praxis-ai.md` in full, decisions 41 to 48 and
+> §6.18 above all (not re-opened), then `docs/guides/partnerships.md`, then
+> `docs/handoff/praxis-ai-engine.md`, then what CLAUDE.md step 2 asks for a full-stack task. Build
+> only PR 2, on what PR 1 built. If the guide is wrong or silent, change it first in the same PR.
+> Finish as CLAUDE.md step 5 says, log the handoff, open the PR ready for review, and merge it once
+> GitHub's CI is green.
+
 ## 14 · Change log
 
+- 13/11/2026 · TB · Documents in the chat planned (§1.10 decisions 41 to 48, asked of TB with JBS Praxis's invoice INV-202611-9525 as the sample): Attach Document with three kinds picked first (Invoice, Payment Receipt, Contract or MoU), PDF and images only, read on Image Reading, the server setting every figure the file gave, an invoice's balance due itemised, a receipt recording its disbursement, a contract or MoU summarised and filed. The design is §6.18, the screens §2 and §10, the edge cases §11, and the build plan Appendix A (two PRs, each in a fresh chat). Nothing is built yet.
 - 13/11/2026 · TB · From New Request on staging ("Expected string, received number" on Quantity and Unit Price, Check the format on Edit's 700000, Quantity drawn as a box of lines): the model's numbers are put in the contract's forms before every card is checked (`cards.shape`, every card, §6.11), the system turn names money and figures as text, a field of figures is a one-line number field and Edit reads an amount as typed. An ask may ask for several fields in one turn (`also`), and an action may offer next steps once pressed (`then`, `AiActionResult.next`), each a button that asks its question (§6.11). Tests: `ai-engine.test.js`, `ai-actions-expenses.test.js`, `ActionCard.test.tsx`.
 - 11/11/2026 · JP · Faults of the 11/11 staging brief. #1 and #8 (`VALIDATION: owner_id`, `VALIDATION: department_id` at `POST /ai/cards/:id/confirm`): a card drawn with a problem on a field (Pick one where the model's words matched none of the person's records) still offered its verb, and the press was refused by the re-check. `ActionCard` now offers no verb while a field shows a problem, Edit in its place as the primary button, until Save Changes clears it (decision 34, §10, the Praxis AI chapter). New Vacancy's card asks and matches its hiring manager from `vacancies.hiring_managers` and picks it with the new `AiCardPicks` value `hiring_manager` (§6.11; `recruitment.md` §9, fault #3). Already fixed: #5 by #67 (decision 34), #6 by #64, #7 by #63.
 - 07/11/2026 · AJ · M7 PR 5 (`partnerships.md` §9, §13.2 In PR 5): the Workspace cards (Create Task, Save Task,
