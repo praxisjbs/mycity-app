@@ -15,6 +15,14 @@
       "phone"
     ]
   },
+  "praxis-attach": {
+    "spec": "e5809e27d83b428a",
+    "source": "11fd771284f4bae0",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "praxis-card": {
     "spec": "7b51d75761db25cc",
     "source": "e3b0c44298fc1c14",

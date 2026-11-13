@@ -814,6 +814,22 @@ lead ("It should always ask for required fields, so we never see an error. We ca
 - [x] 03/11/2026 · Gate 23 rule 7 (`requiredAsked`): every required field of every action's input has an ask
 - [x] 03/11/2026 · Questions on every action (18 lacked one); the lead of a task shared with a department; tests; two evaluation cases
 
+### 6.11 Documents in the chat (decisions 41 to 48, TB, 13/11/2026; `praxis-ai.md` Appendix A)
+
+PR 1, the attach control with invoices and payment receipts, built on the branch
+`claude/praxis-ai-docs-pr-1-2akyek`. PR 2 (contracts and MoUs) starts in a fresh chat once PR 1 merges.
+
+- [x] 13/11/2026 · `praxis-ai.md` §6.18 rewritten as built first (the overlay before the ask guard and on later questions, `from_file`, gate 23 rule 8, the file named on its field, a receipt matching none asks which request, migration 8030), §2, §5, §6.15, §10, §11, §14; `expenses.md` §4, §5, §6.1, §9, §10, §14; `foundation.md` §14
+- [x] 13/11/2026 · Contract: `AiAttachmentKind`, `AiAttachment`, `AiAsk.attachment` (an empty question with a document), `AiAttachmentKinds`, `AiAnswer.attachment`, the card field kind `lines`; `ExpenseInvoiceRead` and `ExpenseInvoiceSuggestion` widened, `ExpenseRequestFromInvoice`; `DisbursementReceiptRead`; the upload purpose `ai_attachment`
+- [x] 13/11/2026 · Engine: the manifest's `files` (`defineManifest`, `registry.files`, `file`, `filesFor`, the kinds' cards checked after load), an action's `from_file`, `cards.kindOf` `lines` and a line's numbers shaped; the orchestrator's read 1 (`file.<kind>`, four reads left), the reading replayed in later turns, the file's actions offered only with it; `answer.withReading`, `readingChoices`, `readingProblems`; gate 19's header, gate 23 rules 7 and 8
+- [x] 13/11/2026 · Assistant: `assistant.files.js` (the kinds, the one reading of the person's own staged upload, what an answer keeps), `GET /ai/attachment-kinds`, the ask's reading step, an unreadable file answered in one sentence with no model asked, the server's sentences; History and the replay carry the attachment
+- [x] 13/11/2026 · Expenses: Read Invoice widened for the chat (`readForChat`: the lines with paid to date, Check the lines, Naira only, paid in full, the payee's bank, the payee type, a possible duplicate), `my_expenses.from_invoice`, a negative line and `EXPENSE_TOTAL_NOT_POSITIVE`, migration `8030_expense_line_discount.sql`; Disbursements: `disbursement-receipt-read` (Image Reading, chosen by TB) and its prompt, the request match in SQL (`requestsPaidBy`), Record Disbursement carrying the receipt
+- [x] 13/11/2026 · Screens: Attach Document (`app/src/features/assistant/Attach.tsx`) on desktop and in the phone's chat, the file chip on the question's bubble, `LinesField`, `MoneyField` `signed`, `RadioCards` captions, the card's `lines`, New Request's form on `LinesField` with the bank from Read Invoice; the in-browser mock in contract shapes
+- [x] 13/11/2026 · Tests: `tests/integration/ai-files.test.js` (the four cases of Appendix A and an unreadable file, a paid-up invoice, a Word file), `expenses.test.js` (a discount line, a total below zero), `expenses-ai.test.js` (the bank), the components' and `Assistant.test.tsx`'s; two evaluation cases with made-up samples under `scripts/ai/samples/`
+- [x] 13/11/2026 · The User Guide: Praxis AI's Attach a document with its picture, Expenses' Raise a request, its pictures retaken; PROGRESS (#67, #56, #59), README
+- [ ] On staging: the sample invoice into a request of ₦150,000.00 its line manager opens with its invoice, and a receipt recorded from the chat (`eval-assistant.js --only=file`)
+- [ ] PR 2 · Contracts and MoUs (`praxis-ai.md` Appendix A), in a fresh chat from its start prompt
+
 ## 7 · Gates this work adds
 
 | Gate | Script | Refuses |
@@ -828,6 +844,14 @@ lead ("It should always ask for required fields, so we never see an error. We ca
 
 ## 8 · Log
 
+- 13/11/2026 · TB · Documents in the chat, PR 1 built (§6.11): Attach Document with Invoice and
+  Payment Receipt; the reading as read 1 and its values over the model's card before the ask guard,
+  kept on the answer so a later question keeps the file's figures; New Request from an invoice for
+  its balance due, Record Disbursement from a receipt with the request matched in SQL. Found on the
+  way and written into `praxis-ai.md` §6.18: the registry already used `file` on every entry, so an
+  action drawn from a file says `from_file`; a document's citation needs `link: null` for the
+  answer's contract; a receipt's beneficiary account is kept under `account_number` so redaction
+  keeps it from the chat's model; 8010's CHECKs refused a negative line, so migration 8030.
 - 13/11/2026 · TB · Documents in the chat planned: `praxis-ai.md` §1.10 (decisions 41 to 48),
   §6.18 and Appendix A (two PRs, each in a fresh chat). The engine side PR 1 builds: the manifest's
   `files` key, the ask's reading step as one read, and `draftCard` laying the reader's fields over

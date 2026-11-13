@@ -34,19 +34,25 @@ My Requests lists every request you raised, newest first, with who it waits on n
    your purpose and items; check it before you send.
 5. Pick a **Project** if the money is for one, and check the **Department**.
 6. Fill in each item: what it is, its **Quantity** and **Unit Price**. Press
-   **Add Line** for another item, and the bin beside an item to take it out.
+   **Add Line** for another item, and the bin beside an item to take it out. A discount, or a
+   payment already made on the invoice, is a line with a minus before its **Unit Price**. The
+   **Total** under the lines must stay above zero.
 7. Pick the **Payee**: **Staff**, **Vendor**, **Partner** or **Dedicated Task Team (DTT)**.
 8. For yourself, tick **Use My Company Account** to be paid into the bank account on your profile.
    For anyone else, fill in **Payee Name**, **Bank**, **Account Name** and **Account Number**.
    Type the **Bank** and pick it from the list; if it is not there, press **Add** to keep it as
    typed, and it is offered to everyone from then on.
-9. Attach the invoice under **Invoice**. Press **Read Invoice** to fill the payee and the items from
-   it, then check every line.
+9. Attach the invoice under **Invoice**. Press **Read Invoice** to fill the payee, their bank and the
+   items from it, then check every line.
 10. Press **Send Request**. Or press **Save Draft** to finish it later.
 
 > **Tip:** In [Praxis AI · Ask](/praxis-ai?tab=ask), say "Raise an expense request". It asks **What are you paying
 > for? How many? How much is each?** and draws the request for you to check. To list several items,
 > say so: it saves a draft, then offers **Add Another Item** and **Send Request**.
+
+> **Tip:** In [Praxis AI · Ask](/praxis-ai?tab=ask), press **Attach Document** and pick **Invoice**
+> to have the request drawn from the invoice itself, every line and the balance due
+> ([Attach a document](#praxis-ask-attach)).
 
 > **Tip:** **Over Budget** on a request means it is more than its department has left for that
 > category this year. It is still sent; the approvers see it.
