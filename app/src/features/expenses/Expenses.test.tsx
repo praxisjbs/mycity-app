@@ -211,3 +211,18 @@ describe("Expenses · amounts as typed", () => {
     expect(screen.queryByText("Check the format")).toBeNull();
   }, 40000);
 });
+
+describe("New Request · a line that takes money off (TB, 13/11/2026)", () => {
+  it("Unit Price keeps a minus on a line, and the total takes it off", async () => {
+    await as("chidera@mycityapp.io", <MyRequestsPage />, "My Requests");
+    fireEvent.click(screen.getAllByRole("button", { name: "New Request" })[0]);
+    const form = await screen.findByRole("dialog", { name: "New Request" }, { timeout: 5000 });
+    fireEvent.click(within(form).getByRole("button", { name: "Add Line" }));
+    const prices = within(form).getAllByRole("textbox", { name: "Unit Price" });
+    fireEvent.change(prices[0], { target: { value: "450,000" } });
+    fireEvent.change(prices[1], { target: { value: "-300,000.50" } });
+    expect((prices[1] as HTMLInputElement).value).toBe("-300,000.50");
+    expect(within(form).queryByText("Not below zero")).toBeNull();
+    expect(within(form).getByText(/^Total/).textContent).toMatch(/149,999\.50/);
+  }, 40000);
+});

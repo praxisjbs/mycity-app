@@ -259,9 +259,12 @@ module.exports = async function seed({ pool, log = () => {} }) {
       const id = made.expense_request_id;
       if (plan.walk === "draft" || plan.walk === "with_manager") continue;
       if (plan.walk === "sent_back" || plan.walk === "rejected") {
+        // Whoever the stage names decides, as approveThrough does: a requester who manages people
+        // goes straight to Operations & People, whom their line manager may not decide for.
         const manager = await lineOf(person);
         const instanceId = await instanceOf(id);
-        const who = manager || ops;
+        const current = (await pool.query("SELECT current_stage FROM workflow_instance WHERE workflow_instance_id = $1", [instanceId])).rows[0].current_stage;
+        const who = current !== "operations_people" && manager ? manager : ops;
         await decide(who, instanceId, plan.walk === "sent_back" ? "request_changes" : "reject", plan.reason);
         if (plan.walk === "sent_back") await expenses.sentBack(id, { instance_id: instanceId, reason: plan.reason });
         else await expenses.settle(id, await stateOf(instanceId), instanceId);

@@ -184,6 +184,16 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf }) {
       await appSettle(page);
     }
   }
+  // The offer to clock in, which opens over the first screen of a working day: Not Now, as a
+  // person would before a demonstration (clocking in is theirs to do, never filming's).
+  if (shot.as) {
+    const notNow = page.getByRole("dialog", { name: "Clock In" }).getByRole("button", { name: "Not Now", exact: true });
+    if (await notNow.waitFor({ timeout: 2500 }).then(() => true, () => false)) {
+      await notNow.click({ timeout: 3000 }).catch(() => null);
+      await sleep(0.5);
+      await appSettle(page);
+    }
+  }
   const s = hands(page, { phone, origin });
   if (shot.setup) await shot.setup(s);
   await sleep(0.6);

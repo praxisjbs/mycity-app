@@ -468,7 +468,7 @@ async function sentBack(id, payload) {
     if (!row || row.status !== "submitted" || (payload.instance_id && row.workflow_instance_id !== payload.instance_id)) return null;
     const instance = await engine.findOpenInstance(client, { type: "payroll_run", id });
     if (instance && instance.definition_key === DEFINITION_KEY)
-      await engine.cancel(client, { instance_id: instance.workflow_instance_id, actor: { user_id: instance.opened_by }, reason: payload.reason || null });
+      await engine.cancel(client, { instance_id: instance.workflow_instance_id, actor: { user_id: instance.opened_by }, reason: payload.reason || null, sentBack: true });
     await lock.returnToDraft(client, id, { reason: payload.reason || null });
     return "draft";
   });

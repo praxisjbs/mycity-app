@@ -432,7 +432,10 @@ element outside the form components (§8.6).
   schema changes nothing else in the form.
 - **Reward early, punish late.** A field is checked when the person leaves it, or after they pause
   typing for about 600 ms. Once a field is marked, it is re-checked on every keystroke, so the mark
-  clears the moment it is fixed. A field with a format shows a tick when it is right.
+  clears the moment it is fixed. A field with a format shows a tick when it is right. A field the
+  person only passed through, never typing in it (a form's first field, focused as it opens), is
+  not marked on leaving: Save marks it. Marked on leaving, its message pushed down whatever the
+  pointer was pressing below it, and the press was lost (found filming M8, 13/11/2026).
 - **The signal is on the field**: a red ring and a ! mark, with an error of at most 4 words beside
   it ("Not a real date"). Never a sentence under the form, never a dialog, never a toast. The
   words are the contract's own when they fit in 4 ("Ten digits", "Pick a model"), so a schema's

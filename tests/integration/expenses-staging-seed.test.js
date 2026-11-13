@@ -74,6 +74,15 @@ describeDb("Expenses' staging seed against the real migrations", () => {
       }
     }
     await runFile(staffSeed);
+    // On the real roster the build account manages people, so its requests go straight to
+    // Operations & People: its sent-back or rejected request must be decided there, never by its
+    // line manager (refused "You are not an approver for this stage" on staging, 13/11/2026).
+    await q(
+      `UPDATE employee SET line_manager_id = (SELECT employee_id FROM employee WHERE work_email = 'build@jbspraxis.test')
+        WHERE employee_id = (SELECT e.employee_id FROM employee e JOIN department d ON d.department_id = e.department_id
+                              WHERE d.name <> 'Implementation' AND e.status = 'active' AND e.line_manager_seat_id IS NULL
+                                AND e.work_email <> 'build@jbspraxis.test' ORDER BY e.staff_number LIMIT 1)`,
+    );
     // 8099's five, as a staging database that ran Home's seed before 8101 still holds them.
     await q(`INSERT INTO expense_category (code, name) VALUES ('travel', 'Travel'), ('office', 'Office Supplies') ON CONFLICT (code) DO NOTHING`);
     await runFile(seed, logs);

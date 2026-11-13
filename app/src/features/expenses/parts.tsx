@@ -11,7 +11,7 @@ import { hasCapability } from "@/shell/access";
 import { paging } from "@/features/shared/wire";
 import type { Tone } from "@/api/types/common";
 import {
-  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, EMPTY_LINE, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LinesField,
+  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, EMPTY_LINE, Field, formatDate, formatDateTime, formatMoney, FormFooter, Grid, HelpTerm, KeyValue, LinesField,
   LoadingRows, Money, Pager, Pill, plural, Popover, RecordPicker, SelectField, Sub, TextAreaField, TextField, Timeline, toast, toMoneyString, useConfirm, useContractForm, useModal, UploadField, type ComboFieldProps, type LineValue,
 } from "@mycity/ui";
 
@@ -113,6 +113,11 @@ function BankField(binding: Omit<ComboFieldProps<ExpenseBank>, "list" | "option"
   return <ComboField<ExpenseBank> {...binding} list={banks} option={(b) => b.bank_name} sub={(b) => (b.uses ? plural(b.uses, "request") : undefined)} placeholder="Zenith Bank" />;
 }
 
+/** A wire amount as a person types it ("-100000.00" to "-100,000"), so a filled Unit Price reads like a typed one and fits its field. */
+export const asTyped = (wire: string) => {
+  const [w, f = "00"] = wire.replace(/^-/, "").split(".");
+  return `${wire.startsWith("-") ? "-" : ""}${w.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${f === "00" ? "" : `.${f}`}`;
+};
 
 /* ------------------------------------------------------------------ *
  * New Request and Edit
@@ -138,7 +143,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       project_id: existing?.project_id ?? project ?? "",
       department_id: existing?.department_id ?? "",
       needed_on: "",
-      lines: existing ? existing.lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unit_price })) : [{ ...EMPTY_LINE }],
+      lines: existing ? existing.lines.map((l) => ({ description: l.description, quantity: l.quantity.replace(/\.00$/, ""), unit_price: asTyped(l.unit_price) })) : [{ ...EMPTY_LINE }],
       payee_type: existing?.payee_type ?? ("vendor" as ExpenseRow["payee_type"]),
       uses_profile_account: existing?.uses_profile_account ?? false,
       payee_name: existing?.uses_profile_account ? "" : (existing?.payee_name ?? ""),
@@ -184,15 +189,18 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       if (got.payee_name) f.set("payee_name", got.payee_name);
       if (got.expense_category_id) {
         f.set("expense_category_id", got.expense_category_id);
-        setCategory(null);
+        setCategory(got.category);
       }
-      if (got.lines.length) setLines(got.lines.map((l) => ({ description: l.description, quantity: l.quantity ?? "1", unit_price: l.unit_price })));
+      if (got.lines.length) setLines(got.lines.map((l) => ({ description: l.description, quantity: l.quantity ?? "1", unit_price: asTyped(l.unit_price) })));
       // The payee's bank, from the same reading, for a payee who is not on Use My Company Account.
       if (!profile) {
         if (got.bank_name) f.set("bank_name", got.bank_name);
         if (got.account_name) f.set("account_name", got.account_name);
         if (got.account_number) f.set("account_number", got.account_number);
       }
+      // The lines are the model's reading; the amount the invoice asks for is read on its own, so a
+      // discount or a payment it missed shows here rather than at the bank.
+      if (got.amount_due && got.amount && got.amount_due !== got.amount) return toast(`Invoice asks ${formatMoney(got.amount_due)}. Check lines`);
       toast("Invoice read. Check every line");
     } catch (e) {
       say(e);
@@ -331,10 +339,21 @@ export function RequestCard({ id, actions }: { id: string; actions?: (r: Expense
         rows={r.lines}
         rowKey={(l) => l.expense_request_line_id}
         columns={[
-          { key: "d", label: "Item", render: (l) => l.description },
-          { key: "q", label: "Quantity", align: "n", render: (l) => l.quantity },
-          { key: "u", label: "Unit Price", align: "n", render: (l) => <Money value={l.unit_price} />, desktop: true },
-          { key: "a", label: "Amount", align: "n", render: (l) => <Money value={l.amount} /> },
+          // Two columns, so a long description from an invoice reads in the modal: the quantity and
+          // the price of each sit under it. A line that takes money off reads "less".
+          {
+            key: "d",
+            label: "Item",
+            render: (l) => (
+              <span className="flex flex-col">
+                {l.description}
+                <Sub>
+                  {l.quantity.replace(/\.00$/, "")} × <Money value={l.unit_price} negLabel="less" />
+                </Sub>
+              </span>
+            ),
+          },
+          { key: "a", label: "Amount", align: "n", render: (l) => <Money value={l.amount} negLabel="less" /> },
         ]}
       />
       <div className="mt-3">
