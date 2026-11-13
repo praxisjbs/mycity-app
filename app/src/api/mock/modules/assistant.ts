@@ -306,11 +306,11 @@ route("GET /api/v1/ai/suggestions", (req) => {
   return ok({ questions: view === "staff" ? ["What happened today?", "How many leave days do I have left?", "Which of my tasks are overdue?", "Was I late at all this month?", "When is the next public holiday?"] : all });
 });
 
-/** The kinds of document a person may attach (praxis-ai.md decision 41): Payment Receipt for a holder of expenses.finance. */
+/** The kinds of document a person may attach (praxis-ai.md decision 41): Payment Receipt for a holder of expenses.finance, Contract or MoU for everyone who sees Partnerships. */
 const KIND_LABEL = { invoice: "Invoice", payment_receipt: "Payment Receipt", contract: "Contract or MoU" } as const;
 const KIND_QUESTION = { invoice: "Raise an expense request from this invoice", payment_receipt: "Record the payment on this receipt", contract: "Summarise this contract and file it" } as const;
 type Kind = keyof typeof KIND_LABEL;
-const kindsFor = (user: string): Kind[] => ((SIGN_INS[user]?.view ?? "staff") === "staff" ? ["invoice"] : ["invoice", "payment_receipt"]);
+const kindsFor = (user: string): Kind[] => ((SIGN_INS[user]?.view ?? "staff") === "staff" ? ["invoice", "contract"] : ["invoice", "payment_receipt", "contract"]);
 route("GET /api/v1/ai/attachment-kinds", (req) => ok({ kinds: kindsFor(req.user!).map((kind) => ({ kind, label: KIND_LABEL[kind], question: KIND_QUESTION[kind] })), available: true }));
 
 /** New Request from an attached invoice (§6.18), as the server draws it: every line, the discount and the payment already made as minus lines. */
@@ -366,6 +366,57 @@ function invoiceCard(messageId: string, document: { document_id: string; file_na
   };
 }
 
+/** A made-up signed MoU as the server reads it (§6.18): its terms for the Record tab, a person's words throughout. */
+const MOU_TERMS: NonNullable<AiAnswer["attachment"]>["record"] = {
+  title: "Memorandum of Understanding",
+  items: [
+    { label: "Kind", value: "MOU" },
+    { label: "Parties", value: "MyCity App Ltd (MyCity); Lagoon Youth Fest Limited (Partner)" },
+    { label: "Signed On", value: "12/11/2026" },
+    { label: "Starts On", value: "01/12/2026" },
+    { label: "Ends On", value: "30/11/2027" },
+    { label: "Notice", value: "30 days" },
+    { label: "Value", value: "₦2,500,000.00" },
+    { label: "Renewal", value: "Renews each year unless either party gives 30 days' notice." },
+    { label: "Lagoon Youth Fest Limited", value: "List every ticketed event on MyCityApp." },
+    { label: "MyCity App Ltd", value: "Promote the festival to its users for six weeks." },
+    { label: "Signed By", value: "Ngozi Adebayo, Founder; Ada Okafor, Chief Executive Officer" },
+  ],
+};
+
+/** Record Signed Copy from an attached MoU (§6.18): the agreement waiting for its signature, the day, who signed. */
+function signedCopyCard(messageId: string, document: { document_id: string; file_name: string }): AiActionCard {
+  const agreement = sid("agreement:lagoon");
+  return {
+    ai_action_draft_id: sid(`card:${messageId}`),
+    ai_message_id: messageId,
+    problems: {},
+    suggested: false,
+    status: "shown",
+    expires_at: inHalfAnHour(),
+    result: null,
+    created_at: nowIso(),
+    action_key: "agreements.record_signed_copy",
+    module_key: "partnerships",
+    label: "Record Signed Copy",
+    description: "File an attached contract or MoU as the signed copy of the agreement waiting for its signature",
+    schema: "agreements.AgreementSignedCopyAdd",
+    risk: "approval",
+    confirm: "fresh_sign_in",
+    bulk: 1,
+    values: { partnership_agreement_id: agreement, document_id: document.document_id, signed_on: "2026-11-12", signed_by_name: "Ngozi Adebayo", signed_by_title: "Founder" },
+    records: [{ type: "agreement", id: agreement, label: "AGR-2026-0004 Lagoon Youth Fest MOU", link: `/partnerships?tab=contracts-and-mous&id=${agreement}` }],
+    names: [{ type: "document", id: document.document_id, label: document.file_name, link: null }],
+    fields: [
+      field("partnership_agreement_id", "Agreement", "id", { required: true }),
+      field("document_id", "Document", "id", { required: true }),
+      field("signed_on", "Signed On", "date", { required: true }),
+      field("signed_by_name", "Signed By", "text", { required: true }),
+      field("signed_by_title", "Title", "text"),
+    ],
+  };
+}
+
 route("POST /api/v1/ai/ask", async (req) => {
   const attached = req.body.attachment as { document_id?: string; kind?: Kind } | undefined;
   if (attached && (!attached.kind || !kindsFor(req.user!).includes(attached.kind))) return fail(403, "ATTACHMENT_FORBIDDEN", "You cannot attach that kind of document");
@@ -385,15 +436,26 @@ route("POST /api/v1/ai/ask", async (req) => {
     k = { owner: user, conversation: { ai_conversation_id: sid(`conv:${user}:${KEPT.length}:${now}`), title: question.slice(0, 120), last_asked_at: now, questions: 0, rows_read: 0 }, turns: [] };
     KEPT.unshift(k);
   }
-  const d = attached?.kind === "invoice" ? said("This invoice from Sample Studio Ltd asks for the balance of ₦150,000.00.") : attached ? said("This transfer of ₦150,000.00 matches no request waiting to be paid. Which request was paid?") : answerFor(question, SIGN_INS[user]?.view ?? "staff");
+  const d =
+    attached?.kind === "invoice"
+      ? said("This invoice from Sample Studio Ltd asks for the balance of ₦150,000.00.")
+      : attached?.kind === "contract" && document
+        ? said(
+            "A memorandum of understanding between MyCity App Ltd and Lagoon Youth Fest Limited, signed on 12/11/2026 and running from 01/12/2026 to 30/11/2027 with 30 days' notice. It is worth ₦2,500,000.00 and renews each year. The festival lists every ticketed event on MyCityApp; MyCity promotes it for six weeks.",
+            { reads: [{ ...read("file.contract", 1, 1, 1), module_key: "partnerships", params: { document_id: document.document_id } }], citations: [{ entity_type: "document", entity_id: document.document_id, label: document.file_name, read_key: "file.contract", link: null }] },
+          )
+        : attached
+          ? said("This transfer of ₦150,000.00 matches no request waiting to be paid. Which request was paid?")
+          : answerFor(question, SIGN_INS[user]?.view ?? "staff");
   // The screen the question was asked from travels back with the answer (decision 12).
   const context = (req.body.context as AiAnswer["context"] | undefined) ?? null;
   const messageId = sid(`answer:${now}:${k.turns.length}`);
   // A card only for a screen that draws one (§6.11), and only for a change the mock offers; otherwise the screen button stands.
   const shows = Array.isArray(req.body.shows) ? (req.body.shows as string[]) : [];
-  const card = document && attached?.kind === "invoice" && shows.includes("cards") ? invoiceCard(messageId, document) : d.declined === "change" && shows.includes("cards") ? cardFor(question, messageId) : null;
+  const fromFile = document && shows.includes("cards") ? (attached?.kind === "invoice" ? invoiceCard(messageId, document) : attached?.kind === "contract" ? signedCopyCard(messageId, document) : null) : null;
+  const card = fromFile ?? (d.declined === "change" && shows.includes("cards") ? cardFor(question, messageId) : null);
   if (card) CARDS.push({ owner: user, card });
-  const answer: AiAnswer = { ...d, card, link: card ? null : d.link, declined: card ? null : d.declined, context, sources: sourcesOf(d.citations), ai_message_id: messageId, ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, attachment: document && attached?.kind ? { document, kind: attached.kind } : null, feedback: null, created_at: now, provisional: true };
+  const answer: AiAnswer = { ...d, card, link: card ? null : d.link, declined: card ? null : d.declined, context, sources: sourcesOf(d.citations), ai_message_id: messageId, ai_conversation_id: k.conversation.ai_conversation_id, question, citations_total: d.citations.length, attachment: document && attached?.kind ? { document, kind: attached.kind, record: attached.kind === "contract" ? MOU_TERMS : null } : null, feedback: null, created_at: now, provisional: true };
   const tokens = 900 + question.length * 7 + d.reads.length * 600;
   COSTS.set(answer.ai_message_id, { tokens, cost_ngn: (tokens * 0.0076).toFixed(2) });
   k.turns.unshift(answer);

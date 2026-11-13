@@ -13,7 +13,9 @@ import { EmptyState, formatDateTime, OverviewPane, PaneSheet, PaneTabs, paneValu
  * sheet (PhonePane). The Table pages the answer's read again (GET /ai/answers/:id/reads/:n, §6.12),
  * so its rows come from the records with the person's rights now, never from the model. The Table's
  * Export asks for every row of that read as a workbook (POST /ai/answers/:id/reads/:n/export, §6.16),
- * made in the worker and saved on this device like every export (foundation.md §6.12).
+ * made in the worker and saved on this device like every export (foundation.md §6.12). A document
+ * attached to the question (§6.18) is read as `file.<kind>`, which is never replayed: it never opens a
+ * Table, and a contract's terms (`attachment.record`) open on Record instead.
  */
 
 /** The answer in the pane, which view, which of its reads the Table pages, and the record picked. */
@@ -31,19 +33,31 @@ export interface PanePick {
   record?: PaneRecord;
 }
 
+/** A document read (`file.<kind>`, §6.18 step 3) is never replayed, so it never opens a Table. */
+const isFileRead = (key: string): boolean => key.startsWith("file.");
+
+/** A read the Table can page again: a list or record read that returned rows, never a document's. */
+const replayable = (r: AiAnswer["reads"][number]): boolean => r.kind === "read" && r.outcome === "read" && r.rows > 0 && !isFileRead(r.key);
+
 /** The read the Table pages first: the one the answer's table came from, else the first that returned rows. */
-const firstReadN = (a: AiAnswer): number | null => a.table?.read ?? a.reads.find((r) => r.kind === "read" && r.outcome === "read" && r.rows > 0)?.n ?? null;
+const firstReadN = (a: AiAnswer): number | null => a.table?.read ?? a.reads.find(replayable)?.n ?? null;
 
-const defaultTab = (a: AiAnswer, readN: number | null): PaneTab => (a.overview ? "overview" : readN ? "table" : "sources");
+/** A document's terms as the Record tab shows them (a contract or MoU, §6.18), or null. */
+export function fileRecordOf(a: AiAnswer): PaneRecord | null {
+  const r = a.attachment?.record;
+  return r ? { title: r.title, items: r.items.map((i) => [i.label, i.value] as const), link: null } : null;
+}
 
-/** Whether an answer has anything for the pane: figures, a table, or reads to list; a card drawn from what was said has none and leaves the pane as it was (§10.1). */
-export const paneHas = (a: AiAnswer): boolean => Boolean(a.overview || a.table?.rows.length || a.reads.length);
+const defaultTab = (a: AiAnswer, readN: number | null): PaneTab => (a.overview ? "overview" : fileRecordOf(a) ? "record" : readN ? "table" : "sources");
+
+/** Whether an answer has anything for the pane: figures, a table, a document's terms, or reads to list; a card drawn from what was said has none and leaves the pane as it was (§10.1). */
+export const paneHas = (a: AiAnswer): boolean => Boolean(a.overview || a.table?.rows.length || a.attachment?.record || a.reads.length);
 
 /** What the pane shows for an answer, keeping the view already open on that same answer. */
 function shownFor(s: PaneShown | null, answer: AiAnswer, pick: PanePick): PaneShown {
   const same = s && s.answer.ai_message_id === answer.ai_message_id ? s : null;
   const readN = pick.readN ?? (same ? same.readN : firstReadN(answer));
-  const record = pick.record ?? (same ? same.record : null);
+  const record = pick.record ?? (same ? same.record : fileRecordOf(answer));
   const tab = pick.tab ?? (same ? same.tab : defaultTab(answer, readN));
   return { answer, tab, readN, record };
 }
@@ -62,10 +76,12 @@ export function usePane() {
 
 export type Pane = ReturnType<typeof usePane>;
 
-/** What a source chip asks for: the Table of the read that cited that kind of record, else the Sources. */
+/** What a source chip asks for: a document's terms on Record, else the Table of the read that cited that kind of record, else the Sources. */
 export function pickForSource(a: AiAnswer, entityType: string): PanePick {
+  const terms = entityType === "document" ? fileRecordOf(a) : null;
+  if (terms) return { tab: "record", record: terms };
   const readKey = a.citations.find((c) => c.entity_type === entityType)?.read_key;
-  const n = readKey ? a.reads.find((r) => r.key === readKey && r.kind === "read" && r.outcome === "read" && r.rows > 0)?.n : undefined;
+  const n = readKey ? a.reads.find((r) => r.key === readKey && replayable(r))?.n : undefined;
   return n ? { tab: "table", readN: n } : { tab: "sources" };
 }
 
@@ -83,7 +99,7 @@ export function paneReadsOf(a: AiAnswer): PaneRead[] {
     rows: r.rows,
     total: r.total,
     masked: (r.masked ?? []).map(paneWords),
-    opens: r.kind === "read" && r.outcome === "read" && r.rows > 0,
+    opens: replayable(r),
   }));
 }
 
