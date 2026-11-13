@@ -170,6 +170,9 @@ mycity-app/
 │   │                         m4-recruitment-2.js (M4 part 2, Assessments and Interviews),
 │   │                         m5-offers-1.js (M5 part 1, Offers),
 │   │                         m5-onboarding-2.js (M5 part 2, Documentation and Onboarding),
+│   │                         m8-expenses-1.js (M8 part 1, Raising and Approving, with the `prepare`
+│   │                         both M8 parts film on: make.js m8-expenses-1 prepare),
+│   │                         m8-expenses-2.js (M8 part 2, Paying and Budgets),
 │   │                         m10-knowledge-hub.js (M10 part 1, Policies, SOPs and Training),
 │   │                         m10-praxis-ai.js (M10 part 2, Praxis AI and AI Control)
 │   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging;

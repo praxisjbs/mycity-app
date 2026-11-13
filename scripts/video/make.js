@@ -4,6 +4,8 @@
  * Make a MyCity training video (docs/runbooks/training-videos.md).
  *
  *   node scripts/video/make.js <scene> script               print the narration, chapter by chapter
+ *   node scripts/video/make.js <scene> prepare              the ground a scene films on, when it has one
+ *                                                           (its `prepare`; runbook §4.1), on a fresh database
  *   node scripts/video/make.js <scene> narrate              Emma's voice for every line (cached by text)
  *   node scripts/video/make.js <scene> film [--only c03s01,c04s02]   record the shots
  *   node scripts/video/make.js <scene> assemble             cards, captions, chapters, sound: the MP4
@@ -36,6 +38,13 @@ const SAID = [
   [/\bBVN\b/g, "B V N"],
   [/\bNYSC\b/g, "N Y S C"],
   [/\bMyLagosApp\b/g, "My Lagos App"],
+  [/\bEXP-0*(\d+)/g, "expense $1"],
+  [/\bREQ-0*(\d+)/g, "requisition $1"],
+  [/\bDSB-0*(\d+)/g, "disbursement $1"],
+  [/\bINV-\d+-(\d\d)(\d\d)\b/g, "ending $1 $2"],
+  [/\bJBS\b/g, "J B S"],
+  [/\bPDF\b/g, "P D F"],
+  [/\bDTT\b/g, "D T T"],
   [/ & /g, " and "],
   [/\bhub\.mycityapp\.io\b/g, "hub dot my city app dot I O"],
   [/\|/g, ""],
@@ -89,6 +98,10 @@ async function main() {
   if (!name) { console.log(fs.readFileSync(__filename, "utf8").split("*/")[0]); process.exit(2); }
   const plan = planOf(loadScene(name));
   if (step === "script") return printScript(plan);
+  if (step === "prepare") {
+    if (!plan.prepare) throw new Error(`${plan.id} has no prepare step: seed with scripts/db/seed.js --staging (runbook §4.1).`);
+    return plan.prepare({ log: console.log });
+  }
 
   const out = process.env.VIDEO_OUT || path.join(os.tmpdir(), "mycity-video", plan.id);
   const audioDir = path.join(out, "audio");

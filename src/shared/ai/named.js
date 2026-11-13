@@ -13,9 +13,13 @@
  * quantityOf() is the one number in a figure written with its words or unit ("95%").
  */
 
-/** Words as a person says them: lower case, the dropped words and punctuation left out ("Annual Leave" → "annual"). */
+/**
+ * Words as a person says them: lower case, "&" said as "and", the dropped words and punctuation
+ * left out ("Annual Leave" → "annual"; "Travel & Transport" → "travel and transport", the
+ * category named "Travel and Transport": a model writes either, found filming M8, 13/11/2026).
+ */
 function plainWords(s, drop = []) {
-  let out = String(s === null || s === undefined ? "" : s).toLowerCase();
+  let out = String(s === null || s === undefined ? "" : s).toLowerCase().replace(/&/g, " and ");
   for (const w of drop) out = out.replace(new RegExp(`\\b${w}\\b`, "g"), " ");
   return out.replace(/[^a-z0-9]+/g, " ").trim();
 }
