@@ -189,7 +189,7 @@ const NOTE_PAUSE = 800;
 
 /**
  * My Notes on a course (§6.13): the person's own, loaded when first opened, saved a moment after
- * typing pauses, on Close Notes and when the course closes. Only they read it.
+ * typing pauses, on Close Notes, before Download Word and when the course closes. Only they read it.
  */
 function MyNotes({ courseId, subject, open, onClose }: { courseId: string; subject: string; open: boolean; onClose: () => void }) {
   const path = `/api/v1/training/me/courses/${courseId}/note`;
@@ -244,6 +244,10 @@ function MyNotes({ courseId, subject, open, onClose }: { courseId: string; subje
       onRetry={error ? reload : save}
       maxLength={training.NOTE_MAX}
       loading={value === null}
+      onDownload={async () => {
+        await save();
+        return saveExport(api.call("POST /api/v1/training/me/courses/:id/note/export", { params: { id: courseId }, body: {} }));
+      }}
     />
   );
 }

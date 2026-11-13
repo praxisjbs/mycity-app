@@ -499,7 +499,9 @@ Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/d
 and `services/web` (Staff Community's PDF previews and link cards), `shared/geo`,
 `shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence),
 `shared/documents/exports` (every Export and Download button's file: reserved in the request, made
-in the worker, downloaded on the device that asked, removed a day later; `docs/guides/foundation.md` §6.12).
+in the worker, downloaded on the device that asked, removed a day later; `docs/guides/foundation.md` §6.12),
+and `shared/documents/docx` (a Word file from plain text, made in the worker as an export: My Notes'
+Download Word, M10, `docs/guides/knowledge.md` §6.13).
 
 Templates first filled in M1: `templates/documents/report.html` (a report run, landscape, its RPT
 number on it), `templates/documents/policy.html` (a policy version on the letterhead with its signatures) and `templates/email/scheduled-report.html` (a schedule's file attached);

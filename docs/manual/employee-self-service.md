@@ -993,6 +993,8 @@ Your notes are yours alone: nobody else can read them, not even the course's own
 4. Press **Minimise Notes** to keep only its bar, and **Open Notes** to bring it back. Press **Close
    Notes** when you are done. Press **Take Notes** again any time: your notes are still there, on
    any device.
+5. Press **Download Word** under your notes to keep a copy. It saves what you typed, then your
+   notes download as a Word file with the course's name at the top.
 
 ### Start a Library course {#ess-training-library}
 
@@ -1310,6 +1312,7 @@ do:
 crop: viewport
 marks:
   1: role region "My Notes" | Your own notes
+  2: button "Download Word" | A Word copy
 ```
 
 ```shot ess-training-completed

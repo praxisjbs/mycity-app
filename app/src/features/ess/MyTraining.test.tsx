@@ -163,6 +163,16 @@ describe("ESS · My Training", () => {
     await item("Key Rules");
     expect(await screen.findByRole("heading", { name: "Why it matters" }, { timeout: 5000 })).toBeTruthy();
     await waitFor(() => expect(within(notes).getByRole("status").textContent).toBe("Saved"), { timeout: 5000 });
+    // Download Word saves what is typed first, then asks for the note as a Word file.
+    const call = vi.spyOn(api, "call");
+    fireEvent.change(within(notes).getByRole("textbox"), { target: { value: "Report a lost laptop the same day. Lock it." } });
+    fireEvent.click(within(notes).getByRole("button", { name: "Download Word" }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith("POST /api/v1/training/me/courses/:id/note/export", expect.objectContaining({ body: {} })), { timeout: 5000 });
+    const order = call.mock.calls.map(([route]) => route).filter((r) => String(r).includes("/note"));
+    expect(order.indexOf("PUT /api/v1/training/me/courses/:id/note")).toBeLessThan(order.indexOf("POST /api/v1/training/me/courses/:id/note/export"));
+    call.mockRestore();
+    fireEvent.change(within(notes).getByRole("textbox"), { target: { value: "Report a lost laptop the same day." } });
+    await waitFor(() => expect(within(notes).getByRole("status").textContent).toBe("Saved"), { timeout: 5000 });
     fireEvent.click(within(notes).getByRole("button", { name: "Minimise Notes" }));
     expect(within(notes).queryByRole("textbox")).toBeNull();
     fireEvent.click(within(notes).getByRole("button", { name: "Close Notes" }));
