@@ -241,6 +241,23 @@ describeDb("contracts and MoUs in the chat against the real migrations", () => {
     expect(docs.data.map((d) => d.document.document_id)).toContain(staged.document_id);
   });
 
+  test("partner_documents.attach: a kind MyCity's list does not hold is drawn without a problem, filed, and joins the list", async () => {
+    reads(reading("Lagoon Youth Fest", { kind: "other" }));
+    script(say({ text: "A merchant agreement with Lagoon Youth Fest.", action: { key: "partner_documents.attach", values: { kind: "Merchant Agreement" }, suggested: false } }));
+    const staged = await stage("staff", "lagoon-merchant-2027.pdf");
+    const card = ok(await attach("staff", staged)).card;
+    expect(card).toMatchObject({ action_key: "partner_documents.attach", problems: {} });
+    expect(card.values).toMatchObject({ document_id: staged.document_id, kind: "Merchant Agreement", partner_id: made.partner });
+
+    const pressed = ok(await h.press("staff", card.ai_action_draft_id));
+    expect(pressed.status).toBe("done");
+    await drain();
+    expect(await one("SELECT kind, origin FROM partner_document WHERE document_id = $1", [staged.document_id])).toEqual({ kind: "merchant_agreement", origin: "upload" });
+    expect(await one("SELECT label, active FROM reference_value WHERE domain = 'partner_document_kind' AND code = 'merchant_agreement'")).toEqual({ label: "Merchant Agreement", active: true });
+    const suggested = ok(await h.as("staff").get("/partnerships/lists/partner_document_kind/suggestions?q=merchant"));
+    expect(suggested.data).toEqual([{ label: "Merchant Agreement" }]);
+  });
+
   test("a party nobody may edit asks whose document it is; a reader with Partnerships view alone gets the terms and no card", async () => {
     reads(reading("Unheard Of Ventures Limited"));
     script(say({ text: "An MoU with Unheard Of Ventures Limited.", action: null }));

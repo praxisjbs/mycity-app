@@ -25,7 +25,7 @@ const ROW = `l.lead_id, l.number::text AS number, l.name, l.partner_category_id,
   ${personJson("e", "d")} AS owner, ${deals.lastContact("lead", "l.lead_id")} AS last_contact_at, l.identified_on, l.created_at`;
 
 const DETAIL = `${ROW}, l.industry, l.website, l.objective, l.source, src.label AS source_label, l.region_scope,
-  COALESCE(l.impact, '{}') AS impact, l.impact_rating, l.impact_note, l.comments, l.custom, l.lost_reason,
+  COALESCE(l.impact, '{}') AS impact, ${deals.impactLabels("l.impact")} AS impact_labels, l.impact_rating, l.impact_note, l.comments, l.custom, l.lost_reason,
   l.converted_partner_id, l.converted_at, l.owner_id, dl.partnership_opportunity_id AS deal_id`;
 
 const SORTS = { name: "l.name", identified_on: "l.identified_on", created_at: "l.created_at" };

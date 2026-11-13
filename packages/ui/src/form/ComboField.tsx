@@ -23,6 +23,8 @@ export interface ComboFieldProps<R> {
   value: string;
   /** Called with the new text, on each key and on a pick. */
   onChange: (value: string) => void;
+  /** Called with the text a pick puts in the field (Add, or a suggestion), after onChange; with it, Enter adds what was typed. ComboListField's chips. */
+  onPick?: (value: string) => void;
   /** Called when the person leaves the field. */
   onBlur?: () => void;
   /** The mark; the Field around it supplies one otherwise. */
@@ -49,7 +51,7 @@ export interface ComboFieldProps<R> {
 
 type Item<R> = { key: string; add?: boolean; row?: R };
 
-export function ComboField<R>({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, name, id, list, option, sub, placeholder, className }: ComboFieldProps<R>) {
+export function ComboField<R>({ value, onChange, onPick, onBlur, state, message: _message, onProblem: _onProblem, name, id, list, option, sub, placeholder, className }: ComboFieldProps<R>) {
   const { state: mark, ...aria } = useFieldControl({ id, state });
   const labelId = useFieldLabelId();
   const listId = `${useId().replace(/[^A-Za-z0-9_-]/g, "")}-combo`;
@@ -72,7 +74,9 @@ export function ComboField<R>({ value, onChange, onBlur, state, message: _messag
     setActive(-1);
   };
   const pick = (item: Item<R>) => {
-    onChange(item.add || !item.row ? typed : option(item.row));
+    const chosen = item.add || !item.row ? typed : option(item.row);
+    onChange(chosen);
+    onPick?.(chosen);
     list.setQ?.("");
     close();
   };
@@ -91,10 +95,14 @@ export function ComboField<R>({ value, onChange, onBlur, state, message: _messag
       setOpen(true);
       setActive((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + n) % n);
     } else if (e.key === "Enter") {
-      // Enter picks the row in hand; with none, it only closes the list, so what was typed stays.
+      // Enter picks the row in hand; with none, it only closes the list, so what was typed stays,
+      // unless a pick adds it (onPick): then what was typed is added, as the suggestion that says it.
       if (listed && active >= 0) {
         e.preventDefault();
         pick(items[active]!);
+      } else if (onPick && typed) {
+        e.preventDefault();
+        pick(items.find((i) => i.row && option(i.row).toLowerCase() === typed.toLowerCase()) ?? { key: "add", add: true });
       } else if (listed) close();
     } else if (e.key === "Escape" && listed) {
       e.stopPropagation();

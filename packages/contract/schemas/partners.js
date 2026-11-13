@@ -19,7 +19,7 @@ const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, bla
 const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
 const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
-const { RegionScope, DealHealth, DealFields, DealRow, Deliverable, RecordHistoryLine, Field, CustomValues, CustomFilter, listCode, flag } = require("./partner_pipeline");
+const { RegionScope, DealHealth, DealFields, DealRow, Deliverable, RecordHistoryLine, Field, CustomValues, CustomFilter, listCode, listWords, flag } = require("./partner_pipeline");
 const { Interaction } = require("./interactions");
 
 const PartnerStatus = z.enum(["active", "dormant", "closed"]);
@@ -375,11 +375,14 @@ const PartnerDocumentQuery = listQuery(
   ["created_at"],
 );
 
-/** Upload Document: a vault upload tagged for a record, with its kind (a partner_document_kind code). */
+/**
+ * Upload Document: a vault upload tagged for a record, with its kind by its name as typed or picked, or
+ * its code; a name MyCity's document kinds do not hold joins them (§6.3).
+ */
 const PartnerDocumentAttach = z
   .object({
     document_id: uuid,
-    kind: listCode,
+    kind: listWords,
     partner_id: blank(uuid),
     lead_id: blank(uuid),
     deal_id: blank(uuid),
@@ -389,9 +392,9 @@ const PartnerDocumentAttach = z
 
 /**
  * Upload Document as a Praxis AI card (docs/guides/praxis-ai.md §6.18; partnerships.md §9): the
- * form's request with the kind as a person reads it ("MOU"), since MyCity's document kinds are a list
- * of its own; the run turns the name into its code and sends `PartnerDocumentAttach`. Drawn only from
- * a contract or MoU attached on Ask.
+ * form's request with the kind as a person reads it ("MOU"); the run sends it as the list writes it, or
+ * as the card holds it when the list has none, in `PartnerDocumentAttach`, where a new kind joins the
+ * list. Drawn only from a contract or MoU attached on Ask.
  */
 const PartnerDocumentAdd = z
   .object({

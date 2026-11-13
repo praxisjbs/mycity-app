@@ -11,6 +11,7 @@
  *   GET   /duplicates               create: likely duplicates over leads and partners (advisory)
  *   POST  /contacts, PATCH /contacts/:id   edit: Add Contact, Edit Contact
  *   GET   /documents, POST /documents      view, edit: a record's documents; Upload Document
+ *   DELETE /documents/:id           edit: Remove Document, an upload (by its document_id) of a record the reader may see
  *   GET   /work                     view: the Work tab, the record's projects, tasks and events the
  *                                   reader may see in My Workspace, and how many they may not (§6.16)
  *   GET   /work/records, /work/deals       view: Connect to Partner's Partner and Deal
@@ -41,6 +42,7 @@ route(router, "patch", "/contacts/:id", { params: c.common.IdParams, body: p.Con
 
 route(router, "get", "/documents", { query: p.PartnerDocumentQuery, response: p.PartnerDocumentPage, summary: "A record's documents" }, view(), controller.documents);
 route(router, "post", "/documents", { body: p.PartnerDocumentAttach, response: p.PartnerDocument, summary: "Attach an upload to a lead or partner" }, edit(), controller.attach);
+route(router, "delete", "/documents/:id", { params: c.common.IdParams, no_content: true, summary: "Remove an uploaded document from a lead or partner" }, edit(), controller.removeDocument);
 
 route(router, "get", "/work", { query: p.PartnerWorkQuery, response: p.PartnerWorkPage, summary: "A record's projects, tasks and events the reader may see" }, view(), controller.work);
 route(router, "get", "/work/records", { query: p.PartnerLinkRecordQuery, response: p.PartnerLinkRecordPage, summary: "Partners and leads to connect work to" }, view(), controller.workRecords);

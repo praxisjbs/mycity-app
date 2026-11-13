@@ -339,7 +339,40 @@ export const mockCategories = () => CATEGORIES;
 export const mockFields = () => FIELDS;
 /** One of MyCity's lists as Categories holds it now, in its order, for the deals' mock. */
 export const mockList = (list: string): ListValue[] => ordered(list);
+
+/** The lists a form types into as well as picks from: a name they do not hold joins them (§6.3). */
+const OPEN = ["partnership_impact", "lead_source", "partner_document_kind"];
+
+/**
+ * The code of the value a form's words name, by its code or its name whatever the case (an active one
+ * first), else a new value named as typed at the end of the list; null for no words. The server's
+ * lists.codeFor.
+ */
+export function mockCodeFor(list: string, words: unknown): string | null {
+  const name = String(words ?? "").replace(/\s+/g, " ").trim();
+  const values = LISTS[list];
+  if (!name || !values || !OPEN.includes(list)) return null;
+  const w = name.toLowerCase();
+  const found = ordered(list).find((v) => v.code.toLowerCase() === w || v.label.toLowerCase() === w);
+  if (found) return found.code;
+  let code = codeOf(name);
+  for (let n = 2; values.some((v) => v.code === code); n += 1) code = `${codeOf(name)}_${n}`;
+  values.push({ code, label: name, meaning: null, position: (values.at(-1)?.position ?? 0) + 10, active: true });
+  return code;
+}
+
+/** The codes of several values a form's words name, each once (the server's lists.codesFor). */
+export const mockCodesFor = (list: string, words: unknown): string[] =>
+  [...new Set((Array.isArray(words) ? words : []).map((w) => mockCodeFor(list, w)).filter((c): c is string => Boolean(c)))];
+
+/** The names of a record's values, in the list's order (a record's impact_labels). */
+export const mockLabelsOf = (list: string, codes: string[]): string[] => ordered(list).filter((v) => codes.includes(v.code)).map((v) => v.label);
+
 route("GET /api/v1/partnerships/lists/:list", (req) => (LISTS[req.params.list] ? ok({ list: req.params.list, values: ordered(req.params.list) }) : notFound()));
+route("GET /api/v1/partnerships/lists/:list/suggestions", (req) => {
+  if (!OPEN.includes(req.params.list)) return invalid({ list: ["Not an open list"] });
+  return paged(ordered(req.params.list).filter((v) => v.active).map((v) => ({ label: v.label })), req, { search: (v) => [v.label] });
+});
 route("POST /api/v1/partnerships/lists/:list", (req) => {
   const list = LISTS[req.params.list];
   if (!list) return notFound();

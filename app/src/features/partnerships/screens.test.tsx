@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ModalProvider } from "@mycity/ui";
 import { installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
@@ -143,6 +144,47 @@ describe("Partnerships on the contract", () => {
     expect(within(dialog).getByRole("button", { name: "Add Option" })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: /Advanced/ }));
     for (const label of ["Impact Rating", "Commission %", "Validity", "Team"]) expect(await within(dialog).findByText(label)).toBeTruthy();
+    // Impact is typed or picked: MyCity's names are suggested, and one it does not hold is added as typed (§6.3).
+    const impact = within(dialog).getByRole("combobox", { name: /^Impact( Optional)?$/ });
+    fireEvent.focus(impact);
+    expect(await within(dialog).findByRole("option", { name: "Brand Visibility" }, { timeout: 8000 })).toBeTruthy();
+    fireEvent.change(impact, { target: { value: "Tourism Reach" } });
+    fireEvent.keyDown(impact, { key: "Enter" });
+    expect(within(dialog).getByRole("button", { name: "Remove Tourism Reach" })).toBeTruthy();
+  }, 30000);
+
+  it("Documents: a row opens its file in the viewer; each has Download, and an upload has Remove Document", async () => {
+    await open("/partnerships?tab=partners");
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Documents" }, { timeout: 8000 }), { button: 0 });
+    // An upload on every partner of the first page, so the one open beside the list has one.
+    const partners = await api.call("GET /api/v1/partnerships/partners", { query: {} });
+    for (const p of partners.data) await api.call("POST /api/v1/partnerships/documents", { body: { document_id: crypto.randomUUID(), kind: "MOU", partner_id: p.partner_id } });
+    await act(async () => invalidate("/api/v1/partnerships/documents"));
+    expect(await screen.findByRole("button", { name: "Download Upload.pdf" }, { timeout: 8000 })).toBeTruthy();
+    const removes = screen.getAllByRole("button", { name: "Remove Upload.pdf" });
+    expect(removes.length).toBe(screen.getAllByRole("button", { name: "Download Upload.pdf" }).length);
+    // A signed copy the hub filed has Download and no Remove.
+    for (const b of screen.queryAllByRole("button", { name: /^Download .* Agreement\.pdf$/ })) expect(b.closest("tr")?.querySelector('[aria-label^="Remove"]')).toBeNull();
+
+    fireEvent.click(removes[0]!);
+    const ask = await screen.findByRole("alertdialog", {}, { timeout: 8000 });
+    fireEvent.click(within(ask).getByRole("button", { name: "Remove Document" }));
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: "Remove Upload.pdf" }).length).toBe(removes.length - 1), { timeout: 8000 });
+
+    fireEvent.click(screen.getAllByRole("button", { name: /^Download / })[0]!.closest("tr")!.querySelector("td")!);
+    expect(await screen.findByRole("dialog", {}, { timeout: 8000 })).toBeTruthy();
+  }, 30000);
+
+  it("Upload Document: Kind is typed or picked from MyCity's document kinds", async () => {
+    await open("/partnerships?tab=partners");
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Documents" }, { timeout: 8000 }), { button: 0 });
+    fireEvent.click(await screen.findByRole("button", { name: "Upload Document" }, { timeout: 8000 }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+    const kind = within(dialog).getByRole("combobox", { name: /^Kind/ });
+    fireEvent.focus(kind);
+    expect(await within(dialog).findByRole("option", { name: "Service Agreement" }, { timeout: 8000 })).toBeTruthy();
+    fireEvent.change(kind, { target: { value: "Deal Merchant Agreement" } });
+    expect(await within(dialog).findByRole("option", { name: /^Add .Deal Merchant Agreement.$/ }, { timeout: 8000 })).toBeTruthy();
   }, 30000);
 
   it("on a phone nothing opens until a row is tapped, then the record opens in a sheet", async () => {

@@ -8,6 +8,8 @@ import {
   Button,
   CheckboxField,
   ChoiceField,
+  ComboField,
+  ComboListField,
   DateField,
   DateRangeField,
   Field,
@@ -24,7 +26,7 @@ import {
   type FieldState,
   type PlaceValue,
 } from "@mycity/ui";
-import { SCOPES, useCategoryOptions, useListOptions } from "../lib";
+import { SCOPES, useCategoryOptions, useListSuggestions } from "../lib";
 
 /**
  * The fields New Lead, New Partner, New Deal and their edits share (docs/guides/partnerships.md §10.1:
@@ -97,7 +99,7 @@ export function OwnerField({ f, label = "Owner", name = "owner_id", initial }: {
 export function OrganisationPart({ f, kind, owner, custom }: { f: Bound; kind: "lead" | "partner"; owner?: PersonRef | null; custom?: CustomField[] }) {
   const x = b(f);
   const categories = useCategoryOptions();
-  const sources = useListOptions("lead_source");
+  const sources = useListSuggestions("lead_source");
   return (
     <>
       <Field label="Name" {...x.status("name")}><TextField {...txt(f, "name")} placeholder="House of Hevix" /></Field>
@@ -115,7 +117,7 @@ export function OrganisationPart({ f, kind, owner, custom }: { f: Bound; kind: "
         )}
         {kind === "partner" && <Field label="Partner Since" optional {...x.status("since")}><DateField {...txt(f, "since")} /></Field>}
         {kind === "lead" && (
-          <Field label="Source" optional {...x.status("source")}><SelectField {...txt(f, "source")} options={[["", "None"], ...sources]} placeholder="Choose One" /></Field>
+          <Field label="Source" optional {...x.status("source")}><ComboField {...txt(f, "source")} list={sources} option={(s) => s.label} placeholder="Referral" /></Field>
         )}
         {kind === "lead" && <ImpactFields f={f} />}
         {kind === "lead" && <Field label="Comments" optional {...x.status("comments")}><TextAreaField {...txt(f, "comments")} /></Field>}
@@ -270,7 +272,7 @@ export function dealBody(v: Record<string, unknown>, deal?: { money: boolean; cu
  * Impact, custom fields and a deal's terms (§6.3, §6.5, §6.6, §10.1)
  * ------------------------------------------------------------------ */
 
-/** Several of a list's values, each a tick (Impact; a Pick Many custom field). */
+/** Several of a list's values, each a tick (a Pick Many custom field). */
 function ManyField({ value, onChange, options }: { value: string[]; onChange: (v: string[]) => void; options: Array<[string, string]> }) {
   return (
     <span className="flex flex-col">
@@ -281,17 +283,15 @@ function ManyField({ value, onChange, options }: { value: string[]; onChange: (v
   );
 }
 
-/** Impact: the values it serves, a rating and a note (Advanced). */
+/** Impact: the values it serves, typed or picked from MyCity's list (a new one joins it, §6.3), a rating and a note (Advanced). */
 export function ImpactFields({ f }: { f: Bound }) {
   const x = b(f);
-  const impacts = useListOptions("partnership_impact");
+  const impacts = useListSuggestions("partnership_impact");
   return (
     <>
-      {impacts.length > 0 && (
-        <Field label="Impact" optional {...x.status("impact")}>
-          <ManyField value={(x.values.impact as string[] | undefined) ?? []} onChange={(v) => x.set("impact", v)} options={impacts} />
-        </Field>
-      )}
+      <Field label="Impact" optional {...x.status("impact")}>
+        <ComboListField value={(x.values.impact as string[] | undefined) ?? []} onChange={(v) => x.set("impact", v)} list={impacts} option={(i) => i.label} max={9} placeholder="Brand Visibility" />
+      </Field>
       <Field label="Impact Rating" optional {...x.status("impact_rating")}>
         <SelectField {...txt(f, "impact_rating")} options={[["", "None"], ["high", "High"], ["medium", "Medium"], ["low", "Low"]]} placeholder="Choose One" />
       </Field>

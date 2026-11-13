@@ -44,7 +44,7 @@ export function DealForm({ close, partnerId, deal, categoryId }: { close: () => 
         next_action_on: deal.next_action_on ?? "",
         comments: deal.comments ?? "",
         owner_id_person: deal.owner ? [deal.owner] : [],
-        impact: deal.impact,
+        impact: deal.impact_labels,
         impact_rating: deal.impact_rating ?? "",
         impact_note: deal.impact_note ?? "",
         commission_pct: deal.commission_pct ?? "",

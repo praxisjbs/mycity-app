@@ -368,7 +368,8 @@ Workspace services.
 
 - `reference_value` domains: **MyCity's** `partnership_stage` (with `metadata.meaning`),
   `partnership_impact`, `lead_source`, `partner_document_kind` (Proposal, MOU, Service Agreement,
-  Contract, Brief, Invoice, Media, Other), entered on Categories or by Start From Tracker; **seeded**
+  Contract, Brief, Invoice, Media, Other), entered on Categories or by Start From Tracker, and the last
+  three also by any form that types a name they do not hold (§6.3, open lists); **seeded**
   (code lists the code switches on, A26) `deal_health` (`on_track`, `follow_up_required`, `stalled`) and
   `interaction_type` (`call`, `meeting`, `email`, `visit`, `note`).
 - `7099` (merged) seeds business choices A26 forbids; a fix-forward switches them off (`active =
@@ -413,6 +414,7 @@ The schemas and their fields are catalogued in Appendix C.
 | `POST /categories/:id/checklist`, `PATCH /checklist-items/:id` | `ChecklistItemCreate`, `ChecklistItemUpdate` → `CategoryDetail` | edit · `partnerships.configure` | | |
 | `GET /fields`, `POST /fields`, `PATCH /fields/:id` | `FieldListQuery` → `FieldList`; `FieldCreate`, `FieldUpdate` → `Field` | view; edit · `partnerships.configure` | no | §6.3 |
 | `GET /lists/:list`, `POST /lists/:list`, `PATCH /lists/:list/:code` | → `ListValues`; `ListValueCreate`, `ListValueUpdate` | view; edit · `partnerships.configure` | no | Stages carry a meaning |
+| `GET /lists/:list/suggestions` | `OpenListParams`, `ListSuggestionQuery` → `ListSuggestionPage` | view | yes | An open list's active names in its order, narrowed by `q`: what Kind, Source and Impact suggest (§6.3) |
 | `POST /setup/from-tracker`, `POST /setup/from-tracker/apply` | `TrackerSetup` → `TrackerSetupDraft`; `TrackerSetupApply` → `SetupResult` | edit · `partnerships.configure` | | Start From Tracker (§6.13) |
 | `GET /proof-points`, `POST /proof-points`, `PATCH /proof-points/:id`, `POST /proof-points/:id/image` | `ProofPointCreate`, `ProofPointUpdate`, an upload → `ProofPoint` | view; edit · `partnerships.configure` | yes | §6.11; the image is uploaded to the proof point and stored against it, never named by `document_id` |
 | `GET /leads/summary`, `GET /leads` | → `LeadsSummary`; `LeadListQuery` → `LeadPage` | view · §6.1 | yes | |
@@ -426,7 +428,8 @@ The schemas and their fields are catalogued in Appendix C.
 | `GET /duplicates` | `DuplicateQuery` → `Duplicates` | create | no | Over leads and partners, advisory, at most 25 |
 | `POST /contacts`, `PATCH /contacts/:id` | `ContactCreate`, `ContactUpdate` → `Contact` | edit · §6.1 | | |
 | `GET /interactions`, `POST /interactions` | `InteractionListQuery` → `InteractionPage`; `InteractionCreate` → `Interaction` | view; create · §6.1 | yes | |
-| `GET /documents`, `POST /documents` | `PartnerDocumentQuery` → `PartnerDocumentPage`; `PartnerDocumentAttach` → `PartnerDocument` | view; edit · §6.1 | yes | Every document of a record; Upload Document tags a vault upload |
+| `GET /documents`, `POST /documents` | `PartnerDocumentQuery` → `PartnerDocumentPage`; `PartnerDocumentAttach` → `PartnerDocument` | view; edit · §6.1 | yes | Every document of a record; Upload Document tags a vault upload with its kind by name (a new one joins the list, §6.3) |
+| `DELETE /documents/:id` | `IdParams` (the file's `document_id`) → 204 | edit · §6.1 | | Remove Document: an upload only (`DOCUMENT_KEPT` for a signed copy, an agreement or a proposal); the row and the vault's file go in one transaction, the bytes after commit |
 | `GET /work` | `PartnerWorkQuery` (`partner_id` or `lead_id`, `deal_id`, `kind`) → `PartnerWorkPage` | view · §6.1 | yes | Projects, tasks, events the reader may see, and the hidden counts (§6.16) |
 | `GET /proposals/summary`, `GET /proposals`, `GET /proposals/:id` | → `ProposalsSummary`; `ProposalListQuery` → `ProposalPage`; → `ProposalDetail` | view · §6.1 | yes | |
 | `POST /proposals` | `ProposalStart` → `ProposalDetail` | create · §6.1 | | Opens the studio, queues the questions |
@@ -530,6 +533,20 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `POST /par
   Visibility, User Acquisition, Vendor Acquisition, Content Collaboration, Community Growth, Business
   Listings, Strategic Positioning), **lead sources** and **document kinds** are lists too. Impact is one
   or more values, a rating (High, Medium, Low) and a note.
+- **Open lists** (JBS Praxis, 13/11/2026): impact, lead sources and document kinds are typed or picked,
+  never only picked. Upload Document's Kind and a lead's Source are a `ComboField`, Impact a
+  `ComboListField`; each suggests the list's active names in its order, 25 at a time
+  (`GET /lists/:list/suggestions`). A form sends the words (`listWords`: a name, or a code as the importer
+  and the cards send it), and the owning service turns them into a code in its own transaction
+  (`partner_pipeline.lists.codeFor`, `codesFor`): the value with that code or that name whatever the case,
+  an active one first and then a retired one (a record keeps a retired value; it is never added twice), or
+  else a new value named as typed, added at the end of the list with `list_value.created`. Two saves
+  typing the same new name at once add it once (an advisory lock on the list). Whoever may save the form
+  may add to its list this way; renaming, moving and retiring stay with `partnerships.configure` on Pipeline
+  Settings. A record's reads carry its impacts by name (`impact_labels`) beside their codes, so Edit Lead and
+  Edit Deal show names. The stages stay a closed list: a stage carries a meaning the rules count. Praxis AI's
+  Add Partner Document card is unchanged: its kind, as the list writes it or as the card holds it, files
+  through Upload Document's own request, so a kind the list does not hold joins it at the press (§9).
 - **Custom fields:** holders of `partnerships.configure` add a field on Categories, for one category or
   all, for leads, partners or deals, of a type (text, long text, number, money, date, pick, multi-pick,
   yes or no, link). Values are checked by type on the server; money through `shared/money`; picks from
@@ -1024,6 +1041,7 @@ holds a `PlaceInput` key to its owner's name, and the contract's region key is `
 | `agreement.sent`, `agreement.viewed`, `agreement.signed` | The signature service | Status; the sealed copy to every signer and the owner; `deal.signed` |
 | `agreement.activated`, `agreement.expiring`, `agreement.renewed`, `agreement.closed` | Daily job, Renew, Close | The reminder `agreement_renewal` (`defineReminder`) at the notice date and nearer |
 | `deal_return.saved` | Enter Returns, the import | Audit |
+| `partner_document.attached`, `partner_document.removed` | Upload Document, a signed copy, Add Partner Document; Remove Document | Audit (Settings · Audit Log); the vault's `document.removed` beside a removal |
 | `mailbox.thread_bound`, `mailbox.thread_unbound` | Link to Partner, Unlink | Audit (mailbox's own events) |
 | job `proposal-questions`, `proposal-draft` | The studio | The AI action, validation, render; Try Again on failure |
 | job `partner-inactivity` (scheduler `partner-inactivity`) | Each morning after `home-alert-sweeps` | §6.12 |
@@ -1134,7 +1152,8 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   `AgreementSignedCopyAdd`, risk `approval`) when a matched record has an agreement in `sent` or
   `viewed`, run by `agreements.signedCopy`; otherwise **Add Partner Document**
   (`partner_documents.attach`, `PartnerDocumentAdd`: Upload Document's request with the kind by its
-  name, MyCity's `partner_document_kind`), run by `partners.documents.attach`. `not_offered` reaches
+  name, MyCity's `partner_document_kind`; a name the list does not hold is filed and joins the list, §6.3),
+  run by `partners.documents.attach`. `not_offered` reaches
   `SignedCopyRecord` through Record Signed Copy (`via`); `PartnerDocumentAttach`, an Attach rather
   than a create or edit form, is in no `not_offered` and is sent by Add Partner Document's run. Nothing else is made:
   no agreement drafted, no partner or lead created. The staging setup seed enters the document kinds
@@ -1155,7 +1174,7 @@ Verb Noun buttons, Lucide icons.
 |---|---|---|---|
 | Pipeline | KPI strip (Open Deals, Signed This Year, Signed Value, Stalled); filters (Stage, Category, Region, Owner, Health); Stages bars; Longest at a Stage (record, deal, stage, days, owner); Stalled (record, deal, blockers, owner); New Lead | Help on Stalled; help on Signed Value | Stage meanings and counting: §6.3, §6.6 |
 | Categories | Category list (name, partners, leads, default commission); the picked category: Defaults (Default Commission, Default Validity, Counts as Vendor), Templates (name, kind, default, version; Add Template, Tidy With AI, Edit), Delivery Checklist (item, due; Add Item, Move Up, Move Down, Retire), Custom Fields (label, type, applies to, filterable; Add Field); Pipeline Settings (stages with what each counts as; impact; sources; document kinds); Proof Points; New Category; Start From Tracker | Help on Counts As; help on Counts as Vendor | Why lists are data (A26): §6.3 |
-| Partner 360 | Header (logo, name, category, region, owner, status); KPI cards (§6.2); tabs; on Overview each deal's stage switcher, Health, Blockers, Next Action, Expected Close; New Deal, Log Interaction, New Proposal, Generate Agreement, Upload Document, Enter Returns, New Project, New Task, New Event, Add Contact | Help on Days Since Last Contact; help on Dormant | How the 360 is assembled: §6.2 |
+| Partner 360 | Header (logo, name, category, region, owner, status); KPI cards (§6.2); tabs; on Overview each deal's stage switcher, Health, Blockers, Next Action, Expected Close; New Deal, Log Interaction, New Proposal, Generate Agreement, Upload Document, Enter Returns, New Project, New Task, New Event, Add Contact; on Documents (the Lead 360's too) a row opens its file in the viewer (a file it cannot show downloads), Download on each row, Remove Document on an upload | Help on Days Since Last Contact; help on Dormant | How the 360 is assembled: §6.2 |
 | Lead 360 | Header with the status from the deal; KPI cards (Projected Value, Days at Stage, Health, Days Since Last Contact); tabs; the stage switcher; Log Interaction, New Proposal, Close as Lost, Convert to Partner | Help on Status: read from the deal's stage | The conversion transaction: §6.4 |
 | Stage switcher, Set Health | Stages in order, the current marked; Why (required back, On Hold, Closed Lost); Health; Blockers (required for Stalled); Attach Signed Copy when moving to a signed stage | Help on a stage: what it counts as | History mechanics: §6.5 |
 | Partners and Leads lists | List (name, category, region, stage, health, owner, last contact; leads: status); search; filters incl. filterable custom fields; Export; New Partner or New Lead; Lost chip on Leads | None | Dedup scoring: §6.2 |
@@ -1190,7 +1209,8 @@ From `@mycity/ui` (docs/COMPONENTS.md): `ListDetail`, `DetailPane`, `DataView`, 
 `MoneyField`, `DateField`, `DateRangeField`, `AddressField`, `PlacesField`, `UploadField`, `Switch`,
 `Wizard`, `StepBar`, `OtpField`, `SignatureField`, `PdfViewer`, `Timeline`, `Chain`, `Meter`,
 `BarChart`, `AreaChart`, `DonutChart`, `TrendChart`, `ActionGroup`, `Tooltip`, `HelpTerm`, `EmptyState`,
-`Paper`, `RichText`; and the app's own `ExportAction` (`app/src/features/shared/sections.tsx`), as
+`Paper`, `RichText`, `ComboField` (Upload Document's Kind, a lead's Source) and `ComboListField` (Impact,
+§6.3); and the app's own `ExportAction` (`app/src/features/shared/sections.tsx`), as
 every screen's Export already uses. **New**, each added with `npm run new:component` (header, test,
 gallery page), never inside the feature: `StageSwitcher` (stages in order, one press to move, keyboard
 and 44 px targets), `QuestionCard` (a studio card: question, why, answer control by kind, suggestion,
@@ -1921,6 +1941,8 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · A record's documents open (§5, §7, §10.1): on the Partner 360's and the Lead 360's Documents tab a row opens its file in the app's file viewer (`useFileViewer`, `GET /documents/:id/content` under the vault's read rule), each row has Download, and an upload has Remove Document after a confirm (`DELETE /partnerships/documents/:id`, `partner_document.removed`, the file out of the vault); a signed copy, an agreement or a proposal is kept (`DOCUMENT_KEPT`). Found the same day: an upload could be listed but neither opened nor downloaded.
+- 13/11/2026 · JP · Open lists (§6.3): Upload Document's Kind, a lead's Source and Impact on New Lead, New Partner, New Deal, Edit Lead and Edit Deal are typed or picked; a name the list does not hold joins it, and Pipeline Settings still renames, moves and retires every value. New `GET /lists/:list/suggestions`; `PartnerDocumentAttach.kind`, `LeadCreate`/`LeadUpdate` `source` and every `impact` take `listWords`; `LeadDetail` and `DealDetail` gain `impact_labels`; new shared component `ComboListField` (`ComboField` gained `onPick`). Found on Praxis AI: an Add Partner Document card holding a kind MyCity's list lacked ("Service Agreement") showed Pick from the list with no list to pick from; it now files and the kind joins the list, the card unchanged.
 - 13/11/2026 · TB · Contracts and MoUs in the chat built (`praxis-ai.md` Appendix A PR 2, §9): read on `agreement-document-read`, summarised with its terms on Praxis AI's Record tab, and filed by Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else by Add Partner Document (`partner_documents.attach`) on the partner or lead it names. `SignedCopyRecord` is reached `via` Record Signed Copy; Add Partner Document's run sends `PartnerDocumentAttach`. The staging setup seed enters the document kinds of §4.3. §10 is unchanged: no Partnerships screen changes; the cards and the Record tab are Praxis AI's (`praxis-ai.md` §10).
 - 13/11/2026 · TB · Send Back on an agreement's approval no longer tells its approvers "Withdrawn: The requester withdrew this before it was decided": the handler withdraws the approval with `engine.cancel(..., sentBack: true)`, which tells nobody (the requester is told of the Send Back with its reason). Found filming M8 on Expenses, the same handler (`docs/runbooks/training-videos.md` §7).
 - 13/11/2026 · TB · Contracts and MoUs in the chat planned (`praxis-ai.md` decisions 41 to 48, Appendix A PR 2): read, summarised, and filed as Record Signed Copy or Add Partner Document (§9). Nothing built yet.
