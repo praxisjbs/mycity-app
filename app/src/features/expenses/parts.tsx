@@ -122,7 +122,7 @@ const kobo = (v: string) => {
   return minus ? -k : k;
 };
 /** A wire amount as a person types it ("-100000.00" to "-100,000"), so a filled Unit Price reads like a typed one and fits its field. */
-const asTyped = (wire: string) => {
+export const asTyped = (wire: string) => {
   const [w, f = "00"] = wire.replace(/^-/, "").split(".");
   return `${wire.startsWith("-") ? "-" : ""}${w.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${f === "00" ? "" : `.${f}`}`;
 };
