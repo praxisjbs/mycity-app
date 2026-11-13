@@ -227,6 +227,10 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     const steps = [{ title: "Order the banners" }, { title: "Book the venue" }, { title: "Order the flyers" }];
     const step = (said) => (oneNamed(steps, said, (x) => [x.title]) || {}).title || null;
     expect(["order the banners", "banners", "Order the", "venue", "the", "paint"].map(step)).toEqual(["Order the banners", "Order the banners", null, "Book the venue", null, null]);
+    // "&" is said "and", either way round: a model writes "Travel & Transport" for "Travel and Transport".
+    const cats = [{ name: "Travel and Transport" }, { name: "Branding & Printing" }, { name: "Office and Admin" }];
+    const cat = (said) => (oneNamed(cats, said, (c) => [c.name]) || {}).name || null;
+    expect(["Travel & Transport", "travel and transport", "Branding and Printing", "Office & Admin"].map(cat)).toEqual(["Travel and Transport", "Travel and Transport", "Branding & Printing", "Office and Admin"]);
   });
 
   test("a record's words as an answer to tap fit 60 characters, cut at a word and marked, and still name their record (decision 34)", () => {
