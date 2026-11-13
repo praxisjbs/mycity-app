@@ -1,13 +1,13 @@
 ---
 title: Employee Self-Service
 module: ess
-milestones: M1
-summary: Your own record: profile, attendance and clocking in, leave, documents, policies, devices, training and how you sign in.
+milestones: M1, M6
+summary: Your own record: profile, attendance and clocking in, payslips, leave, documents, policies, devices, training and how you sign in.
 icon: user
 ---
 
 Employee Self-Service is your own corner of the hub. Everything in it is about you: your details,
-your attendance, your leave, your documents and how you sign in. Nobody else sees it as you do.
+your attendance, your payslips, your leave, your documents and how you sign in. Nobody else sees it as you do.
 
 Open it from **Employee Self-Service** in the menu on a computer, or **Self-Service** in the bar at
 the bottom of a phone. Its screens are tabs along the top. On a phone, swipe the tabs sideways to
@@ -548,6 +548,44 @@ is the CEO.
 | **At least 10 characters** | The reason is too short | Say why in a full sentence |
 | **This version is not waiting on you** | Another approver decided first, or it was taken back | Nothing to do. Close it |
 
+## My Payslips {#ess-payslips screen=ess/my-payslips icon=wallet}
+
+Your payslips, a year at a time. A month appears once the CEO approves that month's run.
+
+![My Payslips](shot:ess-payslips)
+
+### Read your payslips {#ess-payslips-read}
+
+1. Open [My Payslips](/ess?tab=my-payslips).
+2. Use the arrows beside the year to see another year.
+3. The figures add up the year: **Gross**, **Net Received**, **Payslips** and **Deductions**.
+   **Next Payday** is the day your next pay is due.
+4. Each month shows its **Net** and its **Status**. **In the run** means approved, with the pay not
+   yet sent. **Paid** means it was sent. **Paid with a deduction** means something was taken from it.
+
+### Open a month's payslip {#ess-payslips-open}
+
+1. Open [My Payslips](/ess?tab=my-payslips) and press a month.
+2. Your payslip opens. **Preparing** shows while its PDF is made.
+   ![A payslip](shot:ess-payslip)
+3. Press **Download PDF** to keep it on your device.
+4. Press **Email a Copy** to send it to your work email.
+
+### See what was deducted {#ess-payslips-deductions}
+
+1. Open [My Payslips](/ess?tab=my-payslips).
+2. Press **View Details** on **Deductions**. **Salary Deductions** opens.
+3. Each line shows the **Month**, **Amount**, **Reason**, the **Query** behind a fine and its
+   **Outcome**. A fine spread over months shows each share, such as "2 of 3".
+4. Press **Open My Queries** to read the query a fine came from.
+
+### Download a whole year {#ess-payslips-year}
+
+1. Open [My Payslips](/ess?tab=my-payslips) and pick the year.
+2. Press **Download All**. One PDF holds every payslip of that year, a page each.
+
+> Tax and pension are not taken from your pay while MyCity runs simple payroll.
+
 ## My Leave {#ess-leave screen=ess/my-leave icon=calendar}
 
 Your leave this year: what you are entitled to, what you have taken and booked, and your requests.
@@ -1085,6 +1123,25 @@ crop: modal
 marks:
   1: button "Read Full Policy" | Read it in full
   2: button "Acknowledge" | You have read it
+```
+
+```shot ess-payslips
+open: /ess?tab=my-payslips
+as: staff
+sources:
+  - app/src/features/payroll/parts.tsx
+marks:
+  1: button "Download All" | The whole year in one PDF
+```
+
+```shot ess-payslip
+open: /ess?tab=my-payslips
+as: staff
+sources:
+  - app/src/features/payroll/parts.tsx
+do:
+  - click: row 1
+crop: modal
 ```
 
 ```shot ess-leave

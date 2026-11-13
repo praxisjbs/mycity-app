@@ -85,6 +85,10 @@ mycity-app/
 │                             and the Talent Pool, through the services, on the Implementation
 │                             Team as hiring managers and panelists, tested by tests/integration/
 │                             recruitment-staging-seed.test.js;
+│                             58_payroll.js: six invented @example.test people, last month's run
+│                             locked by the CEO and this month's computed, an advance over two
+│                             months and two joiners, everyone else left out, through the
+│                             services, tested by tests/integration/payroll-staging-seed.test.js;
 │                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest;
 │                             65_partnership_setup.js: Partnerships · Categories as MyCity sets it up (stages,
 │                             impacts, types, the Events checklist and Deal Merchant Agreement, proof points),
@@ -744,7 +748,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M3 | `query-rule-evaluate` | `query-rule-sweep` (people with a task due yesterday still open or done late queued for `overdue_task`, 06:20 Lagos) |
 | M4 | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` | `assessment-expiry`, `interview-reminders`, `talent-pool-purge` (the Talent Pool moved from M5, TB 04/11/2026), `apply-cv-purge` (CVs on Apply links that ended without an application, nightly at 02:47 Lagos) |
 | M5 | | `signature-reminders` (lapsed signature requests ended, a sent offer's among them, 06:17 Lagos), `onboarding-dispatch` (cases whose start date has come begin onboarding with their plan's steps; owners of overdue steps reminded once, 06:43 Lagos) |
-| M6 | `payroll-compute`, `payslip-render` | |
+| M6 | | |
 | M7 | `partner-inactivity` (the morning's follow-ups, re-run by hand), `agreement-renewal`, `proposal-questions` (a brief's question cards, after New Proposal and Try Again), `proposal-draft` (the writing job: the draft, its figure check and its pages) | `partner-inactivity` (each newly quiet partner's and lead's follow-up: its deals Follow-Up Required and one task for its owner, 06:30 Lagos, after `home-alert-sweeps`; `docs/guides/partnerships.md` §6.12), `agreement-renewals`, `proposal-expiry` (sent proposals past `valid_until` expired and their links stopped, daily, until `agreement-renewals` takes it; `docs/guides/partnerships.md` §13.2) |
 | M8 | `budget-threshold` (the morning's sweep, re-run by hand for a day), `approval-ageing` | `budget-threshold` (each budget line 90% used, committed and spent, told to its department's head and Operations & People once, 07:00 Lagos; `docs/guides/expenses.md` §6.6), `approval-ageing` |
 | M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |

@@ -1,0 +1,70 @@
+{
+  "payroll-add-adjustment": {
+    "spec": "38ad336b9ff96a86",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "payroll-configurations": {
+    "spec": "28c3bccf2c9f2d91",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "payroll-deductions": {
+    "spec": "1a9e307c4f24cca9",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "payroll-payslip": {
+    "spec": "e3c6a98de68cf586",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "payroll-payslips": {
+    "spec": "5cebef18ba750844",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "payroll-record-advance": {
+    "spec": "0ac0b8a123843d60",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "payroll-runs": {
+    "spec": "810dfc2449dccc83",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "payroll-set-pay-day": {
+    "spec": "b671226aad0d7279",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "payroll-statutory-item": {
+    "spec": "83698235c58bbde9",
+    "source": "ecad59d625ee3e94",
+    "devices": [
+      "desktop"
+    ]
+  }
+}

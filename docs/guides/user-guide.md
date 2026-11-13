@@ -10,7 +10,7 @@
 | Capabilities | none of its own; the guide reads every module's grants and capabilities to decide what each reader receives |
 | Screens (PROGRESS.md rows) | #102 Knowledge Hub · User Guide, #108 Public · Help |
 | Status | Agreed |
-| Last changed | 08/11/2026 |
+| Last changed | 13/11/2026 |
 
 Sources: MILESTONES §16 (M11: "a user manual written per module against the screens as shipped",
 "the manual covers every module with screenshots from the shipped build"), FRONTEND_GUIDE §5.1 (tier 3
@@ -528,6 +528,8 @@ word limits do not count it, as they do not count an article.
 - Who signs off each milestone's chapters before the next PR starts (TB proposed as reviewer).
 
 ## 14 · Change log
+
+- 13/11/2026 · JP · The Payroll chapter (M6 PR 8, `docs/manual/payroll.md`, `milestones: M6`): Payroll Runs, Payslips, Deductions and Configurations, the month from New Run to Mark Paid, fines and advances, the pay day, Bank Details Required, statutory figures with their sources, Remove Change and Advanced Payroll; the ESS chapter's My Payslips section (`milestones: M1, M6`); their pictures.
 
 - 11/11/2026 · TB · Procedures under a section about a screen: the published department SOPs whose steps happen there, with their department, each opening the SOP (§3 step 4; `docs/guides/knowledge.md` §3 step 3, M10 PR 2). The Knowledge Hub chapter gains an SOPs section.
 

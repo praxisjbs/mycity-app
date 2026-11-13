@@ -41,6 +41,8 @@
 /app/                                              @Ghosted34 @tomblakeasaah196 @swizfcodes
 /public-app/                                       @Ghosted34 @tomblakeasaah196 @swizfcodes
 /assets/                                           @Ghosted34 @tomblakeasaah196 @swizfcodes
+# Payroll's screens are LA's (docs/guides/payroll.md §13.1 item 40); My Payslips stays under /app/ (AJ)
+/app/src/features/payroll/                         @LovedataX @swizfcodes @tomblakeasaah196
 # The design system (F11): every shared component, its gallery and catalogue
 /packages/ui/                                      @Ghosted34 @tomblakeasaah196 @swizfcodes
 /docs/COMPONENTS.md                                @Ghosted34 @tomblakeasaah196 @swizfcodes

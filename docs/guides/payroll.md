@@ -10,7 +10,7 @@
 | Capabilities | `payroll.configure` (switch the advanced option on or off, set the pay day, enter statutory rates, bands, salary grades, pay components and a person's Prior Pay; the run itself needs only the `payroll` grant) |
 | Screens (PROGRESS.md rows) | #45 Payroll Runs, #46 Payslips, #48 Deductions, Configurations (new; PR 1 registers it in the next free row, #109 while free (#107 and #108 are the public site's), and marks #47 Salary Structure and #49 Statutory Dropped), #11 My Payslips; changes to Home (the Payroll In Progress card), Settings · Approvals (#72, the `payroll.run` flow), People · Attendance (#25, its Deductions and Overtime views gain a link to the run), Queries & Sanctions · Sanctions (a fine's Payroll state) and the Notification Settings (#74, the Payroll category) |
 | Status | Agreed |
-| Last changed | 12/11/2026 |
+| Last changed | 13/11/2026 |
 
 ---
 
@@ -1203,10 +1203,9 @@ re-arms the stage and tells the CEO instead of approving, and refuses `auto_appr
 run is about no one person), and the actor the submitter.
 
 **Jobs.** `pdf-render` (existing) renders every payslip and the batch; `email-send` (existing) delivers the
-mails. Compute runs inline in the request. `src/jobs/handlers/payroll-compute.js` and `payslip-render.js`
-exist as empty stubs. PR 2 measured Compute for 308 people at 550 ms on the real migrations
+mails. Compute runs inline in the request. PR 2 measured Compute for 308 people at 550 ms on the real migrations
 (`tests/integration/payroll-run.test.js`; `PAYROLL_MEASURE=1` prints it), far under the three seconds that would move it to
-`payroll-compute`, so there is no compute job and both stubs are deleted at the end (PR 8, README §11.5). There is no scheduler:
+`payroll-compute`, so there is no compute job, and PR 8 deleted the empty `payroll-compute.js` and `payslip-render.js` stubs (README §11.5). There is no scheduler:
 no reminder on pay day was agreed (the approver's waiting approval is already reminded by the engine's
 reminder rules).
 
@@ -1722,7 +1721,7 @@ Each is LA's to change with a line in §14; each is the smallest reading that ma
 1. **One run per month, ever.** Discard deletes a Draft or Computed run (nothing was frozen); there is no cancelled state.
 2. **Five statuses:** `draft`, `computed`, `submitted`, `approved`, `paid`. The demo's Previewed is Computed and its
    Locked is Approved.
-3. **Compute is inline** in the request; the `payroll-compute` and `payslip-render` job stubs are deleted at the end
+3. **Compute is inline** in the request; the `payroll-compute` and `payslip-render` job stubs were deleted in PR 8
    (PR 2 measured 550 ms for 308 people, 09/11/2026, so there is no job).
 4. **Submit recomputes and freezes** pay items and instalments (narrowing attendance's T4 from "until locked");
    Send Back and Reject release them; `RUN_CHANGED` guards the totals the submitter saw.
@@ -1837,6 +1836,18 @@ Each is LA's to change with a line in §14; each is the smallest reading that ma
     relief from its snapshot; computed again while Draft or Computed, it takes the cumulative method.
 44. **Prior Pay is the screen's word for pay to date** (PR 11): the button is Set Prior Pay (a button is three words at
     most), the API's `pay-to-date`; its year is this year or next, and its certificate a restricted `leaving_certificate`.
+45. **Download My Data keeps no payslips** (PR 8; Appendix A asked for them in or said to be out): the workbook stays "no
+    salary or pay" (`docs/guides/ess.md` §6), and My Payslips' Download All already hands the person each year's payslips as
+    one PDF, the document they read on screen. A Payslips sheet would be a second copy of that file in another shape.
+46. **The staging seed pays invented people only, and the CEO's login approves its locked run** (PR 8, asked in its chat,
+    13/11/2026; §13.1 item 19). `seeds/staging/58_payroll.js` adds six invented people at `@example.test` addresses (the
+    mailer never hands a reserved name to a mail server) in the Implementation department, with no login; the Implementation
+    Team's account opens, computes and submits the runs and records the advance; the real CEO approves last month's run,
+    the one approval payroll has (item 7), as the expenses seed's CEO authorises a requisition, so the engine tells the CEO
+    of it as of any approval. A run takes everyone paid in its month (§6.1), so every person who is not a test person is
+    left out of both runs ("Not in the demonstration"): no real pay is computed, and leaving a person out tells them
+    nothing. The runs and the advance are made only while the database has no run at all. The test people's days are
+    judged by attendance like anyone's, so their absences reach this month's run on its next Compute.
 
 ### 13.3 Still open
 
@@ -2066,6 +2077,16 @@ the screens' skeleton; 23 to 27 Nov PR 5 to PR 8 and the demo.
   payslips (in or said to be out); the M6 training-video plan in `docs/runbooks/training-videos.md` once the screens are
   final.
 - Done when: Appendix B is ticked end to end on staging.
+- Built 13/11/2026 (`m6/release`, after PR 11 merged as praxisjbs/mycity-app#134): `seeds/staging/58_payroll.js` (number 58:
+  after the seeds it reads, `10_staff` and `50_queries`, whose fine it leaves waiting; no seed reads payroll's tables),
+  invented people and the CEO's approval as §13.2 item 46 records, tested by `tests/integration/payroll-staging-seed.test.js`;
+  `docs/manual/payroll.md` (`milestones: M6`, a section for each of the four tabs) and the ESS chapter's My Payslips
+  section (`milestones: M1, M6`), their pictures taken; the job stubs deleted (§13.2 item 3) and off `README.MD` §5.15 and
+  Appendix D; CODEOWNERS' `/app/src/features/payroll/` line (LA, GE, TB); the demo's FAQ (`demo.html`, `demo (5).html`) no
+  longer says the 27th; the ESS guide's payroll lines brought to what was built (its `payslip` row, `payslip.published`,
+  the Coming Soon examples; "27th", "Payroll approves" and "Coming Soon until M6" had gone already); Download My Data's
+  payslips said to be out (§13.2 item 45); the M6 video plan (`docs/runbooks/training-videos.md` §8). Left: Appendix B on
+  staging once this merges and staging's mail is resumed (its item 9).
 
 ### PR 9 · The statutory research register (`m6/statutory-research`) · documentation only
 
@@ -2296,8 +2317,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `.calc` (pure), `.inputs`, `.run`, `.lock`, `.config.repo`, `.ai`, `.search`, `.test`; `payslips`: `.routes`,
   `.controller`, `.service`, `.repo`, `.events`, `.breakdown`, `.pdf`, `.ai`, `.search`, `.test`; `deductions`: `.routes`,
   `.controller`, `.service`, `.repo`, `.events`, `.acceptance`, `.ai`, `.search`, `.test`; `salary_structure` and
-  `statutory` as in README §5.9 (`statutory.rates`, `statutory.report`). The stubs for jobs
-  (`src/jobs/handlers/payroll-compute.js`, `payslip-render.js`) are deleted at the end if unused (decision 3 of §13.2).
+  `statutory` as in README §5.9 (`statutory.rates`, `statutory.report`). M6 has no job handler or scheduler: the two empty
+  job stubs were deleted in PR 8 (decision 3 of §13.2).
 - **Other modules touched:** `attendance.pay.js`, `sanctions.fines.js`, `organisation` (tax and pension numbers, PR 5;
   the Tax and Pension fields, the import's columns and `employee.rent.js`, the declared rent, PR 11), `shared/places/owners.js`
   (the rented property's address, PR 11),
@@ -2305,7 +2326,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `shared/rbac/field-mask.js`, `shared/workflow/definitions.js`, `shared/route-map.js`, `shared/search/screens.js`.
 - **Schema:** `migrations/6000_payroll.sql`, `6010_payroll_deductions.sql`, `6020_payroll_advanced.sql`,
   `6030_leave_unpaid.sql`, `6040_statutory_sources.sql`, `6050_statutory_law.sql`; `seeds/reference/6099_seed_payroll.sql`;
-  `seeds/staging/NN_payroll.js`.
+  `seeds/staging/58_payroll.js` (PR 8, tested by `tests/integration/payroll-staging-seed.test.js`).
 - **Templates:** `templates/documents/payslip.html`, `payslip-batch.html`, `statutory-report.html`;
   `templates/email/payslip-ready.html`.
 - **Frontend:** `app/src/features/payroll/` (the files of PR 7; `Deductions.tsx` came with PR 3 and `Configurations.tsx`
@@ -2321,6 +2342,11 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · PR 8 (the staging seed, the User Guide and the release check, `m6/release`), after PR 11 merged. §13.2
+  item 45 (Download My Data keeps no payslips) and item 46 (the staging seed's invented people, the CEO's login approving
+  its locked run, everyone else left out; asked in PR 8's chat); §7 and §13.2 item 3 say the job stubs are deleted;
+  Appendix A's PR 8 built note; Appendix D names `58_payroll.js` and its test and drops the stubs. The User Guide's Payroll
+  chapter and My Payslips section; `docs/guides/ess.md`'s payroll lines; the M6 video plan.
 - 12/11/2026 · JP · PR 11 (the statutory engine to the research, `m6/statutory-law`) built what §6.16 confirms, every line the engine can produce tracing to a row of it; the guide meets what was built (the header, §2, §3.5, §4, §5, §6.11 rules 3, 3a and 4, §6.12, §6.14's advanced example, §6.15, §6.16's Built column, §7 to §11, §13.2 items 14, 22, 24, 28 and 32 amended and items 36 to 44 added, Appendices A, C and D). TB's answers, asked before building, are §13.1 items 41 to 46; §13.3 items 5 to 9 and 11 leave it, and items 4 and 10 stay open and unbuilt. PAYE is cumulative on the year to date with the year's bands scaled by month/12, a PAYE Refund earning line when the cumulative tax falls, the month's taxable pay kept on the payslip (`payslip.taxable_pay`) and Prior Pay for a person's year before MyCity's first statutory month; employee pension and NHF reduce taxable pay in code, so `PayeBasis`, the three conventions of the API, the Conventions card and `NO_CONVENTIONS` are gone (the columns stay, unread); the relief is retired (refused, never listed or computed, its rows kept) and rent relief built on each person's declared rent with its evidence; the minimum wage is an item, exempting PAYE at or below it on the rate of pay; NHF is a person's choice, on gross; pension's base is never below basic, housing and transport; ITF's and pension's thresholds are entered, not computed; an advanced run waits for its year's earlier runs (`EARLIER_RUN_OPEN`); the statutory report prints each item's base and remittance, how PAYE was worked out, and PAYE by State of Residence. People · Employees gained the Tax and Pension step (Tax ID, Pension PIN, Pension Administrator, NHF Number, Contributes to NHF, State of Residence), the record's Tax and Pension tab with Declare Rent, and the import's six columns. Migration `6050`. §13.1 item 42's button reads Set Prior Pay, a button being three words at most. The option still ships off and no figure is in any seed. Checked on the real API (a local database with the mock's 25 people, the API, the worker and the app in live mode, the test figures entered with a TEST SOURCE) at 1440 and 390 px: the Tax and Pension step saved through Edit Record and read on the record's tab; Declare Rent with its evidence uploaded and the address taken from the device while address search had no key; Configurations' eight items with their Figure and Source, the retired relief and a convention refused by the API; Set Prior Pay in a person's sheet; a November run blocked by an October draft ("An earlier run this year is still open") and, with October discarded, computed to the kobo (Zainab Abubakar's PAYE ₦56,700.00 on ₦418,500.00 with her Prior Pay and 11/12 of her rent relief; no PAYE for Kemi Adebayo, who had nothing to date; nothing taxed for Tolu Adeyemi below the minimum wage); submitted, approved by the CEO and its statutory report rendered. That found one fault, older than PR 11: the report's run number never printed, the document engine laying the document's own number (none, for an export) over the data's, so `StatutoryReportVars` names it `run_number`.
 - 12/11/2026 · JP · JBS Praxis's decisions after PR 9's research (§13.1 items 38 to 40). **LA owns M6 in full** (item 40): the header, §0, §13.2, §13.3 and Appendix A's lanes (PR 8, PR 10 and PR 11 are LA's) name LA where they named TB; #11 My Payslips keeps AJ. **MyCity has no accountant** and does not apply statutory deductions yet (item 38, replacing the pending accountant's confirmation): Operations & People, who run its payroll, enter each figure of §6.16 with its source on Configurations when MyCity starts, and the build waits for nothing; §0.2, §3.5, §6.11 rule 3a, §6.12 rules 7, 14 and 15, §6.16, §13.2 item 24, §13.3, Appendix A (PR 9, PR 11) and Appendix B say Operations & People where they said MyCity's accountant. **PAYE's bands are scaled to the months elapsed in the calendar year** (item 39): §6.12 rule 11, the §6.16 PAYE row and PR 11's scope state it. §13.3 gains items 5 to 11, the smaller PAYE points for PR 11 (a mid-year switch-on, a joiner without a certificate, the minimum-wage test, rent relief's timing, the refund line, the leaver's certificate, the State of residence), each with a recommendation, for LA with Operations & People.
 
