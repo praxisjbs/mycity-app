@@ -142,10 +142,10 @@ export function QuestionBubble({ words, file = null, className }: QuestionBubble
     <div className={cn("ml-auto flex w-fit max-w-4/5 flex-col items-end gap-1.5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm", className)}>
       {file.onOpen ? (
         <Button size="sm" variant="ghost" icon="clip" onClick={file.onOpen}>
-          <span data-copy="content" className="wrap-any">{file.name}</span>
+          <span data-copy="content" className="wrap-any text-foreground">{file.name}</span>
         </Button>
       ) : (
-        <span data-copy="content" className="flex items-center gap-1 text-xs wrap-any">
+        <span data-copy="content" className="flex items-center gap-1 text-xs text-foreground wrap-any">
           {file.name}
         </span>
       )}

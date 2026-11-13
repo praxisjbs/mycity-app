@@ -10,7 +10,7 @@
  * @example <Field label="Payroll Access" {...form.status("payroll_access")}><RadioCards options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]} {...form.field("payroll_access")} /></Field>
  * @example <RadioCards label="Payroll Access" value={level} onChange={setLevel} options={levels.map((l) => ({ value: l.code, label: l.name, leading: <LevelMeter value={l.rank} label={l.name} decorative /> }))} />
  */
-import type { FocusEvent, ReactNode } from "react";
+import { useId, type FocusEvent, type ReactNode } from "react";
 import * as RadioGroup from "@radix-ui/react-radio-group";
 import { cn } from "../lib/cn";
 import type { FieldState } from "./binding";
@@ -50,6 +50,8 @@ export interface RadioCardsProps<V extends string = string> {
 
 export function RadioCards<V extends string = string>({ value, onChange, onBlur, options, label, state, message: _message, className }: RadioCardsProps<V>) {
   const a = useFieldControl({ state, group: true });
+  /* Each row's words name it and its caption describes it, so the caption is never read as the radio's name. */
+  const ids = useId();
   /* Moving between rows is not leaving the group: onBlur fires only when focus goes elsewhere. */
   const leave = (e: FocusEvent<HTMLDivElement>) => {
     if (!onBlur) return;
@@ -70,12 +72,14 @@ export function RadioCards<V extends string = string>({ value, onChange, onBlur,
       orientation="vertical"
       className={cn("flex flex-col rounded-box border border-input bg-card", a.state === "bad" && "border-destructive", className)}
     >
-      {options.map((o) => (
+      {options.map((o, i) => (
         <RadioGroup.Item
           key={o.value}
           value={o.value}
           disabled={o.disabled}
-          data-ui="button"
+          data-ui={o.caption ? undefined : "button"}
+          aria-labelledby={o.caption ? `${ids}-${i}` : undefined}
+          aria-describedby={o.caption ? `${ids}-${i}-caption` : undefined}
           className="group flex min-h-11 w-full items-center gap-3 border-t border-border px-3 py-2 text-left text-sm font-semibold text-foreground first:rounded-t-box first:border-t-0 last:rounded-b-box focus-visible:-outline-offset-2 disabled:opacity-45 data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[state=unchecked]:enabled:hover:bg-muted phone:min-h-13"
         >
           <span
@@ -90,8 +94,15 @@ export function RadioCards<V extends string = string>({ value, onChange, onBlur,
             </span>
           )}
           <span className="min-w-0 flex-1">
-            {o.label}
-            {o.caption && <span className="block text-xs font-normal text-subtle-foreground group-data-[state=checked]:text-accent-foreground">{o.caption}</span>}
+            {/* The row's words are its button copy (gate 8); the caption is a line under them, as IconCard's is. */}
+            <span id={`${ids}-${i}`} data-ui={o.caption ? "button" : undefined} className="block">
+              {o.label}
+            </span>
+            {o.caption && (
+              <span id={`${ids}-${i}-caption`} className="block text-xs font-normal text-subtle-foreground group-data-[state=checked]:text-accent-foreground">
+                {o.caption}
+              </span>
+            )}
           </span>
         </RadioGroup.Item>
       ))}
