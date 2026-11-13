@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | Praxis AI · Ask and History (#67, #68) |
 | Status | Built |
-| Last changed | 11/11/2026 |
+| Last changed | 13/11/2026 |
 
 Sources: MILESTONES §15 (M10's assistant, its definition of done) and A23 (it reads; since
 01/11/2026 it acts only through a declared action a person confirms, §1.2), BACKEND_STRUCTURE §14
@@ -825,6 +825,36 @@ button), unless the run of questions just before already asked it (then the card
 the gap), and never more than six questions in a row. What a question asked for is kept on its
 answer (`metadata.ask`) and replayed, so the guard and the model both see the run.
 
+**One turn for several fields (`also`; TB, 13/11/2026).** An ask may name, in `also`, one to three
+other fields the same turn asks for; its question is then one short question a field, at most 8
+words each ("What are you paying for? How many? How much is each?", New Request's item, quantity and
+unit price), the model reads each from the one answer, and the turn stands in the run for its own
+field. A field of `also` may keep an ask of its own, asked only when the answer left it out (Unit
+Price's "How much is each?").
+
+**The model's numbers in the contract's forms (TB, 13/11/2026; every card).** A model writes 700000
+and 1 where the contract takes the text "700000.00" and "1" (money is a two-place string, gate 20;
+a quantity is sent as text), and a card was refused "Expected string, received number" on a value
+the person gave right. `authorise.checkAction`, at the draft, at Save Changes and at the press,
+first puts each value in the form its field's JSON Schema takes (the engine's `cards.shape`): a
+number where text of figures is taken is that text; an amount with ₦, commas or fewer than two
+places, written or as a number, is the two-place string ("₦700,000" and 700000 are "700000.00"); a
+number written as text where a number is taken is the number; "true" and "false" where a boolean
+is. Anything else, three places or words, is left for the schema to refuse on its field. The system
+turn names the form too (an amount as text with two places; a number as text). On the card a field
+of figures sent as text (a quantity, an account number) is a one-line number field (`kind`
+`number`), and Edit checks and saves an amount as typed through `toMoneyString`, as every money form
+reads it.
+
+**What a done press offers next (`then`; TB, 13/11/2026).** An action may give `then(result,
+values)`, the steps a person most often takes next, at most three `{ label, question }`; they are
+kept with the run (`ai_action_run.result`) and returned as `AiActionResult.next`. Under the result
+line the card shows each as a button (the first primary); pressing it asks its question in the
+conversation, so the next card is drawn, checked and confirmed as any other, never pressed by the
+button. New Request kept as a draft and Add Line offer Add Another Item and Send Request; a request
+sent at once offers nothing (`expenses.md` §9). A `then` that throws offers nothing and the press
+stands.
+
 **The actions (PR4).** Each runs the same service function the screen's own button calls, with
 the person's rights as the grant gives them; a bulk action runs its records one after another,
 each in the service's own transaction, and reads back a line per record (done, or why not), so one
@@ -1446,6 +1476,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · From New Request on staging ("Expected string, received number" on Quantity and Unit Price, Check the format on Edit's 700000, Quantity drawn as a box of lines): the model's numbers are put in the contract's forms before every card is checked (`cards.shape`, every card, §6.11), the system turn names money and figures as text, a field of figures is a one-line number field and Edit reads an amount as typed. An ask may ask for several fields in one turn (`also`), and an action may offer next steps once pressed (`then`, `AiActionResult.next`), each a button that asks its question (§6.11). Tests: `ai-engine.test.js`, `ai-actions-expenses.test.js`, `ActionCard.test.tsx`.
 - 11/11/2026 · JP · Faults of the 11/11 staging brief. #1 and #8 (`VALIDATION: owner_id`, `VALIDATION: department_id` at `POST /ai/cards/:id/confirm`): a card drawn with a problem on a field (Pick one where the model's words matched none of the person's records) still offered its verb, and the press was refused by the re-check. `ActionCard` now offers no verb while a field shows a problem, Edit in its place as the primary button, until Save Changes clears it (decision 34, §10, the Praxis AI chapter). New Vacancy's card asks and matches its hiring manager from `vacancies.hiring_managers` and picks it with the new `AiCardPicks` value `hiring_manager` (§6.11; `recruitment.md` §9, fault #3). Already fixed: #5 by #67 (decision 34), #6 by #64, #7 by #63.
 - 07/11/2026 · AJ · M7 PR 5 (`partnerships.md` §9, §13.2 In PR 5): the Workspace cards (Create Task, Save Task,
   Create Project, Save Project, Create Event, Save Event) carry Connect to Partner's optional `partner_id` or `lead_id`

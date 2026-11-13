@@ -265,6 +265,7 @@ export function Conversation({ id, context = null, shows = [], onOpened, onGone,
                   onPane={onPane}
                   paneOpen={paneFor === a.ai_message_id}
                   onRedraw={!pending ? () => ask(a.question) : undefined}
+                  onAsk={a.ai_message_id === newest && !pending ? (question) => ask(question) : undefined}
                 />
               </div>
             ))}
@@ -317,7 +318,7 @@ function pagingOf(a: AiAnswer): string | null {
   return from && from > 1 ? `Showing ${from} to ${from + read.rows - 1} of ${read.total}` : `Showing ${read.rows} of ${read.total}`;
 }
 
-function Answer({ a, feedback, onFeedback, onNext, onChoose, onPane, paneOpen, onRedraw }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> | undefined; onChoose?: (choice: string) => Promise<void> | undefined; onPane?: (answer: AiAnswer, pick?: PanePick) => void; paneOpen: boolean; onRedraw?: () => Promise<void> | undefined }) {
+function Answer({ a, feedback, onFeedback, onNext, onChoose, onPane, paneOpen, onRedraw, onAsk }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> | undefined; onChoose?: (choice: string) => Promise<void> | undefined; onPane?: (answer: AiAnswer, pick?: PanePick) => void; paneOpen: boolean; onRedraw?: () => Promise<void> | undefined; onAsk?: (question: string) => Promise<void> | undefined }) {
   const { navigate } = useRouter();
   // Kinds of record with how many (decision 9); the one record, named, when the answer rests on one. A chip opens the pane on them.
   const from = a.sources.map((s) =>
@@ -338,7 +339,7 @@ function Answer({ a, feedback, onFeedback, onNext, onChoose, onPane, paneOpen, o
   return (
     <AnswerBubble
       text={a.content}
-      card={a.card ? <AnswerCard card={a.card} onRedraw={onRedraw} /> : undefined}
+      card={a.card ? <AnswerCard card={a.card} onRedraw={onRedraw} onAsk={onAsk} /> : undefined}
       /* A question's answers to tap (decision 28), on the newest answer only: a tap is the next question. */
       choices={a.choices}
       onChoose={onChoose}

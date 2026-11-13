@@ -82,6 +82,13 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(refused({ asks: [{ field: "due_on", question: "When is it due?", after: "now" }] })).toThrow(/an ask takes no "after"/);
     expect(refused({ fields: ["title"], asks: [{ field: "due_on", question: "When is it due?" }] })).toThrow(/asks names "due_on", which the card does not carry/);
     expect(refused({ asks: [{ field: "title", question: "What is it?" }, { field: "title", question: "What is it?" }] })).toThrow(/twice/);
+    // One turn asking for several fields: one short question a field, each a field the card carries.
+    const grouped = defineManifest({ module: "workspace", actions: [{ ...ACTION, asks: [{ field: "title", also: ["due_on"], question: "What is the task? When is it due?" }] }] }).actions[0];
+    expect(grouped.asks[0]).toMatchObject({ field: "title", also: ["due_on"] });
+    expect(refused({ asks: [{ field: "title", also: ["due_on"], question: "What is the task?" }] })).toThrow(/2 short questions, one a field/);
+    expect(refused({ asks: [{ field: "title", also: ["title"], question: "What is it? What is it?" }] })).toThrow(/also names one to three other fields/);
+    expect(refused({ fields: ["title"], asks: [{ field: "title", also: ["due_on"], question: "What is it? When is it due?" }] })).toThrow(/also names one to three other fields/);
+    expect(refused({ then: { label: "Next" } })).toThrow(/then is \(result, values\)/);
   });
 
   test("a field written by name (resolve) and answers read from the person's records (options) are checked at load (decision 32)", () => {
@@ -448,6 +455,26 @@ describe("cards (engine/cards.js)", () => {
     const site = cards.fieldsOf(jsonSchemaOf(c.attendance.TemporarySiteAdd), {}, { picks: { address: "place", employee_ids: "site_member" } });
     expect(site.find((f) => f.name === "employee_ids")).toMatchObject({ kind: "list", picks: "site_member" });
     expect(site.find((f) => f.name === "purpose").options).not.toContain("temporary_home");
+  });
+
+  test("shape: the model's numbers in the forms the contract takes, anything else left for the schema (every card)", () => {
+    const js = jsonSchemaOf(c.expenses.ExpenseRequestAdd);
+    expect(cards.shape(js, { quantity: 1, unit_price: 700000, description: "Invoice JBS/001", submit: "false" })).toEqual({ quantity: "1", unit_price: "700000.00", description: "Invoice JBS/001", submit: false });
+    expect(cards.shape(js, { quantity: 1.5, unit_price: "700000" }).unit_price).toBe("700000.00");
+    expect(cards.shape(js, { unit_price: "₦700,000.5" }).unit_price).toBe("700000.50");
+    expect(cards.shape(js, { unit_price: 12.345 }).unit_price).toBe(12.345);
+    expect(cards.shape(js, { unit_price: "seven hundred" }).unit_price).toBe("seven hundred");
+    expect(cards.shape(js, { unit_price: "7,00,000" }).unit_price).toBe("7,00,000");
+    expect(cards.shape(js, { account_number: 123456789 }).account_number).toBe("123456789");
+    expect(cards.shape(js, { other: 5 })).toEqual({ other: 5 });
+    // A number field takes a number written as text; a nullable money field shaped all the same.
+    const budget = jsonSchemaOf(c.budgets.ProjectBudgetSet);
+    const moneyField = Object.keys(budget.properties).find((k) => /amount|budget/.test(k) && !/_id$/.test(k));
+    expect(cards.shape(budget, { [moneyField]: 1500000 })[moneyField]).toBe("1500000.00");
+    // The card draws a quantity sent as text as a one-line number field, never a box of lines.
+    const fields = cards.fieldsOf(js);
+    expect(fields.find((f) => f.name === "quantity")).toMatchObject({ kind: "number", long: false });
+    expect(fields.find((f) => f.name === "unit_price")).toMatchObject({ kind: "money" });
   });
 
   test("nextAsk: the first field an action asks for that the values leave out, once in a run, never more than six in a row (decision 29)", () => {

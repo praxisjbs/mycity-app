@@ -6721,6 +6721,7 @@ An action Praxis AI drafted for the person to confirm: every field as the action
 | `onSave` | `(values: Record<string, unknown>) => Promise<unknown> \| void` |  | Edit's Save Changes, with the values as edited; the parent re-validates them with the API. |
 | `onRedraw` | `() => Promise<unknown> \| void` |  | Draw It Again on an expired card: the question is asked again. |
 | `onOpen` | `(path: string) => void` |  | Opens a record's screen. |
+| `onAsk` | `(question: string) => Promise<unknown> \| void` |  | Asks a done press's next question (Add Another Item); without it the result offers no next step. |
 | `problem` | `string \| null` |  | Why the last press was refused, in the server's words. |
 | `problemAction` | `{ label: string; onPress: () => void } \| null` |  | A button beside the refusal, where a screen answers it (Open Mailbox). |
 | `className` | `string` |  | Layout classes only (spacing). |

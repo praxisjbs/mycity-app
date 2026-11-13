@@ -34,6 +34,8 @@ export interface CardResult {
   /** Why it failed, in the service's words; null when it went through. */
   message: string | null;
   error_code: string | null;
+  /** What a done press offers next: each a button whose words are asked as the next question. */
+  next?: Array<{ label: string; question: string }>;
 }
 
 export interface ResultLineProps {

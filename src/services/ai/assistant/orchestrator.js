@@ -79,6 +79,9 @@ function schemaFields(schema, { required = false, only = null, byName = [] } = {
     else if (node.format === "date-time") form = " (YYYY-MM-DDTHH:MM:SS+01:00)";
     else if (node.format === "uuid" || /_id$/.test(k)) form = " (an id a read returned)";
     else if (node.pattern === ISO_DAY) form = " (YYYY-MM-DD)";
+    // Money and figures go as text, as the contract takes them; the server shapes a number the model writes anyway.
+    else if (node.type === "string" && typeof node.pattern === "string" && /\\\.\\d\{2\}\$$/.test(node.pattern)) form = ' (an amount as text, two places, like "700000.00")';
+    else if (node.type === "string" && typeof node.pattern === "string" && /^\^-?\\d/.test(node.pattern)) form = ' (a number as text, like "1")';
     else if (node.type === "array") form = " (a list)";
     else if (node.type === "boolean") form = " (true or false)";
     return `${k}${form}${required && must.has(k) ? ", required" : ""}`;
@@ -104,7 +107,9 @@ function actionLine(a, today) {
       // A field naming a record is one of the person's own, from that read; one required in some states is asked only then (decision 34).
       const from = q.read ? `; one of the person's own from ${q.read}, by its words or id` : "";
       const when = !q.when ? "" : typeof q.when === "object" ? `; only when ${q.when.field} is given and is not ${q.when.not.join(" or ")}` : `; only when ${q.when} is given`;
-      return `${q.field} ("${q.question}"${choices.length ? `, choices: ${choices.join(", ")}` : ""}${from}${when}${q.none ? `; null when the person says there is none` : ""})`;
+      // One turn asking for several fields (`also`): asked together as written, each read from the one answer.
+      const also = q.also && q.also.length ? `; asks ${[q.field, ...q.also].join(", ")} together in these words, each read from the one answer` : "";
+      return `${q.field} ("${q.question}"${choices.length ? `, choices: ${choices.join(", ")}` : ""}${from}${when}${also}${q.none ? `; null when the person says there is none` : ""})`;
     });
     parts.push(`ask first, one at a time, unless the person gave it: ${asks.join("; ")}`);
   }

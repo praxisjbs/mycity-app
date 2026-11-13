@@ -151,7 +151,7 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
   }
 }
 
-export function AnswerCard({ card: drawn, onRedraw }: { card: AiActionCard; onRedraw?: () => Promise<unknown> | undefined }) {
+export function AnswerCard({ card: drawn, onRedraw, onAsk }: { card: AiActionCard; onRedraw?: () => Promise<unknown> | undefined; onAsk?: (question: string) => Promise<unknown> | undefined }) {
   const { navigate } = useRouter();
   const [card, setCard] = useState<AiActionCard>(drawn);
   const [problem, setProblem] = useState<{ message: string; code: string } | null>(null);
@@ -225,6 +225,7 @@ export function AnswerCard({ card: drawn, onRedraw }: { card: AiActionCard; onRe
       onSave={save}
       onRedraw={onRedraw}
       onOpen={navigate}
+      onAsk={onAsk}
       problem={problem?.message ?? null}
       problemAction={screen ? { label: screen.label, onPress: () => navigate(screen.href) } : null}
     />

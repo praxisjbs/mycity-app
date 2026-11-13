@@ -149,6 +149,34 @@ describe("ActionCard", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it("a done press offers its next steps, each asking its question; Edit reads an amount as typed and a quantity on one line", async () => {
+    const onAsk = vi.fn(async () => undefined);
+    const next = [
+      { label: "Add Another Item", question: "Add another item to EXP-0012" },
+      { label: "Send Request", question: "Send EXP-0012" },
+    ];
+    const { unmount } = render(<ActionCard label="New Request" fields={[]} values={{}} problems={{}} records={[]} status="done" confirm="press" result={{ status: "done", lines: [], message: null, error_code: null, next }} onAsk={onAsk} />);
+    await userEvent.click(screen.getByRole("button", { name: "Add Another Item" }));
+    expect(onAsk).toHaveBeenCalledWith("Add another item to EXP-0012");
+    expect(screen.getByRole("button", { name: "Send Request" })).toBeInTheDocument();
+    unmount();
+
+    const money: CardField[] = [
+      { name: "quantity", label: "Quantity", kind: "number", required: false, options: null, long: false },
+      { name: "unit_price", label: "Unit Price", kind: "money", required: true, options: null, long: false },
+    ];
+    // The contract's money: two places, as the wire takes it.
+    const twoPlaces = { safeParse: (v: unknown) => (/^\d+\.\d{2}$/.test(String((v as Record<string, unknown>).unit_price)) ? { success: true, data: v } : { success: false, error: { issues: [{ path: ["unit_price"], message: "must be an amount like 1250000.00", code: "invalid_string" }] } }) };
+    const onSave = vi.fn(async () => undefined);
+    render(<ActionCard label="New Request" fields={money} values={{ quantity: "1", unit_price: "" }} problems={{}} records={[]} status="shown" confirm="press" schema={twoPlaces} onConfirm={() => undefined} onSave={onSave} />);
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByRole("textbox", { name: "Quantity" }).tagName).toBe("INPUT");
+    await userEvent.type(screen.getByRole("textbox", { name: "Unit Price" }), "700000");
+    expect(screen.queryByText("Check the format")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ quantity: "1", unit_price: "700000.00" }));
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<ActionCard label="Approve Leave" fields={fields} values={{ leave_request_ids: ["l1", "l2"] }} problems={{}} records={records} status="shown" confirm="fresh_sign_in" schema={schema} onConfirm={() => undefined} onCancel={() => undefined} onSave={() => undefined} onOpen={() => undefined} />);
     expect(await axe(container)).toHaveNoViolations();

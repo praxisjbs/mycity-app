@@ -2,7 +2,8 @@
 /**
  * Praxis AI's expense cards on the real migrations (docs/guides/expenses.md §9;
  * docs/guides/praxis-ai.md §6.11, decision 33): a member of staff raises a request with its first
- * line, adds a line and changes it, each through New Request's and Edit's own service; Operations
+ * line (the model's numbers read as the contract's text), adds a line, changes it and sends a draft,
+ * each through New Request's, Edit's and Send Request's own service; Operations
  * & People add and deactivate a category, group approved requests for the CEO, and record a
  * transfer (money: Confirm It's You first) and its reference. A card naming somebody else's
  * request, or one held to `expenses.finance` for someone without it, is refused with nothing run.
@@ -101,6 +102,52 @@ describeDb("Praxis AI's expense cards against the real migrations", () => {
     const r = await one("SELECT expense_request_id, status, amount FROM expense_request WHERE purpose = 'Ikeja activation water'");
     expect(r).toMatchObject({ status: "submitted", amount: "9000.00" });
     made.sent = r.expense_request_id;
+  });
+
+  test("my_expenses.create with the model's numbers, then my_expenses.submit: 1 and 700000 read as \"1\" and \"700000.00\", a draft offers Add Another Item and Send Request, and Send Request sends it", async () => {
+    const drafted = await card("one", "my_expenses.create", {
+      purpose: "Payment gateway integration build",
+      expense_category_id: "Travel and Transport",
+      description: "Invoice JBS/001",
+      quantity: 1,
+      unit_price: 700000,
+      payee_type: "vendor",
+      payee_name: "JBS Praxis Limited",
+      bank_name: "GTBank",
+      account_name: "JBS Praxis Limited",
+      account_number: "0123456780",
+      submit: false,
+    });
+    expect(drafted.problems).toEqual({});
+    expect(drafted.values).toMatchObject({ quantity: "1", unit_price: "700000.00", submit: false });
+    expect(drafted.fields.find((f) => f.name === "quantity")).toMatchObject({ kind: "number", long: false });
+    expect(drafted.fields.find((f) => f.name === "unit_price")).toMatchObject({ kind: "money" });
+    const pressed = await h.press("one", drafted.ai_action_draft_id);
+    expect(pressed.status).toBe(200);
+    const r = await one("SELECT expense_request_id, number, status, amount FROM expense_request WHERE purpose = 'Payment gateway integration build'");
+    expect(r).toMatchObject({ status: "draft", amount: "700000.00" });
+    expect(pressed.body.next).toEqual([
+      { label: "Add Another Item", question: `Add another item to ${r.number}` },
+      { label: "Send Request", question: `Send ${r.number}` },
+    ]);
+
+    // An amount typed on Edit as "₦250,000" is the same amount.
+    const line = await card("one", "my_expenses.add_line", { expense_request_id: r.expense_request_id, description: "Hosting", quantity: 2, unit_price: "₦250,000" });
+    expect([line.problems, line.values.quantity, line.values.unit_price]).toEqual([{}, "2", "250000.00"]);
+    const added = await h.press("one", line.ai_action_draft_id);
+    expect(added.body.next.map((n) => n.label)).toEqual(["Add Another Item", "Send Request"]);
+
+    const send = await card("one", "my_expenses.submit", { expense_request_id: r.expense_request_id });
+    expect(send).toMatchObject({ label: "Send Request", problems: {} });
+    expect(send.records).toEqual([expect.objectContaining({ type: "expense", id: r.expense_request_id })]);
+    const sent = await h.press("one", send.ai_action_draft_id);
+    expect(sent.status).toBe(200);
+    expect(sent.body).toMatchObject({ lines: [expect.objectContaining({ message: "sent" })], next: [] });
+    expect(await one("SELECT status, amount FROM expense_request WHERE expense_request_id = $1", [r.expense_request_id])).toMatchObject({ status: "submitted", amount: "1200000.00" });
+
+    // Sent, it is never sent again from a card.
+    const again = await card("one", "my_expenses.submit", { expense_request_id: r.expense_request_id });
+    expect((await h.press("one", again.ai_action_draft_id)).status).toBeGreaterThanOrEqual(400);
   });
 
   test("my_expenses.add_line and my_expenses.edit: a draft of the person's own grows a line and changes its purpose; somebody else's is refused", async () => {

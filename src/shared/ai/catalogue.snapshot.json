@@ -777,6 +777,17 @@
       "screen": null
     },
     {
+      "key": "my_expenses.submit",
+      "kind": "action",
+      "module_key": "expenses",
+      "permission": "expenses.create",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "expenses.ExpenseSend",
+      "schema_sha": "ab7f7ef81df5147f",
+      "screen": null
+    },
+    {
       "key": "my_leave.request",
       "kind": "action",
       "module_key": "ess",

@@ -24,8 +24,9 @@ My Requests lists every request you raised, newest first, with who it waits on n
 
 ### Raise a request {#expenses-raise needs="expenses create"}
 
-1. Open [Employee Self-Service · My Requests](/ess?tab=my-requests).
-2. Press **New Request** at the top right.
+1. Open [Employee Self-Service · My Requests](/ess?tab=my-requests). Or open
+   [Expenses · Requisitions](/expenses?tab=requisitions) or [Expenses · Approvals](/expenses?tab=approvals).
+2. Press **New Request** at the top right. The request is yours, and shows on your My Requests.
    ![The New Request form](shot:expenses-new-request)
 3. Write the **Purpose**: what the money is for.
 4. Press **Pick Category**. Choose **Operating** or **Capital** to narrow the list, type part of a
@@ -42,6 +43,10 @@ My Requests lists every request you raised, newest first, with who it waits on n
 9. Attach the invoice under **Invoice**. Press **Read Invoice** to fill the payee and the items from
    it, then check every line.
 10. Press **Send Request**. Or press **Save Draft** to finish it later.
+
+> **Tip:** In [Praxis AI · Ask](/praxis-ai?tab=ask), say "Raise an expense request". It asks **What are you paying
+> for? How many? How much is each?** and draws the request for you to check. To list several items,
+> say so: it saves a draft, then offers **Add Another Item** and **Send Request**.
 
 > **Tip:** **Over Budget** on a request means it is more than its department has left for that
 > category this year. It is still sent; the approvers see it.
@@ -97,6 +102,10 @@ Approvals lists the requests waiting on you, the oldest first.
 ```shot expenses-approvals
 open: /expenses?tab=approvals
 as: operations
+sources:
+  - app/src/features/expenses/index.tsx
+marks:
+  1: button "New Request" | Raise a request of your own
 ```
 
 ## Requisitions {#expenses-requisitions screen=expenses/requisitions icon=list}
@@ -131,8 +140,11 @@ An approved request is taken back here until it is paid. Its requester is told w
 ```shot expenses-requisitions
 open: /expenses?tab=requisitions
 as: operations
+sources:
+  - app/src/features/expenses/index.tsx
 marks:
   1: button "Create Requisition" | Group the ticked requests
+  2: button "New Request" | Raise a request of your own
 ```
 
 ## Disbursements {#expenses-disbursements screen=expenses/disbursements icon=wallet}

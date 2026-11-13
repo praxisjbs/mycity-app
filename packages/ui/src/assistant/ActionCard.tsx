@@ -23,7 +23,7 @@ import { Form, FormFooter } from "../form/Form";
 import { useContractForm, type ContractSchema } from "../form/useContractForm";
 import { TextAreaField, TextField, NumberField } from "../form/TextField";
 import { DateField, TimeField } from "../form/DateField";
-import { MoneyField } from "../form/MoneyField";
+import { MoneyField, toMoneyString } from "../form/MoneyField";
 import { ChoiceField, SelectField } from "../form/SelectField";
 import { CheckboxField } from "../form/Switch";
 import { ResultLine, type CardResult } from "./ResultLine";
@@ -94,6 +94,8 @@ export interface ActionCardProps {
   onRedraw?: () => Promise<unknown> | void;
   /** Opens a record's screen. */
   onOpen?: (path: string) => void;
+  /** Asks a done press's next question (Add Another Item); without it the result offers no next step. */
+  onAsk?: (question: string) => Promise<unknown> | void;
   /** Why the last press was refused, in the server's words. */
   problem?: string | null;
   /** A button beside the refusal, where a screen answers it (Open Mailbox). */
@@ -168,7 +170,7 @@ function shown(f: CardField, value: unknown, known: CardRecord[]): string | null
 /** Fields the card lists: those with a value, those with a problem, and the required ones. */
 const listed = (fields: CardField[], values: Record<string, unknown>, problems: Record<string, string[]>) => fields.filter((f) => !isBlank(values[f.name]) || problems[f.name]?.length || f.required);
 
-export function ActionCard({ label, fields, values, problems, records, names = [], picker, status, confirm, suggested = false, result = null, schema, onConfirm, onCancel, onSave, onRedraw, onOpen, problem = null, problemAction = null, className }: ActionCardProps) {
+export function ActionCard({ label, fields, values, problems, records, names = [], picker, status, confirm, suggested = false, result = null, schema, onConfirm, onCancel, onSave, onRedraw, onOpen, onAsk, problem = null, problemAction = null, className }: ActionCardProps) {
   const [editing, setEditing] = useState(false);
   const known = [...names, ...records];
   useEffect(() => {
@@ -254,6 +256,15 @@ export function ActionCard({ label, fields, values, problems, records, names = [
         </p>
       )}
       {result && (status === "done" || status === "failed") && <ResultLine result={result} onOpen={onOpen} />}
+      {result && status === "done" && onAsk && (result.next?.length ?? 0) > 0 && (
+        <ActionGroup>
+          {(result.next ?? []).map((n, i) => (
+            <Button key={n.label} size="sm" variant={i === 0 ? "primary" : undefined} className="phone:w-full" onClick={() => onAsk(n.question)}>
+              {n.label}
+            </Button>
+          ))}
+        </ActionGroup>
+      )}
       {status === "expired" && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-subtle-foreground">This card has expired.</span>
@@ -294,7 +305,14 @@ export function ActionCard({ label, fields, values, problems, records, names = [
  * picker is picked as on the screen's own form, and one without stays as it is.
  */
 function EditFields({ fields, values, problems, known, picker, schema, onSave, onDone }: { fields: CardField[]; values: Record<string, unknown>; problems: Record<string, string[]>; known: CardRecord[]; picker?: ActionCardPicker; schema: ContractSchema; onSave?: (values: Record<string, unknown>) => Promise<unknown> | void; onDone: () => void }) {
-  const f = useContractForm<Record<string, unknown>>({ ...values }, schema);
+  // An amount is checked and saved as the wire takes it ("700000" typed is "700000.00"), as every money form reads it.
+  const wire = (v: Record<string, unknown>) => {
+    const out = { ...v };
+    for (const field of fields) if (field.kind === "money" && typeof out[field.name] === "string" && out[field.name] !== "") out[field.name] = toMoneyString(out[field.name] as string);
+    return out;
+  };
+  const [rules] = useState<ContractSchema>(() => ({ safeParse: (v: unknown) => schema.safeParse(v && typeof v === "object" ? wire(v as Record<string, unknown>) : v) }));
+  const f = useContractForm<Record<string, unknown>>({ ...values }, rules);
   const { setServerErrors } = f;
   useEffect(() => {
     // The card's problems, once, as the fields open: only on a field Edit can change, so an id field the
@@ -310,7 +328,7 @@ function EditFields({ fields, values, problems, known, picker, schema, onSave, o
   }, []);
   const save = async () => {
     if (!f.check()) return;
-    await onSave?.(f.values);
+    await onSave?.(wire(f.values));
     onDone();
   };
   return (
@@ -365,7 +383,7 @@ function EditFields({ fields, values, problems, known, picker, schema, onSave, o
           case "number":
             return (
               <Field key={field.name} label={field.label} optional={optional} {...status}>
-                <NumberField {...b} value={asString(b.value)} />
+                <NumberField {...b} value={asString(b.value)} decimal />
               </Field>
             );
           case "choice": {

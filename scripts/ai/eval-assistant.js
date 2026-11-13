@@ -115,6 +115,7 @@ const CASES = Object.freeze([
   // M8 Expenses (docs/guides/expenses.md §9): the request cards for anyone, the rest for a holder of expenses.finance.
   { id: "card.expense-request", as: "employee", question: "Raise an expense for 2 crates of water at 4,500 naira each for the Ikeja activation, paid to Chuks Stores at GTBank, account 0123456789.", shows: ["cards"], action: "my_expenses.create" },
   { id: "card.expense-line", as: "employee", question: "Add a line to my request {my_expenses.add_line#expense_request_id}: 10 branded caps at 2,500 each.", shows: ["cards"], action: "my_expenses.add_line" },
+  { id: "card.expense-send", as: "employee", question: "Send my request {my_expenses.submit#expense_request_id} for approval.", shows: ["cards"], action: "my_expenses.submit" },
   { id: "card.expense-edit", as: "employee", question: "Change the purpose of my request {my_expenses.edit#expense_request_id} to Ikeja activation refreshments.", shows: ["cards"], action: "my_expenses.edit" },
   { id: "card.expense-category", as: "operations_people", question: "Add an expense category called Field Logistics.", shows: ["cards"], action: "expense_categories.create" },
   { id: "card.expense-category-edit", as: "operations_people", question: "Deactivate the {expense_categories.edit#expense_category_id} expense category.", shows: ["cards"], action: "expense_categories.edit" },

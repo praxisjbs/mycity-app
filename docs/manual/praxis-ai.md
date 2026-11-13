@@ -150,7 +150,9 @@ conversations, and one opens full screen when you press it.
 5. Press the card's button to make the change, for example **Create Task** or **Approve Leave**. A
    card that acts on several records says how many, for example *Approve Leave ×4*.
 6. Under the card, **Done** lists each record and what happened to it. Press **Open** on a line to
-   see the record.
+   see the record. Some cards offer what comes next under **Done**, for example
+   **Add Another Item** and **Send Request** on an expense request kept as a draft. Press one to
+   ask it; Praxis AI draws its card for you to check.
 7. To do nothing, press **Cancel**.
 
 - A card you did not ask for reads as a question, for example *Send Message?*. Press its button to
@@ -287,6 +289,9 @@ screens: it opens the screen, and you save there with its own button.
   request why.
 - For a scorecard line it also asks the section, how it is measured and its weight. For a KPI it
   asks which function, and for a round or a target change which month.
+- For an expense request, or another item on one, it asks *What are you paying for? How many? How
+  much is each?* together. Answer all three in one reply, for example "Invoice JBS/001, 1,
+  700,000". Leave out how many and it takes one.
 - For a task shared with a department it asks **Who leads it?**, with that department's people to
   press.
 - When you do not say which task, event, project, channel or request, it asks which, with your own

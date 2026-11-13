@@ -191,7 +191,7 @@ function resultFor(card: AiActionCard): AiActionResult {
     : card.action_key === "tasks.create"
       ? [{ type: "task", id: sid(`task:${card.ai_action_draft_id}`), label: `T-118 ${String(card.values.title ?? "")}`, ok: true, message: "created", link: `/workspace?tab=tasks&id=${sid(`task:${card.ai_action_draft_id}`)}` }]
       : [{ type: card.action_key === "mail.send" ? "mail_send_queue" : "record", id: sid(`made:${card.ai_action_draft_id}`), label: card.action_key === "mail.send" ? "Mail queued" : "Done", ok: true, message: card.action_key === "mail.send" ? "queued" : "done", link: card.action_key === "mail.send" ? "/mailbox?tab=sent" : null }];
-  return { ai_action_run_id: sid(`run:${card.ai_action_draft_id}`), status: "done", lines, error_code: null, message: null, finished_at: nowIso() };
+  return { ai_action_run_id: sid(`run:${card.ai_action_draft_id}`), status: "done", lines, error_code: null, message: null, next: [], finished_at: nowIso() };
 }
 
 route("GET /api/v1/ai/cards/:id", (req) => {

@@ -828,6 +828,11 @@ lead ("It should always ask for required fields, so we never see an error. We ca
 
 ## 8 · Log
 
+- 13/11/2026 · TB · The engine gains `cards.shape` (a value in the form its field's JSON Schema
+  takes: the model's 700000 is "700000.00", 1 is "1"), run by `authorise.checkAction` on every card;
+  `kindOf` draws figures sent as text as `number`. The manifest gains an ask's `also` (one turn, one
+  short question a field) and an action's `then` (next steps under a done press,
+  `AiActionResult.next`). `praxis-ai.md` §6.11.
 - 01/11/2026 · JP · Read the handover against the code (§1): nine claims true, two false (no
   `MYCITY_DEMO_GAPS.md`; no Change Report 01, the Mailbox is built), one open point answered (the
   PIN already signs a step-up through `POST /security/confirm`), nine challenges resolved into
