@@ -262,6 +262,7 @@ async function aiSummary(db, q, user, scope) {
   if (q.department_id) where.push(`x.department_id = ${add(q.department_id)}::uuid`);
   if (q.payee_type) where.push(`x.payee_type = ${add(q.payee_type)}`);
   if (q.over_budget !== undefined) where.push(`x.over_budget = ${add(q.over_budget)}::boolean`);
+  const filtered = where.length ? `AND ${where.join(" AND ")}` : "";
   const { rows } = await db.query(
     `WITH x AS (
        SELECT er.expense_request_id, er.employee_id, er.amount, ${STATUS} AS status,
@@ -279,7 +280,7 @@ async function aiSummary(db, q, user, scope) {
          LEFT JOIN workflow_instance rwi ON rwi.workflow_instance_id = r.workflow_instance_id
         WHERE true ${audience} ${period}
      ), f AS (
-       SELECT x.* FROM x WHERE true ${where.length ? `AND ${where.join(" AND ")}` : ""}
+       SELECT x.* FROM x WHERE true ${filtered}
      ), figures AS (
        SELECT count(*)::int AS requests,
               COALESCE(sum(amount) FILTER (WHERE status NOT IN ('draft', 'cancelled')), 0)::numeric(18,2) AS asked,
