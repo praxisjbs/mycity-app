@@ -5,6 +5,7 @@ import { PARTNERS } from "../data/partners";
 import { ON_UPLOAD, UPLOADS } from "../uploads";
 import { exportFile } from "./shared";
 import { stale } from "./security";
+import { sitesCounted } from "./worksites";
 
 /* ── Praxis AI (docs/guides/praxis-ai.md): answers from the mock records, within the asker's view, in the contract's shapes. A change is a card the person confirms (§6.11); nothing else writes. ── */
 
@@ -269,6 +270,7 @@ function answerFor(question: string, view: string): Draft {
       reads: [read("budgets.list", BUDGET_ROWS.length, BUDGET_ROWS.length, 1), { ...read("budgets.summary", 0, BUDGET_ROWS.length, null, 2), kind: "summary", params: { by: "department" } }],
       overview: {
         summary: "budgets.summary",
+        read: null,
         title: null,
         figures: [
           { key: "allocated", label: "Allocated", value: "8050000.00", unit: "ngn" },
@@ -280,9 +282,32 @@ function answerFor(question: string, view: string): Draft {
           title: "Budget by department",
           labels: BUDGET_ROWS.map((b) => b.department),
           series: BUDGET_PARTS.map((label, k) => ({ label, values: BUDGET_ROWS.map((b) => b.parts[k] ?? 0) })),
+          unit: null,
         },
       },
       link: { label: "Open Budgets", path: "/expenses?tab=budgets" },
+    });
+  }
+  // A short list with no summary is charted from its own rows when they are the whole list (§6.19 item 6).
+  if (l.includes("worksite")) {
+    if (view === "staff") return said("Worksites are not available to you.", { declined: "not_available", reads: [read("worksites.list", 0, null, null)] });
+    const sites = sitesCounted();
+    const people = sites.reduce((n, w) => n + w.assigned_count, 0);
+    return said(`${people} people work across ${sites.length} worksites.`, {
+      table: tbl(["Name", "People"], sites.map((w) => [w.name, String(w.assigned_count)]), [1], sites.map((w) => `/people?tab=worksites&id=${w.worksite_id}`)),
+      citations: sites.map((w) => ({ entity_type: "worksite", entity_id: w.worksite_id, label: w.name, link: `/people?tab=worksites&id=${w.worksite_id}`, read_key: "worksites.list" })),
+      reads: [read("worksites.list", sites.length, sites.length, 1)],
+      overview: {
+        summary: null,
+        read: 1,
+        title: null,
+        figures: [
+          { key: "rows", label: "Worksites", value: sites.length, unit: "count" },
+          { key: "sum_assigned_count", label: "Assigned Count", value: people, unit: null },
+        ],
+        chart: { kind: "bar", title: "People at each worksite", labels: sites.map((w) => w.name), series: [{ label: "Assigned Count", values: sites.map((w) => w.assigned_count) }], unit: null },
+      },
+      link: { label: "Open Worksites", path: "/people?tab=worksites" },
     });
   }
   if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {
