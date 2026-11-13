@@ -11,7 +11,7 @@ import { hasCapability } from "@/shell/access";
 import { paging } from "@/features/shared/wire";
 import type { Tone } from "@/api/types/common";
 import {
-  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, IconButton, KeyValue,
+  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, Field, formatDate, formatDateTime, formatMoney, FormFooter, Grid, HelpTerm, IconButton, KeyValue,
   LoadingRows, Money, MoneyField, Pager, Pill, plural, Popover, RecordPicker, SelectField, Sub, TextAreaField, TextField, Timeline, toast, toMoneyString, useConfirm, useContractForm, useModal, UploadField, type ComboFieldProps,
 } from "@mycity/ui";
 
@@ -113,12 +113,15 @@ function BankField(binding: Omit<ComboFieldProps<ExpenseBank>, "list" | "option"
   return <ComboField<ExpenseBank> {...binding} list={banks} option={(b) => b.bank_name} sub={(b) => (b.uses ? plural(b.uses, "request") : undefined)} placeholder="Zenith Bank" />;
 }
 
-/* Money in kobo for a total on the form, never in floating point. */
+/* Money in kobo for a total on the form, never in floating point; a line that takes money off is below zero. */
 const kobo = (v: string) => {
-  const [w, f = ""] = (toMoneyString(String(v || "")) || "0").split(".");
-  return Number(w || "0") * 100 + Number((f + "00").slice(0, 2));
+  const wire = toMoneyString(String(v || "")) || "0";
+  const minus = wire.startsWith("-");
+  const [w, f = ""] = (minus ? wire.slice(1) : wire).split(".");
+  const k = Number(w || "0") * 100 + Number((f + "00").slice(0, 2));
+  return minus ? -k : k;
 };
-const naira = (k: number) => `${Math.trunc(k / 100)}.${String(k % 100).padStart(2, "0")}`;
+const naira = (k: number) => `${k < 0 ? "-" : ""}${Math.trunc(Math.abs(k) / 100)}.${String(Math.abs(k) % 100).padStart(2, "0")}`;
 
 /* ------------------------------------------------------------------ *
  * New Request and Edit
@@ -196,6 +199,9 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
         setCategory(null);
       }
       if (got.lines.length) setLines(got.lines.map((l) => ({ description: l.description, quantity: l.quantity ?? "1", unit_price: l.unit_price })));
+      // The lines are the model's reading; the amount the invoice asks for is read on its own, so a
+      // discount or a payment it missed shows here rather than at the bank.
+      if (got.amount_due && got.amount && kobo(got.amount_due) !== kobo(got.amount)) return toast(`Invoice asks ${formatMoney(got.amount_due)}. Check lines`);
       toast("Invoice read. Check every line");
     } catch (e) {
       say(e);
@@ -244,7 +250,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
                 <TextField name={`line-${i}-quantity`} inputMode="decimal" value={l.quantity} onChange={(v) => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: v.replace(/[^\d.]/g, "") } : x)))} />
               </Field>
               <Field label="Unit Price">
-                <MoneyField name={`line-${i}-unit_price`} value={l.unit_price} onChange={(v) => setLines(lines.map((x, j) => (j === i ? { ...x, unit_price: v } : x)))} />
+                <MoneyField signed name={`line-${i}-unit_price`} value={l.unit_price} onChange={(v) => setLines(lines.map((x, j) => (j === i ? { ...x, unit_price: v } : x)))} />
               </Field>
               {lines.length > 1 && (
                 <span className="flex min-h-tap items-center">

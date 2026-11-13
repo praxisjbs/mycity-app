@@ -167,7 +167,11 @@ somebody else staged is refused, `invoice_document_id: Upload it again`.
 
 1. A request has 1 to 25 lines. Each line's amount is quantity times unit price, rounded to two
    places through `shared/money`; the request's `amount` is the sum of its lines. NGN only: a
-   foreign invoice is converted before it is entered.
+   foreign invoice is converted before it is entered. **A line may take money off** (TB,
+   13/11/2026): a discount, a credit, a deposit or an amount already paid on the invoice is a line
+   of its own with a unit price below zero, so the request reads as its invoice does and asks for
+   what the invoice asks to be paid now (migration 8030). The request's `amount` stays above zero
+   (`AMOUNT_REQUIRED` otherwise); the quantity is always above zero.
 2. Send Request needs Purpose, Category, Department, at least one line, a payee and its bank
    details. An invoice is optional but asked for (the approvers see when there is none).
 3. Payee type `staff` with Use My Company Account copies the bank name, account name and account
@@ -399,9 +403,15 @@ requester always sees theirs.
   off with no provider set up, or this month's budget spent, as Write With AI is):
   - **Read Invoice** (`expense-invoice-read`, Image Reading, `expenses.receipt-ai.js`): the file the
     person staged for New Request (or one their own request holds) goes to the model as a file
-    (`complete({ files })`); it answers the payee, the lines and a category; the server matches the
+    (`complete({ files })`); it answers the payee, the lines, a category and the amount the invoice
+    asks to be paid now (`amount_due`: its balance due, else its total); the server matches the
     category among those offered (one it made up is left empty) and works the amount out through
-    `shared/money`. It fills the form, which the person checks and changes; nothing is saved until
+    `shared/money`. Everything the invoice adds or takes away between its items and that amount is
+    a line of its own: a tax on the whole invoice above zero, a discount or an amount already paid
+    below zero (§6.1 rule 1; prompt version 2, 13/11/2026, after a JBS Praxis invoice with a discount
+    and a deposit paid was read as ₦550,000.00 where it asked for ₦150,000.00). When the lines'
+    sum and `amount_due` differ, the form says so in its toast ("Invoice asks ₦150,000.00. Check
+    lines"). It fills the form, which the person checks and changes; nothing is saved until
     they press Save Draft or Send Request. A file the provider refuses (its kind or its size) answers
     `unreadable`, "This file cannot be read", as one of the wrong kind does; this month's AI budget
     spent answers `limit` (audit F9, F20).
@@ -430,7 +440,7 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. Category opens a popover (Pick Category) with a Category Type filter (All, Operating, Capital) and a search over the categories, 25 a page; Bank suggests banks as typed and offers Add for one it does not know; Payee Name and Account Name show a person's name as their example, never the reader's own. The form: Read Invoice once an invoice is attached, Suggest Category in its footer, each filling the form for the person to check; nothing is saved until they press | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." | the approval routing and the budget recount: §3, §6 here, the manual |
+| ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. Category opens a popover (Pick Category) with a Category Type filter (All, Operating, Capital) and a search over the categories, 25 a page; Bank suggests banks as typed and offers Add for one it does not know; Payee Name and Account Name show a person's name as their example, never the reader's own. Unit Price takes a minus for a line that takes money off (a discount, an amount already paid), shown red with (deduction). The form: Read Invoice once an invoice is attached, Suggest Category in its footer, each filling the form for the person to check, Read Invoice's toast naming the amount the invoice asks for when the lines add up to another; nothing is saved until they press | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." | the approval routing and the budget recount: §3, §6 here, the manual |
 | Expenses · Requisitions | New Request (secondary beside Create Requisition; alone, primary, above Not Open to You for a reader without `expenses.finance`); Approved Requests (tick boxes, Create Requisition), each opening its request in the modal with Withdraw (a reason, after a confirm); Requisitions (Reference, Requests, Total, Submitted, Status). The modal: its requests, each opening, Remove, Approve, Reject (the CEO) | help on Requisitions: "Approved requests grouped for the CEO." | why requests are batched: MILESTONES §13, the manual |
 | Expenses · Approvals | New Request; KPI cards With You, Total Value, Oldest, Approved This Month (opens the requests the reader approved since the 1st, `approved_by_me_from`); the list; the modal with lines, invoice (opens as a PDF), budget remaining (the line's, and the department's beside it), an Over Budget pill, a Possible Duplicate pill with Check Duplicate; Approve, Send Back, Reject | help on Over Budget: "More than the department has left for this category this year." Help on Possible Duplicate: "Same payee and amount within 30 days." | the chain's configuration: Settings · Approvals, this guide |
 | Expenses · Disbursements | KPI cards Waiting to Pay and Reference Missing, each opening its list; Waiting to Pay, a request opening in the modal with Record Disbursement and Withdraw; Paid; Record Disbursement (Bank Reference, Receipt, Paid On), No on Save Without Reference? back on Bank Reference; a Reference Missing pill and Add Reference; a paid one's Receipt row with Open Receipt when one was uploaded (TB, 11/11/2026). No chart (decision 7) | help on Bank Reference: "The bank's transaction ID for this transfer." | audit-anchor reasoning: §6.5 here |
@@ -487,6 +497,7 @@ None.
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · Found filming the M8 handover video: Read Invoice read a real invoice with a discount and a deposit already paid as ₦550,000.00, where it asked for ₦150,000.00; the prompt left discounts out, and the database refused a line below zero, so nobody could enter one. A line may now take money off (§6.1 rule 1, migration 8030, Unit Price's `MoneyField signed`), the request's amount still above zero; Read Invoice reads every addition and deduction as a line and the amount due beside them (`amount_due`, §9), and the form warns when they differ. The staging seed's sent-back and rejected requests are decided by whoever their stage names (a requester who manages people goes straight to Operations & People).
 - 13/11/2026 · TB · New Request on Expenses · Requisitions and Expenses · Approvals, the presser's own request through New Request's own form (§2, §3 step 7, §10.1, §10.2), not on the other tabs. Praxis AI: the New Request and Add Line cards ask for their item in one turn ("What are you paying for? How many? How much is each?"), read the model's figures as the contract takes them (Quantity and Unit Price were refused "Expected string, received number"), and a draft offers Add Another Item and Send Request once pressed; Send Request is a new card, `my_expenses.submit` (§9, §5 unchanged: it calls `submit`).
 - 11/11/2026 · AJ · From the Milestones Review of 11/11/2026 (TB): Category on New Request is a popover with a type filter and a server search (§3, §10.1), not a dropdown, since thirty or forty categories are searched, not scrolled; Bank is typed or picked from `GET /expenses/banks` with Add for a bank it does not know (§3, §5, §6.1); Payee Name's example is a name, not the reader's own; a paid disbursement shows Open Receipt (§10.1). Staff asking from their own department only was checked at the review and holds (§8).
 

@@ -1,13 +1,14 @@
 /**
  * @component MoneyField
  * @group Forms
- * @summary An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped.
+ * @summary An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped, unless the field is signed.
  * @use Every amount a person enters (an expense, a salary, a threshold); turn what was typed into the wire value with toMoneyString.
  * @avoid A number field for money (gate 20); showing an amount (use Money).
  * @phone The decimal keypad; 16 px text; right-aligned figures.
  * @a11y Labelled by its Field; the ₦ sign is visual, the label says it is an amount.
  * @status stable
  * @example <MoneyField {...form.field("amount")} />
+ * @example <MoneyField signed {...form.field("unit_price")} />  // a line that may take money off (a discount)
  */
 import { useEffect, useRef } from "react";
 import { cn } from "../lib/cn";
@@ -32,6 +33,8 @@ export interface MoneyFieldProps {
   id?: string;
   /** The field's name, so a failed submit can focus it. */
   name?: string;
+  /** A minus is an amount here, not a mistake: a line that takes money off (a discount, an amount already paid). */
+  signed?: boolean;
 }
 
 /** A minus, or an accounting bracket, before the figures: "-100", "₦-100", "−100", "(100)". */
@@ -44,11 +47,16 @@ const WHOLE_DIGITS = 16;
  * and a leading minus when there was one) and what is wrong with it. Nothing is turned into
  * another amount: a minus is kept and refused, never dropped (a salary of -100 once became 100),
  * and a second point, a comma out of place or a third decimal is refused rather than cut.
- * `final` when typing more cannot put it right.
+ * `final` when typing more cannot put it right. `signed` keeps a minus as part of the amount.
  */
-export function readMoney(typed: string): { text: string; problem?: string; final?: boolean } {
+export function readMoney(typed: string, { signed = false }: { signed?: boolean } = {}): { text: string; problem?: string; final?: boolean } {
   const figures = typed.replace(/[^\d.,]/g, "");
-  if (MINUS.test(typed)) return { text: `-${figures}`, problem: "Not below zero", final: true };
+  if (MINUS.test(typed)) {
+    if (!signed) return { text: `-${figures}`, problem: "Not below zero", final: true };
+    if (!figures) return { text: "-" };
+    const read = readMoney(figures);
+    return { ...read, text: `-${read.text}` };
+  }
   if (!figures) return { text: "" };
   const [whole = "", ...rest] = figures.split(".");
   const fraction = rest[0] ?? "";
@@ -59,9 +67,9 @@ export function readMoney(typed: string): { text: string; problem?: string; fina
   return { text: figures };
 }
 
-export function MoneyField({ value, onChange, onBlur, onProblem, state, message: _message, id, name }: MoneyFieldProps) {
+export function MoneyField({ value, onChange, onBlur, onProblem, state, message: _message, id, name, signed = false }: MoneyFieldProps) {
   const a = useFieldControl({ id, state });
-  const read = readMoney(value ?? "");
+  const read = readMoney(value ?? "", { signed });
   // The form hears of the problem whenever it changes, typed, pasted or set from outside.
   const told = useRef(onProblem);
   told.current = onProblem;
@@ -80,7 +88,7 @@ export function MoneyField({ value, onChange, onBlur, onProblem, state, message:
         autoComplete="off"
         className={cn(controlClass(shown), "h-control pl-7 text-right tabular-nums")}
         value={value ?? ""}
-        onChange={(e) => onChange(readMoney(e.target.value).text)}
+        onChange={(e) => onChange(readMoney(e.target.value, { signed }).text)}
         onBlur={onBlur}
       />
     </span>

@@ -40,6 +40,14 @@ describe("MoneyField", () => {
     expect(readMoney("100-")).toEqual({ text: "100" });
   });
 
+  it("keeps a minus as part of the amount when signed: a line that takes money off", () => {
+    for (const typed of ["-100,000", "₦-100,000", "−100,000", "(100,000)"]) expect(readMoney(typed, { signed: true })).toEqual({ text: "-100,000" });
+    expect(readMoney("-", { signed: true })).toEqual({ text: "-" });
+    expect(readMoney("250,000", { signed: true })).toEqual({ text: "250,000" });
+    expect(readMoney("-1.234.5", { signed: true })).toEqual({ text: "-1.234.5", problem: "Check the amount", final: true });
+    expect(toMoneyString("-100,000")).toBe("-100000.00");
+  });
+
   it("refuses an amount it would otherwise have to change: a second point, a comma out of place, a third decimal, too many digits", () => {
     expect(readMoney("1.234.567")).toEqual({ text: "1.234.567", problem: "Check the amount", final: true });
     expect(readMoney("1,00")).toEqual({ text: "1,00", problem: "Check the amount" });

@@ -34,14 +34,17 @@ My Requests lists every request you raised, newest first, with who it waits on n
    your purpose and items; check it before you send.
 5. Pick a **Project** if the money is for one, and check the **Department**.
 6. Fill in each item: what it is, its **Quantity** and **Unit Price**. Press
-   **Add Line** for another item, and the bin beside an item to take it out.
+   **Add Line** for another item, and the bin beside an item to take it out. For a discount or an
+   amount already paid, add a line with a minus before its **Unit Price** (-100,000). The
+   **Total** is what the invoice asks to be paid.
 7. Pick the **Payee**: **Staff**, **Vendor**, **Partner** or **Dedicated Task Team (DTT)**.
 8. For yourself, tick **Use My Company Account** to be paid into the bank account on your profile.
    For anyone else, fill in **Payee Name**, **Bank**, **Account Name** and **Account Number**.
    Type the **Bank** and pick it from the list; if it is not there, press **Add** to keep it as
    typed, and it is offered to everyone from then on.
 9. Attach the invoice under **Invoice**. Press **Read Invoice** to fill the payee and the items from
-   it, then check every line.
+   it, with its discounts and anything already paid as minus lines, then check every line. If the
+   message says **Invoice asks** another amount, put the lines right before you send.
 10. Press **Send Request**. Or press **Save Draft** to finish it later.
 
 > **Tip:** In [Praxis AI · Ask](/praxis-ai?tab=ask), say "Raise an expense request". It asks **What are you paying

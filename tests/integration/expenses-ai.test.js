@@ -93,7 +93,9 @@ describeDb("expenses' AI features against the real migrations", () => {
           lines: [
             { description: "Crates of water", quantity: "2", unit_price: "4500.00" },
             { description: "Ice", quantity: "1.5", unit_price: "1000.00" },
+            { description: "Paid to date", quantity: "1", unit_price: "-500.00" },
           ],
+          amount_due: "10000",
         },
         run_id: null,
       };
@@ -106,10 +108,12 @@ describeDb("expenses' AI features against the real migrations", () => {
       available: true,
       payee_name: "Chuks Stores",
       expense_category_id: cat["Events and Activations"],
-      amount: "10500.00",
+      amount: "10000.00",
+      amount_due: "10000.00",
       lines: [
         { description: "Crates of water", quantity: "2", unit_price: "4500.00" },
         { description: "Ice", quantity: "1.5", unit_price: "1000.00" },
+        { description: "Paid to date", quantity: "1", unit_price: "-500.00" },
       ],
     });
     expect(asked).toMatchObject({ purpose: "expense-invoice-read", module: "expenses", files: [expect.objectContaining({ mime_type: "application/pdf" })] });

@@ -13,7 +13,9 @@
  * What the model is given: the invoice itself (Read Invoice), the form's purpose and line
  * descriptions (Suggest Category), and the names of the categories offered on a request. Nothing
  * about the person. A category the model names is matched among those offered; one it made up is
- * left empty. Amounts are worked out here through shared/money, never by the model's sum.
+ * left empty. Amounts are worked out here through shared/money, never by the model's sum; a
+ * discount or an amount already paid is a line below zero, and the amount the invoice asks to be
+ * paid now comes back beside the lines' sum, so the form can say when the two differ.
  */
 const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
@@ -27,7 +29,7 @@ const categories = require("../expense_categories/expense_categories.service");
 
 const MODULE = "expenses";
 
-const offInvoice = (reason) => ({ available: false, reason, payee_name: null, expense_category_id: null, category: null, lines: [], amount: null, ai_run_id: null });
+const offInvoice = (reason) => ({ available: false, reason, payee_name: null, expense_category_id: null, category: null, lines: [], amount: null, amount_due: null, ai_run_id: null });
 const offCategory = (reason) => ({ available: false, reason, expense_category_id: null, category: null, ai_run_id: null });
 
 /** The names of the categories a request may use, and their ids by folded name. */
@@ -100,6 +102,7 @@ async function readInvoice(user, body) {
     category: categoryId ? out.category.trim() : null,
     lines,
     amount,
+    amount_due: out.amount_due ? m.toWire(out.amount_due) : null,
     ai_run_id: got.run.run_id || null,
   };
 }

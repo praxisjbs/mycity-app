@@ -27,7 +27,7 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 
-const answer = { payee_name: "Chuks Stores", category: null, lines: [] };
+const answer = { payee_name: "Chuks Stores", category: null, lines: [], amount_due: null };
 
 test("an Image Reading action sends its file beside the input as a data URL", async () => {
   const complete = jest.fn(async () => ({ text: JSON.stringify(answer), usage: { input_tokens: 1, output_tokens: 1 }, model: "gemini-flash" }));

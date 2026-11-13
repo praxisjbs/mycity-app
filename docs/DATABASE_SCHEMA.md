@@ -615,7 +615,7 @@ the status CHECK (`draft`, `submitted`, `sent_back`, `approved`, `in_requisition
 status CHECK; `project.budget_amount`; the foreign-key and list indexes, Home's included ·
 `8100` seed: the `expenses.request` and `expenses.requisition` flows, the statuses and payee types,
 the `expenses.finance` capability for Operations & People, and 8099's unused `expense_request`
-numbering scheme taken out (a request is numbered `expense`). · `8020` one budget per department per year: a unique index on `budget (department_id, starts_on)` for every budget but a closed one, a later duplicate closed first (M8 audit F7).
+numbering scheme taken out (a request is numbered `expense`). · `8020` one budget per department per year: a unique index on `budget (department_id, starts_on)` for every budget but a closed one, a later duplicate closed first (M8 audit F7). · `8030` a request's line may take money off: `expense_request_line`'s `unit_price` and `amount` checks (at or above zero) dropped, so a discount or an amount already paid is a line below zero; the request's amount stays above zero in the service (TB, 13/11/2026; `docs/guides/expenses.md` §6.1 rule 1).
 
 **Owes:**
 - Paid 05/11/2026 (M8 PR 7): the five categories 8099 seeded are taken out by the reference seed

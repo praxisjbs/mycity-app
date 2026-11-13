@@ -122,7 +122,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
-| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped. | stable |
+| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped, unless the field is signed. | stable |
 | Forms | [MonthField](#monthfield) | `MonthField` | A month picked from a year's twelve, bound to a form: the field reads "October 2026" and the value is the month's first day for the wire. | beta |
 | Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
@@ -3902,7 +3902,7 @@ The sign-in screen's larger field: label, control, its mark, and a message that 
 
 ### MoneyField
 
-An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped.
+An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped, unless the field is signed.
 
 | | |
 |---|---|
@@ -3929,9 +3929,11 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `name` | `string` |  | The field's name, so a failed submit can focus it. |
+| `signed` | `boolean` |  | A minus is an amount here, not a mistake: a line that takes money off (a discount, an amount already paid). |
 
 ```tsx
 <MoneyField {...form.field("amount")} />
+<MoneyField signed {...form.field("unit_price")} />  // a line that may take money off (a discount)
 ```
 
 ### MonthField

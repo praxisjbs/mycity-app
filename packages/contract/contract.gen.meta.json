@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "c29dfb396f64109feb848575f2b35cc3820d18585d05145482baa5908fd7552a",
+  "source_hash": "c274647e2aaccd240fc778ad7fcb26af5170122dffdbb2cf7a560161df97b265",
   "schemas": 2176,
   "endpoints": 1020,
   "inputs": {
@@ -28,7 +28,7 @@
     "packages/contract/schemas/employment_contracts.js": "72ceb7959aa4bddec1d3ee62c76360639ad0c373d394eaa649aedd7aa0a547a6",
     "packages/contract/schemas/ess.js": "533956948dbb444b0155578f7de68cd7e672c8485e84b2afb4afc53771aa2924",
     "packages/contract/schemas/expense_categories.js": "efd41a56266125f33f687714c865348a3d5aa15995154c8b3c081a1e77c4c167",
-    "packages/contract/schemas/expenses.js": "aa867ecf6fe02e3780681ce18fb655eda1ed0cb787fd0925f104e39b9deab2d0",
+    "packages/contract/schemas/expenses.js": "19af54dd3ebd82aeca498e0485ed088ba62fa918d496ec52b1000f2a04975f8b",
     "packages/contract/schemas/goals.js": "de63d5202829d1c62a6c81d0f6d5ab81c7f934020aa27026c362ffc6600d8871",
     "packages/contract/schemas/identity.js": "399d7f571458b79f3fd310debeccb41677efa350da3498d59b1e95497fc9447b",
     "packages/contract/schemas/imports.js": "ee9542e4a02e9425e3884b31e7f73a361186b84dcbb07b1420fbdfc420aff80b",

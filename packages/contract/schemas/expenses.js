@@ -195,6 +195,11 @@ const ExpenseApprovalsSummary = z
  * Writing
  * ------------------------------------------------------------------ */
 
+/**
+ * One line of a request. A unit price below zero takes money off, as its invoice does: a discount, a
+ * deposit or an amount already paid (TB, 13/11/2026); the request's total stays above zero, which
+ * the service holds.
+ */
 const ExpenseLineInput = z
   .object({
     description: text(200),
@@ -376,6 +381,8 @@ const ExpenseInvoiceRead = z
           .strict(),
       )
       .max(25),
+    /** What the invoice asks to be paid now (its balance due, else its total), or null when none is printed. */
+    amount_due: money.nullable(),
   })
   .strict();
 
@@ -389,6 +396,8 @@ const ExpenseInvoiceSuggestion = z
     category: z.string().nullable(),
     lines: z.array(ExpenseLineInput),
     amount: money.nullable(),
+    /** What the invoice asks to be paid now, as read; the form warns when the lines add up to something else. */
+    amount_due: money.nullable(),
     ai_run_id: uuid.nullable(),
   })
   .strict();

@@ -188,6 +188,22 @@ describeDb("expenses against the real migrations", () => {
     expect(zen.body.data).toEqual([{ bank_name: "Zenith Bank", uses: 0 }]);
   });
 
+  test("a line may take money off, as its invoice does; the request asks for what is left, never for nothing", async () => {
+    // A discount or an amount already paid is a line below zero (TB, 13/11/2026).
+    const credited = await h.as("staff").post("/expenses/mine").send(body({ bank_name: "Nombank MFB", lines: [
+      { description: "Ticket platform", quantity: "1", unit_price: "300000.00" },
+      { description: "Long-term client discount", quantity: "1", unit_price: "-100000.00" },
+      { description: "Paid to date", quantity: "1", unit_price: "-50000.50" },
+    ] }));
+    expect([credited.status, credited.body.amount]).toEqual([201, "149999.50"]);
+    expect(credited.body.lines.map((l) => [l.unit_price, l.amount])).toEqual([["300000.00", "300000.00"], ["-100000.00", "-100000.00"], ["-50000.50", "-50000.50"]]);
+    const overCredited = await h.as("staff").post("/expenses/mine").send(body({ bank_name: "Nombank MFB", lines: [
+      { description: "Ticket platform", quantity: "1", unit_price: "100000.00" },
+      { description: "Paid to date", quantity: "1", unit_price: "-100000.00" },
+    ] }));
+    expect([overCredited.status, overCredited.body.error.code]).toEqual([422, "AMOUNT_REQUIRED"]);
+  });
+
   test("sent: the line manager, then Operations & People, each from Expenses · Approvals; nobody else decides it", async () => {
     const r = await raise("staff");
     expect(r).toMatchObject({ status: "submitted", waiting_on: "Line Manager", over_budget: true, can_edit: false, can_cancel: true });
