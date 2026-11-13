@@ -208,7 +208,7 @@ async function ask(body, actor, askKey = null) {
     choices: shown.choices,
     overview: shown.overview,
     context,
-    attachment: attached ? { document: attached.document, kind: attached.kind } : null,
+    attachment: attached ? { document: attached.document, kind: attached.kind, record: attached.record } : null,
     feedback: null,
     created_at: new Date(saved.a.created_at).toISOString(),
     provisional: true,

@@ -1090,7 +1090,7 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   projects, tasks and events with their optional partner and deal. Each `run` is the module's own service
   function. **Not in the chat**, each with its `not_offered` reason: Send Proposal, Send for Signature,
   Generate Agreement, Submit for Approval (`design`: a person confirms on screen), signing (`secret`),
-  Record Signed Copy and Upload Document (`file`), categories, fields, lists, checklists and proof points
+  Record Signed Copy and Upload Document (`file` until 13/11/2026, now reached from an attached contract or MoU, below), categories, fields, lists, checklists and proof points
   (`design`), Tidy With AI and Rewrite Section (`ai`), the imports (`file`). `scripts/check/ai-forms-
   gaps.json` only shrinks. **Built in PR 3:** the reads `leads.list`, `leads.get`, `partners.list`,
   `partners.get`, `deals.list`, `deals.get`, `categories.list`, `interactions.list`; the cards
@@ -1124,13 +1124,21 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   (`proposals.search.js`: number, title, partner and deal, the newest version of each), `proposal` off
   `search:none`, and `partnership_proposal`, the type its events and notices name, opening Proposals.
 
-- **Contracts and MoUs in the chat (planned; `praxis-ai.md` decisions 41 to 48, §6.18, Appendix A
-  PR 2).** A contract or MoU attached on Praxis AI · Ask is read (`agreement-document-read`, Image
-  Reading), summarised on the answer and the pane's Record tab, then filed by a card: Record Signed
-  Copy (`agreements.record_signed_copy`, risk `approval`) when it matches an agreement in `sent` or
-  `viewed`, otherwise Add Partner Document (`partner_documents.attach`) on the partner or lead it
-  names. Each runs the route's own service; `not_offered` then reaches `SignedCopyRecord` and
-  `PartnerDocumentAttach` through these cards instead of `file:`.
+- **Contracts and MoUs in the chat (built 13/11/2026; `praxis-ai.md` decisions 41 to 48, §6.18,
+  Appendix A PR 2).** A contract or MoU attached on Praxis AI · Ask (the Contract or MoU tile, for
+  `partnerships` view) is read on `agreement-document-read` (Image Reading, `personal_data: true`,
+  chosen by TB, 13/11/2026; `agreements.document-ai.js`, `AgreementDocumentRead`), summarised, its
+  terms shown on the pane's Record tab, and, for a holder of `partnerships` edit, filed by a card.
+  Its parties are matched by name among the partners and leads the person may edit, as Connect to
+  Partner matches them, MyCity set aside. **Record Signed Copy** (`agreements.record_signed_copy`,
+  `AgreementSignedCopyAdd`, risk `approval`) when a matched record has an agreement in `sent` or
+  `viewed`, run by `agreements.signedCopy`; otherwise **Add Partner Document**
+  (`partner_documents.attach`, `PartnerDocumentAdd`: Upload Document's request with the kind by its
+  name, MyCity's `partner_document_kind`), run by `partners.documents.attach`. `not_offered` reaches
+  `SignedCopyRecord` through Record Signed Copy (`via`); `PartnerDocumentAttach`, an Attach rather
+  than a create or edit form, is in no `not_offered` and is sent by Add Partner Document's run. Nothing else is made:
+  no agreement drafted, no partner or lead created. The staging setup seed enters the document kinds
+  §4.3 lists.
 
 ## 10 · On screen and mobile
 
@@ -1913,6 +1921,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · Contracts and MoUs in the chat built (`praxis-ai.md` Appendix A PR 2, §9): read on `agreement-document-read`, summarised with its terms on Praxis AI's Record tab, and filed by Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else by Add Partner Document (`partner_documents.attach`) on the partner or lead it names. `SignedCopyRecord` is reached `via` Record Signed Copy; Add Partner Document's run sends `PartnerDocumentAttach`. The staging setup seed enters the document kinds of §4.3. §10 is unchanged: no Partnerships screen changes; the cards and the Record tab are Praxis AI's (`praxis-ai.md` §10).
 - 13/11/2026 · TB · Send Back on an agreement's approval no longer tells its approvers "Withdrawn: The requester withdrew this before it was decided": the handler withdraws the approval with `engine.cancel(..., sentBack: true)`, which tells nobody (the requester is told of the Send Back with its reason). Found filming M8 on Expenses, the same handler (`docs/runbooks/training-videos.md` §7).
 - 13/11/2026 · TB · Contracts and MoUs in the chat planned (`praxis-ai.md` decisions 41 to 48, Appendix A PR 2): read, summarised, and filed as Record Signed Copy or Add Partner Document (§9). Nothing built yet.
 - 13/11/2026 · AJ · The signing service (§6.9), from M5's click-through: a request that ends unsigned

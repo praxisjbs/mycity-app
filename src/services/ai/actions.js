@@ -249,6 +249,17 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-11-13",
     built: true,
   }),
+  // A contract or MoU attached on Ask (praxis-ai.md §6.18, decisions 43 and 47): read, summarised, its
+  // terms on the pane's Record tab, and filed by Record Signed Copy or Add Partner Document's card.
+  "agreement-document-read": Object.freeze({
+    label: "Read Agreement",
+    module: "partnerships",
+    job: "image_reading",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-11-13",
+    built: true,
+  }),
   "expense-duplicate-check": Object.freeze({
     label: "Check Duplicate",
     module: "expenses",

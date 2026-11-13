@@ -6,8 +6,10 @@
  * confirms (docs/guides/praxis-ai.md §6.11, decision 33), New Partner (signed before the hub), Edit
  * Partner, Add Contact and Edit Contact, each through the screen's own service function.
  *
- * A signed copy, a logo and Upload Document are files, never in the chat; Close Partner loses every
- * open deal with it, so it stays on the Partner 360.
+ * A signed copy and a logo are files, never in the chat; Close Partner loses every open deal with it,
+ * so it stays on the Partner 360. Upload Document is reached from a contract or MoU attached on Ask
+ * (praxis-ai.md §6.18): Add Partner Document files it on the partner or lead its parties name, its
+ * kind by its name, through Upload Document's own service.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -16,6 +18,8 @@ const routeMap = require("../../shared/route-map");
 const maps = require("../maps/maps.service");
 const pipeline = require("../partner_pipeline/partner_pipeline.service");
 const service = require("./partners.service");
+const work = require("./partners.work");
+const documents = require("./partners.documents");
 
 const link = (id) => (routeMap.linkFor("partner", id) || {}).path || null;
 /** The partner a card made or changed, read back as a line that opens its 360. */
@@ -149,6 +153,29 @@ module.exports = defineManifest({
       },
       readback: contactLine("saved"),
       labels: { partner_contact_id: "Contact", first_name: "First Name", last_name: "Last Name", job_title: "Position", phones: "Phones" },
+    },
+    {
+      key: "partner_documents.attach",
+      label: "Add Partner Document",
+      description: "File an attached contract or MoU among a partner's or a lead's documents (one or the other, never both), its kind by name, and its deal if any",
+      input: c.partners.PartnerDocumentAdd,
+      permission: ["partnerships", "edit"],
+      risk: "standard",
+      form: "none: Upload Document's form picks its kind from MyCity's list by code; the card carries the kind by its name (PartnerDocumentAdd), drawn from an attached contract or MoU",
+      from_file: { kind: "contract", fills: ["document_id"] },
+      fields: ["document_id", "kind", "partner_id", "lead_id", "deal_id"],
+      // Picked, named and found from words as Connect to Partner's are; a kind by its name, as the list writes it.
+      picks: work.card.picks,
+      resolve: { ...work.card.resolve, kind: (value, _actor, db) => documents.kindNameOf(db, value) },
+      names: async (values, actor, db) => [...(await work.card.names(values, actor, db)), ...(await documents.cardFile(db, values.document_id, actor))],
+      asks: [
+        { field: "partner_id", question: "Whose document is it?", read: "partners.list", none: true },
+        { field: "kind", question: "What kind is it?", options: ({ db }) => documents.kindLabels(db) },
+      ],
+      check: (client, values) => documents.assertCard(client, values),
+      run: (values, actor) => documents.cardAttach(actor, values),
+      readback: documents.cardReadback,
+      labels: { document_id: "Document", kind: "Kind", partner_id: "Partner", lead_id: "Lead", deal_id: "Deal" },
     },
   ],
   // Every create and edit form of the partners contract, and how the chat reaches it (gate 23, decision 33).

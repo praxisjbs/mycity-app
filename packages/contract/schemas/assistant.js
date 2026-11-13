@@ -101,11 +101,32 @@ const AiAttachmentKinds = z
   })
   .strict();
 
-/** The file a question carried, as its bubble shows it (§6.18). */
+/**
+ * A document's terms as the pane's Record tab shows them (§6.18, PR 2): its title and each term as a
+ * label and a value a person reads (dates day first, money formatted), drawn by the kind's reader.
+ */
+const AiAttachmentRecord = z
+  .object({
+    title: z.string().min(1).max(200),
+    items: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(200),
+            value: z.string().min(1).max(2000),
+          })
+          .strict(),
+      )
+      .max(30),
+  })
+  .strict();
+
+/** The file a question carried, as its bubble shows it, and its terms for the Record tab when its kind draws them (§6.18). */
 const AiAnswerAttachment = z
   .object({
     document: DocumentRef,
     kind: AiAttachmentKind,
+    record: AiAttachmentRecord.nullable(),
   })
   .strict();
 
@@ -655,6 +676,7 @@ const TABLES = {
   AiAttachment: { table: null, reason: "a staged document and its kind, kept in ai_message.metadata.attachment" },
   AiAttachmentKindOption: { table: null, reason: "a kind of document a person may attach, from the manifests' files" },
   AiAttachmentKinds: { table: null, reason: "the kinds a person may attach and whether reading is on, worked out from code and AI Control" },
+  AiAttachmentRecord: { table: null, reason: "a document's terms for the pane's Record tab, kept in ai_message.metadata.attachment" },
   AiAnswerAttachment: { table: null, reason: "the file a question carried, kept in ai_message.metadata.attachment" },
   AiCitation: {
     table: "ai_message_citation",
@@ -764,6 +786,7 @@ module.exports = {
   AiAsk,
   AiAttachmentKindOption,
   AiAttachmentKinds,
+  AiAttachmentRecord,
   AiAnswerAttachment,
   AiCitation,
   AiAnswerTable,

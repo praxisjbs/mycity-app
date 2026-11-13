@@ -42,9 +42,9 @@
  *     files: [{                                       // a document attached on Ask, read for a card (praxis-ai.md §6.18)
  *       kind: "invoice",                              // an AiAttachmentKind
  *       label: "Invoice",
- *       permission: ["expenses", "create"],           // who is offered the tile; `capability` beside it when one is needed
+ *       permission: ["expenses", "create"],           // who is offered the tile (any grant, view included); `capability` beside it when one is needed
  *       question: "Raise an expense request from this invoice",
- *       read: (actor, doc, db) => receiptAi.readForChat(actor, doc, db),   // { outcome, reading, card, notes }; writes nothing
+ *       read: (actor, doc, db) => receiptAi.readForChat(actor, doc, db),   // { outcome, reading, card, notes, record }; writes nothing
  *       actions: ["my_expenses.from_invoice"],        // the cards it may draw
  *     }],
  *     not_offered: { EmployeeImportRow: "an import row is loaded through the import engine" },
@@ -144,6 +144,12 @@ const CHOICES_MAX = 6;
 const KEY_RE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 /** An action's grant: never `view`, which cannot change anything. */
 const ACTION_GRANTS = new Set(["create", "edit", "approve", "delete", "export"]);
+/**
+ * Who may be offered a kind of document (praxis-ai.md §6.18): any grant, `view` included, since
+ * reading a document writes nothing and every card it draws still needs its own action's grant
+ * (decision 41 offers Contract or MoU to Partnerships view; its filing card needs edit).
+ */
+const FILE_GRANTS = new Set(["view", ...ACTION_GRANTS]);
 /** The risk classes (praxis-ai.md §1.2 decision 11); the four after standard need a fresh sign-in. */
 const RISKS = Object.freeze(["standard", "approval", "money", "payroll", "delete"]);
 const BULK_MAX = 25;
@@ -377,12 +383,12 @@ function checkFile(where, f, seen) {
   seen.add(f.kind);
   const at = `${where} file ${f.kind}`;
   if (typeof f.label !== "string" || !f.label.trim() || f.label.length > 40 || f.label.trim().split(/\s+/).length > 4) throw new Error(`${at}: label is the tile's words, at most 4`);
-  checkPermission(at, f.permission, ACTION_GRANTS, "a file");
+  checkPermission(at, f.permission, FILE_GRANTS, "a file");
   if (f.capability !== undefined && (typeof f.capability !== "string" || !catalog.isCapability(f.capability)))
     throw new Error(`${at}: capability is a code in shared/access/access.catalog.js CAPABILITY_CATALOG`);
   if (typeof f.question !== "string" || f.question.trim().length < 10 || f.question.length > 200 || /[—–]/.test(f.question))
     throw new Error(`${at}: question is the words asked when the box is left empty, 10 to 200 characters`);
-  if (typeof f.read !== "function") throw new Error(`${at}: read is (actor, doc, db) => { outcome, reading, card, notes }`);
+  if (typeof f.read !== "function") throw new Error(`${at}: read is (actor, doc, db) => { outcome, reading, card, notes, record }`);
   if (!Array.isArray(f.actions) || !f.actions.length || f.actions.some((k) => !KEY_RE.test(String(k || ""))))
     throw new Error(`${at}: actions lists the keys of the cards it may draw`);
   return Object.freeze({ ...f, label: f.label.trim(), question: f.question.trim(), capability: f.capability || null, actions: Object.freeze([...f.actions]) });

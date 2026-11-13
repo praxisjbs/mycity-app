@@ -114,9 +114,19 @@ describeDb("documents in the chat against the real migrations", () => {
 
   test("a kind is offered only to someone who may make what it becomes, and refused to anyone else", async () => {
     const staff = await h.as("staff").get("/ai/attachment-kinds");
-    expect([staff.status, staff.body]).toEqual([200, { kinds: [{ kind: "invoice", label: "Invoice", question: "Raise an expense request from this invoice" }], available: true }]);
+    // Every seeded role sees Partnerships, so Contract or MoU is everyone's tile (decision 41).
+    expect([staff.status, staff.body]).toEqual([
+      200,
+      {
+        kinds: [
+          { kind: "invoice", label: "Invoice", question: "Raise an expense request from this invoice" },
+          { kind: "contract", label: "Contract or MoU", question: "Summarise this contract and file it" },
+        ],
+        available: true,
+      },
+    ]);
     const ops = await h.as("ops").get("/ai/attachment-kinds");
-    expect(ops.body.kinds.map((k) => k.kind)).toEqual(["invoice", "payment_receipt"]);
+    expect(ops.body.kinds.map((k) => k.kind)).toEqual(["invoice", "payment_receipt", "contract"]);
 
     const staged = await stage("staff", { name: "receipt.pdf" });
     expect(staged.status).toBe(201);
@@ -136,7 +146,8 @@ describeDb("documents in the chat against the real migrations", () => {
     expect([asked.status, asked.body.error]).toEqual([200, undefined]);
     const a = asked.body;
     expect(a.question).toBe("Raise an expense request from this invoice");
-    expect(a.attachment).toEqual({ kind: "invoice", document: expect.objectContaining({ document_id: staged.body.document_id, file_name: "INV-202611-9525.pdf" }) });
+    // An invoice shows its figures on the card, so it draws no terms for the Record tab (§6.18).
+    expect(a.attachment).toEqual({ kind: "invoice", document: expect.objectContaining({ document_id: staged.body.document_id, file_name: "INV-202611-9525.pdf" }), record: null });
     expect(a.reads[0]).toMatchObject({ n: 1, key: "file.invoice", outcome: "read", module_key: "expenses" });
     // The model got the reading as data with the question, never the file, and never the account number.
     const user = sent[0].messages.filter((m) => m.role === "user").pop();

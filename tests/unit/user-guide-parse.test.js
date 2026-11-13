@@ -104,6 +104,14 @@ describe("parseChapter", () => {
     expect(parseChapter(spec("lock: asleep"), "x.md").problems).toEqual(['x.md: shot locked, line 12: lock reads "lock: idle", "lock: time" or "lock: ended"']);
   });
 
+  test("a picture spec may choose a made-up sample in a file field, and only one of the repository's samples", () => {
+    const spec = (step) => `---\ntitle: X\n---\n\n## A {#a}\n\n![A contract](shot:mou)\n\n\`\`\`shot mou\nopen: /praxis-ai?tab=ask\ndo:\n  - ${step}\n\`\`\`\n`;
+    const ok = parseChapter(spec("upload: css input[type=file] = scripts/ai/samples/mou-signed.pdf"), "x.md");
+    expect(ok.problems).toEqual([]);
+    expect(ok.chapter.shots.mou.do).toEqual([{ action: "upload", target: { kind: "css", selector: "input[type=file]" }, file: "scripts/ai/samples/mou-signed.pdf" }]);
+    expect(parseChapter(spec("upload: css input[type=file] = /etc/passwd"), "x.md").problems).toEqual(['x.md: shot mou, line 12: upload reads "upload: <target> = scripts/ai/samples/<file>"']);
+  });
+
   test("a picture of the public site (site: public) is taken signed out at a public address, and a hub spec stays as it was", () => {
     const spec = (lines) => `---\ntitle: X\n---\n\n## A {#a}\n\n![A role](shot:role)\n\n\`\`\`shot role\n${lines}\n\`\`\`\n`;
     const ok = parseChapter(spec("site: public\nopen: /jobs/head-sales-revenue-lagos"), "x.md");
