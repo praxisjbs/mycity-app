@@ -229,7 +229,7 @@ describe("manifest v2 (§6.11, §6.13)", () => {
     expect(["order the banners", "banners", "Order the", "venue", "the", "paint"].map(step)).toEqual(["Order the banners", "Order the banners", null, "Book the venue", null, null]);
     // "&" is said "and", either way round: a model writes "Travel & Transport" for "Travel and Transport".
     const cats = [{ name: "Travel and Transport" }, { name: "Branding & Printing" }, { name: "Office and Admin" }];
-    const cat = (said) => (oneNamed(cats, said, (c) => [c.name]) || {}).name || null;
+    const cat = (said) => (oneNamed(cats, said, (x) => [x.name]) || {}).name || null;
     expect(["Travel & Transport", "travel and transport", "Branding and Printing", "Office & Admin"].map(cat)).toEqual(["Travel and Transport", "Travel and Transport", "Branding & Printing", "Office and Admin"]);
   });
 
