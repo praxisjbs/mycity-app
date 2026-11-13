@@ -155,6 +155,17 @@ const CASES = Object.freeze([
   // Charts in the Overview, PR 1: budgets (praxis-ai.md §6.19, Appendix B). The question that started the plan.
   { id: "chart.budgets-department", as: "ceo", question: "I want us to study our budget for each department. Share data in a way we can see charts in overview.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar", never_words: ["summary endpoint", "endpoint", "database", "generated", "summary read", "tool"] },
   { id: "chart.budgets-category", as: "operations_people", question: "Show this year's budget by category as a chart.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar" },
+  // Charts in the Overview, PR 2: a short list with no summary, charted from its own rows (praxis-ai.md §6.19 item 6).
+  { id: "chart.worksites", as: "operations_people", question: "How many people work at each worksite?", reads: ["worksites.list"], shows: ["pane"], chart: "bar", never_words: ["summary", "endpoint", "database", "generated", "tool"] },
+  // Charts in the Overview, PR 4: finance and pay (praxis-ai.md §6.13, Appendix B). Each summary as the role payroll.md and expenses.md §8 name.
+  { id: "chart.expenses-category", as: "operations_people", question: "Chart this month's expense requests by category: what is paid, approved and waiting.", reads: ["expenses.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.expenses-waiting", as: "head_of_department", question: "How much is waiting on my approval in expense requests?", reads: ["expenses.summary"], shows: ["pane"] },
+  { id: "chart.requisitions", as: "operations_people", question: "How many requisitions went to the CEO this month, and how many were approved?", reads: ["requisitions.summary"], shows: ["pane"] },
+  { id: "chart.disbursements", as: "operations_people", question: "How much did we pay out this month, by category, and how many transfers are missing a reference?", reads: ["disbursements.summary"], shows: ["pane"] },
+  { id: "chart.payroll-department", as: "operations_people", question: "Chart the latest payroll by department, net pay against deductions.", reads: ["payroll.month"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.payroll-trend", as: "ceo", question: "How has our net payroll moved month by month this year?", reads: ["payroll.trend"], shows: ["pane"], chart: "line" },
+  { id: "chart.deductions", as: "operations_people", question: "Show our deductions by source: fines, advances and attendance.", reads: ["deductions.summary"], shows: ["pane"] },
+  { id: "chart.my-pay", as: "employee", question: "How much have I earned and had deducted this year, month by month?", reads: ["my_pay.summary"], shows: ["pane"] },
   // Charts in the Overview, PR 5: recruitment and onboarding (praxis-ai.md §6.13, Appendix B).
   { id: "chart.vacancies-department", as: "operations_people", question: "Chart our vacancies by department: how many are open, paused and closed?", reads: ["vacancies.summary"], shows: ["pane"], chart: "stacked_bar" },
   { id: "chart.candidates-funnel", as: "operations_people", question: "Show the candidate funnel: how many candidates are at each stage?", reads: ["candidates.summary"], shows: ["pane"], chart: "bar" },

@@ -1295,6 +1295,19 @@ ever wanted, the question CLAUDE.md requires ("which job does it use?", the owne
   `payroll.month` leaves the three amounts out for a reader whose role hides pay (`employee.salary`) and answers the headcount
   alone, as the screen shows Restricted.
 
+  **Charts in the Overview** (built 13/11/2026, `praxis-ai.md` Appendix B PR 4; the figures, groups and series are §6.13's
+  Finance and pay table there). Every read names its summary:
+
+  | Summary | In | Answers | What it adds |
+  |---|---|---|---|
+  | `payroll.month` (widened) | `payroll.ai.js` | `payslips.list` | `by` department or status: the month's payslips by department within the reader's `payroll` scope (Gross stacked as Net Pay and Deductions with the salary grant, people paid without it) and by status (Preview, Published, Excluded); its money now in `ngn`, which the Overview reads as naira |
+  | `payroll.trend` | `payroll.ai.js` | `payroll.runs` | A year's runs (or up to 24 months): runs, months paid, the latest run's month and status, runs by status, and people paid, gross, deductions and net by month from the approved and paid runs (money with the salary grant) |
+  | `deductions.summary` | `deductions.ai.js` | `deductions.list` | What Payroll · Deductions lists, by source, status and department, amounts with the salary grant (counts without), scheduled ahead, recovered this year and advances outstanding, and amount by month |
+  | `my_pay.summary` | `payslips.ai.js` | `payslips.mine`, `deductions.mine` | The person's own published payslips of a year: gross, deductions and net to date, fines and advance repayments, deductions by reason (the payslip's deduction lines), and the three by month; read by the session's employee id alone and never masked from them (§6.13 rule 3) |
+
+  A summary is never masked on the way out, so each leaves out a figure, a part or a series the reader would see as Restricted
+  (`employee.salary`, praxis-ai.md decision 58) and keeps its counts.
+
   **A person's own pay is never masked from them** (§6.13 rule 3), but the assistant's engine masks the salary-derived names in
   every row it reads and the Employee role hides salaries by default (`0449`), so a plain employee would be answered null about
   their own payslip. `payslips.mine` and `deductions.mine` therefore read by the session's employee id and nobody else's and
@@ -2342,6 +2355,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · Praxis AI's payroll summaries (`praxis-ai.md` Appendix B PR 4, §9): `payroll.month` gains its payslips by department and by status and reads its money as naira; `payroll.trend`, `deductions.summary` and `my_pay.summary` added, each read naming its summary; money only with the salary grant, a person's own pay never hidden from them.
 - 13/11/2026 · TB · Send Back on a run's approval no longer tells its approvers "Withdrawn: The requester withdrew this before it was decided": the handler withdraws the approval with `engine.cancel(..., sentBack: true)`, which tells nobody (the requester is told of the Send Back with its reason). Found filming M8 on Expenses, the same handler (`docs/runbooks/training-videos.md` §7).
 
 - 13/11/2026 · JP · PR 8 (the staging seed, the User Guide and the release check, `m6/release`), after PR 11 merged. §13.2

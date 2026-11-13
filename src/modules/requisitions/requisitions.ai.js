@@ -6,6 +6,9 @@
  * them), as Expenses · Requisitions shows them; anyone else is answered with an empty page, as
  * the screen is closed to them. A read carries no capability of its own, so the run asks it.
  *
+ * Its summary gives the requisitions in figures, by status and by month, to the same readers
+ * (praxis-ai.md §6.13, Finance and pay); anyone else is given no figures.
+ *
  * Create Requisition is a card the person confirms: up to 25 approved requests, picked from the
  * requests waiting for a requisition, through the service function the tab's own button calls.
  * The CEO approves or rejects a requisition through the approvals' own card (approvals.decide);
@@ -27,11 +30,22 @@ module.exports = defineManifest({
   reads: [
     {
       key: "requisitions.list",
+      summary: "requisitions.summary",
       description: "List the requisitions: approved expense requests grouped for the CEO, with how many each holds, the total and whether the CEO decided it",
       params: c.requisitions.RequisitionListQuery,
       permission: ["expenses", "view"],
       run: async (_client, params, actor) => ((await holdsCapability(actor, "expenses.finance")) ? service.list(params, actor) : envelope([], 1, 0)),
       cite: (row) => ({ type: "requisition", id: row.requisition_id, label: row.number }),
+    },
+  ],
+  summaries: [
+    {
+      key: "requisitions.summary",
+      description: "Requisitions in figures: how many, the requests in them and their total, waiting on the CEO, approved and declined, by status, and the total by month",
+      params: c.requisitions.RequisitionSummaryQuery,
+      permission: ["expenses", "view"],
+      // The figures are only for a holder of `expenses.finance`, as the read's rows are; the service answers anyone else with none.
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
     },
   ],
   actions: [

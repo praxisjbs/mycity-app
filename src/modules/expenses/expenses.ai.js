@@ -7,6 +7,10 @@
  * and the requests waiting on them now. Bank details are masked by the engine for a reader without
  * `employee.bank`, as on the screen.
  *
+ * Summary: the requests in figures within the same audiences (praxis-ai.md §6.13, Finance and pay),
+ * by status and by category, department, project or payee type, each row stacked Paid, Approved and
+ * Waiting; the reads above name it.
+ *
  * Cards the person confirms (praxis-ai.md §6.11, decision 33), each through the service function
  * New Request's and Edit's own buttons call: New Request (the request with its first line, sent at
  * once unless the person keeps a draft), Add Line (one more line on a draft or sent-back request),
@@ -56,6 +60,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "expenses.mine",
+      summary: "expenses.summary",
       description: "List my own expense requests: what each is for, its amount, its category and project, and where it is (draft, waiting on whom, sent back, approved, paid, rejected or cancelled)",
       params: c.expenses.ExpenseListQuery,
       permission: ["expenses", "view"],
@@ -64,6 +69,7 @@ module.exports = defineManifest({
     },
     {
       key: "expenses.list",
+      summary: "expenses.summary",
       description: "List expense requests within my reach: who raised each, what it is for, its amount, category, project and payee type, whether it is over budget, and where it is",
       params: c.expenses.ExpenseListQuery,
       permission: ["expenses", "view"],
@@ -72,12 +78,23 @@ module.exports = defineManifest({
     },
     {
       key: "expenses.approvals",
+      summary: "expenses.summary",
       description: "List the expense requests waiting on my decision now, oldest first",
       params: c.expenses.ExpenseListQuery,
       // A read asks `view`; only what the stages name the person is returned, so it is empty for anyone who decides none.
       permission: ["expenses", "view"],
       run: (_client, params, actor) => service.approvals(actor, params),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "expenses.summary",
+      description:
+        "Expense requests in figures: asked, approved, paid and waiting by status, category, department, project or payee type (stacked), top requesters, by month; mine or waiting_on_me narrow it",
+      params: c.expenses.ExpenseSummaryQuery,
+      permission: ["expenses", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
     },
   ],
   actions: [

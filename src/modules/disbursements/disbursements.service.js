@@ -21,6 +21,8 @@ const numbering = require("../../shared/numbering/numbering");
 const vault = require("../../shared/documents/vault");
 const lagos = require("../../shared/time/lagos");
 const routeMap = require("../../shared/route-map");
+const m = require("../../shared/money/money");
+const { holdsCapability } = require("../../middleware/rbac");
 const expenses = require("../expenses/expenses.service");
 const expensesRepo = require("../expenses/expenses.repo");
 const repo = require("./disbursements.repo");
@@ -40,6 +42,49 @@ async function tx(fn) {
 const notFound = () => new AppError("NOT_FOUND", "That disbursement does not exist", 404, { disbursement_id: ["No such disbursement"] });
 
 const list = (query, scope) => repo.list(pool, query, scope);
+
+/** A payee type as New Request's form names it. */
+const PAYEE_WORDS = Object.freeze({ staff: "Staff", vendor: "Vendor", partner: "Partner", task_team: "Dedicated Task Team" });
+const DIM_WORDS = Object.freeze({ category: "category", department: "department", payee_type: "payee type" });
+const BUCKET_WORDS = Object.freeze({ day: "day", week: "week", month: "month" });
+
+/**
+ * The transfers in figures for the assistant (docs/guides/praxis-ai.md §6.13, Finance and pay), for a
+ * holder of `expenses.finance` as the screen shows them, within their `expenses` scope: those paid in the
+ * period (this Lagos month to today unless asked), by category, department or payee type, amount paid
+ * by day, week or month, and what is authorised and still to pay. Anyone else is given no figures.
+ * @param {{query: Function}} client
+ * @param {object} params  DisbursementSummaryQuery, parsed
+ * @param {object} actor   the asking person with their `expenses` scope
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  if (!(await holdsCapability(actor, "expenses.finance"))) return { figures: [], groups: [], series: [], total: 0 };
+  const { figure, group, series, periodOf } = require("../../shared/ai/summary");
+  const dim = DIM_WORDS[params.by] ? params.by : "category";
+  const bucket = BUCKET_WORDS[params.by] ? params.by : "month";
+  const r = await repo.aiSummary(client, { reference_missing: params.reference_missing, ...periodOf(params, now), dim, bucket }, actor.scope);
+  const f = r.figures;
+  const average = f.average_days === null || f.average_days === undefined ? 0 : Number(f.average_days);
+  return {
+    figures: [
+      figure("payments", "Payments", f.payments || 0),
+      figure("paid", "Amount paid", m.toWire(f.paid || "0.00"), "ngn"),
+      figure("reference_missing", "Reference missing", f.reference_missing || 0),
+      figure("to_pay", "Authorised, not yet paid", r.waiting.n || 0),
+      figure("to_pay_amount", "Amount to pay", m.toWire(r.waiting.amount || "0.00"), "ngn"),
+      figure("average_days", "Days from authorised to paid", average, "days"),
+    ],
+    groups: [
+      group(
+        dim,
+        `Amount paid by ${DIM_WORDS[dim]}`,
+        r.by_dim.map((x) => ({ ...x, label: dim === "payee_type" ? PAYEE_WORDS[x.label] || x.label : x.label, value: m.toWire(x.value) })),
+      ),
+    ],
+    series: [series("paid", `Amount paid by ${BUCKET_WORDS[bucket]}`, r.points.map((p) => ({ at: p.at, value: m.toWire(p.value) })))],
+    total: f.payments || 0,
+  };
+}
 
 /** One disbursement within the reader's scope; the requester's id beside it for the controller's mask. */
 async function getFor(scope, id) {
@@ -181,4 +226,4 @@ async function assertCardMissing(db, id, actor) {
 
 const readback = (status) => (r) => [{ type: "disbursement", id: r.disbursement_id, label: `${r.number}, ${r.request_number}`, status: r.reference_missing ? "recorded, reference missing" : status, link: linkOf(r.disbursement_id) }];
 
-module.exports = { list, getFor, publicRow, create, addReference, cardRequest, cardNames, assertCardPayable, cardDisbursement, assertCardMissing, readback };
+module.exports = { list, aiSummary, getFor, publicRow, create, addReference, cardRequest, cardNames, assertCardPayable, cardDisbursement, assertCardMissing, readback };

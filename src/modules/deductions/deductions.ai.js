@@ -7,6 +7,9 @@
  * Payroll · Deductions lists them, masked as the screen is) and, for the asking person, their own deductions and
  * the instalments scheduled (`deductions.mine`, never masked from them: payslips.service `ownDeductionsForAssistant`).
  *
+ * A summary, figures and never rows (praxis-ai.md §6.13, Finance and pay): what the tab lists by source, status,
+ * department and month, its amounts only for a reader with the salary grant.
+ *
  * Cards the person confirms (praxis-ai.md §6.11, decision 33), each through the service function a button on Payroll ·
  * Deductions calls, each risk `payroll` so Confirm It's You comes first (decision 11): Accept Deduction (a fine, this
  * month or spread), Waive Fine and Record Advance. A fine's buttons sit on its own sheet and never name it, so the
@@ -42,6 +45,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "deductions.list",
+      summary: "deductions.summary",
       description:
         "List deductions: attendance items waiting, fines (waiting, active, settled, waived) and salary advances, by person, source, status or month, with who each is about, why, its month and status",
       params: c.deductions.DeductionListQuery,
@@ -56,11 +60,22 @@ module.exports = defineManifest({
     },
     {
       key: "deductions.mine",
+      summary: "my_pay.summary",
       description: "List my own deductions on my payslips: each month that carried a fine or an advance repayment and each still scheduled, with the reason, query number, which instalment and the amount",
       params: c.common.PageQuery,
       permission: ["ess", "view"],
       run: (_client, params, actor) => (actor.employee_id ? payslips.ownDeductionsForAssistant(actor.employee_id, params) : EMPTY),
       cite: (row) => ({ type: "payroll_own_deduction", id: row.payroll_deduction_instalment_id, label: `${row.reason}, ${row.month}` }),
+    },
+  ],
+  summaries: [
+    {
+      key: "deductions.summary",
+      description:
+        "Deductions in figures by source, status, department and month: how many, waiting, waived; with the salary grant their amounts, scheduled ahead, recovered this year and advances owed",
+      params: c.deductions.DeductionSummaryQuery,
+      permission: ["payroll", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
     },
   ],
   actions: [

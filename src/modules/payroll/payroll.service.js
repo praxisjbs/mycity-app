@@ -27,7 +27,8 @@ const engine = require("../../shared/workflow/engine");
 const lagos = require("../../shared/time/lagos");
 const { formatMonth } = require("../../shared/time/day-first");
 const { oneNamed } = require("../../shared/ai/named");
-const { figure } = require("../../shared/ai/summary");
+const { figure, part, group, series } = require("../../shared/ai/summary");
+const m = require("../../shared/money/money");
 const { emit } = require("../../shared/events/emit");
 const workflowService = require("../workflow/workflow.service");
 const statutoryRates = require("../statutory/statutory.rates");
@@ -320,12 +321,78 @@ async function monthSummary(db, params, actor) {
   const figures = [figure("headcount", "People paid", month.headcount)];
   if (salary) {
     figures.push(
-      figure("gross", "Gross pay", month.earnings_total, "NGN"),
-      figure("deductions", "Deductions", month.deductions_total, "NGN"),
-      figure("net", "Net pay", month.net_total, "NGN"),
+      figure("gross", "Gross pay", month.earnings_total, "ngn"),
+      figure("deductions", "Deductions", month.deductions_total, "ngn"),
+      figure("net", "Net pay", month.net_total, "ngn"),
     );
   }
-  return { figures, groups: [], series: [], total: month.headcount };
+  const g = await repo.monthGroups(db, month.payroll_run_id, actor.scope);
+  const byDepartment = salary
+    ? group("department", "Gross pay by department", g.by_department.map(payStack))
+    : group("department", "People paid by department", g.by_department.map((r) => ({ key: r.key, label: r.label, value: r.count, count: r.count })));
+  const byStatus = group("status", "Payslips by status", g.by_status.map((r) => ({ key: r.key, label: PAYSLIP_WORDS[r.key] || r.key, value: r.count, count: r.count })));
+  return { figures, groups: params.by === "status" ? [byStatus, byDepartment] : [byDepartment, byStatus], series: [], total: month.headcount };
+}
+
+/** A payslip's status as Payroll · Payslips reads it. */
+const PAYSLIP_WORDS = Object.freeze({ draft: "Preview", published: "Published", excluded: "Excluded" });
+
+/** A run's status in words. */
+const RUN_WORDS = Object.freeze({ draft: "Draft", computed: "Computed", submitted: "Submitted", approved: "Approved", paid: "Paid" });
+
+/**
+ * A department's payslips as a stacked bar: Net Pay and Deductions within its gross. Net Pay is never below
+ * zero (a department whose deductions pass its gross shows Deductions to its gross), so the parts sum to it.
+ */
+function payStack(r) {
+  const gross = m.money(r.gross || "0.00");
+  const net = m.Decimal.min(gross, m.Decimal.max(m.ZERO, m.money(r.net || "0.00")));
+  return {
+    key: r.key,
+    label: r.label,
+    value: m.toWire(gross),
+    count: r.count,
+    parts: [part("net", "Net Pay", m.toWire(net)), part("deductions", "Deductions", m.toWire(gross.minus(net)))],
+  };
+}
+
+/** The months a trend covers: a calendar year (this Lagos year when nothing is asked), or `from` to `to`, at most 24. */
+function trendSpan(params, now = new Date()) {
+  if (!params.from && !params.to) {
+    const year = params.year || Number(lagos.today(now).slice(0, 4));
+    return { from: `${year}-01-01`, to: `${year}-12-01` };
+  }
+  const thisMonth = lagos.monthBounds(lagos.today(now)).first;
+  let to = params.to || (params.from > thisMonth ? params.from : thisMonth);
+  let from = params.from || lagos.addMonths(to, -11);
+  if (from > to) [from, to] = [to, from];
+  if (lagos.addMonths(from, 23) < to) from = lagos.addMonths(to, -23);
+  return { from, to };
+}
+
+/**
+ * `payroll.trend`, the assistant's runs over time (docs/guides/praxis-ai.md §6.13, Finance and pay): runs and
+ * months paid, the newest run's month and status, the runs by status, and people paid by month from the
+ * approved and paid runs; gross, deductions and net by month only for a reader who sees pay (decision 58).
+ * @param {{query: Function}} db
+ * @param {object} params  PayrollTrendQuery, parsed
+ * @param {object} actor
+ */
+async function trendSummary(db, params, actor, now = new Date()) {
+  const { from, to } = trendSpan(params, now);
+  const [r, salary] = await Promise.all([repo.trendOf(db, from, to), canSee(db, actor, "employee.salary")]);
+  const f = r.figures;
+  const figures = [figure("runs", "Runs", f.runs || 0), figure("months_paid", "Months paid", f.paid || 0)];
+  if (f.latest_period) figures.push(figure("latest_month", "Latest run", formatMonth(f.latest_period), null), figure("latest_status", "Latest run's status", RUN_WORDS[f.latest_status] || f.latest_status, null));
+  const points = (key) => r.points.map((p) => ({ at: p.at, value: key === "headcount" ? p.headcount : m.toWire(p[key] || "0.00") }));
+  const out = [series("headcount", "People paid by month", points("headcount"))];
+  if (salary) out.push(series("gross", "Gross pay by month", points("gross")), series("deductions", "Deductions by month", points("deductions")), series("net", "Net pay by month", points("net")));
+  return {
+    figures,
+    groups: [group("status", "Runs by status", r.by_status.map((x) => ({ key: x.key, label: RUN_WORDS[x.key] || x.key, value: x.count, count: x.count })))],
+    series: out,
+    total: f.runs || 0,
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -501,4 +568,6 @@ module.exports = {
   cardRun,
   assertCardRun,
   monthSummary,
+  trendSummary,
+  trendSpan,
 };

@@ -24,6 +24,7 @@ const m = require("../../shared/money/money");
 const engine = require("../../shared/workflow/engine");
 const approvers = require("../../shared/workflow/approvers");
 const routeMap = require("../../shared/route-map");
+const { holdsCapability } = require("../../middleware/rbac");
 const expenses = require("../expenses/expenses.service");
 const expensesRepo = require("../expenses/expenses.repo");
 const repo = require("./requisitions.repo");
@@ -48,6 +49,40 @@ const notFound = () => new AppError("NOT_FOUND", "That requisition does not exis
  * ------------------------------------------------------------------ */
 
 const list = (query, user) => repo.list(pool, query, user);
+
+/** A requisition's status in words, as the list's pill reads it. */
+const STATUS_WORDS = Object.freeze({ submitted: "With the CEO", approved: "Approved", rejected: "Declined", cancelled: "Cancelled" });
+
+/** No figures: the summary of a reader Requisitions is closed to, as its read answers them an empty page. */
+const NO_FIGURES = Object.freeze({ figures: [], groups: [], series: [], total: 0 });
+
+/**
+ * The requisitions in figures for the assistant (docs/guides/praxis-ai.md §6.13, Finance and pay), for a
+ * holder of `expenses.finance` as the screen shows them: those sent within the period (this Lagos month
+ * to today unless asked), by status, and their total by month.
+ * @param {{query: Function}} client
+ * @param {object} params  RequisitionSummaryQuery, parsed
+ * @param {object} actor
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  if (!(await holdsCapability(actor, "expenses.finance"))) return NO_FIGURES;
+  const { figure, group, series, periodOf } = require("../../shared/ai/summary");
+  const r = await repo.aiSummary(client, { status: params.status, ...periodOf(params, now) });
+  const f = r.figures;
+  return {
+    figures: [
+      figure("requisitions", "Requisitions", f.requisitions || 0),
+      figure("requests", "Requests in them", f.requests || 0),
+      figure("total", "Total", m.toWire(f.total || "0.00"), "ngn"),
+      figure("waiting", "Waiting on the CEO", f.waiting || 0),
+      figure("approved", "Approved", f.approved || 0),
+      figure("declined", "Declined", f.declined || 0),
+    ],
+    groups: [group("status", "Requisitions by status", r.by_status.map((x) => ({ key: x.key, label: STATUS_WORDS[x.key] || x.key, value: m.toWire(x.value), count: x.count })))],
+    series: [series("total", "Total by month", r.by_month.map((p) => ({ at: p.at, value: m.toWire(p.value) })))],
+    total: f.requisitions || 0,
+  };
+}
 
 /** One requisition with its requests (25 at most: a requisition is made of 25 at most). */
 async function get(user, id) {
@@ -219,4 +254,4 @@ async function assertCardRequests(db, ids) {
 
 const readback = (r) => [{ type: "requisition", id: r.requisition_id, label: `${r.number}, ${r.requests} ${r.requests === 1 ? "request" : "requests"}`, status: "sent to the CEO", link: (routeMap.linkFor("requisition", r.requisition_id) || {}).path || null }];
 
-module.exports = { list, get, create, remove, recountIn, settle, cardRequests, assertCardRequests, readback };
+module.exports = { list, aiSummary, get, create, remove, recountIn, settle, cardRequests, assertCardRequests, readback };

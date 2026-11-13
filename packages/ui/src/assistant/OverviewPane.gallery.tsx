@@ -25,6 +25,15 @@ export default {
     "Stacked Bar": () => (
       <OverviewPane overview={{ title: null, figures: budgetFigures, chart: { kind: "stacked_bar", title: "Budget by department", labels: BUDGETS.map((b) => b.label), series: byDepartmentParts } }} />
     ),
+    "Bars in Naira": () => (
+      <OverviewPane
+        overview={{
+          title: null,
+          figures: [{ key: "rows", label: "Budgets", value: BUDGETS.length, unit: "count" }],
+          chart: { kind: "bar", title: "Allocated by department", labels: BUDGETS.map((b) => b.label), series: [{ label: "Allocated", values: BUDGETS.map((b) => b.parts.reduce((n, v) => n + v, 0)) }], unit: "ngn" },
+        }}
+      />
+    ),
     Donut: () => <OverviewPane overview={{ title: null, figures: figures.slice(0, 2), chart: { kind: "donut", title: "Who was late", labels, series: [byDepartment] } }} />,
     Line: () => (
       <OverviewPane

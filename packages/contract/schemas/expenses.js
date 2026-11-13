@@ -157,6 +157,33 @@ const ExpenseListQuery = listQuery(
 );
 const ExpensePage = Paged(ExpenseRow);
 
+/** A month as YYYY-MM, for a summary's period. */
+const summaryMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "must be a month as YYYY-MM");
+
+/**
+ * The assistant's requests summary (docs/guides/praxis-ai.md §6.13, Finance and pay): the list's own
+ * filters and audience (`mine` the reader's requests, `waiting_on_me` those at their stage, otherwise
+ * the requests within their scope), a period on the day sent, and the grouping. The yes-or-no filters
+ * are JSON booleans here, as the model writes them, not the list's query-string words. Figures, never a row.
+ */
+const ExpenseSummaryBy = z.enum(["category", "department", "project", "payee_type", "status", "month"]);
+const ExpenseSummaryQuery = z
+  .object({
+    status: ExpenseStatus.optional(),
+    expense_category_id: uuid.optional(),
+    project_id: uuid.optional(),
+    department_id: uuid.optional(),
+    payee_type: PayeeType.optional(),
+    over_budget: z.boolean().optional(),
+    mine: z.boolean().optional(),
+    waiting_on_me: z.boolean().optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    month: summaryMonth.optional(),
+    by: ExpenseSummaryBy.default("category"),
+  })
+  .strict();
+
 /**
  * GET /expenses/banks: the Bank field's suggestions on New Request. The common banks, then every
  * bank a request has named, most used first; a bank typed that is not there is kept as typed and
@@ -317,6 +344,7 @@ const TABLES = {
     },
   },
   ExpenseListQuery: { table: null, reason: "list controls for the requests" },
+  ExpenseSummaryQuery: { table: null, reason: "the filters, audience, period and grouping of the assistant's requests summary; figures, never a row" },
   ExpenseDuplicateRef: { table: "expense_request" },
   ExpenseHistoryEntry: { table: null, reason: "an audit_ledger entry about a request, its requisition or its disbursement" },
   ExpenseHistoryPage: { table: null, reason: "a page of a request's history" },
@@ -484,6 +512,8 @@ module.exports = {
   ExpenseRow,
   ExpenseRequest,
   ExpenseListQuery,
+  ExpenseSummaryBy,
+  ExpenseSummaryQuery,
   ExpensePage,
   ExpenseBankListQuery,
   ExpenseBank,
