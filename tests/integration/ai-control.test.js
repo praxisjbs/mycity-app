@@ -253,6 +253,7 @@ describeDb("AI Control against the real migrations", () => {
         "template-tidy",
         "expense-invoice-read",
         "disbursement-receipt-read",
+        "agreement-document-read",
         "expense-duplicate-check",
         "expense-category-suggest",
         "jd-draft",
@@ -274,6 +275,8 @@ describeDb("AI Control against the real migrations", () => {
       expect(by["expense-invoice-read"]).toMatchObject({ job: "image_reading", personal_data: true, chosen_by: "AJ" });
       // A payment receipt attached on Praxis AI (praxis-ai.md decision 43), chosen by TB: Image Reading, never DeepSeek.
       expect(by["disbursement-receipt-read"]).toMatchObject({ job: "image_reading", personal_data: true, built: true, chosen_by: "TB" });
+      // A contract or MoU attached on Praxis AI (praxis-ai.md decision 43), chosen by TB: Image Reading, never DeepSeek.
+      expect(by["agreement-document-read"]).toMatchObject({ job: "image_reading", personal_data: true, built: true, chosen_by: "TB", module: "partnerships" });
       expect(by["data-answers"]).toMatchObject({ job: "default", built: true, own_chain: true, personal_data: true, chosen_by: "TB" });
       expect(by["data-answers"].chain.links.map((l) => l.model)).toEqual(["gemini-3.8-flash", "gemini-2.5-pro"]);
       expect(by["policy-tidy"]).toMatchObject({ own_chain: false, chain: expect.objectContaining({ scope: "job", key: "default" }) });

@@ -129,6 +129,11 @@ const CASES = Object.freeze([
   // staging holds none of its amount.
   { id: "file.invoice", as: "employee", question: "Raise an expense request from this invoice", file: "invoice", sample: "invoice.pdf", shows: ["cards"], action: "my_expenses.from_invoice" },
   { id: "file.receipt", as: "operations_people", question: "Record the payment on this receipt", file: "payment_receipt", sample: "payment-receipt.pdf", shows: ["cards"], ask: { action: "disbursements.create", field: "expense_request_id" } },
+  // A made-up MoU with staging's partner Lumen Arts Festival, which has no agreement waiting, is filed among
+  // its documents; a made-up signed MoU with the lead Lagoon Youth Fest is its agreement's signed copy once
+  // that agreement is sent for signature on staging (skipped until then, saying so).
+  { id: "file.contract", as: "operations_people", question: "Summarise this contract and file it", file: "contract", sample: "mou.pdf", shows: ["cards", "pane"], action: "partner_documents.attach" },
+  { id: "file.contract-signed", as: "operations_people", question: "Summarise this contract and file it", file: "contract", sample: "mou-signed.pdf", shows: ["cards", "pane"], action: "agreements.record_signed_copy", given: ["signing_agreement"] },
   { id: "card.budget", as: "operations_people", question: "Set the {departments.edit#department_id} budget for 2027: 2,000,000 naira for {expense_categories.edit#expense_category_id}.", shows: ["cards"], action: "budgets.create" },
   { id: "card.budget-edit", as: "operations_people", question: "Change the {budgets.edit#budget_id} budget to 2,500,000 naira for {expense_categories.edit#expense_category_id}.", shows: ["cards"], action: "budgets.edit" },
   { id: "card.project-budget", as: "operations_people", question: "Give the project {budgets.set_project#project_id} a budget of 1,500,000 naira.", shows: ["cards"], action: "budgets.set_project" },
@@ -395,6 +400,19 @@ const FILLS = Object.freeze({
       const waiting = await require("../../src/modules/workflow/workflow.service").mine(actor, { page: 1 });
       return waiting.data.some((r) => r.definition_key === "leave.approval") ? "yes" : null;
     },
+  },
+  signing_agreement: {
+    what: "agreement on Lagoon Youth Fest waiting for its signature (Send for Signature on Contracts & MOUs)",
+    find: (pool) =>
+      one(
+        pool,
+        `SELECT a.number AS words FROM partnership_agreement a
+           LEFT JOIN partner p ON p.partner_id = a.partner_id
+           LEFT JOIN lead l ON l.lead_id = a.lead_id
+          WHERE a.status IN ('sent', 'viewed') AND COALESCE(p.name, l.name) = 'Lagoon Youth Fest'
+          ORDER BY a.created_at DESC LIMIT 1`,
+        [],
+      ),
   },
   waiting_requisition: {
     what: "requisition waiting on the CEO",

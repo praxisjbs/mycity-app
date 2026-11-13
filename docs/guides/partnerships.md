@@ -1135,7 +1135,8 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   `viewed`, run by `agreements.signedCopy`; otherwise **Add Partner Document**
   (`partner_documents.attach`, `PartnerDocumentAdd`: Upload Document's request with the kind by its
   name, MyCity's `partner_document_kind`), run by `partners.documents.attach`. `not_offered` reaches
-  `SignedCopyRecord` and `PartnerDocumentAttach` through these cards (`via`). Nothing else is made:
+  `SignedCopyRecord` through Record Signed Copy (`via`); `PartnerDocumentAttach`, an Attach rather
+  than a create or edit form, is in no `not_offered` and is sent by Add Partner Document's run. Nothing else is made:
   no agreement drafted, no partner or lead created. The staging setup seed enters the document kinds
   §4.3 lists.
 
@@ -1920,7 +1921,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
-- 13/11/2026 · TB · Contracts and MoUs in the chat built (`praxis-ai.md` Appendix A PR 2, §9): read on `agreement-document-read`, summarised with its terms on Praxis AI's Record tab, and filed by Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else by Add Partner Document (`partner_documents.attach`) on the partner or lead it names. `SignedCopyRecord` and `PartnerDocumentAttach` are reached `via` these cards. The staging setup seed enters the document kinds of §4.3. §10 is unchanged: no Partnerships screen changes; the cards and the Record tab are Praxis AI's (`praxis-ai.md` §10).
+- 13/11/2026 · TB · Contracts and MoUs in the chat built (`praxis-ai.md` Appendix A PR 2, §9): read on `agreement-document-read`, summarised with its terms on Praxis AI's Record tab, and filed by Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else by Add Partner Document (`partner_documents.attach`) on the partner or lead it names. `SignedCopyRecord` is reached `via` Record Signed Copy; Add Partner Document's run sends `PartnerDocumentAttach`. The staging setup seed enters the document kinds of §4.3. §10 is unchanged: no Partnerships screen changes; the cards and the Record tab are Praxis AI's (`praxis-ai.md` §10).
 - 13/11/2026 · TB · Contracts and MoUs in the chat planned (`praxis-ai.md` decisions 41 to 48, Appendix A PR 2): read, summarised, and filed as Record Signed Copy or Add Partner Document (§9). Nothing built yet.
 - 13/11/2026 · AJ · The signing service (§6.9), from M5's click-through: a request that ends unsigned
   (Close, a lapse, a decline) keeps its links, read only, so the signer reads *Agreement Withdrawn*,

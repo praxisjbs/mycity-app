@@ -13,6 +13,17 @@
       "screen": null
     },
     {
+      "key": "agreements.record_signed_copy",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "approval",
+      "bulk": 1,
+      "schema": "agreements.AgreementSignedCopyAdd",
+      "schema_sha": "2397324d32a67b86",
+      "screen": null
+    },
+    {
       "key": "alert_rules.create",
       "kind": "action",
       "module_key": "home",
@@ -959,6 +970,17 @@
       "bulk": 1,
       "schema": "attendance.OvertimePreApprovalCreate",
       "schema_sha": "3f38e2d89a1bf8fa",
+      "screen": null
+    },
+    {
+      "key": "partner_documents.attach",
+      "kind": "action",
+      "module_key": "partnerships",
+      "permission": "partnerships.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "partners.PartnerDocumentAdd",
+      "schema_sha": "f8a417622e0a46d5",
       "screen": null
     },
     {
