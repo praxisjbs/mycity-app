@@ -1,6 +1,6 @@
 import type { AgreementStatus, ChecklistItem, DealDetail, DealRow, Field, LeadRow, ListValue, PartnerRow, RecordField, TemplateAsk } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { useApi, useInfinite } from "@/api/hooks";
+import { useApi, useInfinite, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { paging } from "@/features/shared/wire";
 import { hasCapability } from "@/shell/access";
@@ -55,10 +55,13 @@ export function useStages(): { stages: ListValue[]; all: ListValue[]; loading: b
   return { stages: all.filter((s) => s.active && s.meaning), all, loading: list.loading };
 }
 
-/** One of MyCity's other lists (sources, impact, document kinds) as options. */
-export function useListOptions(list: "lead_source" | "partnership_impact" | "partner_document_kind"): Array<[string, string]> {
-  const values = useApi("GET /api/v1/partnerships/lists/:list", { params: { list } });
-  return (values.data?.values ?? []).filter((v) => v.active).map((v) => [v.code, v.label] as [string, string]);
+/**
+ * One of MyCity's open lists (sources, impact, document kinds) as a field suggests it while the person
+ * types (§6.3): its names, 25 at a time, narrowed by the server. What is typed that the list does not
+ * hold is sent as typed and joins the list.
+ */
+export function useListSuggestions(list: "lead_source" | "partnership_impact" | "partner_document_kind") {
+  return usePaged("GET /api/v1/partnerships/lists/:list/suggestions", { params: { list } });
 }
 
 /** The custom fields a lead, partner or deal of a category is given, in use (§6.3): its category's and every category's. */

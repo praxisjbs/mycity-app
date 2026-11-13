@@ -42,6 +42,7 @@ function detailOf(r, region) {
     source_label: r.source_label,
     region_view: region,
     impact: (r.impact || []).map(String),
+    impact_labels: r.impact_labels || [],
     impact_rating: r.impact_rating,
     impact_note: r.impact_note,
     comments: r.comments,

@@ -49,6 +49,16 @@ const ListName = z.enum(["partnership_stage", "partnership_impact", "lead_source
 /** A code of one of MyCity's lists: a stage, an impact, a source, a document kind. */
 const listCode = z.string().regex(/^[a-z][a-z0-9_]{0,59}$/, "must be a list's code");
 
+/** The lists a form types into as well as picks from: a name the list does not hold joins it (§6.3). */
+const OpenListName = z.enum(["partnership_impact", "lead_source", "partner_document_kind"]);
+
+/**
+ * A value of one of the open lists as a form sends it: its name as typed or picked ("Service
+ * Agreement"), or its code. The server finds the value by either, whatever the case, and a name the
+ * list does not hold joins it (§6.3).
+ */
+const listWords = text(80);
+
 /** A percentage with at most two places, as numeric(5,2) leaves the API: "8.00". */
 const percent = z
   .string()
@@ -449,6 +459,13 @@ const ListValues = z
 const ListParams = z.object({ list: ListName }).strict();
 const ListValueParams = z.object({ list: ListName, code: listCode }).strict();
 
+/** An open list's suggestions: what a form offers as the person types (Kind, Source, Impact). */
+const OpenListParams = z.object({ list: OpenListName }).strict();
+const ListSuggestionQuery = listQuery();
+/** One value a form suggests: its name, as the list writes it. */
+const ListSuggestion = z.object({ label: z.string() }).strict();
+const ListSuggestionPage = Paged(ListSuggestion);
+
 /** A stage needs its meaning; the other lists have none. */
 const ListValueCreate = z
   .object({
@@ -586,7 +603,7 @@ const DealFields = z
     owner_id: uuid,
     member_ids: z.array(uuid).max(20).optional(),
     options: z.array(DealOptionInput).max(5, "At most five options").optional(),
-    impact: z.array(listCode).max(9).optional(),
+    impact: z.array(listWords).max(9).optional(),
     impact_rating: blank(ImpactRating),
     impact_note: optionalText(500),
     comments: optionalText(2000),
@@ -622,7 +639,7 @@ const DealUpdate = z
     owner_id: uuid.optional(),
     member_ids: z.array(uuid).max(20).optional(),
     options: z.array(DealOptionInput).max(5, "At most five options").optional(),
-    impact: z.array(listCode).max(9).optional(),
+    impact: z.array(listWords).max(9).optional(),
     impact_rating: ImpactRating.nullable().optional(),
     impact_note: z.string().trim().max(500).nullable().optional(),
     comments: z.string().trim().max(2000).nullable().optional(),
@@ -804,6 +821,8 @@ const DealDetail = DealRow.extend({
   /** Its agreement's value when it has one, else its projected value. */
   signed_value: money.nullable(),
   impact: z.array(z.string()),
+  /** Its impacts by name, in the list's order: what Edit Deal's Impact holds. */
+  impact_labels: z.array(z.string()),
   impact_rating: ImpactRating.nullable(),
   impact_note: z.string().nullable(),
   comments: z.string().nullable(),
@@ -1033,6 +1052,10 @@ const TABLES = {
   ListValues: { table: null, reason: "one of MyCity's lists, whole, in its order" },
   ListParams: { table: null, reason: "the :list path parameter" },
   ListValueParams: { table: null, reason: "the :list and :code path parameters" },
+  OpenListParams: { table: null, reason: "the :list path parameter of an open list" },
+  ListSuggestionQuery: { table: null, reason: "list controls for an open list's suggestions" },
+  ListSuggestion: { table: null, reason: "a value a form suggests, by its name: reference_value.label" },
+  ListSuggestionPage: { table: null, reason: "a page of an open list's suggestions" },
   ListValueCreate: {
     table: "reference_value",
     virtual: { meaning: "reference_value.metadata.meaning", position: "reference_value.display_order" },
@@ -1094,6 +1117,7 @@ const TABLES = {
       members: "deal_member rows",
       deliverables: "deal_deliverable rows",
       history: "the latest partnership_stage_history lines",
+      impact_labels: "the names of its impacts, from reference_value",
     },
   },
   DealListQuery: { table: null, reason: "list controls and filters for the deals" },
@@ -1125,7 +1149,9 @@ module.exports = {
   HistorySource,
   ReturnSource,
   ListName,
+  OpenListName,
   listCode,
+  listWords,
   percent,
   flag,
   CustomValue,
@@ -1164,6 +1190,10 @@ module.exports = {
   ListValues,
   ListParams,
   ListValueParams,
+  OpenListParams,
+  ListSuggestionQuery,
+  ListSuggestion,
+  ListSuggestionPage,
   ListValueCreate,
   ListValueUpdate,
   TrackerSetup,

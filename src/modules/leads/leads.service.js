@@ -76,8 +76,9 @@ function get360(id, scope, actor) {
  * @returns {Promise<{lead_id: string, number: string, deal_id: string}>}
  */
 async function createIn(client, actor, body, { held, source = "person" }) {
-  if (body.source && !(await lists.allActive(client, "lead_source", [body.source]))) throw invalid("source", "Pick from the list");
-  if (body.impact && !(await lists.allActive(client, "partnership_impact", body.impact))) throw invalid("impact", "Pick from the list");
+  // A source and impacts by name or code: a name the list does not hold joins it (§6.3).
+  const sourceCode = await lists.codeFor(client, actor, "lead_source", body.source);
+  const impact = body.impact === undefined || body.impact === null ? null : await lists.codesFor(client, actor, "partnership_impact", body.impact);
   const custom = await fields.checkCustom(client, { appliesTo: "lead", categoryId: body.partner_category_id, values: body.custom });
   const { number } = await numbering.allocate(client, "lead");
   const identifiedOn = body.identified_on ?? lagos.today();
@@ -90,10 +91,10 @@ async function createIn(client, actor, body, { held, source = "person" }) {
     region_scope: body.region.scope,
     website: body.website ?? null,
     objective: body.objective ?? null,
-    source: body.source ?? null,
+    source: sourceCode,
     owner_id: body.owner_id,
     identified_on: identifiedOn,
-    impact: body.impact ?? null,
+    impact,
     impact_rating: body.impact_rating ?? null,
     impact_note: body.impact_note ?? null,
     comments: body.comments ?? null,
@@ -140,12 +141,13 @@ async function update(actor, scope, id, body) {
   if (body.owner_id) assertOwner(scope, body.owner_id);
   await pipeline.tx(async (client) => {
     const lead = await lockSeen(client, id, scope);
-    if (body.source && !(await lists.allActive(client, "lead_source", [body.source]))) throw invalid("source", "Pick from the list");
-    if (body.impact && !(await lists.allActive(client, "partnership_impact", body.impact))) throw invalid("impact", "Pick from the list");
     const changes = {};
     for (const k of ["name", "partner_category_id", "industry", "website", "objective", "source", "owner_id", "identified_on", "impact", "impact_rating", "impact_note", "comments"]) {
       if (body[k] !== undefined) changes[k] = body[k];
     }
+    // A source and impacts by name or code: a name the list does not hold joins it (§6.3).
+    if (body.source !== undefined) changes.source = await lists.codeFor(client, actor, "lead_source", body.source);
+    if (Array.isArray(body.impact)) changes.impact = await lists.codesFor(client, actor, "partnership_impact", body.impact);
     if (body.region) changes.region_scope = await saveRegion(client, id, body.region);
     if (body.custom !== undefined) {
       changes.custom = await fields.checkCustom(client, { appliesTo: "lead", categoryId: body.partner_category_id || lead.partner_category_id, values: body.custom, had: lead.custom });

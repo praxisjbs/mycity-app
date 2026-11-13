@@ -22,6 +22,7 @@
  *   GET   /fields                                       view: every definition, whole
  *   POST  /fields, PATCH /fields/:id                    edit + configure
  *   GET   /lists/:list                                  view: stages, impacts, sources, document kinds
+ *   GET   /lists/:list/suggestions                      view: an open list's names as a form suggests them, 25 a page
  *   POST  /lists/:list, PATCH /lists/:list/:code        edit + configure
  *   POST  /setup/from-tracker, /setup/from-tracker/apply   edit + configure: Start From Tracker
  *
@@ -96,6 +97,10 @@ route(router, "patch", "/fields/:id",
 route(router, "get", "/lists/:list",
   { params: p.ListParams, response: p.ListValues, summary: "One of the partnership lists" },
   view, controller.getList);
+
+route(router, "get", "/lists/:list/suggestions",
+  { params: p.OpenListParams, query: p.ListSuggestionQuery, response: p.ListSuggestionPage, summary: "The names Kind, Source or Impact suggests" },
+  view, controller.listSuggestions);
 
 route(router, "post", "/lists/:list",
   { params: p.ListParams, body: p.ListValueCreate, response: p.ListValues, summary: "Add a value to a list" },

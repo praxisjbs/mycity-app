@@ -1,16 +1,19 @@
 "use strict";
 /**
  * Every document of a lead or a partner (docs/guides/partnerships.md §2, §6.2, §6.4, §6.6): Upload
- * Document tags a vault upload with its kind (a partner_document_kind code) and, optionally, the
- * deal it is about; a signing's signed copy is kept the same way (origin `signed_copy`), and the
+ * Document tags a vault upload with its kind (a partner_document_kind, typed or picked by its name: a
+ * name the list does not hold joins it, §6.3) and, optionally, the deal it is about; a signing's signed copy is kept the same way (origin `signed_copy`), and the
  * proposals and agreements arrive with theirs (M7 PR 6 and PR 7).
  *
  * Each is a `partner_document` row, which the vault names as its entity: a lead's documents follow
  * it to its partner by re-pointing that row, and who may read one is who may see its record (§6.1).
+ * Remove Document takes an upload off its record and its file out of the vault (`remove`); what the
+ * hub filed itself (a signed copy, an agreement, a proposal) is kept.
  *
  * Add Partner Document, Praxis AI's card (docs/guides/praxis-ai.md §6.18; §9 here), files a contract
  * or MoU attached on Ask through `attach` as Upload Document does, its kind carried as a person reads
- * it ("MOU") and turned into MyCity's code at the press (`kindCodeOf`, `cardAttach`).
+ * it ("MOU") and sent at the press as the list writes it, or as the card holds it when the list has
+ * none, which then joins the list (`cardAttach`).
  */
 const { pool } = require("../../config/db");
 const { emit } = require("../../shared/events/emit");
@@ -113,20 +116,47 @@ async function page(query, scope) {
   );
 }
 
-/** Upload Document (POST /documents): a vault upload tagged for a record the reader may see, with its kind. */
+/**
+ * Upload Document (POST /documents): a vault upload tagged for a record the reader may see, with its
+ * kind by its name or its code; a name MyCity's document kinds do not hold joins them (§6.3).
+ */
 async function attach(actor, scope, body) {
   const record = body.partner_id ? { kind: "partner", id: body.partner_id } : { kind: "lead", id: body.lead_id };
   const id = await require("../partner_pipeline/partner_pipeline.service").tx(async (client) => {
     if (!(await recordSeen(client, record, scope))) throw invalid(record.kind === "partner" ? "partner_id" : "lead_id", `No such ${record.kind}`);
-    if (!(await lists.allActive(client, "partner_document_kind", [body.kind]))) throw invalid("kind", "Pick from the list");
     if (body.deal_id) {
       const { rows } = await client.query(`SELECT 1 FROM partnership_opportunity WHERE partnership_opportunity_id = $1 AND ${record.kind}_id = $2`, [body.deal_id, record.id]);
       if (!rows.length) throw invalid("deal_id", "Not this record's deal");
     }
-    return attachIn(client, actor, { record, deal_id: body.deal_id || null, document_id: body.document_id, kind: body.kind });
+    const kind = await lists.codeFor(client, actor, KIND_LIST, body.kind);
+    return attachIn(client, actor, { record, deal_id: body.deal_id || null, document_id: body.document_id, kind });
   });
   const { rows } = await pool.query(`SELECT ${ROW} ${FROM} WHERE pd.partner_document_id = $1`, [id]);
   return rows[0];
+}
+
+/**
+ * Remove Document (DELETE /documents/:id, by the file's document_id): an upload on a record the reader
+ * may see, taken off with `partner_document.removed`, its file out of the vault in the same
+ * transaction and its bytes after commit. A signed copy, an agreement or a proposal is refused.
+ */
+async function remove(actor, scope, documentId) {
+  const keys = await require("../partner_pipeline/partner_pipeline.service").tx(async (client) => {
+    const { rows } = await client.query("SELECT partner_document_id, partner_id, lead_id, deal_id, origin FROM partner_document WHERE document_id = $1 FOR UPDATE", [documentId]);
+    const row = rows[0];
+    const record = row ? (row.partner_id ? { kind: "partner", id: row.partner_id } : { kind: "lead", id: row.lead_id }) : null;
+    if (!row || !(await recordSeen(client, record, scope))) throw new AppError("NOT_FOUND", "That document does not exist, or you cannot see it.", 404);
+    if (row.origin !== "upload") throw new AppError("DOCUMENT_KEPT", "Only an upload can be removed", 409);
+    await emit(client, {
+      key: EVENTS.PARTNER_DOCUMENT_REMOVED,
+      entity: { type: "partner_document", id: row.partner_document_id },
+      actor,
+      payload: { partner_document_id: row.partner_document_id, document_id: documentId, [`${record.kind}_id`]: record.id, deal_id: row.deal_id },
+    });
+    // The vault's row goes, and the partner_document row with it (ON DELETE CASCADE).
+    return vault.remove(client, documentId, { actor, reason: "removed from a partner's or lead's documents" });
+  });
+  await vault.removeFiles(keys);
 }
 
 /* ------------------------------------------------------------------ *
@@ -163,12 +193,6 @@ async function kindNameOf(db, words) {
   return (await kindLabelOf(db, words)) || words;
 }
 
-/** The code of the kind the words name, or null. */
-async function kindCodeOf(db, words) {
-  const found = await kindNamed(db, words);
-  return found ? found.code : null;
-}
-
 /** The card's file, named by its name: the person's own upload, never another's (decision 32). */
 async function cardFile(db, documentId, actor) {
   if (!db || !actor || !isId(documentId)) return [];
@@ -176,23 +200,24 @@ async function cardFile(db, documentId, actor) {
   return doc && doc.uploaded_by === actor.user_id ? [{ type: "document", id: documentId, label: doc.original_name || doc.title || "Document" }] : [];
 }
 
-/** The card's check before the press: the kind is one of MyCity's (`Pick from the list` on Kind). */
-async function assertCard(db, values) {
-  if (values.kind && !(await kindNamed(db, values.kind))) throw invalid("kind", "Pick from the list");
-}
+/**
+ * The card's check before the press. Any kind is taken, as Upload Document takes it: a name the list
+ * does not hold joins it at the press (§6.3), so nothing here refuses one.
+ */
+async function assertCard() {}
 
 /**
- * Add Partner Document's press: the card's kind turned into its code, then Upload Document's own
- * request through `attach`, which checks the record, the kind and the deal and claims the file.
+ * Add Partner Document's press: the card's kind as the list writes it (a name the card's words find,
+ * "mou" is MOU), or as the card holds it when the list has none, then Upload Document's own request
+ * through `attach`, which checks the record and the deal, adds a new kind to the list and claims the file.
  * @param {object} actor  carrying the card's `partnerships` edit scope
  * @param {{document_id: string, kind: string, partner_id?: string, lead_id?: string, deal_id?: string}} values  PartnerDocumentAdd
  */
 async function cardAttach(actor, values) {
-  const code = await kindCodeOf(pool, values.kind);
-  if (!code) throw invalid("kind", "Pick from the list");
+  const kind = (await kindLabelOf(pool, values.kind)) || values.kind;
   const body = require("../../shared/http/validate").parseBody(c.partners.PartnerDocumentAttach, {
     document_id: values.document_id,
-    kind: code,
+    kind,
     partner_id: values.partner_id || null,
     lead_id: values.lead_id || null,
     deal_id: values.deal_id || null,
@@ -229,6 +254,7 @@ module.exports = {
   fileIn,
   attachIn,
   attach,
+  remove,
   page,
   moveToPartner,
   mayRead,
@@ -236,7 +262,6 @@ module.exports = {
   kindLabels,
   kindLabelOf,
   kindNameOf,
-  kindCodeOf,
   cardFile,
   assertCard,
   cardAttach,

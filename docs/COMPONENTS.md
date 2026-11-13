@@ -116,6 +116,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [ColorField](#colorfield) | `ColorField` | A colour as #RRGGBB, pasted or typed, with a square of it beside the value. | beta |
 | Forms | [ComboField](#combofield) | `ComboField` | A value typed or picked: the server suggests what is already in use as the person types, and what they type that it does not know is kept as it is. | stable |
+| Forms | [ComboListField](#combolistfield) | `ComboListField` | Several values typed or picked, each a chip with Remove: the server suggests what is already in use, and what is typed that it does not know is added as it is. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [DocumentEditor](#documenteditor) | `DocumentEditor` | The editor for an agreement template's wording: headings, numbered clauses, tables, and named fields drawn as chips. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
@@ -3618,6 +3619,7 @@ A value typed or picked: the server suggests what is already in use as the perso
 |---|---|---|---|
 | `value` | `string` | yes | The text, from form.field(name): typed, or put there by a pick. |
 | `onChange` | `(value: string) => void` | yes | Called with the new text, on each key and on a pick. |
+| `onPick` | `(value: string) => void` |  | Called with the text a pick puts in the field (Add, or a suggestion), after onChange; with it, Enter adds what was typed. ComboListField's chips. |
 | `onBlur` | `() => void` |  | Called when the person leaves the field. |
 | `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
@@ -3632,6 +3634,46 @@ A value typed or picked: the server suggests what is already in use as the perso
 
 ```tsx
 <ComboField list={units} option={(u) => u.unit} {...f.field("unit")} />
+```
+
+### ComboListField
+
+Several values typed or picked, each a chip with Remove: the server suggests what is already in use, and what is typed that it does not know is added as it is.
+
+| | |
+|---|---|
+| Use | A record's few short values from a list that new records may extend: a deal's impacts. The suggestions are a server-paged list, 25 at a time. |
+| Avoid | One value (ComboField); values that must come from a fixed list (SelectField, ChoiceField); people or records (PersonPicker, RecordPicker); places (PlacesField). |
+| Phone | The chips wrap above the field, each Remove a 44 px target; the suggestions open under the field as 44 px rows, Add and the typed text first. |
+| Accessibility | A combobox over a listbox: arrows move, Enter adds, Esc closes; each chip's Remove names its value. Takes its label and error links from the Field around it. |
+| Status | beta |
+| Exports | `ComboListField` |
+| Import | `import { ComboListField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/ComboListField.tsx` |
+| Test | `packages/ui/src/form/ComboListField.test.tsx` |
+| Gallery | `packages/ui/src/form/ComboListField.gallery.tsx` (`npm run gallery`, `#/ComboListField`) |
+
+**ComboListField** props (`ComboListFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string[]` | yes | The values held, from form.field(name): each a name as typed or picked. |
+| `onChange` | `(value: string[]) => void` | yes | Called with the new list, a value added or removed. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Unused here (the values are always the form's); accepted so {...form.field(name)} spreads cleanly. |
+| `name` | `string` |  | The form field's name, on the input. |
+| `id` | `string` |  | The control's id; the Field around it supplies one otherwise. |
+| `list` | `DataViewList<R>` | yes | The server-paged suggestions (a `usePaged()` result); the field drives its search as the person types. |
+| `option` | `(row: R) => string` | yes | The value a suggestion adds. |
+| `sub` | `(row: R) => ReactNode` |  | The line beside a suggestion (how often it is used). |
+| `max` | `number` |  | How many may be held; the box goes once that many are. |
+| `placeholder` | `string` |  | A format example of at most 3 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ComboListField list={impacts} option={(i) => i.label} {...f.field("impact")} />
 ```
 
 ### DateField

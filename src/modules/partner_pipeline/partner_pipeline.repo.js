@@ -335,6 +335,33 @@ async function listValues(db, domain) {
 const getValue = (db, domain, code) =>
   one(db, `SELECT ${VALUE} FROM reference_value v WHERE v.domain = $1 AND v.code = $2`, [domain, code]);
 
+/**
+ * The value a form's words name, by its code or its name whatever the case: an active one first, then a
+ * retired one (a record that holds it keeps it); null when the list holds neither.
+ */
+const valueByWords = (db, domain, words) =>
+  one(
+    db,
+    `SELECT ${VALUE} FROM reference_value v
+      WHERE v.domain = $1 AND (lower(v.code::text) = lower($2) OR lower(v.label) = lower($2))
+      ORDER BY v.active DESC, (lower(v.label) = lower($2)) DESC, v.display_order
+      LIMIT 1`,
+    [domain, words],
+  );
+
+/** A page of an open list's active values by name, in the list's order, narrowed by `q`: what a form suggests. */
+function suggestions(db, domain, query) {
+  return pageQuery(
+    db,
+    `SELECT v.label, ${TOTAL_COL} FROM reference_value v
+      WHERE v.domain = $1 AND v.active
+        AND ($2::text IS NULL OR strpos(search_fold(v.label), search_fold($2)) > 0)
+      ORDER BY v.display_order, v.label, v.code`,
+    [domain, query.q || null],
+    query,
+  );
+}
+
 const valueByLabel = (db, domain, label) =>
   one(db, `SELECT ${VALUE} FROM reference_value v WHERE v.domain = $1 AND lower(v.label) = lower($2) AND v.active`, [domain, label]);
 
@@ -493,10 +520,16 @@ const ROW = `po.partnership_opportunity_id AS deal_id, po.number, po.title,
   po.estimated_value, po.currency::text AS currency, po.expected_close_on, ${lagosDaysSince(stageSince("po"))} AS days_at_stage,
   po.event_title, po.event_starts_on, po.created_at`;
 
+/** The names of a record's impacts (its `impact` codes), in the list's order: what its Edit form's Impact holds. */
+const impactLabels = (column) =>
+  `ARRAY(SELECT iv.label::text FROM reference_value iv
+          WHERE iv.domain = 'partnership_impact' AND iv.code = ANY(COALESCE(${column}, '{}')::citext[])
+          ORDER BY iv.display_order, iv.label)`;
+
 const DETAIL = `${ROW}, po.objective, po.event_ends_on, po.expected_attendance, po.blockers, po.next_action, po.next_action_on,
   po.commission_pct, po.commission_deviates, po.validity_days, po.valid_until, po.identified_on, po.signed_at,
   po.completed_at, po.close_reason, ${signedValue("po")} AS signed_value, COALESCE(po.impact, '{}') AS impact,
-  po.impact_rating, po.impact_note, po.comments, po.custom, po.owner_id,
+  ${impactLabels("po.impact")} AS impact_labels, po.impact_rating, po.impact_note, po.comments, po.custom, po.owner_id,
   COALESCE(p.partner_category_id, l.partner_category_id) AS partner_category_id`;
 
 const DEAL_SORTS = {
@@ -1149,6 +1182,8 @@ module.exports = {
   listValues,
   getValue,
   valueByLabel,
+  valueByWords,
+  suggestions,
   codeTaken,
   nextValuePosition,
   insertValue,
@@ -1166,6 +1201,7 @@ module.exports = {
   dealSeen,
   recordSeen,
   regionLabel,
+  impactLabels,
   regionHasCity,
   lastContact,
   lagosDaysSince,

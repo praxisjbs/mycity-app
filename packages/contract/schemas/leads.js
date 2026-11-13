@@ -17,7 +17,7 @@ const { z } = require("zod");
 const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PlaceToken } = require("./maps");
 const { PersonRef } = require("./organisation");
-const { RegionScope, DealHealth, DealFields, DealDetail, ImpactRating, Field, CustomValues, CustomFilter, listCode } = require("./partner_pipeline");
+const { RegionScope, DealHealth, DealFields, DealDetail, ImpactRating, Field, CustomValues, CustomFilter, listCode, listWords } = require("./partner_pipeline");
 const { RegionInput, RegionView, ContactInput, Contact, EventBrief } = require("./partners");
 const { Interaction } = require("./interactions");
 
@@ -32,11 +32,12 @@ const LeadFields = z
     industry: optionalText(80),
     website: optionalText(200),
     objective: optionalText(2000),
-    /** A lead_source code. */
-    source: blank(listCode),
+    /** A lead source by its name or its code; a name the list does not hold joins it (§6.3). */
+    source: blank(listWords),
     owner_id: uuid,
     identified_on: blank(isoDate),
-    impact: z.array(listCode).max(9).optional(),
+    /** Impacts by name or code; a name the list does not hold joins it. */
+    impact: z.array(listWords).max(9).optional(),
     impact_rating: blank(ImpactRating),
     impact_note: optionalText(500),
     comments: optionalText(2000),
@@ -58,10 +59,10 @@ const LeadUpdate = z
     industry: z.string().trim().max(80).nullable().optional(),
     website: z.string().trim().max(200).nullable().optional(),
     objective: z.string().trim().max(2000).nullable().optional(),
-    source: listCode.nullable().optional(),
+    source: listWords.nullable().optional(),
     owner_id: uuid.optional(),
     identified_on: isoDate.nullable().optional(),
-    impact: z.array(listCode).max(9).optional(),
+    impact: z.array(listWords).max(9).optional(),
     impact_rating: ImpactRating.nullable().optional(),
     impact_note: z.string().trim().max(500).nullable().optional(),
     comments: z.string().trim().max(2000).nullable().optional(),
@@ -168,6 +169,8 @@ const LeadDetail = LeadRow.extend({
   source_label: z.string().nullable(),
   region_view: RegionView,
   impact: z.array(z.string()),
+  /** Its impacts by name, in the list's order: what Edit Lead's Impact holds. */
+  impact_labels: z.array(z.string()),
   impact_rating: ImpactRating.nullable(),
   impact_note: z.string().nullable(),
   comments: z.string().nullable(),
@@ -278,7 +281,7 @@ const TABLES = {
   LeadRow: { table: "lead", virtual: ROW },
   LeadDetail: {
     table: "lead",
-    virtual: { ...ROW, source_label: "the lead_source label", region_view: REGION },
+    virtual: { ...ROW, source_label: "the lead_source label", impact_labels: "the names of its impacts, from reference_value", region_view: REGION },
   },
   LeadListQuery: { table: null, reason: "list controls and filters for the leads" },
   LeadPage: { table: null, reason: "a page of leads" },

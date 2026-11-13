@@ -21,12 +21,12 @@ import type {
 import type { ProposalContent, ProposalContentEdit, ProposalDetail, ProposalQuestion, ProposalTemplate } from "@mycity/contract/contract.gen.ts";
 import SAMPLE_HTML from "@mycity/ui/samples/proposal-kit.sample.html?raw";
 import SAMPLE_CONTENT from "@mycity/ui/samples/proposal-kit.sample.json";
-import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, uuid, type Req } from "../core";
+import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, uuid, type Req } from "../core";
 import { byId, byKey, refKey } from "../data/people";
 import { PARTNERS, type MockPartner } from "../data/partners";
 import { pickedPlace, placeOf } from "./maps";
 import { exportFile } from "./shared";
-import { mockCategories, mockFields, mockList } from "./partnerships_categories";
+import { mockCategories, mockCodeFor, mockCodesFor, mockFields, mockLabelsOf, mockList } from "./partnerships_categories";
 
 /**
  * Partnerships on the mock (docs/guides/partnerships.md): Pipeline, Partners, Leads and both 360s in
@@ -400,6 +400,7 @@ function dealDetail(d: MockDeal, money: boolean): DealDetail {
     close_reason: d.close_reason,
     signed_value: signedValue(d),
     impact: d.impact,
+    impact_labels: mockLabelsOf("partnership_impact", d.impact),
     impact_rating: d.impact_rating,
     impact_note: d.impact_note,
     comments: d.comments,
@@ -495,6 +496,7 @@ function lead360(r: MockRecord, money: boolean): Lead360 {
     source_label: mockList("lead_source").find((x) => x.code === r.source)?.label ?? null,
     region_view: regionView(r),
     impact: r.impact,
+    impact_labels: mockLabelsOf("partnership_impact", r.impact),
     impact_rating: r.impact_rating,
     impact_note: r.impact_note,
     comments: r.comments,
@@ -801,7 +803,7 @@ function newDeal(b: Body, record: MockRecord, stage: ListValue, by: string): Moc
     impact_note: str(b.impact_note),
     comments: str(b.comments),
     custom: customFrom({}, b.custom),
-    impact: Array.isArray(b.impact) ? (b.impact as string[]) : [],
+    impact: mockCodesFor("partnership_impact", b.impact),
   };
   DEALS.unshift(d);
   return d;
@@ -847,7 +849,7 @@ function recordFrom(kind: "lead" | "partner", b: Body, by: string): MockRecord {
     created_at: now(),
     identified_on: str(b.identified_on) ?? isoDaysAgo(0),
     since: kind === "partner" ? (str(b.since) ?? isoDaysAgo(0)) : null,
-    source: str(b.source),
+    source: mockCodeFor("lead_source", b.source),
     objective: str(b.objective),
     comments: str(b.comments),
     lost_reason: null,
@@ -859,7 +861,7 @@ function recordFrom(kind: "lead" | "partner", b: Body, by: string): MockRecord {
     close_reason: null,
     headquarters: b.headquarters ? placeOf(b.headquarters)?.view ?? null : null,
     custom: customFrom({}, b.custom),
-    impact: Array.isArray(b.impact) ? (b.impact as string[]) : [],
+    impact: mockCodesFor("partnership_impact", b.impact),
     impact_rating: (str(b.impact_rating) as LeadDetail["impact_rating"]) ?? null,
     impact_note: str(b.impact_note),
   };
@@ -931,7 +933,7 @@ route("PATCH /api/v1/partnerships/deals/:id", (req) => {
     DEALS.shift();
   }
   if (Array.isArray(b.member_ids)) d.members = [d.owner!, ...(b.member_ids as string[]).map(keyOfEmployee).filter((x): x is string => !!x && x !== d.owner)];
-  if (Array.isArray(b.impact)) d.impact = b.impact as string[];
+  if (Array.isArray(b.impact)) d.impact = mockCodesFor("partnership_impact", b.impact);
   if (b.impact_rating !== undefined) d.impact_rating = (b.impact_rating as DealDetail["impact_rating"]) ?? null;
   if (b.custom !== undefined) d.custom = customFrom(d.custom, b.custom);
   if (b.validity !== undefined) Object.assign(d, b.validity === null ? { validity_days: null, valid_until: null } : validityFrom(b.validity, null));
@@ -1009,11 +1011,12 @@ route("PATCH /api/v1/partnerships/leads/:id", (req) => {
   if (!r || r.kind !== "lead") return notFound();
   if (r.status === "converted") return fail(409, "LEAD_CONVERTED", "This lead is now a partner; open the partner.");
   const b = req.body;
-  for (const key of ["name", "industry", "website", "objective", "source", "comments", "identified_on"] as const) if (b[key] !== undefined) (r as unknown as Body)[key] = b[key] === null ? null : String(b[key]);
+  for (const key of ["name", "industry", "website", "objective", "comments", "identified_on"] as const) if (b[key] !== undefined) (r as unknown as Body)[key] = b[key] === null ? null : String(b[key]);
+  if (b.source !== undefined) r.source = mockCodeFor("lead_source", b.source);
   if (b.partner_category_id) r.category_id = String(b.partner_category_id);
   if (b.owner_id) r.owner = keyOfEmployee(b.owner_id) ?? r.owner;
   if (b.region) regionFrom(b, r);
-  if (Array.isArray(b.impact)) r.impact = b.impact as string[];
+  if (Array.isArray(b.impact)) r.impact = mockCodesFor("partnership_impact", b.impact);
   if (b.impact_rating !== undefined) r.impact_rating = (b.impact_rating as LeadDetail["impact_rating"]) ?? null;
   if (b.impact_note !== undefined) r.impact_note = str(b.impact_note);
   if (b.custom !== undefined) r.custom = customFrom(r.custom, b.custom);
@@ -1091,11 +1094,21 @@ route("PATCH /api/v1/partnerships/contacts/:id", (req) => {
 route("POST /api/v1/partnerships/documents", (req) => {
   const r = recordOf(String(req.body.partner_id ?? req.body.lead_id ?? ""));
   if (!r) return invalid({ partner_id: ["Pick the lead or the partner"] });
-  const kind = mockList("partner_document_kind").find((x) => x.code === req.body.kind);
-  if (!kind) return invalid({ kind: ["Pick from the list"] });
+  // A kind by its name or its code; a name the list does not hold joins it (§6.3).
+  const code = mockCodeFor("partner_document_kind", req.body.kind);
+  const kind = mockList("partner_document_kind").find((x) => x.code === code);
+  if (!kind) return invalid({ kind: ["Required"] });
   const doc: PartnerDocument = { document: { document_id: String(req.body.document_id), file_name: "Upload.pdf", size_bytes: 120000, mime_type: "application/pdf" }, kind: kind.code, kind_label: kind.label, deal_id: str(req.body.deal_id), origin: "upload", uploaded_by: refKey(req.user!).display_name, created_at: now() };
   DOCUMENTS.unshift({ ...doc, record_id: r.id });
   return created(doc);
+});
+/** Remove Document: an upload only; what the hub filed itself is kept. */
+route("DELETE /api/v1/partnerships/documents/:id", (req) => {
+  const i = DOCUMENTS.findIndex((d) => d.document.document_id === req.params.id);
+  if (i < 0) return notFound();
+  if (DOCUMENTS[i]!.origin !== "upload") return fail(409, "DOCUMENT_KEPT", "Only an upload can be removed");
+  DOCUMENTS.splice(i, 1);
+  return noContent();
 });
 route("POST /api/v1/partnerships/interactions", (req) => {
   const b = req.body;
