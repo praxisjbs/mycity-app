@@ -155,6 +155,8 @@ const CASES = Object.freeze([
   // Charts in the Overview, PR 1: budgets (praxis-ai.md §6.19, Appendix B). The question that started the plan.
   { id: "chart.budgets-department", as: "ceo", question: "I want us to study our budget for each department. Share data in a way we can see charts in overview.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar", never_words: ["summary endpoint", "endpoint", "database", "generated", "summary read", "tool"] },
   { id: "chart.budgets-category", as: "operations_people", question: "Show this year's budget by category as a chart.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar" },
+  // Charts in the Overview, PR 2: a short list with no summary, charted from its own rows (praxis-ai.md §6.19 item 6).
+  { id: "chart.worksites", as: "operations_people", question: "How many people work at each worksite?", reads: ["worksites.list"], shows: ["pane"], chart: "bar", never_words: ["summary", "endpoint", "database", "generated", "tool"] },
   // Charts in the Overview, PR 4: finance and pay (praxis-ai.md §6.13, Appendix B). Each summary as the role payroll.md and expenses.md §8 name.
   { id: "chart.expenses-category", as: "operations_people", question: "Chart this month's expense requests by category: what is paid, approved and waiting.", reads: ["expenses.summary"], shows: ["pane"], chart: "stacked_bar" },
   { id: "chart.expenses-waiting", as: "head_of_department", question: "How much is waiting on my approval in expense requests?", reads: ["expenses.summary"], shows: ["pane"] },

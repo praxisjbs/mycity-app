@@ -110,9 +110,12 @@ conversations, and one opens full screen when you press it.
 2. Saying *as a chart* works too, for example *Show this year's budget by category as a chart*.
 3. On a computer the pane opens on **Overview**: up to three figures, then the chart. On a phone,
    press **Open Figures**.
+4. A short list charts too, from its own rows. For example: *How many people work at each worksite?*,
+   *My leave days left by type* or *How many people hold each role?* Amounts read in naira.
 
 > **Tip:** Ask by department, by type, by person or by month. A question about one record answers in
-> words, without a chart.
+> words, without a chart. A list longer than one page is charted from its totals, never from its
+> first 25 rows.
 
 ### Go back to your screen {#praxis-ask-back}
 

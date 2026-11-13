@@ -207,7 +207,7 @@ function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = fal
     "",
     ...(pane
       ? [
-          "The pane's Overview: when a summary read answered, name it in \"overview\" with up to three of its figure keys and one chart over one of its groups (group: its \"by\") or series (series: their keys). A group whose rows carry parts suits a stacked bar. The chart's title is a short sentence; a number in it must be one of the summary's own figures or values, or the title is dropped. Never tell the person how the pane or its charts are made.",
+          "The pane's Overview: when a summary read answered, name it in \"overview\" with up to three of its figure keys and one chart over one of its groups (group: its \"by\") or series (series: their keys). A group whose rows carry parts suits a stacked bar. When no summary fits and a list read's whole answer came back on one page, chart its own rows instead: \"read\" its number, a chart's \"label\" field and its \"values\" fields or the \"count\" field, and figures as {\"of\": \"rows\"}, {\"of\": \"sum\", \"field\"} or {\"of\": \"count\", \"field\", \"value\"}; never from the first page of a longer list. The chart's title is a short sentence; a number in it must be one of the summary's own figures or values, or the rows', or the title is dropped. Never tell the person how the pane or its charts are made.",
           "",
         ]
       : []),

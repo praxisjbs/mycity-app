@@ -4,7 +4,7 @@
  * model's draft and the reads the question made. Nothing the model typed becomes a figure: a
  * table's cells are the named read's own rows, the screen button is one of the routes offered
  * this question, the citations are the records the reads returned (shared/ai/cite.js), the
- * Overview's figures and chart are a summary's own, and a card's values are checked against the
+ * Overview's figures and chart are a summary's own, or a whole list's rows' (§6.19 item 6), and a card's values are checked against the
  * action's schema and the person's rights before anyone sees them.
  *
  *   const asked = answer.askFirst({ draft, actions, history, shows, now });   // the draft, or its question instead
@@ -19,7 +19,7 @@ const authorise = require("../../../shared/ai/authorise");
 const { contractNameOf, shapeOf } = require("../../../shared/ai/manifest");
 const { formatDate, formatDateTime } = require("../../../shared/time/day-first");
 const lagos = require("../../../shared/time/lagos");
-const { formatNaira } = require("../../../shared/money/money");
+const { formatNaira, sum: sumOf, toWire } = require("../../../shared/money/money");
 const { jsonSchemaOf } = require("../structured");
 const { placeholdersIn } = require("../drafts");
 const { logger } = require("../../../config/logger");
@@ -243,6 +243,16 @@ function linkOf(intent, values, routes, screens) {
   };
 }
 
+/**
+ * The Overview the draft asked for (§6.13, §6.19 item 6): the summary's when it names one that
+ * answered, else a chart of a read's rows when they are its whole list, drawn by the table's own
+ * cells, so a label reads as its cell does and money as naira.
+ */
+function overviewFor(spec, reads) {
+  if (!spec) return null;
+  return engine.pane.overviewOf(spec, reads) || engine.pane.overviewOfRows(spec, reads, { cell, moneyField: (field) => MONEY_FIELD.test(field), sumMoney: (amounts) => toWire(sumOf(amounts)) });
+}
+
 /** The reads as the wire and History carry them (AiReadMade), from the pane's sources. */
 const readsMade = (sources) => sources.map(({ n, key, kind, module_key, params, outcome, rows, total, first, masked }) => ({ n, key, kind, module_key, params, outcome, rows, total, first, masked: Array.isArray(masked) ? masked : [] }));
 
@@ -269,7 +279,7 @@ function build({ draft, reads, routes, screens, shows = [] }) {
   const stored = engine.pane.sourcesOf(reads);
   const madeReads = readsMade(stored);
   const more = Boolean(draft.more) && ok.some((r) => r.page && r.page.has_next);
-  const overview = wants.has("pane") ? engine.pane.overviewOf(draft.overview, reads) : null;
+  const overview = wants.has("pane") ? overviewFor(draft.overview, reads) : null;
   const ask = askOf(draft.ask);
   const shown = {
     content: draft.text,
@@ -537,4 +547,4 @@ async function draftCard({ draft, actions, actor, context = null, db = null, now
   };
 }
 
-module.exports = { build, draftCard, withReading, readingChoices, readingProblems, askFirst, withChoices, withOptions, recordChoices, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };
+module.exports = { build, overviewFor, draftCard, withReading, readingChoices, readingProblems, askFirst, withChoices, withOptions, recordChoices, askOf, askedRun, gapsIn, tableOf, drawTable, defaultFields, whoOf, valueAt, presentTable, groupsOf, linkOf, prefillOf, cell, readsMade, MAX_CITATIONS, MAX_COLUMNS, MAX_CHOICES, FILL_THE_GAP };

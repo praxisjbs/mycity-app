@@ -24,15 +24,17 @@ export interface PaneFigure {
   unit: string | null;
 }
 
-/** A chart the server drew from a summary's own groups or series. */
+/** A chart the server drew from a summary's own groups or series, or from a short list's own rows. */
 export interface PaneChart {
   kind: "bar" | "stacked_bar" | "line" | "donut";
   title: string;
   labels: string[];
   series: Array<{ label: string; values: number[] }>;
+  /** `ngn` when every value is an amount of money, read in naira; null or absent for a plain number. */
+  unit?: string | null;
 }
 
-/** The Overview: up to three figures and one chart, or nothing when no summary answered. */
+/** The Overview: up to three figures and one chart, or nothing when no summary or short list answered. */
 export interface PaneOverview {
   title: string | null;
   figures: PaneFigure[];

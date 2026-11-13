@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B (§6.12) (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B, PR 2 praxisjbs/mycity-app#150 (§6.12) (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -845,7 +845,7 @@ order: PR 1 first, PR 3 after PR 2, PR 8 after PRs 4 to 7 (Appendix B.2). Tick a
 date, the branch and the PR when it merges.
 
 - [x] 13/11/2026 · PR 1 · Stacked bars, Budgets' summary and every read naming its summary, gate 23 rule 9 with `scripts/check/ai-summary-gaps.json`, money in naira, no mechanics in an answer (built in the planning chat on `claude/bold-hawking-byligf`)
-- [ ] PR 2 · Charts from a complete table (`m10/overview-tables`)
+- [x] 13/11/2026 · PR 2 · Charts from a complete table: the draft's `read` Overview drawn by the server from the rows (`overviewOfRows`), `AiRowFigure`, `AiOverview.read`, `AiOverviewChart.unit`, prompt version 12 (built in its own chat on the session's branch `claude/brave-cori-1cd0l4` rather than `m10/overview-tables`, praxisjbs/mycity-app#150)
 - [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
 - [x] 13/11/2026 · PR 4 · Finance and pay summaries: `expenses.summary`, `requisitions.summary`, `disbursements.summary`, `payroll.month` by department and status, `payroll.trend`, `deductions.summary`, `my_pay.summary`; ten reads off the gaps file (built in its own chat on `claude/serene-shannon-ek7yft`)
 - [ ] PR 5 · Recruitment and onboarding summaries (`m10/summaries-recruitment`)
@@ -883,6 +883,14 @@ date, the branch and the PR when it merges.
   list of the summaries offered to staff gains them. The container's PostgreSQL lacked pgvector again
   (installed by hand, `postgresql-16-pgvector`), and the image had no Node 20 under `/opt` (installed into a
   scratch folder).
+- 13/11/2026 · JP · Charts in the Overview, PR 2 built (§6.12), in its own chat, as praxisjbs/mycity-app#150: an Overview from a
+  read whose rows are its whole list, the engine's `overviewOfRows` pure (gate 24) with the table's
+  `cell` and the money rule handed in by `answer.js`, the summary's Overview chosen first. Found on
+  the way and written into `praxis-ai.md` §6.19 item 6: a chart of amounts read as plain numbers, so
+  `AiOverviewChart` gained `unit`; the plan named no labels for the server's figures, nor how the
+  model's kind fits rows that cannot draw it. The container again lacked Node 20, `node_modules` and
+  pgvector (installed by hand: `npm install node@20` linked at `/opt/node20`, `npm ci`,
+  `postgresql-16-pgvector`).
 - 13/11/2026 · JP · Charts in the Overview, PR 1 built (§6.12): `AiSummaryPart` and a group row's
   `parts`, `engine/pane.js` drawing them as one series a part, `budgets.summary`, a read's `summary`
   in the manifest, the snapshot and the description the model is offered, gate 23 rule 9 with its
