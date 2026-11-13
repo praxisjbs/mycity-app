@@ -14,6 +14,7 @@
  *       permission: ["people", "view"],
  *       run: (client, params, actor) => repo.list(client, params, actor.scope),
  *       cite: (row) => ({ type: "employee", id: row.employee_id, label: row.full_name }),
+ *       summary: "employees.summary",                 // its counts and totals, or "none: one record"
  *     }],
  *     summaries: [{                                   // figures the database computes, never rows
  *       key: "employees.summary",
@@ -102,7 +103,9 @@ const WRITE_WORDS = new Set([
   "updates",
   "deletes",
 ]);
-const READ_KEYS = new Set(["key", "description", "params", "permission", "run", "cite", "matrix"]);
+const READ_KEYS = new Set(["key", "description", "params", "permission", "run", "cite", "matrix", "summary"]);
+/** A read's `summary`: the summary that answers its counts and totals, or why it needs none (praxis-ai.md §6.19 item 3). */
+const SUMMARY_OF = /^(?:[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*|none: \S.{2,})$/;
 const SUMMARY_KEYS = new Set(["key", "description", "params", "permission", "run", "matrix"]);
 const ACTION_KEYS = new Set([
   "key",
@@ -244,6 +247,8 @@ function checkRead(where, r, seen) {
   if (typeof r.run !== "function") throw new Error(`${at}: run is (client, params, actor) => result`);
   if (typeof r.cite !== "function") throw new Error(`${at}: cite is (row) => { type, id, label? }`);
   checkMatrix(at, r.matrix);
+  if (r.summary !== undefined && (typeof r.summary !== "string" || !SUMMARY_OF.test(r.summary)))
+    throw new Error(`${at}: summary is the key of the summary that answers it, or "none: <reason>"`);
   return Object.freeze({
     ...r,
     kind: "read",

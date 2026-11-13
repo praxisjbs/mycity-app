@@ -32,6 +32,7 @@ module.exports = defineManifest({
     },
     {
       key: "payslips.list",
+      summary: "payroll.month",
       description: "List the payslips within my reach, by person, month or payroll run: who it is for, the month, gross pay, deductions, net pay and whether it is still a preview or published",
       params: c.payslips.PayslipListQuery,
       permission: ["payroll", "view"],

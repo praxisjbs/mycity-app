@@ -2,13 +2,19 @@ import { describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { axe } from "../testing/axe";
 import { BarChart, type BarChartBar } from "./BarChart";
-import { EVERY_LABEL_UP_TO, labelRoom, labelSpots, widthForLabels } from "./BarChart.draw";
-import { DEPARTMENTS, MONTH_OF_DAYS } from "./fixtures";
+import { EVERY_LABEL_UP_TO, labelRoom, labelSpots, PART_GAP, stackParts, widthForLabels } from "./BarChart.draw";
+import { BUDGET_PARTS, BUDGETS, DEPARTMENTS, MONTH_OF_DAYS } from "./fixtures";
 
 const BARS: BarChartBar[] = [
   { label: "Jan", value: 14 },
   { label: "Feb", value: 22 },
   { label: "Mar", value: 9 },
+];
+
+const PARTS = ["Spent", "Committed", "Remaining"];
+const STACKED: BarChartBar[] = [
+  { label: "Finance", value: 10, parts: [6, 3, 1] },
+  { label: "People", value: 5, parts: [2, 2, 1] },
 ];
 
 /** The labels the drawing shows, left to right. */
@@ -101,6 +107,53 @@ describe("BarChart", () => {
   it("has no accessibility violations", async () => {
     const { container } = render(<BarChart title="Claims by Month" bars={BARS} caption="Approved claims only" />);
     await waitFor(() => expect(container.querySelectorAll("rect")).toHaveLength(3));
+    expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("BarChart with stacked parts", () => {
+  it("draws each bar as its parts, bottom to top, in series 1 to 6", async () => {
+    const { container } = render(<BarChart title="Budget by Department" parts={PARTS} bars={STACKED} />);
+    await waitFor(() => expect(container.querySelectorAll("path")).toHaveLength(6));
+    const fills = [...container.querySelectorAll("path")].map((p) => p.getAttribute("fill"));
+    expect(fills).toEqual(["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-1)", "var(--chart-2)", "var(--chart-3)"]);
+    expect(container.querySelectorAll("rect")).toHaveLength(0);
+  });
+
+  it("reads each bar as its label, each part's name and figure, then its total", () => {
+    render(<BarChart title="Budget by Department" parts={PARTS} bars={STACKED} format={(v) => `₦${v}`} />);
+    expect(screen.getByText("Finance: Spent ₦6, Committed ₦3, Remaining ₦1, Total ₦10")).toBeInTheDocument();
+    expect(screen.getByText("People: Spent ₦2, Committed ₦2, Remaining ₦1, Total ₦5")).toBeInTheDocument();
+  });
+
+  it("names every part in the key under the title", () => {
+    render(<BarChart title="Budget by Department" parts={BUDGET_PARTS} bars={BUDGETS} />);
+    for (const name of BUDGET_PARTS) expect(screen.getByText(name)).toBeInTheDocument();
+  });
+
+  it("draws a negative or missing part as 0", async () => {
+    const { container } = render(<BarChart label="Budget" parts={PARTS} bars={[{ label: "Finance", value: 7, parts: [5, -3] }]} />);
+    await waitFor(() => expect(container.querySelectorAll("path")).toHaveLength(1));
+    expect(container.querySelector("path")).toHaveAttribute("fill", "var(--chart-1)");
+    expect(screen.getByText("Finance: Spent 5, Committed 0, Remaining 0, Total 7")).toBeInTheDocument();
+  });
+
+  it("stacks on one scale whose top is the largest total, a gap between parts", () => {
+    const [first, second, third] = stackParts([6, 3, 1], 10, 140, 132);
+    expect(first!.y + first!.height).toBeCloseTo(140);
+    expect(first!.y - (second!.y + second!.height)).toBeCloseTo(PART_GAP);
+    expect(second!.y - (third!.y + third!.height)).toBeCloseTo(PART_GAP);
+    expect(third!.y).toBeCloseTo(8);
+    // A smaller total stops short of the top, in proportion.
+    const shorter = stackParts([2, 2, 1], 10, 140, 132);
+    expect(shorter[shorter.length - 1]!.y).toBeCloseTo(140 - 66);
+    // A part of 0 is left out.
+    expect(stackParts([4, 0, 0], 10, 140, 132).map((p) => p.k)).toEqual([0]);
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = render(<BarChart title="Budget by Department" parts={BUDGET_PARTS} bars={BUDGETS} caption="This year's budgets" />);
+    await waitFor(() => expect(container.querySelectorAll("path").length).toBeGreaterThan(0));
     expect(await axe(container)).toHaveNoViolations();
   });
 });

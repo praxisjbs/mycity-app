@@ -254,6 +254,7 @@ module.exports = defineManifest({
       // so a task's watcher, a meeting's guest or a message's colleague is found by name for anyone
       // (docs/guides/praxis-ai.md §6.9). The caller is listed too, so every reader sees the same people.
       key: "colleagues.list",
+      summary: "none: a directory search; headcount is employees.summary",
       description: "Find colleagues by name: everyone with a login, with their job title and department",
       params: c.community.ColleagueListQuery,
       permission: ["community", "view"],
@@ -294,6 +295,7 @@ module.exports = defineManifest({
     },
     {
       key: "channels.list",
+      summary: "none: a short list; messages are never read (decision 19)",
       description:
         "The channels the person is a member of, by name, with unread counts",
       params: c.community.ChannelListQuery,

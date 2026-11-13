@@ -33,6 +33,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "training.mine",
+      summary: "none: my own short list",
       description: "List my own training courses: to do, in progress or completed, with their due dates and progress",
       params: c.training.MyTrainingQuery,
       permission: ["ess", "view"],

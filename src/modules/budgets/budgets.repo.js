@@ -275,6 +275,85 @@ async function project(db, id) {
 }
 
 /**
+ * A year's budgets in figures for the assistant (docs/guides/praxis-ai.md §6.13, Finance: Budgets),
+ * in one statement with the reader's scope (on the budget's owner, as list() applies it): the totals
+ * over the budgets' lines, the lines by department and by category, what was paid by month (requests
+ * disbursed against those lines), and, only when `projects` is true (a reader whose scope is all), the
+ * projects with a budget. Groups cut to 20 rows, the months to the year's 12. Figures, never a row.
+ */
+async function aiSummary(db, q, scope) {
+  const params = [COMMITTED, SPENT, q.year, q.department_id || null, q.projects === true];
+  const s = scopeClause(scope, { column: "v.owner_id" }, params);
+  const { rows } = await db.query(
+    `WITH b AS (
+       SELECT v.budget_id, v.department_id, v.department, v.allocated, v.committed, v.spent
+         FROM (${BUDGETS}) v
+        WHERE v.year = $3::int
+          AND ($4::uuid IS NULL OR v.department_id = $4::uuid)
+          ${s.and}
+     ), l AS (
+       SELECT bl.budget_line_id, bl.budget_id, bl.expense_category_id, ec.name AS category,
+              bl.amount, bl.committed_amount, bl.spent_amount
+         FROM budget_line bl
+         JOIN b ON b.budget_id = bl.budget_id
+         JOIN expense_category ec ON ec.expense_category_id = bl.expense_category_id
+     ), figures AS (
+       SELECT (SELECT count(*) FROM b)::int AS budgets,
+              COALESCE(sum(amount), 0)::numeric(18,2) AS allocated,
+              COALESCE(sum(committed_amount), 0)::numeric(18,2) AS committed,
+              COALESCE(sum(spent_amount), 0)::numeric(18,2) AS spent,
+              count(*) FILTER (WHERE committed_amount + spent_amount > amount)::int AS lines_over,
+              count(*) FILTER (WHERE amount > 0 AND committed_amount + spent_amount >= amount * 0.8)::int AS lines_past_80
+         FROM l
+     ), by_department AS (
+       SELECT COALESCE(b.department_id::text, 'none') AS key, COALESCE(min(b.department), 'No department') AS label,
+              COALESCE(sum(b.allocated), 0)::numeric(18,2) AS allocated,
+              COALESCE(sum(b.committed), 0)::numeric(18,2) AS committed,
+              COALESCE(sum(b.spent), 0)::numeric(18,2) AS spent,
+              row_number() OVER (ORDER BY sum(b.allocated) DESC NULLS LAST, min(b.department), b.department_id) AS rank
+         FROM b GROUP BY b.department_id
+     ), by_category AS (
+       SELECT l.expense_category_id::text AS key, min(l.category) AS label,
+              sum(l.amount)::numeric(18,2) AS allocated,
+              sum(l.committed_amount)::numeric(18,2) AS committed,
+              sum(l.spent_amount)::numeric(18,2) AS spent,
+              row_number() OVER (ORDER BY sum(l.amount) DESC, min(l.category), l.expense_category_id) AS rank
+         FROM l GROUP BY l.expense_category_id
+     ), by_project AS (
+       SELECT x.project_id::text AS key, TRIM(COALESCE(x.number, '') || ' ' || x.name) AS label,
+              x.budget_amount AS allocated, x.committed, x.spent,
+              row_number() OVER (ORDER BY x.budget_amount DESC, x.name, x.project_id) AS rank
+         FROM (${PROJECTS}) x
+        WHERE $5::boolean AND x.budget_amount IS NOT NULL
+     ), paid AS (
+       SELECT to_char(er.disbursed_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, sum(er.amount)::numeric(18,2) AS value
+         FROM expense_request er
+         JOIN l ON l.budget_line_id = er.budget_line_id
+        WHERE er.status = ANY($2::text[]) AND er.disbursed_at IS NOT NULL
+          AND date_part('year', er.disbursed_at AT TIME ZONE 'Africa/Lagos')::int = $3::int
+        GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated, 'committed', committed, 'spent', spent) ORDER BY rank)
+               FROM by_department WHERE rank <= 20) AS by_department,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated, 'committed', committed, 'spent', spent) ORDER BY rank)
+               FROM by_category WHERE rank <= 20) AS by_category,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated, 'committed', committed, 'spent', spent) ORDER BY rank)
+               FROM by_project WHERE rank <= 20) AS by_project,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM paid) AS paid`,
+    params,
+  );
+  const row = rows[0] || {};
+  return {
+    figures: row.figures || {},
+    by_department: row.by_department || [],
+    by_category: row.by_category || [],
+    by_project: row.by_project || [],
+    paid: row.paid || [],
+  };
+}
+
+/**
  * The lines past `percent` used (committed and spent over allocated) on budgets running on a
  * Lagos date, not yet warned about: a batch of at most `size` after the line `after`, by id.
  * A line is warned once, ever, and a line belongs to one year, so once per line per year.
@@ -372,6 +451,7 @@ module.exports = {
   history,
   projects,
   project,
+  aiSummary,
   linesPast,
   warnedUsers,
   userOf,

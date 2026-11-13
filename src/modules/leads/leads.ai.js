@@ -150,6 +150,7 @@ module.exports = defineManifest({
     },
     {
       key: "leads.get",
+      summary: "none: one record",
       description: "One lead's whole picture: its deal, stage, health, projected value, contacts and latest interactions",
       params: c.common.IdParams,
       permission: ["partnerships", "view"],

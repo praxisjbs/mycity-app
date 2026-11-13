@@ -83,6 +83,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "policies.mine",
+      summary: "none: my own short list",
       description: "List the company policies that apply to me, those I still have to acknowledge first, with their versions and due dates",
       params: c.policies.MyPolicyListQuery,
       permission: ["ess", "view"],
@@ -91,6 +92,7 @@ module.exports = defineManifest({
     },
     {
       key: "policies.read",
+      summary: "none: one record",
       description: "Read one policy version that applies to me: its text, or its rules as sentences, what changed and when it applies",
       params: c.common.IdParams,
       permission: ["ess", "view"],

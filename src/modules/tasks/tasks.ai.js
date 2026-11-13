@@ -275,6 +275,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "tasks.list",
+      summary: "tasks.summary",
       description: "List tasks: status, due date, priority, who it is for and who set it; mine or my team's, overdue, due today or this week",
       params: c.tasks.TaskListQuery,
       permission: ["workspace", "view"],
@@ -284,6 +285,7 @@ module.exports = defineManifest({
     },
     {
       key: "tasks.get",
+      summary: "none: one record",
       description: "One task I can see, as its panel shows it: its steps (each with its id), what it waits on and holds up, its watchers and hold",
       params: c.common.IdParams,
       permission: ["workspace", "view"],

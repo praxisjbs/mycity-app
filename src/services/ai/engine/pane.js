@@ -4,9 +4,9 @@
  * reads, never from the model's numbers. Sources from every read made (its outcome: read,
  * refused, invalid, failed, or timed_out when the database cut it); Overview from the summary
  * the draft names, its figures by key and one chart drawn from the summary's own groups or
- * series. A figure, group or series the summary does not hold is dropped; a chart title that
- * names a number the summary does not hold anywhere (a figure, a group's value or count, a
- * point) is dropped for the chart's own label.
+ * series, a group whose rows carry parts drawn as a stacked bar. A figure, group or series the
+ * summary does not hold is dropped; a chart title that names a number the summary does not hold
+ * anywhere (a figure, a group's value, count or part, a point) is dropped for the chart's own label.
  */
 
 const CHART_KINDS = new Set(["bar", "stacked_bar", "line", "donut"]);
@@ -33,10 +33,24 @@ const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** A chart over a summary's group: its rows as labels, one series of their values. */
+/**
+ * A chart over a summary's group: its rows as labels. A stacked bar over rows that carry parts is
+ * one series per part, in the order of the first row's parts (§6.19 item 1); a stacked bar over rows
+ * without parts is drawn as a bar; any other kind draws the rows' values (a row with parts: their sum).
+ */
 function chartOfGroup(spec, group) {
   const rows = group.rows.slice(0, MAX_POINTS);
-  return { kind: spec.kind, title: spec.title, labels: rows.map((r) => r.label), series: [{ label: group.label, values: rows.map((r) => num(r.value)) }] };
+  const labels = rows.map((r) => r.label);
+  const parts = (rows.find((r) => Array.isArray(r.parts) && r.parts.length) || {}).parts;
+  if (spec.kind === "stacked_bar" && parts) {
+    const series = parts.slice(0, 6).map((p) => ({
+      label: p.label,
+      values: rows.map((r) => num(((r.parts || []).find((x) => x.key === p.key) || {}).value)),
+    }));
+    return { kind: "stacked_bar", title: spec.title, labels, series };
+  }
+  const kind = spec.kind === "stacked_bar" ? "bar" : spec.kind;
+  return { kind, title: spec.title, labels, series: [{ label: group.label, values: rows.map((r) => num(r.value)) }] };
 }
 
 /** A chart over a summary's series: their points' labels, one line per series. */
@@ -50,7 +64,7 @@ function chartOfSeries(spec, series) {
   };
 }
 
-/** Every number a summary holds, as strings: its figures, its groups' values and counts, its points. */
+/** Every number a summary holds, as strings: its figures, its groups' values, counts and parts, its points. */
 function valuesOf(result) {
   const out = new Set();
   const add = (v) => {
@@ -67,6 +81,7 @@ function valuesOf(result) {
     for (const r of g.rows || []) {
       add(r.value);
       add(r.count);
+      for (const p of r.parts || []) add(p.value);
     }
   for (const s of result.series || []) for (const p of s.points || []) add(p.value);
   add(result.total);

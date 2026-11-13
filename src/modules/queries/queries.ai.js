@@ -89,6 +89,7 @@ module.exports = defineManifest({
     },
     {
       key: "queries.get",
+      summary: "none: one record",
       description: "One query: its details, the employee's response and the decision",
       params: c.common.IdParams,
       permission: ["queries", "view"],

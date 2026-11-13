@@ -217,12 +217,26 @@ const AiSummaryFigure = z
   })
   .strict();
 
+/**
+ * One part of a group row, drawn as one segment of its stacked bar (§6.19 item 1): budgets' Spent,
+ * Committed, Remaining and Over Budget. Never below zero; the row's value is the sum of its parts.
+ */
+const AiSummaryPart = z
+  .object({
+    key: z.string().min(1).max(64),
+    label: z.string().trim().min(1).max(60),
+    value: figureValue,
+  })
+  .strict();
+
 const AiSummaryGroupRow = z
   .object({
     key: z.string().min(1).max(120),
     label: z.string().trim().min(1).max(120),
     value: figureValue,
     count: z.number().int().min(0).nullable(),
+    /** The row's parts, for a stacked bar; up to six, in the same order on every row of the group. */
+    parts: z.array(AiSummaryPart).max(6).optional(),
   })
   .strict();
 
@@ -694,6 +708,7 @@ const TABLES = {
   },
   AiScreenContext: { table: null, reason: "the screen a question was asked from, kept in ai_message.context and ai_conversation.opened_from" },
   AiSummaryFigure: { table: null, reason: "a figure a summary read computed; never stored" },
+  AiSummaryPart: { table: null, reason: "one part of a summary's group row, a stacked bar's segment; never stored" },
   AiSummaryGroupRow: { table: null, reason: "one group of a summary read; never stored" },
   AiSummaryGroup: { table: null, reason: "a grouping of a summary read; never stored" },
   AiSummaryPoint: { table: null, reason: "a point of a summary's series; never stored" },
@@ -794,6 +809,7 @@ module.exports = {
   AiAnswerLink,
   AiReadMade,
   AiSummaryFigure,
+  AiSummaryPart,
   AiSummaryGroupRow,
   AiSummaryGroup,
   AiSummaryPoint,

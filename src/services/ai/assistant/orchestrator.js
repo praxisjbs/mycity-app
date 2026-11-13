@@ -207,7 +207,7 @@ function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = fal
     "",
     ...(pane
       ? [
-          "The pane's Overview: when a summary read answered, name it in \"overview\" with up to three of its figure keys and one chart over one of its groups (group: its \"by\") or series (series: their keys). The chart's title is a short sentence; a number in it must be one of the summary's own figures or values, or the title is dropped.",
+          "The pane's Overview: when a summary read answered, name it in \"overview\" with up to three of its figure keys and one chart over one of its groups (group: its \"by\") or series (series: their keys). A group whose rows carry parts suits a stacked bar. The chart's title is a short sentence; a number in it must be one of the summary's own figures or values, or the title is dropped. Never tell the person how the pane or its charts are made.",
           "",
         ]
       : []),
@@ -345,9 +345,12 @@ async function answer({ db, actor, question, history = [], context = null, shows
     if (fresh) reads.push(fileRead(file));
     /** The restricted fields this person sees on screen, which reach the model for them alone. */
     const keep = Object.keys(fieldMask.FIELDS).filter((k) => !hidden.includes(k));
+    // A read names the summary that answers its counts and totals, when this person is offered it (§6.19 item 3).
+    const offered = new Set(allowedSummaries.map((s) => s.key));
+    const describe = (r) => (r.summary && offered.has(r.summary) ? `${r.description}. For counts, totals or a chart, use ${toolName(r.summary)}` : r.description);
     const tools = [...allowedReads, ...allowedSummaries].map((r) => ({
       type: "function",
-      function: { name: toolName(r.key), description: r.description, parameters: jsonSchemaOf(r.params) },
+      function: { name: toolName(r.key), description: describe(r), parameters: jsonSchemaOf(r.params) },
     }));
     const messages = [
       systemTurn(talk.prompt, ctx, now, { context, actions: allowedActions, pane: wants.has("pane") }),

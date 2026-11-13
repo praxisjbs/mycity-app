@@ -6,10 +6,12 @@
  * this file only names them for the model and the pane, so no module invents its own words for a
  * count. authorise.runSummary parses what comes out with the contract's AiSummaryResult.
  *
- *   const { figure, group, series, periodOf, cut } = require("../../shared/ai/summary");
+ *   const { figure, part, group, series, periodOf, cut } = require("../../shared/ai/summary");
  *   return {
  *     figures: [figure("late", "Late days", 12, "count"), figure("late_minutes", "Minutes late", 340, "minutes")],
  *     groups: [group("late_days", "Late days by department", rows)],
+ *     // A stacked bar: each row carries its parts, which sum to its value.
+ *     // group("department", "Budget by department", [{ key, label, value: "500.00", parts: [part("spent", "Spent", "200.00"), part("remaining", "Remaining", "300.00")] }])
  *     series: [series("late_days", "Late days by day", points)],
  *     total: 12,
  *   };
@@ -37,20 +39,46 @@ function figure(key, label, v, unit = "count") {
   return { key, label, value: value(v), unit };
 }
 
+/** The most parts a row's stacked bar carries (praxis-ai.md §6.19 item 1). */
+const PARTS = 6;
+
 /**
- * One grouping of at most `max` rows, each { key, label, value, count }. Rows arrive from the repo's
- * json_agg as { key, label, value, count? }; a missing count is null.
+ * One part of a group row, one segment of its stacked bar: Spent, Committed, Remaining. A part is
+ * never below zero (a repo names an overspend as a part of its own); a negative one is refused.
+ */
+function part(key, label, v) {
+  const n = num(v);
+  if (n < 0) throw new Error(`summary part ${key} is below zero (${v}); name an overspend as its own part`);
+  return { key, label, value: value(v) };
+}
+
+/** Two figures equal to the kobo: a row's value and the sum of its parts. */
+const sameAmount = (a, b) => Math.round(num(a) * 100) === Math.round(num(b) * 100);
+
+/**
+ * One grouping of at most `max` rows, each { key, label, value, count } and, for a stacked bar,
+ * `parts` (built with part()). Rows arrive from the repo's json_agg as { key, label, value, count? }
+ * with any parts already built; a missing count is null. A row with parts and no value takes their
+ * sum; a value that disagrees with its parts throws, so a repo's mistake fails a test, never a screen.
  */
 function group(by, label, rows, max = GROUP_ROWS) {
   return {
     by,
     label,
-    rows: (rows || []).slice(0, max).map((r) => ({
-      key: String(r.key ?? r.label ?? ""),
-      label: String(r.label ?? r.key ?? "").slice(0, 120) || "(none)",
-      value: value(r.value),
-      count: r.count === null || r.count === undefined ? null : num(r.count),
-    })),
+    rows: (rows || []).slice(0, max).map((r) => {
+      const row = {
+        key: String(r.key ?? r.label ?? ""),
+        label: String(r.label ?? r.key ?? "").slice(0, 120) || "(none)",
+        value: value(r.value),
+        count: r.count === null || r.count === undefined ? null : num(r.count),
+      };
+      if (!Array.isArray(r.parts) || !r.parts.length) return row;
+      const parts = r.parts.slice(0, PARTS);
+      const total = parts.reduce((n, p) => n + num(p.value), 0);
+      if (r.value === null || r.value === undefined || r.value === "") row.value = Math.round(total * 100) / 100;
+      else if (!sameAmount(r.value, total)) throw new Error(`summary row ${row.key} of ${by}: value ${r.value} is not the sum of its parts (${total})`);
+      return { ...row, parts };
+    }),
   };
 }
 
@@ -90,4 +118,4 @@ function periodOf(q, now = new Date()) {
 /** Rows cut to a grouping's most, after the repo ranked them. */
 const cut = (rows, max = GROUP_ROWS) => (rows || []).slice(0, max);
 
-module.exports = { GROUP_ROWS, TOP_ROWS, SERIES_POINTS, PERIOD_DAYS, figure, group, top, series, periodOf, cut, num, value };
+module.exports = { GROUP_ROWS, TOP_ROWS, SERIES_POINTS, PERIOD_DAYS, PARTS, figure, part, group, top, series, periodOf, cut, num, value };
