@@ -387,6 +387,23 @@ const PartnerDocumentAttach = z
   .strict()
   .refine((v) => Boolean(v.partner_id) !== Boolean(v.lead_id), { message: "Pick the lead or the partner", path: ["partner_id"] });
 
+/**
+ * Upload Document as a Praxis AI card (docs/guides/praxis-ai.md §6.18; partnerships.md §9): the
+ * form's request with the kind as a person reads it ("MOU"), since MyCity's document kinds are a list
+ * of its own; the run turns the name into its code and sends `PartnerDocumentAttach`. Drawn only from
+ * a contract or MoU attached on Ask.
+ */
+const PartnerDocumentAdd = z
+  .object({
+    document_id: uuid,
+    kind: text(60),
+    partner_id: blank(uuid),
+    lead_id: blank(uuid),
+    deal_id: blank(uuid),
+  })
+  .strict()
+  .refine((v) => Boolean(v.partner_id) !== Boolean(v.lead_id), { message: "Pick the lead or the partner", path: ["partner_id"] });
+
 const PartnerDocument = z
   .object({
     document: DocumentRef,
@@ -663,6 +680,7 @@ const TABLES = {
     table: null,
     reason: "tags a vault document for a lead or partner (document.entity_type and entity_id) with its kind and deal",
   },
+  PartnerDocumentAdd: { table: null, reason: "Upload Document's request with the kind by its name, a Praxis AI card" },
   PartnerDocument: { table: null, reason: "a document of a record: the vault's row, its kind and where it came from" },
   PartnerDocumentPage: { table: null, reason: "a page of a record's documents" },
   PartnerWorkQuery: { table: null, reason: "list controls for a record's work" },
@@ -708,6 +726,7 @@ module.exports = {
   Duplicates,
   PartnerDocumentQuery,
   PartnerDocumentAttach,
+  PartnerDocumentAdd,
   PartnerDocument,
   PartnerDocumentPage,
   WorkKind,

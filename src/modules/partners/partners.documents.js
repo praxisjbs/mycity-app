@@ -7,6 +7,10 @@
  *
  * Each is a `partner_document` row, which the vault names as its entity: a lead's documents follow
  * it to its partner by re-pointing that row, and who may read one is who may see its record (§6.1).
+ *
+ * Add Partner Document, Praxis AI's card (docs/guides/praxis-ai.md §6.18; §9 here), files a contract
+ * or MoU attached on Ask through `attach` as Upload Document does, its kind carried as a person reads
+ * it ("MOU") and turned into MyCity's code at the press (`kindCodeOf`, `cardAttach`).
  */
 const { pool } = require("../../config/db");
 const { emit } = require("../../shared/events/emit");
@@ -16,6 +20,8 @@ const vault = require("../../shared/documents/vault");
 const { EVENTS, DOC_TYPE, ENTITY } = require("./partners.events");
 const dealRepo = require("../partner_pipeline/partner_pipeline.repo");
 const lists = require("../partner_pipeline/partner_pipeline.lists");
+const { oneNamed } = require("../../shared/ai/named");
+const c = require("@mycity/contract");
 
 const invalid = (field, message) => new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { [field]: [message] });
 
@@ -123,6 +129,86 @@ async function attach(actor, scope, body) {
   return rows[0];
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's Add Partner Document (praxis-ai.md §6.18)
+ * ------------------------------------------------------------------ */
+
+const KIND_LIST = "partner_document_kind";
+const isId = (v) => c.common.uuid.safeParse(v).success;
+
+/** MyCity's active document kinds, as Upload Document's Kind offers them. */
+async function activeKinds(db = pool) {
+  return (await lists.values(KIND_LIST, db)).values.filter((v) => v.active);
+}
+
+/** The active kinds' names, in the list's order (the card's question's answers to tap). */
+async function kindLabels(db = pool) {
+  return (await activeKinds(db)).map((v) => v.label);
+}
+
+/** The active kind the words name, by its name or its code ("MOU", "mou", "Service Agreement"), or null. */
+async function kindNamed(db, words) {
+  if (!words) return null;
+  return oneNamed(await activeKinds(db), String(words), (v) => [v.label, v.code]);
+}
+
+/** The name of the kind the words name, as the list writes it ("MOU"), or null when the list holds none. */
+async function kindLabelOf(db, words) {
+  const found = await kindNamed(db, words);
+  return found ? found.label : null;
+}
+
+/** A kind's name as the list writes it, for words that name one (the card's `resolve`); the words as they were otherwise. */
+async function kindNameOf(db, words) {
+  return (await kindLabelOf(db, words)) || words;
+}
+
+/** The code of the kind the words name, or null. */
+async function kindCodeOf(db, words) {
+  const found = await kindNamed(db, words);
+  return found ? found.code : null;
+}
+
+/** The card's file, named by its name: the person's own upload, never another's (decision 32). */
+async function cardFile(db, documentId, actor) {
+  if (!db || !actor || !isId(documentId)) return [];
+  const doc = await vault.get(db, documentId);
+  return doc && doc.uploaded_by === actor.user_id ? [{ type: "document", id: documentId, label: doc.original_name || doc.title || "Document" }] : [];
+}
+
+/** The card's check before the press: the kind is one of MyCity's (`Pick from the list` on Kind). */
+async function assertCard(db, values) {
+  if (values.kind && !(await kindNamed(db, values.kind))) throw invalid("kind", "Pick from the list");
+}
+
+/**
+ * Add Partner Document's press: the card's kind turned into its code, then Upload Document's own
+ * request through `attach`, which checks the record, the kind and the deal and claims the file.
+ * @param {object} actor  carrying the card's `partnerships` edit scope
+ * @param {{document_id: string, kind: string, partner_id?: string, lead_id?: string, deal_id?: string}} values  PartnerDocumentAdd
+ */
+async function cardAttach(actor, values) {
+  const code = await kindCodeOf(pool, values.kind);
+  if (!code) throw invalid("kind", "Pick from the list");
+  const body = require("../../shared/http/validate").parseBody(c.partners.PartnerDocumentAttach, {
+    document_id: values.document_id,
+    kind: code,
+    partner_id: values.partner_id || null,
+    lead_id: values.lead_id || null,
+    deal_id: values.deal_id || null,
+  });
+  const doc = await attach(actor, actor.scope, body);
+  return { ...doc, partner_id: body.partner_id || null, lead_id: body.lead_id || null };
+}
+
+/** What the press did, as the card's result line reads it: the file, filed on its record. */
+function cardReadback(r) {
+  const routeMap = require("../../shared/route-map");
+  const type = r.partner_id ? "partner" : "lead";
+  const id = r.partner_id || r.lead_id;
+  return [{ type: "document", id: r.document.document_id, label: r.document.file_name, status: "filed", link: (routeMap.linkFor(type, id) || {}).path || null }];
+}
+
 /** A lead's documents become its partner's (a conversion, §6.4). */
 async function moveToPartner(client, leadId, partnerId) {
   await client.query("UPDATE partner_document SET partner_id = $2, lead_id = NULL WHERE lead_id = $1", [leadId, partnerId]);
@@ -140,4 +226,19 @@ async function mayRead(client, user, doc) {
 }
 
 module.exports = {
-  fileIn, attachIn, attach, page, moveToPartner, mayRead, recordSeen };
+  fileIn,
+  attachIn,
+  attach,
+  page,
+  moveToPartner,
+  mayRead,
+  recordSeen,
+  kindLabels,
+  kindLabelOf,
+  kindNameOf,
+  kindCodeOf,
+  cardFile,
+  assertCard,
+  cardAttach,
+  cardReadback,
+};

@@ -82,6 +82,30 @@ async function get(db, id, scope = null, { lock = false } = {}) {
   return one(db, `SELECT ${DETAIL} ${FROM} WHERE a.partnership_agreement_id = $1 ${seen}${lock ? " FOR UPDATE OF a" : ""}`, params);
 }
 
+/**
+ * The agreements waiting for their signature (Sent or Viewed) that the reader sees, newest first, a
+ * page of 25: on these partners and leads, or named by these words (praxis-ai.md §6.18: a contract
+ * or MoU attached on Ask is filed as the signed copy of one of them).
+ * @param {{partner_ids?: string[], lead_ids?: string[], q?: string|null}} on
+ */
+function awaitingSignature(db, { partner_ids = null, lead_ids = null, q = null } = {}, scope) {
+  const records = partner_ids || lead_ids;
+  const params = [records ? partner_ids || [] : null, lead_ids || [], q || null];
+  const seen = dealSeen(scope, "po", params);
+  return pageQuery(
+    db,
+    `SELECT ${ROW}, ${TOTAL_COL}
+       ${FROM}
+      WHERE a.status IN ('sent', 'viewed')
+        AND ($1::uuid[] IS NULL OR a.partner_id = ANY($1::uuid[]) OR a.lead_id = ANY($2::uuid[]))
+        AND ($3::text IS NULL OR search_fold(a.number || ' ' || a.title || ' ' || COALESCE(p.name, l.name, '')) LIKE '%' || search_fold($3) || '%')
+        ${seen}
+      ORDER BY a.created_at DESC, a.partnership_agreement_id`,
+    params,
+    { page: 1 },
+  );
+}
+
 /** The cards above Contracts & MOUs, within scope. */
 async function summary(db, scope) {
   const params = [];
@@ -238,6 +262,7 @@ const today = () => lagos.today();
 module.exports = {
   list,
   get,
+  awaitingSignature,
   summary,
   renewals,
   dealFacts,

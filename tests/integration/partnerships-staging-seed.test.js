@@ -34,6 +34,12 @@ describeDb("Partnerships · Categories staging seed", () => {
     await pool.end();
   });
 
+  test("the document kinds Upload Document and Praxis AI's Add Partner Document pick from (praxis-ai.md §6.18)", async () => {
+    const kinds = (await pool.query("SELECT code, label FROM reference_value WHERE domain = 'partner_document_kind' AND active ORDER BY display_order")).rows;
+    expect(kinds.map((k) => k.label)).toEqual(seed.DOCUMENT_KINDS);
+    expect(kinds.find((k) => k.label === "MOU")).toMatchObject({ code: "mou" });
+  });
+
   test("MyCity's thirteen stages carry what each counts as, and the pipeline is whole", async () => {
     const stages = (await pool.query("SELECT label, metadata ->> 'meaning' AS meaning FROM reference_value WHERE domain = 'partnership_stage' AND active ORDER BY display_order")).rows;
     expect(stages).toHaveLength(13);
@@ -98,6 +104,6 @@ describeDb("Partnerships · Categories staging seed", () => {
       await count("SELECT count(*)::int AS n FROM proof_point"),
     ];
     expect(after).toEqual(before);
-    expect(logs[0]).toMatch(/13 stages, 9 impacts, 12 categories, 5 checklist items, 1 field, 1 template, 3 proof points/);
+    expect(logs[0]).toMatch(/13 stages, 9 impacts, 8 document kinds, 12 categories, 5 checklist items, 1 field, 1 template, 3 proof points/);
   });
 });

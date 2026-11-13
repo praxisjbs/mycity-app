@@ -6,6 +6,8 @@
  *   kinds(actor)                      GET /ai/attachment-kinds: the tiles this person is offered
  *   read(actor, attachment)           the kind's reader on the person's own staged upload, once
  *   kept(md)                          what an answer's metadata keeps of it, for the replay
+ *   shownOf(md)                       the file as the question's bubble and the pane show it: its terms
+ *                                     for the Record tab when its kind draws them (a contract, PR 2)
  *
  * The kinds live in the modules' manifests (`files`), beside their reads: Expenses reads an invoice,
  * Disbursements a payment receipt. A kind is offered only to someone who may make what it becomes
@@ -15,6 +17,7 @@
  * transaction, on its own action and job, and writes nothing; what it read goes to the chat's model
  * as data, never the file.
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { AppError } = require("../../shared/errors");
 const registry = require("../../shared/ai/registry");
@@ -35,6 +38,15 @@ const SAID = Object.freeze({
 
 const forbidden = () => new AppError("ATTACHMENT_FORBIDDEN", "You cannot attach that kind of document", 403, { attachment: ["Not open to you"] });
 const notStaged = () => new AppError("NOT_FOUND", "Upload the file again", 404, { attachment: ["Upload it again"] });
+
+/** A reader's terms for the Record tab (AiAttachmentRecord), or null when it drew none or drew them wrong. */
+function recordOf(record) {
+  if (!record) return null;
+  const parsed = c.assistant.AiAttachmentRecord.safeParse(record);
+  if (parsed.success) return parsed.data;
+  logger.warn({ issues: parsed.error.issues.slice(0, 3) }, "Praxis AI: a document's terms did not parse; the pane shows none");
+  return null;
+}
 
 /** The kinds this person may attach, in the modal's order. */
 async function allowed(actor) {
@@ -57,7 +69,7 @@ async function kinds(actor) {
  * @param {object} actor  req.user
  * @param {{document_id: string, kind: string}} attachment  AiAttachment
  * @returns {Promise<{kind: string, module: string, label: string, question: string, actions: string[], document: object,
- *   outcome: "read"|"unreadable"|"off"|"limit", reading: object|null, card: object|null, notes: string[], said: string|null}>}
+ *   outcome: "read"|"unreadable"|"off"|"limit", reading: object|null, card: object|null, notes: string[], record: object|null, said: string|null}>}
  */
 async function read(actor, attachment) {
   const offered = await allowed(actor);
@@ -85,6 +97,7 @@ async function read(actor, attachment) {
     reading: outcome === "read" && got.reading && typeof got.reading === "object" ? got.reading : null,
     card: outcome === "read" && got.card && got.card.action && f.actions.includes(got.card.action) ? got.card : null,
     notes: outcome === "read" && Array.isArray(got.notes) ? got.notes.filter((n) => typeof n === "string" && n.trim()).slice(0, 3) : [],
+    record: outcome === "read" ? recordOf(got.record) : null,
     said: outcome === "read" ? null : SAID[outcome],
   };
 }
@@ -95,7 +108,7 @@ async function read(actor, attachment) {
  */
 function kept(file) {
   if (!file) return null;
-  return { document: file.document, kind: file.kind, module: file.module, outcome: file.outcome, reading: file.reading, card: file.card };
+  return { document: file.document, kind: file.kind, module: file.module, outcome: file.outcome, reading: file.reading, card: file.card, record: file.record || null };
 }
 
 /** The newest attachment of a conversation's replayed turns, as kept, or null. */
@@ -104,7 +117,8 @@ function latestOf(history) {
   return null;
 }
 
-/** The file a question carried, as its bubble shows it (AiAnswer.attachment), from its answer's metadata. */
-const shownOf = (md) => (md && md.attachment && md.attachment.document ? { document: md.attachment.document, kind: md.attachment.kind } : null);
+/** The file a question carried, as its bubble and the pane show it (AiAnswer.attachment), from its answer's metadata. */
+const shownOf = (md) =>
+  md && md.attachment && md.attachment.document ? { document: md.attachment.document, kind: md.attachment.kind, record: md.attachment.record || null } : null;
 
 module.exports = { kinds, read, kept, latestOf, shownOf, ORDER, SAID };

@@ -6,6 +6,8 @@
  *
  *   the pipeline's stages     the thirteen of MyCity's tracker, each with what it counts as
  *   potential impacts         the tracker's nine
+ *   document kinds            the kinds partnerships.md §4.3 lists, which Upload Document and Praxis AI's
+ *                             Add Partner Document pick from (praxis-ai.md §6.18)
  *   categories                the tracker's twelve partnership types
  *   Events                    its delivery checklist (the Deal Merchant Agreement's five clauses), a
  *                             custom field and the Deal Merchant Agreement rebuilt as its default
@@ -36,6 +38,9 @@ const STAGES = Object.freeze([
   ["Closed Lost", "closed_lost"],
   ["On Hold", "on_hold"],
 ]);
+
+/** What a record's document may be (partnerships.md §4.3), as Upload Document's Kind offers them. */
+const DOCUMENT_KINDS = Object.freeze(["Proposal", "MOU", "Service Agreement", "Contract", "Brief", "Invoice", "Media", "Other"]);
 
 const IMPACTS = Object.freeze([
   "App Downloads & Visibility",
@@ -148,7 +153,7 @@ async function seed({ pool, actor, log = () => {} }) {
   const proof = src("modules/proposals/proposals.proof");
   const repo = src("modules/partner_pipeline/partner_pipeline.repo");
 
-  const n = { stages: 0, impacts: 0, categories: 0, checklist: 0, templates: 0, fields: 0, proof: 0 };
+  const n = { stages: 0, impacts: 0, kinds: 0, categories: 0, checklist: 0, templates: 0, fields: 0, proof: 0 };
 
   for (const [label, meaning] of STAGES) {
     if (await repo.valueByLabel(pool, lists.STAGES, label)) continue;
@@ -159,6 +164,11 @@ async function seed({ pool, actor, log = () => {} }) {
     if (await repo.valueByLabel(pool, "partnership_impact", label)) continue;
     await lists.add(actor, "partnership_impact", { label });
     n.impacts += 1;
+  }
+  for (const label of DOCUMENT_KINDS) {
+    if (await repo.valueByLabel(pool, "partner_document_kind", label)) continue;
+    await lists.add(actor, "partner_document_kind", { label });
+    n.kinds += 1;
   }
   for (const c of CATEGORIES) {
     if (await repo.categoryByName(pool, c.name)) continue;
@@ -199,11 +209,12 @@ async function seed({ pool, actor, log = () => {} }) {
     n.proof += 1;
   }
 
-  log(`partnerships: ${n.stages} stages, ${n.impacts} impacts, ${n.categories} categories, ${n.checklist} checklist items, ${n.fields} field, ${n.templates} template, ${n.proof} proof points`);
+  log(`partnerships: ${n.stages} stages, ${n.impacts} impacts, ${n.kinds} document kinds, ${n.categories} categories, ${n.checklist} checklist items, ${n.fields} field, ${n.templates} template, ${n.proof} proof points`);
 }
 
 module.exports = seed;
 module.exports.STAGES = STAGES;
+module.exports.DOCUMENT_KINDS = DOCUMENT_KINDS;
 module.exports.AGREEMENT = AGREEMENT;
 module.exports.ASKS = ASKS;
 module.exports.CHECKLIST = CHECKLIST;

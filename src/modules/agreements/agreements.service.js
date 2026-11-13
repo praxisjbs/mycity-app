@@ -187,6 +187,51 @@ async function mayOpenFile(client, user, doc) {
   return Boolean(await repo.get(client, doc.entity_id, scope));
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's Record Signed Copy (praxis-ai.md §6.18; partnerships.md §9)
+ * ------------------------------------------------------------------ */
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** An agreement as a card and its question name it: its number and title, as its citation reads. */
+const cardLabel = (a) => `${a.number} ${a.title}`;
+
+/**
+ * The agreements waiting for their signature that the reader sees, on these partners and leads (or
+ * named by these words), newest first: a page of 25.
+ * @param {{query: Function}} db
+ * @param {{partner_ids?: string[], lead_ids?: string[], q?: string|null}} on
+ */
+async function awaitingSignature(db, on, scope) {
+  const page = await repo.awaitingSignature(db, on, scope);
+  return page.data.map(rowOf);
+}
+
+/** The agreement a card records, by number and title for a reader who sees it; its id alone otherwise, which the check refuses. */
+async function cardAgreement(db, id, scope) {
+  if (!UUID.test(String(id || ""))) return [];
+  const a = db ? await repo.get(db, id, scope) : null;
+  return [a ? { type: "agreement", id, label: cardLabel(a) } : { type: "agreement", id }];
+}
+
+/** The agreement waiting for its signature that the words name (its number or title, as a tapped answer reads), or the words as they were. */
+async function agreementIdOf(db, words, scope) {
+  if (UUID.test(String(words || ""))) return words;
+  if (!words || !scope) return words;
+  db = db || pool;
+  const { oneNamed } = require("../../shared/ai/named");
+  const found = oneNamed(await awaitingSignature(db, { q: String(words).slice(0, 100) }, scope), String(words), (a) => [cardLabel(a), a.number, a.title]);
+  if (found) return found.partnership_agreement_id;
+  // A tapped answer is the number and title together: read the waiting agreements as they stand.
+  const all = oneNamed(await awaitingSignature(db, {}, scope), String(words), (a) => [cardLabel(a), a.number, a.title]);
+  return all ? all.partnership_agreement_id : words;
+}
+
+/** What Record Signed Copy's press did, as its result line reads: the agreement, signed, opening Contracts & MOUs. */
+function cardReadback(a) {
+  const routeMap = require("../../shared/route-map");
+  return [{ type: "agreement", id: a.partnership_agreement_id, label: cardLabel(a), status: "signed", link: (routeMap.linkFor("agreement", a.partnership_agreement_id) || {}).path || null }];
+}
+
 /** Conversion moves a lead's agreements to its partner (partners.convert.js, §6.4), in its transaction. */
 async function moveToPartnerIn(client, leadId, partnerId) {
   await client.query("UPDATE partnership_agreement SET partner_id = $2, lead_id = NULL WHERE lead_id = $1", [leadId, partnerId]);
@@ -205,6 +250,11 @@ module.exports = {
   documentOf,
   mayOpenFile,
   moveToPartnerIn,
+  awaitingSignature,
+  cardLabel,
+  cardAgreement,
+  agreementIdOf,
+  cardReadback,
   generate: (actor, scope, body) => lifecycle().generateOne(actor, scope, body),
   update: (actor, scope, id, body) => lifecycle().update(actor, scope, id, body),
   submit: (actor, scope, id) => lifecycle().submit(actor, scope, id),

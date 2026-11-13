@@ -238,7 +238,7 @@ marks:
 - **Pictures**: `![What it shows](shot:<id>)` and, anywhere in the file, a fenced `shot <id>` block:
   `open` (the address), `as` (the demo account: operations, ceo, manager, staff, admin), `device`
   (`both`, `desktop` or `phone`; both unless set), `do` (steps before the picture: `click`, `fill`,
-  `press`, `wait`), `marks` (number: target `|` what it is), `crop` (`page`, `modal`, `viewport`
+  `upload` (a made-up sample under `scripts/ai/samples/` chosen in a file field), `press`, `wait`), `marks` (number: target `|` what it is), `crop` (`page`, `modal`, `viewport`
   or a selector), `prompt` (`keep`: a picture of a prompt that opens once per sign-in, taken in a
   sign-in of its own), `site` (`public`: a public site page, taken signed out on the public app's demo
   build, `open` its address such as `/jobs/<slug>`), `sources` (extra code paths the picture depends on).
@@ -528,6 +528,8 @@ word limits do not count it, as they do not count an article.
 - Who signs off each milestone's chapters before the next PR starts (TB proposed as reviewer).
 
 ## 14 · Change log
+
+- 13/11/2026 · TB · A picture's `do` steps gain `upload: <target> = scripts/ai/samples/<file>`, a made-up sample chosen in a file field (`packages/contract/guide.js`, `scripts/guide/shoot.js`), so Praxis AI's Attach a document pictures a contract's answer (`praxis-ai.md` §6.18, Appendix A PR 2). Only the repository's own samples, never another file.
 
 - 13/11/2026 · JP · The Payroll chapter (M6 PR 8, `docs/manual/payroll.md`, `milestones: M6`): Payroll Runs, Payslips, Deductions and Configurations, the month from New Run to Mark Paid, fines and advances, the pay day, Bank Details Required, statutory figures with their sources, Remove Change and Advanced Payroll; the ESS chapter's My Payslips section (`milestones: M1, M6`); their pictures.
 

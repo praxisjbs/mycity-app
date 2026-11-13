@@ -824,11 +824,13 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
 describe("Attach Document (docs/guides/praxis-ai.md §6.18)", () => {
   const KINDS = "GET /api/v1/ai/attachment-kinds";
   const INVOICE_DOC = { document_id: "00000000-0000-4000-8000-0000000000f1", file_name: "INV-202611-9525.pdf", size_bytes: 52_000, mime_type: "application/pdf" };
-  const withKinds = (kinds: Array<"invoice" | "payment_receipt">, available = true) => {
-    m.data[KINDS] = {
-      kinds: kinds.map((k) => (k === "invoice" ? { kind: k, label: "Invoice", question: "Raise an expense request from this invoice" } : { kind: k, label: "Payment Receipt", question: "Record the payment on this receipt" })),
-      available,
-    };
+  const KIND = {
+    invoice: { label: "Invoice", question: "Raise an expense request from this invoice" },
+    payment_receipt: { label: "Payment Receipt", question: "Record the payment on this receipt" },
+    contract: { label: "Contract or MoU", question: "Summarise this contract and file it" },
+  } as const;
+  const withKinds = (kinds: Array<keyof typeof KIND>, available = true) => {
+    m.data[KINDS] = { kinds: kinds.map((k) => ({ kind: k, ...KIND[k] })), available };
   };
 
   it("offers only the kinds the person may attach, as tiles; Read Document asks the kind's question with the file, and the bubble carries it", async () => {
@@ -847,7 +849,7 @@ describe("Attach Document (docs/guides/praxis-ai.md §6.18)", () => {
             question: "Raise an expense request from this invoice",
             content: "This invoice from JBS Praxis asks for the balance.",
             table: null,
-            attachment: { kind: "invoice", document: INVOICE_DOC },
+            attachment: { kind: "invoice", document: INVOICE_DOC, record: null },
             card: {
               ai_action_draft_id: "00000000-0000-4000-8000-0000000000d9",
               ai_message_id: "00000000-0000-4000-8000-0000000000a1",
@@ -893,6 +895,98 @@ describe("Attach Document (docs/guides/praxis-ai.md §6.18)", () => {
     expect(await screen.findByRole("button", { name: "INV-202611-9525.pdf" })).toBeTruthy();
     expect(screen.getAllByText("Paid to date on INV-202611-9525").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Total").length).toBeGreaterThan(0);
+  });
+
+  it("a contract or MoU: its tile, its terms opening on Record and again from its file's chip, never a Table of the file, and Record Signed Copy (§6.18, PR 2)", async () => {
+    const user = userEvent.setup();
+    withKinds(["invoice", "contract"]);
+    const MOU_DOC = { document_id: "00000000-0000-4000-8000-0000000000f2", file_name: "lagoon-mou-signed.pdf", size_bytes: 64_000, mime_type: "application/pdf" };
+    const { upload } = await import("@/api/upload");
+    vi.mocked(upload).mockResolvedValue(MOU_DOC as never);
+    const terms = {
+      title: "Memorandum of Understanding",
+      items: [
+        { label: "Kind", value: "MOU" },
+        { label: "Parties", value: "MyCity App Ltd (MyCity); Lagoon Youth Fest Limited (Partner)" },
+        { label: "Value", value: "₦2,500,000.00" },
+        { label: "Lagoon Youth Fest Limited", value: "List every ticketed event on MyCityApp." },
+      ],
+    };
+    m.call.mockImplementation(async (key: unknown) =>
+      key === "POST /api/v1/ai/ask"
+        ? answer({
+            question: "Summarise this contract and file it",
+            content: "A memorandum of understanding between MyCity App Ltd and Lagoon Youth Fest Limited.",
+            table: null,
+            link: null,
+            reads: [{ n: 1, key: "file.contract", kind: "read", module_key: "partnerships", params: {}, outcome: "read", rows: 1, total: 1, first: 1, masked: [] }],
+            citations: [{ entity_type: "document", entity_id: MOU_DOC.document_id, label: MOU_DOC.file_name, link: null, read_key: "file.contract" }],
+            citations_total: 1,
+            sources: [{ kind: "record", entity_type: "document", label: MOU_DOC.file_name, count: 1, link: null }],
+            attachment: { kind: "contract", document: MOU_DOC, record: terms },
+            card: {
+              ai_action_draft_id: "00000000-0000-4000-8000-0000000000da",
+              ai_message_id: "00000000-0000-4000-8000-0000000000a1",
+              action_key: "agreements.record_signed_copy",
+              module_key: "partnerships",
+              label: "Record Signed Copy",
+              description: "File an attached contract or MoU as the signed copy of the agreement waiting for its signature",
+              schema: "agreements.AgreementSignedCopyAdd",
+              risk: "approval",
+              confirm: "fresh_sign_in",
+              bulk: 1,
+              values: { partnership_agreement_id: "00000000-0000-4000-8000-0000000000b9", document_id: MOU_DOC.document_id, signed_on: "2026-11-12", signed_by_name: "Ngozi Adebayo", signed_by_title: "Founder" },
+              problems: {},
+              records: [{ type: "agreement", id: "00000000-0000-4000-8000-0000000000b9", label: "AGR-2026-0004 Lagoon Youth Fest MOU", link: "/partnerships?tab=contracts-and-mous" }],
+              names: [{ type: "document", id: MOU_DOC.document_id, label: MOU_DOC.file_name, link: null }],
+              fields: [
+                { name: "partnership_agreement_id", label: "Agreement", kind: "id", required: true, options: null, long: false, picks: null },
+                { name: "document_id", label: "Document", kind: "id", required: true, options: null, long: false, picks: null },
+                { name: "signed_on", label: "Signed On", kind: "date", required: true, options: null, long: false, picks: null },
+                { name: "signed_by_name", label: "Signed By", kind: "text", required: true, options: null, long: false, picks: null },
+              ],
+              suggested: false,
+              status: "shown",
+              expires_at: "2026-10-22T10:00:00.000Z",
+              result: null,
+              created_at: "2026-10-22T09:30:00.000Z",
+            } satisfies AiActionCard,
+          })
+        : {},
+    );
+    ui("ask");
+    await user.click(await screen.findByRole("button", { name: "Attach Document" }));
+    const dialog = await screen.findByRole("dialog");
+    const tile = within(dialog).getByRole("radio", { name: /Contract or MoU/ });
+    expect(tile.textContent).toContain("Signed or to sign");
+    await user.click(tile);
+    fireEvent.change(dialog.querySelector("input[type=file]") as HTMLInputElement, { target: { files: [new File(["%PDF"], MOU_DOC.file_name, { type: "application/pdf" })] } });
+    expect(await within(dialog).findByText(MOU_DOC.file_name)).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Read Document" }));
+    await waitFor(() => expect(asked()).toHaveLength(1));
+    expect(asked()[0]!.body).toMatchObject({ question: "Summarise this contract and file it", attachment: { document_id: MOU_DOC.document_id, kind: "contract" } });
+
+    // The pane opens on Record with the terms; the file read is never a Table.
+    const pane = screen.getByRole("region", { name: "Pane" });
+    await waitFor(() => expect(within(pane).getByRole("tab", { name: "Record" }).getAttribute("aria-selected")).toBe("true"));
+    expect(within(pane).getByRole("heading", { name: "Memorandum of Understanding" })).toBeTruthy();
+    expect(within(pane).getByText("₦2,500,000.00")).toBeTruthy();
+    expect(within(pane).getByText("List every ticketed event on MyCityApp.")).toBeTruthy();
+    // The file read is listed on Sources, never offered as a Table.
+    const table = within(pane).getByRole("tab", { name: "Table" });
+    expect(table.getAttribute("aria-disabled") === "true" || table.hasAttribute("disabled")).toBe(true);
+    await user.click(within(pane).getByRole("tab", { name: "Sources" }));
+    expect(within(pane).queryByRole("button", { name: "Open Table" })).toBeNull();
+    // The file's From chip opens the terms again.
+    await user.click(within(pane).getByRole("tab", { name: "Sources" }));
+    const reply = screen.getByRole("article", { name: "Answer" });
+    await user.click(within(reply).getByRole("button", { name: /lagoon-mou-signed\.pdf/ }));
+    await waitFor(() => expect(within(pane).getByRole("tab", { name: "Record" }).getAttribute("aria-selected")).toBe("true"));
+    // The card: Record Signed Copy, its agreement as its chip.
+    expect(screen.getAllByText("Record Signed Copy").length).toBeGreaterThan(0);
+    // The agreement reads by name, as the card's chip and on its Agreement field.
+    expect(screen.getAllByText("AGR-2026-0004 Lagoon Youth Fest MOU").length).toBeGreaterThan(0);
+    expect(m.call.mock.calls.some((c) => c[0] === "GET /api/v1/ai/answers/:id/reads/:n")).toBe(false);
   });
 
   it("a member of staff is offered the Invoice alone; a Word file is refused at upload", async () => {

@@ -525,6 +525,29 @@ async function signedCopy(actor, scope, id, body) {
   return service().get(id, scope, actor);
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI's Record Signed Copy (praxis-ai.md §6.18; partnerships.md §9)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Record Signed Copy's card, checked before the press as the route's own service will check it: the
+ * agreement is one the reader sees (else 404) and waits for its signature (Sent or Viewed, or
+ * approved and not yet sent), so a card on a draft or a signed agreement is refused on its field.
+ */
+async function assertSignable(client, id, scope) {
+  const a = await service().visibleIn(client, id, scope);
+  const approvedNow = a.status === "approval" && (await approval.isApproved(client, a));
+  if (!approvedNow && !["sent", "viewed"].includes(a.status))
+    throw refused("NOT_APPROVED", "Only an approved agreement can be recorded as signed", 409, { partnership_agreement_id: ["Not awaiting a signature"] });
+}
+
+/** The card's press: Record Signed Copy's own request for the agreement it names. */
+function signedCopyCard(actor, values) {
+  const { partnership_agreement_id: id, ...rest } = values;
+  const body = require("../../shared/http/validate").parseBody(require("@mycity/contract").agreements.SignedCopyRecord, rest);
+  return signedCopy(actor, actor.scope, id, body);
+}
+
 /** The suggested Send for Signature signers: the record's signatory contact, then MyCity's when countersigned. */
 async function suggestedSigners(db, a, countersigned) {
   const out = [];
@@ -567,6 +590,8 @@ module.exports = {
   send,
   resend,
   signedCopy,
+  assertSignable,
+  signedCopyCard,
   suggestedSigners,
   verifyOf,
   catalogOf,

@@ -23,6 +23,14 @@
       "phone"
     ]
   },
+  "praxis-attach-contract": {
+    "spec": "197a60e7ea348f2f",
+    "source": "57c7e2adcc47b446",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "praxis-card": {
     "spec": "7b51d75761db25cc",
     "source": "e3b0c44298fc1c14",

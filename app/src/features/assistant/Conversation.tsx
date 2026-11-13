@@ -9,7 +9,7 @@ import { AnswerBubble, Button, DataView, EmptyState, ErrorState, Form, Icon, Ico
 import { useFileViewer } from "@/features/shared/files";
 import { AnswerCard } from "./Card";
 import { AttachDocument, type Attached } from "./Attach";
-import { paneHas, pickForSource, type PanePick } from "./Pane";
+import { fileRecordOf, paneHas, pickForSource, type PanePick } from "./Pane";
 
 /** Praxis AI's conversation (docs/guides/praxis-ai.md §10): what is asked, what came back, and the box. */
 
@@ -341,15 +341,21 @@ function Answer({ a, feedback, onFeedback, onNext, onChoose, onPane, paneOpen, o
         key={`record:${s.entity_type}`}
         kind="record"
         label={s.label}
-        onSelect={onPane ? () => onPane(a, { tab: "record", record: { title: s.label, items: [], link: s.link } }) : s.link ? () => navigate(s.link!) : undefined}
+        onSelect={
+          onPane
+            ? () => onPane(a, s.entity_type === "document" && fileRecordOf(a) ? pickForSource(a, "document") : { tab: "record", record: { title: s.label, items: [], link: s.link } })
+            : s.link
+              ? () => navigate(s.link!)
+              : undefined
+        }
       />
     ) : (
       <SourceChip key={`type:${s.entity_type}`} label={s.label} count={s.count} onSelect={onPane ? () => onPane(a, pickForSource(a, s.entity_type)) : undefined} />
     ),
   );
-  // A question is its words and its answers to tap; Open Figures only where there are figures or a table (§10.1).
+  // A question is its words and its answers to tap; Open Figures only where there are figures, a table or a document's terms (§10.1).
   const asks = a.choices.length > 0;
-  const figures = Boolean(a.overview || a.table?.rows.length);
+  const figures = Boolean(a.overview || a.table?.rows.length || fileRecordOf(a));
   return (
     <AnswerBubble
       text={a.content}

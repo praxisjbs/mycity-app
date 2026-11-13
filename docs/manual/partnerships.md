@@ -335,6 +335,9 @@ The table marks the main contact **Primary** and a signer **Signs**.
 
 Signed agreements, signed copies and proposals are filed here for you.
 
+> **Tip:** You can also attach a contract or MoU in Praxis AI. It sums the document up and files it
+> here with **Add Partner Document** ([Attach a document](#praxis-ask-attach)).
+
 ### Enter a month's returns {#partnerships-partners-returns needs="partnerships edit, cap partnerships.money"}
 
 Returns are what a partner's deal earned in a month.
@@ -677,6 +680,10 @@ If a signer declines, a line says so with their reason. If the link expires, the
 
 The agreement reads **Signed Outside the Hub**. It is filed and the lead converts, as for a signature
 made on screen.
+
+> **Tip:** Attach the signed copy in Praxis AI instead, and it finds the agreement waiting for its
+> signature and draws **Record Signed Copy** with the day and the signer filled
+> ([Attach a document](#praxis-ask-attach)).
 
 ### Renew an agreement {#partnerships-contracts-renew needs="partnerships edit"}
 
