@@ -18,8 +18,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M5 Offers and Onboarding, part 2: Documentation and Onboarding (6:41, 11 chapters) | `m5-onboarding-2.js` | Made and uploaded 12/11/2026 | [Part 2](https://drive.google.com/file/d/1QehhMb7Q3N4-sDeIteZroX3u8YeTy_q5/view?usp=drivesdk) |
 | M6 Payroll, part 1: Payroll Runs and Payslips (about 7 min) | `m6-payroll-1.js`, to write | Planned 13/11/2026 (§8) | |
 | M6 Payroll, part 2: Deductions, Configurations and My Payslips (about 6 min) | `m6-payroll-2.js`, to write | Planned 13/11/2026 (§8) | |
-| M8 Expenses, part 1: Raising and Approving (about 7:50, 9 chapters) | `m8-expenses-1.js` | Made 13/11/2026 (§8) | |
-| M8 Expenses, part 2: Paying and Budgets (about 6:30, 10 chapters) | `m8-expenses-2.js` | Made 13/11/2026 (§8) | |
+| M8 Expenses, part 1: Raising and Approving (8:19, 9 chapters) | `m8-expenses-1.js` | Made 13/11/2026, sent to TB; to upload (§5) | |
+| M8 Expenses, part 2: Paying and Budgets (6:04, 10 chapters) | `m8-expenses-2.js` | Made 13/11/2026, sent to TB; to upload (§5) | |
 | M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 | M10 Praxis AI, part 2: Praxis AI and AI Control (7:00, 10 chapters) | `m10-praxis-ai.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 
@@ -340,7 +340,7 @@ listed here and in `docs/PROGRESS.md`.
 
 **13/11/2026 · TB (with Claude).** Both Milestone 8 videos written, filmed and assembled on one
 development database, the same day, from M8's own `prepare` (§4.1): part 1, Raising and Approving
-(9 chapters) and part 2, Paying and Budgets (10 chapters). Decided by TB: two videos; MyCity's real
+(8:19, 9 chapters, -16.4 LUFS) and part 2, Paying and Budgets (6:04, 10 chapters, -16.5 LUFS). Decided by TB: two videos; MyCity's real
 staff throughout ("Use real employees. Make it feel so real"); every AI feature; JBS Praxis's real
 invoice INV-202611-9525, which TB shared, read by Read Invoice. Aaron Agama raises a request on his
 phone (Suggest Category, Use My Company Account); Bode Oluwasanmi raises the invoice (Read Invoice: six
@@ -356,7 +356,8 @@ minus lines in parallel and the branches were joined. The tooling learnt §6.22 
 `prepare`, and EXP-, REQ-, DSB-, JBS, PDF, DTT and an invoice's number in `SAID`.
 
 - [x] Write, film and check both M8 videos (13/11/2026).
-- [ ] Upload both to Drive (§5) and add their links to the table at the top.
+- [ ] Upload both to Drive (§5) and add their links to the table at the top. Sent to TB in the chat: the Drive
+      connector a session holds takes files of 10 MB at most, and these are 19 and 16 MB.
 
 **13/11/2026 · JP (with Claude). The Milestone 6 plan**, written once the screens were final (`docs/guides/payroll.md`
 Appendix A, PR 8). Nothing filmed yet. Two videos, as M4, M5 and M10. The chapter list follows the guide's demo
