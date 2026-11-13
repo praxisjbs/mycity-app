@@ -291,13 +291,18 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
     const staff = await userOf("staff");
     // Every login holds ess and performance (own), workspace, partnerships and expenses (own): those summaries are
     // offered, the partnerships' and the budgets' over their own records (partnerships.md §8, §9; budgets as
-    // Budgets shows them, none for staff); the people's and the log's are not.
+    // Budgets shows them, none for staff), the requests' over their own, requisitions and disbursements with no
+    // figures (expenses.finance only), and their own pay (my_pay); the people's, payroll's and the log's are not.
     expect((await authorise.allowedSummaries(staff)).map((s) => s.key).sort()).toEqual([
       "approvals.summary",
       "budgets.summary",
+      "disbursements.summary",
+      "expenses.summary",
       "goals.summary",
+      "my_pay.summary",
       "partnership_returns.summary",
       "partnerships.summary",
+      "requisitions.summary",
       "reviews.summary",
       "sample.count",
       "sample.slow",

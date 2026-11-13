@@ -109,6 +109,21 @@ const DeductionListQuery = listQuery(
   },
   ["created", "employee", "amount"],
 );
+
+/**
+ * The assistant's deductions summary (docs/guides/praxis-ai.md §6.13, Finance and pay): the tab's own
+ * filters and the grouping asked first (the others follow). Figures, never a row.
+ */
+const DeductionSummaryBy = z.enum(["source", "status", "department", "month"]);
+const DeductionSummaryQuery = z
+  .object({
+    status: DeductionStatus.optional(),
+    source: DeductionSource.optional(),
+    employee_id: uuid.optional(),
+    month: month.optional(),
+    by: DeductionSummaryBy.default("source"),
+  })
+  .strict();
 const DeductionPage = Paged(DeductionRow);
 
 /** How many, and how much: one figure above the tab. `pay_amount` is null below the salary grant. */
@@ -190,6 +205,7 @@ const TABLES = {
     reason: "a union of attendance_pay_item, sanction_fine and payroll_deduction rows, each read as its owner reads it",
   },
   DeductionListQuery: { table: null, reason: "list controls for the Deductions tab" },
+  DeductionSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's deductions summary; figures, never a row" },
   DeductionPage: { table: null, reason: "a page of deductions" },
   DeductionFigure: { table: null, reason: "a count and an amount over deductions" },
   DeductionSummary: { table: null, reason: "figures over the deductions" },
@@ -225,6 +241,8 @@ module.exports = {
   InstalmentStatus,
   DeductionRow,
   DeductionListQuery,
+  DeductionSummaryBy,
+  DeductionSummaryQuery,
   DeductionPage,
   DeductionFigure,
   DeductionSummary,

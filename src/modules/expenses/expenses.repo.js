@@ -214,6 +214,125 @@ async function mineSummary(db, employeeId, yearStart) {
   return rows[0];
 }
 
+/** The groupings the assistant's requests summary offers beside its status: the SQL of each row's key and words. */
+const SUMMARY_DIMS = Object.freeze({
+  category: { key: "x.expense_category_id::text", label: "x.category" },
+  department: { key: "COALESCE(x.department_id::text, 'none')", label: "COALESCE(x.department, 'No department')" },
+  project: { key: "COALESCE(x.project_id::text, 'none')", label: "COALESCE(x.project, 'No project')" },
+  payee_type: { key: "x.payee_type", label: "x.payee_type" },
+});
+
+/**
+ * The assistant's requests summary (docs/guides/praxis-ai.md §6.13, Finance and pay) in one statement:
+ * the requests of the reader's audience (their own with `mine`; those whose approval's stage names them
+ * now with `waiting_on_me`, as waitingOn() reads them; otherwise those within their scope, somebody
+ * else's draft left out, as list() does), sent within the period (a draft by the day it was made), with
+ * the list's filters. The figures, the requests by status, by `dim` with what is paid, approved and
+ * waiting, the top ten requesters, and asked and paid by month. Groups cut to 20 by row_number().
+ * Figures, never a row.
+ * @param {{query: Function}} db
+ * @param {object} q  ExpenseSummaryQuery with `dim`, and the period the service worked out (`from` and `to`, or neither)
+ * @param {{user_id: string, employee_id?: string|null, role_ids?: string[], is_ceo?: boolean}} user
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(db, q, user, scope) {
+  const dim = SUMMARY_DIMS[q.dim] || SUMMARY_DIMS.category;
+  const params = [];
+  const add = (value) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+  let audience;
+  if (q.mine) audience = `AND er.employee_id = ${add(user.employee_id || null)}::uuid`;
+  else if (q.waiting_on_me) {
+    const roleCodes = await approvers.roleCodesOf(db, user.role_ids || []);
+    const clause = approvers.waitingOnClause("wi", user, roleCodes, params);
+    audience = `AND er.status = 'submitted' AND wi.state = 'pending' AND wi.definition_key = 'expenses.request' AND ${clause}`;
+  } else {
+    const s = scopeClause(scope, { column: "er.employee_id" }, params);
+    audience = `AND (er.status <> 'draft' OR er.employee_id = ${add(user.employee_id || null)}::uuid) ${s.and}`;
+  }
+  const period = q.from
+    ? `AND (COALESCE(er.submitted_at, er.created_at) AT TIME ZONE 'Africa/Lagos')::date BETWEEN ${add(q.from)}::date AND ${add(q.to)}::date`
+    : "";
+  const where = [];
+  if (q.status) where.push(`x.status = ${add(q.status)}`);
+  if (q.expense_category_id) where.push(`x.expense_category_id = ${add(q.expense_category_id)}::uuid`);
+  if (q.project_id) where.push(`x.project_id = ${add(q.project_id)}::uuid`);
+  if (q.department_id) where.push(`x.department_id = ${add(q.department_id)}::uuid`);
+  if (q.payee_type) where.push(`x.payee_type = ${add(q.payee_type)}`);
+  if (q.over_budget !== undefined) where.push(`x.over_budget = ${add(q.over_budget)}::boolean`);
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT er.expense_request_id, er.employee_id, er.amount, ${STATUS} AS status,
+              er.expense_category_id, ec.name AS category, er.project_id, pr.name AS project,
+              er.department_id, rd.name AS department, er.payee_type, er.over_budget,
+              er.submitted_at, er.disbursed_at, COALESCE(wi.stage_entered_at, er.submitted_at) AS waiting_since,
+              btrim(e.first_name || ' ' || e.last_name) AS requester
+         FROM expense_request er
+         JOIN employee e ON e.employee_id = er.employee_id
+         JOIN expense_category ec ON ec.expense_category_id = er.expense_category_id
+         LEFT JOIN project pr ON pr.project_id = er.project_id
+         LEFT JOIN department rd ON rd.department_id = er.department_id
+         LEFT JOIN requisition r ON r.requisition_id = er.requisition_id
+         LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = er.workflow_instance_id
+         LEFT JOIN workflow_instance rwi ON rwi.workflow_instance_id = r.workflow_instance_id
+        WHERE true ${audience} ${period}
+     ), f AS (
+       SELECT x.* FROM x WHERE true ${where.length ? `AND ${where.join(" AND ")}` : ""}
+     ), figures AS (
+       SELECT count(*)::int AS requests,
+              COALESCE(sum(amount) FILTER (WHERE status NOT IN ('draft', 'cancelled')), 0)::numeric(18,2) AS asked,
+              COALESCE(sum(amount) FILTER (WHERE status IN ('approved', 'in_requisition', 'authorised')), 0)::numeric(18,2) AS approved,
+              COALESCE(sum(amount) FILTER (WHERE status = 'disbursed'), 0)::numeric(18,2) AS paid,
+              count(*) FILTER (WHERE status = 'submitted')::int AS waiting,
+              COALESCE(sum(amount) FILTER (WHERE status = 'submitted'), 0)::numeric(18,2) AS waiting_amount,
+              count(*) FILTER (WHERE status = 'sent_back')::int AS sent_back,
+              count(*) FILTER (WHERE status = 'rejected')::int AS rejected,
+              count(*) FILTER (WHERE over_budget AND status NOT IN ('draft', 'cancelled', 'rejected'))::int AS over_budget,
+              floor(extract(epoch FROM now() - min(waiting_since) FILTER (WHERE status = 'submitted')) / 86400)::int AS oldest_waiting_days
+         FROM f
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, min(${dim.label}) AS label, count(*)::int AS n,
+              COALESCE(sum(x.amount) FILTER (WHERE x.status = 'disbursed'), 0)::numeric(18,2) AS paid,
+              COALESCE(sum(x.amount) FILTER (WHERE x.status IN ('approved', 'in_requisition', 'authorised')), 0)::numeric(18,2) AS approved,
+              COALESCE(sum(x.amount) FILTER (WHERE x.status IN ('submitted', 'sent_back')), 0)::numeric(18,2) AS waiting,
+              row_number() OVER (ORDER BY COALESCE(sum(x.amount) FILTER (WHERE x.status NOT IN ('draft', 'cancelled', 'rejected')), 0) DESC,
+                                          count(*) DESC, min(${dim.label}), ${dim.key}) AS rank
+         FROM f x GROUP BY ${dim.key}
+     ), requesters AS (
+       SELECT employee_id::text AS key, min(requester) AS label, count(*)::int AS n,
+              COALESCE(sum(amount) FILTER (WHERE status NOT IN ('draft', 'cancelled')), 0)::numeric(18,2) AS asked,
+              row_number() OVER (ORDER BY COALESCE(sum(amount) FILTER (WHERE status NOT IN ('draft', 'cancelled')), 0) DESC,
+                                          count(*) DESC, min(requester), employee_id) AS rank
+         FROM f GROUP BY employee_id
+     )
+     SELECT (SELECT row_to_json(t) FROM figures t) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', amount, 'count', n) ORDER BY n DESC, status)
+               FROM (SELECT status, count(*)::int AS n, COALESCE(sum(amount), 0)::numeric(18,2) AS amount FROM f GROUP BY status) s) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'count', n, 'paid', paid, 'approved', approved, 'waiting', waiting) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', asked, 'count', n) ORDER BY rank)
+               FROM requesters WHERE rank <= 10) AS requesters,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at)
+               FROM (SELECT to_char(submitted_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, sum(amount)::numeric(18,2) AS value
+                       FROM f WHERE submitted_at IS NOT NULL AND status NOT IN ('draft', 'cancelled') GROUP BY 1) a) AS asked,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at)
+               FROM (SELECT to_char(disbursed_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, sum(amount)::numeric(18,2) AS value
+                       FROM f WHERE status = 'disbursed' AND disbursed_at IS NOT NULL GROUP BY 1) p) AS paid`,
+    params,
+  );
+  const row = rows[0] || {};
+  return {
+    figures: row.figures || {},
+    by_status: row.by_status || [],
+    by_dim: row.by_dim || [],
+    requesters: row.requesters || [],
+    asked: row.asked || [],
+    paid: row.paid || [],
+  };
+}
+
 /** One request with what its modal and the service need, or null. */
 async function get(db, id) {
   const { rows } = await db.query(`SELECT ${FULL_OUT} FROM (${ROWS}) v WHERE v.expense_request_id = $1`, [id]);
@@ -581,6 +700,7 @@ module.exports = {
   waitingOn,
   approvalsSummary,
   mineSummary,
+  aiSummary,
   get,
   lines,
   lock,

@@ -234,9 +234,23 @@ const PayrollAdjustmentAdd = z
 
 /**
  * `payroll.month`, the assistant's month summary: a month's first day, the newest run's month when it is
- * left out. Figures, never a row.
+ * left out, and which grouping of its payslips comes first (both are given). Figures, never a row.
  */
-const PayrollMonthQuery = z.object({ period: monthStart("Pick a month").optional() }).strict();
+const PayrollMonthBy = z.enum(["department", "status"]);
+const PayrollMonthQuery = z.object({ period: monthStart("Pick a month").optional(), by: PayrollMonthBy.default("department") }).strict();
+
+/**
+ * `payroll.trend`, the assistant's runs over time (docs/guides/praxis-ai.md §6.13, Finance and pay): a
+ * calendar year (this Lagos year when nothing is asked), or the first days of two months, at most 24
+ * months apart (a longer span is cut to the 24 ending at `to`). Figures, never a row.
+ */
+const PayrollTrendQuery = z
+  .object({
+    year: z.coerce.number().int().min(2020).max(2100).optional(),
+    from: monthStart("Pick a month").optional(),
+    to: monthStart("Pick a month").optional(),
+  })
+  .strict();
 
 /**
  * Submit for Approval as a card names it: the run, and the net the person saw (`PayrollRunSubmit`'s own
@@ -373,6 +387,7 @@ const TABLES = {
   PayrollAdjustmentPage: { table: null, reason: "a page of a run's adjustments" },
   PayrollAdjustmentAdd: { table: "payroll_adjustment" },
   PayrollMonthQuery: { table: null, reason: "which month the assistant's payroll summary covers; figures, never a row" },
+  PayrollTrendQuery: { table: null, reason: "which months the assistant's payroll trend covers; figures, never a row" },
   PayrollRunSubmission: {
     table: "payroll_run",
     virtual: { expected_net_total: "the net the person saw, compared with the recomputed payroll_run.net_total" },
@@ -419,7 +434,9 @@ module.exports = {
   PayrollAdjustmentPage,
   PayrollAdjustmentParams,
   PayrollAdjustmentAdd,
+  PayrollMonthBy,
   PayrollMonthQuery,
+  PayrollTrendQuery,
   PayrollRunSubmission,
   PayrollRunAdjust,
   PayrollSettingsVersion,

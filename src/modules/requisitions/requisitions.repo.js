@@ -62,6 +62,43 @@ async function list(db, query, user) {
   );
 }
 
+/**
+ * The assistant's requisitions summary (docs/guides/praxis-ai.md §6.13, Finance and pay) in one
+ * statement: the requisitions sent within the period, with a status if asked (the status worked out
+ * with the CEO's approval, as the list does), their figures, by status, and their total by month.
+ * Figures, never a row. The service decides who may read it, as the list's read does.
+ * @param {{query: Function}} db
+ * @param {{status?: string, from: string, to: string}} q
+ */
+async function aiSummary(db, q) {
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT r.requisition_id, r.total_amount, r.submitted_at, ${STATUS} AS status,
+              (SELECT count(*)::int FROM expense_request er WHERE er.requisition_id = r.requisition_id) AS requests
+         FROM requisition r
+         LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = r.workflow_instance_id
+        WHERE (COALESCE(r.submitted_at, r.created_at) AT TIME ZONE 'Africa/Lagos')::date BETWEEN $2::date AND $3::date
+     ), f AS (
+       SELECT * FROM x WHERE ($1::text IS NULL OR status = $1)
+     )
+     SELECT (SELECT json_build_object(
+               'requisitions', count(*)::int,
+               'requests', COALESCE(sum(requests), 0)::int,
+               'total', COALESCE(sum(total_amount), 0)::numeric(18,2),
+               'waiting', count(*) FILTER (WHERE status = 'submitted')::int,
+               'approved', count(*) FILTER (WHERE status = 'approved')::int,
+               'declined', count(*) FILTER (WHERE status = 'rejected')::int) FROM f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', total, 'count', n) ORDER BY n DESC, status)
+               FROM (SELECT status, count(*)::int AS n, COALESCE(sum(total_amount), 0)::numeric(18,2) AS total FROM f GROUP BY status) s) AS by_status,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at)
+               FROM (SELECT to_char(submitted_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, sum(total_amount)::numeric(18,2) AS value
+                       FROM f WHERE submitted_at IS NOT NULL GROUP BY 1) m) AS by_month`,
+    [q.status || null, q.from, q.to],
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_status: row.by_status || [], by_month: row.by_month || [] };
+}
+
 /** One requisition as the list shows it, for this reader, or null. */
 async function get(db, id, user) {
   const params = [];
@@ -112,4 +149,4 @@ async function userOfEmployee(db, employeeId) {
   return rows[0] ? rows[0].user_id : null;
 }
 
-module.exports = { userOfEmployee, list, get, lock, insert, setWorkflow, setTotal, settle };
+module.exports = { userOfEmployee, list, aiSummary, get, lock, insert, setWorkflow, setTotal, settle };
