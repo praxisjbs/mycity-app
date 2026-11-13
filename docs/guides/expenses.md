@@ -454,8 +454,21 @@ requester always sees theirs.
   Committed within its allocation, Remaining, and Over Budget past it, within the reader's `expenses`
   scope as Budgets applies it (a head their department's, staff none), and paid by month.
   `budgets.list` and `budgets.projects` name it as their summary.
-  `expenses.summary`, `requisitions.summary` and `disbursements.summary` (PR 4) answer the
-  requests, requisitions, disbursements and categories reads. Each read names its summary.
+  `expenses.summary`, `requisitions.summary` and `disbursements.summary` (built 13/11/2026, PR 4;
+  each in its module's `.ai.js`, one SQL in its repo through its service's `aiSummary`; the figures,
+  groups and series are `praxis-ai.md` §6.13's Finance and pay table):
+  - `expenses.summary` answers `expenses.mine`, `expenses.list`, `expenses.approvals` and
+    `expense_categories.list`: requests and their amounts asked, approved, paid and waiting, by
+    status and by category, department, project or payee type, each row stacked Paid, Approved and
+    Waiting, the top requesters, and asked and paid by month. Its audience is the read's own:
+    `mine` the person's requests, `waiting_on_me` what waits on them at their stage (the stage as
+    `expenses.approvals` reads it), else the requests within their `expenses` scope with somebody
+    else's draft left out (§8).
+  - `requisitions.summary` answers `requisitions.list` and `disbursements.summary` answers
+    `disbursements.list`, for a holder of `expenses.finance` (anyone else gets no figures, as the
+    reads give them an empty page): requisitions by status and their total by month; payments by
+    category, department or payee type, the references missing, what is authorised and not yet
+    paid, the average days from authorised to paid, and amount paid by day, week or month.
 
 ## 10 · On screen and mobile
 
@@ -525,6 +538,7 @@ None.
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · `expenses.summary`, `requisitions.summary` and `disbursements.summary` built (`praxis-ai.md` Appendix B PR 4, §9): Praxis AI charts requests by status, category, department, project or payee type (stacked Paid, Approved, Waiting), requisitions by status and payments by category or month, each within the reader's audience and scope as its list shows it.
 - 13/11/2026 · JP · `budgets.summary` built (`praxis-ai.md` Appendix B PR 1, §9): Praxis AI charts a year's budgets by department or category as stacked bars (Spent, Committed, Remaining, Over Budget), by project for scope all, and reads budget amounts in naira.
 - 13/11/2026 · JP · Charts in the Overview planned (`praxis-ai.md` decisions 49 to 58, Appendix B): Budgets' summary with stacked bars in PR 1, the requests', requisitions' and disbursements' summaries in PR 4 (§9). Nothing built yet.
 - 13/11/2026 · TB · Documents in the chat built (`praxis-ai.md` Appendix A PR 1, §9): an invoice on Praxis AI becomes a New Request card for its balance due, a receipt a Record Disbursement card. §6.1 rule 1: a line may carry a negative unit price and a request's total is above zero, `EXPENSE_TOTAL_NOT_POSITIVE` replacing `AMOUNT_REQUIRED`, with migration 8030 dropping 8010's CHECKs on a line's price and amount (§4). Read Invoice fills the payee's bank (§5). New Request's lines are the shared `LinesField` (§10.1: a minus taken on a unit price, the total under the lines).

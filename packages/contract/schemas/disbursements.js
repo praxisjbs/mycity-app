@@ -45,6 +45,21 @@ const DisbursementListQuery = listQuery(
 );
 const DisbursementPage = Paged(Disbursement);
 
+/**
+ * The assistant's disbursements summary (docs/guides/praxis-ai.md §6.13, Finance and pay): the list's
+ * filter (a JSON boolean here), a period on the day paid, and the grouping. Figures, never a row.
+ */
+const DisbursementSummaryBy = z.enum(["category", "department", "payee_type", "day", "week", "month"]);
+const DisbursementSummaryQuery = z
+  .object({
+    reference_missing: z.boolean().optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "must be a month as YYYY-MM").optional(),
+    by: DisbursementSummaryBy.default("category"),
+  })
+  .strict();
+
 /** Record Disbursement, for one authorised request. */
 const DisbursementCreate = z
   .object({
@@ -103,6 +118,7 @@ const TABLES = {
   },
   DisbursementListQuery: { table: null, reason: "list controls for the disbursements" },
   DisbursementPage: { table: null, reason: "a page of disbursements" },
+  DisbursementSummaryQuery: { table: null, reason: "the filter, period and grouping of the assistant's disbursements summary; figures, never a row" },
   DisbursementCreate: {
     table: "disbursement",
     virtual: { confirm_without_reference: "the person chose Save Without Reference" },
@@ -114,6 +130,8 @@ module.exports = {
   TABLES,
   Disbursement,
   DisbursementListQuery,
+  DisbursementSummaryBy,
+  DisbursementSummaryQuery,
   DisbursementPage,
   DisbursementCreate,
   DisbursementReference,

@@ -230,6 +230,12 @@ const PayslipBatchVars = z
 /** GET /ess/payslips and the summary: the year to read (this Lagos year when absent). */
 const EssPayslipQuery = listQuery({ year: z.coerce.number().int().min(2020).max(2100).optional() });
 
+/**
+ * `my_pay.summary`, the assistant's figures over the person's own published payslips of a year (this Lagos
+ * year when left out; docs/guides/praxis-ai.md §6.13, Finance and pay). Figures, never a row.
+ */
+const MyPaySummaryQuery = z.object({ year: z.coerce.number().int().min(2020).max(2100).optional() }).strict();
+
 /** The cards above My Payslips: the year's gross, Net Received, how many payslips, what was deducted, and the next pay day. */
 const EssPayslipSummary = z
   .object({
@@ -317,6 +323,7 @@ const TABLES = {
   PayslipVars: { table: null, reason: "template variables of the payslip document" },
   PayslipBatchVars: { table: null, reason: "template variables of the Download All document" },
   EssPayslipQuery: { table: null, reason: "list controls for the person's own payslips" },
+  MyPaySummaryQuery: { table: null, reason: "the year of the assistant's summary of the person's own payslips; figures, never a row" },
   EssPayslipSummary: { table: null, reason: "figures over the person's own payslips for a year" },
   EssDeductionRow: {
     table: "payroll_deduction_instalment",
@@ -354,6 +361,7 @@ module.exports = {
   PayslipVars,
   PayslipBatchVars,
   EssPayslipQuery,
+  MyPaySummaryQuery,
   EssPayslipSummary,
   EssDeductionRow,
   EssDeductionPage,

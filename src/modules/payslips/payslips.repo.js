@@ -184,6 +184,38 @@ function summaryOwn(db, employeeId, year) {
   );
 }
 
+/**
+ * `my_pay.summary` (docs/guides/praxis-ai.md §6.13, Finance and pay) in one statement over the person's own
+ * published payslips of a year: their count and totals, what fines and advance repayments took, the deduction
+ * lines by their code, and each month's gross, deductions and net, oldest first (twelve at most).
+ * @param {{query: Function}} db
+ * @param {string} employeeId
+ * @param {number} year
+ */
+function myPay(db, employeeId, year) {
+  return one(
+    db,
+    `WITH p AS (
+       SELECT p.payslip_id, r.period, p.earnings_total, p.deductions_total, p.net_pay
+         FROM payslip p JOIN payroll_run r ON r.payroll_run_id = p.payroll_run_id
+        WHERE p.employee_id = $1 AND p.status = 'published' AND date_part('year', r.period)::int = $2
+     ), l AS (
+       SELECT l.code, l.amount FROM payslip_line l JOIN p ON p.payslip_id = l.payslip_id WHERE l.kind = 'deduction'
+     )
+     SELECT (SELECT json_build_object('payslips', count(*)::int,
+                                      'gross', COALESCE(sum(earnings_total), 0)::numeric(18,2),
+                                      'deductions', COALESCE(sum(deductions_total), 0)::numeric(18,2),
+                                      'net', COALESCE(sum(net_pay), 0)::numeric(18,2)) FROM p) AS figures,
+            (SELECT json_build_object('fines', COALESCE(sum(amount) FILTER (WHERE code = 'fine'), 0)::numeric(18,2),
+                                      'advances', COALESCE(sum(amount) FILTER (WHERE code = 'advance'), 0)::numeric(18,2)) FROM l) AS taken,
+            (SELECT json_agg(json_build_object('key', code, 'value', amount, 'count', n) ORDER BY amount DESC, code)
+               FROM (SELECT code, count(*)::int AS n, sum(amount)::numeric(18,2) AS amount FROM l GROUP BY code) x) AS by_reason,
+            (SELECT json_agg(json_build_object('at', to_char(period, 'YYYY-MM'), 'gross', earnings_total, 'deductions', deductions_total, 'net', net_pay) ORDER BY period)
+               FROM p) AS points`,
+    [employeeId, year],
+  );
+}
+
 /** Whether the run of a month is paid (Next Payday skips a month that has had its payday). */
 async function periodPaid(db, period) {
   const r = await one(db, `SELECT 1 AS paid FROM payroll_run WHERE period = $1::date AND status = 'paid'`, [period]);
@@ -373,6 +405,7 @@ module.exports = {
   listOwn,
   getOwn,
   summaryOwn,
+  myPay,
   periodPaid,
   deductionsOwn,
   printRowsOfRun,

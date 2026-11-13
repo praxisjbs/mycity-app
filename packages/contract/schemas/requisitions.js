@@ -8,7 +8,7 @@
  * Statuses: submitted (with the CEO), approved, rejected, cancelled (every request removed).
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, money, listQuery, Paged } = require("./common");
+const { uuid, text, isoDate, isoDateTime, money, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
 const { ExpenseRow } = require("./expenses");
 
@@ -41,6 +41,21 @@ const RequisitionListQuery = listQuery(
   ["submitted_at", "total_amount", "number"],
 );
 const RequisitionPage = Paged(Requisition);
+
+/**
+ * The assistant's requisitions summary (docs/guides/praxis-ai.md §6.13, Finance and pay): a status,
+ * a period on the day sent, and the grouping. Figures, never a row.
+ */
+const RequisitionSummaryBy = z.enum(["status", "month"]);
+const RequisitionSummaryQuery = z
+  .object({
+    status: RequisitionStatus.optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "must be a month as YYYY-MM").optional(),
+    by: RequisitionSummaryBy.default("status"),
+  })
+  .strict();
 
 /** Create Requisition: the approved requests ticked, 1 to 25 at a time. */
 const RequisitionCreate = z
@@ -77,6 +92,7 @@ const TABLES = {
   },
   RequisitionListQuery: { table: null, reason: "list controls for the requisitions" },
   RequisitionPage: { table: null, reason: "a page of requisitions" },
+  RequisitionSummaryQuery: { table: null, reason: "the status, period and grouping of the assistant's requisitions summary; figures, never a row" },
   RequisitionCreate: { table: null, reason: "the requests to group; sets expense_request.requisition_id" },
   RequisitionRemove: { table: null, reason: "clears expense_request.requisition_id; the reason is its history" },
 };
@@ -87,6 +103,8 @@ module.exports = {
   Requisition,
   RequisitionDetail,
   RequisitionListQuery,
+  RequisitionSummaryBy,
+  RequisitionSummaryQuery,
   RequisitionPage,
   RequisitionCreate,
   RequisitionRemove,

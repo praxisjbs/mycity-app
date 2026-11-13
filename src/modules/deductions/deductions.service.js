@@ -18,6 +18,7 @@ const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { scopeFor } = require("../../middleware/rbac");
+const { canSee } = require("../../shared/rbac/field-mask");
 const lagos = require("../../shared/time/lagos");
 const { formatDate, formatMonth } = require("../../shared/time/day-first");
 const { oneNamed } = require("../../shared/ai/named");
@@ -101,6 +102,56 @@ async function summary() {
     pending_attendance: figure(r.attendance_count, r.attendance_amount),
     active: figure(r.active_count, r.active_amount),
     recovered_this_year: figure(r.recovered_count, r.recovered_amount),
+  };
+}
+
+/** A row's source and status in words, as the tab's chips read them. */
+const SOURCE_WORDS = Object.freeze({ attendance: "Attendance", fine: "Fines", advance: "Salary advances" });
+const STATUS_WORDS = Object.freeze({ pending: "Waiting", active: "Active", settled: "Settled", waived: "Waived" });
+
+/**
+ * The deductions in figures for the assistant (docs/guides/praxis-ai.md §6.13, Finance and pay), over what
+ * the tab lists with its filters and within the reader's `payroll` scope. The amounts are salary-derived, so a
+ * reader who sees them Restricted on the tab is given counts alone (decision 58): no amount figure, each group
+ * row's value its count, and deductions rather than naira by month. The grouping asked comes first.
+ * @param {{query: Function}} client
+ * @param {object} params  DeductionSummaryQuery, parsed
+ * @param {object} actor   the asking person with their `payroll` scope
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series } = require("../../shared/ai/summary");
+  const m = require("../../shared/money/money");
+  const [r, salary] = await Promise.all([
+    repo.aiSummary(client, { ...params, yearStart: `${lagos.today(now).slice(0, 4)}-01-01` }, actor.scope),
+    canSee(client, actor, "employee.salary"),
+  ]);
+  const f = r.figures;
+  const money = (v) => m.toWire(v || "0.00");
+  const valueOf = (x) => (salary ? money(x.amount) : x.count);
+  const figures = [figure("deductions", "Deductions", f.deductions || 0)];
+  if (salary) figures.push(figure("amount", "Amount", money(f.amount), "ngn"));
+  figures.push(figure("waiting", "Waiting", f.waiting || 0), figure("waived", "Waived", f.waived || 0));
+  if (salary)
+    figures.push(
+      figure("scheduled", "Scheduled ahead", money(r.instalments.scheduled), "ngn"),
+      figure("recovered", "Recovered this year", money(r.instalments.recovered), "ngn"),
+      figure("advances", "Advances outstanding", money(r.instalments.advances), "ngn"),
+    );
+  const by = {
+    source: group("source", "Deductions by source", r.by_source.map((x) => ({ key: x.key, label: SOURCE_WORDS[x.key] || x.key, value: valueOf(x), count: x.count }))),
+    status: group("status", "Deductions by status", r.by_status.map((x) => ({ key: x.key, label: STATUS_WORDS[x.key] || x.key, value: valueOf(x), count: x.count }))),
+    department: group("department", "Deductions by department", r.by_department.map((x) => ({ key: x.key, label: x.label, value: valueOf(x), count: x.count }))),
+  };
+  const first = by[params.by] ? params.by : "source";
+  return {
+    figures,
+    groups: [by[first], ...Object.keys(by).filter((k) => k !== first).map((k) => by[k])],
+    series: [
+      salary
+        ? series("amount", "Amount by month", r.by_month.map((p) => ({ at: p.at, value: money(p.amount) })))
+        : series("deductions", "Deductions by month", r.by_month.map((p) => ({ at: p.at, value: p.count }))),
+    ],
+    total: f.deductions || 0,
   };
 }
 
@@ -231,6 +282,7 @@ module.exports = {
   present,
   list,
   summary,
+  aiSummary,
   acceptFine,
   waiveFine,
   releaseFine,

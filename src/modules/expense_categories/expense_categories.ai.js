@@ -20,6 +20,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "expense_categories.list",
+      summary: "expenses.summary",
       description: "List the expense categories: each one's type, whether it is offered, this month's spend and how many requests name it",
       params: c.expense_categories.ExpenseCategoryListQuery,
       permission: ["expenses", "view"],

@@ -7,6 +7,9 @@
  * the screen is closed to them. Bank details are masked by the engine for a reader without
  * `employee.bank`.
  *
+ * Its summary gives the transfers in figures to the same readers within the same scope (praxis-ai.md
+ * §6.13, Finance and pay); anyone else is given no figures.
+ *
  * Cards a holder of `expenses.finance` confirms, through the service functions the tab's own
  * buttons call: Record Disbursement (money: Confirm It's You first) for one authorised request,
  * and Add Reference on a transfer saved without one.
@@ -28,11 +31,23 @@ module.exports = defineManifest({
   reads: [
     {
       key: "disbursements.list",
+      summary: "disbursements.summary",
       description: "List the transfers that paid expense requests: the payee, amount, day paid and bank reference, or that the reference is missing",
       params: c.disbursements.DisbursementListQuery,
       permission: ["expenses", "view"],
       run: async (_client, params, actor) => ((await holdsCapability(actor, "expenses.finance")) ? service.list(params, actor.scope) : envelope([], 1, 0)),
       cite: (row) => ({ type: "disbursement", id: row.disbursement_id, label: `${row.number}, ${row.request_number}` }),
+    },
+  ],
+  summaries: [
+    {
+      key: "disbursements.summary",
+      description:
+        "Disbursements in figures: transfers, amount paid, references missing, authorised and not yet paid, days to pay, by category, department or payee type, and paid by day, week or month",
+      params: c.disbursements.DisbursementSummaryQuery,
+      permission: ["expenses", "view"],
+      // The figures are only for a holder of `expenses.finance`, as the read's rows are; the service answers anyone else with none.
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
     },
   ],
   actions: [
