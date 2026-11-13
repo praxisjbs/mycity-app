@@ -7,7 +7,7 @@
  * @phone Full width; the answers to tap are one under the other, full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets.
  * @a11y An article named Answer; the words are content; the answers to tap are a group named Answers whose buttons wait for each other while one is asked (ActionGroup); Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane.
  * @status beta
- * @exports QuestionBubble (the person's words, and the file a question carried as a chip that opens it)
+ * @exports QuestionBubble
  * @example <AnswerBubble text={a.content} table={table} paging="Showing 25 of 312" onNext={next} link={{ label: "Open Leave", onOpen }} from={chips} feedback={null} onFeedback={give} onPane={showPane} />
  */
 import type { ReactNode } from "react";

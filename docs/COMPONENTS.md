@@ -198,7 +198,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
-| Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble (the person's words`, `and the file a question carried as a chip that opens it)` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
+| Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
 | Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
 | Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary. | beta |
 | Assistant | [PaneSheet](#panesheet) | `PaneSheet` | The phone's pane: a full-height sheet that holds the four views (PaneTabs) for one answer, opened from Open Figures under it. | beta |
@@ -6774,8 +6774,8 @@ One answer of Praxis AI: its words, the answers to tap when it asks a question, 
 | Phone | Full width; the answers to tap are one under the other, full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets. |
 | Accessibility | An article named Answer; the words are content; the answers to tap are a group named Answers whose buttons wait for each other while one is asked (ActionGroup); Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane. |
 | Status | beta |
-| Exports | `AnswerBubble`, `QuestionBubble (the person's words`, `and the file a question carried as a chip that opens it)` |
-| Import | `import { AnswerBubble, QuestionBubble (the person's words, and the file a question carried as a chip that opens it) } from "@mycity/ui";` |
+| Exports | `AnswerBubble`, `QuestionBubble` |
+| Import | `import { AnswerBubble, QuestionBubble } from "@mycity/ui";` |
 | File | `packages/ui/src/assistant/AnswerBubble.tsx` |
 | Test | `packages/ui/src/assistant/AnswerBubble.test.tsx` |
 | Gallery | `packages/ui/src/assistant/AnswerBubble.gallery.tsx` (`npm run gallery`, `#/AnswerBubble`) |
@@ -6799,9 +6799,13 @@ One answer of Praxis AI: its words, the answers to tap when it asks a question, 
 | `onChoose` | `(choice: string) => Promise<unknown> \| void` |  | A tap on a choice: the screen asks it as the person's next question; every choice is busy until it lands. Left out, the choices are not shown. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
-**QuestionBubble (the person's words** props: missing (no `QuestionBubble (the person's wordsProps` in the file)
+**QuestionBubble** props (`QuestionBubbleProps`)
 
-**and the file a question carried as a chip that opens it)** props: missing (no `and the file a question carried as a chip that opens it)Props` in the file)
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `words` | `string` | yes | The person's words. |
+| `file` | `{ name: string; onOpen?: () => void } \| null` |  | The document the question carried (praxis-ai.md §6.18): its name as a chip that opens it. |
+| `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
 <AnswerBubble text={a.content} table={table} paging="Showing 25 of 312" onNext={next} link={{ label: "Open Leave", onOpen }} from={chips} feedback={null} onFeedback={give} onPane={showPane} />

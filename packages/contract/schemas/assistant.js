@@ -13,7 +13,7 @@
  * An answer is provisional: its words are the model's; a table's cells are the records' (§6.4).
  */
 const { z } = require("zod");
-const { uuid, text, money, isoDateTime, listQuery, Paged, PageMeta } = require("./common");
+const { uuid, money, isoDateTime, listQuery, Paged, PageMeta } = require("./common");
 const { DocumentRef } = require("./documents");
 
 /** Why an answer did not give what was asked (§6.4): a read was refused, or a change was asked for. */

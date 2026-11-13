@@ -48,9 +48,6 @@
  * Production is refused: the questions read real people's records.
  */
 
-const fs = require("node:fs");
-const path = require("node:path");
-
 /** Who asks: `ceo` is the one CEO login; any other word is a role code, held by an active login. */
 const CASES = Object.freeze([
   { id: "today.what-happened", as: "ceo", question: "What happened today?", reads: ["activity.list"] },
@@ -531,13 +528,13 @@ async function main(argv) {
 
   /** A made-up sample uploaded as the person, as the modal uploads it (purpose ai_attachment). */
   const stageSample = (actor, name) => {
-    const buffer = fs.readFileSync(path.join(__dirname, "samples", name));
+    const buffer = require("node:fs").readFileSync(require("node:path").join(__dirname, "samples", name));
     return documents.stage({ buffer, originalname: name, size: buffer.length, declared_type: "application/pdf", purpose: "ai_attachment" }, { purpose: "ai_attachment" }, actor);
   };
   /** The sample removed once its question is graded: an evaluation keeps nothing. */
   const unstage = async (documentId, actor) => {
     const client = await pool.connect();
-    let keys = null;
+    let keys;
     try {
       keys = await atomically(client, () => vault.remove(client, documentId, { actor, reason: "an evaluation's sample was read" }));
     } finally {

@@ -38,8 +38,8 @@ const notStaged = () => new AppError("NOT_FOUND", "Upload the file again", 404, 
 
 /** The kinds this person may attach, in the modal's order. */
 async function allowed(actor) {
-  const kinds = await registry.filesFor(actor);
-  return kinds.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
+  const offered = await registry.filesFor(actor);
+  return offered.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
 }
 
 /**
@@ -60,8 +60,8 @@ async function kinds(actor) {
  *   outcome: "read"|"unreadable"|"off"|"limit", reading: object|null, card: object|null, notes: string[], said: string|null}>}
  */
 async function read(actor, attachment) {
-  const kinds = await allowed(actor);
-  const f = kinds.find((k) => k.kind === attachment.kind);
+  const offered = await allowed(actor);
+  const f = offered.find((k) => k.kind === attachment.kind);
   if (!f) throw forbidden();
   const doc = await vault.get(pool, attachment.document_id);
   // Only the person's own staged upload: never a record's file, nor somebody else's (the card claims it).
