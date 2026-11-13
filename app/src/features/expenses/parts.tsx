@@ -121,6 +121,11 @@ const kobo = (v: string) => {
   const k = Number(w || "0") * 100 + Number((f + "00").slice(0, 2));
   return minus ? -k : k;
 };
+/** A wire amount as a person types it ("-100000.00" to "-100,000"), so a filled Unit Price reads like a typed one and fits its field. */
+const asTyped = (wire: string) => {
+  const [w, f = "00"] = wire.replace(/^-/, "").split(".");
+  return `${wire.startsWith("-") ? "-" : ""}${w.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${f === "00" ? "" : `.${f}`}`;
+};
 const naira = (k: number) => `${k < 0 ? "-" : ""}${Math.trunc(Math.abs(k) / 100)}.${String(Math.abs(k) % 100).padStart(2, "0")}`;
 
 /* ------------------------------------------------------------------ *
@@ -196,9 +201,9 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       if (got.payee_name) f.set("payee_name", got.payee_name);
       if (got.expense_category_id) {
         f.set("expense_category_id", got.expense_category_id);
-        setCategory(null);
+        setCategory(got.category);
       }
-      if (got.lines.length) setLines(got.lines.map((l) => ({ description: l.description, quantity: l.quantity ?? "1", unit_price: l.unit_price })));
+      if (got.lines.length) setLines(got.lines.map((l) => ({ description: l.description, quantity: l.quantity ?? "1", unit_price: asTyped(l.unit_price) })));
       // The lines are the model's reading; the amount the invoice asks for is read on its own, so a
       // discount or a payment it missed shows here rather than at the bank.
       if (got.amount_due && got.amount && kobo(got.amount_due) !== kobo(got.amount)) return toast(`Invoice asks ${formatMoney(got.amount_due)}. Check lines`);
