@@ -72,6 +72,7 @@ function resultView(run) {
     lines: (r.lines || []).slice(0, 25).map((l) => ({ type: String(l.type || "record"), id: l.id === undefined || l.id === null ? null : String(l.id), label: String(l.label || ""), ok: l.ok !== false, message: l.message || null, link: l.link || null })),
     error_code: run.error_code || null,
     message: r.message || null,
+    next: run.status === "done" ? nextOf(r.next) : [],
     finished_at: iso(run.finished_at || run.started_at),
   };
 }
@@ -175,6 +176,29 @@ async function recordRefusal(id, actor, err) {
   }
 }
 
+/** What a done press offers next, as AiActionResult.next holds it: at most three { label, question }. */
+function nextOf(list) {
+  const out = [];
+  for (const n of Array.isArray(list) ? list : list ? [list] : []) {
+    if (!n || typeof n !== "object") continue;
+    const label = typeof n.label === "string" ? n.label.trim() : "";
+    const question = typeof n.question === "string" ? n.question.trim() : "";
+    if (label && question && label.length <= 40 && question.length <= 200) out.push({ label, question });
+  }
+  return out.slice(0, 3);
+}
+
+/** The action's `then` over what the press made; a `then` that throws offers nothing, the press stands. */
+function thenOf(action, result, values) {
+  if (!action.then) return [];
+  try {
+    return nextOf(action.then(result, values));
+  } catch (err) {
+    logger.warn({ err, ai_action: action.key }, "Praxis AI: an action's then() threw; the press offers nothing next");
+    return [];
+  }
+}
+
 /** The lines a press reads back, from the action's readback or the records it named. */
 function linesOf(action, result, records) {
   const lines = action.readback ? action.readback(result) : records.map((r) => ({ ...r, status: "done" }));
@@ -258,8 +282,9 @@ async function runPress(opened, actor, idempotencyKey) {
     return resultView(closed);
   }
   const lines = linesOf(action, result, records);
+  const next = thenOf(action, result, values);
   const closed = await tx(async (client) => {
-    const r = await repo.finishRun(client, run.ai_action_run_id, { status: "done", result: { lines, message: null } });
+    const r = await repo.finishRun(client, run.ai_action_run_id, { status: "done", result: { lines, message: null, next } });
     await repo.setDraft(client, found.ai_action_draft_id, { status: "done" });
     await emit(client, {
       key: EVENTS.ASSISTANT_ACTION_CONFIRMED,

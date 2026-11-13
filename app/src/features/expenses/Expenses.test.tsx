@@ -88,6 +88,24 @@ describe("Expenses · Requisitions", () => {
   }, 40000);
 });
 
+describe("Expenses · New Request (13/11/2026)", () => {
+  it("Requisitions and Approvals open New Request's own form; Requisitions offers it even to someone it is not open to", async () => {
+    await as("cynthia@mycityapp.io", <Expenses tab="requisitions" id={null} />, "Requisitions");
+    expect(screen.getByRole("button", { name: "Create Requisition" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "New Request" }));
+    expect(await screen.findByRole("dialog", { name: "New Request" }, { timeout: 5000 })).toBeTruthy();
+    cleanup();
+    await as("cynthia@mycityapp.io", <Expenses tab="approvals" id={null} />, "Approvals");
+    fireEvent.click(screen.getByRole("button", { name: "New Request" }));
+    expect(await screen.findByRole("dialog", { name: "New Request" }, { timeout: 5000 })).toBeTruthy();
+    cleanup();
+    await as("chidera@mycityapp.io", <Expenses tab="requisitions" id={null} />, "Requisitions");
+    expect(screen.getByText("Not Open to You")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "New Request" }));
+    expect(await screen.findByRole("dialog", { name: "New Request" }, { timeout: 5000 })).toBeTruthy();
+  }, 60000);
+});
+
 describe("Expenses · Disbursements", () => {
   it("a waiting request opens with Record Disbursement and Withdraw; Waiting to Pay opens its requests (F5, F21)", async () => {
     await as("cynthia@mycityapp.io", <Expenses tab="disbursements" id={null} />, "Disbursements");

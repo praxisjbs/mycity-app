@@ -120,11 +120,12 @@ const ACTION_KEYS = new Set([
   "capability",
   "allows",
   "capabilities",
+  "then",
 ]);
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
 /** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decisions 31 and 32). */
 const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task", "employee", "worksite", "policy", "place", "site_member", "partner", "lead", "partner_deal", "hiring_manager"]);
-const ASK_KEYS = new Set(["field", "question", "choices", "options", "none", "when", "read", "params", "type"]);
+const ASK_KEYS = new Set(["field", "question", "choices", "options", "none", "when", "read", "params", "type", "also"]);
 /** The answers to tap under a question, at most (AiAnswer.choices). */
 const CHOICES_MAX = 6;
 const KEY_RE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
@@ -310,6 +311,8 @@ function checkAction(where, a, seen) {
       if (typeof fn !== "function") throw new Error(`${at}: allows.${k} is (gap) => boolean`);
     }
   }
+  // What a done press offers next: (result, values) => [{ label, question }] (AiActionResult.next), each asked as the next question.
+  if (a.then !== undefined && typeof a.then !== "function") throw new Error(`${at}: then is (result, values) => [{ label, question }]`);
   const asks = checkAsks(at, a.asks, takes, carried);
   checkMatrix(at, a.matrix);
   return Object.freeze({
@@ -330,6 +333,7 @@ function checkAction(where, a, seen) {
     capability: a.capability || null,
     allows: Object.freeze({ ...(a.allows || {}) }),
     capabilities: a.capabilities ? Object.freeze([...a.capabilities]) : null,
+    then: a.then || null,
   });
 }
 
@@ -340,7 +344,8 @@ function checkAction(where, a, seen) {
  * person's own records; or `read`, a list read whose rows are the person's own records, with its
  * `params` and the citation `type` kept), whether "none" is an answer (`none`: null, or an empty
  * list, is then a value the person gave), and `when`, another field: asked only while it holds a
- * value. A read's key is checked against the registry once every manifest has loaded.
+ * value, and `also`, the other fields the same turn asks for, its question then one short question a
+ * field. A read's key is checked against the registry once every manifest has loaded.
  */
 function checkAsks(at, asks, takes, carried) {
   if (asks === undefined) return Object.freeze([]);
@@ -353,9 +358,14 @@ function checkAsks(at, asks, takes, carried) {
       if (!takes(q.field) || !carried(q.field)) throw new Error(`${at}: asks names "${q.field}", which the card does not carry`);
       if (seen.has(q.field)) throw new Error(`${at}: asks names "${q.field}" twice`);
       seen.add(q.field);
+      // `also`: the other fields the same turn asks for, one short question each ("What are you paying for? How many? How much is each?").
+      if (q.also !== undefined && (!Array.isArray(q.also) || !q.also.length || q.also.length > 3 || q.also.some((f) => typeof f !== "string" || f === q.field || !takes(f) || !carried(f)) || new Set(q.also).size !== q.also.length))
+        throw new Error(`${at}: ask ${q.field}'s also names one to three other fields the card carries`);
       const words = String(q.question || "").trim();
-      if (!words.endsWith("?") || words.split(/\s+/).length > 8 || /[—–]/.test(words))
-        throw new Error(`${at}: ask ${q.field}'s question is one short question, at most 8 words`);
+      const questions = words.split(/(?<=\?)\s+/).filter(Boolean);
+      const count = 1 + (q.also ? q.also.length : 0);
+      if (!words.endsWith("?") || questions.length !== count || questions.some((one) => !one.endsWith("?") || one.split(/\s+/).length > 8) || /[—–]/.test(words))
+        throw new Error(`${at}: ask ${q.field}'s question is ${count === 1 ? "one short question" : `${count} short questions, one a field`}, at most 8 words each`);
       const fixed = Array.isArray(q.choices);
       if (q.choices !== undefined && !fixed && typeof q.choices !== "function")
         throw new Error(`${at}: ask ${q.field}'s choices are a list, or ({ today }) => a list`);
@@ -388,6 +398,7 @@ function checkAsks(at, asks, takes, carried) {
         read: q.read || null,
         params: Object.freeze({ ...(q.params || {}) }),
         type: q.type || null,
+        also: Object.freeze([...(q.also || [])]),
       });
     }),
   );

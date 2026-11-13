@@ -10,7 +10,7 @@
 | Capabilities | `expenses.finance` (group approved requests into requisitions, record disbursements, set budgets, manage categories) |
 | Screens (PROGRESS.md rows) | #56 (in ESS), #57, #58, #59, #60, #61, #106 Projects |
 | Status | Agreed |
-| Last changed | 05/11/2026 |
+| Last changed | 13/11/2026 |
 
 Agreed by AJ on 04/11/2026 from the Modules Review meeting of the same day (TB handed every M8
 decision to AJ). The decisions and the build plan are in `docs/handoff/m8-expenses.md`; where this
@@ -32,8 +32,8 @@ Projects).
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | ESS · My Requests (`my-requests`, #56) | staff app, ESS | every employee, own requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the requests list; a request's detail in a modal | New Request, Save Draft, Send Request, Edit and Send Again a sent-back request, Cancel Request |
-| Expenses · Requisitions (`requisitions`, #58) | staff app | `expenses.finance` holders and the CEO | approved requests not yet in a requisition; the requisitions and their status | tick requests and Create Requisition; open a request and Withdraw it; the CEO opens one, removes a request, approves or rejects it |
-| Expenses · Approvals (`approvals`, #57) | staff app | anyone a request's approval waits on (line managers, Operations & People) | requests waiting on the reader, with the invoice and the chain | Approve, Send Back, Reject |
+| Expenses · Requisitions (`requisitions`, #58) | staff app | `expenses.finance` holders and the CEO | approved requests not yet in a requisition; the requisitions and their status | tick requests and Create Requisition; open a request and Withdraw it; the CEO opens one, removes a request, approves or rejects it; New Request (their own), for anyone with `expenses` create, even where the list is not open to them |
+| Expenses · Approvals (`approvals`, #57) | staff app | anyone a request's approval waits on (line managers, Operations & People) | requests waiting on the reader, with the invoice and the chain | Approve, Send Back, Reject; New Request (their own) |
 | Expenses · Disbursements (`disbursements`, #59) | staff app | `expenses.finance` holders and the CEO | requests the CEO authorised, waiting to be paid; paid ones with their bank reference | open a waiting request, then Record Disbursement or Withdraw; Add Reference on one saved without it |
 | Expenses · Projects (`projects`, #106) | staff app | `expenses` view, all scope | each project's budget, committed, spent and remaining, and the requests under it | New Request with the project filled; Set Budget (with `expenses.finance`); open a request (Withdraw with `expenses.finance`) |
 | Expenses · Budgets (`budgets`, #60) | staff app | `expenses` view; a head sees their own department | each department's budget for the year by category: allocated, committed, spent, remaining | New Budget, Edit Budget (with `expenses.finance`); Budget History |
@@ -42,7 +42,7 @@ Projects).
 | Settings · Approvals | staff app | Settings holders | the two flows `expenses.request` and `expenses.requisition` | change who approves, without a deploy |
 | My Workspace projects | staff app | as Workspace shows them | the projects the Project picker offers | none here |
 | Notifications (bell, push) | both shells | the people named in §7 | each step of a request | open the request |
-| Praxis AI and ⌘K | both shells | within the reader's grant | requests, requisitions, disbursements, budgets, categories | ask, find, and draft the forms as cards (§9) |
+| Praxis AI and ⌘K | both shells | within the reader's grant | requests, requisitions, disbursements, budgets, categories | ask, find, and draft the forms as cards (§9); a draft's card offers Add Another Item and Send Request |
 
 ## 3 · How the screens relate
 
@@ -75,7 +75,10 @@ Projects).
    `disbursed` and its amount moves from committed to spent (§6.6).
 7. **Budgets and projects.** Expenses · Budgets shows each department's year; Expenses · Projects
    each project's. Whoever manages a project raises its requests from there: New Request opens
-   with the project filled, the same form and service as on My Requests (handoff decision 17). A request larger than its department's remaining budget is flagged before the
+   with the project filled, the same form and service as on My Requests (handoff decision 17). New
+   Request is on Expenses · Requisitions and Expenses · Approvals too (TB, 13/11/2026): the same form
+   and service, the request the presser's own, found afterwards on their My Requests; not on the
+   other tabs. A request larger than its department's remaining budget is flagged before the
    line manager and Operations & People decide it, never after.
 8. **History.** Every step is one event through `emit()`, so a request's history (raised, each
    decision with its reason, grouped, removed, authorised, paid, reference added) reads from the
@@ -366,8 +369,10 @@ requester always sees theirs.
   and scope.
 - **AI actions** (cards the person confirms; every create and edit form, the forms gate). Built in
   PR 3 and PR 4: New Request (`my_expenses.create`, `ExpenseRequestAdd`: the request with its first
-  line flat, sent at once unless the person keeps a draft), Add Line (`my_expenses.add_line`,
-  `ExpenseLineAdd`), Save Request (`my_expenses.edit`, `ExpenseChange`), New Category
+  line flat, sent at once unless the person keeps a draft, which the model keeps when the person
+  names more than one item), Add Line (`my_expenses.add_line`, `ExpenseLineAdd`), Send Request
+  (`my_expenses.submit`, `ExpenseSend`: a draft or sent-back request of the person's own, sent as
+  the modal's Send Request sends it; TB, 13/11/2026), Save Request (`my_expenses.edit`, `ExpenseChange`), New Category
   (`expense_categories.create`), Save Category (`expense_categories.edit`, `ExpenseCategoryChange`),
   Create Requisition (`requisitions.create`), Record Disbursement (`disbursements.create`, risk
   money) and Add Reference (`disbursements.add_reference`, `DisbursementReferenceAdd`). Built in
@@ -381,6 +386,14 @@ requester always sees theirs.
   form's own schema (PR 7); the others say `form: "none: <reason>"`, because their form never names
   its record (Edit, Add Reference, Edit Budget, Set Budget), holds many lines (New Request), or is a
   press on ticked rows (Create Requisition).
+- **Asking for an item** (TB, 13/11/2026). New Request and Add Line ask for their line in one turn:
+  "What are you paying for? How many? How much is each?" (`also`, `praxis-ai.md` §6.11), the
+  quantity 1 when the answer gives none, and "How much is each?" again only when the answer gave
+  no price. The model's figures are read as the contract takes them (1 is "1", 700000 and
+  "₦700,000" are "700000.00"), on every card. Once pressed, a request still a draft or sent back
+  offers **Add Another Item** and **Send Request** under its result (`then`, `nextAfter`), each
+  asking the next question; a request sent at once offers nothing, since a sent request is never
+  edited (§6.1 rule 4).
 - **AI features** (PR 6; jobs chosen by AJ, registered in `services/ai/actions.js` with
   `chosen_by: "AJ"`; each runs on the person's press, never in a transaction, and nothing is kept;
   off with no provider set up, or this month's budget spent, as Write With AI is):
@@ -418,8 +431,8 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. Category opens a popover (Pick Category) with a Category Type filter (All, Operating, Capital) and a search over the categories, 25 a page; Bank suggests banks as typed and offers Add for one it does not know; Payee Name and Account Name show a person's name as their example, never the reader's own. The form: Read Invoice once an invoice is attached, Suggest Category in its footer, each filling the form for the person to check; nothing is saved until they press | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." | the approval routing and the budget recount: §3, §6 here, the manual |
-| Expenses · Requisitions | Approved Requests (tick boxes, Create Requisition), each opening its request in the modal with Withdraw (a reason, after a confirm); Requisitions (Reference, Requests, Total, Submitted, Status). The modal: its requests, each opening, Remove, Approve, Reject (the CEO) | help on Requisitions: "Approved requests grouped for the CEO." | why requests are batched: MILESTONES §13, the manual |
-| Expenses · Approvals | KPI cards With You, Total Value, Oldest, Approved This Month (opens the requests the reader approved since the 1st, `approved_by_me_from`); the list; the modal with lines, invoice (opens as a PDF), budget remaining (the line's, and the department's beside it), an Over Budget pill, a Possible Duplicate pill with Check Duplicate; Approve, Send Back, Reject | help on Over Budget: "More than the department has left for this category this year." Help on Possible Duplicate: "Same payee and amount within 30 days." | the chain's configuration: Settings · Approvals, this guide |
+| Expenses · Requisitions | New Request (secondary beside Create Requisition; alone, primary, above Not Open to You for a reader without `expenses.finance`); Approved Requests (tick boxes, Create Requisition), each opening its request in the modal with Withdraw (a reason, after a confirm); Requisitions (Reference, Requests, Total, Submitted, Status). The modal: its requests, each opening, Remove, Approve, Reject (the CEO) | help on Requisitions: "Approved requests grouped for the CEO." | why requests are batched: MILESTONES §13, the manual |
+| Expenses · Approvals | New Request; KPI cards With You, Total Value, Oldest, Approved This Month (opens the requests the reader approved since the 1st, `approved_by_me_from`); the list; the modal with lines, invoice (opens as a PDF), budget remaining (the line's, and the department's beside it), an Over Budget pill, a Possible Duplicate pill with Check Duplicate; Approve, Send Back, Reject | help on Over Budget: "More than the department has left for this category this year." Help on Possible Duplicate: "Same payee and amount within 30 days." | the chain's configuration: Settings · Approvals, this guide |
 | Expenses · Disbursements | KPI cards Waiting to Pay and Reference Missing, each opening its list; Waiting to Pay, a request opening in the modal with Record Disbursement and Withdraw; Paid; Record Disbursement (Bank Reference, Receipt, Paid On), No on Save Without Reference? back on Bank Reference; a Reference Missing pill and Add Reference; a paid one's Receipt row with Open Receipt when one was uploaded (TB, 11/11/2026). No chart (decision 7) | help on Bank Reference: "The bank's transaction ID for this transfer." | audit-anchor reasoning: §6.5 here |
 | Expenses · Projects | projects with Budget, Committed, Spent, Remaining, to `expenses` view at scope all (a refused read is Not Open to You); a project's requests in its modal, each opening; New Request (the project filled), Set Budget (`expenses.finance`), Remove Budget after a confirm | help on Committed: "Approved but not yet paid." | how spend is counted: §6.6 |
 | Expenses · Budgets | Year picker; departments with Allocated, Committed, Spent, Remaining; a budget's lines by category; New Budget, Edit Budget, Budget History | help on Remaining: "Allocated less committed and spent." | the 90% warning rule: §6.6 |
@@ -430,8 +443,8 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | ESS · My Requests | the four KPI cards two to a row, then request cards (purpose, amount, a stage pill) | Submitted date on the card | New Request, full width; the form is a full sheet, lines added one at a time | ESS tabs; bottom bar |
-| Expenses · Requisitions | approved request cards with a tick, Create Requisition pinned at the bottom once one is ticked | the requisitions' Approved date | Create Requisition; in the sheet Approve, full width | Expenses tabs scroll sideways |
-| Expenses · Approvals | the four KPI cards, then request cards with amount and requester | the requester's department | Approve, full width in the request's sheet, Send Back and Reject beside it | Expenses tabs scroll sideways |
+| Expenses · Requisitions | approved request cards with a tick, Create Requisition pinned at the bottom once one is ticked | the requisitions' Approved date | Create Requisition; in the sheet Approve, full width; New Request from the floating button (second after Create Requisition, first for a reader without `expenses.finance`) | Expenses tabs scroll sideways |
+| Expenses · Approvals | the four KPI cards, then request cards with amount and requester | the requester's department | Approve, full width in the request's sheet, Send Back and Reject beside it; New Request, the floating button's action | Expenses tabs scroll sideways |
 | Expenses · Disbursements | Waiting to Pay cards, then Paid with the Reference Missing pill | the Paid On column | Record Disbursement, full width in the sheet | Expenses tabs scroll sideways |
 | Expenses · Projects | project cards with a used bar and Remaining | Committed and Spent (in the sheet) | Set Budget in the sheet | Expenses tabs scroll sideways |
 | Expenses · Budgets | year picker, then department cards with a used bar | the category lines (in the sheet) | Edit Budget in the sheet | Expenses tabs scroll sideways |
@@ -474,6 +487,7 @@ None.
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · New Request on Expenses · Requisitions and Expenses · Approvals, the presser's own request through New Request's own form (§2, §3 step 7, §10.1, §10.2), not on the other tabs. Praxis AI: the New Request and Add Line cards ask for their item in one turn ("What are you paying for? How many? How much is each?"), read the model's figures as the contract takes them (Quantity and Unit Price were refused "Expected string, received number"), and a draft offers Add Another Item and Send Request once pressed; Send Request is a new card, `my_expenses.submit` (§9, §5 unchanged: it calls `submit`).
 - 11/11/2026 · AJ · From the Milestones Review of 11/11/2026 (TB): Category on New Request is a popover with a type filter and a server search (§3, §10.1), not a dropdown, since thirty or forty categories are searched, not scrolled; Bank is typed or picked from `GET /expenses/banks` with Add for a bank it does not know (§3, §5, §6.1); Payee Name's example is a name, not the reader's own; a paid disbursement shows Open Receipt (§10.1). Staff asking from their own department only was checked at the review and holds (§8).
 
 - 06/11/2026 · TB · Merging M7 PR 2 (#80): Categories' New Category is New Expense Category in ⌘K and the phone's floating button (§9, §10.2), as Partnerships' is New Partner Category, since ⌘K holds each label once; the header button, the form and the User Guide's step are unchanged. A note for AJ is in `docs/handoff/m8-expenses.md` §6.

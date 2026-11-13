@@ -264,6 +264,9 @@ const ExpenseLineAdd = z
   })
   .strict();
 
+/** Send Request's card: a draft or sent-back request of the person's own, sent as the modal's Send Request sends it. */
+const ExpenseSend = z.object({ expense_request_id: uuid }).strict();
+
 const TABLES = {
   ExpenseBankListQuery: { table: null, reason: "list controls for the banks New Request suggests" },
   ExpenseBank: { table: null, reason: "a bank New Request suggests: a common bank, or one a request named, and how many name it" },
@@ -331,6 +334,7 @@ const TABLES = {
   },
   ExpenseChange: { table: "expense_request" },
   ExpenseLineAdd: { table: "expense_request_line" },
+  ExpenseSend: { table: "expense_request" },
 };
 
 /* ------------------------------------------------------------------ *
@@ -451,6 +455,7 @@ module.exports = {
   ExpenseRequestAdd,
   ExpenseChange,
   ExpenseLineAdd,
+  ExpenseSend,
   ExpenseDuplicateRef,
   ExpenseHistoryEntry,
   ExpenseHistoryPage,

@@ -570,7 +570,7 @@ describe("A card inside an answer (docs/guides/praxis-ai.md §6.11)", () => {
     created_at: "2026-10-22T09:30:00.000Z",
     ...over,
   });
-  const result = (): AiActionResult => ({ ai_action_run_id: "00000000-0000-4000-8000-0000000000f1", status: "done", lines: [{ type: "task", id: "t1", label: "T-118 Send the weekly report", ok: true, message: "created", link: "/workspace?tab=tasks&id=t1" }], error_code: null, message: null, finished_at: "2026-10-22T09:31:00.000Z" });
+  const result = (): AiActionResult => ({ ai_action_run_id: "00000000-0000-4000-8000-0000000000f1", status: "done", lines: [{ type: "task", id: "t1", label: "T-118 Send the weekly report", ok: true, message: "created", link: "/workspace?tab=tasks&id=t1" }], error_code: null, message: null, next: [], finished_at: "2026-10-22T09:31:00.000Z" });
   const pressed = () => m.call.mock.calls.filter(([key]) => key === "POST /api/v1/ai/cards/:id/confirm").map(([, opts]) => opts as { params: { id: string }; body: unknown; idempotencyKey: string });
 
   it("shows the card with its fields and values; pressed, the action runs once with an idempotency key and the result line follows", async () => {

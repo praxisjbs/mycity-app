@@ -52,6 +52,8 @@ const registry = require("./registry");
 const { citationsFor } = require("./cite");
 const { oneNamed } = require("./named");
 const c = require("@mycity/contract");
+const { jsonSchemaOf } = require("../../services/ai/structured");
+const engine = require("../../services/ai/engine");
 
 const scopeFor = (...args) => require("../../middleware/rbac").scopeFor(...args);
 const holdsCapability = (...args) => require("../../middleware/rbac").holdsCapability(...args);
@@ -241,7 +243,9 @@ async function checkAction(actor, key, values = {}, db = null) {
   const scope = await scopeOf(actor, action);
   if (!scope) throw refused(key, actor, "action");
   const who = { ...actor, scope };
-  const given = await resolved(action, carried(action, values && typeof values === "object" ? values : {}), who, db);
+  // The model's numbers in the forms the contract takes (700000 is "700000.00"), before anything is matched or parsed.
+  const shaped = engine.cards.shape(inputSchemaOf(action), carried(action, values && typeof values === "object" ? values : {}));
+  const given = await resolved(action, shaped, who, db);
   const parsed = action.input.safeParse(given);
   const problems = parsed.success ? {} : fieldsOf(parsed);
   const clean = parsed.success ? parsed.data : given;
@@ -257,6 +261,14 @@ async function checkAction(actor, key, values = {}, db = null) {
   // Pick one only where the names were read: without a database, or when names() failed, nothing is marked.
   const unnamed = names === null ? {} : unnamedIn(action, clean, [...names, ...records]);
   return { action, scope, ok: parsed.success && !Object.keys(unnamed).length, values: clean, problems: { ...problems, ...unnamed }, records, names: names || [] };
+}
+
+/** An action's input as JSON Schema, worked out once per action. */
+const inputSchemas = new WeakMap();
+function inputSchemaOf(action) {
+  if (!action.input || typeof action.input !== "object") return {};
+  if (!inputSchemas.has(action.input)) inputSchemas.set(action.input, jsonSchemaOf(action.input));
+  return inputSchemas.get(action.input);
 }
 
 /** A record's id as the model or a picker writes it. */

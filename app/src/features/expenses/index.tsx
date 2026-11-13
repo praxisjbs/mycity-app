@@ -16,7 +16,7 @@ import {
   ActionGroup, Button, Card, CardHeader, DataView, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, HelpTerm,
   KeyValue, KpiCard, ListDetail, LoadingRows, Money, MoneyField, PageHeader, Pager, Pill, SelectField, TextAreaField, TextField, toast, todayIso, toMoneyString, useConfirm, useContractForm, useModal, UploadField,
 } from "@mycity/ui";
-import { DecisionForm, OwnActions, refreshAll, RequestCard, say, stagePill, useFinance } from "./parts";
+import { DecisionForm, OwnActions, refreshAll, RequestCard, say, stagePill, useFinance, useRaise } from "./parts";
 import { Projects } from "./Projects";
 
 /**
@@ -43,9 +43,9 @@ const requestColumns = (extra: Column[] = []): Column[] => [
   { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
   ...extra,
 ];
-const closed = (title: string, text: string) => (
+const closed = (title: string, text: string, actions?: ReactNode) => (
   <>
-    <PageHeader title={title} />
+    <PageHeader title={title} actions={actions} />
     <EmptyState title="Not Open to You" text={text} />
   </>
 );
@@ -71,11 +71,23 @@ function Requisitions() {
       say(e);
     }
   };
-  useScreenAction(finance ? { label: "Create Requisition", onSelect: group } : null);
-  if (!finance) return closed("Requisitions", "Operations & People group requests.");
+  const raise = useRaise();
+  useScreenAction(finance ? { label: "Create Requisition", onSelect: group } : raise ? { label: "New Request", onSelect: raise } : null);
+  useScreenAction(finance && raise ? { label: "New Request", onSelect: raise } : null, { second: true });
+  const newRequest = raise ? <Button variant={finance ? undefined : "primary"} icon="plus" onClick={async () => raise()}>New Request</Button> : null;
+  if (!finance) return closed("Requisitions", "Operations & People group requests.", newRequest);
   return (
     <>
-      <PageHeader title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={group}>Create Requisition</Button>} />
+      <PageHeader
+        title="Requisitions"
+        sub="Approved requests grouped for the CEO"
+        actions={
+          <ActionGroup>
+            {newRequest}
+            <Button variant="primary" icon="plus" onClick={group}>Create Requisition</Button>
+          </ActionGroup>
+        }
+      />
       <ListDetail
         layout="modal"
         open={request !== null}
@@ -201,9 +213,11 @@ function Approvals({ id }: { id: string | null }) {
   const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
   const records = () => modal.open({ title: "With You", wide: true, body: () => <ApprovalRecords /> });
   const approvedByMe = () => modal.open({ title: "Approved This Month", wide: true, body: () => <RequestRecords title="Approved by You" filters={{ approved_by_me_from: `${todayIso().slice(0, 7)}-01` }} /> });
+  const raise = useRaise();
+  useScreenAction(raise ? { label: "New Request", onSelect: raise } : null);
   return (
     <>
-      <PageHeader title="Approvals" sub="Requests waiting on you" />
+      <PageHeader title="Approvals" sub="Requests waiting on you" actions={raise ? <Button variant="primary" icon="plus" onClick={async () => raise()}>New Request</Button> : undefined} />
       {s.data && (
         <Grid cols="4m2">
           <KpiCard title="With You" value={String(s.data.with_you)} tone={s.data.with_you ? "warn" : "ok"} onOpen={records} />

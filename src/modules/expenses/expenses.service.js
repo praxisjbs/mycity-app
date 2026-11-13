@@ -699,6 +699,24 @@ async function addLineFromCard(actor, values) {
   return update(actor, values.expense_request_id, body);
 }
 
+/**
+ * What New Request's and Add Line's cards offer once pressed (the action's `then`): while the
+ * request is still the person's to change (a draft, or sent back), another item and sending it,
+ * each asked as the next question; once sent, nothing (rule 4: a sent request is never edited).
+ */
+function nextAfter(r) {
+  if (!r || !EDITABLE.includes(r.status)) return [];
+  return [
+    { label: "Add Another Item", question: `Add another item to ${r.number}` },
+    { label: "Send Request", question: `Send ${r.number}` },
+  ];
+}
+
+/** Send Request's card: the person's own draft or sent-back request, sent as Send Request sends it. */
+function submitFromCard(actor, values) {
+  return submit(actor, values.expense_request_id);
+}
+
 /** The request a card names, by number and purpose, when it is the person's own. */
 async function cardRequest(db, actor, id) {
   const row = db && UUID.test(String(id || "")) ? await repo.get(db, id) : null;
@@ -762,6 +780,8 @@ module.exports = {
   changeFromCard,
   addLineFromCard,
   readbackOf,
+  nextAfter,
+  submitFromCard,
   cardRequest,
   assertCardEditable,
   cardNames,

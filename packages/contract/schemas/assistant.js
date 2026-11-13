@@ -270,7 +270,19 @@ const AiActionLine = z
   })
   .strict();
 
-/** POST /ai/cards/:id/confirm's answer: the run, done or failed, with a line per record. */
+/**
+ * What a done press offers next (an action's `then`, at most three): a button whose words are asked
+ * as the next question ("Add Another Item" asks "Add another item to EXP-0012"). Never a press of
+ * its own: the question draws a card the person checks and confirms as any other.
+ */
+const AiActionNext = z
+  .object({
+    label: z.string().max(40),
+    question: z.string().max(200),
+  })
+  .strict();
+
+/** POST /ai/cards/:id/confirm's answer: the run, done or failed, with a line per record, and what it offers next. */
 const AiActionResult = z
   .object({
     ai_action_run_id: uuid,
@@ -278,6 +290,7 @@ const AiActionResult = z
     lines: z.array(AiActionLine).max(25),
     error_code: z.string().nullable(),
     message: z.string().nullable(),
+    next: z.array(AiActionNext).max(3),
     finished_at: isoDateTime,
   })
   .strict();
@@ -606,11 +619,13 @@ const TABLES = {
   AiCardRecord: { table: null, reason: "a record a card touches, kept in ai_action_draft.records" },
   AiCardField: { table: null, reason: "a card's field as the action's schema takes it, from the schema itself" },
   AiActionLine: { table: null, reason: "one record's outcome of a press, kept in ai_action_run.result" },
+  AiActionNext: { table: null, reason: "what a done press offers next, kept in ai_action_run.result" },
   AiActionResult: {
     table: "ai_action_run",
     virtual: {
       lines: "ai_action_run.result, one line per record",
       message: "the error's words, kept beside error_code in ai_action_run.result",
+      next: "what a done press offers next, from the action's then, kept in ai_action_run.result",
     },
   },
   AiActionCard: {
@@ -702,6 +717,7 @@ module.exports = {
   AiCardPicks,
   AiCardField,
   AiActionLine,
+  AiActionNext,
   AiActionResult,
   AiActionCard,
   AiActionEdit,

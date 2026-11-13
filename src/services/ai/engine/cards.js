@@ -59,8 +59,78 @@ function kindOf(name, p) {
   if (node.format === "date-time") return "datetime";
   if (node.pattern === "^\\d{4}-\\d{2}-\\d{2}$" || node.format === "date") return "date";
   if (node.pattern && /\\d\{2\}\$/.test(node.pattern) && /(amount|salary|ngn|price|fee|cost|total|budget|pay)/i.test(name)) return "money";
+  // Figures sent as text (a quantity "1.5", an account number): a one-line number field, never a box of lines.
+  if (node.type === "string" && typeof node.pattern === "string" && FIGURES.test(node.pattern) && !TWO_PLACES.test(node.pattern)) return "number";
   if (node.type === "string") return "text";
   return "other";
+}
+
+/** A pattern of an amount with exactly two places ("^-?\d{1,16}\.\d{2}$"): money on the wire. */
+const TWO_PLACES = /\\\.\\d\{2\}\$$/;
+/** A pattern that takes figures only: a quantity, a count, a percentage sent as text. */
+const FIGURES = /^\^-?\\d/;
+/** An amount as a person or a model writes it: ₦, commas and up to two places ("₦700,000", "700000.5"). */
+const AMOUNT = /^-?\s*(?:₦|NGN)?\s*-?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?$/i;
+
+/** The kinds of JSON Schema a node takes: its own type, or each of its anyOf's. */
+const typesOf = (p) => {
+  if (!p) return [];
+  if (Array.isArray(p.anyOf)) return p.anyOf.flatMap((x) => typesOf(x));
+  return p.type ? [].concat(p.type) : [];
+};
+
+/**
+ * One value in the form its field takes, when it is plainly the same value in another form, so a
+ * card is never refused for how the model wrote it: a number where the contract takes text (a
+ * quantity of 1 is "1"), an amount written without its two places or with ₦ and commas
+ * ("700000", 700000 and "₦700,000" are "700000.00"), a number written as text where a number is
+ * taken ("3" is 3), and "true" or "false" where a boolean is. Anything else is left as it came,
+ * for the schema to refuse.
+ */
+function shapeOne(p, v) {
+  if (v === null || v === undefined) return v;
+  const node = nodeOf(p);
+  const types = typesOf(p);
+  if (node.type === "array" && Array.isArray(v) && node.items) return v.map((x) => shapeOne(node.items, x));
+  const money = node.type === "string" && typeof node.pattern === "string" && TWO_PLACES.test(node.pattern);
+  if (money && (typeof v === "number" || typeof v === "string")) {
+    const text = typeof v === "number" ? (Number.isFinite(v) ? String(v) : "") : v.trim();
+    const m = AMOUNT.exec(text);
+    if (!m || (typeof v === "number" && !/^-?\d+(\.\d{1,2})?$/.test(text))) return v;
+    const minus = text.includes("-");
+    return `${minus ? "-" : ""}${m[1].replace(/,/g, "")}.${((m[2] || "") + "00").slice(0, 2)}`;
+  }
+  if (typeof v === "number" && Number.isFinite(v) && types.includes("string") && !types.includes("number") && !types.includes("integer")) {
+    // A figure field ("^\d{1,10}(\.\d{1,2})?$") or free text takes it as written; text of another pattern (a code) is left for the schema.
+    if (node.pattern && !FIGURES.test(node.pattern)) return v;
+    return String(v);
+  }
+  if (typeof v === "string" && (types.includes("number") || types.includes("integer")) && !types.includes("string")) {
+    const t = v.trim().replace(/,/g, "");
+    if (/^-?\d+(\.\d+)?$/.test(t)) return Number(t);
+    return v;
+  }
+  if (typeof v === "string" && types.includes("boolean") && !types.includes("string")) {
+    const t = v.trim().toLowerCase();
+    if (t === "true") return true;
+    if (t === "false") return false;
+  }
+  return v;
+}
+
+/**
+ * The model's values in the forms the input schema takes (shapeOne), field by field; a field the
+ * schema does not name is passed as it is. Pure: the same values give the same answer.
+ * @param {object} jsonSchema  the action's input as JSON Schema
+ * @param {object} values
+ * @returns {object}
+ */
+function shape(jsonSchema, values) {
+  if (!values || typeof values !== "object" || Array.isArray(values)) return values;
+  const props = (jsonSchema && jsonSchema.properties) || {};
+  const out = {};
+  for (const [k, v] of Object.entries(values)) out[k] = Object.prototype.hasOwnProperty.call(props, k) ? shapeOne(props[k], v) : v;
+  return out;
 }
 
 /** A text this long or longer is written in a box of several lines (a message, a note, a reason). */
@@ -240,6 +310,7 @@ module.exports = {
   confirmOf,
   humanise,
   fieldsOf,
+  shape,
   nextAsk,
   draft,
   fillFromContext,

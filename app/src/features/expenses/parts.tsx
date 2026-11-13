@@ -22,6 +22,16 @@ import {
 
 export const useFinance = () => hasCapability(useMe(), "expenses.finance");
 
+/**
+ * New Request from the Expenses tabs that offer it (Requisitions and Approvals): the same form and
+ * service as ESS · My Requests, the request the person's own. Null without `expenses` create.
+ */
+export function useRaise(): (() => void) | null {
+  const modal = useModal();
+  const may = Boolean(useMe().grants.expenses?.includes("create"));
+  return may ? () => modal.open({ title: "New Request", wide: true, body: (close) => <RequestForm close={close} /> }) : null;
+}
+
 export const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
 export const refreshAll = () => {
   invalidate("/api/v1/expenses");

@@ -1,7 +1,7 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "be9a2a375471d43bf9ec4b7abf1ce613b34de0aeb709cb2e11961ef3117f91a2",
-  "schemas": 2174,
+  "source_hash": "c29dfb396f64109feb848575f2b35cc3820d18585d05145482baa5908fd7552a",
+  "schemas": 2176,
   "endpoints": 1020,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
@@ -12,7 +12,7 @@
     "packages/contract/schemas/announcements.js": "c89a196cd3a803619550427c8dc43a5af3fd84e51d2806c458051bd0832ba7f8",
     "packages/contract/schemas/appearance.js": "19d4a590df5d59d507ad5f6df04600edf7137782027bec0f022a4f566caa3cbe",
     "packages/contract/schemas/assessments.js": "932fec12a02531314b59293114eda332b5d4eb46de0ff668bdb43c8e92133e2f",
-    "packages/contract/schemas/assistant.js": "1e4f88c0f0e71c77977c07c2eec9c90aeb280c2e4f57fb7a1ed437f82c673f63",
+    "packages/contract/schemas/assistant.js": "4bf870252091089248f17ea9ac022c442b6c61209fb4541117df362e83971222",
     "packages/contract/schemas/attendance.js": "77cd99e5e57ad48bb752415003f60b90c1db6ca79992116eb9dabbc065d41c37",
     "packages/contract/schemas/audit.js": "6d89015604235f5d773aae741a069230d68e02bc97aa4120b666d337379fc785",
     "packages/contract/schemas/budgets.js": "d54f3b2721ac85bb1de59db35a89f4ad593bf1a7270256907adaab75250bc876",
@@ -28,7 +28,7 @@
     "packages/contract/schemas/employment_contracts.js": "72ceb7959aa4bddec1d3ee62c76360639ad0c373d394eaa649aedd7aa0a547a6",
     "packages/contract/schemas/ess.js": "533956948dbb444b0155578f7de68cd7e672c8485e84b2afb4afc53771aa2924",
     "packages/contract/schemas/expense_categories.js": "efd41a56266125f33f687714c865348a3d5aa15995154c8b3c081a1e77c4c167",
-    "packages/contract/schemas/expenses.js": "d5bf8307ce333946ad5a79f16bc16731c9057f7aaf242e2741408852d5275db5",
+    "packages/contract/schemas/expenses.js": "aa867ecf6fe02e3780681ce18fb655eda1ed0cb787fd0925f104e39b9deab2d0",
     "packages/contract/schemas/goals.js": "de63d5202829d1c62a6c81d0f6d5ab81c7f934020aa27026c362ffc6600d8871",
     "packages/contract/schemas/identity.js": "399d7f571458b79f3fd310debeccb41677efa350da3498d59b1e95497fc9447b",
     "packages/contract/schemas/imports.js": "ee9542e4a02e9425e3884b31e7f73a361186b84dcbb07b1420fbdfc420aff80b",
