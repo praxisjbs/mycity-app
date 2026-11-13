@@ -24,6 +24,8 @@ import { useContractForm, type ContractSchema } from "../form/useContractForm";
 import { TextAreaField, TextField, NumberField } from "../form/TextField";
 import { DateField, TimeField } from "../form/DateField";
 import { MoneyField, toMoneyString } from "../form/MoneyField";
+import { LinesField, lineAmount, linesTotal, type LineValue } from "../form/LinesField";
+import { Money } from "../display/Money";
 import { ChoiceField, SelectField } from "../form/SelectField";
 import { CheckboxField } from "../form/Switch";
 import { ResultLine, type CardResult } from "./ResultLine";
@@ -32,7 +34,8 @@ import { ResultLine, type CardResult } from "./ResultLine";
 export interface CardField {
   name: string;
   label: string;
-  kind: "text" | "number" | "boolean" | "date" | "datetime" | "money" | "choice" | "list" | "id" | "other";
+  /** `lines`: a request's items (description, quantity, unit price), shown as a table with its total. */
+  kind: "text" | "number" | "boolean" | "date" | "datetime" | "money" | "choice" | "list" | "lines" | "id" | "other";
   required: boolean;
   options: string[] | null;
   /** A text of several lines (a message, a note, a reason). */
@@ -145,6 +148,9 @@ function shown(f: CardField, value: unknown, known: CardRecord[]): string | null
   const nameOf = (id: unknown): string | null => known.find((r) => r.id === String(id))?.label ?? null;
   const plainOf = (v: unknown): string | null => (RECORD_ID.test(asString(v)) ? null : asString(v));
   switch (f.kind) {
+    case "lines":
+      // Drawn as its own table (CardLines), never as text.
+      return null;
     case "id":
       return nameOf(value);
     case "list": {
@@ -165,6 +171,61 @@ function shown(f: CardField, value: unknown, known: CardRecord[]): string | null
     default:
       return asString(value);
   }
+}
+
+/** A `lines` value as the card holds it: each line with its text, quantity and unit price. */
+const linesOf = (v: unknown): LineValue[] =>
+  Array.isArray(v)
+    ? v.filter((l): l is Record<string, unknown> => Boolean(l) && typeof l === "object").map((l) => ({ description: asString(l.description), quantity: asString(l.quantity) || "1", unit_price: asString(l.unit_price) }))
+    : [];
+
+/**
+ * A request's lines on the card (decision 45): Item, Qty, Unit Price and Amount with the total under
+ * them; on a phone each line is a row of its own, the amount at its right.
+ */
+function CardLines({ lines }: { lines: LineValue[] }) {
+  if (!lines.length) return null;
+  const total = linesTotal(lines);
+  return (
+    <span {...content} className="flex w-full flex-col gap-1.5">
+      <table className="w-full border-collapse text-xs phone:hidden">
+        <thead>
+          <tr className="text-subtle-foreground">
+            <th scope="col" className="py-1 pr-2 text-left font-normal">Item</th>
+            <th scope="col" className="py-1 pr-2 text-right font-normal">Qty</th>
+            <th scope="col" className="py-1 pr-2 text-right font-normal">Unit Price</th>
+            <th scope="col" className="py-1 text-right font-normal">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((l, i) => (
+            <tr key={i} className="border-t border-border">
+              <td className="py-1 pr-2 wrap-any">{l.description}</td>
+              <td className="py-1 pr-2 text-right tabular-nums">{l.quantity}</td>
+              <td className="py-1 pr-2 text-right"><Money value={toMoneyString(l.unit_price)} negLabel="less" /></td>
+              <td className="py-1 text-right"><Money value={lineAmount(l)} negLabel="less" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <ul className="m-0 hidden list-none flex-col gap-1 p-0 text-xs phone:flex">
+        {lines.map((l, i) => (
+          <li key={i} className="flex items-start justify-between gap-2 border-t border-border pt-1">
+            <span className="wrap-any">
+              {l.description}
+              <span className="block text-subtle-foreground">
+                {l.quantity} × <Money value={toMoneyString(l.unit_price)} negLabel="less" />
+              </span>
+            </span>
+            <Money value={lineAmount(l)} negLabel="less" />
+          </li>
+        ))}
+      </ul>
+      <span className="flex justify-end gap-1.5 text-sm font-strong">
+        Total <Money value={total} />
+      </span>
+    </span>
+  );
 }
 
 /** Fields the card lists: those with a value, those with a problem, and the required ones. */
@@ -211,6 +272,7 @@ export function ActionCard({ label, fields, values, problems, records, names = [
                 label: f.label,
                 value: (
                   <span className="flex flex-wrap items-center gap-1.5">
+                    {f.kind === "lines" && <CardLines lines={linesOf(values[f.name])} />}
                     {value !== null && (
                       <span {...content} className="whitespace-pre-line wrap-any">
                         {value}
@@ -309,6 +371,8 @@ function EditFields({ fields, values, problems, known, picker, schema, onSave, o
   const wire = (v: Record<string, unknown>) => {
     const out = { ...v };
     for (const field of fields) if (field.kind === "money" && typeof out[field.name] === "string" && out[field.name] !== "") out[field.name] = toMoneyString(out[field.name] as string);
+    // A request's lines: each unit price as the wire takes it, a minus kept ("-100,000" is "-100000.00").
+    for (const field of fields) if (field.kind === "lines" && Array.isArray(out[field.name])) out[field.name] = linesOf(out[field.name]).map((l) => ({ ...l, unit_price: toMoneyString(l.unit_price) }));
     return out;
   };
   const [rules] = useState<ContractSchema>(() => ({ safeParse: (v: unknown) => schema.safeParse(v && typeof v === "object" ? wire(v as Record<string, unknown>) : v) }));
@@ -384,6 +448,12 @@ function EditFields({ fields, values, problems, known, picker, schema, onSave, o
             return (
               <Field key={field.name} label={field.label} optional={optional} {...status}>
                 <NumberField {...b} value={asString(b.value)} decimal />
+              </Field>
+            );
+          case "lines":
+            return (
+              <Field key={field.name} label={field.label} optional={optional} {...status}>
+                <LinesField name={field.name} value={linesOf(b.value)} onChange={b.onChange} />
               </Field>
             );
           case "choice": {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "../lib/cn";
 import type { GalleryEntry } from "../testing/gallery";
+import { Icon } from "../icons/Icon";
 import { Field } from "./Field";
 import { RadioCards, type RadioCardOption } from "./RadioCards";
 
@@ -61,6 +62,23 @@ function LeaveType() {
   );
 }
 
+function DocumentKind() {
+  const [kind, setKind] = useState<string | null>(null);
+  return (
+    <Field label="What Is It?">
+      <RadioCards
+        value={kind}
+        onChange={setKind}
+        options={[
+          { value: "invoice", label: "Invoice", caption: "Bill to pay", leading: <Icon name="doc" /> },
+          { value: "payment_receipt", label: "Payment Receipt", caption: "Proof of a transfer", leading: <Icon name="wallet" /> },
+        ]}
+        className="max-w-sm"
+      />
+    </Field>
+  );
+}
+
 export default {
   component: "RadioCards",
   states: {
@@ -69,5 +87,6 @@ export default {
     "Full Disabled": () => <Levels module="Payroll" initial="view" fullOff />,
     "Field Error": () => <Missing />,
     "Without Glyphs": () => <LeaveType />,
+    "With Captions": () => <DocumentKind />,
   },
 } satisfies GalleryEntry;

@@ -4,6 +4,7 @@
  *
  *   POST   /ask                      create  a question answered from the reads the caller may run
  *   GET    /suggestions              view    up to six questions the caller's reads can answer
+ *   GET    /attachment-kinds         view    the kinds of document the caller may attach (§6.18)
  *   GET    /conversations            view    the caller's conversations, 25 a page
  *   GET    /conversations/:id/turns  view    one conversation's answers, newest page first
  *   DELETE /conversations/:id        view    delete one of the caller's conversations
@@ -43,6 +44,10 @@ route(router, "post", "/ask",
 route(router, "get", "/suggestions",
   { response: a.AiSuggestions, summary: "Questions the caller's reads can answer" },
   view, controller.suggestions);
+
+route(router, "get", "/attachment-kinds",
+  { response: a.AiAttachmentKinds, summary: "The kinds of document I may attach to a question" },
+  view, controller.attachmentKinds);
 
 route(router, "get", "/conversations",
   { query: a.AiConversationListQuery, response: a.AiConversationPage, summary: "My conversations with the assistant" },

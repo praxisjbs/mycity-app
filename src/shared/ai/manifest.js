@@ -39,6 +39,14 @@
  *       asks: [{ field: "confirmed_on", question: "From which day?", choices: ["Today"] }],   // asked before the card
  *     }],
  *     routes: [{ intent: "add an employee", screen: "people.employees", params: { new: "1" } }],
+ *     files: [{                                       // a document attached on Ask, read for a card (praxis-ai.md §6.18)
+ *       kind: "invoice",                              // an AiAttachmentKind
+ *       label: "Invoice",
+ *       permission: ["expenses", "create"],           // who is offered the tile; `capability` beside it when one is needed
+ *       question: "Raise an expense request from this invoice",
+ *       read: (actor, doc, db) => receiptAi.readForChat(actor, doc, db),   // { outcome, reading, card, notes }; writes nothing
+ *       actions: ["my_expenses.from_invoice"],        // the cards it may draw
+ *     }],
  *     not_offered: { EmployeeImportRow: "an import row is loaded through the import engine" },
  *   });
  *
@@ -79,7 +87,7 @@ const catalog = require("../access/access.catalog");
 const routeMap = require("../route-map");
 
 const MANIFEST = Symbol.for("mycity.ai.manifest");
-const TOP_KEYS = new Set(["module", "reads", "summaries", "actions", "routes", "not_offered"]);
+const TOP_KEYS = new Set(["module", "reads", "summaries", "actions", "routes", "not_offered", "files"]);
 /** A write by another name, anywhere in a manifest: refused. */
 const WRITE_WORDS = new Set([
   "write",
@@ -121,7 +129,12 @@ const ACTION_KEYS = new Set([
   "allows",
   "capabilities",
   "then",
+  "from_file",
 ]);
+/** A document a module reads when it is attached on Ask (praxis-ai.md §6.18). */
+const FILE_KEYS = new Set(["kind", "label", "permission", "capability", "question", "read", "actions"]);
+/** The kinds a person may attach (packages/contract AiAttachmentKind). */
+const FILE_KINDS = new Set(["invoice", "payment_receipt", "contract"]);
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
 /** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decisions 31 and 32). */
 const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task", "employee", "worksite", "policy", "place", "site_member", "partner", "lead", "partner_deal", "hiring_manager"]);
@@ -313,6 +326,15 @@ function checkAction(where, a, seen) {
   }
   // What a done press offers next: (result, values) => [{ label, question }] (AiActionResult.next), each asked as the next question.
   if (a.then !== undefined && typeof a.then !== "function") throw new Error(`${at}: then is (result, values) => [{ label, question }]`);
+  // An action drawn only from an attached document: offered only while one of that kind is in the
+  // conversation, its `fills` given by the document's reader (praxis-ai.md §6.18).
+  if (a.from_file !== undefined) {
+    const f = a.from_file;
+    if (!f || typeof f !== "object" || Object.keys(f).some((k) => k !== "kind" && k !== "fills") || !FILE_KINDS.has(f.kind))
+      throw new Error(`${at}: from_file is { kind: one of ${[...FILE_KINDS].join(", ")}, fills: [fields] }`);
+    if (!Array.isArray(f.fills) || !f.fills.length || f.fills.some((k) => typeof k !== "string" || !takes(k) || !carried(k)))
+      throw new Error(`${at}: from_file.fills names the fields the card carries that the document's reader gives`);
+  }
   const asks = checkAsks(at, a.asks, takes, carried);
   checkMatrix(at, a.matrix);
   return Object.freeze({
@@ -334,7 +356,36 @@ function checkAction(where, a, seen) {
     allows: Object.freeze({ ...(a.allows || {}) }),
     capabilities: a.capabilities ? Object.freeze([...a.capabilities]) : null,
     then: a.then || null,
+    from_file: a.from_file ? Object.freeze({ kind: a.from_file.kind, fills: Object.freeze([...a.from_file.fills]) }) : null,
   });
+}
+
+/**
+ * A kind of document the module reads when a person attaches it on Ask (praxis-ai.md §6.18): its
+ * tile, who is offered it (a grant, and a capability on top when the card needs one), the question
+ * asked when the box is left empty, the module's own reader (data only: it writes nothing) and the
+ * cards it may draw, whose keys the registry checks once every manifest has loaded.
+ */
+function checkFile(where, f, seen) {
+  if (!f || typeof f !== "object") throw new Error(`${where}: each file is an object`);
+  for (const k of Object.keys(f)) {
+    if (WRITE_WORDS.has(k)) throw new Error(`${where}: "${k}" in a file. A document is read; a card the person presses does the rest`);
+    if (!FILE_KEYS.has(k)) throw new Error(`${where}: unknown file key "${k}"`);
+  }
+  if (!FILE_KINDS.has(f.kind)) throw new Error(`${where}: a file's kind is one of ${[...FILE_KINDS].join(", ")}`);
+  if (seen.has(f.kind)) throw new Error(`${where}: file kind ${f.kind} declared twice`);
+  seen.add(f.kind);
+  const at = `${where} file ${f.kind}`;
+  if (typeof f.label !== "string" || !f.label.trim() || f.label.length > 40 || f.label.trim().split(/\s+/).length > 4) throw new Error(`${at}: label is the tile's words, at most 4`);
+  checkPermission(at, f.permission, ACTION_GRANTS, "a file");
+  if (f.capability !== undefined && (typeof f.capability !== "string" || !catalog.isCapability(f.capability)))
+    throw new Error(`${at}: capability is a code in shared/access/access.catalog.js CAPABILITY_CATALOG`);
+  if (typeof f.question !== "string" || f.question.trim().length < 10 || f.question.length > 200 || /[—–]/.test(f.question))
+    throw new Error(`${at}: question is the words asked when the box is left empty, 10 to 200 characters`);
+  if (typeof f.read !== "function") throw new Error(`${at}: read is (actor, doc, db) => { outcome, reading, card, notes }`);
+  if (!Array.isArray(f.actions) || !f.actions.length || f.actions.some((k) => !KEY_RE.test(String(k || ""))))
+    throw new Error(`${at}: actions lists the keys of the cards it may draw`);
+  return Object.freeze({ ...f, label: f.label.trim(), question: f.question.trim(), capability: f.capability || null, actions: Object.freeze([...f.actions]) });
 }
 
 /**
@@ -478,8 +529,9 @@ function defineManifest(spec) {
     if (!TOP_KEYS.has(k)) throw new Error(`${where}: unknown key "${k}"`);
   }
   if (!catalog.isModule(spec.module)) throw new Error(`${where}: module is a permission key (shared/access/access.catalog.js)`);
-  for (const k of ["reads", "summaries", "actions", "routes"])
+  for (const k of ["reads", "summaries", "actions", "routes", "files"])
     if (spec[k] !== undefined && !Array.isArray(spec[k])) throw new Error(`${where}: ${k} is an array`);
+  const seenFiles = new Set();
   const seenKeys = new Set();
   const seenRoutes = new Set();
   return Object.freeze({
@@ -490,6 +542,7 @@ function defineManifest(spec) {
     actions: Object.freeze((spec.actions || []).map((a) => checkAction(where, a, seenKeys))),
     routes: Object.freeze((spec.routes || []).map((r) => checkRoute(where, r, seenRoutes))),
     not_offered: checkNotOffered(where, spec.not_offered),
+    files: Object.freeze((spec.files || []).map((f) => checkFile(where, f, seenFiles))),
   });
 }
 
@@ -505,4 +558,5 @@ module.exports = {
   RISKS,
   BULK_MAX,
   ACTION_GRANTS,
+  FILE_KINDS,
 };

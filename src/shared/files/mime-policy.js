@@ -58,6 +58,9 @@ const ALLOW = Object.freeze({
   assessment_answer: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv, ...VIDEO],
   // An assessment exported from another hub, read back by Import (docs/guides/recruitment.md §6.7).
   assessment_import: [TYPES.json],
+  // A document attached to a question on Praxis AI: what the Image Reading model reads itself, PDF and
+  // a phone's photos (a HEIF photo sniffs as HEIC); never Word or a sheet (docs/guides/praxis-ai.md §6.18).
+  ai_attachment: [TYPES.pdf, ...IMAGES],
 });
 
 const NEVER = new Set(["markup", "archive", "unknown"]);

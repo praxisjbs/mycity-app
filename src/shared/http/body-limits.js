@@ -45,6 +45,8 @@ const UPLOAD_CAPS = Object.freeze({
   // A file answer to an assessment, at the system's limit (docs/guides/recruitment.md §6.7).
   assessment_answer: 25 * MB,
   assessment_import: 1 * MB,
+  // A document attached to a question on Praxis AI, at the AI client's FILE_MAX_BYTES (docs/guides/praxis-ai.md §6.18).
+  ai_attachment: 10 * MB,
 });
 
 /** "15 MB", for messages people read. */

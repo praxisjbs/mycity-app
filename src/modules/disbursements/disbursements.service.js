@@ -153,6 +153,12 @@ async function cardRequest(db, id) {
   return row && row.status !== "draft" ? [{ type: "expense", id, label: `${row.number}, ${row.purpose}` }] : [];
 }
 
+/** The receipt a Record Disbursement card carries, by its file's name, when it is the person's own upload. */
+async function cardNames(db, values, actor) {
+  const name = await expenses.fileName(db, values.receipt_document_id, actor);
+  return name ? [{ type: "document", id: values.receipt_document_id, label: name }] : [];
+}
+
 /** Record Disbursement's re-check: the request is authorised and not paid. */
 async function assertCardPayable(db, id) {
   const row = UUID.test(String(id || "")) ? await expensesRepo.get(db, id) : null;
@@ -175,4 +181,4 @@ async function assertCardMissing(db, id, actor) {
 
 const readback = (status) => (r) => [{ type: "disbursement", id: r.disbursement_id, label: `${r.number}, ${r.request_number}`, status: r.reference_missing ? "recorded, reference missing" : status, link: linkOf(r.disbursement_id) }];
 
-module.exports = { list, getFor, publicRow, create, addReference, cardRequest, assertCardPayable, cardDisbursement, assertCardMissing, readback };
+module.exports = { list, getFor, publicRow, create, addReference, cardRequest, cardNames, assertCardPayable, cardDisbursement, assertCardMissing, readback };

@@ -238,6 +238,17 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-11-04",
     built: true,
   }),
+  // Praxis AI's documents in the chat (docs/guides/praxis-ai.md §1.10 decision 43, §6.18): a payment
+  // receipt attached on Ask is read for Record Disbursement's card. An invoice reuses Read Invoice above.
+  "disbursement-receipt-read": Object.freeze({
+    label: "Read Receipt",
+    module: "expenses",
+    job: "image_reading",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-11-13",
+    built: true,
+  }),
   "expense-duplicate-check": Object.freeze({
     label: "Check Duplicate",
     module: "expenses",

@@ -7,7 +7,7 @@
  * @phone Full width; the answers to tap are one under the other, full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets.
  * @a11y An article named Answer; the words are content; the answers to tap are a group named Answers whose buttons wait for each other while one is asked (ActionGroup); Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane.
  * @status beta
- * @exports QuestionBubble
+ * @exports QuestionBubble (the person's words, and the file a question carried as a chip that opens it)
  * @example <AnswerBubble text={a.content} table={table} paging="Showing 25 of 312" onNext={next} link={{ label: "Open Leave", onOpen }} from={chips} feedback={null} onFeedback={give} onPane={showPane} />
  */
 import type { ReactNode } from "react";
@@ -124,15 +124,34 @@ export function AnswerBubble({ text, table, paging, onNext, link, from, onPane, 
 export interface QuestionBubbleProps {
   /** The person's words. */
   words: string;
+  /** The document the question carried (praxis-ai.md §6.18): its name as a chip that opens it. */
+  file?: { name: string; onOpen?: () => void } | null;
   /** Layout classes only (spacing). */
   className?: string;
 }
 
-/** The person's question, as their own bubble at the right. */
-export function QuestionBubble({ words, className }: QuestionBubbleProps) {
+/** The person's question, as their own bubble at the right, with the file it carried above the words. */
+export function QuestionBubble({ words, file = null, className }: QuestionBubbleProps) {
+  if (!file)
+    return (
+      <p data-copy="content" className={cn("ml-auto w-fit max-w-4/5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm wrap-any", className)}>
+        {words}
+      </p>
+    );
   return (
-    <p data-copy="content" className={cn("ml-auto w-fit max-w-4/5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm wrap-any", className)}>
-      {words}
-    </p>
+    <div className={cn("ml-auto flex w-fit max-w-4/5 flex-col items-end gap-1.5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm", className)}>
+      {file.onOpen ? (
+        <Button size="sm" variant="ghost" icon="clip" onClick={file.onOpen}>
+          <span data-copy="content" className="wrap-any">{file.name}</span>
+        </Button>
+      ) : (
+        <span data-copy="content" className="flex items-center gap-1 text-xs wrap-any">
+          {file.name}
+        </span>
+      )}
+      <p data-copy="content" className="m-0 wrap-any">
+        {words}
+      </p>
+    </div>
   );
 }

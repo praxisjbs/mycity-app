@@ -121,15 +121,16 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
+| Forms | [LinesField](#linesfield) | `LinesField` | A request's lines: each an Item, a Quantity and a Unit Price (a minus taken for a discount or a payment already made), its Amount worked out, Add Line under them and the Total beside it, counted in kobo, never in floating point. | beta |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
-| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped. | stable |
+| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped; with `signed` it is kept and taken (a discount), shown in the destructive colour. | stable |
 | Forms | [MonthField](#monthfield) | `MonthField` | A month picked from a year's twelve, bound to a form: the field reads "October 2026" and the value is the month's first day for the wire. | beta |
 | Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
 | Forms | [QuestionCard](#questioncard) | `QuestionCard` | One question the Proposal Studio asks before a draft: the question, why it is asked, an answer field matched to its kind, a suggested answer with where it came from, and Skip and Reshuffle. | beta |
-| Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
+| Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words and a short caption under them: the radio cards of FRONTEND_GUIDE §8.2. | stable |
 | Forms | [RatingField](#ratingfield) | `RatingField` | A rating from 1 to 10 (or another top from 3 to 10) as a row of stars, a tap on the seventh star rating it 7; disabled locks a given rating in place, readOnly draws one already given or a panel's mean. | beta |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
@@ -197,7 +198,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 | Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
-| Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
+| Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble (the person's words`, `and the file a question carried as a chip that opens it)` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
 | Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
 | Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read; nothing until a question reads a summary. | beta |
 | Assistant | [PaneSheet](#panesheet) | `PaneSheet` | The phone's pane: a full-height sheet that holds the four views (PaneTabs) for one answer, opened from Open Figures under it. | beta |
@@ -3864,6 +3865,37 @@ No props of its own.
 <InlineInput aria-label="Message" value={text} onChange={setText} />
 ```
 
+### LinesField
+
+A request's lines: each an Item, a Quantity and a Unit Price (a minus taken for a discount or a payment already made), its Amount worked out, Add Line under them and the Total beside it, counted in kobo, never in floating point.
+
+| | |
+|---|---|
+| Use | New Request's lines (Expenses), and Edit on a Praxis AI card whose field is `lines` (an invoice read into a request); bind it with useContractForm's field("lines") and send the lines through toMoneyString. |
+| Avoid | One amount (MoneyField); a list of names or ids (a picker); a table a person only reads (DataView, or the card's own lines table). |
+| Phone | Each line is two columns: the item full width, then Quantity and Unit Price side by side, the Amount and the remove button under them; Add Line and the Total stay at the foot; every target is 44 px. |
+| Accessibility | A group named by its Field's label; each control is labelled (Item 1, Quantity, Unit Price); the remove button names its line (Remove Item 2); the Total is text, its minus read, never colour alone. |
+| Status | beta |
+| Exports | `LinesField` |
+| Import | `import { LinesField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/LinesField.tsx` |
+| Test | `packages/ui/src/form/LinesField.test.tsx` |
+| Gallery | `packages/ui/src/form/LinesField.gallery.tsx` (`npm run gallery`, `#/LinesField`) |
+
+**LinesField** props (`LinesFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `LineValue[]` | yes | The lines as typed. |
+| `onChange` | `(lines: LineValue[]) => void` | yes | Called with every line after a change. |
+| `max` | `number` |  | The most lines a request holds (the contract's 25). |
+| `name` | `string` |  | The field's name, so a failed submit can focus its first control. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<LinesField value={lines} onChange={setLines} />
+```
+
 ### LoginField
 
 The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try.
@@ -3902,11 +3934,11 @@ The sign-in screen's larger field: label, control, its mark, and a message that 
 
 ### MoneyField
 
-An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped.
+An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped; with `signed` it is kept and taken (a discount), shown in the destructive colour.
 
 | | |
 |---|---|
-| Use | Every amount a person enters (an expense, a salary, a threshold); turn what was typed into the wire value with toMoneyString. |
+| Use | Every amount a person enters (an expense, a salary, a threshold); turn what was typed into the wire value with toMoneyString. `signed` only where an amount may be below zero (a request's discount line, a payment already made). |
 | Avoid | A number field for money (gate 20); showing an amount (use Money). |
 | Phone | The decimal keypad; 16 px text; right-aligned figures. |
 | Accessibility | Labelled by its Field; the ₦ sign is visual, the label says it is an amount. |
@@ -3929,9 +3961,10 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `name` | `string` |  | The field's name, so a failed submit can focus it. |
+| `signed` | `boolean` |  | A minus is taken (a discount, a payment already made), not refused; the amount then reads in the destructive colour. |
 
 ```tsx
-<MoneyField {...form.field("amount")} />
+<MoneyField {...form.field("amount")} /> <MoneyField signed value="-100,000" onChange={set} />
 ```
 
 ### MonthField
@@ -4154,7 +4187,7 @@ One question the Proposal Studio asks before a draft: the question, why it is as
 
 ### RadioCards
 
-Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2.
+Pick one of two to five options shown as stacked rows, each with an optional glyph before its words and a short caption under them: the radio cards of FRONTEND_GUIDE §8.2.
 
 | | |
 |---|---|
@@ -6741,8 +6774,8 @@ One answer of Praxis AI: its words, the answers to tap when it asks a question, 
 | Phone | Full width; the answers to tap are one under the other, full width; the table above it is cards (DataView); Open Figures opens the pane as a sheet; the buttons are 44 px targets. |
 | Accessibility | An article named Answer; the words are content; the answers to tap are a group named Answers whose buttons wait for each other while one is asked (ActionGroup); Helpful and Not Helpful say their pressed state (aria-pressed) and wait for each other (ActionGroup); the chips are buttons when they open the pane. |
 | Status | beta |
-| Exports | `AnswerBubble`, `QuestionBubble` |
-| Import | `import { AnswerBubble, QuestionBubble } from "@mycity/ui";` |
+| Exports | `AnswerBubble`, `QuestionBubble (the person's words`, `and the file a question carried as a chip that opens it)` |
+| Import | `import { AnswerBubble, QuestionBubble (the person's words, and the file a question carried as a chip that opens it) } from "@mycity/ui";` |
 | File | `packages/ui/src/assistant/AnswerBubble.tsx` |
 | Test | `packages/ui/src/assistant/AnswerBubble.test.tsx` |
 | Gallery | `packages/ui/src/assistant/AnswerBubble.gallery.tsx` (`npm run gallery`, `#/AnswerBubble`) |
@@ -6766,12 +6799,9 @@ One answer of Praxis AI: its words, the answers to tap when it asks a question, 
 | `onChoose` | `(choice: string) => Promise<unknown> \| void` |  | A tap on a choice: the screen asks it as the person's next question; every choice is busy until it lands. Left out, the choices are not shown. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
-**QuestionBubble** props (`QuestionBubbleProps`)
+**QuestionBubble (the person's words** props: missing (no `QuestionBubble (the person's wordsProps` in the file)
 
-| Prop | Type | Required | Description |
-|---|---|---|---|
-| `words` | `string` | yes | The person's words. |
-| `className` | `string` |  | Layout classes only (spacing). |
+**and the file a question carried as a chip that opens it)** props: missing (no `and the file a question carried as a chip that opens it)Props` in the file)
 
 ```tsx
 <AnswerBubble text={a.content} table={table} paging="Showing 25 of 312" onNext={next} link={{ label: "Open Leave", onOpen }} from={chips} feedback={null} onFeedback={give} onPane={showPane} />

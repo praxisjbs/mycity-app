@@ -302,7 +302,8 @@ async function normalise(db, employee, body, keepCategory = null) {
   if (!items.length) throw invalid("LINES_REQUIRED", "Add a line", { lines: ["Add a line"] });
   if (items.length > MAX_LINES) throw invalid("TOO_MANY_LINES", `A request holds at most ${MAX_LINES} lines`, { lines: ["At most 25"] });
   const amount = m.toWire(m.sum(items.map((i) => i.amount)));
-  if (!m.money(amount).greaterThan(0)) throw invalid("AMOUNT_REQUIRED", "The request needs an amount", { lines: ["Add an amount"] });
+  // A line may be negative (a discount, a payment already made: praxis-ai.md decision 45); the request's total never is.
+  if (!m.money(amount).greaterThan(0)) throw invalid("EXPENSE_TOTAL_NOT_POSITIVE", "The request's total must be above zero", { lines: ["Total above zero"] });
   const profile = body.uses_profile_account === true;
   if (profile && body.payee_type !== "staff")
     throw invalid("PROFILE_ACCOUNT_STAFF_ONLY", "Only a staff payee uses the company account", { uses_profile_account: ["Staff only"] });
@@ -669,6 +670,26 @@ function bodyOf(row) {
   };
 }
 
+/** New Request's card from an attached invoice (praxis-ai.md §6.18): every line, the payee's bank and the invoice, through create(). */
+function createFromInvoice(actor, values) {
+  return create(actor, values);
+}
+
+/** A running project by its name, for a card that writes one by name. */
+const projectIdOf = (db, name) => (db ? repo.projectIdByName(db, name) : null);
+
+/**
+ * Requests the person may open that an invoice attached on Praxis AI might repeat (praxis-ai.md
+ * §6.18; §6.8 here): sent within 30 days to the same payee for the same amount. The rest are never
+ * named, as on a request's modal.
+ * @returns {Promise<Array<{number: string, submitted_at: string}>>}
+ */
+async function possibleDuplicatesOf(actor, scope, { account_number: accountNumber, payee_name: payeeName, amount }) {
+  if (!amount || (!accountNumber && !payeeName)) return [];
+  const dups = await repo.duplicatesFor(pool, { account_number: accountNumber, payee_name: payeeName, amount });
+  return (await readableDuplicates(actor, scope, dups)).shown;
+}
+
 /** New Request's card: its first line flat, sent at once unless the person said to keep a draft. */
 function createFromCard(actor, values) {
   const { description, quantity, unit_price: unitPrice, ...rest } = values;
@@ -728,8 +749,8 @@ async function assertCardEditable(db, actor, id) {
   await editableOwn(db, actor, id);
 }
 
-/** The ids a New Request or Save Request card holds, by name: its category, project and department. */
-async function cardNames(db, values) {
+/** The ids a New Request or Save Request card holds, by name: its category, project and department, and the invoice it carries. */
+async function cardNames(db, values, actor = null) {
   if (!db) return [];
   const out = [...(await categories.cardCategory(db, values.expense_category_id))];
   if (UUID.test(String(values.project_id || ""))) {
@@ -740,7 +761,16 @@ async function cardNames(db, values) {
     const name = await repo.departmentName(db, values.department_id);
     if (name) out.push({ type: "department", id: values.department_id, label: name });
   }
+  const invoice = await fileName(db, values.invoice_document_id, actor);
+  if (invoice) out.push({ type: "document", id: values.invoice_document_id, label: invoice });
   return out;
+}
+
+/** A file a card carries, by its name, when it is the person's own upload; null otherwise. */
+async function fileName(db, documentId, actor) {
+  if (!db || !actor || !UUID.test(String(documentId || ""))) return null;
+  const doc = await vault.get(db, documentId);
+  return doc && doc.uploaded_by === actor.user_id ? doc.original_name || doc.title || "Invoice" : null;
 }
 
 module.exports = {
@@ -777,6 +807,10 @@ module.exports = {
   attachToBudgetIn,
   detachLineIn,
   createFromCard,
+  createFromInvoice,
+  projectIdOf,
+  possibleDuplicatesOf,
+  fileName,
   changeFromCard,
   addLineFromCard,
   readbackOf,

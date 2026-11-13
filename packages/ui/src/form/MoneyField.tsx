@@ -1,13 +1,13 @@
 /**
  * @component MoneyField
  * @group Forms
- * @summary An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped.
- * @use Every amount a person enters (an expense, a salary, a threshold); turn what was typed into the wire value with toMoneyString.
+ * @summary An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped; with `signed` it is kept and taken (a discount), shown in the destructive colour.
+ * @use Every amount a person enters (an expense, a salary, a threshold); turn what was typed into the wire value with toMoneyString. `signed` only where an amount may be below zero (a request's discount line, a payment already made).
  * @avoid A number field for money (gate 20); showing an amount (use Money).
  * @phone The decimal keypad; 16 px text; right-aligned figures.
  * @a11y Labelled by its Field; the ₦ sign is visual, the label says it is an amount.
  * @status stable
- * @example <MoneyField {...form.field("amount")} />
+ * @example <MoneyField {...form.field("amount")} /> <MoneyField signed value="-100,000" onChange={set} />
  */
 import { useEffect, useRef } from "react";
 import { cn } from "../lib/cn";
@@ -32,6 +32,8 @@ export interface MoneyFieldProps {
   id?: string;
   /** The field's name, so a failed submit can focus it. */
   name?: string;
+  /** A minus is taken (a discount, a payment already made), not refused; the amount then reads in the destructive colour. */
+  signed?: boolean;
 }
 
 /** A minus, or an accounting bracket, before the figures: "-100", "₦-100", "−100", "(100)". */
@@ -46,9 +48,15 @@ const WHOLE_DIGITS = 16;
  * and a second point, a comma out of place or a third decimal is refused rather than cut.
  * `final` when typing more cannot put it right.
  */
-export function readMoney(typed: string): { text: string; problem?: string; final?: boolean } {
+export function readMoney(typed: string, { signed = false }: { signed?: boolean } = {}): { text: string; problem?: string; final?: boolean } {
   const figures = typed.replace(/[^\d.,]/g, "");
-  if (MINUS.test(typed)) return { text: `-${figures}`, problem: "Not below zero", final: true };
+  const minus = MINUS.test(typed);
+  if (minus && !signed) return { text: `-${figures}`, problem: "Not below zero", final: true };
+  if (minus) {
+    // A signed amount keeps its minus and is read as the amount after it.
+    const rest = readMoney(figures);
+    return { ...rest, text: `-${rest.text}` };
+  }
   if (!figures) return { text: "" };
   const [whole = "", ...rest] = figures.split(".");
   const fraction = rest[0] ?? "";
@@ -59,9 +67,10 @@ export function readMoney(typed: string): { text: string; problem?: string; fina
   return { text: figures };
 }
 
-export function MoneyField({ value, onChange, onBlur, onProblem, state, message: _message, id, name }: MoneyFieldProps) {
+export function MoneyField({ value, onChange, onBlur, onProblem, state, message: _message, id, name, signed = false }: MoneyFieldProps) {
   const a = useFieldControl({ id, state });
-  const read = readMoney(value ?? "");
+  const read = readMoney(value ?? "", { signed });
+  const below = signed && (value ?? "").trim().startsWith("-");
   // The form hears of the problem whenever it changes, typed, pasted or set from outside.
   const told = useRef(onProblem);
   told.current = onProblem;
@@ -78,9 +87,9 @@ export function MoneyField({ value, onChange, onBlur, onProblem, state, message:
         name={name}
         inputMode="decimal"
         autoComplete="off"
-        className={cn(controlClass(shown), "h-control pl-7 text-right tabular-nums")}
+        className={cn(controlClass(shown), "h-control pl-7 text-right tabular-nums", below && "text-destructive")}
         value={value ?? ""}
-        onChange={(e) => onChange(readMoney(e.target.value).text)}
+        onChange={(e) => onChange(readMoney(e.target.value, { signed }).text)}
         onBlur={onBlur}
       />
     </span>

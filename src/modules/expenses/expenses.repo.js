@@ -522,6 +522,41 @@ function banks(db, query, common) {
   );
 }
 
+/**
+ * Requests sent within 30 days of now to a payee (the same account number, or the same name with case
+ * and accents set aside) for an amount: what an invoice attached on Praxis AI might repeat
+ * (praxis-ai.md §6.18; guide §6.8). The service names only those the reader may open.
+ */
+async function duplicatesFor(db, { account_number: accountNumber, payee_name: payeeName, amount }) {
+  const { rows } = await db.query(
+    `SELECT o.expense_request_id, o.number, o.purpose, o.amount, ${OTHER_STATUS} AS status, o.submitted_at,
+            o.employee_id, o.workflow_instance_id, owi.state AS approval_state
+       FROM expense_request o
+       LEFT JOIN workflow_instance owi ON owi.workflow_instance_id = o.workflow_instance_id
+       LEFT JOIN requisition orq ON orq.requisition_id = o.requisition_id
+       LEFT JOIN workflow_instance orwi ON orwi.workflow_instance_id = orq.workflow_instance_id
+      WHERE o.amount = $3::numeric AND o.submitted_at >= now() - interval '30 days'
+        AND (($1::text IS NOT NULL AND o.account_number = $1::text)
+             OR ($2::text IS NOT NULL AND o.payee_name IS NOT NULL AND search_fold(o.payee_name) = search_fold($2::text)))
+      ORDER BY o.submitted_at DESC, o.expense_request_id
+      LIMIT ${DUPLICATES_SHOWN} -- pagination:batch the few possible duplicates an attached invoice warns of`,
+    [accountNumber || null, payeeName || null, amount],
+  );
+  return rows;
+}
+
+/** A running project by its name, case and accents set aside: one, or null when none or several match. */
+async function projectIdByName(db, name) {
+  const { rows } = await db.query(
+    `SELECT project_id FROM project
+      WHERE status NOT IN ('archived', 'cancelled') AND search_fold(name) = search_fold($1::text)
+      ORDER BY project_id
+      LIMIT 2 -- pagination:batch one match, or a second to say the name is not one project's`,
+    [name],
+  );
+  return rows.length === 1 ? rows[0].project_id : null;
+}
+
 async function departmentName(db, id) {
   const { rows } = await db.query("SELECT name FROM department WHERE department_id = $1", [id]);
   return rows[0] ? rows[0].name : null;
@@ -531,6 +566,8 @@ module.exports = {
   banks,
   historyOf,
   duplicatesOf,
+  duplicatesFor,
+  projectIdByName,
   refreshOverBudget,
   attachToBudget,
   detachLine,

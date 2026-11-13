@@ -54,6 +54,8 @@ const UploadPurpose = z.enum([
   "cv",
   "assessment_answer",
   "assessment_import",
+  // A document attached to a question on Praxis AI: PDF or a photo, 10 MB (praxis-ai.md §6.18).
+  "ai_attachment",
 ]);
 
 const DocumentSensitivity = z.enum(["normal", "personal", "restricted"]);

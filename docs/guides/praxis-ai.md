@@ -314,7 +314,7 @@ are below. §6.18 is the design and Appendix A the build plan.
 | AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; Data Answers' chain takes any text model as first choice or fallback | As built (`ai-control.md`) |
 | Every module's manifest | Backend | | The reads, summaries and actions Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9), summaries for its big tables (§6.13, PR3) and actions for the changes people ask for (§6.11, PR4) |
 | An action card | Inside an answer, on the full screen and in the phone's chat | The person who asked, for an action their grant allows | The action's name, the fields its form offers as it will receive them (as a person reads them: people, departments and projects by name, decision 31), the records it acts on named and linked, a problem on its field, the buttons; the result line after the press, one line per record; Expired with Draw It Again | Press the verb (with the count when it acts on several; Confirm It's You first for a sensitive class; not offered while a field shows a problem, Edit standing in its place), Edit (the fields through the form system, people, departments and projects with the screen's own pickers, Save Changes), Cancel; a suggested card reads as a question with Not Now |
-| Praxis AI · Ask, Attach Document (Appendix A; not built yet) | Staff app: beside the question box, on the full screen and in the phone's chat | `praxis_ai` create, and the grant each kind needs (decision 41) | A modal: the three kinds as tiles, then the file; the question's bubble then carries the file | Attach an invoice, a payment receipt, or a contract or MoU, and get its card (§6.18) |
+| Praxis AI · Ask, Attach Document (Appendix A: invoices and payment receipts built in PR 1; contracts and MoUs in PR 2) | Staff app: beside the question box, on the full screen and in the phone's chat | `praxis_ai` create, and the grant each kind needs (decision 41) | A modal: the kinds the person may attach as tiles, then the file; the question's bubble then carries the file | Attach an invoice or a payment receipt (a contract or MoU from PR 2), and get its card (§6.18) |
 
 ## 3 · How the screens relate
 
@@ -403,7 +403,8 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `POST /ask` | `AiAsk` (`question` up to 500 characters, `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`, and `choices`, the answers to tap under a question asked before a card; `reads` carry `n`, `module_key`, `params`, `outcome` (`read`, `refused`, `invalid`, `failed` or `timed_out`) and `masked`; a `table` names the `read` it was drawn from) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed, with `ai:progress` on the person's realtime room before each read (§6.1.8). The full screen sends `context` and `shows: ["pane"]`. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
+| `GET /attachment-kinds` | → `AiAttachmentKinds` | `praxis_ai` view | no | The kinds the caller may attach (decision 41), each with its label and question, and whether reading is available now (§6.18) |
+| `POST /ask` | `AiAsk` (`question` up to 500 characters, empty only beside an `attachment` (`{ document_id, kind }`, §6.18), `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`, `attachment` (the file the question carried), and `choices`, the answers to tap under a question asked before a card; `reads` carry `n`, `module_key`, `params`, `outcome` (`read`, `refused`, `invalid`, `failed` or `timed_out`) and `masked`; a `table` names the `read` it was drawn from) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed, with `ai:progress` on the person's realtime room before each read (§6.1.8). The full screen sends `context` and `shows: ["pane"]`. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
 | `GET /answers/:id/reads/:n` (`page`) | `PageQuery` → `AiReadRows` | `praxis_ai` view · own | yes, 25 | Read `n` of the answer run again with its stored parameters and the caller's rights now (§6.12): the Table's later pages, the Sources tab and Excel come from here. 404 for a summary or a read that was refused or timed out |
 | `POST /answers/:id/reads/:n/export` | `EmptyBody` → `documents.ExportFile`, 202 | `praxis_ai` view · own | | Download Excel (§6.16): every row of read `n`, replayed in the worker with the caller's rights and masks as they stand then, at most 25,000 rows, with an About This File sheet; the screen waits on `GET /exports/:id` and downloads as every export does (`foundation.md` §6.12). 404 as the replay is |
 | `GET /cards/:id` | → `AiActionCard` | `praxis_ai` view · own | | The card as the person sees it (§6.11): its fields (`AiCardField`, each with its kind, whether it is `long`, a box of several lines, and `picks`, the picker an id field is chosen with on Edit), its records (what a press acts on) and its `names` (the ids its fields hold, by name), named through the module's own repo, its problems; a status past `shown` is read only |
@@ -1212,9 +1213,11 @@ PR there.
    and edit schema and how it is accounted for.
 7. a field a card needs is never asked (decision 34): a field an action's input requires (its JSON
    Schema's `required`, among the fields the card carries, with no default) that no ask of the
-   action names without a `when`. A field required only in some states is the action's own to ask
-   with `when`; a field that names a record is asked with `read`, so its answers are the person's
-   own records.
+   action names without a `when`, and that a file does not fill (`from_file.fills`, §6.18). A field
+   required only in some states is the action's own to ask with `when`; a field that names a record
+   is asked with `read`, so its answers are the person's own records;
+8. a kind of document (a manifest's `files`, §6.18) that no integration test names as `file.<kind>`,
+   or that no case of the evaluation set reads with `file: "<kind>"`.
 
 ### 6.16 Download Excel (decision 15; PR3)
 
@@ -1312,50 +1315,68 @@ not run. Production is refused, as the evaluation set is.
 
 ### 6.18 Documents in the chat (decisions 41 to 48; Appendix A)
 
-**Not built yet.** This section is the design Appendix A's two pull requests build; each changes it
-first where the code teaches it otherwise, and says so in the Change log.
+**Built for invoices and payment receipts (PR 1, 13/11/2026); contracts and MoUs are PR 2.** Where
+the build taught the design otherwise, the change is written here and in the Change log.
 
-**The contract** (`packages/contract/schemas/assistant.js`, PR 1):
+**The contract** (`packages/contract/schemas/assistant.js`):
 
 - `AiAttachmentKind`: `invoice`, `payment_receipt`, `contract` (the tile reads Contract or MoU).
 - `AiAttachment`: `{ document_id, kind }`; `AiAsk.attachment` takes one, optional. With an
   attachment the question may be left empty: the server asks the kind's own question ("Raise an
   expense request from this invoice", "Record the payment on this receipt", "Summarise this contract
-  and file it").
+  and file it"). Without one an empty question is refused as before.
 - `GET /api/v1/ai/attachment-kinds` → `AiAttachmentKinds`: the kinds this person may attach
-  (`kind`, `label`), the order the modal shows them, and `available` (false while reading is off:
-  AI switched off, Praxis AI's switch off, no Image Reading model set up, or the month's cap
-  reached). Not paged: at most three rows, a fixed list.
+  (`kind`, `label`, `question`), in the order the modal shows them, and `available` (false while
+  reading is off: AI switched off, Praxis AI's switch off, no provider set up, or the month's cap
+  reached, as `drafts.availability` says for every Write With AI). Not paged: at most three rows, a
+  fixed list. A kind no module declares yet (`contract` until PR 2) is never listed.
 - `AiAnswer.attachment`: `{ document, kind }` or null (`documents.DocumentRef`), kept in
-  `ai_message.metadata.attachment` and replayed with the conversation, so the question's bubble
-  shows the file it was asked about. No new table and no migration.
+  `ai_message.metadata.attachment` with the reading and replayed with the conversation, so the
+  question's bubble shows the file it was asked about. No new table and no migration for the
+  assistant (Expenses' negative line needs one, below).
 
-**The upload.** The modal uploads through the upload engine (`POST /api/v1/documents`, gate 18) with the purpose `ai_attachment`: `shared/files/mime-policy.js` gains it with PDF,
-JPEG, PNG, WebP, HEIC and HEIF; the AI client's `FILE_TYPES` gains `image/heic` and `image/heif`,
-which Gemini reads. The file is a staged upload (`staged_upload`): its uploader's alone, and nobody
-else's until a record claims it. The card the person presses claims it (`vault.claim`), as the
-screen's own form does: the request's invoice (`expense_invoice`), the disbursement's receipt
-(`disbursement_receipt`), the agreement's signed copy, the partner's document. A file never claimed
-stays staged under the upload engine's own rule.
+**The upload.** The modal uploads through the upload engine (`POST /api/v1/documents`, gate 18) with
+the purpose `ai_attachment` (10 MB): `shared/files/mime-policy.js` takes PDF, JPEG, PNG, WebP and
+HEIC for it (the upload engine's sniffer names a HEIF photo `image/heic`, so the one type takes
+both), and the AI client's `FILE_TYPES` gains `image/heic` and `image/heif`, which Gemini reads.
+The file is a staged upload (`staged_upload`): its uploader's alone until a record claims it. The
+card the person presses claims it (`vault.claim`), as the screen's own form does: the request's
+invoice (`expense_invoice`), the disbursement's receipt (`disbursement_receipt`). A file never
+claimed stays staged under the upload engine's own rule.
 
-**The ask** (`assistant.service`, PR 1). With an attachment, before the model is asked:
+**The ask** (`assistant.service`, `assistant.files.js`). With an attachment, before the model is asked:
 
-1. The kind must be among the person's `attachment-kinds`, and the document their own staged upload
-   (else 404, `document_id: Upload it again`), of a readable kind, its scan neither pending nor
-   infected (else the answer says the file cannot be read).
+1. The kind must be among the person's `attachment-kinds` (else 403 `ATTACHMENT_FORBIDDEN` on
+   `attachment`), and the document their own staged upload (else 404, `attachment: Upload it
+   again`). A file of a kind the model cannot read, larger than `FILE_MAX_BYTES`, or whose scan is
+   pending or infected is answered as `unreadable`.
 2. Governance as for any question (§6.1), then the kind's reader runs once, outside any transaction,
    on its own action and job. Its spend is that action's in AI Control.
-3. The reader's result goes into the turn as one read, `file.<kind>`, its rows the result and its
-   citation the document (`entity_type: "document"`), and it is shown on Sources like any read. The
-   file itself never goes to the chat's model; only the reader's fields do, so words written in a
-   document are data and never instructions.
-4. The model answers from it and drafts one of the actions the kind offers (§6.11). `draftCard`
-   then lays the reader's fields over the model's values (decision 44) before
-   `authorise.checkAction` checks them, and fills the card's document field from the attachment.
-   The card names the file as a record chip that opens it.
+3. The reader's result goes into the turn as read 1, `file.<kind>` (`kind: "read"`, the module that
+   declares the kind), its fields given to the model with the question, through `redactValue` as a
+   read's rows are (an account number never reaches the chat's model), cited as the document
+   (`entity_type: "document"`, the file's name). It is shown on Sources like any read, counts as
+   one of the five (the model has four more), and is never replayed (`GET /ai/answers/:id/reads/1`
+   is 404). The file itself never goes to the chat's model; only the reader's fields do, so words
+   written in a document are data and never instructions.
+4. The model answers from it and drafts one of the actions the kind offers (§6.11). The server then
+   lays the reader's values over the model's (decision 44) **before the ask guard** (`askFirst`), so
+   a field the file gave is never asked, and before `authorise.checkAction` checks them; the
+   reader's own problems (`Check the lines`, `Naira only`) join the card's. When the model drafts no
+   card and asks nothing, the kind's card is drawn anyway, as asked when the question is the kind's
+   own, else as suggested. The card names the file on its field (Invoice, Receipt) by the file's
+   name (`names`), never as a record: records are what the press acts on and count on the verb. The
+   file opens from the question's chip.
 5. A reader that cannot read the file (`unreadable`), is off (`off`) or has no budget left
-   (`limit`) answers that in one sentence, draws no card, and spends nothing more. A later question
-   in the conversation sees the reading again from the replay; the file is not read twice.
+   (`limit`) answers that in one sentence ("This file cannot be read. Try a clearer copy.", "Reading
+   documents is off.", "This month's AI budget is spent."), with no model asked, no card and nothing
+   more spent. The server's own sentences (an invoice paid in full, a possible duplicate, a receipt
+   already paid) are added to the model's words, one each (`notes`).
+6. A later question in the same conversation sees the reading again from the replay (the turn's
+   words carry it, `metadata.attachment.reading`), and the reader's values are laid over that
+   question's card too, so a tapped answer ("Which request was paid?") draws the card with the
+   file's figures. The file is not read twice. The newest attachment of the conversation is the
+   one that counts.
 
 **Where a kind lives.** A module's manifest declares the documents it reads beside its reads,
 checked by `defineManifest` and refused anything that writes (gate 19):
@@ -1367,61 +1388,74 @@ files: [{
   permission: ["expenses", "create"],                // who is offered the tile; `capability` beside it when one is needed
   question: "Raise an expense request from this invoice",
   read: (actor, doc, db) => receiptAi.readForChat(actor, doc, db),   // the module's own reader; returns data, writes nothing
-  actions: ["my_expenses.from_invoice"],             // the cards it may draw
+  actions: ["my_expenses.from_invoice"],             // the cards it may draw, the first drawn when the model drafts none
 }],
 ```
 
-The registry lists the kinds a person may use (`registry.filesFor(actor)`), and gate 23 rule 7
-holds them to tests and evaluation cases as it holds actions (an evaluation case gains `file:`, a
-sample under `scripts/ai/samples/`; the set uploads it as the person before it asks).
+`read` answers `{ outcome, reading, card, notes }`: `outcome` `read`, `unreadable`, `off` or
+`limit`; `reading`, the fields the model sees; `card`, `{ action, values, problems, choices }` or
+null (null draws no card); `notes`, the server's sentences. An action drawn only from a file says
+so beside its fields, `from_file: { kind, fills }`: it is offered only while the conversation holds a
+file of that kind, and the fields in `fills` come from the reader, so gate 23 rule 7 counts them as
+asked. The registry lists the kinds a person may use (`registry.filesFor(actor)`) and checks each
+kind's actions once every manifest has loaded; gate 23 rule 8 holds each kind to an integration test
+naming `file.<kind>` and an evaluation case with `file: "<kind>"` (a made-up sample under
+`scripts/ai/samples/`, which the set uploads as the person before it asks).
 
-**Invoice** (PR 1, Expenses' own code):
+**Invoice** (Expenses' own code, `expenses.receipt-ai.js`):
 
-- The reader is Read Invoice's, widened: `ExpenseInvoiceRead` (the model's output) gains
-  `invoice_number`, `issued_on`, `total`, `paid_to_date`, `balance_due`, `bank_name`,
+- The reader is Read Invoice's, widened: `ExpenseInvoiceRead` (the model's output) gains `subject`,
+  `invoice_number`, `issued_on`, `currency`, `total`, `paid_to_date`, `balance_due`, `bank_name`,
   `account_name` and `account_number`, and its lines may carry a negative unit price (a discount).
-  `ExpenseInvoiceSuggestion` (what New Request's own Read Invoice returns) gains the bank fields
-  too, so the form fills the payee's bank from the same reading.
+  `ExpenseInvoiceSuggestion` (what New Request's own Read Invoice returns) gains the bank fields too,
+  so the form fills the payee's bank from the same reading.
 - The server builds the lines (decision 45): the items as read, then, when `paid_to_date` is above
   zero, one line `Paid to date on <invoice number>`, quantity 1, its unit price the amount paid,
-  negative. It counts the lines through `shared/money`; when the invoice gives `balance_due` and
-  the lines do not come to it, the card shows the problem `Check the lines` on its lines. A total
-  of zero or less draws no card: the answer says the invoice is paid. A currency other than naira
-  shows `Naira only`.
+  negative. It counts the lines through `shared/money`; when the invoice gives `balance_due` and the
+  lines do not come to it, the card shows `Check the lines` on its lines. A total of zero or less
+  draws no card: the answer says the invoice is paid in full. A currency other than naira shows
+  `Naira only` on the lines. More than 25 lines shows `At most 25`.
 - The card is a new action, `my_expenses.from_invoice` (label New Request), on a new card schema
   `ExpenseRequestFromInvoice`: the request's fields (`ExpenseFields`) with every line and
   `invoice_document_id` required, and `submit` (on by default, as New Request's card). Its purpose
-  is the invoice's subject with its number ("Website ticket payments: three switchable gateways,
-  INV-202611-9525"); its payee Vendor unless the payee is a partner the person sees (Partner) or the
-  person themself (Staff); its category among those offered, else asked; its project by name among
-  the running projects, else left empty; its department the person's own. A request still a draft
-  offers Add Another Item and Send Request once pressed (`then`, §6.11), as New Request's card does.
-- The card's lines are a new card field kind, `lines`: a table (Item, Qty, Unit Price, Amount) with
-  the total under it, and on Edit a `LinesField` from `packages/ui/src/form/` (made with `npm run
-  new:component`), the same field New Request's form then uses. `MoneyField` gains `signed`: a
-  leading minus is kept and accepted (a discount, a payment already made), shown in the destructive
-  token; without `signed` a minus is refused as today.
-- Expenses' service (§6.1 of `expenses.md`): a line may carry a negative unit price; the request's
-  total must be above zero, else 422 `EXPENSE_TOTAL_NOT_POSITIVE` on `lines` ("Total above zero").
-- Before drafting, the server asks the expenses service for a possible duplicate (§6.8 of
-  `expenses.md`: the same payee and amount within 30 days, only those the person may open), and the
-  answer names it in one sentence ("EXP-0012 asked the same payee for the same amount on
-  12/11/2026"); the card is still drawn.
+  is the invoice's subject with its number ("Website ticket payments, INV-202611-9525"), else
+  `Invoice <number> from <payee>`; its payee Vendor unless the payee is a partner the person sees
+  (Partner) or the person themself (Staff); its bank, account name and account number the
+  invoice's; its category among those offered, else asked ("Which category?"); its project by name
+  among the running projects, else left empty; its department the person's own. A request still a
+  draft offers Add Another Item and Send Request once pressed (`then`, §6.11).
+- The card's lines are a card field kind of their own, `lines` (an array of items with a
+  description, quantity and unit price): a table (Item, Qty, Unit Price, Amount) with the total
+  under it, and on Edit a `LinesField` from `packages/ui/src/form/`, the same field New Request's
+  form uses. `MoneyField` gains `signed`: a leading minus is kept and accepted (a discount, a
+  payment already made), shown in the destructive token; without `signed` a minus is refused as
+  before.
+- Expenses' service (`expenses.md` §6.1 rule 1): a line may carry a negative unit price; the
+  request's total must be above zero, else 422 `EXPENSE_TOTAL_NOT_POSITIVE` on `lines` ("Total
+  above zero"). Migration `8030_expense_line_discount.sql` (M8's block, beside the table it
+  changes) drops 8010's CHECKs on a line's unit price and amount; the quantity stays above zero.
+- Before drafting, the reader asks the expenses service for a possible duplicate (`expenses.md`
+  §6.8: the same payee, by account number or name, and the same amount, sent within 30 days, only
+  those the person may open), and the answer names it in one sentence ("EXP-0012 asked the same
+  payee for the same amount on 12/11/2026."); the card is still drawn.
 
-**Payment Receipt** (PR 1, Disbursements' own code):
+**Payment Receipt** (Disbursements' own code, `disbursements.receipt-ai.js`):
 
-- The reader, `disbursement-receipt-read`, returns `DisbursementReceiptRead`: `payment_reference`,
-  `paid_on`, `amount`, `beneficiary_name`, `beneficiary_account_number`, `beneficiary_bank`,
-  `narration`.
+- The reader, `disbursement-receipt-read` (Image Reading, `personal_data: true`, chosen by TB),
+  returns `DisbursementReceiptRead`: `payment_reference`, `paid_on`, `amount`, `beneficiary_name`,
+  `beneficiary_account_number`, `beneficiary_bank`, `narration`.
 - The match is the disbursements service's, in SQL through its repo, never the model's: authorised
-  requests the person may pay, whose account number equals the beneficiary's (else whose payee name
-  equals it, case and accents set aside) and whose amount equals the receipt's. One fills
-  `expense_request_id`; several make the card's ask "Which request?" offer them; none leaves it to
-  pick (Pick one). A request already paid is named in the answer ("Paid as DSB-0004").
-- The card is Record Disbursement's own, `disbursements.create`, carrying `receipt_document_id`
-  from the attachment and the reference and day from the reading; its risk stays `money`.
+  requests within the person's `expenses` scope whose account number equals the beneficiary's (else
+  whose payee name equals it, case and accents set aside) and whose amount equals the receipt's. One
+  fills `expense_request_id`; several make the card's question "Which request was paid?" offer them
+  to tap; none asks the same question with the authorised requests to tap (decision 34: a required
+  field is asked, never left to Pick one). A request already paid is named in the answer ("EXP-0004
+  was already paid as DSB-0004.").
+- The card is Record Disbursement's own, `disbursements.create`, now carrying
+  `receipt_document_id` from the attachment, named by the file's name, and the reference and day
+  from the reading; its risk stays `money`, so its press asks Confirm It's You.
 
-**Contract or MoU** (PR 2, Partnerships' own code):
+**Contract or MoU** (PR 2, Partnerships' own code, not built yet):
 
 - The reader, `agreement-document-read`, returns `AgreementDocumentRead`: `title`, `kind` (`mou`,
   `service_agreement`, `contract`, `other`), `parties` (name, role), `signed_on`, `starts_on`,
@@ -1619,9 +1653,11 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   file the model refuses answers "This file cannot be read. Try a clearer copy." with no card; a
   Word file or anything outside the six kinds is refused at upload; a file over 10 MB is refused at
   upload; another person's upload, or one already claimed by a record, is refused `Upload it again`;
-  an invoice already paid in full draws no card and says so; an invoice in another currency shows
-  Naira only; lines that do not come to the balance due show Check the lines; a receipt matching no
-  authorised request leaves the request to pick, and one already paid is named; a document whose
+  a kind the person may not attach is refused; an invoice already paid in full draws no card and
+  says so; an invoice in another currency shows Naira only; lines that do not come to the balance
+  due show Check the lines; a receipt matching no authorised request asks "Which request was paid?"
+  with the authorised requests to tap, several matching offer those, and one already paid is named;
+  a later question in the conversation keeps the file's figures on its card; a document whose
   words try to instruct the assistant changes nothing, since only the reader's fields reach the
   model and every card still waits for the person's press and the server's checks.
 
@@ -1761,6 +1797,7 @@ Commits.
 
 ## 14 · Change log
 
+- 13/11/2026 · TB · Documents in the chat, PR 1 built (Appendix A): Attach Document on Ask with Invoice and Payment Receipt, `GET /ai/attachment-kinds`, `AiAsk.attachment`, the reading as read 1 (`file.<kind>`), the manifest's `files`, `my_expenses.from_invoice` with its `lines`, Record Disbursement from a receipt with the request matched in SQL, `LinesField` and `MoneyField` `signed`. The build taught §6.18 five things, written there: the reader's values are laid over the model's before the ask guard and again on later questions of the conversation (a tapped answer keeps the file's figures); an action drawn only from a file says `from_file: { kind, fills }`, offered only with that file and its `fills` counted as asked by gate 23 rule 7, and a new rule 8 holds each kind to a test and an evaluation case; the card names the file on its field rather than as a record, which would count on the verb; a receipt that matches none asks which request (decision 34) rather than leaving Pick one; Expenses' negative line needs migration 8030 (8010's CHECKs on a line's price and amount), and `ExpenseInvoiceRead` gains `subject` and `currency` for the purpose and Naira only.
 - 13/11/2026 · TB · Documents in the chat planned (§1.10 decisions 41 to 48, asked of TB with JBS Praxis's invoice INV-202611-9525 as the sample): Attach Document with three kinds picked first (Invoice, Payment Receipt, Contract or MoU), PDF and images only, read on Image Reading, the server setting every figure the file gave, an invoice's balance due itemised, a receipt recording its disbursement, a contract or MoU summarised and filed. The design is §6.18, the screens §2 and §10, the edge cases §11, and the build plan Appendix A (two PRs, each in a fresh chat). Nothing is built yet.
 - 13/11/2026 · TB · From New Request on staging ("Expected string, received number" on Quantity and Unit Price, Check the format on Edit's 700000, Quantity drawn as a box of lines): the model's numbers are put in the contract's forms before every card is checked (`cards.shape`, every card, §6.11), the system turn names money and figures as text, a field of figures is a one-line number field and Edit reads an amount as typed. An ask may ask for several fields in one turn (`also`), and an action may offer next steps once pressed (`then`, `AiActionResult.next`), each a button that asks its question (§6.11). Tests: `ai-engine.test.js`, `ai-actions-expenses.test.js`, `ActionCard.test.tsx`.
 - 11/11/2026 · JP · Faults of the 11/11 staging brief. #1 and #8 (`VALIDATION: owner_id`, `VALIDATION: department_id` at `POST /ai/cards/:id/confirm`): a card drawn with a problem on a field (Pick one where the model's words matched none of the person's records) still offered its verb, and the press was refused by the re-check. `ActionCard` now offers no verb while a field shows a problem, Edit in its place as the primary button, until Save Changes clears it (decision 34, §10, the Praxis AI chapter). New Vacancy's card asks and matches its hiring manager from `vacancies.hiring_managers` and picks it with the new `AiCardPicks` value `hiring_manager` (§6.11; `recruitment.md` §9, fault #3). Already fixed: #5 by #67 (decision 34), #6 by #64, #7 by #63.

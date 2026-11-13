@@ -14,6 +14,7 @@
  */
 const { z } = require("zod");
 const { uuid, text, money, isoDateTime, listQuery, Paged, PageMeta } = require("./common");
+const { DocumentRef } = require("./documents");
 
 /** Why an answer did not give what was asked (§6.4): a read was refused, or a change was asked for. */
 const AiDeclined = z.enum(["not_available", "change"]);
@@ -44,13 +45,67 @@ const AiScreenContext = z
 const AiShows = z.enum(["cards", "pane"]);
 
 /** POST /ai/ask: a question, and after the first, the conversation it continues. */
+/**
+ * What a document attached to a question is (§1.10 decision 41): picked before the file, so the
+ * server knows which reading to run and a guess never decides it. The tile for `contract` reads
+ * Contract or MoU.
+ */
+const AiAttachmentKind = z.enum(["invoice", "payment_receipt", "contract"]);
+
+/** A file the person staged through the upload engine (purpose `ai_attachment`), and what it is (§6.18). */
+const AiAttachment = z
+  .object({
+    document_id: uuid,
+    kind: AiAttachmentKind,
+  })
+  .strict();
+
+/**
+ * A question. With an `attachment` the words may be left empty: the server asks the kind's own
+ * question (§6.18). Without one a question is required.
+ */
 const AiAsk = z
   .object({
-    question: text(500),
+    question: z.string().trim().max(500).default(""),
     ai_conversation_id: uuid.optional(),
     context: AiScreenContext.optional(),
     /** A screen that cannot draw a card is offered no action; one with no pane gets no overview. */
     shows: z.array(AiShows).max(2).default([]),
+    /** A document the question is about (decision 41): one file a question. */
+    attachment: AiAttachment.optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (!v.question && !v.attachment) ctx.addIssue({ code: "custom", path: ["question"], message: "Ask a question" });
+  });
+
+/** One kind of document this person may attach, as Attach Document's tile shows it. */
+const AiAttachmentKindOption = z
+  .object({
+    kind: AiAttachmentKind,
+    label: z.string().min(1).max(40),
+    /** The question asked when the person leaves the box empty. */
+    question: z.string().min(1).max(200),
+  })
+  .strict();
+
+/**
+ * GET /ai/attachment-kinds: the kinds this person may attach (decision 41), in the order the modal
+ * shows them, and whether reading a document is possible now (AI on, Praxis AI on, a provider set
+ * up, the month's cap not reached). At most three: a fixed list, never paged.
+ */
+const AiAttachmentKinds = z
+  .object({
+    kinds: z.array(AiAttachmentKindOption).max(3),
+    available: z.boolean(),
+  })
+  .strict();
+
+/** The file a question carried, as its bubble shows it (§6.18). */
+const AiAnswerAttachment = z
+  .object({
+    document: DocumentRef,
+    kind: AiAttachmentKind,
   })
   .strict();
 
@@ -248,7 +303,8 @@ const AiCardField = z
   .object({
     name: z.string().min(1).max(64),
     label: z.string().min(1).max(60),
-    kind: z.enum(["text", "number", "boolean", "date", "datetime", "money", "choice", "list", "id", "other"]),
+    /** `lines`: a request's items (description, quantity, unit price), shown as a table with its total (§6.18). */
+    kind: z.enum(["text", "number", "boolean", "date", "datetime", "money", "choice", "list", "lines", "id", "other"]),
     required: z.boolean(),
     options: z.array(z.string()).max(50).nullable(),
     /** A text long enough for a box of several lines (a message, a note, a reason). */
@@ -395,6 +451,8 @@ const AiAnswer = z
     overview: AiOverview.nullable(),
     /** The screen the question was asked from (§1.2 decision 12). */
     context: AiScreenContext.nullable(),
+    /** The document the question carried (§6.18), or null. */
+    attachment: AiAnswerAttachment.nullable(),
     feedback: AiFeedbackValue.nullable(),
     created_at: isoDateTime,
     provisional: z.literal(true),
@@ -591,8 +649,13 @@ const TABLES = {
     virtual: {
       question: "becomes the content of the question message",
       shows: "what the asking screen can draw (cards, the pane); decides what is offered, never stored",
+      attachment: "the file the question is about, kept in the answer's ai_message.metadata",
     },
   },
+  AiAttachment: { table: null, reason: "a staged document and its kind, kept in ai_message.metadata.attachment" },
+  AiAttachmentKindOption: { table: null, reason: "a kind of document a person may attach, from the manifests' files" },
+  AiAttachmentKinds: { table: null, reason: "the kinds a person may attach and whether reading is on, worked out from code and AI Control" },
+  AiAnswerAttachment: { table: null, reason: "the file a question carried, kept in ai_message.metadata.attachment" },
   AiCitation: {
     table: "ai_message_citation",
     virtual: { link: "worked out from shared/route-map when shown, never stored" },
@@ -659,6 +722,7 @@ const TABLES = {
       card: "the answer's ai_action_draft, when it drew one",
       choices: "from ai_message.metadata, the question's answers to tap",
       overview: "from ai_message.metadata",
+      attachment: "from ai_message.metadata, the file the question carried",
       provisional: "every answer is provisional (BACKEND_STRUCTURE §14.2)",
     },
   },
@@ -695,7 +759,12 @@ module.exports = {
   AiFeedbackValue,
   AiScreenContext,
   AiShows,
+  AiAttachmentKind,
+  AiAttachment,
   AiAsk,
+  AiAttachmentKindOption,
+  AiAttachmentKinds,
+  AiAnswerAttachment,
   AiCitation,
   AiAnswerTable,
   AiSource,

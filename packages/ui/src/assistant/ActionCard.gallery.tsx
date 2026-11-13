@@ -32,6 +32,28 @@ const mailFields: CardField[] = [
   { name: "subject", label: "Subject", kind: "text", required: true, options: null, long: false },
   { name: "body", label: "Message", kind: "text", required: true, options: null, long: true },
 ];
+/** New Request drawn from an attached invoice: every line, the discount and the payment already made as minus lines. */
+const invoiceFields: CardField[] = [
+  { name: "purpose", label: "Purpose", kind: "text", required: true, options: null, long: false },
+  { name: "lines", label: "Lines", kind: "lines", required: true, options: null, long: false },
+  { name: "payee_name", label: "Payee", kind: "text", required: false, options: null, long: false },
+  { name: "bank_name", label: "Bank", kind: "text", required: false, options: null, long: false },
+  { name: "invoice_document_id", label: "Invoice", kind: "id", required: true, options: null, long: false },
+];
+const invoiceValues = {
+  purpose: "Website ticket payments, INV-202611-9525",
+  lines: [
+    { description: "Payment gateway integration", quantity: "1", unit_price: "250000.00" },
+    { description: "Ticket checkout pages", quantity: "1", unit_price: "150000.00" },
+    { description: "Refunds and reconciliation", quantity: "1", unit_price: "100000.00" },
+    { description: "Testing and go-live support", quantity: "1", unit_price: "50000.00" },
+    { description: "Discount", quantity: "1", unit_price: "-100000.00" },
+    { description: "Paid to date on INV-202611-9525", quantity: "1", unit_price: "-300000.00" },
+  ],
+  payee_name: "JBS Praxis",
+  bank_name: "Nombank MFB",
+  invoice_document_id: "d1",
+};
 const noop = () => undefined;
 const frame = (children: ReactNode) => <div className="max-w-xl">{children}</div>;
 
@@ -45,6 +67,7 @@ export default {
     Suggested: () => frame(<ActionCard label="Send Message" fields={[{ name: "employee_id", label: "To", kind: "id", required: true, options: null, long: false }, { name: "body", label: "Message", kind: "text", required: true, options: null, long: true }]} values={{ employee_id: "e1", body: "Your leave is approved. Enjoy the break." }} problems={{}} records={[{ type: "employee", id: "e1", label: "Ada Obi", link: "/people?tab=employees&id=e1" }]} status="shown" confirm="press" suggested onConfirm={noop} onCancel={noop} onOpen={noop} />),
     "A Mail": () => frame(<ActionCard label="Send Mail" fields={mailFields} values={{ to_addresses: ["ada@partner.test"], subject: "Venue visit on Thursday", body: "Dear Ada,\n\nThis confirms our visit on Thursday at 10:00.\n\nWe look forward to seeing you." }} problems={{}} records={[]} status="shown" confirm="press" schema={schema} onConfirm={noop} onCancel={noop} onSave={noop} />),
     Done: () => frame(<ActionCard label="Approve Leave" fields={leaveFields} values={{ leave_request_ids: ["l1", "l2"] }} problems={{}} records={leaveRecords.slice(0, 2)} status="done" confirm="fresh_sign_in" result={{ status: "done", lines: [{ type: "leave_request", id: "l1", label: "Ayo Bello, Annual Leave, 3 days", ok: true, message: "approved", link: "/people?tab=leave&id=l1" }, { type: "leave_request", id: "l2", label: "Kemi Ade, Annual Leave, 2 days", ok: false, message: "This request was already decided", link: "/people?tab=leave&id=l2" }], message: null, error_code: null }} onOpen={noop} />),
+    "From an Invoice": () => frame(<ActionCard label="New Request" fields={invoiceFields} values={invoiceValues} problems={{}} records={[]} names={[{ type: "document", id: "d1", label: "INV-202611-9525.pdf", link: null }]} status="shown" confirm="press" schema={schema} onConfirm={noop} onCancel={noop} onSave={noop} />),
     Expired: () => frame(<ActionCard label="Create Task" fields={taskFields} values={{ title: "Send the weekly report" }} problems={{}} records={[]} status="expired" confirm="press" onRedraw={noop} />),
     Refused: () => frame(<ActionCard label="Send Mail" fields={mailFields} values={{ to_addresses: ["ada@partner.test"], subject: "Thursday", body: "See you on Thursday at 10." }} problems={{}} records={[]} status="shown" confirm="press" onConfirm={noop} onCancel={noop} problem="Connect your mailbox first" problemAction={{ label: "Open Mailbox", onPress: noop }} />),
   },
