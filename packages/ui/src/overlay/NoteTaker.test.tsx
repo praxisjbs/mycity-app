@@ -49,6 +49,25 @@ describe("NoteTaker", () => {
     expect(screen.getByRole("textbox")).toHaveValue("Lock the screen before leaving the desk.");
   });
 
+  it("leaves a press on the bar's buttons to the button, and drags from the bar or Move Notes", () => {
+    const had = HTMLElement.prototype.setPointerCapture;
+    const capture = vi.fn();
+    HTMLElement.prototype.setPointerCapture = capture;
+    try {
+      render(<Harness />);
+      for (const name of ["Minimise Notes", "Close Notes"]) {
+        fireEvent.pointerDown(screen.getByRole("button", { name }), { button: 0, pointerId: 1 });
+      }
+      // Capturing the pointer sends the button's click to the bar, and the button never answers.
+      expect(capture).not.toHaveBeenCalled();
+      fireEvent.pointerDown(screen.getByRole("button", { name: "Move Notes" }), { button: 0, pointerId: 1 });
+      fireEvent.pointerDown(screen.getByRole("heading", { name: "My Notes" }), { button: 0, pointerId: 1 });
+      expect(capture).toHaveBeenCalledTimes(2);
+    } finally {
+      HTMLElement.prototype.setPointerCapture = had;
+    }
+  });
+
   it("moves with the arrow keys on Move Notes, staying inside the window", () => {
     render(<Harness />);
     const region = screen.getByRole("region", { name: "My Notes" });
