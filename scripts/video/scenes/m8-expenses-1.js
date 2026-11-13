@@ -525,7 +525,7 @@ module.exports = {
             { say: "Who is it paid to? Bassey presses Staff.", do: (s) => choose(s, "Staff"), hold: 0.3 },
             { say: "The card shows the request as it will be sent: its purpose, category, line and payee.", do: (s) => soft(s, s.page.getByRole("article", { name: "Answer" }).last().getByText("Purpose", { exact: true }), 15000) },
             { say: "Edit changes a field first. Nothing is saved until he presses.", do: (s) => soft(s, s.page.getByRole("article", { name: "Answer" }).last().getByRole("button", { name: "Edit", exact: true })) },
-            { say: "He presses New Request. It's sent, with the same checks and the same road as one from the form.", do: async (s) => { const card = s.page.getByRole("article", { name: "Answer" }).last(); await s.click(card.getByRole("button", { name: "New Request", exact: true })); await s.wait(2.5); await s.settle(); }, hold: 1 },
+            { say: "He presses New Request. It's sent, with the same checks and the same road as one raised on the form.", do: async (s) => { const card = s.page.getByRole("article", { name: "Answer" }).last(); await s.click(card.getByRole("button", { name: "New Request", exact: true })); await s.wait(2.5); await s.settle(); }, hold: 1 },
           ],
         },
       ],
