@@ -79,6 +79,7 @@ module.exports = defineManifest({
     },
     {
       key: "sanctions.standing",
+      summary: "none: one person's chain",
       description: "One person's steps on the chain still in force, and the step a new offence would be",
       params: c.sanctions.SanctionStandingQuery,
       permission: ["queries", "view"],

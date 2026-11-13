@@ -84,8 +84,10 @@ conversations, and one opens full screen when you press it.
    when you open a conversation from **Recent** or History. An answer that only draws a card leaves
    it as it was. On a phone, press **Open Figures** under an answer with
    a table or figures. The pane opens as a sheet, **Figures**.
-2. **Overview** shows figures and a chart when an answer counted or summed something. Until an
-   answer has figures, it is greyed out.
+2. **Overview** shows figures and a chart when an answer counted or summed something. A budget's
+   bars are stacked: *Spent*, *Committed* and *Remaining* make up each allocation, and *Over Budget*
+   shows how far one went past it. The legend under the chart names each colour. Until an answer
+   has figures, **Overview** is greyed out.
 3. **Table** lists every row the answer was read from, 25 to a page. Press **Next** and
    **Previous** to page. Past 200 rows it says how many rows there are. Press **Export** to save
    every row as an Excel file on this device; its second sheet, About This File, says who exported
@@ -100,6 +102,17 @@ conversations, and one opens full screen when you press it.
 7. On a phone, press **Close** or swipe the sheet down to return to the conversation.
 
 ![The pane on a phone](shot:praxis-figures)
+
+### See figures as a chart {#praxis-ask-charts needs="praxis_ai create"}
+
+1. Ask for figures grouped the way you want to compare them. For example: *Our budget by department
+   this year*, *Leave days by type this year* or *Lateness by department this month*.
+2. Saying *as a chart* works too, for example *Show this year's budget by category as a chart*.
+3. On a computer the pane opens on **Overview**: up to three figures, then the chart. On a phone,
+   press **Open Figures**.
+
+> **Tip:** Ask by department, by type, by person or by month. A question about one record answers in
+> words, without a chart.
 
 ### Go back to your screen {#praxis-ask-back}
 

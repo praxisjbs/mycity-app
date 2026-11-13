@@ -153,6 +153,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "deals.list",
+      summary: "partnerships.summary",
       description: "List partnership deals: title, the lead or partner, category, stage, health, status (open, live, completed, lost), owner, projected value, expected close and days at stage",
       params: c.partner_pipeline.DealListQuery,
       permission: ["partnerships", "view"],
@@ -161,6 +162,7 @@ module.exports = defineManifest({
     },
     {
       key: "deals.get",
+      summary: "none: one record",
       description: "One deal whole: its event, venue, terms, validity, options, team, blockers, next action and history",
       params: c.common.IdParams,
       permission: ["partnerships", "view"],
@@ -169,6 +171,7 @@ module.exports = defineManifest({
     },
     {
       key: "categories.list",
+      summary: "none: configuration; charted from its table (decision 50)",
       description: "List the partnership categories (Event, Hospitality, Vendor and the rest), with how many partners and leads each has",
       params: c.partner_pipeline.CategoryListQuery,
       permission: ["partnerships", "view"],

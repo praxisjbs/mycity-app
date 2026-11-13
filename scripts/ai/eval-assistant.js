@@ -23,6 +23,10 @@
  *   picks      with `action`: fields the card may leave for the person to pick (Pick one), as a
  *              typed address is when our search does not find exactly one place (decision 37)
  *   given      records the question needs without naming them, as its placeholders do
+ *   chart      the answer's Overview drew a chart of this kind (`stacked_bar`), asked from a screen
+ *              with the pane, `shows: ["pane"]` (praxis-ai.md §6.19)
+ *   never_words  none of these words is in the answer's words: an answer never says how Praxis AI
+ *              works (praxis-ai.md decision 55)
  *   file       the kind of document attached to the question (praxis-ai.md §6.18): `sample`, a
  *              made-up file under scripts/ai/samples/, is uploaded as the person, read by the kind's
  *              reader as Ask reads it, and removed once the question is graded
@@ -148,6 +152,9 @@ const CASES = Object.freeze([
   // Payroll's reads and its summary, as each role of docs/guides/payroll.md §8 holds them (M6 PR 6).
   { id: "payroll.runs", as: "operations_people", question: "Which payroll runs have not been paid yet?", reads: ["payroll.runs"] },
   { id: "summary.payroll-month", as: "operations_people", question: "How many people are in the latest payroll run and what is the net pay?", reads: ["payroll.month"], shows: ["pane"] },
+  // Charts in the Overview, PR 1: budgets (praxis-ai.md §6.19, Appendix B). The question that started the plan.
+  { id: "chart.budgets-department", as: "ceo", question: "I want us to study our budget for each department. Share data in a way we can see charts in overview.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar", never_words: ["summary endpoint", "endpoint", "database", "generated", "summary read", "tool"] },
+  { id: "chart.budgets-category", as: "operations_people", question: "Show this year's budget by category as a chart.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar" },
   { id: "payroll.payslips", as: "operations_people", question: "Which payslips are in the latest payroll run?", reads: ["payslips.list"] },
   { id: "payroll.deductions", as: "operations_people", question: "Which fines are waiting for payroll to accept or waive?", reads: ["deductions.list"] },
   { id: "payroll.my-payslip", as: "employee", question: "What was my net pay on my latest payslip?", reads: ["payslips.mine"] },
@@ -506,6 +513,16 @@ function grade(kase, got) {
     else if (!asked || asked.action !== kase.ask.action || asked.field !== kase.ask.field)
       problems.push(`asked ${asked && asked.field ? `for ${asked.action} ${asked.field}` : "nothing"}; expected ${kase.ask.action} ${kase.ask.field}`);
     else if (kase.choices && !asked.choices.length) problems.push(`asked for ${asked.field} with no answers to tap`);
+  }
+  if (kase.chart) {
+    const chart = got.shown.overview && got.shown.overview.chart;
+    if (!chart) problems.push(`drew no chart; expected a ${kase.chart}`);
+    else if (chart.kind !== kase.chart) problems.push(`drew a ${chart.kind}, not a ${kase.chart}`);
+  }
+  if (kase.never_words) {
+    const said = String(got.shown.content || got.shown.text || "").toLowerCase();
+    const named = kase.never_words.filter((w) => new RegExp(`\\b${w.toLowerCase()}`).test(said));
+    if (named.length) problems.push(`its words say how Praxis AI works (${named.join(", ")})`);
   }
   if (kase.table === "names") {
     const t = got.shown.table;

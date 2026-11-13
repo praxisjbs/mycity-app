@@ -355,6 +355,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "goals.okrs",
+      summary: "goals.summary",
       description: "List a quarter's objectives with their key results, owners, latest status and score; the company's or a function's",
       params: c.goals.OkrListQuery,
       permission: ["performance", "view"],
@@ -363,6 +364,7 @@ module.exports = defineManifest({
     },
     {
       key: "goals.trace",
+      summary: "none: one key result's chain",
       description: "What a key result rolls up to: the company key result, the objective and the organisational goal",
       params: c.goals.TraceQuery,
       permission: ["performance", "view"],
@@ -374,6 +376,7 @@ module.exports = defineManifest({
     },
     {
       key: "goals.analytics",
+      summary: "goals.summary",
       description:
         "A quarter's analytics: function scores by month, key results by status, ratings, on-time check-ins, reviews and commitments, self against final",
       params: c.goals.PerformanceAnalyticsQuery,

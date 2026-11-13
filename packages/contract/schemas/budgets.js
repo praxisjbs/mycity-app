@@ -116,6 +116,20 @@ const ProjectBudget = z.object({ budget_amount: money.nullable() }).strict();
 /** Set Budget as a Praxis AI card: the project it sets, by id. */
 const ProjectBudgetSet = z.object({ project_id: uuid, budget_amount: money.nullable() }).strict();
 
+/**
+ * The assistant's budget summary (docs/guides/praxis-ai.md §6.13, Finance: Budgets): a year's
+ * budgets in figures, grouped by department, category or project. By project only for a reader
+ * whose scope is all, as Expenses · Projects. Figures, never a row.
+ */
+const BudgetSummaryBy = z.enum(["department", "category", "project"]);
+const BudgetSummaryQuery = z
+  .object({
+    year: year.optional(),
+    department_id: uuid.optional(),
+    by: BudgetSummaryBy.default("department"),
+  })
+  .strict();
+
 const TABLES = {
   BudgetLine: {
     table: "budget_line",
@@ -157,6 +171,7 @@ const TABLES = {
   ProjectSpendPage: { table: null, reason: "a page of projects" },
   ProjectBudget: { table: "project" },
   ProjectBudgetSet: { table: "project" },
+  BudgetSummaryQuery: { table: null, reason: "the year, department and grouping of the assistant's budget summary; figures, never a row" },
 };
 
 module.exports = {
@@ -165,6 +180,8 @@ module.exports = {
   BudgetLine,
   Budget,
   BudgetListQuery,
+  BudgetSummaryBy,
+  BudgetSummaryQuery,
   BudgetPage,
   BudgetLineInput,
   BudgetCreate,

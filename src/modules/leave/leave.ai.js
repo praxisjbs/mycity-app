@@ -177,6 +177,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "leave.requests",
+      summary: "leave.summary",
       description: "List leave requests: who is away, when, and whether each is waiting, approved, rejected or cancelled",
       params: c.leave.LeaveListQuery,
       permission: ["people", "view"],

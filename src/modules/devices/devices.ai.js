@@ -15,6 +15,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "devices.mine",
+      summary: "none: my own short list",
       description: "List my own clock-in devices and whether each is registered",
       params: c.common.PageQuery,
       permission: ["ess", "view"],

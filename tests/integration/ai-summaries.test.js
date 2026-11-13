@@ -289,10 +289,12 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
 
   test("a member of staff is neither offered nor served the people's summaries; the Audit Log's needs the whole log", async () => {
     const staff = await userOf("staff");
-    // Every login holds ess and performance (own), workspace and partnerships (own): those summaries are offered,
-    // the partnerships' over their own records (partnerships.md §8, §9); the people's and the log's are not.
+    // Every login holds ess and performance (own), workspace, partnerships and expenses (own): those summaries are
+    // offered, the partnerships' and the budgets' over their own records (partnerships.md §8, §9; budgets as
+    // Budgets shows them, none for staff); the people's and the log's are not.
     expect((await authorise.allowedSummaries(staff)).map((s) => s.key).sort()).toEqual([
       "approvals.summary",
+      "budgets.summary",
       "goals.summary",
       "partnership_returns.summary",
       "partnerships.summary",

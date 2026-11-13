@@ -38,6 +38,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "guide.search",
+      summary: "none: a search",
       description: "Search the User Guide for how to do something in the hub: which screen to open, which button to press, the steps of a task",
       params: c.common.PageQuery,
       permission: ["knowledge", "view"],

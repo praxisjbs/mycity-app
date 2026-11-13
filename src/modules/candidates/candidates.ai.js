@@ -42,6 +42,7 @@ module.exports = defineManifest({
     },
     {
       key: "candidates.get",
+      summary: "none: one record",
       description: "One candidate: their answers, scores and scorecard parts, assessments, interviews and stage history",
       params: c.common.IdParams,
       permission: ["recruitment", "view"],

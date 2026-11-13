@@ -234,6 +234,72 @@ async function projects(query, scope) {
   return repo.projects(pool, query);
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Finance: Budgets; §6.19 item 2)
+ * ------------------------------------------------------------------ */
+
+/**
+ * A row's parts for a stacked bar, as Decimals so nothing drifts: what was spent and committed within
+ * the allocation, what remains, and what went past it (Over Budget). The parts sum to the allocation,
+ * or to what was used when that is more; none is below zero.
+ */
+function stackOf(row, withOver) {
+  const { part } = require("../../shared/ai/summary");
+  const allocated = m.money(row.allocated || "0.00");
+  const spent = m.money(row.spent || "0.00");
+  const committed = m.money(row.committed || "0.00");
+  const spentIn = m.Decimal.min(spent, allocated);
+  const committedIn = m.Decimal.min(committed, allocated.minus(spentIn));
+  const remaining = allocated.minus(spentIn).minus(committedIn);
+  const over = m.Decimal.max(m.ZERO, spent.plus(committed).minus(allocated));
+  const parts = [part("spent", "Spent", m.toWire(spentIn)), part("committed", "Committed", m.toWire(committedIn)), part("remaining", "Remaining", m.toWire(remaining))];
+  if (withOver) parts.push(part("over", "Over Budget", m.toWire(over)));
+  return { key: row.key, label: row.label, value: m.toWire(allocated.plus(over)), count: null, parts };
+}
+
+/** Whether a row used more than its allocation. */
+const wentOver = (r) => m.compare(m.money(r.spent || "0.00").plus(m.money(r.committed || "0.00")), m.money(r.allocated || "0.00")) > 0;
+
+/** One grouping of budget rows as stacked bars; Over Budget is a part only when a row went past. */
+function stackedGroup(by, label, rows) {
+  const { group } = require("../../shared/ai/summary");
+  const withOver = rows.some(wentOver);
+  return group(by, label, rows.map((r) => stackOf(r, withOver)));
+}
+
+/**
+ * A year's budgets in figures (this Lagos year unless asked), within the reader's `expenses` scope:
+ * the totals, by department and by category always, by project for a reader whose scope is all and
+ * asked for it, and what was paid by month as a series.
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, series } = require("../../shared/ai/summary");
+  const year = params.year || Number(lagos.today(now).slice(0, 4));
+  const byProject = params.by === "project" && scope.scope === "all";
+  const r = await repo.aiSummary(client, { year, department_id: params.department_id, projects: byProject }, scope);
+  const f = r.figures;
+  const allocated = m.money(f.allocated || "0.00");
+  const used = m.money(f.committed || "0.00").plus(m.money(f.spent || "0.00"));
+  const usedShare = m.isZero(allocated) ? 0 : used.times(100).dividedBy(allocated).toDecimalPlaces(0).toNumber();
+  const groups = [stackedGroup("department", "Budget by department", r.by_department), stackedGroup("category", "Budget by category", r.by_category)];
+  if (byProject) groups.push(stackedGroup("project", "Budget by project", r.by_project));
+  return {
+    figures: [
+      figure("allocated", "Allocated", m.toWire(allocated), "ngn"),
+      figure("committed", "Committed", m.toWire(f.committed || "0.00"), "ngn"),
+      figure("spent", "Spent", m.toWire(f.spent || "0.00"), "ngn"),
+      figure("remaining", "Remaining", m.toWire(allocated.minus(used)), "ngn"),
+      figure("used", "Used", usedShare, "percent"),
+      figure("budgets", "Budgets", f.budgets || 0),
+      figure("lines_over", "Lines over budget", f.lines_over || 0),
+      figure("lines_past_80", "Lines at 80% or more", f.lines_past_80 || 0),
+    ],
+    groups,
+    series: [series("spent", `Paid by month, ${year}`, r.paid.map((p) => ({ at: p.at, value: m.toWire(p.value) })))],
+    total: f.budgets || 0,
+  };
+}
+
 /** Set Budget on Expenses · Projects: through the projects service, which owns the table. */
 async function setProjectBudget(actor, scope, id, body) {
   allScope(scope);
@@ -341,6 +407,7 @@ module.exports = {
   update,
   projects,
   setProjectBudget,
+  aiSummary,
   recountIn,
   warnThresholds,
   readback,

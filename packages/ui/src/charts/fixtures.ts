@@ -1,7 +1,8 @@
 /**
  * Sample figures for the Charts group's gallery pages: a fortnight of
- * attendance, a year of claims, a month of days and a salary structure. Not
- * exported from the package; a screen's figures come from the API.
+ * attendance, a year of claims, a month of days, departments' budgets and a
+ * salary structure. Invented, not exported from the package; a screen's
+ * figures come from the API.
  */
 export const WORKING_DAYS = ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11", "12", "13", "15", "16"];
 export const PRESENT = [44, 46, 45, 47, 46, 23, 45, 44, 46, 47, 45, 22, 46, 47];
@@ -18,6 +19,17 @@ export const DEPARTMENTS = [
   { label: "Operations", value: 21 },
   { label: "Technology", value: 14 },
   { label: "Partnerships", value: 6 },
+];
+
+/** The parts of a department's budget, bottom to top: an overspend is a part of its own, never a negative one. */
+export const BUDGET_PARTS = ["Spent", "Committed", "Remaining", "Over Budget"];
+
+/** Departments' budgets in naira, each the total of its parts in BUDGET_PARTS' order; Technology has gone over. */
+export const BUDGETS = [
+  { label: "Finance", value: 2500000, parts: [1250000, 400000, 850000, 0] },
+  { label: "People", value: 1800000, parts: [900000, 300000, 600000, 0] },
+  { label: "Operations", value: 3000000, parts: [2100000, 650000, 250000, 0] },
+  { label: "Technology", value: 2000000, parts: [1400000, 300000, 0, 300000] },
 ];
 
 export const GRADES = [

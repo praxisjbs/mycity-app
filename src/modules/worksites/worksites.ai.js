@@ -87,6 +87,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "worksites.list",
+      summary: "none: configuration; charted from its table (decision 50)",
       description: "List the worksites staff clock in at, with their radius and how many people each has",
       params: c.worksites.WorksiteListQuery,
       permission: ["people", "view"],

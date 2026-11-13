@@ -86,6 +86,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "approvals.mine",
+      summary: "approvals.summary",
       description: "List the requests waiting on me for a decision, oldest first, with the stage each one is at",
       params: c.workflow.ApprovalMineQuery,
       permission: ["ess", "view"],

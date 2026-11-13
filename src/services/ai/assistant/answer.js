@@ -31,7 +31,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 const MONEY = /^-?\d{1,16}\.\d{2}$/;
 /** Fields named like an amount: a two-place string there is naira. */
-const MONEY_FIELD = /(amount|total|salary|cost|price|fee|balance|pay|ngn|naira|budget|spend|deduction|value)/i;
+const MONEY_FIELD = /(amount|total|salary|cost|price|fee|balance|pay|ngn|naira|budget|spend|deduction|value|allocated|committed|spent|remaining|gross|net|due|paid|owed|outstanding|commission|sales|fine)/i;
 /** A record's id: never a cell a person reads. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** The keys a row names its own record by, the most telling first, and the column each makes. */
