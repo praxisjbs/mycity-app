@@ -10,7 +10,7 @@
  * excerpt.
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, blank, listQuery, Paged } = require("./common");
+const { uuid, text, isoDateTime, blank, listQuery, Paged, summaryPeriod } = require("./common");
 const { PersonRef } = require("./organisation");
 const { RecordRef } = require("./partner_pipeline");
 
@@ -98,7 +98,26 @@ const ThreadContext = z
   .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's interaction summary (docs/guides/praxis-ai.md §6.13, Partnerships): the calls, meetings,
+ * emails, visits and notes on the partners and leads the reader may see, in figures, by type, by the person
+ * who logged them stacked by type, the partners and leads most reached (the grouping asked first), and by
+ * month, or by week when asked. A period (when it happened) narrows it only when asked. Figures, never a row.
+ */
+const InteractionSummaryBy = z.enum(["type", "person", "partner", "week"]);
+const InteractionSummaryQuery = z
+  .object({
+    partner_id: uuid.optional(),
+    lead_id: uuid.optional(),
+    deal_id: uuid.optional(),
+    interaction_type: InteractionType.optional(),
+    ...summaryPeriod,
+    by: InteractionSummaryBy.default("type"),
+  })
+  .strict();
+
 const TABLES = {
+  InteractionSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's interaction summary; figures, never a row" },
   Interaction: {
     table: "partner_interaction",
     virtual: {
@@ -125,6 +144,8 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  InteractionSummaryBy,
+  InteractionSummaryQuery,
   InteractionType,
   Interaction,
   InteractionCreate,

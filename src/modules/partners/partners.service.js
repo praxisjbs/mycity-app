@@ -364,6 +364,53 @@ async function contactIdOf(db, words, scope) {
   return found.n === 1 ? found.id : null;
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Partnerships)
+ * ------------------------------------------------------------------ */
+
+/** A partner's status and its deal's health as a person reads them. */
+const STATUS_WORDS = Object.freeze({ active: "Active", dormant: "Dormant", closed: "Closed" });
+const STATUS_ORDER = Object.freeze(["active", "dormant", "closed"]);
+const HEALTH_WORDS = Object.freeze({ on_track: "On Track", follow_up_required: "Follow-up Required", stalled: "Stalled" });
+const BY_WORDS = Object.freeze({ category: "category", region: "region", owner: "owner", health: "deal health" });
+
+/**
+ * The partners the reader may see, in figures: every partner unless a period (added) is asked, by status,
+ * then by category, region, owner or their furthest live deal's health stacked Active, Dormant and Closed,
+ * and added by month. Quiet is the list's own rule and days (§6.12). Runs on the client the assistant hands
+ * over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   PartnerSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const by = BY_WORDS[params.by] ? params.by : "category";
+  const days = await quietDays(client);
+  const r = await repo.aiSummary(client, { ...params, from: period && period.from, to: period && period.to, by }, scope, { quietFrom: await quietFrom(client, days) });
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const parts = STATUS_ORDER.map((key) => ({ key, label: STATUS_WORDS[key], optional: key === "closed" }));
+  const rows = by === "health" ? r.by_dim.map((x) => ({ ...x, label: HEALTH_WORDS[x.key] || x.label })) : r.by_dim;
+  return {
+    figures: [
+      figure("partners", "Partners", f.partners || 0),
+      figure("active", "Active", f.active || 0),
+      figure("dormant", "Dormant", f.dormant || 0),
+      figure("closed", "Closed", f.closed || 0),
+      figure("quiet", `Quiet, no contact in ${days} days`, f.quiet || 0),
+      figure("live", "With a live deal", f.live || 0),
+    ],
+    groups: [
+      group("status", "Partners by status", STATUS_ORDER.filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATUS_WORDS[k], value: counted.get(k) }))),
+      group(by, `Partners by ${BY_WORDS[by]}`, stacked(rows, parts)),
+    ],
+    series: [series("added", "Partners added by month", r.added)],
+    total: f.partners || 0,
+  };
+}
+
 module.exports = {
   QUIET_DAYS,
   contactIdOf,
@@ -377,6 +424,7 @@ module.exports = {
   updateContact,
   list,
   summary,
+  aiSummary,
   get360,
   syncStatus,
   insertIn,

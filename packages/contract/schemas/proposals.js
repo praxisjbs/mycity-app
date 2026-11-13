@@ -15,7 +15,7 @@
  * accepted, declined, expired (past `valid_until`), withdrawn (the link stops).
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, email, isoDate, isoDateTime, money, blank, listQuery, Paged, summaryPeriod } = require("./common");
 const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
 const { RecordRef, flag } = require("./partner_pipeline");
@@ -742,7 +742,27 @@ const ROW = {
   deal_title: "partnership_opportunity.title",
   owner: "its deal's owner, from employee and department",
 };
+/**
+ * The assistant's proposal summary (docs/guides/praxis-ai.md §6.13, Partnerships): the newest version of each
+ * proposal the reader may see in figures, by status (how many, and their value), the sent ones by owner
+ * stacked Accepted, Waiting and Declined, and sent and accepted by month. A period (sent) narrows it only when
+ * asked. Figures, never a row.
+ */
+const ProposalSummaryBy = z.enum(["status", "owner", "month"]);
+const ProposalSummaryQuery = z
+  .object({
+    status: ProposalStatus.optional(),
+    deal_id: uuid.optional(),
+    partner_id: uuid.optional(),
+    lead_id: uuid.optional(),
+    owner_id: uuid.optional(),
+    ...summaryPeriod,
+    by: ProposalSummaryBy.default("status"),
+  })
+  .strict();
+
 const TABLES = {
+  ProposalSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's proposal summary; figures, never a row" },
   FigureSource: { table: null, reason: "where a figure in a section comes from" },
   CoverSection: { table: null, reason: KIT },
   LetterSection: { table: null, reason: KIT },
@@ -825,6 +845,8 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  ProposalSummaryBy,
+  ProposalSummaryQuery,
   ProposalStatus,
   QuestionGroup,
   AnswerKind,

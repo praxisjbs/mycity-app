@@ -28,9 +28,9 @@ async function pipelineSummary(client, params, actor, now = new Date()) {
       figure("open_deals", "Open deals", f.open_deals),
       figure("live_deals", "Live deals", f.live_deals),
       figure("stalled", "Stalled deals", f.stalled),
-      figure("open_value", "Projected value of open deals (NGN)", String(f.open_value ?? "0.00"), "NGN"),
+      figure("open_value", "Projected value of open deals (NGN)", String(f.open_value ?? "0.00"), "ngn"),
       figure("signed", `Deals signed ${range.from} to ${range.to}`, f.signed),
-      figure("signed_value", `Value signed ${range.from} to ${range.to} (NGN)`, String(f.signed_value ?? "0.00"), "NGN"),
+      figure("signed_value", `Value signed ${range.from} to ${range.to} (NGN)`, String(f.signed_value ?? "0.00"), "ngn"),
     ],
     groups: [group(`signed_value_by_${by}`, `Value signed by ${by} (NGN), largest first`, r.signed), group(`open_by_${by}`, `Open and live deals by ${by}`, r.open)],
     series: [],
@@ -47,9 +47,9 @@ async function returnsSummary(client, params, actor, now = new Date()) {
   const figures = [figure("months", "Months with returns", f.months), figure("deals", "Deals with returns", f.deals), figure("downloads", "Downloads", f.downloads), figure("units_sold", "Units sold", f.units_sold)];
   if (money) {
     figures.push(
-      figure("gross_sales", "Gross sales (NGN)", String(f.gross_sales ?? "0.00"), "NGN"),
-      figure("mycity_commission", "MyCity's commission (NGN)", String(f.mycity_commission ?? "0.00"), "NGN"),
-      figure("paid_to_partner", "Paid to partners (NGN)", String(f.paid_to_partner ?? "0.00"), "NGN"),
+      figure("gross_sales", "Gross sales (NGN)", String(f.gross_sales ?? "0.00"), "ngn"),
+      figure("mycity_commission", "MyCity's commission (NGN)", String(f.mycity_commission ?? "0.00"), "ngn"),
+      figure("paid_to_partner", "Paid to partners (NGN)", String(f.paid_to_partner ?? "0.00"), "ngn"),
     );
   }
   const what = money ? "MyCity's commission (NGN)" : "Downloads";

@@ -1126,6 +1126,21 @@ lost, partners closed, proposals declined or withdrawn, agreements closed, so hi
   `proposals.list`; the card `proposals.start` (`ProposalBriefAdd`: the deal and the notes; a transcript
   and images are files, added on the studio's Brief), run by `proposals.service.start`. Proposals' other
   forms are `design`. Analytics itself has no form.
+- **Summaries for Praxis AI's charts (built 13/11/2026; `praxis-ai.md` §6.13 Partnerships, Appendix B
+  PR 6).** Figures for the Overview, never a row, each one SQL in its module's repo with §6.1's one rule:
+  `leads.summary` (`leads.repo.js` `aiSummary`: leads by status, then by stage, category, region, owner or
+  source stacked by status, the lost ones counted as their own figure, identified and converted by month),
+  `partners.summary` (by status, then by category, region, owner or the furthest live deal's health stacked
+  Active, Dormant and Closed; quiet by §6.12's own rule and days; added by month), `proposals.summary` (the
+  newest version of each: by status and value, each owner's sent proposals stacked by outcome, the
+  acceptance rate, sent and accepted by month), `agreements.summary` (by status, kind and owner, ending
+  within 60 days, renewals due by month over the next 12 months) and `interactions.summary` (by type, by
+  person stacked by type, the partners and leads most reached, by month or week). A period narrows them
+  only when asked; otherwise they count every record, as the lists do. `leads.list`, `partners.list`,
+  `proposals.list`, `agreements.list`, `agreements.renewals` and `interactions.list` name them. Every figure
+  is one a reader of the list already sees; commission and returns stay `partnership_returns.summary`'s,
+  with `partnerships.money`. `partnerships.summary` and `partnership_returns.summary` read their money as
+  naira on the Overview (`ngn`).
 - **AI routes:** "add a lead" opens Leads with New Lead; "move a deal" opens its 360; "write a proposal for
   X" opens the studio; "renewals due" opens Contracts & MOUs; "set up a category" opens Categories.
 - **Search** (`partners.search.js`, `leads.search.js`, `partner_pipeline.search.js` for deals and
@@ -1941,6 +1956,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · Praxis AI's partnerships summaries (`praxis-ai.md` Appendix B PR 6, §9): leads, partners, proposals, agreements and interactions in figures for the Overview's charts, within §6.1's one rule; `partnerships.summary` and `partnership_returns.summary` give their money as `ngn`, so the Overview reads it as naira. No screen of Partnerships changed.
 - 13/11/2026 · JP · A record's documents open (§5, §7, §10.1): on the Partner 360's and the Lead 360's Documents tab a row opens its file in the app's file viewer (`useFileViewer`, `GET /documents/:id/content` under the vault's read rule), each row has Download, and an upload has Remove Document after a confirm (`DELETE /partnerships/documents/:id`, `partner_document.removed`, the file out of the vault); a signed copy, an agreement or a proposal is kept (`DOCUMENT_KEPT`). Found the same day: an upload could be listed but neither opened nor downloaded.
 - 13/11/2026 · JP · Open lists (§6.3): Upload Document's Kind, a lead's Source and Impact on New Lead, New Partner, New Deal, Edit Lead and Edit Deal are typed or picked; a name the list does not hold joins it, and Pipeline Settings still renames, moves and retires every value. New `GET /lists/:list/suggestions`; `PartnerDocumentAttach.kind`, `LeadCreate`/`LeadUpdate` `source` and every `impact` take `listWords`; `LeadDetail` and `DealDetail` gain `impact_labels`; new shared component `ComboListField` (`ComboField` gained `onPick`). Found on Praxis AI: an Add Partner Document card holding a kind MyCity's list lacked ("Service Agreement") showed Pick from the list with no list to pick from; it now files and the kind joins the list, the card unchanged.
 - 13/11/2026 · TB · Contracts and MoUs in the chat built (`praxis-ai.md` Appendix A PR 2, §9): read on `agreement-document-read`, summarised with its terms on Praxis AI's Record tab, and filed by Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else by Add Partner Document (`partner_documents.attach`) on the partner or lead it names. `SignedCopyRecord` is reached `via` Record Signed Copy; Add Partner Document's run sends `PartnerDocumentAttach`. The staging setup seed enters the document kinds of §4.3. §10 is unchanged: no Partnerships screen changes; the cards and the Record tab are Praxis AI's (`praxis-ai.md` §10).
