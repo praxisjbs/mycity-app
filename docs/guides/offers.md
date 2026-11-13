@@ -10,7 +10,7 @@
 | Capabilities | none; who approves an offer is the `recruitment.offer` flow on Settings · Approvals, not a capability |
 | Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, #112 Upload Documents (added with PR 6a; `new:screen` makes staff-app tabs only); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
 | Status | Built |
-| Last changed | 12/11/2026 |
+| Last changed | 13/11/2026 |
 
 The public pages (`public-app/src/pages/SignOffer.tsx`, `Verify.tsx`) joined **Frontend paths** with
 PR 4, which wired them; Upload Documents with PR 7. The People 360 Documents tab joined with PR 7 as
@@ -374,6 +374,7 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 ## 9 · AI and search
 
 - **AI reads** (`offers.ai.js`, `onboarding.ai.js`): offers by status and expiring soon; cases by status with outstanding items. Paged at 25. No personal data to DeepSeek.
+- **AI summaries** (`praxis-ai.md` §6.13, Recruitment and onboarding; Appendix B PR 5, built 13/11/2026): `offers.summary` (`offers.repo.js` `aiSummary`): offers by status, the acceptance rate and those outside the pay range, the offers sent by department or vacancy stacked Accepted, Declined, Waiting, and Expired or Withdrawn, sent and accepted by month; the annual pay accepted and the average offered only for a reader whose role shows pay (`employee.salary`), left out otherwise, never zero. `onboarding.summary` (`onboarding.repo.js` `aiSummary`): cases by status, by department stacked by status, starting within 14 days, documents outstanding, starts by month. Each within the list's own scope (the vacancy's hiring manager; the case's owner), never a row; `offers.list` and `onboarding.list` name them.
 - **AI routes**: "make an offer to <candidate>" opens New Offer with the application; "who still owes documents" opens Onboarding filtered.
 - **AI cards**: New Offer is a card (`offers.create`, `OfferCard`: the candidate picked from the shortlist through `candidates.list`, the start date, the monthly basic salary, and the reason when it sits outside the vacancy's range; the rest starts from the vacancy and the draft is finished on Offers); the document upload and BVN forms are `not_offered: personal`. Approving, signing, sending and withdrawing stay on the screen.
 - **Search** (`offers.search.js`, `onboarding.search.js`): offers by number (OFF-), candidate and role; onboarding cases by the hire's name or the role (built in PR 6a, opening the case by `?case=` as a contract does); employment contracts by number (CON-).
@@ -555,6 +556,8 @@ Decided 12/11/2026 (AJ), found filming the Milestone 5 video:
   own and stops none: the hire may have the page open, sending the rest.
 
 ## 14 · Change log
+
+- 13/11/2026 · JP · Praxis AI's offer and onboarding summaries (`praxis-ai.md` Appendix B PR 5, §9): offers and cases in figures for the Overview's charts, within the lists' own scope, an offer's pay only for a reader who sees pay. No screen changed.
 
 - 13/11/2026 · AJ · The click-through's findings (§3, §6, §7, §13): the sealed offer filed on the hire
   and both sealed copies the next version of what was signed (`vault.follow` `sealed`); ended signing

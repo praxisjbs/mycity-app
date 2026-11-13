@@ -138,6 +138,77 @@ async function summary(db, query, scope) {
   return rows[0];
 }
 
+/** The assistant summary's series buckets: a week (its Monday) or a Lagos month, never the caller's words. */
+const BUCKETS = Object.freeze({ week: { unit: "week", format: "YYYY-MM-DD" }, month: { unit: "month", format: "YYYY-MM" } });
+
+/**
+ * The applications in figures for the assistant (docs/guides/praxis-ai.md §6.13, Recruitment and
+ * onboarding), in one statement with the reader's scope (the vacancy's hiring manager, as list()
+ * applies it): the counts by status and the average shown score of those in progress; those in
+ * progress by stage (hired by its status); each vacancy's applications by stage group for a stacked
+ * bar (20); by source; applications by week or month. A period (applied) narrows it only when `from`
+ * and `to` are given. Figures, never a row.
+ * @param {{vacancy_id?: string, status?: string, from?: string, to?: string, bucket: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const bucket = BUCKETS[q.bucket] || BUCKETS.month;
+  const params = [q.vacancy_id || null, q.status || null, q.from || null, q.to || null, bucket.unit, bucket.format];
+  const s = scopeClause(scope, { column: "v.hiring_manager_id" }, params);
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT a.application_id, a.vacancy_id, a.stage, a.status, a.source, a.applied_at,
+              COALESCE(a.screening_score, a.provisional_score) AS score,
+              v.number::text AS vacancy_number, v.title AS vacancy_title
+         FROM application a
+         JOIN vacancy v ON v.vacancy_id = a.vacancy_id
+        WHERE ($1::uuid IS NULL OR a.vacancy_id = $1)
+          AND ($2::text IS NULL OR a.status = $2)
+          AND ($3::date IS NULL OR (a.applied_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $3::date AND $4::date)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS candidates,
+              count(*) FILTER (WHERE status = 'active')::int AS active,
+              count(*) FILTER (WHERE status = 'hired')::int AS hired,
+              count(*) FILTER (WHERE status = 'not_progressed')::int AS not_progressed,
+              count(*) FILTER (WHERE status = 'withdrawn')::int AS withdrawn,
+              round(avg(score) FILTER (WHERE status = 'active'), 1)::float AS average_score
+         FROM x
+     ), by_vacancy AS (
+       SELECT vacancy_id::text AS key, min(vacancy_number) || ', ' || min(vacancy_title) AS label,
+              count(*) FILTER (WHERE status = 'active' AND stage IN ('application', 'screening'))::int AS screening,
+              count(*) FILTER (WHERE status = 'active' AND stage = 'assessment')::int AS assessment,
+              count(*) FILTER (WHERE status = 'active' AND stage IN ('interview', 'shortlist'))::int AS interview,
+              count(*) FILTER (WHERE status = 'active' AND stage IN ('offer', 'documentation', 'pre_onboarding', 'onboarding'))::int AS offer,
+              count(*) FILTER (WHERE status = 'hired')::int AS hired,
+              count(*) FILTER (WHERE status IN ('not_progressed', 'withdrawn'))::int AS ended,
+              row_number() OVER (ORDER BY count(*) DESC, min(vacancy_number), vacancy_id) AS rank
+         FROM x GROUP BY vacancy_id
+     ), points AS (
+       SELECT to_char(date_trunc($5::text, applied_at AT TIME ZONE 'Africa/Lagos'), $6::text) AS at, count(*)::int AS value
+         FROM x GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'value', n))
+               FROM (SELECT CASE WHEN status = 'hired' THEN 'hired' ELSE stage END AS key, count(*)::int AS n
+                       FROM x WHERE status IN ('active', 'hired') GROUP BY 1) y) AS by_stage,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'screening', screening, 'assessment', assessment,
+                                               'interview', interview, 'offer', offer, 'hired', hired, 'ended', ended) ORDER BY rank)
+               FROM by_vacancy WHERE rank <= 20) AS by_vacancy,
+            (SELECT json_agg(json_build_object('key', source, 'value', n) ORDER BY n DESC, source)
+               FROM (SELECT source, count(*)::int AS n FROM x GROUP BY source) y) AS by_source,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM points) AS points`,
+    params,
+  );
+  const row = rows[0] || {};
+  return {
+    figures: row.figures || {},
+    by_stage: row.by_stage || [],
+    by_vacancy: row.by_vacancy || [],
+    by_source: row.by_source || [],
+    points: row.points || [],
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Apply (candidates.apply.js)
  * ------------------------------------------------------------------ */
@@ -441,6 +512,7 @@ module.exports = {
   list,
   get,
   summary,
+  aiSummary,
   vacancy,
   applyQuestions,
   candidateByEmail,

@@ -848,7 +848,7 @@ date, the branch and the PR when it merges.
 - [ ] PR 2 · Charts from a complete table (`m10/overview-tables`)
 - [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
 - [ ] PR 4 · Finance and pay summaries (`m10/summaries-finance`)
-- [ ] PR 5 · Recruitment and onboarding summaries (`m10/summaries-recruitment`)
+- [x] 13/11/2026 · PR 5 · Recruitment and onboarding summaries: vacancies, candidates, interviews, assessments, offers, onboarding and the talent pool, the matrix's summary probes (built on `claude/affectionate-sagan-vxaysr`)
 - [ ] PR 6 · Partnerships summaries (`m10/summaries-partnerships`)
 - [ ] PR 7 · People, performance and queries summaries (`m10/summaries-people`)
 - [ ] PR 8 · Workspace, Knowledge Hub, Community, Home and Settings summaries; the gaps file deleted (`m10/summaries-close`)
@@ -868,6 +868,15 @@ date, the branch and the PR when it merges.
 
 ## 8 · Log
 
+- 13/11/2026 · JP · Charts in the Overview, PR 5 built (§6.12): seven summaries in the recruitment
+  modules' repos, their seven reads off the gaps file, `askedPeriod` and `stacked` in
+  `shared/ai/summary.js`, the matrix's summary branch (a summary's total counted around its probe's
+  inside and outside records, through its own `run` so the cache never answers). Found on the way
+  and written into `praxis-ai.md` §6.13: a recruitment list shows every record, so its summary's
+  period narrows only when asked; Candidates' `CandidateSummaryQuery` was taken
+  (`ApplicationSummaryQuery`); an interview has no missed state; a case's parts are its statuses. The
+  container's PostgreSQL lacked pgvector again (installed by hand, `postgresql-16-pgvector`), and the
+  image had no Node 20 or `node_modules` (`node@20` in the scratchpad, `npm ci`).
 - 13/11/2026 · JP · Charts in the Overview, PR 1 built (§6.12): `AiSummaryPart` and a group row's
   `parts`, `engine/pane.js` drawing them as one series a part, `budgets.summary`, a read's `summary`
   in the manifest, the snapshot and the description the model is offered, gate 23 rule 9 with its

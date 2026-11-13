@@ -1233,17 +1233,36 @@ summing them.
 | `deductions.summary` | `payroll` view, the readers Deductions shows | `DeductionSummaryQuery`: `status`, `source`, `employee_id`, `month`, `by` source, status, department or month | Deductions, their amount, scheduled ahead, waived, recovered this year, advances outstanding; by source and by status (amount), then by department (20); amount by month as a series |
 | `my_pay.summary` | `ess` view, the person's own payslips and deductions, never masked from them | `MyPaySummaryQuery`: `year` (this year) | Payslips this year, gross, deductions and net to date, fines and advance repayments; deductions by reason; gross, deductions and net by month as series (published payslips only) |
 
-*Recruitment and onboarding (planned, PR 5)*
+*Recruitment and onboarding (built, PR 5, 13/11/2026)*
+
+Each answers the list it names with the list's own scope: the vacancy's hiring manager in the
+reader's `recruitment` scope (`recruitment.md` §8), Interviews adding a seat on the panel and
+Onboarding the case's owner. The build taught four things, written here: a recruitment list shows
+every record, never only this month's, so a summary's period narrows it only when one is asked
+(`from` and `to`, or a `month`, at most a year, `askedPeriod`); left out, it counts every record, as
+the list does, and "how many open vacancies" is never only the ones opened this month. Candidates'
+own figures already take `CandidateSummaryQuery` (`GET /candidates/summary`), so this summary's is
+`ApplicationSummaryQuery`. An interview has no missed state: one past its end with its round still
+open is Awaiting Feedback. A case's parts are its own statuses, as Onboarding names them, rather
+than Done, In Progress and Not Started. A part another row may not have (Ended, Expired or
+Withdrawn, Withdrawn, Drafts) is drawn only in a grouping where some row has one (`stacked`), as
+budgets' Over Budget is. Pay in an offer is left out, never zero, for a reader whose role hides
+`employee.salary` (decision 58).
 
 | Summary | Module, grant | Params | Figures, groups and series |
 |---|---|---|---|
-| `vacancies.summary` | `recruitment` view, the vacancies the reader may list | `VacancySummaryQuery`: `status`, `department_id`, a period (opened), `by` status, department or hiring manager | Vacancies, open, paused, closed, applicants, the average days open, closing within 7 days; by status; by department or hiring manager (20) with parts Open, Paused, Closed; applicants per vacancy (top 10); vacancies opened by month |
-| `candidates.summary` | `recruitment` view, the candidates the reader may list | `CandidateSummaryQuery`: `vacancy_id`, `status`, a period (applied), `by` stage, vacancy, source or month | Candidates, active, hired, rejected, withdrawn, the average score; by stage in the pipeline's order (the funnel); by vacancy (20) with parts by stage group (Screening, Assessment, Interview, Offer, Hired); by source; applications by week or month |
-| `interviews.summary` | `recruitment` view, as Interviews lists them (`mine` the reader's own) | `InterviewSummaryQuery`: `status`, `mine`, a period, `by` status, outcome, interviewer or week | Interviews, scheduled, held, missed, cancelled, outcomes; by status and by outcome; by interviewer (20); interviews by week |
-| `assessments.summary` | `recruitment` view, the sittings the reader may list | `SittingSummaryQuery`: `status`, a period, `by` assessment, status or month | Sittings, not started, done, waiting to be marked, the average score; by assessment (20: sittings, the average score as its value); by status; sittings by month |
-| `offers.summary` | `recruitment` view; pay only with the salary grant | `OfferSummaryQuery`: `status`, `vacancy_id`, a period (sent), `by` status, vacancy, department or month | Offers, sent, accepted, declined, expired, the acceptance rate, outside the pay range; by status; by department or vacancy (20) with parts Accepted, Declined, Waiting; offers by month |
-| `onboarding.summary` | `recruitment` view, as Onboarding lists them | `OnboardingSummaryQuery`: `status`, `department_id`, `by` status, department or month | Cases, in progress, done, starting within 14 days, documents outstanding; by status; by department (20) with parts Done, In Progress, Not Started; starts by month |
-| `talent_pool.summary` | `recruitment` view | `PoolSummaryQuery`: `invited`, `by` role, reason or month | People kept, invited back, leaving the pool within 30 days, the average score; by role applied for (20); by why kept; kept by month |
+| `vacancies.summary` | `recruitment` view, the vacancies the reader may list | `VacancySummaryQuery`: `status`, `department_id`, a period (opened), `by` status, department or hiring manager | Vacancies, open, paused, closed, drafts, applicants (every application, as the list counts them), the average days open (from publishing to closing, or today), closing within 7 days; by status; by department (20), or by hiring manager when asked, with parts Open, Paused, Closed and Drafts; applicants per vacancy (top 10); vacancies opened by month as a series |
+| `candidates.summary` | `recruitment` view, the applications the reader may list | `ApplicationSummaryQuery`: `vacancy_id`, `status`, a period (applied), `by` stage, vacancy, source, week or month | Candidates, in progress, hired, not progressing, withdrawn, the average score of those in progress (screening, else the estimate); in progress by stage in the pipeline's order (the funnel: `M4_STAGES` then `M5_STAGES`, Hired last); by vacancy (20) with parts Screening (Application and Screening), Assessment, Interview (Interview and Shortlist), Offer (Offer to Onboarding), Hired and Ended (Not Progressing and Withdrawn); by source (Careers Page, Invited, Talent Pool); applications by month, or by week when asked |
+| `interviews.summary` | `recruitment` view, as Interviews lists them (the hiring manager in scope, or a seat on the panel; `mine` the reader's seats) | `InterviewSummaryQuery`: `status`, `mine`, a period (scheduled), `by` status, outcome, interviewer or week | Interviews, upcoming, awaiting feedback, held (the round closed), cancelled, and the rounds reported Select, On Hold and Reject; by status (Upcoming, Awaiting Feedback, Held, Cancelled); by outcome of the held ones (Select, On Hold, Reject, No Report Yet); by interviewer (20) with parts Card Submitted and Card Waiting, never a rating (`recruitment.md` §6.6); interviews by week as a series |
+| `assessments.summary` | `recruitment` view, the sittings the reader may list | `SittingSummaryQuery`: `status`, a period (sent), `by` assessment, status or month | Sittings, not started, in progress, waiting to be marked, scored, expired or cancelled, the average score of scored ones; the average score by assessment (20, its value the average, its count the scored sittings; an assessment with none scored is left out, never 0); by status; sittings sent by month as a series |
+| `offers.summary` | `recruitment` view, the offers the reader may list; pay only with the salary grant | `OfferSummaryQuery`: `status`, `vacancy_id`, a period (sent), `by` status, vacancy, department or month | Offers, sent, accepted, declined, expired, withdrawn, the acceptance rate (accepted of those accepted, declined or expired), outside the pay range; with the salary grant, the annual pay of accepted offers and the average annual pay of sent ones in naira; by status; the offers sent by department (20), or by vacancy when asked, with parts Accepted, Declined, Waiting, and Expired or Withdrawn; offers sent and accepted by month as series |
+| `onboarding.summary` | `recruitment` view, as Onboarding lists them (the case's owner in scope) | `OnboardingSummaryQuery`: `status`, `department_id`, a period (starts), `by` status, department or month | Cases, at documentation, pre-onboarding and onboarding, completed, withdrawn, starting within 14 days, documents outstanding (required items not verified on cases at documentation); by status; by department (20) with parts Documentation, Pre-Onboarding, Onboarding, Completed and Withdrawn; starts by month as a series |
+| `talent_pool.summary` | `recruitment` view, the people kept the reader may list | `PoolSummaryQuery`: `invited`, a period (added), `by` role, reason or month | People kept, invited back, hired from the pool, leaving the pool within 30 days, the average score; by role applied for (20); by why kept (top 10, the reason as written); people kept by month as a series |
+
+A summary over a list whose read carries a `matrix` probe carries the same probe (`vacancies`,
+`candidates`, `assessments`, `talent_pool`): the matrix counts the summary's `total` before the
+probe's inside record is made, after it (one more) and after the outside one (no more), run through
+the summary's own `run` so the summary cache never answers (§6.17).
 
 *Partnerships (planned, PR 6)*
 
@@ -1399,7 +1418,10 @@ everything has nothing outside). The suite gives each role one report and itself
 hands every probe a `ctx`: the actor with the tool's scope, the tool's key, their report, the
 outsider, the annual leave type, a fresh working day, their capabilities and `scopeOf()`. A read must
 return the inside record and never the outside one; a card naming the outside record must be
-refused by `authorise.checkAction` or the action's own `check`. Probed: Workspace (`tasks.list`,
+refused by `authorise.checkAction` or the action's own `check`; a summary must count the inside
+record (its `total` one more once it is made) and never the outside one (no more once that is
+made), run through its own `run` so the summary cache never answers (Appendix B PR 5:
+`vacancies.summary`, `candidates.summary`, `assessments.summary`, `talent_pool.summary`). Probed: Workspace (`tasks.list`,
 `tasks.complete`, `tasks.comment`, `tasks.edit`, `tasks.add_step`, `tasks.edit_step`,
 `tasks.wait_on`, `projects.edit`, `calendar.month`, `calendar.edit`), People (`employees.list`, `leave.requests`,
 `leave.approve`, `leave.reject`, `attendance.register`, `overtime.approve`, `leave.record`,
@@ -1655,7 +1677,7 @@ naming `file.<kind>` and an evaluation case with `file: "<kind>"` (a made-up sam
 
 ### 6.19 Charts in the Overview (decisions 49 to 58; Appendix B)
 
-**Items 1 to 5 built (Appendix B PR 1, 13/11/2026); items 6 to 9 planned.** Each PR of Appendix B
+**Items 1 to 5 built (Appendix B PR 1, 13/11/2026); item 9 built for recruitment and onboarding (PR 5, 13/11/2026); items 6 to 8 and the rest of 9 planned.** Each PR of Appendix B
 writes what it built here as built. Where the build shows the design wrong, the change goes here and in the Change log, never
 silently.
 
@@ -1782,9 +1804,13 @@ how the pane works, and the model repeated that to the person.
    allow-listed in the contract and mapped to SQL in the repo, groups cut to 20 rows and top lists to
    10 by `row_number()`, a series to its newest 60 points, everything named through
    `shared/ai/summary.js`, a period of at most a year (`periodOf`), and `npm run gen:ai-catalogue`.
-   A summary over a list whose read carries a `matrix` probe carries one too. Each has an
-   integration case in its PR's own test file and an evaluation case. Each module's guide gains its
-   summary in §9.
+   A summary over a list whose read carries a `matrix` probe carries one too: the matrix counts the
+   summary's `total` before the inside record, after it (one more) and after the outside one (no
+   more), through the summary's own `run` so the cache never answers (built in PR 5, §6.17). A
+   summary whose list shows every record counts every record unless a period is asked
+   (`askedPeriod`, PR 5), and a part only some rows have is drawn only where one does (`stacked`,
+   `shared/ai/summary.js`). Each has an integration case in its PR's own test file and an
+   evaluation case. Each module's guide gains its summary in §9.
 
 ## 7 · Events, jobs and notifications
 
@@ -1887,7 +1913,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   as a follow-up in the same conversation.
 - **A question that needs a total over more than one page** (a sum of 400 records): answered from
   the module's summary read (§6.13: attendance, tasks, leave, approvals, performance, reviews,
-  employees, the Audit Log); where a module has none, the answer gives the total, says it looked at
+  employees, the Audit Log, budgets, and Recruitment's vacancies, candidates, interviews,
+  assessments, offers, onboarding and talent pool); where a module has none, the answer gives the total, says it looked at
   the first 25 and names the screen (the prompt says so and never to estimate the rest). A module
   adds a summary read when its questions need one; Appendix B adds one for every list that can
   grow (decision 49, §6.13's planned tables).
@@ -2475,6 +2502,7 @@ area and guides from B.4:
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · Charts in the Overview, PR 5 built (Appendix B; §6.13 Recruitment and onboarding, §6.19 item 9): seven summaries, `vacancies.summary`, `candidates.summary`, `interviews.summary`, `assessments.summary`, `offers.summary`, `onboarding.summary` and `talent_pool.summary`, each one SQL in its module's repo with the list's own scope, stacked where a grouping has parts (vacancies by status, candidates by stage group, interviewers' cards submitted and waiting, offers by outcome, cases by status); their seven reads name them and leave the gaps file; the four whose lists carry a matrix probe carry it, and the matrix counts a summary's total around the inside and outside records (§6.17). The build taught §6.13 four things, written there: a recruitment summary counts every record unless a period is asked (`askedPeriod`), since the lists show every record; Candidates' `CandidateSummaryQuery` was taken, so the summary's is `ApplicationSummaryQuery`; an interview has no missed state (Awaiting Feedback); a case's parts are its statuses. `shared/ai/summary.js` gains `askedPeriod` and `stacked` (a part only some rows have is drawn only where one does).
 - 13/11/2026 · JP · Charts in the Overview, PR 1 built (Appendix B; §6.13 Finance: Budgets, §6.19 items 1 to 5): a summary row's `parts` (`AiSummaryPart`, `part()`, `group()` summing and checking them) drawn as a stacked bar by the pane and `BarChart`, `budgets.summary` (by department and category, by project for scope all, Over Budget as its own part, paid by month), every read naming its summary or why it needs none with gate 23 rule 9 and `scripts/check/ai-summary-gaps.json` (48 reads waiting on PRs 4 to 8), a read's description naming its summary to the model, budget and pay columns read as naira, the prompt (version 11) never saying how Praxis AI works, and the evaluation set's `chart` and `never_words`. The build taught §6.13 and §6.19 three things, written there: Over Budget is a part only in a grouping where some row went past; a member of staff holds `expenses` view (their own requests), so `budgets.summary` is offered to them over no budgets, as Budgets shows them; the catalogue snapshot, not `catalogue()`, carries a read's `summary`.
 - 13/11/2026 · JP · Charts in the Overview planned (§1.11 decisions 49 to 58, §6.13's planned tables, §6.19, Appendix B), from JBS Praxis's six answers: why a budget question left the Overview empty (12 of the 94 reads had a summary, budgets none), stacked bars, charts from a complete table, a charted answer's table in the pane, View Data and Download PDF with a designed PDF, no mechanics in an answer, money in naira, and 41 new summaries so that every read names its summary or why it needs none (gate 23 rule 9); eight PRs with their order, waves and start prompts. §2, §5, §7, §10, §11 and §13 carry the planned rows. Nothing built.
 - 13/11/2026 · TB · Documents in the chat, PR 2 built (Appendix A): Contract or MoU on Attach Document, read on `agreement-document-read` (Image Reading, chosen by TB), summarised, its terms on the pane's Record tab (`AiAnswerAttachment.record`, `AiAttachmentRecord`), and filed by a card: Record Signed Copy (`agreements.record_signed_copy`, risk approval) on the agreement waiting for its signature, else Add Partner Document (`partner_documents.attach`) on the partner or lead it names. The build taught §6.18 five things, written there: a kind's grant may be `view` (decision 41 offers the tile to Partnerships view; the manifest refused anything but an action's grants), and a reader without edit gets no card; the card's kind reads as its name and the run turns it into MyCity's code, so the card schema `PartnerDocumentAdd` stays and its run sends `PartnerDocumentAttach`, which never had a `file:` reason (an Attach is no form gate 23 rule 6 counts, and no `not_offered` may name it); the reading carries `currency` and each signatory's party, so a dollar value is not read as naira and the partner's signer is told from MyCity's; a `file.<kind>` read is never replayed, so the pane opens Record or Sources for it and never a Table (an invoice's pane asked for the replay and got 404); staging had no document kinds, so its partnership setup enters §4.3's list.

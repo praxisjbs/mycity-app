@@ -171,6 +171,51 @@ async function get(id, user, scope) {
   return detailOf(pool, await visibleRow(pool, id, user, scope), user);
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding)
+ * ------------------------------------------------------------------ */
+
+const STATE_WORDS = Object.freeze({ upcoming: "Upcoming", awaiting_feedback: "Awaiting Feedback", held: "Held", cancelled: "Cancelled" });
+const OUTCOME_WORDS = Object.freeze({ select: "Select", on_hold: "On Hold", reject: "Reject", none: "No Report Yet" });
+
+/**
+ * The interviews the reader may list (`mine`, their own seats), in figures: every interview unless a
+ * period (scheduled) is asked; by state, the held ones by outcome, each interviewer's cards submitted
+ * and waiting as a stacked bar (never a rating), and by week. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   InterviewSummaryQuery, parsed
+ * @param {{employee_id?: string, scope: {scope: string, scope_ids: string[]|null}}} actor
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const r = await repo.aiSummary(client, { status: params.status, mine: params.mine, from: period && period.from, to: period && period.to }, actor.scope, actor.employee_id);
+  const f = r.figures;
+  const inOrder = (rows, words) => {
+    const n = new Map(rows.map((x) => [x.key, x.value]));
+    return Object.keys(words).filter((k) => n.has(k)).map((k) => ({ key: k, label: words[k], value: n.get(k) }));
+  };
+  return {
+    figures: [
+      figure("interviews", "Interviews", f.interviews || 0),
+      figure("upcoming", "Upcoming", f.upcoming || 0),
+      figure("awaiting_feedback", "Awaiting feedback", f.awaiting_feedback || 0),
+      figure("held", "Held", f.held || 0),
+      figure("cancelled", "Cancelled", f.cancelled || 0),
+      figure("selected", "Select", f.selected || 0),
+      figure("on_hold", "On hold", f.on_hold || 0),
+      figure("rejected", "Reject", f.rejected || 0),
+    ],
+    groups: [
+      group("status", "Interviews by status", inOrder(r.by_state, STATE_WORDS)),
+      group("outcome", "Held interviews by outcome", inOrder(r.by_outcome, OUTCOME_WORDS)),
+      group("interviewer", "Cards by interviewer", stacked(r.by_interviewer, [{ key: "submitted", label: "Card Submitted" }, { key: "waiting", label: "Card Waiting" }])),
+    ],
+    series: [series("interviews", "Interviews by week", r.weeks)],
+    total: f.interviews || 0,
+  };
+}
+
 /** The candidate's CV for the panel: 409 while it is being checked, never once infected. */
 async function cv(id, user, scope) {
   const row = await visibleRow(pool, id, user, scope);
@@ -186,6 +231,7 @@ async function cv(id, user, scope) {
 const then = (write) => async (actor, scope, ...args) => get(await write(actor, scope, ...args), actor, scope);
 
 module.exports = {
+  aiSummary,
   list,
   get,
   cv,

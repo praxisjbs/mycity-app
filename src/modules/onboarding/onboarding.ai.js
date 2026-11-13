@@ -3,7 +3,7 @@
  * What the assistant may read and do about onboarding (docs/guides/offers.md §9): the cases by status,
  * with how many required items each still owes, in the scope the screen keeps (the vacancy's hiring
  * manager). Never a document, a guarantor's details or the BVN: they are the hire's own and sit
- * behind the record.
+ * behind the record. Its summary counts the cases in figures (praxis-ai.md §6.13).
  *
  * Nothing here acts. Verifying a document, recording a reference check, marking a step done,
  * completing onboarding (which invites a login) and withdrawing a case are a person's judgement on the
@@ -34,11 +34,21 @@ module.exports = defineManifest({
   reads: [
     {
       key: "onboarding.list",
+      summary: "onboarding.summary",
       description: "List onboarding cases: the hire, role, department, status, start date and how many required documents are still outstanding",
       params: c.onboarding.OnboardingListQuery,
       permission: ["recruitment", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "onboarding.summary",
+      description: "Onboarding cases in figures: by status, starting within 14 days, documents outstanding; by department as stacked bars by status, starts by month",
+      params: c.onboarding.OnboardingSummaryQuery,
+      permission: ["recruitment", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
   ],
   routes: [

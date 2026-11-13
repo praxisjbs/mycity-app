@@ -16,7 +16,7 @@
  * `:id` on every /recruitment/interviews route is an interview_id.
  */
 const { z } = require("zod");
-const { uuid, isoDateTime, blank, listQuery, Paged, PAGE_SIZE } = require("./common");
+const { uuid, isoDateTime, blank, listQuery, Paged, PAGE_SIZE, summaryPeriod } = require("./common");
 const { PersonRef } = require("./organisation");
 const { VacancyRef, ScorecardPart, optionalWhole, clearable } = require("./vacancies");
 
@@ -407,6 +407,22 @@ const InterviewAssessmentFormVars = z
   .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's interview summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding): the
+ * interviews the reader may list (`mine`, their own seats) by status, the held rounds' outcomes, each
+ * interviewer's cards submitted and waiting (never a rating), and by week. A period (scheduled)
+ * narrows it only when asked. Figures, never a row.
+ */
+const InterviewSummaryBy = z.enum(["status", "outcome", "interviewer", "week"]);
+const InterviewSummaryQuery = z
+  .object({
+    status: InterviewStatus.optional(),
+    mine: z.enum(["true"]).optional(),
+    ...summaryPeriod,
+    by: InterviewSummaryBy.default("status"),
+  })
+  .strict();
+
 const TABLES = {
   InterviewAssessmentFormVars: { table: null, reason: "the variables of templates/documents/interview-assessment-form.html" },
   QuestionRating: { table: "interview_rating" },
@@ -482,6 +498,7 @@ const TABLES = {
     },
   },
   InterviewListQuery: { table: null, reason: "list controls and filters for Interviews" },
+  InterviewSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's interview summary; figures, never a row" },
   PanelistListQuery: { table: null, reason: "list controls for the people who may sit on a panel" },
   PanelistPage: { table: null, reason: "a page of people who may sit on a panel" },
   InterviewSchedule: {
@@ -533,6 +550,8 @@ module.exports = {
   InterviewPage,
   InterviewDetail,
   InterviewListQuery,
+  InterviewSummaryBy,
+  InterviewSummaryQuery,
   PanelistListQuery,
   PanelistPage,
   InterviewSchedule,

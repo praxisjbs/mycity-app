@@ -11,7 +11,7 @@
  * may read, and nothing else ever reaches /api/public/v1/jobs.
  */
 const { z } = require("zod");
-const { uuid, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
+const { uuid, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn, summaryPeriod } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
 const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
 const { RichTextBlock } = require("./policies");
@@ -736,6 +736,21 @@ const SlugParams = z.object({ slug: z.string().min(1).max(200) }).strict();
  * ------------------------------------------------------------------ */
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's vacancy summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding): the
+ * vacancies the reader may list in figures, by status, by department or hiring manager, applicants per
+ * vacancy and opened by month. A period (opened) narrows it only when asked. Figures, never a row.
+ */
+const VacancySummaryBy = z.enum(["status", "department", "hiring_manager"]);
+const VacancySummaryQuery = z
+  .object({
+    status: VacancyStatus.optional(),
+    department_id: uuid.optional(),
+    ...summaryPeriod,
+    by: VacancySummaryBy.default("department"),
+  })
+  .strict();
+
 const TABLES = {
   VacancyRef: { table: "vacancy" },
   VacancyQuestion: { table: "vacancy_question" },
@@ -787,6 +802,7 @@ const TABLES = {
   },
   VacancyListQuery: { table: null, reason: "list controls and filters for Vacancies" },
   VacanciesSummary: { table: null, reason: "counts over vacancy and application within the reader's scope" },
+  VacancySummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's vacancy summary; figures, never a row" },
   SeatSuggestion: {
     table: "org_seat",
     virtual: {
@@ -869,6 +885,8 @@ module.exports = {
   VacancyDetail,
   VacancyListQuery,
   VacanciesSummary,
+  VacancySummaryBy,
+  VacancySummaryQuery,
   SeatSuggestion,
   SeatSuggestionPage,
   SeatSuggestionListQuery,

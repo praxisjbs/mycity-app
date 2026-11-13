@@ -234,6 +234,76 @@ async function summary(scope, user) {
   return { ...(await repo.summary(pool, scope)), can_configure: Boolean(editing && editing.scope === "all") };
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding)
+ * ------------------------------------------------------------------ */
+
+/** An offer's status as a person reads it, in the order an offer moves. */
+const OFFER_WORDS = Object.freeze({
+  draft: "Draft",
+  approval: "With Approval",
+  approved: "Approved",
+  sent: "With the Candidate",
+  accepted: "Accepted",
+  declined: "Declined",
+  expired: "Expired",
+  withdrawn: "Withdrawn",
+});
+
+/**
+ * The offers the reader may list, in figures: every offer unless a period (sent) is asked; the
+ * acceptance rate (accepted of those accepted, declined or let lapse); by status; the offers sent by
+ * department or vacancy stacked by outcome; sent and accepted by month. The pay figures only for a
+ * reader whose role shows pay (`employee.salary`), left out for anyone else, never zero (decision 58).
+ * Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   OfferSummaryQuery, parsed
+ * @param {object} actor    the reader, with `scope`
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const { canSee } = require("../../shared/rbac/field-mask");
+  const period = askedPeriod(params, now);
+  const by = params.by === "vacancy" ? "vacancy" : "department";
+  const [r, pay] = await Promise.all([
+    repo.aiSummary(client, { status: params.status, vacancy_id: params.vacancy_id, from: period && period.from, to: period && period.to, by }, actor.scope),
+    canSee(client, actor, "employee.salary"),
+  ]);
+  const f = r.figures;
+  const decided = (f.accepted || 0) + (f.declined || 0) + (f.expired || 0);
+  const n = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const figures = [
+    figure("offers", "Offers", f.offers || 0),
+    figure("sent", "Sent", f.sent || 0),
+    figure("accepted", "Accepted", f.accepted || 0),
+    figure("declined", "Declined", f.declined || 0),
+    figure("expired", "Expired", f.expired || 0),
+    figure("withdrawn", "Withdrawn", f.withdrawn || 0),
+    figure("acceptance_rate", "Acceptance rate", decided ? Math.round(((f.accepted || 0) * 100) / decided) : 0, "percent"),
+    figure("outside_range", "Outside the pay range", f.outside_range || 0),
+  ];
+  if (pay)
+    figures.push(
+      figure("accepted_pay", "Annual pay accepted", money.toWire(f.accepted_pay || "0.00"), "ngn"),
+      figure("average_pay", "Average annual pay offered", money.toWire(f.average_pay || "0.00"), "ngn"),
+    );
+  const parts = [
+    { key: "accepted", label: "Accepted" },
+    { key: "declined", label: "Declined" },
+    { key: "waiting", label: "Waiting" },
+    { key: "ended", label: "Expired or Withdrawn", optional: true },
+  ];
+  return {
+    figures,
+    groups: [
+      group("status", "Offers by status", Object.keys(OFFER_WORDS).filter((k) => n.has(k)).map((k) => ({ key: k, label: OFFER_WORDS[k], value: n.get(k) }))),
+      group(by, by === "vacancy" ? "Offers sent by vacancy" : "Offers sent by department", stacked(r.by_dim, parts)),
+    ],
+    series: [series("sent", "Offers sent by month", r.sent), series("accepted", "Offers accepted by month", r.accepted)],
+    total: f.offers || 0,
+  };
+}
+
 /** The application New Offer is for, in the reader's edit scope, at a stage that may take one. */
 async function offerable(db, applicationId, scope, { lock = false } = {}) {
   const a = await repo.application(db, applicationId, { lock });
@@ -914,6 +984,7 @@ module.exports = {
   list,
   get,
   summary,
+  aiSummary,
   draft,
   create,
   createFromCard,

@@ -324,6 +324,74 @@ async function letterSavedAt(db, kind, key) {
   return rows[0] ? rows[0].created_at : null;
 }
 
+/** The assistant summary's second grouping: the column and name each `by` maps to (never the caller's words). */
+const SUMMARY_BY = Object.freeze({
+  department: { key: "x.department_id", label: "x.department", none: "No department" },
+  vacancy: { key: "x.vacancy_id", label: "x.vacancy", none: "No vacancy" },
+});
+
+/**
+ * The offers in figures for the assistant (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding),
+ * in one statement with the reader's scope (the vacancy's hiring manager, as list() applies it): the
+ * counts by status, those outside the vacancy's range and the pay figures (which the service hands
+ * only to a reader who sees pay); by status; the offers sent by department or vacancy, each row's
+ * outcomes for a stacked bar (20); sent and accepted by Lagos month. A period (sent) narrows it only
+ * when `from` and `to` are given. Figures, never a row.
+ * @param {{status?: string, vacancy_id?: string, from?: string, to?: string, by: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const dim = SUMMARY_BY[q.by] || SUMMARY_BY.department;
+  const params = [q.status || null, q.vacancy_id || null, q.from || null, q.to || null, dim.none];
+  const s = scopeClause(scope, { column: "v.hiring_manager_id" }, params);
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT o.offer_id, o.status, o.sent_at, o.accepted_at, o.outside_range, o.annual_compensation,
+              o.department_id, d.name AS department, a.vacancy_id, v.number::text || ', ' || v.title AS vacancy
+         FROM offer o
+         JOIN application a ON a.application_id = o.application_id
+         JOIN vacancy v ON v.vacancy_id = a.vacancy_id
+         LEFT JOIN department d ON d.department_id = o.department_id
+        WHERE ($1::text IS NULL OR o.status = $1)
+          AND ($2::uuid IS NULL OR a.vacancy_id = $2)
+          AND ($3::date IS NULL OR (o.sent_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $3::date AND $4::date)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS offers,
+              count(*) FILTER (WHERE sent_at IS NOT NULL)::int AS sent,
+              count(*) FILTER (WHERE status = 'accepted')::int AS accepted,
+              count(*) FILTER (WHERE status = 'declined')::int AS declined,
+              count(*) FILTER (WHERE status = 'expired')::int AS expired,
+              count(*) FILTER (WHERE status = 'withdrawn')::int AS withdrawn,
+              count(*) FILTER (WHERE outside_range)::int AS outside_range,
+              COALESCE(sum(annual_compensation) FILTER (WHERE status = 'accepted'), 0)::numeric(18,2)::text AS accepted_pay,
+              COALESCE(round(avg(annual_compensation) FILTER (WHERE sent_at IS NOT NULL), 2), 0)::numeric(18,2)::text AS average_pay
+         FROM x
+     ), by_dim AS (
+       SELECT COALESCE(${dim.key}::text, 'none') AS key, COALESCE(min(${dim.label}), $5) AS label,
+              count(*) FILTER (WHERE status = 'accepted')::int AS accepted,
+              count(*) FILTER (WHERE status = 'declined')::int AS declined,
+              count(*) FILTER (WHERE status = 'sent')::int AS waiting,
+              count(*) FILTER (WHERE status IN ('expired', 'withdrawn'))::int AS ended,
+              row_number() OVER (ORDER BY count(*) DESC, min(${dim.label}), ${dim.key}) AS rank
+         FROM x WHERE sent_at IS NOT NULL GROUP BY ${dim.key}
+     ), sent AS (
+       SELECT to_char(sent_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value FROM x WHERE sent_at IS NOT NULL GROUP BY 1
+     ), accepted AS (
+       SELECT to_char(accepted_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value
+         FROM x WHERE status = 'accepted' AND accepted_at IS NOT NULL GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM x GROUP BY status) z) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'accepted', accepted, 'declined', declined, 'waiting', waiting, 'ended', ended) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM sent) AS sent,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM accepted) AS accepted`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_status: row.by_status || [], by_dim: row.by_dim || [], sent: row.sent || [], accepted: row.accepted || [] };
+}
+
 module.exports = {
   refusedSince,
   SIGNATORY_SETTING,
@@ -332,6 +400,7 @@ module.exports = {
   bySignatureRequest,
   openFor,
   summary,
+  aiSummary,
   payLines,
   setPayLines,
   insert,

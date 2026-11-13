@@ -12,7 +12,7 @@
  * a sitting never started by its start-by day is expired; one stopped by staff is cancelled.
  */
 const { z } = require("zod");
-const { uuid, isoDate, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, isoDate, isoDateTime, listQuery, Paged, summaryPeriod } = require("./common");
 const { DocumentRef } = require("./documents");
 const { optionalWhole, clearable, M4_STAGES } = require("./vacancies");
 
@@ -436,6 +436,20 @@ const AssessmentInviteEmailVars = z
   .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's assessment summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding): the
+ * sittings the reader may list in figures, the average score by assessment, by status, and sent by
+ * month. A period (sent) narrows it only when asked. Figures, never a row.
+ */
+const SittingSummaryBy = z.enum(["assessment", "status", "month"]);
+const SittingSummaryQuery = z
+  .object({
+    status: SittingStatus.optional(),
+    ...summaryPeriod,
+    by: SittingSummaryBy.default("assessment"),
+  })
+  .strict();
+
 const TABLES = {
   AssessmentOption: { table: null, reason: "one option of assessment_question.options, its points from answer_key_enc" },
   AssessmentQuestion: {
@@ -503,6 +517,7 @@ const TABLES = {
     },
   },
   SittingListQuery: { table: null, reason: "list controls and filters for Sittings" },
+  SittingSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's assessment summary; figures, never a row" },
   SittingSend: {
     table: "application_assessment",
     virtual: { start_within_days: "kept as start_by, that many Lagos days from today" },
@@ -551,6 +566,8 @@ module.exports = {
   SittingAnswer,
   SittingDetail,
   SittingListQuery,
+  SittingSummaryBy,
+  SittingSummaryQuery,
   SittingSend,
   SittingMarks,
   SittingSendBulk,

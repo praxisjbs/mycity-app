@@ -9,7 +9,7 @@
  * `pool`. Scope is the hiring manager of the vacancy the person applied for, as on Candidates.
  */
 const { z } = require("zod");
-const { uuid, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, isoDateTime, listQuery, Paged, summaryPeriod } = require("./common");
 const { VacancyRef } = require("./vacancies");
 
 /** One person in the pool. The score is the screening score of the application they came from. */
@@ -74,6 +74,20 @@ const PoolExportRequest = z
   .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/**
+ * The assistant's talent pool summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding): the
+ * people kept that the reader may list in figures, by role applied for, by why kept, and kept by month.
+ * A period (added) narrows it only when asked. Figures, never a row.
+ */
+const PoolSummaryBy = z.enum(["role", "reason", "month"]);
+const PoolSummaryQuery = z
+  .object({
+    invited: z.enum(["true", "false"]).optional(),
+    ...summaryPeriod,
+    by: PoolSummaryBy.default("role"),
+  })
+  .strict();
+
 const TABLES = {
   PoolEntry: {
     table: "talent_pool_entry",
@@ -91,6 +105,7 @@ const TABLES = {
   PoolPage: { table: null, reason: "a page of the pool" },
   PoolListQuery: { table: null, reason: "list controls and filters for the Talent Pool" },
   PoolSummary: { table: null, reason: "counts over talent_pool_entry within the reader's scope" },
+  PoolSummaryQuery: { table: null, reason: "the filter, period and grouping of the assistant's talent pool summary; figures, never a row" },
   PoolAdd: { table: "talent_pool_entry" },
   PoolInvite: { table: null, reason: "the vacancy an Apply link is for; stamped as invited_vacancy_id" },
   PoolRemove: { table: "talent_pool_entry" },
@@ -103,6 +118,8 @@ module.exports = {
   PoolPage,
   PoolListQuery,
   PoolSummary,
+  PoolSummaryBy,
+  PoolSummaryQuery,
   PoolAdd,
   PoolInvite,
   PoolRemove,

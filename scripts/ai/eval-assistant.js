@@ -155,6 +155,15 @@ const CASES = Object.freeze([
   // Charts in the Overview, PR 1: budgets (praxis-ai.md §6.19, Appendix B). The question that started the plan.
   { id: "chart.budgets-department", as: "ceo", question: "I want us to study our budget for each department. Share data in a way we can see charts in overview.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar", never_words: ["summary endpoint", "endpoint", "database", "generated", "summary read", "tool"] },
   { id: "chart.budgets-category", as: "operations_people", question: "Show this year's budget by category as a chart.", reads: ["budgets.summary"], shows: ["pane"], chart: "stacked_bar" },
+  // Charts in the Overview, PR 5: recruitment and onboarding (praxis-ai.md §6.13, Appendix B).
+  { id: "chart.vacancies-department", as: "operations_people", question: "Chart our vacancies by department: how many are open, paused and closed?", reads: ["vacancies.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.candidates-funnel", as: "operations_people", question: "Show the candidate funnel: how many candidates are at each stage?", reads: ["candidates.summary"], shows: ["pane"], chart: "bar" },
+  { id: "chart.candidates-vacancy", as: "head_of_department", question: "Chart my vacancies' candidates by stage for each role.", reads: ["candidates.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.interviews-cards", as: "operations_people", question: "Who still owes interview cards? Show each interviewer's cards submitted and waiting as a chart.", reads: ["interviews.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.assessments-average", as: "operations_people", question: "What is the average score on each assessment? Show it as a chart.", reads: ["assessments.summary"], shows: ["pane"], chart: "bar" },
+  { id: "chart.offers-outcome", as: "operations_people", question: "How are our offers going? Chart accepted, declined and waiting offers by department.", reads: ["offers.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.onboarding-status", as: "operations_people", question: "Chart our onboarding cases by status for each department.", reads: ["onboarding.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.pool-role", as: "operations_people", question: "How many people are in the talent pool for each role? Show it as a chart.", reads: ["talent_pool.summary"], shows: ["pane"], chart: "bar" },
   { id: "payroll.payslips", as: "operations_people", question: "Which payslips are in the latest payroll run?", reads: ["payslips.list"] },
   { id: "payroll.deductions", as: "operations_people", question: "Which fines are waiting for payroll to accept or waive?", reads: ["deductions.list"] },
   { id: "payroll.my-payslip", as: "employee", question: "What was my net pay on my latest payslip?", reads: ["payslips.mine"] },

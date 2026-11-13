@@ -642,9 +642,55 @@ async function cardVacancy(db, id, scope) {
   return row ? [{ type: "vacancy", id, label: `${row.number}, ${row.title}` }] : [];
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding)
+ * ------------------------------------------------------------------ */
+
+/** A vacancy's status as a person reads it. */
+const STATUS_WORDS = Object.freeze({ draft: "Drafts", open: "Open", paused: "Paused", closed: "Closed" });
+const STATUS_ORDER = Object.freeze(["open", "paused", "closed", "draft"]);
+
+/**
+ * The vacancies the reader may list, in figures: every vacancy unless a period (opened) is asked, by
+ * status, by department or hiring manager stacked Open, Paused, Closed and Drafts, applicants per
+ * vacancy and opened by month. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   VacancySummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, top, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const by = params.by === "hiring_manager" ? "hiring_manager" : "department";
+  const r = await repo.aiSummary(client, { status: params.status, department_id: params.department_id, from: period && period.from, to: period && period.to, by }, scope);
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const parts = STATUS_ORDER.map((key) => ({ key, label: STATUS_WORDS[key], optional: key === "draft" }));
+  return {
+    figures: [
+      figure("vacancies", "Vacancies", f.vacancies || 0),
+      figure("open", "Open", f.open || 0),
+      figure("paused", "Paused", f.paused || 0),
+      figure("closed", "Closed", f.closed || 0),
+      figure("draft", "Drafts", f.draft || 0),
+      figure("applicants", "Applicants", f.applicants || 0),
+      figure("days_open", "Average days open", f.days_open || 0, "days"),
+      figure("closing_soon", "Closing within 7 days", f.closing_soon || 0),
+    ],
+    groups: [
+      group("status", "Vacancies by status", STATUS_ORDER.filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATUS_WORDS[k], value: counted.get(k) }))),
+      group(by, by === "hiring_manager" ? "Vacancies by hiring manager" : "Vacancies by department", stacked(r.by_dim, parts)),
+      top("applicants", "Applicants by vacancy", r.applied),
+    ],
+    series: [series("opened", "Vacancies opened by month", r.opened)],
+    total: f.vacancies || 0,
+  };
+}
+
 module.exports = {
   list,
   summary,
+  aiSummary,
   wordsEveryRole,
   suggested,
   hiringManagers,

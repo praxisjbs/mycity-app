@@ -6,7 +6,7 @@
  * this file only names them for the model and the pane, so no module invents its own words for a
  * count. authorise.runSummary parses what comes out with the contract's AiSummaryResult.
  *
- *   const { figure, part, group, series, periodOf, cut } = require("../../shared/ai/summary");
+ *   const { figure, part, group, series, periodOf, askedPeriod, stacked, cut } = require("../../shared/ai/summary");
  *   return {
  *     figures: [figure("late", "Late days", 12, "count"), figure("late_minutes", "Minutes late", 340, "minutes")],
  *     groups: [group("late_days", "Late days by department", rows)],
@@ -115,7 +115,38 @@ function periodOf(q, now = new Date()) {
   return { from, to };
 }
 
+/**
+ * The period a summary was asked for, or null when none was: for a summary whose list shows every
+ * record (a recruitment list), which counts every record unless `from`, `to` or a `month` narrows it.
+ * Asked, it is periodOf's: at most a year.
+ * @param {{from?: string, to?: string, month?: string}} q
+ * @param {Date} [now]
+ * @returns {{from: string, to: string}|null}
+ */
+function askedPeriod(q, now = new Date()) {
+  return q && (q.from || q.to || q.month) ? periodOf(q, now) : null;
+}
+
+/**
+ * Rows as stacked bars: each row's parts read from its own fields, in the order given, its value their
+ * sum (group() adds them). A part marked `optional` (Ended, Withdrawn, Drafts) is kept only when some
+ * row has one, so a legend never names a part no bar carries; as budgets' Over Budget.
+ *   group("department", "Vacancies by department", stacked(rows, [{ key: "open", label: "Open" }, { key: "draft", label: "Drafts", optional: true }]))
+ * @param {Array<object>} rows   { key, label, count?, ...each part's field }
+ * @param {Array<{key: string, label: string, field?: string, optional?: boolean}>} parts
+ */
+function stacked(rows, parts) {
+  const list = rows || [];
+  const kept = parts.filter((p) => !p.optional || list.some((r) => num(r[p.field || p.key]) > 0));
+  return list.map((r) => ({
+    key: r.key,
+    label: r.label,
+    count: r.count === undefined ? null : r.count,
+    parts: kept.map((p) => part(p.key, p.label, r[p.field || p.key] ?? 0)),
+  }));
+}
+
 /** Rows cut to a grouping's most, after the repo ranked them. */
 const cut = (rows, max = GROUP_ROWS) => (rows || []).slice(0, max);
 
-module.exports = { GROUP_ROWS, TOP_ROWS, SERIES_POINTS, PERIOD_DAYS, PARTS, figure, part, group, top, series, periodOf, cut, num, value };
+module.exports = { GROUP_ROWS, TOP_ROWS, SERIES_POINTS, PERIOD_DAYS, PARTS, figure, part, group, top, series, periodOf, askedPeriod, stacked, cut, num, value };

@@ -277,10 +277,10 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
     if (!compared) throw new Error(`nothing compared: ${JSON.stringify(skipped)}`);
   });
 
-  test("the probes: a read returns the record inside the person's reach and never the one outside it; a card naming the outside record is refused by the action's own check (§6.17)", async () => {
+  test("the probes: a read returns the record inside the person's reach and never the one outside it; a summary counts the one and never the other; a card naming the outside record is refused by the action's own check (§6.17)", async () => {
     const scoped = cases.filter((c) => c.expect === "scoped");
     expect(scoped.length).toBeGreaterThan(20);
-    const done = { reads_inside: 0, reads_outside: 0, actions_inside: 0, actions_outside: 0, nothing: 0 };
+    const done = { reads_inside: 0, reads_outside: 0, actions_inside: 0, actions_outside: 0, summaries_inside: 0, summaries_outside: 0, nothing: 0 };
     /** The ids a person is served by a read, across its pages, without their type. */
     const idsServed = async (u, key, params) => idsOf(registry.tool(key), (await walk(u, key, params)).rows).map((x) => x.split(":").slice(1).join(":"));
     for (const k of scoped) {
@@ -299,15 +299,28 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
         scopeOf: (module, action) => scopeFor(u, module, action),
       };
       const where = `${k.key} as ${k.role}`;
+      const tool = registry.tool(k.key);
+      // A summary counts: its total around each record made, through its own run so the summary cache never answers (§6.17).
+      const totalOf = k.kind === "summary" ? async () => (await tool.run(pool, tool.params.parse({}), actor)).total : null;
+      const before = totalOf ? await totalOf() : null;
       const inside = await k.probe.inside(ctx);
+      const counted = totalOf ? await totalOf() : null;
       // Nothing is outside the reach of someone who sees everything.
       const outside = scope.scope === "all" ? null : await k.probe.outside(ctx);
       if (!inside && !outside) {
         done.nothing += 1;
         continue;
       }
-      const tool = registry.tool(k.key);
-      if (k.kind === "read") {
+      if (k.kind === "summary") {
+        if (inside) {
+          expect([where, "inside", counted]).toEqual([where, "inside", before + 1]);
+          done.summaries_inside += 1;
+        }
+        if (outside) {
+          expect([where, "outside", await totalOf()]).toEqual([where, "outside", counted]);
+          done.summaries_outside += 1;
+        }
+      } else if (k.kind === "read") {
         if (inside) {
           const ids = await idsServed(u, k.key, inside.params || {});
           expect([where, "inside", String(inside.id), ids.includes(String(inside.id))]).toEqual([where, "inside", String(inside.id), true]);
@@ -347,6 +360,8 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
     expect(done.reads_outside).toBeGreaterThan(10);
     expect(done.actions_inside).toBeGreaterThan(5);
     expect(done.actions_outside).toBeGreaterThan(5);
+    expect(done.summaries_inside).toBeGreaterThan(0);
+    expect(done.summaries_outside).toBeGreaterThan(0);
   });
 
   test("an allowed action is checked with the person's scope and its schema: values that do not parse are problems, never a run", async () => {

@@ -642,8 +642,71 @@ async function restoreEmail(actor, scope, key) {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding)
+ * ------------------------------------------------------------------ */
+
+/** The pipeline's stages in order, as a person reads them; Hired last. */
+const STAGE_WORDS = Object.freeze({
+  application: "Application",
+  screening: "Screening",
+  assessment: "Assessment",
+  interview: "Interview",
+  shortlist: "Shortlist",
+  offer: "Offer",
+  documentation: "Documentation",
+  pre_onboarding: "Pre-Onboarding",
+  onboarding: "Onboarding",
+  hired: "Hired",
+});
+const SOURCE_WORDS = Object.freeze({ careers: "Careers Page", invited: "Invited", pool: "Talent Pool" });
+/** A vacancy's applications by stage group, each a part of its stacked bar; Ended only where some row has one. */
+const STAGE_GROUPS = Object.freeze([
+  { key: "screening", label: "Screening" },
+  { key: "assessment", label: "Assessment" },
+  { key: "interview", label: "Interview" },
+  { key: "offer", label: "Offer" },
+  { key: "hired", label: "Hired" },
+  { key: "ended", label: "Ended", optional: true },
+]);
+
+/**
+ * The applications the reader may list, in figures: every application unless a period (applied) is
+ * asked; the funnel in the pipeline's order; each vacancy by stage group as a stacked bar; by source;
+ * applications by month, or by week when asked. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   ApplicationSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const bucket = params.by === "week" ? "week" : "month";
+  const r = await repo.aiSummary(client, { vacancy_id: params.vacancy_id, status: params.status, from: period && period.from, to: period && period.to, bucket }, scope);
+  const f = r.figures;
+  const atStage = new Map(r.by_stage.map((x) => [x.key, x.value]));
+  return {
+    figures: [
+      figure("candidates", "Candidates", f.candidates || 0),
+      figure("active", "In progress", f.active || 0),
+      figure("hired", "Hired", f.hired || 0),
+      figure("not_progressed", "Not progressing", f.not_progressed || 0),
+      figure("withdrawn", "Withdrawn", f.withdrawn || 0),
+      figure("average_score", "Average score in progress", f.average_score || 0),
+    ],
+    groups: [
+      group("stage", "Candidates by stage", Object.keys(STAGE_WORDS).map((k) => ({ key: k, label: STAGE_WORDS[k], value: atStage.get(k) || 0 }))),
+      group("vacancy", "Candidates by vacancy", stacked(r.by_vacancy, STAGE_GROUPS)),
+      group("source", "Candidates by source", r.by_source.map((x) => ({ key: x.key, label: SOURCE_WORDS[x.key] || x.key, value: x.value }))),
+    ],
+    series: [series("applications", bucket === "week" ? "Applications by week" : "Applications by month", r.points)],
+    total: f.candidates || 0,
+  };
+}
+
 module.exports = {
   card,
+  aiSummary,
   cvState,
   list,
   summary,

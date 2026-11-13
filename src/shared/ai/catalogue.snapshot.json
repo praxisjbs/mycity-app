@@ -1606,7 +1606,8 @@
       "bulk": null,
       "schema": "assessments.SittingListQuery",
       "schema_sha": "baa8c05b4df75e8d",
-      "screen": null
+      "screen": null,
+      "summary": "assessments.summary"
     },
     {
       "key": "attendance.exceptions",
@@ -1731,7 +1732,8 @@
       "bulk": null,
       "schema": "candidates.CandidateListQuery",
       "schema_sha": "0d00a44c6d028998",
-      "screen": null
+      "screen": null,
+      "summary": "candidates.summary"
     },
     {
       "key": "cards.mine",
@@ -2031,7 +2033,8 @@
       "bulk": null,
       "schema": "interviews.InterviewListQuery",
       "schema_sha": "81c2f8ddcd90026a",
-      "screen": null
+      "screen": null,
+      "summary": "interviews.summary"
     },
     {
       "key": "kpis.list",
@@ -2147,7 +2150,8 @@
       "bulk": null,
       "schema": "offers.OfferListQuery",
       "schema_sha": "1ef2069374a40ace",
-      "screen": null
+      "screen": null,
+      "summary": "offers.summary"
     },
     {
       "key": "onboarding.list",
@@ -2158,7 +2162,8 @@
       "bulk": null,
       "schema": "onboarding.OnboardingListQuery",
       "schema_sha": "5ab5282ff1c97f96",
-      "screen": null
+      "screen": null,
+      "summary": "onboarding.summary"
     },
     {
       "key": "organisation.get",
@@ -2456,7 +2461,8 @@
       "bulk": null,
       "schema": "talent_pool.PoolListQuery",
       "schema_sha": "cfabc7d2d676ebf0",
-      "screen": null
+      "screen": null,
+      "summary": "talent_pool.summary"
     },
     {
       "key": "tasks.get",
@@ -2572,7 +2578,8 @@
       "bulk": null,
       "schema": "vacancies.VacancyListQuery",
       "schema_sha": "cdd9c3dfedb43ced",
-      "screen": null
+      "screen": null,
+      "summary": "vacancies.summary"
     },
     {
       "key": "working_week.get",
@@ -4073,6 +4080,17 @@
       "screen": null
     },
     {
+      "key": "assessments.summary",
+      "kind": "summary",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "assessments.SittingSummaryQuery",
+      "schema_sha": "4fa19147073180a7",
+      "screen": null
+    },
+    {
       "key": "attendance.summary",
       "kind": "summary",
       "module_key": "people",
@@ -4106,6 +4124,17 @@
       "screen": null
     },
     {
+      "key": "candidates.summary",
+      "kind": "summary",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "candidates.ApplicationSummaryQuery",
+      "schema_sha": "8cacf83bec14581f",
+      "screen": null
+    },
+    {
       "key": "employees.summary",
       "kind": "summary",
       "module_key": "people",
@@ -4128,6 +4157,17 @@
       "screen": null
     },
     {
+      "key": "interviews.summary",
+      "kind": "summary",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "interviews.InterviewSummaryQuery",
+      "schema_sha": "ab880d0c043caaa7",
+      "screen": null
+    },
+    {
       "key": "leave.summary",
       "kind": "summary",
       "module_key": "people",
@@ -4136,6 +4176,28 @@
       "bulk": null,
       "schema": "leave.LeaveSummaryQuery",
       "schema_sha": "69b79fd857991372",
+      "screen": null
+    },
+    {
+      "key": "offers.summary",
+      "kind": "summary",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "offers.OfferSummaryQuery",
+      "schema_sha": "bc78f269901167e8",
+      "screen": null
+    },
+    {
+      "key": "onboarding.summary",
+      "kind": "summary",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "onboarding.OnboardingSummaryQuery",
+      "schema_sha": "b2691a653edd31d7",
       "screen": null
     },
     {
@@ -4183,6 +4245,17 @@
       "screen": null
     },
     {
+      "key": "talent_pool.summary",
+      "kind": "summary",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "talent_pool.PoolSummaryQuery",
+      "schema_sha": "8311e484d4e8237b",
+      "screen": null
+    },
+    {
       "key": "tasks.summary",
       "kind": "summary",
       "module_key": "workspace",
@@ -4191,6 +4264,17 @@
       "bulk": null,
       "schema": "tasks.TaskCountsQuery",
       "schema_sha": "815712491b73aed2",
+      "screen": null
+    },
+    {
+      "key": "vacancies.summary",
+      "kind": "summary",
+      "module_key": "recruitment",
+      "permission": "recruitment.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "vacancies.VacancySummaryQuery",
+      "schema_sha": "f8868d70b99ae460",
       "screen": null
     }
   ]

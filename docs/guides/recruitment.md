@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #38 Vacancies, #39 Candidates, #40 Assessments, #41 Interviews, #44 Talent Pool, #111 Analytics; public #107 Home, #80 Careers, #81 Vacancy, #82 Apply, #83 Assessment |
 | Status | Built |
-| Last changed | 11/11/2026 |
+| Last changed | 13/11/2026 |
 
 Sources: MILESTONES §9 (scope, A9, A10, definition of done) and §1 (A23 as amended 01/11/2026);
 REUSE_MAP §5; MILESTONE_QUESTIONS Q4, Q9, Q10; DATABASE_SCHEMA M4; the discovery call of
@@ -695,8 +695,22 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
   weighted total, provisional flag), `interviews.list` (upcoming, awaiting feedback, blind as §6.6),
   `assessments.list` (the library), `assessments.sittings` (awaiting marking), `talent_pool.list` (the
   pool), `vacancies.hiring_managers` (who may be a hiring manager, §6.1); `vacancies.get` (one vacancy with its questions and scorecard), `candidates.get` (one
-  application). No summary is declared. A card or a read never names a vacancy outside the asker's scope,
+  application). A card or a read never names a vacancy outside the asker's scope,
   by id, number or title.
+- **AI summaries** (`praxis-ai.md` §6.13, Recruitment and onboarding; Appendix B PR 5, built
+  13/11/2026): figures for Praxis AI's Overview, each one SQL in its module's repo with the screens'
+  scope, never a row. `vacancies.summary` (`vacancies.repo.js` `aiSummary`): vacancies by status, by
+  department or hiring manager stacked Open, Paused, Closed and Drafts, applicants per vacancy, opened
+  by month. `candidates.summary` (`ApplicationSummaryQuery`, since `CandidateSummaryQuery` is the
+  board's own figures): the funnel in the pipeline's order, each vacancy stacked by stage group
+  (Screening, Assessment, Interview, Offer, Hired, Ended), by source, applications by month or week.
+  `interviews.summary`: by status (Upcoming, Awaiting Feedback, Held, Cancelled), the held rounds'
+  outcomes, each interviewer's cards submitted and waiting (never a rating, §6.6), by week.
+  `assessments.summary`: sittings by status and the average score by assessment. `talent_pool.summary`:
+  the people kept by role applied for and by why kept, leaving within 30 days, kept by month. A period
+  narrows them only when asked; otherwise they count every record, as the lists do. The reads name
+  them (`vacancies.list`, `candidates.list`, `interviews.list`, `assessments.sittings`,
+  `talent_pool.list`), and the four whose lists carry a matrix probe carry it.
 - **AI actions and routes**: routes to New Vacancy (prefill title, department), to a candidate, to
   Schedule Interview. The create and edit forms are accounted for in each manifest's `not_offered`:
   candidate and feedback forms are `personal`, files are `file`, Write With AI is `ai`. Vacancies:
@@ -806,6 +820,8 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 - How long candidates' data is kept after a decision (NDPR): not discussed; nothing is deleted in M4.
 
 ## 14 · Change log
+
+- 13/11/2026 · JP · Praxis AI's recruitment summaries (`praxis-ai.md` Appendix B PR 5, §9): vacancies, candidates, interviews, assessments and the talent pool in figures for the Overview's charts, within the screens' own scope. No screen of Recruitment changed.
 
 - 12/11/2026 · AJ · `onboarding-document-rejected`, a tenth Candidate Email (§6.8,
   `OnboardingDocumentRejectedEmailVars`): M5 mails the hire what to send again, with a fresh link,

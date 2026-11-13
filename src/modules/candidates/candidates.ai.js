@@ -28,6 +28,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "candidates.list",
+      summary: "candidates.summary",
       description:
         "List candidates: the role, stage and status of each application, its screening score (and whether it is the provisional estimate), weighted total and days at stage",
       params: c.candidates.CandidateListQuery,
@@ -48,6 +49,20 @@ module.exports = defineManifest({
       permission: ["recruitment", "view"],
       run: (_client, params, actor) => service.get(params.id, actor, actor.scope),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "candidates.summary",
+      description: "Candidates in figures: in progress, hired, not progressing; the funnel by stage, each vacancy by stage as stacked bars, by source, applications by month or week",
+      params: c.candidates.ApplicationSummaryQuery,
+      permission: ["recruitment", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+      // An application to a role the asker manages is counted; one to the outsider's role never is (praxis-ai.md §6.17).
+      matrix: probeFor(async (v, ctx) => {
+        const a = await applicationFor(v, `${ctx.role} summary`);
+        return { type: "candidate", id: a.application_id };
+      }),
     },
   ],
   routes: [

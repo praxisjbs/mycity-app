@@ -133,6 +133,27 @@ describe("the shaper (shared/ai/summary.js)", () => {
     expect(shaper.periodOf({ to: "2026-10-31" }, now)).toEqual({ from: "2026-10-01", to: "2026-10-31" });
     expect(shaper.periodOf({ from: "2020-01-01", to: "2026-11-14" }, now)).toEqual({ from: "2025-11-13", to: "2026-11-14" });
   });
+
+  test("an asked period: none when nothing narrows it (a list that shows every record), else periodOf's (Appendix B PR 5)", () => {
+    const now = new Date("2026-11-14T10:00:00Z");
+    expect(shaper.askedPeriod({}, now)).toBeNull();
+    expect(shaper.askedPeriod({ status: "open" }, now)).toBeNull();
+    expect(shaper.askedPeriod({ month: "2026-10" }, now)).toEqual({ from: "2026-10-01", to: "2026-10-31" });
+    expect(shaper.askedPeriod({ from: "2020-01-01", to: "2026-11-14" }, now)).toEqual({ from: "2025-11-13", to: "2026-11-14" });
+  });
+
+  test("stacked rows: parts from each row's fields in order, the value their sum, an optional part only where some row has one", () => {
+    const parts = [
+      { key: "open", label: "Open" },
+      { key: "closed", label: "Closed" },
+      { key: "draft", label: "Drafts", optional: true },
+    ];
+    const none = shaper.group("department", "By department", shaper.stacked([{ key: "a", label: "A", open: 2, closed: 1, draft: 0 }], parts));
+    expect(none.rows[0]).toEqual({ key: "a", label: "A", value: 3, count: null, parts: [{ key: "open", label: "Open", value: 2 }, { key: "closed", label: "Closed", value: 1 }] });
+    const some = shaper.stacked([{ key: "a", label: "A", open: 2 }, { key: "b", label: "B", open: 0, closed: 1, draft: 1 }], parts);
+    expect(some.map((r) => r.parts.map((p) => p.value))).toEqual([[2, 0, 0], [0, 1, 1]]);
+    expect(shaper.stacked(null, parts)).toEqual([]);
+  });
 });
 
 describe("the pane after PR3 (engine/pane.js)", () => {

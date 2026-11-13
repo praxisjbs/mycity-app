@@ -277,6 +277,57 @@ async function get(id, user, scope) {
 }
 
 /* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding)
+ * ------------------------------------------------------------------ */
+
+/** A case's status as a person reads it, in the order a case moves; a cancelled case reads Withdrawn. */
+const CASE_WORDS = Object.freeze({
+  documentation: "Documentation",
+  pre_onboarding: "Pre-Onboarding",
+  onboarding: "Onboarding",
+  completed: "Completed",
+  cancelled: "Withdrawn",
+});
+
+/**
+ * The cases the reader may list, in figures: every case unless a period (starts) is asked; by status,
+ * by department stacked by status, and starts by month. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   OnboardingSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const r = await repo.aiSummary(
+    client,
+    { status: params.status, department_id: params.department_id, from: period && period.from, to: period && period.to, today: lagos.today(now) },
+    scope,
+  );
+  const f = r.figures;
+  const n = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const parts = Object.keys(CASE_WORDS).map((key) => ({ key, label: CASE_WORDS[key], optional: key === "cancelled" }));
+  return {
+    figures: [
+      figure("cases", "Cases", f.cases || 0),
+      figure("documentation", "At documentation", f.documentation || 0),
+      figure("pre_onboarding", "At pre-onboarding", f.pre_onboarding || 0),
+      figure("onboarding", "Onboarding", f.onboarding || 0),
+      figure("completed", "Completed", f.completed || 0),
+      figure("cancelled", "Withdrawn", f.cancelled || 0),
+      figure("starting_soon", "Starting within 14 days", f.starting_soon || 0),
+      figure("outstanding", "Documents outstanding", f.outstanding || 0),
+    ],
+    groups: [
+      group("status", "Cases by status", Object.keys(CASE_WORDS).filter((k) => n.has(k)).map((k) => ({ key: k, label: CASE_WORDS[k], value: n.get(k) }))),
+      group("department", "Cases by department", stacked(r.by_department, parts)),
+    ],
+    series: [series("starts", "Starts by month", r.starts)],
+    total: f.cases || 0,
+  };
+}
+
+/* ------------------------------------------------------------------ *
  * The documentation gate
  * ------------------------------------------------------------------ */
 
@@ -617,6 +668,7 @@ module.exports = {
   caseForOffer,
   list,
   summary,
+  aiSummary,
   get,
   detailOf,
   itemOf,

@@ -242,4 +242,51 @@ async function cancel(actor, scope, id) {
   });
 }
 
-module.exports = { sittings, sitting, send, sendBulk, mark, cancel, listed };
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Recruitment and onboarding)
+ * ------------------------------------------------------------------ */
+
+/** A sitting's status as a person reads it, in the order a sitting moves. */
+const SITTING_WORDS = Object.freeze({
+  sent: "Not Started",
+  in_progress: "In Progress",
+  submitted: "Submitted",
+  timed_out: "Timed Out",
+  scored: "Scored",
+  expired: "Expired",
+  cancelled: "Cancelled",
+});
+
+/**
+ * The sittings the reader may list, in figures: every sitting unless a period (sent) is asked; the
+ * average score by assessment, by status, and sent by month. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   SittingSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series, askedPeriod } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const r = await repo.aiSummary(client, { status: params.status, from: period && period.from, to: period && period.to }, scope);
+  const f = r.figures;
+  const n = new Map(r.by_status.map((x) => [x.key, x.value]));
+  return {
+    figures: [
+      figure("sittings", "Sittings", f.sittings || 0),
+      figure("not_started", "Not started", f.not_started || 0),
+      figure("in_progress", "In progress", f.in_progress || 0),
+      figure("to_mark", "Waiting to be marked", f.to_mark || 0),
+      figure("scored", "Scored", f.scored || 0),
+      figure("ended", "Expired or cancelled", f.ended || 0),
+      figure("average_score", "Average score", f.average_score || 0),
+    ],
+    groups: [
+      group("assessment", "Average score by assessment", r.by_assessment),
+      group("status", "Sittings by status", Object.keys(SITTING_WORDS).filter((k) => n.has(k)).map((k) => ({ key: k, label: SITTING_WORDS[k], value: n.get(k) }))),
+    ],
+    series: [series("sittings", "Sittings sent by month", r.months)],
+    total: f.sittings || 0,
+  };
+}
+
+module.exports = { sittings, sitting, send, sendBulk, mark, cancel, listed, aiSummary };
