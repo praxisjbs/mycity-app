@@ -52,6 +52,9 @@ export function siteOf(key: string): Site | null {
 const count = (id: string) => [...ASSIGNED.values()].filter((v) => v === id).length;
 const withCount = (w: Site): Site => ({ ...w, assigned_count: count(w.worksite_id) });
 
+/** Every worksite with how many people work there, as worksites.list reads them (Praxis AI's short list, praxis-ai.md §6.19 item 6). */
+export const sitesCounted = (): Site[] => WORKSITES.map(withCount);
+
 /** The reader's `people` grant: whether they hold the action, and whether their scope is everyone. */
 export function peopleGrant(user: string, action: string) {
   const may = !!grantsFor(user).people?.includes(action);

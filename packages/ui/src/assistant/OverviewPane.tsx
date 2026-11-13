@@ -1,8 +1,8 @@
 /**
  * @component OverviewPane
  * @group Assistant
- * @summary The pane's Overview: up to three figures and one chart the server drew from a summary read (a bar, a stacked bar with its key, a line or a ring); nothing until a question reads a summary.
- * @use In PaneTabs' overview slot with the answer's `overview` (AiAnswer.overview); the tab is disabled while it is null. The figures and the chart come from the server (docs/guides/praxis-ai.md §6.13; the summary reads land with PR3 of the Praxis AI Engine).
+ * @summary The pane's Overview: up to three figures and one chart the server drew from a summary read or a short list's own rows (a bar, a stacked bar with its key, a line or a ring); nothing until an answer has figures.
+ * @use In PaneTabs' overview slot with the answer's `overview` (AiAnswer.overview); the tab is disabled while it is null. The figures and the chart come from the server (docs/guides/praxis-ai.md §6.13, §6.19 item 6); a chart whose `unit` is `ngn` reads its values in naira, as the figures do.
  * @avoid Figures a screen worked out itself; a dashboard (Home's KpiGrid and its charts); a table (TablePane).
  * @phone The figures two to a row, the chart below, inside the pane sheet; no chart caption.
  * @a11y The figures are KpiCards (a named figure each); the chart is one of the shared charts, read out as a list of label and figure, a stacked bar as each part and its total.
@@ -43,15 +43,21 @@ const partOf = (v: number | undefined) => (typeof v === "number" && Number.isFin
 /** The chart's name: its first series' label, which is the summary's own grouping (Title Case, short). */
 const nameOf = (c: PaneChart) => c.series[0]?.label ?? "Overview";
 
+/** A chart's value as a person reads it: naira with kobo when the chart's unit is `ngn`, else a number. */
+export function chartValue(chart: Pick<PaneChart, "unit">): (v: number) => string {
+  return chart.unit === "ngn" ? (v) => formatMoney(v.toFixed(2)) : (v) => formatNumber(v);
+}
+
 function Chart({ chart }: { chart: PaneChart }) {
   const first = chart.series[0];
   if (!first) return null;
+  const show = chartValue(chart);
   if (chart.kind === "line") {
-    return <TrendChart title={nameOf(chart)} labels={chart.labels} lines={chart.series.slice(0, 3).map((s) => ({ name: s.label, values: s.values.map((v) => (Number.isFinite(v) ? v : null)) }))} />;
+    return <TrendChart title={nameOf(chart)} labels={chart.labels} lines={chart.series.slice(0, 3).map((s) => ({ name: s.label, values: s.values.map((v) => (Number.isFinite(v) ? v : null)) }))} format={show} />;
   }
   if (chart.kind === "donut") {
     const slices = chart.labels.map((label, i) => ({ label, value: first.values[i] ?? 0 }));
-    return <DonutChart title={nameOf(chart)} middle={formatNumber(sum(first.values))} under="in all" slices={slices} />;
+    return <DonutChart title={nameOf(chart)} middle={show(sum(first.values))} under="in all" slices={slices} />;
   }
   if (chart.kind === "stacked_bar") {
     // One series per part, in order, the key naming each; a bar's total is the sum of its parts.
@@ -60,10 +66,10 @@ function Chart({ chart }: { chart: PaneChart }) {
       const values = parts.map((s) => partOf(s.values[i]));
       return { label, value: sum(values), parts: values };
     });
-    return <BarChart label={chart.title} parts={parts.map((s) => s.label)} bars={bars} format={(v) => formatNumber(v)} />;
+    return <BarChart label={chart.title} parts={parts.map((s) => s.label)} bars={bars} format={show} />;
   }
   // A bar draws its first series.
-  return <BarChart title={nameOf(chart)} bars={chart.labels.map((label, i) => ({ label, value: first.values[i] ?? 0 }))} colourPerBar={chart.labels.length <= 6} format={(v) => formatNumber(v)} />;
+  return <BarChart title={nameOf(chart)} bars={chart.labels.map((label, i) => ({ label, value: first.values[i] ?? 0 }))} colourPerBar={chart.labels.length <= 6} format={show} />;
 }
 
 export function OverviewPane({ overview, className }: OverviewPaneProps) {

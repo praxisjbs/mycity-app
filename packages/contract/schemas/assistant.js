@@ -280,20 +280,29 @@ const AiSummaryResult = z
 
 const AiChartKind = z.enum(["bar", "stacked_bar", "line", "donut"]);
 
-/** A chart the server drew from a summary's own groups or series: labels and up to six series. */
+/**
+ * A chart the server drew from a summary's own groups or series, or from a whole list's own rows
+ * (§6.19 item 6): labels and up to six series. `unit` is `ngn` when every value is an amount of
+ * money, so the chart reads naira as the figures do (decision 56); null otherwise.
+ */
 const AiOverviewChart = z
   .object({
     kind: AiChartKind,
     title: z.string().trim().min(1).max(120),
     labels: z.array(z.string()).max(60),
     series: z.array(z.object({ label: z.string().max(60), values: z.array(z.number()).max(60) }).strict()).max(6),
+    unit: z.string().max(16).nullable().default(null),
   })
   .strict();
 
-/** The pane's Overview (§6.13): the summary it rests on, up to three figures and one chart. */
+/**
+ * The pane's Overview (§6.13, §6.19 item 6): the summary it rests on, or the read (by `n`) whose
+ * rows were its whole list; one of the two is set. Up to three figures and one chart.
+ */
 const AiOverview = z
   .object({
-    summary: z.string(),
+    summary: z.string().nullable(),
+    read: z.number().int().min(1).max(5).nullable().default(null),
     title: z.string().max(120).nullable(),
     figures: z.array(AiSummaryFigure).max(3),
     chart: AiOverviewChart.nullable(),
@@ -495,6 +504,19 @@ const AiAnswer = z
   .strict();
 
 /**
+ * A figure the server works out from a whole list's rows (§6.19 item 6): how many rows, the sum of a
+ * number or money field, or how many rows hold a code ("active", or its words "Active"). Never a
+ * number the model wrote.
+ */
+const AiRowFigure = z
+  .object({
+    of: z.enum(["rows", "sum", "count"]),
+    field: z.string().min(1).max(64).nullable().default(null),
+    value: z.string().min(1).max(64).nullable().default(null),
+  })
+  .strict();
+
+/**
  * What the model returns as its answer (§6.4); the server turns it into AiAnswer. Never sent
  * over HTTP: it is the output schema of the assistant's last round.
  */
@@ -545,19 +567,27 @@ const AiAnswerDraft = z
       .nullable()
       .default(null),
     /**
-     * The Overview the pane draws (§6.13): which of this turn's summaries (by key), up to three of its
-     * figures by key, and one chart over one of its groups (`group`) or series (`series`).
+     * The Overview the pane draws (§6.13, §6.19 item 6). From a summary: which of this turn's
+     * summaries (by key), up to three of its figures by key, and one chart over one of its groups
+     * (`group`) or series (`series`). From a list whose whole answer is on one page: which read (by
+     * `n`), up to three figures the server works out from its rows (`AiRowFigure`), and one chart of
+     * its rows: `label` the field each bar is named by, and `values` (number or money fields) or
+     * `count` (a code field whose rows are counted).
      */
     overview: z
       .object({
-        summary: z.string().max(80),
-        figures: z.array(z.string().max(64)).max(3).default([]),
+        summary: z.string().max(80).nullable().default(null),
+        read: z.number().int().min(1).max(5).nullable().default(null),
+        figures: z.array(z.union([z.string().max(64), AiRowFigure])).max(3).default([]),
         chart: z
           .object({
             kind: AiChartKind,
             title: z.string().trim().min(1).max(120),
             group: z.string().max(64).nullable().default(null),
             series: z.array(z.string().max(64)).max(6).nullable().default(null),
+            label: z.string().min(1).max(64).nullable().default(null),
+            values: z.array(z.string().min(1).max(64)).max(6).nullable().default(null),
+            count: z.string().min(1).max(64).nullable().default(null),
           })
           .strict()
           .nullable()
@@ -764,6 +794,7 @@ const TABLES = {
     },
   },
   AiAnswerDraft: { table: null, reason: "the model's answer before the server checks it; never on the wire" },
+  AiRowFigure: { table: null, reason: "a figure the server works out from a whole list's rows, named in the model's answer; never on the wire" },
   AiSuggestions: { table: null, reason: "example questions for the reads the person may run, from code" },
   AiConversation: {
     table: "ai_conversation",
@@ -834,6 +865,7 @@ module.exports = {
   AiReadRows,
   AiAnswer,
   AiAnswerDraft,
+  AiRowFigure,
   AiSuggestions,
   AiConversation,
   AiConversationListQuery,

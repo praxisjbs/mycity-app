@@ -435,6 +435,31 @@ describe("The full screen: Back, the context and the pane", () => {
     expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("a short list charted from its own rows opens the pane on Overview, its amounts in naira (§6.19 item 6)", async () => {
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    const charted = answer({
+      content: "Four departments hold budgets this year.",
+      reads: [{ n: 1, key: "budgets.list", kind: "read", module_key: "expenses", params: {}, outcome: "read", rows: 4, total: 4, first: 1, masked: [] }],
+      overview: {
+        summary: null,
+        read: 1,
+        title: null,
+        figures: [{ key: "sum_allocated", label: "Allocated", value: "8050000.00", unit: "ngn" }],
+        chart: { kind: "bar", title: "Allocated by department", labels: ["Programmes", "Operations"], series: [{ label: "Allocated", values: [3500000, 2000000] }], unit: "ngn" },
+      },
+    });
+    m.call.mockImplementation(async () => charted);
+    ui("ask");
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "Our budgets this year as a chart");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Four departments hold budgets this year.");
+    const pane = screen.getByRole("region", { name: "Pane" });
+    expect(within(pane).getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(pane).getByText("₦8,050,000.00")).toBeTruthy();
+    expect(await within(pane).findByText("Programmes: ₦3,500,000.00")).toBeTruthy();
+  });
+
   it("a conversation opened shows its latest answer's pane; an earlier answer's chip brings its own back, and Open Figures moves it again", async () => {
     const A1 = "00000000-0000-4000-8000-0000000000a1";
     const A2 = "00000000-0000-4000-8000-0000000000a2";
