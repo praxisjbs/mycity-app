@@ -155,7 +155,7 @@ Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sig
 | `POST /api/v1/auth/forgot` | `ForgotBody` → `Accepted` | anonymous | | Same answer for every email; 5 per address in 15 minutes |
 | `POST /api/v1/auth/link` | `LinkCheckBody` → `LinkCheck` | anonymous | | 404 `LINK_INVALID` when expired or spent |
 | `POST /api/v1/auth/reset` | `ResetBody` → `ResetDone` | anonymous | | Sets the password, ends every session |
-| `GET /api/v1/auth/me` | → `Me` | own account | | `grants` per module, and `capabilities`: the codes the person holds through a role or directly, A to Z (the CEO's are every code in `capability`), the same the routes check (README §5.2). Every session response carries the same `Me` |
+| `GET /api/v1/auth/me` | → `Me` | own account | | `grants` per module, `scopes` (each module's widest record scope over the person's roles: `all`, `team` or `own`), and `capabilities`: the codes the person holds through a role or directly, A to Z (the CEO's are every code in `capability`), the same the routes check (README §5.2). Every session response carries the same `Me` |
 | `GET /api/v1/auth/security` | → `SecuritySummary` | own account | | |
 | `POST /api/v1/auth/password` | `PasswordChange` → `PasswordChanged` | own account | | 10 per person in 15 minutes |
 | `GET /api/v1/auth/sessions` | `SignInListQuery` → `SignInPage` | own account | yes, 25 | Filter `status` (active, ended); sort `issued_at` |
@@ -537,3 +537,4 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 - 19/10/2026 · AJ · My Security's Clock-In Devices card lists the person's registered and new devices (`GET /devices/mine`) above Manage My Devices, in place of the link alone (the team lead, 19/10/2026). §10 updated.
 - 20/10/2026 · TB · Sign Out also wipes this device's trail of places (`app/src/lib/trail.ts`, FRONTEND_FOUNDATION F29), so the next person on a shared device never sees where the last one went; a session that ends or locks keeps it for the same person's next sign-in.
 - 26/10/2026 · JP · From the User Guide audit's screen defects: the lock screen's code step has Back and says where a recovery code comes from, and an expired code returns it to the first step (it offered only Sign Out); a link whose token fails its shape reads Link Expired with Request New Link, not Link Not Checked (§6, §10).
+- 14/11/2026 · TB · `/auth/me` (and the sign-in answer's `user`) carries `scopes`: each module's widest record scope over the person's roles (`identity.repo.js` `grantsOf`), so People's Employees tab follows `people` view over `all` for a custom role too, not only Settings holders (found filming the Milestone 9 video; `docs/guides/foundation.md` §8; `identity.test.js`).
