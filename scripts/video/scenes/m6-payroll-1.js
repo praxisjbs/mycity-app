@@ -195,8 +195,6 @@ async function prepare({ log = console.log } = {}) {
 const RUNS = "/payroll?tab=payroll-runs";
 const DEDUCTIONS = "/payroll?tab=deductions";
 
-/** The dialog, sheet or confirmation on top. */
-const dialog = (s) => s.page.locator("[role=dialog], [role=alertdialog]").last();
 /** A window by its name, never a help term's popup (runbook §6.16). */
 const named = (s, name) => s.page.getByRole("dialog", { name }).last();
 const inside = (s, name, label) => named(s, name).getByLabel(label, { exact: true }).first();
@@ -221,7 +219,7 @@ async function soft(s, loc, wait = 4000) {
 }
 
 /** Pick a person in a window's Employee search: type part of the name, then press them. */
-async function person(s, windowName, typed, name) {
+async function pickPerson(s, windowName, typed, name) {
   await s.type(named(s, windowName).getByRole("searchbox", { name: "Employee" }), typed, { delay: 70 });
   await s.click(named(s, windowName).getByRole("option", { name: new RegExp(`^${name}`) }).first());
 }
@@ -351,7 +349,7 @@ module.exports = {
           start: DEDUCTIONS,
           lines: [
             "Deductions lists everything taken from pay: attendance deductions, fines and advances.",
-            { say: "Pending Fines counts four. Each comes from a query upheld in Queries and Sanctions, with a fine.", do: (s) => s.hover(tile(s, "Pending Fines")) },
+            { say: ["Pending Fines counts four. Each comes from a query upheld in Queries and Sanctions,", "with a fine."].join(" "), do: (s) => s.hover(tile(s, "Pending Fines")) },
             { say: "Lateness and absence come here from attendance. Those are waived on People, under Attendance.", do: (s) => s.hover(tile(s, "Pending Attendance")) },
             { say: "Cynthia opens Tobiloba Dada's fine: 5,000 naira, for listings that went up four days late.", do: (s) => s.click(text(s, "Tobiloba Dada")) },
             { say: "Accept This Month takes it whole from November's pay. Tobiloba is told.", do: async (s) => { await s.click(button(s, "Accept This Month")); await toastOf(s, "Fine accepted"); } },
@@ -376,7 +374,7 @@ module.exports = {
           lines: [
             "An advance is pay the CEO sends someone before pay day, by bank transfer outside the hub.",
             "Yesterday Aaron Agama was sent 100,000 naira ahead of his November pay. Recording it recovers it from his payslips.",
-            { say: "Cynthia presses Record Advance, and picks Aaron.", do: async (s) => { await s.click(button(s, "Record Advance")); await person(s, "Record Advance", "Aaron", "Aaron Agama"); } },
+            { say: "Cynthia presses Record Advance, and picks Aaron.", do: async (s) => { await s.click(button(s, "Record Advance")); await pickPerson(s, "Record Advance", "Aaron", "Aaron Agama"); } },
             { say: "Amount, 100,000 naira. Paid On, the day it was sent.", do: async (s) => { await s.type(inside(s, "Record Advance", "Amount"), "100,000", { delay: 70 }); await s.type(inside(s, "Record Advance", "Paid On"), "13/11/2026", { delay: 70 }); } },
             { say: "Months, two, from November: 50,000 naira comes off each payslip.", do: (s) => s.hover(named(s, "Record Advance").getByRole("combobox", { name: "Months" })) },
             { say: "The Reason, then Record Advance. Aaron is told.", do: async (s) => { await s.type(inside(s, "Record Advance", "Reason"), "Advance on salary for rent", { delay: 30 }); await s.click(button(s, "Record Advance", named(s, "Record Advance"))); await toastOf(s, "Advance recorded"); } },
@@ -396,12 +394,12 @@ module.exports = {
           lines: [
             "An adjustment is a one-off earning or deduction, for one person, in this run.",
             { say: "Bassey Ekpe covered the Ikeja launch over the weekend. Cynthia presses Add Adjustment.", do: (s) => s.click(button(s, "Add Adjustment")) },
-            { say: "She picks Bassey, and Earning.", do: async (s) => { await person(s, "Add Adjustment", "Bassey", "Bassey Ekpe"); await s.click(named(s, "Add Adjustment").getByRole("radio", { name: "Earning" })); } },
+            { say: "She picks Bassey, and Earning.", do: async (s) => { await pickPerson(s, "Add Adjustment", "Bassey", "Bassey Ekpe"); await s.click(named(s, "Add Adjustment").getByRole("radio", { name: "Earning" })); } },
             { say: "The Label is what his payslip shows. Then the Amount, 25,000 naira, and the Reason.", do: async (s) => { await s.type(inside(s, "Add Adjustment", "Label"), "Launch weekend allowance", { delay: 30 }); await s.type(inside(s, "Add Adjustment", "Amount"), "25,000", { delay: 70 }); await s.type(inside(s, "Add Adjustment", "Reason"), "Covered the Ikeja launch on Saturday and Sunday", { delay: 22 }); } },
             { say: "Add Adjustment.", do: async (s) => { await s.click(button(s, "Add Adjustment", named(s, "Add Adjustment"))); await toastOf(s, "Adjustment added"); } },
             { say: "A month already locked is never changed. Its correction comes into the next run, as an adjustment.", do: (s) => soft(s, s.page.getByRole("heading", { name: "Adjustments" })) },
             { say: "Exclude leaves someone out of this run, with a reason.", do: (s) => s.click(button(s, "Exclude")) },
-            { say: "The JBS Praxis Team's account is in the run. JBS Praxis is paid by invoice, not payroll.", do: async (s) => { await person(s, "Exclude Person", "JBS", "JBS Praxis Team"); await s.type(inside(s, "Exclude Person", "Reason"), "Paid by JBS Praxis invoice, not payroll", { delay: 26 }); } },
+            { say: "The JBS Praxis Team's account is in the run. JBS Praxis is paid by invoice, not payroll.", do: async (s) => { await pickPerson(s, "Exclude Person", "JBS", "JBS Praxis Team"); await s.type(inside(s, "Exclude Person", "Reason"), "Paid by JBS Praxis invoice, not payroll", { delay: 26 }); } },
             { say: "Exclude Person. It's listed under Left Out, and Include would put it back.", do: async (s) => { await s.click(button(s, "Exclude Person", named(s, "Exclude Person"))); await s.wait(1.2); await soft(s, s.page.getByRole("heading", { name: "Left Out" })); } },
             { say: "Compute Run. The figures are ready to send.", do: async (s) => { await s.click(button(s, "Compute Run")); await toastOf(s, "Run computed"); await soft(s, text(s, "Net")); } },
           ],

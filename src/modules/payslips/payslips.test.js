@@ -95,7 +95,8 @@ describe("the shipped templates", () => {
     const template = await t;
     expect(variables.undeclared("document", "payslip", parse(template.body))).toEqual([]);
     const html = render(template.body, sample());
-    for (const text of ["October 2026", "PAY-2026-10-0001", "Ada Obi", "Ending 1234", "30/10/2026", "26 of 26", "Monthly Pay", "₦450,000.00", "Total Earnings", "Total Deductions", "₦95,423.07", "Net Pay", "₦362,576.93", "QRY-0019, 1 of 3"])
+    // Its number prints in the letterhead (the integration test reads it there), not in the body.
+    for (const text of ["October 2026", "Ada Obi", "Ending 1234", "30/10/2026", "26 of 26", "Monthly Pay", "₦450,000.00", "Total Earnings", "Total Deductions", "₦95,423.07", "Net Pay", "₦362,576.93", "QRY-0019, 1 of 3"])
       expect([text, html.includes(text)]).toEqual([text, true]);
     expect(html).not.toMatch(STATUTORY);
   });

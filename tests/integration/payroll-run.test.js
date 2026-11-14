@@ -443,9 +443,9 @@ describeDb("a month's payroll run against the real migrations", () => {
     const page = p.PayrollProblemPage.parse((await as("ops").get(`/payroll/runs/${octoberRun}/problems`)).body);
     const found = page.data.find((x) => x.code === "NO_START_DATE");
     expect(found).toMatchObject({ severity: "blocking", message: "No Start Date for Nostart Tester" });
-    const slip = await one("SELECT payslip_id, net_pay::text AS net_pay FROM payslip WHERE payroll_run_id = $1 AND employee_id = $2", [octoberRun, id]);
-    expect(slip.net_pay).toBe("0.00");
-    expect((await one("SELECT count(*)::int AS n FROM payslip_line WHERE payslip_id = $1", [slip.payslip_id])).n).toBe(0);
+    const nostartSlip = await one("SELECT payslip_id, net_pay::text AS net_pay FROM payslip WHERE payroll_run_id = $1 AND employee_id = $2", [octoberRun, id]);
+    expect(nostartSlip.net_pay).toBe("0.00");
+    expect((await one("SELECT count(*)::int AS n FROM payslip_line WHERE payslip_id = $1", [nostartSlip.payslip_id])).n).toBe(0);
 
     // Gone before the month began: Compute takes the payslip away and the run is as it was.
     await q("UPDATE employee SET status = 'left', left_on = '2025-12-31' WHERE employee_id = $1", [id]);
