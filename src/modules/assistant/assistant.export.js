@@ -383,7 +383,7 @@ async function overviewDocument(kept, reads, reader, now = new Date()) {
   let spec = md.overview_spec || null;
   const masked = new Set();
   const sections = [];
-  let figures = [];
+  let figures;
 
   const summaryKey = (spec && spec.summary) || (!spec && kept0.summary) || null;
   const readN = (spec && spec.read) || (!spec && kept0.read) || null;
