@@ -299,7 +299,8 @@ function build({ draft, reads, routes, screens, shows = [] }) {
   // What is kept on the answer's message, for History and the next turn's replay, and every
   // citation, whose count History shows beside the first fifty; each read for ai_message_read.
   // A question keeps what it asked for, so the next answer's guard does not ask it again (askFirst).
-  shown.metadata = { table, link, reads: madeReads, declined, more, overview, ask };
+  // The Overview's own spec is kept beside it, so Download PDF draws it again with the rights at the build (§6.19 item 8).
+  shown.metadata = { table, link, reads: madeReads, declined, more, overview, overview_spec: overview ? draft.overview : null, ask };
   shown.stored_citations = all;
   shown.stored_reads = stored;
   return shown;

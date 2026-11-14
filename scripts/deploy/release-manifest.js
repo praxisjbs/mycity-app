@@ -45,6 +45,9 @@ const FILES = [
   { path: "migrations" },
   { path: "seeds" },
   { path: "templates" },
+  /* The light theme's chart colours, which a document's chart reads (src/shared/documents/chart.js;
+     docs/guides/praxis-ai.md §6.19 item 8.4): the one file of packages/ui the server needs. */
+  { path: "packages/ui/src/styles/tokens.css" },
   { path: "assets" },
   /* The User Guide's chapters and pictures, which the API serves (docs/guides/user-guide.md §4).
      The printed performance guide beside them is built on a laptop and never served. */

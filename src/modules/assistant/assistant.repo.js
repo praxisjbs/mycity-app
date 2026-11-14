@@ -98,6 +98,20 @@ function readOf(db, messageId, n, userId) {
   );
 }
 
+/** Every read of the caller's answer, in order (Download PDF draws its Overview from them again, §6.19 item 8). */
+async function readsOf(db, messageId, userId) {
+  const { rows } = await db.query(
+    `SELECT r.n, r.read_key, r.kind, r.module_key, r.params, r.page, r.rows, r.total, r.outcome, r.masked
+       FROM ai_message_read r
+       JOIN ai_message a ON a.ai_message_id = r.ai_message_id
+       JOIN ai_conversation c ON c.ai_conversation_id = a.ai_conversation_id
+      WHERE r.ai_message_id = $1 AND c.user_id = $2
+      ORDER BY r.n`,
+    [messageId, userId],
+  );
+  return rows;
+}
+
 const DRAFT = `d.ai_action_draft_id, d.ai_message_id, d.user_id, d.action_key, d.module_key, d.risk, d."values", d.problems, d.records,
        d.names, d.suggested, d.status, d.expires_at, d.created_at`;
 
@@ -380,6 +394,7 @@ module.exports = {
   summaryFigures,
   insertReads,
   readOf,
+  readsOf,
   insertDraft,
   draftOf,
   draftsOfMessages,

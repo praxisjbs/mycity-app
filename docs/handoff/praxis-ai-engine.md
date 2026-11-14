@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B, PR 2 praxisjbs/mycity-app#150 and PR 7 praxisjbs/mycity-app#153 (§6.12) (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B, PR 2 praxisjbs/mycity-app#150, PR 3 praxisjbs/mycity-app#156 and PR 7 praxisjbs/mycity-app#153 (§6.12) (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -846,7 +846,7 @@ date, the branch and the PR when it merges.
 
 - [x] 13/11/2026 · PR 1 · Stacked bars, Budgets' summary and every read naming its summary, gate 23 rule 9 with `scripts/check/ai-summary-gaps.json`, money in naira, no mechanics in an answer (built in the planning chat on `claude/bold-hawking-byligf`)
 - [x] 13/11/2026 · PR 2 · Charts from a complete table: the draft's `read` Overview drawn by the server from the rows (`overviewOfRows`), `AiRowFigure`, `AiOverview.read`, `AiOverviewChart.unit`, prompt version 12 (built in its own chat on the session's branch `claude/brave-cori-1cd0l4` rather than `m10/overview-tables`, praxisjbs/mycity-app#150)
-- [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
+- [x] 14/11/2026 · PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF (`POST /ai/answers/:id/overview/export`, `buildOverviewPdf`, `ai_answer_overview`, `templates/documents/ai-overview.html`), the chart's figures on Table for an answer from a summary alone, `shared/documents/chart.js` and the renderer's chart block; `budgets.summary`'s kobo fixed on the way (built in its own chat on the session's branch `ccr-8cb65fd0-85fhse` rather than `m10/overview-pdf`, praxisjbs/mycity-app#156)
 - [x] 13/11/2026 · PR 4 · Finance and pay summaries: `expenses.summary`, `requisitions.summary`, `disbursements.summary`, `payroll.month` by department and status, `payroll.trend`, `deductions.summary`, `my_pay.summary`; ten reads off the gaps file (built in its own chat on `claude/serene-shannon-ek7yft`)
 - [x] 13/11/2026 · PR 5 · Recruitment and onboarding summaries: vacancies, candidates, interviews, assessments, offers, onboarding and the talent pool, the matrix's summary probes (built on `claude/affectionate-sagan-vxaysr`)
 - [x] 13/11/2026 · PR 6 · Partnerships summaries: leads, partners, proposals, agreements and interactions, their six reads off the gaps file, Partnerships' built summaries in `ngn` (built in its own chat on `claude/praxis-ai-partnerships-pr6-z2sywn` rather than `m10/summaries-partnerships`)
@@ -867,6 +867,18 @@ date, the branch and the PR when it merges.
 ---
 
 ## 8 · Log
+
+- 14/11/2026 · JP · Charts in the Overview, PR 3 built (§6.12): a charted answer's table moves to the
+  pane, the Overview's foot (View Data, Download PDF), the chart's figures on Table for an answer from a
+  summary alone, and the PDF made in the worker with the asker's rights at the build on
+  `templates/documents/ai-overview.html`, its charts drawn by `src/shared/documents/chart.js`.
+  Written into `praxis-ai.md` §6.19 first: the file is reserved with `exports.reserve` (not
+  `documents.generate()`, which draws inside the request); the draft's spec is kept with the answer
+  (`metadata.overview_spec`) and rebuilt for an older answer; a summary's chart reads naira when its
+  values are amounts; a release carries `tokens.css`; a grown table keeps its rows and How Many.
+  Found on the way: `budgets.summary` failed on an allocation with kobo (JSON numbers), fixed in its
+  repo. The container lacked Node 20, `node_modules` and pgvector again (`node@20` in the scratchpad,
+  `npm ci`, `postgresql-16-pgvector`).
 
 - 14/11/2026 · JP · PR 7, before its merge: checked the planning chat's concern from #155 (the matrix's
   probe day passing into next year from December). `my_leave.summary` counts every request unless a

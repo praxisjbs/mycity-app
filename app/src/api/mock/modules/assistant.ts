@@ -282,7 +282,7 @@ function answerFor(question: string, view: string): Draft {
           title: "Budget by department",
           labels: BUDGET_ROWS.map((b) => b.department),
           series: BUDGET_PARTS.map((label, k) => ({ label, values: BUDGET_ROWS.map((b) => b.parts[k] ?? 0) })),
-          unit: null,
+          unit: "ngn",
         },
       },
       link: { label: "Open Budgets", path: "/expenses?tab=budgets" },
@@ -575,6 +575,15 @@ route("POST /api/v1/ai/answers/:id/reads/:n/export", (req) => {
   const r = t?.reads.find((x) => x.n === Number(req.params.n));
   if (!t || !r || r.kind !== "read" || r.outcome !== "read") return fail(404, "NOT_FOUND", "Not found");
   return exportFile(req.user!, `praxis-ai-${r.key.replace(/\./g, "-")}`);
+});
+
+/** Download PDF on an answer's Overview (§6.19 item 8): the file pending, done at once, as every mock export is. */
+route("POST /api/v1/ai/answers/:id/overview/export", (req) => {
+  const t = KEPT.filter((k) => k.owner === req.user)
+    .flatMap((k) => k.turns)
+    .find((x) => x.ai_message_id === req.params.id);
+  if (!t || !t.overview?.chart) return fail(404, "NOT_FOUND", "Not found");
+  return exportFile(req.user!, "praxis-ai-overview", "pdf");
 });
 
 route("DELETE /api/v1/ai/conversations/:id", (req) => {

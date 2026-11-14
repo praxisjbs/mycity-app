@@ -356,6 +356,8 @@ function Answer({ a, feedback, onFeedback, onNext, onChoose, onPane, paneOpen, o
   // A question is its words and its answers to tap; Open Figures only where there are figures, a table or a document's terms (§10.1).
   const asks = a.choices.length > 0;
   const figures = Boolean(a.overview || a.table?.rows.length || fileRecordOf(a));
+  // A charted answer keeps its words in the chat; its table is the pane's Table (decision 52, §6.19 item 7).
+  const charted = Boolean(a.overview?.chart);
   return (
     <AnswerBubble
       text={a.content}
@@ -363,9 +365,9 @@ function Answer({ a, feedback, onFeedback, onNext, onChoose, onPane, paneOpen, o
       /* A question's answers to tap (decision 28), on the newest answer only: a tap is the next question. */
       choices={a.choices}
       onChoose={onChoose}
-      table={a.table ? <AnswerTable a={a} /> : undefined}
-      paging={pagingOf(a)}
-      onNext={onNext}
+      table={a.table && !charted ? <AnswerTable a={a} /> : undefined}
+      paging={charted ? null : pagingOf(a)}
+      onNext={charted ? undefined : onNext}
       link={a.link ? { label: a.link.label, onOpen: () => navigate(a.link!.path) } : null}
       from={!asks && from.length ? from : undefined}
       onPane={onPane && !asks && figures ? () => onPane(a) : undefined}
