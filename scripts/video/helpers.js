@@ -1,4 +1,5 @@
 "use strict";
+/* global window */
 /**
  * Moves the Milestone 0 and 1 scenes share (docs/runbooks/training-videos.md §4.3): finding a window,
  * a field, a button or a toast the way a person reads the screen, the email a person opens on their
@@ -21,7 +22,7 @@ const words = (s, w) => s.page.locator("main").getByText(w, { exact: true }).fir
 /** A KPI tile: a button named by its label and its figure. */
 const tile = (s, label) => s.page.getByRole("button", { name: new RegExp(`^${label}\\b`) }).first();
 /** A table's row, or a list's item, holding every one of `words`. */
-const row = (s, ...words) => words.reduce((r, w) => r.filter({ hasText: w }), s.page.getByRole("row").or(s.page.getByRole("listitem"))).first();
+const row = (s, ...terms) => terms.reduce((r, w) => r.filter({ hasText: w }), s.page.getByRole("row").or(s.page.getByRole("listitem"))).first();
 
 /** Wait for a toast that starts with `start` (the branded Toaster's), up to `seconds`. */
 async function toastOf(s, start, seconds = 20) {

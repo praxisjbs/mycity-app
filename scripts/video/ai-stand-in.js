@@ -5,7 +5,7 @@
  *
  *   VIDEO_AI_REPLIES=/tmp/video/replies.json node -r ./scripts/video/ai-stand-in.js src/server.js
  *
- * It answers the calls the app makes to generativelanguage.googleapis.com, and nothing else: the
+ * It answers the calls the app's Gemini vendor makes (its API's /v1beta paths), and nothing else: the
  * model list (so Settings · Integrations' Test passes and AI Control can name the model) and chat
  * completions, each answered with the first reply in VIDEO_AI_REPLIES whose `match` (a regular
  * expression) is found in the request's messages. The file is read again on every call, so a scene
@@ -20,7 +20,8 @@
  */
 const fs = require("node:fs");
 
-const HOST = "generativelanguage.googleapis.com";
+/** The Gemini API's calls, by their paths: the stand-in answers them and calls nothing itself. */
+const isGemini = (url) => url.hostname.endsWith(".googleapis.com") && url.pathname.startsWith("/v1beta/");
 const MODELS = Object.freeze([
   { id: "gemini-3.1-flash", name: "Gemini 3.1 Flash" },
   { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite" },
@@ -43,7 +44,7 @@ if (file && process.env.APP_ENV === "development") {
 
   globalThis.fetch = async (input, init = {}) => {
     const url = new URL(typeof input === "string" ? input : input.url);
-    if (url.hostname !== HOST) return real(input, init);
+    if (!isGemini(url)) return real(input, init);
     const method = (init.method || "GET").toUpperCase();
     if (method === "GET" && /\/openai\/models$/.test(url.pathname))
       return json(200, { object: "list", data: MODELS.map((m) => ({ id: `models/${m.id}`, object: "model", owned_by: "google" })) });
