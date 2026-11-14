@@ -54,6 +54,7 @@ const ProblemSeverity = z.enum(["blocking", "warning"]);
 /** The problems a run reports (guide §6.15). Blocking ones stop Submit; warnings never do. */
 const ProblemCode = z.enum([
   "NO_SALARY",
+  "NO_START_DATE",
   "NEGATIVE_NET",
   "NO_RATES",
   "OVERTIME_WAITING",

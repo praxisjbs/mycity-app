@@ -16,8 +16,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M4 Recruitment, part 2: Assessments and Interviews (6:54, 11 chapters) | `m4-recruitment-2.js` | Made 10/11/2026, sent to TB; to upload (§5) | |
 | M5 Offers and Onboarding, part 1: Offers (7:08, 10 chapters) | `m5-offers-1.js` | Made and uploaded 12/11/2026 | [Part 1](https://drive.google.com/file/d/1U9ybR4Xb1KTsRBtn5YNeI_3ZLZvLYTcp/view?usp=drivesdk) |
 | M5 Offers and Onboarding, part 2: Documentation and Onboarding (6:41, 11 chapters) | `m5-onboarding-2.js` | Made and uploaded 12/11/2026 | [Part 2](https://drive.google.com/file/d/1QehhMb7Q3N4-sDeIteZroX3u8YeTy_q5/view?usp=drivesdk) |
-| M6 Payroll, part 1: Payroll Runs and Payslips (about 7 min) | `m6-payroll-1.js`, to write | Planned 13/11/2026 (§8) | |
-| M6 Payroll, part 2: Deductions, Configurations and My Payslips (about 6 min) | `m6-payroll-2.js`, to write | Planned 13/11/2026 (§8) | |
+| M6 Payroll, part 1: Running the Month (6:04, 8 chapters) | `m6-payroll-1.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
+| M6 Payroll, part 2: Payslips and Pay Day (4:23, 7 chapters) | `m6-payroll-2.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
 | M8 Expenses, part 1: Raising and Approving (8:19, 9 chapters) | `m8-expenses-1.js` | Made 13/11/2026, sent to TB; to upload (§5) | |
 | M8 Expenses, part 2: Paying and Budgets (6:04, 10 chapters) | `m8-expenses-2.js` | Made 13/11/2026, sent to TB; to upload (§5) | |
 | M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
@@ -304,6 +304,21 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
     public), so Use My Company Account is refused; M8's `prepare` gives the people the videos pay
     into their own account a number on the filming database only, made from their name.
 
+26. **No "New sign-in" in a bell.** A sign-in from a browser the app has never seen tells the person "New sign-in to
+    your account", and every shot opens a fresh browser: a shot of the bell showed a column of them. `people.ready`
+    now checks the filming password against its hash instead of signing in, and `film.js` keeps each person's device
+    cookie between shots and runs (`<VIDEO_OUT>/devices.json`; copy it to the next part's folder). Notices an older
+    take left are artifacts of filming: remove them from the filming database before the shot that opens the bell.
+27. **The login page greets a known browser.** Once `/auth/device` answers, the page renders again ("Good afternoon,
+    Cynthia") and clears what was typed: `signIn` waits for the page to settle before it types.
+28. **Read a toast's words from the screen's code** (`grep toast\(` in the feature), never from the User Guide's verbs:
+    Accept This Month's reads "Fine accepted for this month", and a wait for another toast stalls a take 20 seconds.
+    A line's role can change with its state too: a run's problem line is an `alert` while anything blocks and a
+    `status` after, so address it by its words.
+29. **The offer to clock out.** Once a person's shift has ended (15:00 for MyCity's office pattern), Clock Out's
+    Finish Your Day opens over the first screen; filming closes it (`film.js`), as it answers Not Now to Clock In.
+    Film a part in one sitting where you can: a take after the shift's end meets it, a take before it does not.
+
 ## 7 · Bugs found while filming
 
 Each is fixed on the video's branch, in the screen's own code, its guide and chapter with it, and
@@ -334,9 +349,32 @@ listed here and in `docs/PROGRESS.md`.
 | 13/11/2026 | Workflow · Send Back (Expenses, Agreements, Payroll) | The approver who pressed Send Back was told "Withdrawn: The requester withdrew this before it was decided" | Fixed the same day: `engine.cancel` takes `sentBack`, and a Send Back's withdrawal tells nobody (the requester hears of the Send Back itself); `expenses.test.js` |
 | 13/11/2026 | Praxis AI · a New Request card | Asked for a request by chat, the card read Category "Invalid uuid" and offered no New Request: the model wrote "Travel & Transport", and matching a name by its words never read "&" as "and" | Fixed the same day: `shared/ai/named.js` reads "&" as "and"; `ai-engine.test.js` |
 | 13/11/2026 | Expenses staging seed | Two of its thirteen requests (sent back, rejected) stayed waiting: "You are not an approver for this stage", since the Implementation Team's account manages people and its requests go straight to Operations & People | Fixed the same day: decided by whoever the stage names; `expenses-staging-seed.test.js` |
+| 14/11/2026 | Payroll · Payroll Runs (#45) | A person with no start date was left out of every run without a word (`payroll.inputs` read `start_date <=` the month's end), and the roster loads Operations & People's lead, the CTO and the Program Manager with none: the first real run would have skipped them | Fixed the same day: such a person is in the run with a payslip of no lines and the blocking problem No Start Date (`NO_START_DATE`; `payroll.md` §6.1, §6.15, §11; the User Guide's Deal with problems); `payroll-run.test.js`. People to set the three dates before the first real run |
+| 14/11/2026 | Every payslip PDF; an employment contract | The payslip read "November 2026 ·" with no number, and a contract's "reference" was blank: the document engine's own number, none for these types, overwrote the number their data carries | Fixed the same day: `renderDocumentHtml` keeps the data's number when the engine numbers nothing; the payslip's number prints in the letterhead above the date, as the agreed sample has it, and its subtitle is the month alone; `payslips.test.js` |
+| 14/11/2026 | Workflow notices (every approval) | "Approval needed: Payroll Run. CEO is waiting on you.", sent to the CEO, reads as if the CEO waits on herself: the body names the stage, not the record | Not fixed: for GE (`shared/notifications/fanout.js`; tests pin the wording across modules) |
 | 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opened in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say; once beside it, its section headings skipped a level and its two small cards broke words | Fixed the same day: `ListDetail` on a wide desktop (the first role shown until another is pressed), its forms return to it in place; the dialog stays on a phone and where two columns do not fit; headings `h3`; the cards stack in the pane. Tests and the User Guide's pictures follow |
 
 ## 8 · Where the work stands
+
+**14/11/2026 · JP (with Claude).** Both Milestone 6 videos written, filmed and assembled on one development
+database, the same day, from M6's own `prepare` (§4.1): part 1, Running the Month (6:04, 8 chapters, -16.4 LUFS) and
+part 2, Payslips and Pay Day (4:23, 7 chapters, -16.4 LUFS). Decided by JBS Praxis (four questions asked first): an
+internal video, so MyCity's real staff by name, each with an example salary said so on camera (the roster carries no
+pay); the fines and the advance on real staff; Advanced Payroll shown but left off (no figure without its source);
+the files sent in the chat, to be uploaded to Drive. The plan of 13/11 below was reshaped so the month runs in order:
+Deductions moved into part 1, before Submit. November 2026 is MyCity's first run in the hub. In part 1 Cynthia
+Osakunih opens and computes it, puts right No Salary Set (Victor Esuk) and No Start Date (Etudor Edidiong, as the roster
+truly has him) on People · Employees, accepts Tobiloba Dada's fine, spreads Gideon Ekom's over three months, waives
+Similoluwa Michael's, records Aaron Agama's advance, adds Bassey Ekpe's launch weekend allowance, leaves the JBS Praxis
+Team's account out (paid by invoice) and submits; Ifeoma Mbonu approves on her phone from the bell. In part 2 Cynthia
+reads Aaron's payslip, emails and downloads them all, marks the run paid with the bank's reference and walks
+Configurations (Set Pay Day, Bank Details Required, Employee Pension's source fields and No Legal Source, Switch On
+refused with no figure); Aaron opens the payslip email on his phone, then My Payslips and Salary Deductions with his
+advance. Three findings (§7): two fixed on the branch, one for GE. The tooling learnt §6.26 to §6.28.
+
+- [x] Write, film and check both M6 videos (14/11/2026).
+- [ ] Upload both to Drive (§5) and add their links to the table at the top.
+- [ ] People: start dates for the three staff the roster loads without one, before MyCity's first real run.
 
 **13/11/2026 · TB (with Claude).** Both Milestone 8 videos written, filmed and assembled on one
 development database, the same day, from M8's own `prepare` (§4.1): part 1, Raising and Approving
@@ -396,7 +434,7 @@ Part 2, Deductions, Configurations and My Payslips (`m6-payroll-2.js`, about 6 m
    the advance, Download All.
 
 - [x] Plan both M6 videos (13/11/2026).
-- [ ] Write and film both once PR 8 is merged and staging's mail is resumed (Appendix B item 9).
+- [x] Write and film both (14/11/2026, above; filmed on a development database, so staging's mail did not wait).
 
 **12/11/2026 · GE (with Claude).** Both Milestone 5 videos written, filmed and assembled on one
 development database, the same day, with the staging seed: part 1, Offers (7:08, 10 chapters,

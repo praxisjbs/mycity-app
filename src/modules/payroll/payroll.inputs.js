@@ -34,7 +34,8 @@ const GRANTED = `(lr.status = 'approved' OR (lr.status = 'submitted' AND wi.stat
  * Everyone paid in the month, in staff-number order (§6.1 rule 1): started on or before its last day and
  * not gone before its first, whatever their employment type and whether they are active or suspended. A
  * person who has left is paid for the days of their last month; an archived record, or one marked left
- * with no date, is never paid.
+ * with no date, is never paid. A person with no start date is in the run, so its No Start Date problem
+ * names them, never left out without a word (§6.1 rule 2).
  * @param {{query: Function}} db
  * @param {string} first  the month's first day
  * @param {string} last   the month's last day
@@ -48,7 +49,7 @@ async function peopleFor(db, first, last, only = null) {
             e.status, e.start_date::text AS start_date, e.left_on::text AS left_on, e.contract_ends_on::text AS contract_ends_on,
             e.gross_monthly::text AS gross_monthly, e.work_pattern, e.bank_name, e.account_number, e.nhf_contributes
        FROM employee e
-      WHERE e.start_date <= $2::date
+      WHERE (e.start_date IS NULL OR e.start_date <= $2::date)
         AND (e.left_on IS NULL OR e.left_on >= $1::date)
         AND e.status IN ('active', 'suspended', 'left')
         AND (e.status <> 'left' OR e.left_on IS NOT NULL)

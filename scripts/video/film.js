@@ -136,8 +136,32 @@ async function browserFor(origins, port) {
   });
 }
 
+/**
+ * Each person's device cookie, kept between shots (and between runs, in <out>/devices.json): every shot
+ * opens a fresh browser, and a sign-in from a browser the app has never seen tells the person "New
+ * sign-in to your account", which would then sit in their bell on camera.
+ */
+const DEVICE = /^(__Host-)?mycity_device$/;
+function devices(out) {
+  const file = path.join(out, "devices.json");
+  let known = {};
+  try { known = JSON.parse(fs.readFileSync(file, "utf8")); } catch { known = {}; }
+  return {
+    get: (email) => known[email] || [],
+    keep: (email, cookies) => {
+      const mine = cookies.filter((c) => DEVICE.test(c.name));
+      if (!mine.length) return;
+      known[email] = mine;
+      fs.writeFileSync(file, JSON.stringify(known, null, 1));
+    },
+  };
+}
+
 async function signIn(page, origin, email, password) {
   await page.goto(origin + "/login");
+  // A browser the app knows greets its person once /auth/device answers, and that render clears what
+  // was typed before it: wait for the page to settle first.
+  await appSettle(page);
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
@@ -152,7 +176,7 @@ async function signIn(page, origin, email, password) {
  * Film one shot. `shot` is { kind: "desktop"|"phone", site: "hub"|"go", as, start, setup, lines },
  * each line { id, duration, before, do, after, hold }.
  */
-async function filmShot(browser, shot, dir, { origins, password, emailOf }) {
+async function filmShot(browser, shot, dir, { origins, password, emailOf, known }) {
   const phone = shot.kind === "phone";
   const site = shot.site || "hub";
   const origin = origins[site];
@@ -169,7 +193,12 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf }) {
   await context.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.setAttribute("spellcheck", "false")));
   const page = await context.newPage();
   page.setDefaultTimeout(20000);
-  if (shot.as) await signIn(page, origins.hub, emailOf(shot.as), password);
+  if (shot.as) {
+    const email = emailOf(shot.as);
+    if (known) await context.addCookies(known.get(email));
+    await signIn(page, origins.hub, email, password);
+    if (known) known.keep(email, await context.cookies());
+  }
   if (site !== "hub" || shot.start) await page.goto(origin + (shot.start || "/"));
   await appSettle(page);
   // A policy waiting to be acknowledged opens its sheet over the screen: Later, as a person would
@@ -190,6 +219,16 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf }) {
     const notNow = page.getByRole("dialog", { name: "Clock In" }).getByRole("button", { name: "Not Now", exact: true });
     if (await notNow.waitFor({ timeout: 2500 }).then(() => true, () => false)) {
       await notNow.click({ timeout: 3000 }).catch(() => null);
+      await sleep(0.5);
+      await appSettle(page);
+    }
+  }
+  // The offer to clock out, which opens over the screen once a shift has ended: closed, as a person
+  // would before a demonstration (clocking out is theirs to do, never filming's).
+  if (shot.as) {
+    const out = page.getByRole("dialog", { name: "Clock Out" });
+    if (await out.waitFor({ timeout: 2500 }).then(() => true, () => false)) {
+      await out.getByRole("button", { name: "Close", exact: true }).click({ timeout: 3000 }).catch(() => null);
       await sleep(0.5);
       await appSettle(page);
     }
@@ -246,11 +285,12 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf }) {
 /** Film every shot of `plan` that is not a card, or only those in `only` (a Set of shot ids). */
 async function film(plan, out, opts) {
   const browser = await browserFor(opts.origins, opts.port);
+  const known = devices(out);
   try {
     for (const shot of plan.shots) {
       if (shot.kind === "card" || (opts.only && !opts.only.has(shot.id))) continue;
       process.stdout.write(`filming ${shot.id} (${shot.kind}, ${shot.lines.length} lines) ... `);
-      const take = await filmShot(browser, shot, path.join(out, "shots", shot.id), opts);
+      const take = await filmShot(browser, shot, path.join(out, "shots", shot.id), { ...opts, known });
       console.log(`${(take.end - take.start).toFixed(1)}s, ${take.frames.length} frames`);
     }
   } finally {

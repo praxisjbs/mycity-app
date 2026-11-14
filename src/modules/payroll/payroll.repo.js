@@ -549,6 +549,9 @@ const PROBLEMS = `
     SELECT 'NO_SALARY' AS code, 'blocking' AS severity, 0 AS weight, b.payroll_run_id, b.employee_id, b.payslip_id, 1 AS n
       FROM base b WHERE b.gross_monthly IS NULL
     UNION ALL
+    SELECT 'NO_START_DATE', 'blocking', 0, b.payroll_run_id, b.employee_id, b.payslip_id, 1
+      FROM base b JOIN employee e ON e.employee_id = b.employee_id WHERE e.start_date IS NULL
+    UNION ALL
     SELECT 'NEGATIVE_NET', 'blocking', 1, b.payroll_run_id, b.employee_id, b.payslip_id, 1
       FROM base b WHERE b.net_pay < 0
     UNION ALL
