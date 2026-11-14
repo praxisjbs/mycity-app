@@ -10,6 +10,8 @@
  *   activity.list   a day's Activity Today (today unless a date is given), by its allow-list
  *                and the asker's scope on each module it comes from; one person's with
  *                `employee_id` or a name in `q`; a page of 25, each event cited as its record
+ *   activity.summary   the same events in figures, for a day or a period, by kind, module,
+ *                person or day (docs/guides/praxis-ai.md §6.13)
  *
  * Every login holds `home` view, which is all the assistant checks, so nothing here reads
  * past what the asker's own screen shows: who may see each card, and who may open the Team
@@ -38,6 +40,23 @@ const activityProbe = {
   inside: async (ctx) => ((await ctx.scopeOf("people", "view")) && ctx.report ? { type: "employee", id: ctx.report.employee_id } : null),
   outside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id }),
 };
+/**
+ * The summary counts today, so its probe makes today's event: a day of unpaid leave Recorded for the
+ * report by a reader who may record it (Leave Recorded, about the report, in their reach). No service a
+ * probe may call leaves an allow-listed event about the outsider for a reader whose reach stops short of
+ * them, so there is no outside record (docs/guides/praxis-ai.md §6.17).
+ */
+const activitySummaryProbe = {
+  inside: async (ctx) => {
+    const scope = ctx.report ? await ctx.scopeOf("people", "create") : null;
+    if (!scope || !(await ctx.scopeOf("people", "view"))) return null;
+    const day = ctx.freshDay();
+    const leave = require("../leave/leave.service");
+    const r = await leave.record(ctx.actor, scope, { employee_id: ctx.report.employee_id, leave_type_id: ctx.leaveTypeId, starts_on: day, ends_on: day, reason: `Recorded by the matrix for ${ctx.role}` });
+    return { type: "leave_request", id: r.leave_request_id };
+  },
+  outside: () => null,
+};
 
 module.exports = defineManifest({
   module: "home",
@@ -45,6 +64,16 @@ module.exports = defineManifest({
   not_offered: {
     HomeRoleKpisSave: "design: the cards a role's Home opens on and locks are arranged on Home with every card of the role in view",
   },
+  summaries: [
+    {
+      key: "activity.summary",
+      description: "Activity Today in figures, for a day (today unless dated) or a period: events, the people who acted and whom they were about; by kind, module, person or day; by hour",
+      params: c.dashboard.HomeActivitySummaryQuery,
+      permission: ["home", "view"],
+      run: (client, params, actor) => activity.aiSummary(client, actor, params),
+      matrix: activitySummaryProbe,
+    },
+  ],
   reads: [
     {
       key: "cards.mine",
@@ -67,6 +96,7 @@ module.exports = defineManifest({
     },
     {
       key: "activity.list",
+      summary: "activity.summary",
       description: "List a day's events as my Home's Activity Today shows them, today unless dated: who did what and who it was about; one person's by employee_id or a name in q",
       params: c.dashboard.HomeActivityQuery,
       permission: ["home", "view"],

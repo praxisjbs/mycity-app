@@ -14,7 +14,7 @@
  * from its metric and name, so nobody types one.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
+const { uuid, text, optionalText, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn, summaryPeriod } = require("./common");
 const { ACTIONS } = require("./identity");
 
 const count = z.number().int().min(0);
@@ -159,6 +159,23 @@ const HomeAlertQuery = listQuery(
   },
   ["raised_at", "severity"],
 );
+
+/**
+ * The assistant's alert summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community,
+ * Home and Settings): the alerts the reader may clear (open unless `state` says), by category stacked
+ * by severity, by severity, rule or age; raised by day over a period (this month unless asked).
+ * Figures, never a row.
+ */
+const HomeAlertSummaryBy = z.enum(["category", "severity", "rule", "age"]);
+const HomeAlertSummaryQuery = z
+  .object({
+    category: HomeAlertCategory.optional(),
+    severity: HomeAlertSeverity.optional(),
+    state: HomeAlertState.optional(),
+    ...summaryPeriod,
+    by: HomeAlertSummaryBy.default("category"),
+  })
+  .strict();
 const HomeAlertPage = Paged(HomeAlert);
 
 /** GET /home/alerts/summary: the four cards, the chips and Alert Sources, over what the reader may see. */
@@ -336,6 +353,7 @@ const TABLES = {
     },
   },
   HomeAlertQuery: { table: null, reason: "list controls and the Alerts list's filters" },
+  HomeAlertSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's alert summary; figures, never a row" },
   HomeAlertPage: { table: null, reason: "a page of alerts" },
   HomeAlertSummary: { table: null, reason: "counts over home_alert for the alerts the reader may see" },
   HomeAlertClear: { table: "home_alert" },
@@ -375,6 +393,8 @@ module.exports = {
   HomeAlertState,
   HomeAlert,
   HomeAlertQuery,
+  HomeAlertSummaryBy,
+  HomeAlertSummaryQuery,
   HomeAlertPage,
   HomeAlertSummary,
   HomeAlertClear,

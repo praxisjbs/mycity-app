@@ -141,28 +141,17 @@ describe("a read names its summary (manifest and gate 23 rule 9)", () => {
     expect(() => defineManifest({ module: "workspace", reads: [{ ...READ, summary: "later" }] })).toThrow(/summary is the key/);
   });
 
-  test("rule 9: a read with nothing, a summary nobody declares, a gap now answered, a gap the base did not hold", () => {
+  test("rule 9: a read with nothing, or a summary nobody declares; the list of reads waiting is gone (PR 8)", () => {
     const reads = [
       { key: "a.list", summary: "a.summary" },
       { key: "b.list", summary: "none: configuration" },
       { key: "c.list" },
-      { key: "d.list" },
       { key: "e.list", summary: "e.summary" },
-      { key: "f.list", summary: "a.summary" },
     ];
-    const gaps = { "d.list": { summary: "d.summary", pr: 4 }, "f.list": { summary: "a.summary", pr: 4 }, "gone.list": { summary: "g.summary", pr: 8 } };
-    const problems = summariesNamed({ reads, summaryKeys: new Set(["a.summary"]), gaps, baseGaps: { "d.list": {}, "f.list": {} } });
-    expect(problems).toEqual(
-      expect.arrayContaining([
-        expect.stringMatching(/^c\.list: say which summary/),
-        expect.stringMatching(/^e\.list: its summary e\.summary is declared by no manifest/),
-        expect.stringMatching(/^f\.list names its summary now: take it off/),
-        expect.stringMatching(/names gone\.list, which no manifest declares/),
-        expect.stringMatching(/gained gone\.list/),
-      ]),
-    );
-    expect(problems).toHaveLength(5);
-    expect(summariesNamed({ reads: [{ key: "d.list" }], summaryKeys: new Set(), gaps: { "d.list": { summary: "d.summary", pr: 4 } }, baseGaps: null })).toEqual([]);
+    const problems = summariesNamed({ reads, summaryKeys: new Set(["a.summary"]) });
+    expect(problems).toEqual([expect.stringMatching(/^c\.list: say which summary/), expect.stringMatching(/^e\.list: its summary e\.summary is declared by no manifest/)]);
+    expect(summariesNamed({ reads: reads.slice(0, 2), summaryKeys: new Set(["a.summary"]) })).toEqual([]);
+    expect(require("node:fs").existsSync(require("node:path").join(__dirname, "../../../scripts/check/ai-summary-gaps.json"))).toBe(false);
   });
 });
 

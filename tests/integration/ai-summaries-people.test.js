@@ -426,7 +426,7 @@ describeDb("People, performance and queries summaries against the real migration
     expect(offered).toEqual(expect.arrayContaining(["my_attendance.summary", "my_leave.summary"]));
   });
 
-  test("every read names its summary: the people, performance and queries lists name theirs, and none waits in the gaps file", () => {
+  test("every read names its summary: the people, performance and queries lists name theirs", () => {
     const named = {
       "attendance.exceptions": "exceptions.summary",
       "attendance.pay_items": "pay_items.summary",
@@ -443,7 +443,5 @@ describeDb("People, performance and queries summaries against the real migration
       "sanctions.list": "sanctions.summary",
     };
     for (const [read, summary] of Object.entries(named)) expect([read, registry.read(read).summary]).toEqual([read, summary]);
-    const gaps = require("../../scripts/check/ai-summary-gaps.json").gaps.map((g) => g.read);
-    expect(gaps.filter((r) => r in named)).toEqual([]);
   });
 });

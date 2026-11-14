@@ -248,6 +248,15 @@ module.exports = defineManifest({
     MessageCreate: "via community.message: the chat box's own shape, a file or a poll included; the cards carry words alone (DirectMessageSend, ChannelPost)",
     DirectCreate: "via community.message: opening a conversation is the first message's own step",
   },
+  summaries: [
+    {
+      key: "announcements.summary",
+      description: "Announcements in figures: published, scheduled, urgent, how many read each and the average read for people who post them; otherwise the ones I received and read; by announcement, urgency or month",
+      params: c.announcements.AnnouncementSummaryQuery,
+      permission: ["community", "view"],
+      run: (client, params, actor) => require("../announcements/announcements.service").aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       // Staff Community's own directory: anyone with a login, as New Message and New Event list them,
@@ -269,6 +278,7 @@ module.exports = defineManifest({
     },
     {
       key: "announcements.list",
+      summary: "announcements.summary",
       description:
         "Published company announcements, newest first, with how many have read each",
       params: c.announcements.AnnouncementListQuery,

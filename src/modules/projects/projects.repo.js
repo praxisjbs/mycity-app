@@ -121,4 +121,60 @@ async function relinkLead(client, leadId, partnerId) {
   return rows.map((r) => r.project_id);
 }
 
-module.exports = { list, get, lock, statusOf, insert, update, linkOf, ofDeal, relinkLead };
+/**
+ * Every project as Projects lists them, in figures for the assistant (docs/guides/praxis-ai.md §6.13,
+ * Workspace, Knowledge Hub, Community, Home and Settings), in one statement: the projects by status,
+ * those active past their due day, and the tasks in them the reader could open on Tasks (`seen`, as the
+ * list's Open and Done count them): done, open and overdue (open, due before `now`) apart, so a
+ * project's three sum to its tasks; the 20 projects with most tasks. Every project unless `status` is
+ * given. Figures, never a row: never a task's words.
+ * @param {{status?, partner_id?, lead_id?}} q
+ * @param {{scope: string, scope_ids: string[]|null, employee_id: string}} scope
+ * @param {{now: Date, today: string}} at
+ */
+async function aiSummary(db, q, scope, { now, today }) {
+  const params = [q.status || null, q.partner_id || null, q.lead_id || null, now, today];
+  const who = seen(scope, params);
+  const { rows } = await db.query(
+    `WITH p AS (
+       SELECT p.project_id, p.number::text AS number, p.name, p.status, p.due_on
+         FROM project p
+        WHERE ($1::text IS NULL OR p.status = $1)
+          AND ($2::uuid IS NULL OR p.partner_id = $2)
+          AND ($3::uuid IS NULL OR p.lead_id = $3)
+     ), tk AS (
+       SELECT t.project_id, t.status, t.due_at
+         FROM task t
+         JOIN p ON p.project_id = t.project_id
+        WHERE t.archived_at IS NULL AND t.status <> 'cancelled' AND ${who}
+     ), per AS (
+       SELECT p.project_id, min(p.number) AS number, min(p.name) AS name,
+              count(tk.project_id) FILTER (WHERE tk.status = 'done')::int AS done,
+              count(tk.project_id) FILTER (WHERE tk.status <> 'done' AND (tk.due_at IS NULL OR tk.due_at >= $4))::int AS open,
+              count(tk.project_id) FILTER (WHERE tk.status <> 'done' AND tk.due_at < $4)::int AS overdue
+         FROM p LEFT JOIN tk ON tk.project_id = p.project_id
+        GROUP BY p.project_id
+     ), ranked AS (
+       SELECT per.*, row_number() OVER (ORDER BY done + open + overdue DESC, name, project_id) AS rank
+         FROM per WHERE done + open + overdue > 0
+     )
+     SELECT (SELECT json_build_object(
+               'projects', count(*), 'active', count(*) FILTER (WHERE status = 'active'),
+               'completed', count(*) FILTER (WHERE status = 'completed'),
+               'past_due', count(*) FILTER (WHERE status = 'active' AND due_on < $5::date)) FROM p) AS projects,
+            (SELECT json_build_object(
+               'tasks', count(*), 'open', count(*) FILTER (WHERE status <> 'done'),
+               'done', count(*) FILTER (WHERE status = 'done'),
+               'overdue', count(*) FILTER (WHERE status <> 'done' AND due_at < $4)) FROM tk) AS tasks,
+            (SELECT json_agg(json_build_object('key', status, 'value', n) ORDER BY status)
+               FROM (SELECT status, count(*)::int AS n FROM p GROUP BY status) s) AS by_status,
+            (SELECT json_agg(json_build_object('key', project_id, 'label', number || ' ' || name,
+                                               'done', done, 'open', open, 'overdue', overdue) ORDER BY rank)
+               FROM ranked WHERE rank <= 20) AS by_project`,
+    params,
+  );
+  const r = rows[0] || {};
+  return { projects: r.projects || {}, tasks: r.tasks || {}, by_status: r.by_status || [], by_project: r.by_project || [] };
+}
+
+module.exports = { list, get, lock, statusOf, insert, update, linkOf, ofDeal, relinkLead, aiSummary };

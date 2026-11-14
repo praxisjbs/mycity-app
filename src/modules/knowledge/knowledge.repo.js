@@ -310,7 +310,66 @@ async function departmentUsers(db, departmentId) {
   return rows.map((r) => r.user_id);
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI: the SOPs in figures
+ * ------------------------------------------------------------------ */
+
+/**
+ * The SOPs the reader may read, in figures for the assistant (docs/guides/praxis-ai.md §6.13,
+ * Workspace, Knowledge Hub, Community, Home and Settings), in one statement: as the list shows them,
+ * every published one, and the drafts and archived ones of the departments the reader writes (`reach`).
+ * Each is Published (a version in force), a Draft never published, or Archived, so a department's three
+ * sum; a published one with a draft is being changed, a figure of its own. `state` keeps one of the
+ * list's chips. Figures, never a row: never an SOP's words.
+ * @param {{department_id?, state?}} q
+ * @param {{all: boolean, departments: string[]}} reach
+ * @param {Date} since  published on or after it counts as recent
+ */
+async function aiSummary(db, q, reach, since) {
+  const params = [q.department_id || null, q.state || null, since];
+  const mine = writable(reach, params, "s.department_id");
+  const { rows } = await db.query(
+    `WITH s AS (
+       SELECT s.sop_id, s.department_id, d.name AS department, s.status, iv.version IS NOT NULL AS in_force, iv.published_at,
+              EXISTS (SELECT 1 FROM sop_version dv WHERE dv.sop_id = s.sop_id AND dv.status = 'draft') AS has_draft,
+              (${mine}) AS mine
+         FROM sop s
+         JOIN department d ON d.department_id = s.department_id
+         LEFT JOIN sop_version iv ON ${IN_FORCE("s", "iv")}
+        WHERE ($1::uuid IS NULL OR s.department_id = $1)
+     ), x AS (
+       SELECT *, CASE WHEN status = 'archived' THEN 'archived' WHEN in_force THEN 'published' ELSE 'draft' END AS state
+         FROM s
+        WHERE ((status = 'active' AND in_force) OR (mine AND (status = 'archived' OR (status = 'active' AND has_draft))))
+          AND ($2::text IS NULL
+               OR ($2 = 'published' AND status = 'active' AND in_force)
+               OR ($2 = 'draft' AND status = 'active' AND has_draft AND mine)
+               OR ($2 = 'archived' AND status = 'archived' AND mine))
+     ), by_department AS (
+       SELECT department_id::text AS key, min(department) AS label,
+              count(*) FILTER (WHERE state = 'published')::int AS published,
+              count(*) FILTER (WHERE state = 'draft')::int AS draft,
+              count(*) FILTER (WHERE state = 'archived')::int AS archived,
+              row_number() OVER (ORDER BY count(*) DESC, min(department), department_id) AS rank
+         FROM x GROUP BY department_id
+     )
+     SELECT (SELECT json_build_object(
+               'sops', count(*), 'published', count(*) FILTER (WHERE state = 'published'),
+               'changing', count(*) FILTER (WHERE state = 'published' AND has_draft AND mine),
+               'draft', count(*) FILTER (WHERE state = 'draft'),
+               'archived', count(*) FILTER (WHERE state = 'archived'),
+               'recent', count(*) FILTER (WHERE state = 'published' AND published_at >= $3::timestamptz)) FROM x) AS figures,
+            (SELECT json_agg(json_build_object('key', state, 'value', n)) FROM (SELECT state, count(*)::int AS n FROM x GROUP BY state) t) AS by_state,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'published', published, 'draft', draft, 'archived', archived) ORDER BY rank)
+               FROM by_department WHERE rank <= 20) AS by_department`,
+    params,
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, by_state: r.by_state || [], by_department: r.by_department || [] };
+}
+
 module.exports = {
+  aiSummary,
   lock,
   getSop,
   insertSop,

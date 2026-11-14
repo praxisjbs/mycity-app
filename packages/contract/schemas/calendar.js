@@ -100,6 +100,19 @@ const CalendarListQuery = listQuery(
   ["starts_at"],
 );
 
+/**
+ * The assistant's calendar summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community,
+ * Home and Settings): the person's own month as Calendar draws it, by kind or by week stacked by kind.
+ * This Lagos month unless `month` says. Figures, never a row.
+ */
+const CalendarSummaryBy = z.enum(["kind", "week"]);
+const CalendarSummaryQuery = z
+  .object({
+    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Pick a month").optional(),
+    by: CalendarSummaryBy.default("kind"),
+  })
+  .strict();
+
 /** By the instant, not the text: 10:00+01:00 and 09:30Z are compared as times. */
 const endsAfterStart = (v) => !v.starts_at || !v.ends_at || Date.parse(v.ends_at) > Date.parse(v.starts_at);
 const ENDS_BEFORE = { message: "Ends before it starts", path: ["ends_at"] };
@@ -214,6 +227,7 @@ const TABLES = {
   },
   CalendarItemPage: { table: null, reason: "a page of a month's entries" },
   CalendarListQuery: { table: null, reason: "the month and list controls" },
+  CalendarSummaryQuery: { table: null, reason: "the month and grouping of the assistant's calendar summary; figures, never a row" },
   CalendarEventCreate: {
     table: "calendar_event",
     virtual: {
@@ -258,6 +272,8 @@ module.exports = {
   CalendarItem,
   CalendarItemPage,
   CalendarListQuery,
+  CalendarSummaryBy,
+  CalendarSummaryQuery,
   CalendarEventCreate,
   CalendarEventPrefill,
   CalendarEventEdit,

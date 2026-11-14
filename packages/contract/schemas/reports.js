@@ -17,7 +17,7 @@
  * own figures (docs/guides/workspace.md §6).
  */
 const { z } = require("zod");
-const { uuid, text, isoDate, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
+const { uuid, text, isoDate, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn, summaryPeriod } = require("./common");
 const { TimeOfDay } = require("./settings");
 const { LeaveStatus } = require("./leave");
 const { HomeRosterStatus } = require("./dashboard");
@@ -393,6 +393,22 @@ const HomeReportRunQuery = listQuery(
   },
   ["run_at"],
 );
+
+/**
+ * The assistant's report file summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub,
+ * Community, Home and Settings): the files the reader received, by status, by report stacked by
+ * status, by format, by month. A period (made) narrows it only when asked. Figures, never a row.
+ */
+const HomeReportRunSummaryBy = z.enum(["status", "report", "format", "month"]);
+const HomeReportRunSummaryQuery = z
+  .object({
+    saved_report_id: uuid.optional(),
+    status: HomeReportRunStatus.optional(),
+    format: HomeReportFormat.optional(),
+    ...summaryPeriod,
+    by: HomeReportRunSummaryBy.default("status"),
+  })
+  .strict();
 const HomeReportRunPage = Paged(HomeReportRun);
 
 /**
@@ -536,6 +552,7 @@ const TABLES = {
     },
   },
   HomeReportRunQuery: { table: null, reason: "list controls and the Recent Runs filters" },
+  HomeReportRunSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's report file summary; figures, never a row" },
   HomeReportRunPage: { table: null, reason: "a page of report runs" },
   HomeReportRunNow: { table: "home_report_run" },
   HomeReportDocumentVars: {
@@ -580,6 +597,8 @@ module.exports = {
   HomeReportSummary,
   HomeReportRun,
   HomeReportRunQuery,
+  HomeReportRunSummaryBy,
+  HomeReportRunSummaryQuery,
   HomeReportRunPage,
   HomeReportRunNow,
   HomeReportDocumentVars,

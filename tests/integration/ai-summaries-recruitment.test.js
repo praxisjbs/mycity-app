@@ -270,7 +270,7 @@ describeDb("Recruitment and onboarding summaries against the real migrations", (
     for (const key of SUMMARIES) await expect(authorise.runSummary(pool, staff, key, {})).rejects.toMatchObject({ code: "AI_READ_FORBIDDEN" });
   });
 
-  test("every read names its summary: the recruitment lists name theirs, and none waits in the gaps file", () => {
+  test("every read names its summary: the recruitment lists name theirs", () => {
     const named = {
       "vacancies.list": "vacancies.summary",
       "candidates.list": "candidates.summary",
@@ -281,7 +281,5 @@ describeDb("Recruitment and onboarding summaries against the real migrations", (
       "talent_pool.list": "talent_pool.summary",
     };
     for (const [read, summary] of Object.entries(named)) expect([read, registry.read(read).summary]).toEqual([read, summary]);
-    const gaps = require("../../scripts/check/ai-summary-gaps.json").gaps.map((g) => g.read);
-    expect(gaps.filter((r) => r in named)).toEqual([]);
   });
 });

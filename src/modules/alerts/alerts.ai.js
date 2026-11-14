@@ -6,6 +6,8 @@
  *   alerts.mine   the open alerts the asker may clear, as Needs You lists them: a page of 25,
  *                 newest first, filtered by category or severity; an empty page for someone
  *                 without `alerts.clear`
+ *   alerts.summary   the same alerts in figures, by category and severity, rule or age; no
+ *                 figures without `alerts.clear` (docs/guides/praxis-ai.md §6.13)
  *
  * Every login holds `home` view, which is all the assistant checks, so the read asks the same
  * questions the screen does (alerts.service.js forAssistant): the capability, then the rule's
@@ -96,9 +98,19 @@ module.exports = defineManifest({
       labels: { home_alert_rule_id: "Rule", name: "Name", threshold: "Alerts At", window_days: "Over (Days)", severity: "Severity", permission_key: "Who Clears", enabled: "On" },
     },
   ],
+  summaries: [
+    {
+      key: "alerts.summary",
+      description: "The alerts I may clear in figures: open, open a week or more, high, cleared and dismissed this week, the oldest; by category, severity, rule or age; raised by day",
+      params: c.alerts.HomeAlertSummaryQuery,
+      permission: ["home", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "alerts.mine",
+      summary: "alerts.summary",
       description: "List the open alerts I may clear, newest first, with how far past its rule each one is",
       params: c.alerts.HomeAlertQuery,
       permission: ["home", "view"],

@@ -313,11 +313,14 @@ describeDb("Praxis AI against the real migrations", () => {
     expect(staff).not.toContain("Who is in today, and who is late?");
     expect(staff).not.toContain("Which leave requests are waiting?");
     expect((await as("ceo").get("/ai/suggestions")).body.questions[0]).toBe("Who is in today, and who is late?");
+    // A chart for each area, by the summaries the person is offered (praxis-ai.md §6.8, Appendix B PR 8).
+    expect(staff).toContain("Chart my tasks by status");
     for (const who of ["staff", "ops", "ceo"]) {
       const res = await as(who).get("/ai/suggestions");
       expect(res.status).toBe(200);
       const capabilities = await grantsCache.getCapabilities(pool, people[who].user_id);
-      expect(res.body.questions).toEqual(suggestions.forReads(await authorise.allowedReads(userOf(who)), { capabilities, is_ceo: who === "ceo" }));
+      const summaries = await authorise.allowedSummaries(userOf(who));
+      expect(res.body.questions).toEqual(suggestions.forReads(await authorise.allowedReads(userOf(who)), { capabilities, is_ceo: who === "ceo" }, summaries));
     }
   });
 

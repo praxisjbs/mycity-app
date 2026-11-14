@@ -10,7 +10,7 @@
 | Capabilities | `policies.manage` (write, publish, withdraw and archive policies, and see who has acknowledged them; Knowledge Hub · Policies) |
 | Screens (PROGRESS.md rows) | #62 Policies, #89 Policy Updates; the acknowledge sheet over any screen; #73 Settings · Attendance Policy is dropped, its worksheet is the Attendance policy here |
 | Status | Built |
-| Last changed | 22/10/2026 |
+| Last changed | 14/11/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): TB's decisions of 20/10/2026 (§1.1), which
 bring Knowledge Hub · Policies forward from M10 and retire Settings · Attendance Policy (MILESTONES
@@ -313,6 +313,14 @@ nobody else sees who has or has not acknowledged.
   state and due date, own), `policies.read` (one policy's version in force as text or sentences, for
   anyone it applies to; cites the version), `policies.list` (`policies.manage`: every policy with
   its acknowledgement counts). Paged at 25.
+- **AI summary** (`policies.ai.js`; `docs/guides/praxis-ai.md` §6.13, Workspace, Knowledge Hub,
+  Community, Home and Settings; Appendix B PR 8, built 14/11/2026): `policies.summary` (`knowledge`
+  view, for `policies.manage` and the CEO as `policies.list` is; anyone else gets no figures;
+  `PolicySummaryQuery`: `kind`, `state`, `by` policy, department or state): the policies by state (§6.5),
+  and everyone asked to acknowledge the newest published version of each policy not archived that asks
+  for it (§6.7), acknowledged, waiting (not yet due) or overdue, by policy or by the department of the
+  people asked, stacked, with the acknowledgement rate. One SQL (`policies.repo.aiSummary`), figures
+  never rows; never a policy's text or a person's name. `policies.list` names it.
 - **AI actions** (`policies.ai.js`, `docs/guides/praxis-ai.md` §6.11, decision 33): for holders of
   `policies.manage`, as the routes hold it, two cards the person confirms, one press each. **Start
   Policy** (`policies.start`): the title, as New Policy's sheet asks it (the sheet and the card share
@@ -399,6 +407,7 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · §9: `policies.summary`, the policies and their acknowledgements in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8), for `policies.manage` alone. Nothing on screen changes.
 - 08/11/2026 · TB · `RichTextBlock` (`policies.js`) gains a `table` block (a header row and its rows), for an agreement's options table (M7 PR 6, `docs/guides/partnerships.md` §13.2); `markdownToBlocks` keeps tables. A policy's text never holds one, so its screens are unchanged.
 - 03/11/2026 · JP · Start Policy and Save Draft are Praxis AI cards for holders of `policies.manage`
   (§9; `praxis-ai.md` decision 33). New Policy's sheet validates with the contract's `PolicyStart` and

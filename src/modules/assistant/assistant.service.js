@@ -220,8 +220,12 @@ const cardsService = () => require("./assistant.cards");
 
 /** GET /ai/suggestions. */
 async function suggestionsFor(actor) {
-  const [reads, capabilities] = await Promise.all([authorise.allowedReads(actor), grantsCache.getCapabilities(pool, actor.user_id)]);
-  return { questions: suggestions.forReads(reads, { capabilities, is_ceo: actor.is_ceo === true }) };
+  const [reads, summaries, capabilities] = await Promise.all([
+    authorise.allowedReads(actor),
+    authorise.allowedSummaries(actor),
+    grantsCache.getCapabilities(pool, actor.user_id),
+  ]);
+  return { questions: suggestions.forReads(reads, { capabilities, is_ceo: actor.is_ceo === true }, summaries) };
 }
 
 /** POST /ai/answers/:id/feedback: Helpful, Not Helpful, or neither again. */

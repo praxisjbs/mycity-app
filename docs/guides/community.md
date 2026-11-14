@@ -10,7 +10,7 @@
 | Capabilities | `announcements.post` (post to the announcements channel and track who has read a post: the Announcements tab's routes) |
 | Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements (#66 Knowledge Hub · Announcements was dropped, 29/10/2026) |
 | Status | Built |
-| Last changed | 26/10/2026 |
+| Last changed | 14/11/2026 |
 
 Sources: MILESTONES §6.4 and A19, A20; REUSE_MAP §2.4; the internal workflow meeting of 12 October
 2026 (GE presenting, TB reviewing). The demo (`demo.html`, Staff Community) was updated the same day
@@ -487,6 +487,14 @@ Nobody, including People and the CEO, can read a direct message they are not par
   included, so a task's watcher, a meeting's guest or a message's colleague is found by name for
   anyone; `praxis-ai.md` §6.9). **No read over message bodies or direct messages.**
   Private conversation is not material for the assistant. Paged at 25.
+- **AI summary** (`community.ai.js`; `docs/guides/praxis-ai.md` §6.13, Workspace, Knowledge Hub,
+  Community, Home and Settings; Appendix B PR 8, built 14/11/2026): `announcements.summary` (`community`
+  view; `AnnouncementSummaryQuery`: `urgency`, a period published when asked, `by` announcement,
+  urgency or month). For `announcements.post` (and the CEO), every announcement as the Announcements tab
+  tracks it (§3 step 12): published, scheduled, urgent, the people reached, the tab's Average Read, the
+  ten newest stacked Read and Not Read (an urgent one read once acknowledged), by urgency, by month.
+  Anyone else: only those they received and whether they read each, never anyone else's reading. One SQL
+  (`announcements.repo.aiSummary`), figures never rows; never a message. `announcements.list` names it.
 - **AI actions** (`docs/guides/praxis-ai.md` §6.11, decision 19): `community.message` (`community`
   create, standard risk, may be suggested: "Tell Ada her leave is approved?"; input
   `DirectMessageSend`: the colleague and the words; the colleague named through the repo; at the
@@ -656,6 +664,7 @@ fields, never in a toast.
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · §9: `announcements.summary`, the announcements in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8): read rates for `announcements.post`, anyone else their own received and read. Nothing on screen changes.
 - 03/11/2026 · JP · From the evaluation set on staging: Send Wishes' card says "wish her a happy birthday" already gives the wish ("Happy birthday!"), so the card is drawn rather than asking for words the person said. Nothing on the Staff Community screens changes.
 - 03/11/2026 · JP · Every Staff Community form in the chat (`praxis-ai.md` decisions 33 and 40, §6.11):
   Create Channel, Save Channel, Post Recognition, Send Wishes and Save Message in `community.ai.js`,

@@ -815,7 +815,64 @@ async function searchRuns(db, user, { term, page }) {
   return repo.runPage(db, runsSeenBy(user), { q: term, page });
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+/** A file's status as Recent Runs reads it, and a report's parts. */
+const RUN_PARTS = Object.freeze([
+  { key: "done", label: "Done", optional: true },
+  { key: "pending", label: "Waiting", optional: true },
+  { key: "failed", label: "Failed", optional: true },
+  { key: "skipped", label: "Skipped", optional: true },
+]);
+const FORMAT_WORDS = Object.freeze({ pdf: "PDF", xlsx: "Excel" });
+
+/**
+ * The report files the person received, in figures, as `runs.mine` lists them: a holder of
+ * `home.reports` (and the CEO); anyone else gets no figures. Every file unless a period (made) is asked;
+ * by status, by report stacked by status, by format, by month. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   HomeReportRunSummaryQuery, parsed
+ * @param {object} actor    the asking person
+ */
+async function runSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  if (!(await mayReport(client, actor))) return { figures: [], groups: [], series: [], total: 0 };
+  const period = askedPeriod(params, now);
+  const r = await repo.aiRunSummary(client, runsSeenBy(actor), {
+    saved_report_id: params.saved_report_id,
+    status: params.status,
+    format: params.format,
+    from: period && period.from,
+    to: period && period.to,
+  });
+  const f = r.figures;
+  const status = RUN_PARTS.map((p) => ({ key: p.key, label: p.label, value: f[p.key] || 0 })).filter((p) => p.value > 0);
+  const groups = [
+    group("status", "Files by status", status),
+    group("report", "Files by report", stacked(r.by_report, RUN_PARTS)),
+    group("format", "Files by format", r.by_format.map((x) => ({ key: x.key, label: FORMAT_WORDS[x.key] || x.key.toUpperCase(), value: x.value }))),
+  ];
+  if (params.by === "report") groups.unshift(groups.splice(1, 1)[0]);
+  if (params.by === "format") groups.unshift(groups.splice(2, 1)[0]);
+  return {
+    figures: [
+      figure("files", "Files", f.files || 0),
+      figure("done", "Done", f.done || 0),
+      figure("pending", "Waiting", f.pending || 0),
+      figure("failed", "Failed", f.failed || 0),
+      figure("skipped", "Skipped", f.skipped || 0),
+      figure("emailed", "Emailed", f.emailed || 0),
+    ],
+    groups,
+    series: [series("files", "Files by month", r.by_month)],
+    total: f.files || 0,
+  };
+}
+
 module.exports = {
+  runSummary,
   DUE_BATCH,
   readerOf,
   mayReport,

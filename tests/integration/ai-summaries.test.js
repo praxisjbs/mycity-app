@@ -293,12 +293,18 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
     // offered, the partnerships' (leads, partners, proposals, agreements and interactions among them) and the
     // budgets' over their own records (partnerships.md §8, §9; budgets as Budgets shows them, none for staff), the requests' over their own, requisitions and disbursements with no
     // figures (expenses.finance only), their own pay (my_pay), their own attendance and leave (my_attendance,
-    // my_leave), performance's KPIs, scorecards and commitments within their reach, and the queries and sanctions
-    // they raised (queries.md §6.1); the people's, payroll's and the log's are not.
+    // my_leave), performance's KPIs, scorecards and commitments within their reach, the queries and sanctions
+    // they raised (queries.md §6.1), and Workspace's, Knowledge Hub's, Community's and Home's over what those lists
+    // show them (Appendix B PR 8: policies, alerts and report files give them no figures without the capability);
+    // the people's, payroll's, the log's and the imports' are not.
     expect((await authorise.allowedSummaries(staff)).map((s) => s.key).sort()).toEqual([
+      "activity.summary",
       "agreements.summary",
+      "alerts.summary",
+      "announcements.summary",
       "approvals.summary",
       "budgets.summary",
+      "calendar.summary",
       "commitments.summary",
       "disbursements.summary",
       "expenses.summary",
@@ -312,15 +318,20 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
       "partners.summary",
       "partnership_returns.summary",
       "partnerships.summary",
+      "policies.summary",
+      "projects.summary",
       "proposals.summary",
       "queries.summary",
       "requisitions.summary",
       "reviews.summary",
+      "runs.summary",
       "sample.count",
       "sample.slow",
       "sanctions.summary",
       "scorecards.summary",
+      "sops.summary",
       "tasks.summary",
+      "training.summary",
     ]);
     await expect(summaryOf("staff", "attendance.summary")).rejects.toMatchObject({ code: "AI_READ_FORBIDDEN" });
     await expect(summaryOf("staff", "audit.summary")).rejects.toMatchObject({ code: "AI_READ_FORBIDDEN" });

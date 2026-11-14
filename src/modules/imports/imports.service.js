@@ -214,7 +214,63 @@ async function history(query) {
   return { ...page, data: page.data.map(batchOf) };
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+/** A batch's status as the history reads it. */
+const STATUS_WORDS = Object.freeze({
+  committed: "Committed",
+  reverted: "Reverted",
+  failed: "Failed",
+  previewed: "Previewed",
+  mapped: "Mapped",
+  uploaded: "Uploaded",
+});
+const ROW_PARTS = Object.freeze([
+  { key: "imported", label: "Imported" },
+  { key: "refused", label: "Refused", optional: true },
+]);
+
+/**
+ * Every import in figures, as Import History lists them: every one unless a period (started) is asked;
+ * by importer stacked by the rows imported and refused, by status, by month. Runs on the client the
+ * assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   ImportSummaryQuery, parsed
+ */
+async function aiSummary(client, params, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const r = await repo.aiSummary(client, { importer: params.importer, status: params.status, from: period && period.from, to: period && period.to });
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const labelOf = (key) => (registry.get(key) ? registry.get(key).label : key);
+  const groups = [
+    group("importer", "Rows by importer", stacked(r.by_importer.map((x) => ({ ...x, label: labelOf(x.key) })), ROW_PARTS)),
+    group("status", "Imports by status", Object.keys(STATUS_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATUS_WORDS[k], value: counted.get(k) }))),
+  ];
+  if (params.by === "status") groups.reverse();
+  return {
+    figures: [
+      figure("imports", "Imports", f.imports || 0),
+      figure("committed", "Committed", f.committed || 0),
+      figure("reverted", "Reverted", f.reverted || 0),
+      figure("failed", "Failed", f.failed || 0),
+      figure("in_progress", "In progress", f.in_progress || 0),
+      figure("imported", "Rows imported", f.imported || 0),
+      figure("refused", "Rows refused", f.refused || 0),
+      figure("created", "Records created", f.created || 0),
+      figure("updated", "Records updated", f.updated || 0),
+    ],
+    groups,
+    series: [series("imports", "Imports by month", r.by_month)],
+    total: f.imports || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
   importerOf,
   batchOf,
   importers,

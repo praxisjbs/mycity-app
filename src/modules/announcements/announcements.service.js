@@ -426,7 +426,69 @@ async function changeFromCard(values, user) {
   return update(id, parsed.data, user);
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+const URGENCY_WORDS = Object.freeze({ normal: "Normal", important: "Important", urgent: "Urgent" });
+const READ_PARTS = Object.freeze([
+  { key: "read", label: "Read" },
+  { key: "not_read", label: "Not Read" },
+]);
+
+/**
+ * The announcements in figures. A holder of `announcements.post` (and the CEO) reads every one as the
+ * Announcements tab tracks it, read rates included; anyone else reads only those they received and
+ * whether they read each, since who read what is the tab's (decision 58). Every one unless a period is
+ * asked; the ten newest stacked Read and Not Read, by urgency, by month. Runs on the client the
+ * assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   AnnouncementSummaryQuery, parsed
+ * @param {object} actor    the asking person
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const grantsCache = require("../../shared/rbac/grants-cache");
+  const poster = actor.is_ceo === true || (await grantsCache.getCapabilities(client, actor.user_id)).includes("announcements.post");
+  const period = askedPeriod(params, now);
+  const r = await repo.aiSummary(
+    client,
+    { urgency: params.urgency, from: period && period.from, to: period && period.to },
+    { userId: poster ? null : actor.user_id },
+  );
+  const f = r.figures;
+  const counted = new Map(r.by_urgency.map((x) => [x.key, x.value]));
+  const groups = [
+    group("announcement", poster ? "Read by announcement" : "Announcements I received", stacked(r.newest, READ_PARTS)),
+    group("urgency", "Announcements by urgency", Object.keys(URGENCY_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: URGENCY_WORDS[k], value: counted.get(k) }))),
+  ];
+  if (params.by === "urgency") groups.reverse();
+  const month = series("published", poster ? "Published by month" : "Received by month", r.by_month);
+  if (poster) {
+    const figures = [
+      figure("published", "Published", f.published || 0),
+      figure("scheduled", "Scheduled", f.scheduled || 0),
+      figure("urgent", "Urgent", f.urgent || 0),
+      figure("reached", "People reached", f.reached || 0),
+    ];
+    if (f.average_read !== null && f.average_read !== undefined) figures.push(figure("average_read", "Average read", f.average_read, "percent"));
+    return { figures, groups, series: [month], total: (f.published || 0) + (f.scheduled || 0) };
+  }
+  return {
+    figures: [
+      figure("received", "Received", f.published || 0),
+      figure("read", "Read", f.read || 0),
+      figure("not_read", "Not read", Math.max((f.published || 0) - (f.read || 0), 0)),
+      figure("urgent_waiting", "Urgent, not acknowledged", f.urgent_waiting || 0),
+    ],
+    groups,
+    series: [month],
+    total: f.published || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
   view,
   list,
   stats,

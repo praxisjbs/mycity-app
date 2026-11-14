@@ -1266,7 +1266,59 @@ async function assertCardPolicy(db, id) {
   if (policy.status !== "active") throw new AppError("POLICY_ARCHIVED", "This policy is archived", 409, { policy_id: ["Archived"] });
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+/** A policy's state as the list's chips read it, and the acknowledgement parts. */
+const STATE_WORDS = Object.freeze({ in_force: "In Force", waiting: "Waiting", awaiting_approval: "Awaiting Approval", draft: "Draft", archived: "Archived" });
+const ACK_PARTS = Object.freeze([
+  { key: "acknowledged", label: "Acknowledged" },
+  { key: "waiting", label: "Waiting" },
+  { key: "overdue", label: "Overdue", optional: true },
+]);
+const DIM_WORDS = Object.freeze({ policy: "Acknowledgements by policy", department: "Acknowledgements by department" });
+
+/**
+ * The policies in figures, for a holder of `policies.manage` (and the CEO), as Knowledge Hub · Policies
+ * shows them; anyone else gets no figures, as `policies.list` gives them an empty page. By state, and the
+ * acknowledgements of each newest published version by policy or department, stacked. Never a policy's
+ * text. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   PolicySummaryQuery, parsed
+ * @param {object} actor    the asking person
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, stacked } = require("../../shared/ai/summary");
+  if (!(await canManage(client, actor))) return { figures: [], groups: [], series: [], total: 0 };
+  const by = DIM_WORDS[params.by] ? params.by : "policy";
+  const r = await repo.aiSummary(client, { kind: params.kind, state: params.state, by }, lagos.today(now));
+  const p = r.policies;
+  const a = r.acks;
+  const counted = new Map(r.by_state.map((x) => [x.key, x.value]));
+  const groups = [
+    group(by, DIM_WORDS[by], stacked(r.by_dim, ACK_PARTS)),
+    group("state", "Policies by state", Object.keys(STATE_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATE_WORDS[k], value: counted.get(k) }))),
+  ];
+  if (params.by === "state") groups.reverse();
+  const figures = [
+    figure("policies", "Policies", p.policies || 0),
+    figure("in_force", "In force", p.in_force || 0),
+    figure("awaiting_approval", "Awaiting approval", p.awaiting_approval || 0),
+    figure("waiting", "Waiting to start", p.waiting || 0),
+    figure("draft", "Drafts", p.draft || 0),
+    figure("archived", "Archived", p.archived || 0),
+    figure("asked", "Asked to acknowledge", a.asked || 0),
+    figure("acknowledged", "Acknowledged", a.acknowledged || 0),
+    figure("ack_waiting", "Acknowledgements waiting", a.waiting || 0),
+    figure("ack_overdue", "Acknowledgements overdue", a.overdue || 0),
+  ];
+  if (a.asked) figures.push(figure("acknowledged_rate", "Acknowledgement rate", Math.round(((a.acknowledged || 0) * 1000) / a.asked) / 10, "percent"));
+  return { figures, groups, series: [], total: p.policies || 0 };
+}
+
 module.exports = {
+  aiSummary,
   AHEAD_DAYS,
   REMIND_AFTER_DAYS,
   appliesToText,

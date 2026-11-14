@@ -20,7 +20,7 @@
  *     in its controller, gate 9): the assistant has no surface there at all, and that written
  *     reason covers its Create schemas. A module not built yet (no filled controller) is not asked.
  *  5. Every Try Asking line (src/modules/assistant/assistant.suggestions.js) names a read that
- *     exists.
+ *     exists, and every chart line a summary that exists.
  *  6. Every create and edit form is in the chat, or never for a named reason (decision 33): each
  *     `<Thing>Create`, `Edit`, `Update`, `Patch` or `Save` schema of a built module's contract is
  *     an action's input; or its module's `not_offered` reason starts `via <action key>:` (reached
@@ -36,10 +36,8 @@
  *  8. Every kind of document a module reads is exercised by an integration test and the evaluation set.
  *  9. Every read names the summary that answers its counts and totals, or why it needs none
  *     (praxis-ai.md §6.19 item 3): `summary: "<a summary's key>"` (which must exist) or
- *     `summary: "none: <reason>"`; or it waits on the list scripts/check/ai-summary-gaps.json with
- *     the PR of Appendix B that brings its summary. That list only shrinks: a read that now names a
- *     summary, or that no manifest declares, fails until it is taken off, and one the change's base
- *     did not hold fails.
+ *     `summary: "none: <reason>"`. The list of reads waiting for theirs is gone (Appendix B PR 8
+ *     answered the last), so a new read comes with its summary or its reason.
  *
  * Usage: node scripts/check/ai-awareness.js [--list]     exit 0 ok, 1 problems
  *        --list prints the sweep: each Create schema, and each create and edit form, and how it
@@ -60,8 +58,6 @@ const SUGGESTIONS = path.join(ROOT, "src", "modules", "assistant", "assistant.su
 const SCHEMAS = path.join(ROOT, "packages", "contract", "schemas");
 const MODULES = path.join(ROOT, "src", "modules");
 const GAPS = path.join(ROOT, "scripts", "check", "ai-forms-gaps.json");
-const SUMMARY_GAPS_FILE = "scripts/check/ai-summary-gaps.json";
-const SUMMARY_GAPS = path.join(ROOT, SUMMARY_GAPS_FILE);
 const coverage = require("./ai-manifest-coverage");
 
 /** A create or edit form's request, by its schema's name (decision 33). */
@@ -174,51 +170,17 @@ function gapsLists() {
 }
 
 /**
- * Rule 9 (praxis-ai.md §6.19 item 3): every read names its summary, or why it needs none, or waits on
- * the summary gaps list, which only shrinks.
- * @param {{reads: Array<{key: string, summary?: string}>, summaryKeys: Set<string>,
- *          gaps: Record<string, {summary: string, pr: number}>, baseGaps: Record<string, object>|null}} q
- *        `baseGaps` is the list as the change's base held it; null when the base had none
+ * Rule 9 (praxis-ai.md §6.19 item 3): every read names its summary, or why it needs none.
+ * @param {{reads: Array<{key: string, summary?: string}>, summaryKeys: Set<string>}} q
  * @returns {string[]} problems
  */
-function summariesNamed({ reads, summaryKeys, gaps, baseGaps }) {
+function summariesNamed({ reads, summaryKeys }) {
   const problems = [];
-  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
-  const readKeys = new Set(reads.map((r) => r.key));
   for (const r of reads) {
-    if (r.summary) {
-      if (!r.summary.startsWith("none:") && !summaryKeys.has(r.summary)) problems.push(`${r.key}: its summary ${r.summary} is declared by no manifest`);
-      if (has(gaps, r.key)) problems.push(`${r.key} names its summary now: take it off ${SUMMARY_GAPS_FILE} (the list only shrinks)`);
-    } else if (!has(gaps, r.key)) {
-      problems.push(`${r.key}: say which summary answers its counts and totals (summary: "<key>"), or why it needs none (summary: "none: <reason>")`);
-    }
-  }
-  for (const [key, gap] of Object.entries(gaps)) {
-    if (!readKeys.has(key)) problems.push(`${SUMMARY_GAPS_FILE} names ${key}, which no manifest declares: take it off`);
-    if (!gap || typeof gap.summary !== "string" || !Number.isInteger(gap.pr)) problems.push(`${SUMMARY_GAPS_FILE}: ${key} needs the summary it waits on and the PR that brings it ({ summary, pr })`);
-    if (baseGaps && !has(baseGaps, key)) problems.push(`${SUMMARY_GAPS_FILE} gained ${key}: the list only shrinks, so a read comes with its summary or its reason`);
+    if (!r.summary) problems.push(`${r.key}: say which summary answers its counts and totals (summary: "<key>"), or why it needs none (summary: "none: <reason>")`);
+    else if (!r.summary.startsWith("none:") && !summaryKeys.has(r.summary)) problems.push(`${r.key}: its summary ${r.summary} is declared by no manifest`);
   }
   return problems;
-}
-
-/** The summary gaps list as this tree holds it ({} once it is deleted) and as the change's base held it. */
-function summaryGapsLists() {
-  const read = (text) => {
-    const list = JSON.parse(text).gaps || [];
-    return Object.fromEntries(list.map((g) => [g.read, { summary: g.summary, pr: g.pr }]));
-  };
-  const now = fs.existsSync(SUMMARY_GAPS) ? read(fs.readFileSync(SUMMARY_GAPS, "utf8")) : {};
-  const then = (() => {
-    try {
-      const changes = require("./lib/changes");
-      const b = changes.base();
-      const text = b ? changes.git(["show", `${b}:${SUMMARY_GAPS_FILE}`], { allowFail: true }) : null;
-      return text ? read(text) : null;
-    } catch {
-      return null;
-    }
-  })();
-  return { now, then };
 }
 
 function walk(dir, test, out = []) {
@@ -333,10 +295,12 @@ function check() {
     if (Object.keys(manifest.not_offered).length && !fs.existsSync(path.join(SCHEMAS, `${folder}.js`)))
       problems.push(`${folder}.ai.js: not_offered names schemas, but packages/contract/schemas/${folder}.js does not exist`);
 
-  // 5. Try Asking names reads that exist.
+  // 5. Try Asking names reads that exist, and its chart lines summaries that exist (§6.8).
   try {
-    const { QUESTIONS } = require(SUGGESTIONS);
+    const { QUESTIONS, CHARTS = [] } = require(SUGGESTIONS);
     for (const [key] of QUESTIONS) if (!registry.read(key)) problems.push(`assistant.suggestions.js names "${key}", which no manifest declares`);
+    const summaryKeys = new Set(registry.summaries().map((x) => x.key));
+    for (const [key] of CHARTS) if (!summaryKeys.has(key)) problems.push(`assistant.suggestions.js charts "${key}", which no manifest declares as a summary`);
   } catch (err) {
     problems.push(`assistant.suggestions.js could not be read: ${err.message}`);
   }
@@ -374,8 +338,7 @@ function check() {
   }
 
   // 9. Every read names the summary that answers its counts and totals, or why it needs none (§6.19 item 3).
-  const summaryLists = summaryGapsLists();
-  problems.push(...summariesNamed({ reads: registry.reads(), summaryKeys: new Set(registry.summaries().map((x) => x.key)), gaps: summaryLists.now, baseGaps: summaryLists.then }));
+  problems.push(...summariesNamed({ reads: registry.reads(), summaryKeys: new Set(registry.summaries().map((x) => x.key)) }));
 
   return { problems, actions: actions.length, sweep, forms: six.sweep, counts: six.counts };
 }

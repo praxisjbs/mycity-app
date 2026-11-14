@@ -1527,7 +1527,8 @@
       "bulk": null,
       "schema": "dashboard.HomeActivityQuery",
       "schema_sha": "cc05eaf495ef150c",
-      "screen": null
+      "screen": null,
+      "summary": "activity.summary"
     },
     {
       "key": "agreements.list",
@@ -1562,7 +1563,8 @@
       "bulk": null,
       "schema": "alerts.HomeAlertQuery",
       "schema_sha": "f43d29b85d0b4377",
-      "screen": null
+      "screen": null,
+      "summary": "alerts.summary"
     },
     {
       "key": "announcements.list",
@@ -1573,7 +1575,8 @@
       "bulk": null,
       "schema": "announcements.AnnouncementListQuery",
       "schema_sha": "463693b1b2726c8c",
-      "screen": null
+      "screen": null,
+      "summary": "announcements.summary"
     },
     {
       "key": "approvals.mine",
@@ -1716,7 +1719,8 @@
       "bulk": null,
       "schema": "calendar.CalendarListQuery",
       "schema_sha": "7a157a8d6e304cb2",
-      "screen": null
+      "screen": null,
+      "summary": "calendar.summary"
     },
     {
       "key": "candidates.get",
@@ -2027,7 +2031,8 @@
       "bulk": null,
       "schema": "imports.ImportListQuery",
       "schema_sha": "3b5b68e62544d923",
-      "screen": null
+      "screen": null,
+      "summary": "imports.summary"
     },
     {
       "key": "interactions.list",
@@ -2266,7 +2271,8 @@
       "bulk": null,
       "schema": "policies.PolicyListQuery",
       "schema_sha": "628932207fe90e8c",
-      "screen": null
+      "screen": null,
+      "summary": "policies.summary"
     },
     {
       "key": "policies.mine",
@@ -2301,7 +2307,8 @@
       "bulk": null,
       "schema": "projects.ProjectListQuery",
       "schema_sha": "7b679d616863a888",
-      "screen": null
+      "screen": null,
+      "summary": "projects.summary"
     },
     {
       "key": "proposals.list",
@@ -2408,7 +2415,8 @@
       "bulk": null,
       "schema": "reports.HomeReportRunQuery",
       "schema_sha": "097eb947e8b2aec5",
-      "screen": null
+      "screen": null,
+      "summary": "runs.summary"
     },
     {
       "key": "sanctions.list",
@@ -2467,7 +2475,8 @@
       "bulk": null,
       "schema": "knowledge.SopListQuery",
       "schema_sha": "6eee225e9fc20931",
-      "screen": null
+      "screen": null,
+      "summary": "sops.summary"
     },
     {
       "key": "sops.read",
@@ -2538,7 +2547,8 @@
       "bulk": null,
       "schema": "training.MyTrainingQuery",
       "schema_sha": "707307568ddee42c",
-      "screen": null
+      "screen": null,
+      "summary": "training.summary"
     },
     {
       "key": "training.mine",
@@ -2561,7 +2571,8 @@
       "bulk": null,
       "schema": "common.PageQuery",
       "schema_sha": "463693b1b2726c8c",
-      "screen": null
+      "screen": null,
+      "summary": "training.summary"
     },
     {
       "key": "training.progress",
@@ -2572,7 +2583,8 @@
       "bulk": null,
       "schema": "training.CourseListQuery",
       "schema_sha": "dad77c04b79f7946",
-      "screen": null
+      "screen": null,
+      "summary": "training.summary"
     },
     {
       "key": "vacancies.get",
@@ -4098,6 +4110,17 @@
       "screen": "workspace.projects"
     },
     {
+      "key": "activity.summary",
+      "kind": "summary",
+      "module_key": "home",
+      "permission": "home.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "dashboard.HomeActivitySummaryQuery",
+      "schema_sha": "666ac1757559bed9",
+      "screen": null
+    },
+    {
       "key": "agreements.summary",
       "kind": "summary",
       "module_key": "partnerships",
@@ -4106,6 +4129,28 @@
       "bulk": null,
       "schema": "agreements.AgreementSummaryQuery",
       "schema_sha": "4160503d4857f534",
+      "screen": null
+    },
+    {
+      "key": "alerts.summary",
+      "kind": "summary",
+      "module_key": "home",
+      "permission": "home.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "alerts.HomeAlertSummaryQuery",
+      "schema_sha": "4020eb0353f22263",
+      "screen": null
+    },
+    {
+      "key": "announcements.summary",
+      "kind": "summary",
+      "module_key": "community",
+      "permission": "community.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "announcements.AnnouncementSummaryQuery",
+      "schema_sha": "13945607749e85a6",
       "screen": null
     },
     {
@@ -4161,6 +4206,17 @@
       "bulk": null,
       "schema": "budgets.BudgetSummaryQuery",
       "schema_sha": "8e444ad9e1840897",
+      "screen": null
+    },
+    {
+      "key": "calendar.summary",
+      "kind": "summary",
+      "module_key": "workspace",
+      "permission": "workspace.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "calendar.CalendarSummaryQuery",
+      "schema_sha": "f608cde1b03227da",
       "screen": null
     },
     {
@@ -4260,6 +4316,17 @@
       "bulk": null,
       "schema": "goals.PerformanceSummaryQuery",
       "schema_sha": "e3943c914dd6c906",
+      "screen": null
+    },
+    {
+      "key": "imports.summary",
+      "kind": "summary",
+      "module_key": "settings",
+      "permission": "settings.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "imports.ImportSummaryQuery",
+      "schema_sha": "d173565afce4f83a",
       "screen": null
     },
     {
@@ -4439,6 +4506,28 @@
       "screen": null
     },
     {
+      "key": "policies.summary",
+      "kind": "summary",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "policies.PolicySummaryQuery",
+      "schema_sha": "244777c13ccb96bc",
+      "screen": null
+    },
+    {
+      "key": "projects.summary",
+      "kind": "summary",
+      "module_key": "workspace",
+      "permission": "workspace.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "projects.ProjectSummaryQuery",
+      "schema_sha": "73e947f2761497ea",
+      "screen": null
+    },
+    {
       "key": "proposals.summary",
       "kind": "summary",
       "module_key": "partnerships",
@@ -4483,6 +4572,17 @@
       "screen": null
     },
     {
+      "key": "runs.summary",
+      "kind": "summary",
+      "module_key": "home",
+      "permission": "home.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "reports.HomeReportRunSummaryQuery",
+      "schema_sha": "0e45c7498b72a709",
+      "screen": null
+    },
+    {
       "key": "sanctions.summary",
       "kind": "summary",
       "module_key": "queries",
@@ -4516,6 +4616,17 @@
       "screen": null
     },
     {
+      "key": "sops.summary",
+      "kind": "summary",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "knowledge.SopSummaryQuery",
+      "schema_sha": "9d6de24818364956",
+      "screen": null
+    },
+    {
       "key": "talent_pool.summary",
       "kind": "summary",
       "module_key": "recruitment",
@@ -4546,6 +4657,17 @@
       "bulk": null,
       "schema": "attendance.TemporarySiteSummaryQuery",
       "schema_sha": "675518355527e7c1",
+      "screen": null
+    },
+    {
+      "key": "training.summary",
+      "kind": "summary",
+      "module_key": "knowledge",
+      "permission": "knowledge.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "training.TrainingSummaryQuery",
+      "schema_sha": "8bf034e68aab09c4",
       "screen": null
     },
     {
