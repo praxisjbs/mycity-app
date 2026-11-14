@@ -2,7 +2,7 @@
 /**
  * What the assistant may read and do about scorecards and commitments: score to date and rating, and
  * a month's commitments with their states, within the asker's own `performance` scope, 25 at a time
- * (docs/guides/performance.md §9). Never a line's evidence or a review's comments.
+ * (docs/guides/performance.md §9), and both in figures (praxis-ai.md §6.13). Never a line's evidence or a review's comments.
  *
  * As cards the person confirms (docs/guides/praxis-ai.md §6.11, decisions 33 and 40): New Scorecard,
  * a line added or changed on Edit Lines, and Change Reviewer, each through the service function the
@@ -168,6 +168,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "scorecards.list",
+      summary: "scorecards.summary",
       description: "List scorecards in my scope: person, department, reviewer, status, score to date and rating",
       params: c.targets.ScorecardListQuery,
       permission: ["performance", "view"],
@@ -176,11 +177,28 @@ module.exports = defineManifest({
     },
     {
       key: "commitments.list",
+      summary: "commitments.summary",
       description: "List a month's commitments in my scope: who, what, original date, date now and state (due, on time, late, missed, rescoped)",
       params: c.targets.CommitmentListQuery,
       permission: ["performance", "view"],
       run: (_client, params, actor) => commitments.list({ ...params, waiting_on_me: undefined }, actor.scope),
       cite: (row) => ({ type: "task", id: row.task_id, label: `${row.number} ${row.title}` }),
+    },
+  ],
+  summaries: [
+    {
+      key: "scorecards.summary",
+      description: "Scorecards in figures: by status, the average score to date, below Meets; the average score by department or reviewer, by rating",
+      params: c.targets.ScorecardSummaryQuery,
+      permission: ["performance", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+    },
+    {
+      key: "commitments.summary",
+      description: "A month's commitments in figures: due, on time, late, missed, rescoped, the on-time rate; by state, by person or department stacked, due and on time by week",
+      params: c.targets.CommitmentDeliverySummaryQuery,
+      permission: ["performance", "view"],
+      run: (client, params, actor) => commitments.aiSummary(client, params, actor.scope),
     },
   ],
   routes: [

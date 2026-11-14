@@ -292,20 +292,29 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
     // Every login holds ess and performance (own), workspace, partnerships and expenses (own): those summaries are
     // offered, the partnerships' and the budgets' over their own records (partnerships.md §8, §9; budgets as
     // Budgets shows them, none for staff), the requests' over their own, requisitions and disbursements with no
-    // figures (expenses.finance only), and their own pay (my_pay); the people's, payroll's and the log's are not.
+    // figures (expenses.finance only), their own pay (my_pay), days and leave (my_attendance, my_leave), the
+    // KPIs, scorecards and commitments their performance reach reads, and the queries and sanctions of the
+    // queries they raised (none); the people's, payroll's and the log's are not (praxis-ai.md §6.13, PR 7).
     expect((await authorise.allowedSummaries(staff)).map((s) => s.key).sort()).toEqual([
       "approvals.summary",
       "budgets.summary",
+      "commitments.summary",
       "disbursements.summary",
       "expenses.summary",
       "goals.summary",
+      "kpis.summary",
+      "my_attendance.summary",
+      "my_leave.summary",
       "my_pay.summary",
       "partnership_returns.summary",
       "partnerships.summary",
+      "queries.summary",
       "requisitions.summary",
       "reviews.summary",
       "sample.count",
       "sample.slow",
+      "sanctions.summary",
+      "scorecards.summary",
       "tasks.summary",
     ]);
     await expect(summaryOf("staff", "attendance.summary")).rejects.toMatchObject({ code: "AI_READ_FORBIDDEN" });

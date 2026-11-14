@@ -1,7 +1,7 @@
 "use strict";
 /**
  * What the assistant may read and do about KPIs: the functions' operational KPIs with their latest
- * result, 25 at a time (docs/guides/performance.md §9); and, as cards the person confirms
+ * result, 25 at a time (docs/guides/performance.md §9), and their results in figures (praxis-ai.md §6.13); and, as cards the person confirms
  * (docs/guides/praxis-ai.md §6.11, decisions 33 and 40), New KPI and Edit KPI, each through the
  * service function the screen's own button calls, held to `goals.function` as their routes are. It
  * never records an actual: Record Actual and Report Month stay on KPIs and Goals.
@@ -76,11 +76,21 @@ module.exports = defineManifest({
   reads: [
     {
       key: "kpis.list",
+      summary: "kpis.summary",
       description: "List the functions' KPIs with their target and latest monthly result (Met, Not Met or N/A)",
       params: c.kpis.KpiListQuery,
       permission: ["performance", "view"],
       run: (_client, params, actor) => service.list(params, actor),
       cite: (row) => ({ type: "kpi", id: row.kpi_definition_id, label: `${row.code} ${row.name}` }),
+    },
+  ],
+  summaries: [
+    {
+      key: "kpis.summary",
+      description: "KPI results in figures: met, not met, N/A, not entered, met as a per cent; by result, by function stacked, met by month",
+      params: c.kpis.KpiResultSummaryQuery,
+      permission: ["performance", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
     },
   ],
   routes: [{ intent: "see a function's KPIs", screen: "performance.kpis" }],

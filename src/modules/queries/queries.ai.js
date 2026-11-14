@@ -78,9 +78,19 @@ module.exports = defineManifest({
     QueryResponseCreate: "via my_queries.respond: My Queries' own response form, which never names its query; the card is QueryRespond",
     LetterSignatureSave: "file: a signature is drawn by hand on the pad and kept as an image; the chat cannot draw one, and opens Edit Signature to draw it",
   },
+  summaries: [
+    {
+      key: "queries.summary",
+      description: "Queries in figures: awaiting a response, overdue, under review, closed, days to close; by status, by department, rule or raiser stacked, raised by month",
+      params: c.queries.QuerySummaryQuery,
+      permission: ["queries", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, visibility.readerOf(actor.scope, actor)),
+    },
+  ],
   reads: [
     {
       key: "queries.list",
+      summary: "queries.summary",
       description: "List queries: who a query is about, its subject, who raised it, and whether it waits for a response, is under review or is closed",
       params: c.queries.QueryListQuery,
       permission: ["queries", "view"],

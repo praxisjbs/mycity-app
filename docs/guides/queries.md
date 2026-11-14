@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 11/11/2026 |
+| Last changed | 14/11/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -454,6 +454,17 @@ counts, never coordinates or device identifiers.
 - **AI reads** (`queries.ai.js`, `sanctions.ai.js`): `queries.list` and `queries.get` (open and
   closed queries the reader may see, §6.1), `sanctions.list`, `sanctions.standing` (a person's rungs
   in force and the next one; scope all only). `queries` view, paged at 25, cited by number.
+- **AI summaries** (`docs/guides/praxis-ai.md` §6.13, Appendix B PR 7, 14/11/2026), each one SQL
+  over what §6.1 lets the reader see, figures never rows, every record unless a period is asked:
+  `queries.summary` (`QuerySummaryQuery`: status, department, a period raised, `by` department, rule,
+  raised by, status or month): awaiting a response, past the response time, under review, escalated,
+  closed, sanctioned, the average days to close; by status, by department, rule or raiser stacked
+  Awaiting Response, Under Review and Closed, raised by month (`queries.repo.aiSummary`).
+  `sanctions.summary` (`SanctionSummaryQuery`: status, department, a period made, `by` department,
+  step, status or month): issued, awaiting approval, not approved, withdrawn, fines; the fines'
+  total in naira only for a reader who sees pay (a fine is a deduction from pay, Appendix B.4), left
+  out, never zero, for anyone else; by step of the chain, by status, by department stacked, by month
+  (`sanctions.repo.aiSummary`). `queries.list` and `sanctions.list` name them.
 - **AI actions** (`docs/guides/praxis-ai.md` §6.11, decisions 33, 38 and 39): every form of this
   module as a card the person confirms, each through the screen's own function. **Raise Query**
   (`queries.raise`, `queries` create, risk approval: Confirm It's You, since it starts due process
@@ -600,6 +611,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · Praxis AI's queries and sanctions summaries (`praxis-ai.md` Appendix B PR 7, §9): by status, department, rule or step, within §6.1's rule; a fine's total only for a reader who sees pay. No screen changed.
 - 11/11/2026 · JP · Fault #9 of the 11/11 staging brief (`QUERY_SELF: employee_id` at `POST /queries`): Raise a Query's Employee picker offered the raiser and anyone archived or suspended, and only the server refused them. It now asks for active people with the new `exclude_self` filter on `GET /employees` (`foundation.md` §5), so neither is offered (§6.2).
 - 09/11/2026 · JP · M6 PR 3 (`payroll.md` §6.6, §7): a sanction issued with a fine now tells the holders of `payroll` edit "Fine Waiting for Payroll", from an outbox handler of `deductions.events.js` on `sanction.issued` (§7); the fine's events `sanction_fine.accepted`, `.waived` and `.released` are written by `sanctions.fines` when Payroll · Deductions accepts, waives or releases it. Nothing in the sanctions module changed.
 - 09/11/2026 · JP · M6 PR 2 (`payroll.md` §6.6 rule 5): `sanctions.fines.release(client, id, actor, reason)` returns a fine payroll had accepted to `pending`, so it can be accepted again or waived (§6.6); it writes `sanction_fine.released` and refuses a fine not accepted (409 `FINE_NOT_MOVABLE`). That no instalment is yet in a run is payroll's rule to hold, not the fine's. The run's lock settles a fine whose last instalment applied through the existing `settle`.

@@ -2002,7 +2002,204 @@ async function daysOf(db, ids) {
   return rows;
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summaries (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A summary's second grouping, by person or department: the column and name each maps to (never the caller's words). */
+const PEOPLE_BY = Object.freeze({
+  person: { key: "v.employee_id::text", label: "min(v.person)", none: "(none)" },
+  department: { key: "COALESCE(v.department_id::text, 'none')", label: "COALESCE(min(v.department), 'No department')", none: "No department" },
+});
+
+/** A series' bucket over a date column: a day, a week (its Monday) or a month. */
+const BUCKET = Object.freeze({
+  day: (col) => `to_char(${col}, 'YYYY-MM-DD')`,
+  week: (col) => `to_char(date_trunc('week', ${col}), 'YYYY-MM-DD')`,
+  month: (col) => `to_char(${col}, 'YYYY-MM')`,
+});
+
+/**
+ * The exceptions in figures for the assistant, in one statement within the reader's `people` scope, as
+ * listExceptions() applies it: where each stands (Waiting while open, then its outcome), by type with
+ * those as parts, by status, by department (20) or person (top 10, `dim`), and by day or week (the
+ * newest 60). A period (the work date) narrows it only when `from` and `to` are given.
+ * @param {{status?: string, exception_type?: string, department_id?: string, employee_id?: string, from?: string, to?: string, dim: string, bucket: string}} q
+ */
+async function exceptionSummary(db, q, scope) {
+  const dim = PEOPLE_BY[q.dim] || PEOPLE_BY.department;
+  const at = (BUCKET[q.bucket] || BUCKET.day)("v.work_date");
+  const params = [q.status || null, q.exception_type || null, q.department_id || null, q.employee_id || null, q.from || null, q.to || null];
+  const s = scopeClause(scope, { column: "ad.employee_id" }, params);
+  const row = await one(
+    db,
+    `WITH v AS (
+       SELECT x.exception_type, x.status, ad.employee_id, ad.attendance_date AS work_date, e.department_id, d.name AS department,
+              btrim(e.first_name || ' ' || e.last_name) AS person,
+              CASE WHEN x.status = 'open' THEN 'waiting' ELSE COALESCE(x.outcome, 'accepted') END AS stands
+         FROM attendance_exception x
+         JOIN attendance_day ad ON ad.attendance_day_id = x.attendance_day_id
+         JOIN employee e ON e.employee_id = ad.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+        WHERE ($1::text IS NULL OR x.status = $1)
+          AND ($2::text IS NULL OR x.exception_type = $2)
+          AND ($3::uuid IS NULL OR e.department_id = $3)
+          AND ($4::uuid IS NULL OR ad.employee_id = $4)
+          AND ($5::date IS NULL OR ad.attendance_date BETWEEN $5::date AND $6::date)
+          ${s.and}
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, ${dim.label} AS label, count(*)::int AS value,
+              row_number() OVER (ORDER BY count(*) DESC, ${dim.label}, ${dim.key}) AS rank
+         FROM v GROUP BY ${dim.key}
+     ), points AS (
+       SELECT ${at} AS at, count(*)::int AS value, row_number() OVER (ORDER BY ${at} DESC) AS newest
+         FROM v GROUP BY ${at}
+     )
+     SELECT (SELECT json_build_object(
+               'exceptions', count(*)::int,
+               'waiting', count(*) FILTER (WHERE stands = 'waiting')::int,
+               'accepted', count(*) FILTER (WHERE stands = 'accepted')::int,
+               'corrected', count(*) FILTER (WHERE stands = 'corrected')::int,
+               'rejected', count(*) FILTER (WHERE stands = 'rejected')::int,
+               'people', count(DISTINCT employee_id)::int) FROM v) AS figures,
+            (SELECT json_agg(json_build_object('key', exception_type, 'waiting', waiting, 'accepted', accepted,
+                                               'corrected', corrected, 'rejected', rejected) ORDER BY n DESC, exception_type)
+               FROM (SELECT exception_type, count(*) AS n,
+                            count(*) FILTER (WHERE stands = 'waiting')::int AS waiting,
+                            count(*) FILTER (WHERE stands = 'accepted')::int AS accepted,
+                            count(*) FILTER (WHERE stands = 'corrected')::int AS corrected,
+                            count(*) FILTER (WHERE stands = 'rejected')::int AS rejected
+                       FROM v GROUP BY exception_type) t) AS by_type,
+            (SELECT json_agg(json_build_object('key', stands, 'value', n)) FROM (SELECT stands, count(*)::int AS n FROM v GROUP BY stands) t) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank) FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM points WHERE newest <= 60) AS points`,
+    params,
+  );
+  return { figures: row.figures || {}, by_type: row.by_type || [], by_status: row.by_status || [], by_dim: row.by_dim || [], points: row.points || [] };
+}
+
+/**
+ * The deductions and overtime in figures for the assistant, in one statement within the reader's
+ * `people` scope, as listPayItems() applies it: counts by kind, the minutes of each side, pending, and
+ * the amounts of what still counts (neither waived nor cut; the service keeps them from a reader who
+ * does not see pay); by kind with each status as a part, by status, by department (20, items) or person
+ * (top 10, minutes), and each side's minutes by month (the newest 60). A period (the work date) narrows
+ * it only when asked.
+ * @param {{group?: string, kind?: string, status?: string, department_id?: string, employee_id?: string, from?: string, to?: string, dim: string}} q
+ */
+async function payItemSummary(db, q, scope) {
+  const byPerson = q.dim === "person";
+  const dim = PEOPLE_BY[q.dim] || PEOPLE_BY.department;
+  const params = [q.group || null, q.kind || null, q.status || null, q.department_id || null, q.employee_id || null, q.from || null, q.to || null];
+  const s = scopeClause(scope, { column: "pi.employee_id" }, params);
+  const dimValue = byPerson ? "COALESCE(sum(v.minutes), 0)::int" : "count(*)::int";
+  const row = await one(
+    db,
+    `WITH v AS (
+       SELECT pi.kind, pi.status, pi.minutes, pi.amount, pi.employee_id, pi.work_date, e.department_id, d.name AS department,
+              btrim(e.first_name || ' ' || e.last_name) AS person
+         FROM attendance_pay_item pi
+         JOIN employee e ON e.employee_id = pi.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+        WHERE ($1::text IS NULL OR ($1 = 'overtime') = (pi.kind = 'overtime'))
+          AND ($2::text IS NULL OR pi.kind = $2)
+          AND ($3::text IS NULL OR pi.status = $3)
+          AND ($4::uuid IS NULL OR e.department_id = $4)
+          AND ($5::uuid IS NULL OR pi.employee_id = $5)
+          AND ($6::date IS NULL OR pi.work_date BETWEEN $6::date AND $7::date)
+          ${s.and}
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, ${dim.label} AS label, ${dimValue} AS value, count(*)::int AS n,
+              row_number() OVER (ORDER BY ${dimValue} DESC, ${dim.label}, ${dim.key}) AS rank
+         FROM v GROUP BY ${dim.key}
+     ), months AS (
+       SELECT to_char(work_date, 'YYYY-MM') AS at,
+              COALESCE(sum(minutes) FILTER (WHERE kind <> 'overtime'), 0)::int AS deduction_minutes,
+              COALESCE(sum(minutes) FILTER (WHERE kind = 'overtime'), 0)::int AS overtime_minutes,
+              row_number() OVER (ORDER BY to_char(work_date, 'YYYY-MM') DESC) AS newest
+         FROM v GROUP BY 1
+     )
+     SELECT (SELECT json_build_object(
+               'items', count(*)::int,
+               'late', count(*) FILTER (WHERE kind = 'late')::int,
+               'early_departure', count(*) FILTER (WHERE kind = 'early_departure')::int,
+               'absence', count(*) FILTER (WHERE kind = 'absence')::int,
+               'overtime', count(*) FILTER (WHERE kind = 'overtime')::int,
+               'deduction_minutes', COALESCE(sum(minutes) FILTER (WHERE kind <> 'overtime'), 0)::int,
+               'overtime_minutes', COALESCE(sum(minutes) FILTER (WHERE kind = 'overtime'), 0)::int,
+               'pending', count(*) FILTER (WHERE status = 'pending')::int,
+               'deduction_amount', COALESCE(sum(amount) FILTER (WHERE kind <> 'overtime' AND status NOT IN ('waived', 'cut')), 0)::numeric(18,2),
+               'overtime_amount', COALESCE(sum(amount) FILTER (WHERE kind = 'overtime' AND status NOT IN ('waived', 'cut')), 0)::numeric(18,2))
+               FROM v) AS figures,
+            (SELECT json_agg(json_build_object('key', kind, 'pending', pending, 'waived', waived, 'confirmed', confirmed,
+                                               'cut', cut, 'in_run', in_run) ORDER BY kind)
+               FROM (SELECT kind,
+                            count(*) FILTER (WHERE status = 'pending')::int AS pending,
+                            count(*) FILTER (WHERE status = 'waived')::int AS waived,
+                            count(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
+                            count(*) FILTER (WHERE status = 'cut')::int AS cut,
+                            count(*) FILTER (WHERE status = 'in_run')::int AS in_run
+                       FROM v GROUP BY kind) t) AS by_kind,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM v GROUP BY status) t) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value, 'count', n) ORDER BY rank) FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'deduction_minutes', deduction_minutes, 'overtime_minutes', overtime_minutes) ORDER BY at)
+               FROM months WHERE newest <= 60) AS months`,
+    params,
+  );
+  return { figures: row.figures || {}, by_kind: row.by_kind || [], by_status: row.by_status || [], by_dim: row.by_dim || [], months: row.months || [] };
+}
+
+/**
+ * One person's attendance in figures for the assistant, in one statement: their days between two dates
+ * (on time, late, absent, on leave, minutes late and worked), each week or month (`bucket`) with those
+ * as parts, minutes late by day, and their own pay items on those days: overtime minutes (neither waived
+ * nor cut) and the deductions still pending with their amount. The person's own, never masked from them.
+ */
+async function myAttendanceSummary(db, employeeId, from, to, bucket) {
+  const at = (BUCKET[bucket] || BUCKET.week)("attendance_date");
+  return one(
+    db,
+    `WITH days AS (
+       SELECT ad.attendance_date, ad.status, ad.late_minutes, ad.worked_minutes
+         FROM attendance_day ad
+        WHERE ad.employee_id = $1 AND ad.attendance_date BETWEEN $2::date AND $3::date
+     ), buckets AS (
+       SELECT ${at} AS at,
+              count(*) FILTER (WHERE status = 'present')::int AS on_time,
+              count(*) FILTER (WHERE status = 'late')::int AS late,
+              count(*) FILTER (WHERE status = 'absent')::int AS absent,
+              count(*) FILTER (WHERE status = 'leave')::int AS on_leave
+         FROM days GROUP BY 1
+     ), items AS (
+       SELECT pi.kind, pi.status, pi.minutes, pi.amount
+         FROM attendance_pay_item pi
+        WHERE pi.employee_id = $1 AND pi.work_date BETWEEN $2::date AND $3::date
+     )
+     SELECT (SELECT json_build_object(
+               'days', count(*)::int,
+               'on_time', count(*) FILTER (WHERE status = 'present')::int,
+               'late', count(*) FILTER (WHERE status = 'late')::int,
+               'absent', count(*) FILTER (WHERE status = 'absent')::int,
+               'on_leave', count(*) FILTER (WHERE status = 'leave')::int,
+               'late_minutes', COALESCE(sum(late_minutes), 0)::int,
+               'worked_minutes', COALESCE(sum(worked_minutes), 0)::int) FROM days) AS figures,
+            (SELECT json_build_object(
+               'overtime_minutes', COALESCE(sum(minutes) FILTER (WHERE kind = 'overtime' AND status NOT IN ('waived', 'cut')), 0)::int,
+               'deductions_pending', count(*) FILTER (WHERE kind <> 'overtime' AND status = 'pending')::int,
+               'pending_amount', COALESCE(sum(amount) FILTER (WHERE kind <> 'overtime' AND status = 'pending'), 0)::numeric(18,2))
+               FROM items) AS items,
+            (SELECT json_agg(json_build_object('key', at, 'label', at, 'on_time', on_time, 'late', late, 'absent', absent, 'on_leave', on_leave) ORDER BY at)
+               FROM buckets) AS buckets,
+            (SELECT json_agg(json_build_object('at', to_char(attendance_date, 'YYYY-MM-DD'), 'value', late_minutes) ORDER BY attendance_date)
+               FROM days WHERE late_minutes > 0) AS late_by_day`,
+    [employeeId, from, to],
+  );
+}
+
 module.exports = {
+  exceptionSummary,
+  payItemSummary,
+  myAttendanceSummary,
   requestStatusesOf,
   assignmentStatesOf,
   exceptionStatusesOf,

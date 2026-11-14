@@ -1048,7 +1048,50 @@ async function changeLine(actor, scope, values) {
   return saveCardLines(actor, scope, id, lines, at);
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A scorecard's status and rating as Scorecards names them. */
+const STATUS_WORDS = Object.freeze({ draft: "Draft", binding: "Awaiting Agreement", agreed: "Agreed", closed: "Closed" });
+const RATING_WORDS = Object.freeze({ exceeds: "Exceeds", meets: "Meets", partly_meets: "Partly Meets", below: "Below" });
+
+/**
+ * The scorecards the reader may list, in figures (ScorecardSummaryQuery): by status, the average score to
+ * date by department or reviewer, and by rating. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   ScorecardSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope   the actor's scope, with their employee id
+ */
+async function aiSummary(client, params, scope) {
+  const { figure, group } = require("../../shared/ai/summary");
+  const dim = params.by === "reviewer" ? "reviewer" : "department";
+  const r = (await repo.aiSummary(client, { ...params, dim }, scope)) || {};
+  const f = r.figures || {};
+  const counted = new Map((r.by_status || []).map((x) => [x.key, x.value]));
+  const rated = new Map((r.by_rating || []).map((x) => [x.key, x.value]));
+  const byStatus = group("status", "Scorecards by status", Object.keys(STATUS_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATUS_WORDS[k], value: counted.get(k) })));
+  const byDim = group(dim, dim === "reviewer" ? "Average score by reviewer" : "Average score by department", r.by_dim || []);
+  const byRating = group("rating", "Scorecards by rating", Object.keys(RATING_WORDS).filter((k) => rated.has(k)).map((k) => ({ key: k, label: RATING_WORDS[k], value: rated.get(k) })));
+  const figures = [
+    figure("scorecards", "Scorecards", f.scorecards || 0),
+    figure("draft", "Draft", f.draft || 0),
+    figure("binding", "Awaiting agreement", f.binding || 0),
+    figure("agreed", "Agreed", f.agreed || 0),
+    figure("closed", "Closed", f.closed || 0),
+  ];
+  if (f.average !== null && f.average !== undefined) figures.push(figure("average", "Average score to date", f.average, "percent"));
+  figures.push(figure("below", "Below Meets", f.below || 0));
+  return {
+    figures,
+    groups: params.by === "status" ? [byStatus, byDim, byRating] : params.by === "rating" ? [byRating, byDim, byStatus] : [byDim, byStatus, byRating],
+    series: [],
+    total: f.scorecards || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
   bindDepartment,
   applyTargetChange,
   mayRead,

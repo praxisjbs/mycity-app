@@ -575,7 +575,66 @@ async function statesOf(db, ids, today) {
   return rows;
 }
 
+/**
+ * The temporary sites in figures for the assistant (docs/guides/praxis-ai.md §6.13, People, performance
+ * and queries), in one statement: the sites with someone in `scope` on them, as listSites() reads
+ * People's, with where each stands on `today`; people on a site in progress today (still on it), the
+ * person-days of the approved ones (their days by the people still on them); by purpose (20), by state,
+ * and by the month they start (the newest 60). A period (the first day) narrows it only when asked.
+ * Never an address or a point.
+ * @param {{purpose?: string, state?: string, from?: string, to?: string, today: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.today, q.purpose || null, q.state || null, q.from || null, q.to || null];
+  const s = scopeClause(scope, { column: "mv.employee_id" }, params);
+  const row = await one(
+    db,
+    `WITH v AS (
+       SELECT * FROM (
+         SELECT s.temporary_site_id, s.purpose, s.starts_on, s.ends_on, s.status, ${STATE("$1")} AS state,
+                (SELECT count(*)::int FROM attendance_temporary_site_member m
+                  WHERE m.temporary_site_id = s.temporary_site_id AND m.removed_at IS NULL) AS people
+           FROM attendance_temporary_site s
+          WHERE EXISTS (SELECT 1 FROM attendance_temporary_site_member mv
+                         WHERE mv.temporary_site_id = s.temporary_site_id ${s.and})
+            AND ($2::text IS NULL OR s.purpose = $2)
+            AND ($4::date IS NULL OR s.starts_on BETWEEN $4::date AND $5::date)
+       ) x
+        WHERE ($3::text IS NULL OR x.state = $3)
+     ), by_purpose AS (
+       SELECT purpose AS key, count(*)::int AS value, row_number() OVER (ORDER BY count(*) DESC, purpose) AS rank
+         FROM v GROUP BY purpose
+     ), months AS (
+       SELECT to_char(starts_on, 'YYYY-MM') AS at, count(*)::int AS value,
+              row_number() OVER (ORDER BY to_char(starts_on, 'YYYY-MM') DESC) AS newest
+         FROM v GROUP BY 1
+     )
+     SELECT (SELECT json_build_object(
+               'sites', count(*)::int,
+               'submitted', count(*) FILTER (WHERE state = 'submitted')::int,
+               'upcoming', count(*) FILTER (WHERE state = 'upcoming')::int,
+               'in_progress', count(*) FILTER (WHERE state = 'in_progress')::int,
+               'done', count(*) FILTER (WHERE state = 'done')::int,
+               'person_days', COALESCE(sum((ends_on - starts_on + 1) * people) FILTER (WHERE status = 'approved'), 0)::int)
+               FROM v) AS figures,
+            (SELECT count(DISTINCT m.employee_id)::int FROM v
+               JOIN attendance_temporary_site_member m ON m.temporary_site_id = v.temporary_site_id AND m.removed_at IS NULL
+              WHERE v.state = 'in_progress') AS on_site,
+            (SELECT json_agg(json_build_object('key', key, 'value', value) ORDER BY rank) FROM by_purpose WHERE rank <= 20) AS by_purpose,
+            (SELECT json_agg(json_build_object('key', state, 'value', n)) FROM (SELECT state, count(*)::int AS n FROM v GROUP BY state) t) AS by_state,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM months WHERE newest <= 60) AS months`,
+    params,
+  );
+  return {
+    figures: { ...(row.figures || {}), on_site: row.on_site || 0 },
+    by_purpose: row.by_purpose || [],
+    by_state: row.by_state || [],
+    months: row.months || [],
+  };
+}
+
 module.exports = {
+  aiSummary,
   statesOf,
   HOME,
   SITE_HOURS_DAY,

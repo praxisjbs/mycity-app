@@ -609,7 +609,49 @@ async function assertCardRecord(db, { employee_id: employeeId }, actor) {
   if (person.status !== "active") throw new AppError("EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", 422, { employee_id: ["Not active"] });
 }
 
+/** A type's year as the parts of its bar: Taken, Booked, Waiting and Left. */
+const YEAR_PARTS = Object.freeze([
+  { key: "taken", label: "Taken" },
+  { key: "booked", label: "Booked" },
+  { key: "pending", label: "Waiting" },
+  { key: "left", label: "Left" },
+]);
+
+/**
+ * The person's own leave in figures for the assistant (MyLeaveSummaryQuery; docs/guides/praxis-ai.md
+ * §6.13): a year's days (this Lagos year) entitled, taken, booked, waiting and left, each leave type
+ * stacked Taken, Booked, Waiting and Left (Left only for a type with an allowance, never below zero), and
+ * days taken by month. Nobody else's: the actor's own employee alone. `total` is the year's requests.
+ * @param {{query: Function}} client
+ * @param {object} params   MyLeaveSummaryQuery, parsed
+ * @param {{employee_id?: string|null}} actor
+ */
+async function mySummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, stacked } = require("../../shared/ai/summary");
+  if (!actor || !actor.employee_id) return { figures: [], groups: [], series: [], total: 0 };
+  const today = lagos.today(now);
+  const year = params.year || Number(today.slice(0, 4));
+  const r = await repo.mySummary(client, actor.employee_id, year, today);
+  const sum = (key) => r.balances.reduce((n, b) => n + (Number(b[key]) || 0), 0);
+  const allowed = r.balances.filter((b) => b.entitled !== null);
+  const rows = r.balances.map((b) => ({ key: b.leave_type_id, label: b.name, taken: b.taken, booked: b.booked, pending: b.pending, left: Math.max(0, b.remaining || 0) }));
+  return {
+    figures: [
+      figure("entitled", "Days entitled", allowed.reduce((n, b) => n + b.entitled, 0), "days"),
+      figure("taken", "Days taken", sum("taken"), "days"),
+      figure("booked", "Days booked", sum("booked"), "days"),
+      figure("pending", "Days waiting", sum("pending"), "days"),
+      figure("left", "Days left", allowed.reduce((n, b) => n + Math.max(0, b.remaining), 0), "days"),
+      figure("requests", "Requests", r.requests),
+    ],
+    groups: [group("type", `My leave by type, ${year}`, stacked(rows, YEAR_PARTS))],
+    series: [series("taken", "Days taken by month", r.months)],
+    total: r.requests,
+  };
+}
+
 module.exports = {
+  mySummary,
   aiSummary,
   MAX_ACTIVE_TYPES,
   list,

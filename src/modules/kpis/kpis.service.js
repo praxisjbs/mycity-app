@@ -314,4 +314,48 @@ async function assertCardKpi(db, id, actor) {
   await authority.assertSetsGoals(db, actor, k.department_id, "KPIs");
 }
 
-module.exports = { monthView, kpiView, list, summary, units, get, ofDepartment, nextCode, create, update, recordIn, recordActual, importKpi, removeImported, kpiIdOf, kpiChoices, cardKpi, assertCardKpi };
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A month's result as KPIs names it, and a KPI with no month yet as Not Entered. */
+const RESULT_PARTS = Object.freeze([
+  { key: "met", label: "Met" },
+  { key: "not_met", label: "Not Met" },
+  { key: "na", label: "N/A" },
+  { key: "not_entered", label: "Not Entered" },
+]);
+
+/** Met as a whole per cent of those met or not met; N/A and not entered are left out. */
+const metShare = (met, decided) => (decided ? Math.round((met * 100) / decided) : 0);
+
+/**
+ * The KPIs' results in figures (KpiResultSummaryQuery): the active KPIs of the functions the reader reads
+ * (§6.23), each by its latest result on or before the quarter's end, by result, by function stacked Met,
+ * Not Met, N/A and Not Entered, and met as a per cent by month. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   KpiResultSummaryQuery, parsed
+ * @param {object} actor    the asking person
+ */
+async function aiSummary(client, params, actor) {
+  const { figure, group, series, stacked } = require("../../shared/ai/summary");
+  const r = (await repo.aiSummary(client, params, await visibility.readerOf(client, actor))) || {};
+  const f = r.figures || {};
+  const byResult = group("result", "KPIs by result", RESULT_PARTS.map((x) => ({ key: x.key, label: x.label, value: f[x.key] || 0 })).filter((x) => x.value > 0));
+  const byFunction = group("function", "KPIs by function", stacked(r.by_function, RESULT_PARTS));
+  return {
+    figures: [
+      figure("kpis", "KPIs", f.kpis || 0),
+      figure("met", "Met", f.met || 0),
+      figure("not_met", "Not met", f.not_met || 0),
+      figure("na", "N/A", f.na || 0),
+      figure("not_entered", "Not entered", f.not_entered || 0),
+      figure("met_rate", "Met as a per cent", metShare(f.met || 0, (f.met || 0) + (f.not_met || 0)), "percent"),
+    ],
+    groups: params.by === "result" ? [byResult, byFunction] : [byFunction, byResult],
+    series: [series("met_rate", "Per cent of KPIs met by month", (r.months || []).map((m) => ({ at: m.at, value: metShare(m.met, m.decided) })))],
+    total: f.kpis || 0,
+  };
+}
+
+module.exports = { monthView, kpiView, list, summary, aiSummary, units, get, ofDepartment, nextCode, create, update, recordIn, recordActual, importKpi, removeImported, kpiIdOf, kpiChoices, cardKpi, assertCardKpi };

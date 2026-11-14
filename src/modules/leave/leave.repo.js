@@ -275,14 +275,12 @@ async function overlapping(db, employeeId, startsOn, endsOn, exceptId = null) {
 }
 
 /**
- * One person's year, per leave type: the allowance and the days used. A retired type
- * still shows while the year has days on it.
+ * One person's year, per leave type: the allowance and the days used, as balances() and mySummary()
+ * read it ($1 the person, $2 the year, $3 today). A retired type still shows while the year has days on it.
  *   entitled  People's figure for this person and year (leave_balance), else the type's
  *             days_per_year, else null (no allowance)
  */
-async function balances(db, employeeId, year, today) {
-  const { rows } = await db.query(
-    `SELECT t.leave_type_id, t.code::text AS code, t.name,
+const BALANCES = `SELECT t.leave_type_id, t.code::text AS code, t.name,
             COALESCE(b.entitled, (t.policy ->> 'days_per_year')::numeric)::float8 AS entitled,
             COALESCE(sum(v.days) FILTER (WHERE v.status = 'approved' AND v.starts_on <= $3::date), 0)::int AS taken,
             COALESCE(sum(v.days) FILTER (WHERE v.status = 'approved' AND v.starts_on > $3::date), 0)::int AS booked,
@@ -299,22 +297,26 @@ async function balances(db, employeeId, year, today) {
         AND date_part('year', v.starts_on)::int = $2
       GROUP BY t.leave_type_id, t.code, t.name, t.policy, t.active, b.entitled
      HAVING t.active OR count(v.leave_request_id) > 0
-      ORDER BY t.name, t.leave_type_id`,
-    [employeeId, year, today],
-  );
-  return rows.map((r) => {
-    const entitled = r.entitled === null ? null : Number(r.entitled);
-    return {
-      leave_type_id: r.leave_type_id,
-      code: r.code,
-      name: r.name,
-      entitled,
-      taken: r.taken,
-      booked: r.booked,
-      pending: r.pending,
-      remaining: entitled === null ? null : entitled - r.taken - r.booked - r.pending,
-    };
-  });
+      ORDER BY t.name, t.leave_type_id`;
+
+async function balances(db, employeeId, year, today) {
+  const { rows } = await db.query(BALANCES, [employeeId, year, today]);
+  return rows.map(balanceOf);
+}
+
+/** A balances row as the contract's balance: what is left is the allowance less taken, booked and waiting. */
+function balanceOf(r) {
+  const entitled = r.entitled === null ? null : Number(r.entitled);
+  return {
+    leave_type_id: r.leave_type_id,
+    code: r.code,
+    name: r.name,
+    entitled,
+    taken: r.taken,
+    booked: r.booked,
+    pending: r.pending,
+    remaining: entitled === null ? null : entitled - r.taken - r.booked - r.pending,
+  };
 }
 
 /**
@@ -517,7 +519,29 @@ async function statusesOf(db, ids) {
   return rows;
 }
 
+/**
+ * One person's year in figures for the assistant (docs/guides/praxis-ai.md §6.13, People, performance and
+ * queries), in one statement: each leave type's figures as balances() reads them, the days taken by the
+ * month they start (approved and begun by `today`), and the year's requests.
+ */
+async function mySummary(db, employeeId, year, today) {
+  const { rows } = await db.query(
+    `WITH b AS (${BALANCES}),
+          mine AS (SELECT v.status, v.days, v.starts_on FROM (${ROWS}) v
+                    WHERE v.employee_id = $1 AND date_part('year', v.starts_on)::int = $2)
+     SELECT (SELECT json_agg(row_to_json(b) ORDER BY b.name, b.leave_type_id) FROM b) AS balances,
+            (SELECT count(*)::int FROM mine) AS requests,
+            (SELECT json_agg(json_build_object('at', at, 'value', days) ORDER BY at)
+               FROM (SELECT to_char(starts_on, 'YYYY-MM') AS at, sum(days)::int AS days FROM mine
+                      WHERE status = 'approved' AND starts_on <= $3::date GROUP BY 1) m) AS months`,
+    [employeeId, year, today],
+  );
+  const row = rows[0] || {};
+  return { balances: (row.balances || []).map(balanceOf), requests: row.requests || 0, months: row.months || [] };
+}
+
 module.exports = {
+  mySummary,
   statusesOf,
   list,
   aiSummary,

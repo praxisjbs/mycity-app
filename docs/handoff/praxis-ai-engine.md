@@ -850,7 +850,7 @@ date, the branch and the PR when it merges.
 - [x] 13/11/2026 · PR 4 · Finance and pay summaries: `expenses.summary`, `requisitions.summary`, `disbursements.summary`, `payroll.month` by department and status, `payroll.trend`, `deductions.summary`, `my_pay.summary`; ten reads off the gaps file (built in its own chat on `claude/serene-shannon-ek7yft`)
 - [x] 13/11/2026 · PR 5 · Recruitment and onboarding summaries: vacancies, candidates, interviews, assessments, offers, onboarding and the talent pool, the matrix's summary probes (built on `claude/affectionate-sagan-vxaysr`)
 - [ ] PR 6 · Partnerships summaries (`m10/summaries-partnerships`)
-- [ ] PR 7 · People, performance and queries summaries (`m10/summaries-people`)
+- [x] 14/11/2026 · PR 7 · People, performance and queries summaries: exceptions, pay items, temporary sites, devices, seats, my attendance, my leave, KPIs, scorecards, commitments, queries and sanctions; thirteen reads off the gaps file; a summary probe's `params(ctx)` (built on `ccr-1b2f4eb9-lc9emq`)
 - [ ] PR 8 · Workspace, Knowledge Hub, Community, Home and Settings summaries; the gaps file deleted (`m10/summaries-close`)
 - [ ] On staging: the budget question by department draws stacked bars, and its Download PDF opens on the letterhead
 
@@ -868,6 +868,17 @@ date, the branch and the PR when it merges.
 
 ## 8 · Log
 
+- 14/11/2026 · JP · Charts in the Overview, PR 7 built (§6.12): twelve summaries in the people,
+  performance and queries modules' repos, their thirteen reads off the gaps file (18 left, PR 6's and
+  PR 8's). Found on the way and written into `praxis-ai.md` §6.13 first: the plan's statuses were not
+  the records' (an exception has no Approved, a device nothing Waiting or Refused, a seat no Acting
+  state), KPIs' and Commitments' query names were taken (`KpiResultSummaryQuery`,
+  `CommitmentDeliverySummaryQuery`), a scorecard's score is a fraction (its average is a per cent).
+  The matrix's `my_leave.summary` probe needed two things the matrix lacked: the year its probe's day
+  falls in (`params(ctx)` with `ctx.peekDay()`, §6.17), and a leave type with room, since the list's
+  probe and this one would spend the outsider's 20 annual days between them. Staff are now offered
+  seven more summaries their own grants reach (`ai-summaries.test.js`). The image again had no Node 20
+  or `node_modules` (`node@20` in the scratchpad, `npm ci`), and pgvector was installed by hand.
 - 13/11/2026 · JP · Charts in the Overview, PR 5 built (§6.12): seven summaries in the recruitment
   modules' repos, their seven reads off the gaps file, `askedPeriod` and `stacked` in
   `shared/ai/summary.js`, the matrix's summary branch (a summary's total counted around its probe's

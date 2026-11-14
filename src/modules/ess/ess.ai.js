@@ -5,7 +5,7 @@
  * person confirms (docs/guides/praxis-ai.md §6.11), a leave request of their own through the
  * same service function Request Leave's Send calls, and their response to one of their own open
  * queries through My Queries' Send Response (decision 33): their own words, one response a query,
- * never edited once sent. Never another person's record; every read is given the caller's own
+ * never edited once sent. A summary counts the person's own year of leave (praxis-ai.md §6.13). Never another person's record; every read is given the caller's own
  * employee id and nothing else.
  *
  * The rest of ESS (the latest payslip, open queries, docs/guides/ess.md §9) joins
@@ -33,14 +33,31 @@ const profileProbe = {
   inside: (ctx) => ({ type: "employee", id: ctx.actor.employee_id }),
   outside: (ctx) => ({ type: "employee", id: ctx.outsider.employee_id }),
 };
-async function requestFor(ctx, who) {
+async function requestFor(ctx, who, typeId = ctx.leaveTypeId) {
   const day = ctx.freshDay();
-  const r = await leave.request(who.user, who.employee_id, { leave_type_id: ctx.leaveTypeId, starts_on: day, ends_on: day, reason: `A matrix day for ${ctx.role}` });
+  const r = await leave.request(who.user, who.employee_id, { leave_type_id: typeId, starts_on: day, ends_on: day, reason: `A matrix day for ${ctx.role}` });
   return { type: "leave_request", id: r.leave_request_id };
 }
 const leaveProbe = {
   inside: (ctx) => requestFor(ctx, { user: ctx.actor, employee_id: ctx.actor.employee_id }),
   outside: (ctx) => requestFor(ctx, ctx.outsider),
+};
+/**
+ * The same for the person's own leave in figures: its totals are a year's, and the probe's request falls on
+ * the next fresh working day, which may be next year, so both totals are asked for that day's year (§6.17).
+ * Each request takes the person's type with the most room (one with no allowance first), so the list's
+ * probe and this one never spend one allowance between them.
+ */
+async function roomiest(employeeId, year) {
+  const types = (await leave.balancesFor(employeeId, year)).balances;
+  const room = (t) => (t.remaining === null || t.remaining === undefined ? Infinity : t.remaining);
+  return types.reduce((best, t) => (!best || room(t) > room(best) ? t : best), null).leave_type_id;
+}
+const yearOf = (ctx) => Number(ctx.peekDay().slice(0, 4));
+const leaveSummaryProbe = {
+  params: (ctx) => ({ year: yearOf(ctx) }),
+  inside: async (ctx) => requestFor(ctx, { user: ctx.actor, employee_id: ctx.actor.employee_id }, await roomiest(ctx.actor.employee_id, yearOf(ctx))),
+  outside: async (ctx) => requestFor(ctx, ctx.outsider, await roomiest(ctx.outsider.employee_id, yearOf(ctx))),
 };
 
 /**
@@ -158,6 +175,7 @@ module.exports = defineManifest({
     },
     {
       key: "my_leave.list",
+      summary: "my_leave.summary",
       description: "List my own leave requests, with their dates, working days and status",
       params: c.ess.EssLeaveListQuery,
       permission: ["ess", "view"],
@@ -181,6 +199,16 @@ module.exports = defineManifest({
           ? leave.balancesFor(actor.employee_id, params.year)
           : { year: null, balances: [] },
       cite: () => ({ type: "screen", id: "ess.my-leave", label: "My Leave" }),
+    },
+  ],
+  summaries: [
+    {
+      key: "my_leave.summary",
+      description: "My own leave in figures for a year: days entitled, taken, booked, waiting and left; by leave type stacked Taken, Booked, Waiting and Left; days taken by month",
+      params: c.ess.MyLeaveSummaryQuery,
+      permission: ["ess", "view"],
+      run: (client, params, actor) => leave.mySummary(client, params, actor),
+      matrix: leaveSummaryProbe,
     },
   ],
   routes: [

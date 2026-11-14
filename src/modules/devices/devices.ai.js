@@ -3,7 +3,7 @@
  * What the assistant may read about clock-in devices: the asker's own (ESS), and for
  * People the devices within their own `people` scope, a page of 25 at a time. A row
  * carries the label, the owner and the status, never an identifier of the device
- * itself. It never registers or removes a device (A23); it sends the person to the
+ * itself. A summary counts them, by status and department (praxis-ai.md §6.13). It never registers or removes a device (A23); it sends the person to the
  * screen that does.
  */
 const c = require("@mycity/contract");
@@ -24,6 +24,7 @@ module.exports = defineManifest({
     },
     {
       key: "devices.list",
+      summary: "devices.summary",
       description: "List the devices staff clock in from, with who owns each and whether it is registered",
       params: c.devices.DeviceListQuery,
       permission: ["people", "view"],
@@ -33,6 +34,15 @@ module.exports = defineManifest({
         id: row.attendance_device_id,
         label: `${row.employee.display_name}, ${row.label}`,
       }),
+    },
+  ],
+  summaries: [
+    {
+      key: "devices.summary",
+      description: "Clock-in devices in figures: registered, new, removed, people with none registered; by status, by department stacked",
+      params: c.devices.DeviceSummaryQuery,
+      permission: ["people", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
   ],
   routes: [

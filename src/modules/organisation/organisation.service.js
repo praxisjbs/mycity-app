@@ -1616,7 +1616,43 @@ async function aiSummary(client, params, scope, now = new Date()) {
   };
 }
 
+/** A seat's status as the Organogram names it. */
+const SEAT_PARTS = Object.freeze([
+  { key: "filled", label: "Filled" },
+  { key: "vacant", label: "Vacant" },
+  { key: "closed", label: "Closed", optional: true },
+]);
+
+/**
+ * The structure's roles in figures for the assistant (SeatSummaryQuery; docs/guides/praxis-ai.md §6.13):
+ * by status, by department stacked Filled, Vacant and Closed, and the head roles left vacant. The whole
+ * structure, as `seats.list` reads it for every `people` reader. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   SeatSummaryQuery, parsed
+ */
+async function seatSummary(client, params) {
+  const { figure, group, stacked } = require("../../shared/ai/summary");
+  const r = await repo.seatSummary(client, params);
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const byStatus = group("status", "Seats by status", SEAT_PARTS.filter((x) => counted.has(x.key)).map((x) => ({ key: x.key, label: x.label, value: counted.get(x.key) })));
+  const byDepartment = group("department", "Seats by department", stacked(r.by_department, SEAT_PARTS));
+  return {
+    figures: [
+      figure("seats", "Seats", f.seats || 0),
+      figure("filled", "Filled", f.filled || 0),
+      figure("vacant", "Vacant", f.vacant || 0),
+      figure("closed", "Closed", f.closed || 0),
+      figure("acting", "Head roles vacant", f.acting || 0),
+    ],
+    groups: params.by === "status" ? [byStatus, byDepartment] : [byDepartment, byStatus],
+    series: [],
+    total: f.seats || 0,
+  };
+}
+
 module.exports = {
+  seatSummary,
   aiSummary,
   setBirthday,
   setBvnIn,

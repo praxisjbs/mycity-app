@@ -27,6 +27,7 @@ const {
   listQuery,
   Paged,
   money,
+  summaryPeriod,
 } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
 const { PlaceInput, PlaceToken } = require("./maps");
@@ -1463,8 +1464,76 @@ const OvertimePreApproval = z
   })
   .strict();
 
+/**
+ * The assistant's exceptions summary (docs/guides/praxis-ai.md §6.13, People, performance and queries):
+ * the exceptions the reader's `people` scope reaches, as People · Attendance lists them, in figures: by
+ * type stacked by where each stands, by status, by department or person, and by day or week. Every
+ * exception unless a period (the work date) is asked. Figures, never a row.
+ */
+const ExceptionSummaryBy = z.enum(["type", "status", "person", "department", "day", "week"]);
+const ExceptionSummaryQuery = z
+  .object({
+    status: ExceptionStatus.optional(),
+    exception_type: ExceptionType.optional(),
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    ...summaryPeriod,
+    by: ExceptionSummaryBy.default("type"),
+  })
+  .strict();
+
+/**
+ * The assistant's deductions and overtime summary (praxis-ai.md §6.13): the pay items the reader's
+ * `people` scope reaches, by kind stacked by status, by status, by department or person, and minutes by
+ * month; amounts only for a reader who sees pay. Every item unless a period (the work date) is asked.
+ */
+const PayItemSummaryBy = z.enum(["kind", "status", "person", "department", "month"]);
+const PayItemSummaryQuery = z
+  .object({
+    group: PayItemGroup.optional(),
+    kind: PayItemKind.optional(),
+    status: PayItemStatus.optional(),
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    ...summaryPeriod,
+    by: PayItemSummaryBy.default("kind"),
+  })
+  .strict();
+
+/**
+ * The assistant's temporary sites summary (praxis-ai.md §6.13): the sites with someone in the reader's
+ * `people` scope on them, by purpose, by state and by the month they start. Every site unless a period
+ * (the first day) is asked. Never an address.
+ */
+const TemporarySiteSummaryBy = z.enum(["purpose", "state", "month"]);
+const TemporarySiteSummaryQuery = z
+  .object({
+    purpose: TemporarySitePurpose.optional(),
+    state: TemporarySiteState.optional(),
+    ...summaryPeriod,
+    by: TemporarySiteSummaryBy.default("purpose"),
+  })
+  .strict();
+
+/**
+ * The assistant's summary of the person's own attendance (praxis-ai.md §6.13): their days of a period
+ * (this month to today) by week or month, stacked On Time, Late, Absent and On Leave, minutes late by
+ * day, and their own overtime and pending deductions.
+ */
+const MyAttendanceSummaryBy = z.enum(["week", "month"]);
+const MyAttendanceSummaryQuery = z
+  .object({
+    ...summaryPeriod,
+    by: MyAttendanceSummaryBy.default("week"),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  ExceptionSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's exceptions summary; figures, never a row" },
+  PayItemSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's deductions and overtime summary; figures, never a row" },
+  TemporarySiteSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's temporary sites summary; figures, never a row" },
+  MyAttendanceSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's own attendance summary; figures, never a row" },
   HomeLocation: {
     table: "attendance_home",
     virtual: {
@@ -1769,6 +1838,14 @@ const TABLES = {
 };
 
 module.exports = {
+  ExceptionSummaryBy,
+  ExceptionSummaryQuery,
+  PayItemSummaryBy,
+  PayItemSummaryQuery,
+  TemporarySiteSummaryBy,
+  TemporarySiteSummaryQuery,
+  MyAttendanceSummaryBy,
+  MyAttendanceSummaryQuery,
   TABLES,
   EventType,
   PunchState,

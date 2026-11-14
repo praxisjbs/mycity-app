@@ -15,6 +15,9 @@
  *   attendance.summary      figures over a period, never rows (docs/guides/praxis-ai.md §6.13): days,
  *                           late days and minutes, absences, exceptions, by person, department or
  *                           site, or by day, week or month; the asker's `people` scope
+ *   exceptions.summary, pay_items.summary, temporary_sites.summary   the three lists in figures, the
+ *                           asker's `people` scope; pay items' amounts only for a reader who sees pay
+ *   my_attendance.summary   the asker's own days and pay items in figures (anyone; their own only)
  *
  * The Attendance policy's rules are read through policies.read and policies.mine
  * (src/modules/policies/policies.ai.js).
@@ -160,10 +163,39 @@ module.exports = defineManifest({
       permission: ["people", "view"],
       run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
+    {
+      key: "exceptions.summary",
+      description: "Attendance exceptions in figures: waiting, accepted, corrected, rejected; by type stacked by where each stands, by status, by department or person, by day or week",
+      params: c.attendance.ExceptionSummaryQuery,
+      permission: ["people", "view"],
+      run: (client, params, actor) => service.exceptionSummary(client, params, actor.scope),
+    },
+    {
+      key: "pay_items.summary",
+      description: "Attendance deductions and overtime in figures: kinds, minutes, pending; by kind stacked by status, by department or person, minutes by month; amounts only for a reader who sees pay",
+      params: c.attendance.PayItemSummaryQuery,
+      permission: ["people", "view"],
+      run: (client, params, actor) => pay.aiSummary(client, params, actor),
+    },
+    {
+      key: "temporary_sites.summary",
+      description: "Temporary sites in figures: awaiting approval, upcoming, in progress, done, people on a site today, person-days; by purpose, by state, by the month they start",
+      params: c.attendance.TemporarySiteSummaryQuery,
+      permission: ["people", "view"],
+      run: (client, params, actor) => sites.aiSummary(client, params, actor.scope),
+    },
+    {
+      key: "my_attendance.summary",
+      description: "My own attendance in figures: days on time, late, absent and on leave, minutes late, overtime, deductions pending; by week or month stacked, minutes late by day",
+      params: c.attendance.MyAttendanceSummaryQuery,
+      permission: ["ess", "view"],
+      run: (client, params, actor) => service.myAttendanceSummary(client, params, actor),
+    },
   ],
   reads: [
     {
       key: "attendance.my_days",
+      summary: "my_attendance.summary",
       description: "List my own attendance days for a month: clock in, clock out, hours, lateness and status",
       params: c.attendance.MyDayListQuery,
       permission: ["ess", "view"],
@@ -187,6 +219,7 @@ module.exports = defineManifest({
     },
     {
       key: "attendance.exceptions",
+      summary: "exceptions.summary",
       description: "List attendance exceptions waiting for review or decided: outside the worksite, unknown device, missing clock-out",
       params: c.attendance.ExceptionListQuery,
       permission: ["people", "view"],
@@ -199,6 +232,7 @@ module.exports = defineManifest({
     },
     {
       key: "attendance.my_pay_items",
+      summary: "my_attendance.summary",
       description: "List my own attendance deductions and overtime for a month: the day, the minutes and whether it is pending, waived, confirmed or cut",
       params: c.attendance.MyPayItemListQuery,
       permission: ["ess", "view"],
@@ -207,6 +241,7 @@ module.exports = defineManifest({
     },
     {
       key: "attendance.pay_items",
+      summary: "pay_items.summary",
       description: "List attendance deductions and overtime waiting on People or decided: late, early departure, absence and overtime by person and day",
       params: c.attendance.PayItemListQuery,
       permission: ["people", "view"],
@@ -219,6 +254,7 @@ module.exports = defineManifest({
     },
     {
       key: "attendance.temporary_sites",
+      summary: "temporary_sites.summary",
       description: "List temporary sites people work at for some days (client visits, trainings, events): number, purpose, dates, state and who is on them",
       params: c.attendance.TemporarySiteListQuery,
       permission: ["people", "view"],

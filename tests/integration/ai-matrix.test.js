@@ -114,6 +114,13 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
     while (!workingWeek.isWorkingDay(dayCursor.toISOString().slice(0, 10), calendar));
     return dayCursor.toISOString().slice(0, 10);
   };
+  /** The day the next freshDay() gives, without taking it: a summary probe's year (§6.17). */
+  const peekDay = () => {
+    let at = dayCursor;
+    do at = new Date(at.getTime() + 86_400_000);
+    while (!workingWeek.isWorkingDay(at.toISOString().slice(0, 10), calendar));
+    return at.toISOString().slice(0, 10);
+  };
 
   beforeAll(async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
@@ -295,13 +302,15 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
         outsider,
         leaveTypeId,
         freshDay,
+        peekDay,
         capabilities: u.is_ceo === true ? ["home.team"] : await grantsCache.getCapabilities(pool, u.user_id),
         scopeOf: (module, action) => scopeFor(u, module, action),
       };
       const where = `${k.key} as ${k.role}`;
       const tool = registry.tool(k.key);
       // A summary counts: its total around each record made, through its own run so the summary cache never answers (§6.17).
-      const totalOf = k.kind === "summary" ? async () => (await tool.run(pool, tool.params.parse({}), actor)).total : null;
+      const asked = k.kind === "summary" && k.probe.params ? await k.probe.params(ctx) : {};
+      const totalOf = k.kind === "summary" ? async () => (await tool.run(pool, tool.params.parse(asked), actor)).total : null;
       const before = totalOf ? await totalOf() : null;
       const inside = await k.probe.inside(ctx);
       const counted = totalOf ? await totalOf() : null;

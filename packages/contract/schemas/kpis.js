@@ -199,8 +199,24 @@ const KpiImportRow = z
   })
   .strict();
 
+/**
+ * The assistant's KPI results summary (docs/guides/praxis-ai.md §6.13): the active KPIs of the functions
+ * the reader reaches, their latest result on or before the quarter's end, by result and by function
+ * stacked Met, Not Met, N/A and Not Entered, and met as a per cent by month. KPIs' own figures are
+ * `KpiSummaryQuery`. Figures, never a row.
+ */
+const KpiResultSummaryBy = z.enum(["function", "result"]);
+const KpiResultSummaryQuery = z
+  .object({
+    period_id: uuid.optional(),
+    department_id: uuid.optional(),
+    by: KpiResultSummaryBy.default("function"),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  KpiResultSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's KPI results summary; figures, never a row" },
   KpiMonth: {
     table: "kpi_month",
     virtual: { recorded_by: "the employee of kpi_month.recorded_by" },
@@ -241,6 +257,8 @@ const TABLES = {
 };
 
 module.exports = {
+  KpiResultSummaryBy,
+  KpiResultSummaryQuery,
   TABLES,
   KpiResult,
   KpiFrequency,

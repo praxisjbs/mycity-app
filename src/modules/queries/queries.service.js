@@ -528,7 +528,53 @@ async function assertCardRespond(db, employeeId, id) {
   if (!row.can_respond) throw new AppError("QUERY_NOT_OPEN", "This query no longer takes a response", 409, { employee_query_id: ["Already answered"] });
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A query's status as Queries & Sanctions names it: resolved reads Closed. */
+const STATUS_PARTS = Object.freeze([
+  { key: "awaiting_response", label: "Awaiting Response" },
+  { key: "under_review", label: "Under Review" },
+  { key: "resolved", label: "Closed" },
+]);
+const DIM_WORDS = Object.freeze({ department: "Queries by department", rule: "Queries by rule", raised_by: "Queries by who raised them" });
+
+/**
+ * The queries the reader may list (§6.1), in figures (QuerySummaryQuery): every one unless a period
+ * (raised) is asked; by status, by department, rule or raiser stacked by status, and raised by month.
+ * Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   QuerySummaryQuery, parsed
+ * @param {{all: boolean, user_id: string}} reader   visibility.readerOf
+ */
+async function aiSummary(client, params, reader, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const dim = DIM_WORDS[params.by] ? params.by : "department";
+  const r = (await repo.aiSummary(client, { ...params, from: period && period.from, to: period && period.to, dim }, reader)) || {};
+  const f = r.figures || {};
+  const byStatus = group("status", "Queries by status", STATUS_PARTS.map((x) => ({ key: x.key, label: x.label, value: f[x.key] || 0 })).filter((x) => x.value > 0));
+  const byDim = group(dim, DIM_WORDS[dim], stacked(r.by_dim, STATUS_PARTS));
+  return {
+    figures: [
+      figure("queries", "Queries", f.queries || 0),
+      figure("awaiting_response", "Awaiting response", f.awaiting_response || 0),
+      figure("overdue", "Past the response time", f.overdue || 0),
+      figure("under_review", "Under review", f.under_review || 0),
+      figure("escalated", "Escalated", f.escalated || 0),
+      figure("resolved", "Closed", f.resolved || 0),
+      figure("sanctioned", "Sanctioned", f.sanctioned || 0),
+      figure("days_to_close", "Average days to close", f.days_to_close || 0, "days"),
+    ],
+    groups: params.by === "status" ? [byStatus, byDim] : [byDim, byStatus],
+    series: [series("raised", "Queries raised by month", r.months)],
+    total: f.queries || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
   RESPONSE_HOURS,
   list,
   summary,

@@ -218,8 +218,19 @@ const MyReviewPage = Paged(MyReview);
 /** GET /ess/performance/reviews */
 const MyReviewListQuery = listQuery({}, ["month"]);
 
+/**
+ * The assistant's summary of the person's own leave (docs/guides/praxis-ai.md §6.13): a year's days
+ * (this Lagos year) by leave type, stacked Taken, Booked, Waiting and Left, and days taken by month.
+ */
+const MyLeaveSummaryQuery = z
+  .object({
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  MyLeaveSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's own leave summary; figures, never a row" },
   MyPerformance: { table: null, reason: "the caller's quarter: scorecard, check-in, commitments and an open PIP" },
   MyReview: {
     table: "performance_review",
@@ -263,6 +274,7 @@ const TABLES = {
 };
 
 module.exports = {
+  MyLeaveSummaryQuery,
   TABLES,
   EssDocumentUpload,
   EssWorkDay,

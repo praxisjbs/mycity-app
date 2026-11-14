@@ -288,4 +288,57 @@ async function settle(id, outcome) {
 const listMine = (employeeId, query) => repo.listMine(pool, employeeId, query);
 const mineSummary = (employeeId) => repo.mineSummary(pool, employeeId);
 
-module.exports = { list, summary, get, nextStep, standing, propose, approve, reject, settle, listMine, mineSummary };
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A sanction's status as Sanction History names it. */
+const STATUS_PARTS = Object.freeze([
+  { key: "issued", label: "Issued" },
+  { key: "pending_approval", label: "Awaiting Approval" },
+  { key: "rejected", label: "Not Approved", optional: true },
+  { key: "withdrawn", label: "Withdrawn", optional: true },
+]);
+
+/**
+ * The sanctions whose query the reader may see, in figures (SanctionSummaryQuery): every one unless a
+ * period (made) is asked; by step of the chain, by status, by department stacked by status, and by
+ * month. A fine is a deduction from pay, so its total is given only to a reader who sees pay (Appendix
+ * B.4): left out for anyone else, never zero; the count of fines stays.
+ * @param {{query: Function}} client
+ * @param {object} params   SanctionSummaryQuery, parsed
+ * @param {object} actor    the asking person with their `queries` scope
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const { canSee } = require("../../shared/rbac/field-mask");
+  const m = require("../../shared/money/money");
+  const period = askedPeriod(params, now);
+  const [r, salary] = await Promise.all([
+    repo.aiSummary(client, { ...params, from: period && period.from, to: period && period.to }, visibility.readerOf(actor.scope, actor)),
+    canSee(client, actor, "employee.salary"),
+  ]);
+  const row = r || {};
+  const f = row.figures || {};
+  const figures = [
+    figure("sanctions", "Sanctions", f.sanctions || 0),
+    figure("issued", "Issued", f.issued || 0),
+    figure("pending_approval", "Awaiting approval", f.pending_approval || 0),
+    figure("rejected", "Not approved", f.rejected || 0),
+    figure("withdrawn", "Withdrawn", f.withdrawn || 0),
+    figure("fines", "Fines", f.fines || 0),
+  ];
+  if (salary) figures.push(figure("fines_total", "Fines total", m.toWire(f.fines_total || "0.00"), "ngn"));
+  const byStep = group("step", "Sanctions by step", row.by_step || []);
+  const byStatus = group("status", "Sanctions by status", STATUS_PARTS.map((x) => ({ key: x.key, label: x.label, value: f[x.key] || 0 })).filter((x) => x.value > 0));
+  const byDepartment = group("department", "Sanctions by department", stacked(row.by_department, STATUS_PARTS));
+  const lead = { step: byStep, status: byStatus }[params.by] || byDepartment;
+  return {
+    figures,
+    groups: [lead, ...[byDepartment, byStep, byStatus].filter((g) => g !== lead)].slice(0, 3),
+    series: [series("made", "Sanctions by month", row.months)],
+    total: f.sanctions || 0,
+  };
+}
+
+module.exports = { list, summary, aiSummary, get, nextStep, standing, propose, approve, reject, settle, listMine, mineSummary };

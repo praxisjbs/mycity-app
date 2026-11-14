@@ -230,11 +230,15 @@ function labelOfKey(key) {
   return `${cap(verb.replace(/_/g, " "))} ${noun.split(" ").map(cap).join(" ")}`;
 }
 
-/** PR5's scope probes: { inside, outside } functions a module gives the matrix (praxis-ai.md §1.2 decision 26). */
+/**
+ * PR5's scope probes: { inside, outside } functions a module gives the matrix (praxis-ai.md §1.2 decision 26),
+ * and for a summary optionally `params`, (ctx) => the parameters its totals are asked with (§6.17).
+ */
 function checkMatrix(at, matrix) {
   if (matrix === undefined) return;
   if (!matrix || typeof matrix !== "object" || typeof matrix.inside !== "function" || typeof matrix.outside !== "function")
     throw new Error(`${at}: matrix is { inside: (ctx) => record, outside: (ctx) => record }`);
+  if (matrix.params !== undefined && typeof matrix.params !== "function") throw new Error(`${at}: matrix.params is (ctx) => the summary's parameters`);
 }
 
 function checkRead(where, r, seen) {

@@ -25,6 +25,7 @@ const {
   Paged,
   textOfHtml,
   recordId,
+  summaryPeriod,
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { RichTextBlock, SignaturePng } = require("./policies");
@@ -357,8 +358,24 @@ const QueryDraftOutput = z
   })
   .strict();
 
+/**
+ * The assistant's queries summary (docs/guides/praxis-ai.md §6.13): the queries the reader may list
+ * (§6.1), by status, by department, rule or raiser stacked by status, and raised by month. Every query
+ * unless a period (raised) is asked. Figures, never a row.
+ */
+const QuerySummaryBy = z.enum(["department", "rule", "raised_by", "status", "month"]);
+const QuerySummaryQuery = z
+  .object({
+    status: QueryStatus.optional(),
+    department_id: uuid.optional(),
+    ...summaryPeriod,
+    by: QuerySummaryBy.default("department"),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  QuerySummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's queries summary; figures, never a row" },
   LetterSignature: { table: "letter_signature", virtual: { signature: "the vault document's PNG, as a data URL" } },
   LetterSignatureSave: { table: "letter_signature", virtual: { signature: "stored through the vault as document_id" } },
   EvidenceItem: { table: null, reason: "one item of employee_query.evidence or sanction.evidence (jsonb)" },
@@ -441,6 +458,8 @@ const TABLES = {
 };
 
 module.exports = {
+  QuerySummaryBy,
+  QuerySummaryQuery,
   LetterSignature,
   LetterSignatureSave,
   TABLES,

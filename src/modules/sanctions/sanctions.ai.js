@@ -68,9 +68,19 @@ module.exports = defineManifest({
   not_offered: {
     ConsequenceStepUpdate: "via chain.edit_step: a step's own change (Move Up, Move Down, Retire, Restore), which never names its step; the card is ConsequenceStepChange",
   },
+  summaries: [
+    {
+      key: "sanctions.summary",
+      description: "Sanctions in figures: issued, awaiting approval, fines (their total only for a reader who sees pay); by step of the chain, by status, by department stacked, by month",
+      params: c.sanctions.SanctionSummaryQuery,
+      permission: ["queries", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "sanctions.list",
+      summary: "sanctions.summary",
       description: "List sanctions: who, which step of the chain, the reason, any fine, and whether it is issued or waiting for approval",
       params: c.sanctions.SanctionListQuery,
       permission: ["queries", "view"],

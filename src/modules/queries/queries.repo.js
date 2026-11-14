@@ -292,7 +292,74 @@ async function employeeOf(db, employeeId) {
   return rows[0] || null;
 }
 
+/** The assistant summary's second grouping: the column and name each `by` maps to (never the caller's words). */
+const SUMMARY_BY = Object.freeze({
+  department: { key: "COALESCE(e.department_id::text, 'none')", label: "COALESCE(d.name, 'No department')" },
+  rule: { key: "COALESCE(q.query_rule_id::text, q.source)", label: `COALESCE(r.name, CASE q.source WHEN 'attendance' THEN 'Attendance Policy' WHEN 'person' THEN 'No rule' ELSE 'A rule' END)` },
+  raised_by: { key: "COALESCE(q.raised_by::text, 'rule')", label: `COALESCE(${NAME("re")}, 'A rule')` },
+});
+
+/**
+ * The queries in figures for the assistant (docs/guides/praxis-ai.md §6.13, People, performance and
+ * queries), in one statement over those the reader may list (§6.1, visibility.clause): by status, by
+ * department, rule or raiser (20) with each status as a part, raised by Lagos month (the newest 60), past
+ * their response time, escalated, sanctioned and the average days to close. A period (raised, Lagos days)
+ * narrows it only when `from` and `to` are given. Figures, never a row.
+ * @param {{status?: string, department_id?: string, from?: string, to?: string, dim: string}} q
+ */
+async function aiSummary(db, q, reader) {
+  const dim = SUMMARY_BY[q.dim] || SUMMARY_BY.department;
+  const params = [q.status || null, q.department_id || null, q.from || null, q.to || null];
+  const v = visibility.clause(reader, params, "q.raised_by");
+  const { rows } = await db.query(
+    `WITH v AS (
+       SELECT q.status, q.outcome, q.created_at, q.reviewed_at, q.response_due_at,
+              (SELECT qr.submitted_at FROM query_response qr WHERE qr.employee_query_id = q.employee_query_id) AS responded_at,
+              EXISTS (SELECT 1 FROM sanction s WHERE s.employee_query_id = q.employee_query_id AND s.status = 'pending_approval') AS escalated,
+              ${dim.key} AS dim_key, ${dim.label} AS dim_label
+         FROM employee_query q
+         JOIN employee e ON e.employee_id = q.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+         LEFT JOIN query_rule r ON r.query_rule_id = q.query_rule_id
+         LEFT JOIN app_user ru ON ru.user_id = q.raised_by
+         LEFT JOIN employee re ON re.employee_id = ru.employee_id
+        WHERE ($1::text IS NULL OR q.status = $1)
+          AND ($2::uuid IS NULL OR e.department_id = $2)
+          AND ($3::date IS NULL OR (q.created_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $3::date AND $4::date)
+          ${v.and}
+     ), by_dim AS (
+       SELECT dim_key AS key, min(dim_label) AS label,
+              count(*) FILTER (WHERE status = 'awaiting_response')::int AS awaiting_response,
+              count(*) FILTER (WHERE status = 'under_review')::int AS under_review,
+              count(*) FILTER (WHERE status = 'resolved')::int AS resolved,
+              row_number() OVER (ORDER BY count(*) DESC, min(dim_label), dim_key) AS rank
+         FROM v GROUP BY dim_key
+     ), months AS (
+       SELECT to_char(created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value,
+              row_number() OVER (ORDER BY to_char(created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') DESC) AS newest
+         FROM v GROUP BY 1
+     )
+     SELECT (SELECT json_build_object(
+               'queries', count(*)::int,
+               'awaiting_response', count(*) FILTER (WHERE status = 'awaiting_response')::int,
+               'overdue', count(*) FILTER (WHERE status = 'awaiting_response' AND responded_at IS NULL AND response_due_at <= now())::int,
+               'under_review', count(*) FILTER (WHERE status = 'under_review')::int,
+               'escalated', count(*) FILTER (WHERE status <> 'resolved' AND escalated)::int,
+               'resolved', count(*) FILTER (WHERE status = 'resolved')::int,
+               'sanctioned', count(*) FILTER (WHERE outcome = 'sanctioned')::int,
+               'days_to_close', round(avg(EXTRACT(EPOCH FROM (reviewed_at - created_at)) / 86400)
+                                 FILTER (WHERE status = 'resolved' AND reviewed_at IS NOT NULL), 1)::float) FROM v) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'awaiting_response', awaiting_response,
+                                               'under_review', under_review, 'resolved', resolved) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM months WHERE newest <= 60) AS months`,
+    params,
+  );
+  return rows[0] || null;
+}
+
 module.exports = {
+  aiSummary,
   list,
   get,
   lock,

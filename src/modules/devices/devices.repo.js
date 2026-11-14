@@ -187,7 +187,57 @@ async function statusesOf(db, ids) {
   return rows;
 }
 
+/**
+ * The devices in figures for the assistant (docs/guides/praxis-ai.md §6.13, People, performance and
+ * queries), in one statement within the reader's `people` scope on the owner, as list() applies it: by
+ * status, by the owner's department (20) with each status as a part, the people with one registered, and
+ * the active people in scope with none registered. Figures, never a row.
+ * @param {{status?: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.status || null];
+  const s = scopeClause(scope, { column: "ad.employee_id" }, params);
+  const p = scopeClause(scope, { column: "e.employee_id" }, params);
+  const row = await one(
+    db,
+    `WITH v AS (
+       SELECT ad.status, ad.employee_id, e.department_id, d.name AS department
+         FROM attendance_device ad
+         JOIN employee e ON e.employee_id = ad.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+        WHERE ($1::text IS NULL OR ad.status = $1) ${s.and}
+     ), by_department AS (
+       SELECT COALESCE(department_id::text, 'none') AS key, COALESCE(min(department), 'No department') AS label,
+              count(*) FILTER (WHERE status = 'registered')::int AS registered,
+              count(*) FILTER (WHERE status = 'observed')::int AS observed,
+              count(*) FILTER (WHERE status = 'removed')::int AS removed,
+              row_number() OVER (ORDER BY count(*) DESC, min(department), department_id) AS rank
+         FROM v GROUP BY department_id
+     )
+     SELECT (SELECT json_build_object(
+               'devices', count(*)::int,
+               'registered', count(*) FILTER (WHERE status = 'registered')::int,
+               'observed', count(*) FILTER (WHERE status = 'observed')::int,
+               'removed', count(*) FILTER (WHERE status = 'removed')::int,
+               'people_registered', count(DISTINCT employee_id) FILTER (WHERE status = 'registered')::int) FROM v) AS figures,
+            (SELECT count(*)::int FROM employee e
+              WHERE e.status = 'active'
+                AND NOT EXISTS (SELECT 1 FROM attendance_device x WHERE x.employee_id = e.employee_id AND x.status = 'registered')
+                ${p.and}) AS none_registered,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM v GROUP BY status) t) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'registered', registered, 'observed', observed, 'removed', removed) ORDER BY rank)
+               FROM by_department WHERE rank <= 20) AS by_department`,
+    params,
+  );
+  return {
+    figures: { ...(row.figures || {}), none_registered: row.none_registered || 0 },
+    by_status: row.by_status || [],
+    by_department: row.by_department || [],
+  };
+}
+
 module.exports = {
+  aiSummary,
   statusesOf,
   lockEmployee,
   forKnownDevice,

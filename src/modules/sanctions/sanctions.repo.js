@@ -367,7 +367,77 @@ async function settleFine(db, fineId, from, to) {
   return rowCount === 1;
 }
 
+/** The assistant summary's second grouping: the column and name each `by` maps to (never the caller's words). */
+const SUMMARY_BY = Object.freeze({
+  department: { key: "COALESCE(e.department_id::text, 'none')", label: "COALESCE(d.name, 'No department')" },
+  step: { key: "COALESCE(x.consequence_step_id::text, x.sanction_type)", label: "COALESCE(s.name, x.sanction_type)" },
+});
+
+/**
+ * The sanctions in figures for the assistant (docs/guides/praxis-ai.md §6.13, People, performance and
+ * queries), in one statement over those whose query the reader may see (visibility.clause, as list()):
+ * by status, by step of the chain (20), by department (20) with each status as a part, made by Lagos
+ * month (the newest 60), and the fines with their total (the service keeps the total from a reader who
+ * does not see pay). A period (made) narrows it only when asked. Figures, never a row.
+ * @param {{status?: string, department_id?: string, from?: string, to?: string}} q
+ */
+async function aiSummary(db, q, reader) {
+  const params = [q.status || null, q.department_id || null, q.from || null, q.to || null];
+  const v = visibility.clause(reader, params, "eq.raised_by");
+  const dept = SUMMARY_BY.department;
+  const step = SUMMARY_BY.step;
+  const { rows } = await db.query(
+    `WITH v AS (
+       SELECT x.status, x.created_at, f.amount_ngn, (f.sanction_fine_id IS NOT NULL) AS fined, s.position,
+              ${dept.key} AS dept_key, ${dept.label} AS dept_label, ${step.key} AS step_key, ${step.label} AS step_label
+         FROM sanction x
+         JOIN employee_query eq ON eq.employee_query_id = x.employee_query_id
+         JOIN employee e ON e.employee_id = x.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+         LEFT JOIN consequence_step s ON s.consequence_step_id = x.consequence_step_id
+         LEFT JOIN sanction_fine f ON f.sanction_id = x.sanction_id
+        WHERE ($1::text IS NULL OR x.status = $1)
+          AND ($2::uuid IS NULL OR e.department_id = $2)
+          AND ($3::date IS NULL OR (x.created_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $3::date AND $4::date)
+          ${v.and}
+     ), by_dept AS (
+       SELECT dept_key AS key, min(dept_label) AS label,
+              count(*) FILTER (WHERE status = 'issued')::int AS issued,
+              count(*) FILTER (WHERE status = 'pending_approval')::int AS pending_approval,
+              count(*) FILTER (WHERE status = 'rejected')::int AS rejected,
+              count(*) FILTER (WHERE status = 'withdrawn')::int AS withdrawn,
+              row_number() OVER (ORDER BY count(*) DESC, min(dept_label), dept_key) AS rank
+         FROM v GROUP BY dept_key
+     ), by_step AS (
+       SELECT step_key AS key, min(step_label) AS label, count(*)::int AS value,
+              row_number() OVER (ORDER BY min(position) NULLS LAST, min(step_label), step_key) AS rank
+         FROM v GROUP BY step_key
+     ), months AS (
+       SELECT to_char(created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value,
+              row_number() OVER (ORDER BY to_char(created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') DESC) AS newest
+         FROM v GROUP BY 1
+     )
+     SELECT (SELECT json_build_object(
+               'sanctions', count(*)::int,
+               'issued', count(*) FILTER (WHERE status = 'issued')::int,
+               'pending_approval', count(*) FILTER (WHERE status = 'pending_approval')::int,
+               'rejected', count(*) FILTER (WHERE status = 'rejected')::int,
+               'withdrawn', count(*) FILTER (WHERE status = 'withdrawn')::int,
+               'fines', count(*) FILTER (WHERE fined)::int,
+               'fines_total', COALESCE(sum(amount_ngn) FILTER (WHERE fined AND status IN ('issued', 'pending_approval')), 0)::numeric(18,2))
+               FROM v) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'issued', issued, 'pending_approval', pending_approval,
+                                               'rejected', rejected, 'withdrawn', withdrawn) ORDER BY rank)
+               FROM by_dept WHERE rank <= 20) AS by_department,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank) FROM by_step WHERE rank <= 20) AS by_step,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM months WHERE newest <= 60) AS months`,
+    params,
+  );
+  return rows[0] || null;
+}
+
 module.exports = {
+  aiSummary,
   listSteps,
   allSteps,
   getStep,

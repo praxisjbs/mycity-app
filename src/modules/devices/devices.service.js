@@ -191,7 +191,49 @@ async function removeFor(actor, scope, id, body) {
   return getFor(id, scope);
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A device's status as People · Devices names it: New is seen on a punch and not registered. */
+const STATUS_PARTS = Object.freeze([
+  { key: "registered", label: "Registered" },
+  { key: "observed", label: "New" },
+  { key: "removed", label: "Removed", optional: true },
+]);
+
+/**
+ * The devices whose owner the reader's `people` scope reaches, in figures (DeviceSummaryQuery): by
+ * status, by department stacked Registered, New and Removed, and who has none registered. Runs on the
+ * client the assistant hands over. Never a device's identifier.
+ * @param {{query: Function}} client
+ * @param {object} params   DeviceSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope) {
+  const { figure, group, stacked } = require("../../shared/ai/summary");
+  const r = await repo.aiSummary(client, params, scope);
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const byStatus = group("status", "Devices by status", STATUS_PARTS.filter((x) => counted.has(x.key)).map((x) => ({ key: x.key, label: x.label, value: counted.get(x.key) })));
+  const byDepartment = group("department", "Devices by department", stacked(r.by_department, STATUS_PARTS));
+  return {
+    figures: [
+      figure("devices", "Devices", f.devices || 0),
+      figure("registered", "Registered", f.registered || 0),
+      figure("observed", "New", f.observed || 0),
+      figure("removed", "Removed", f.removed || 0),
+      figure("people_registered", "People with one registered", f.people_registered || 0),
+      figure("none_registered", "Active people with none registered", f.none_registered || 0),
+    ],
+    groups: params.by === "status" ? [byStatus, byDepartment] : [byDepartment, byStatus],
+    series: [],
+    total: f.devices || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
   observeForPunch,
   notePunch,
   statusForSession,

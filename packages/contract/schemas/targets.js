@@ -496,7 +496,38 @@ const SCORECARD_VIRTUAL = {
   dotted: "the person in scorecard.dotted_employee_id",
   line_count: "how many lines it has, counted",
 };
+/**
+ * The assistant's scorecards summary (docs/guides/praxis-ai.md §6.13): the scorecards the reader may list,
+ * by status, by department or reviewer (the average score to date) and by rating. Figures, never a row.
+ */
+const ScorecardSummaryBy = z.enum(["department", "reviewer", "status", "rating"]);
+const ScorecardSummaryQuery = z
+  .object({
+    period_id: uuid.optional(),
+    department_id: uuid.optional(),
+    status: ScorecardStatus.optional(),
+    by: ScorecardSummaryBy.default("department"),
+  })
+  .strict();
+
+/**
+ * The assistant's commitments summary (praxis-ai.md §6.13): a month's commitments (this Lagos month) in
+ * the reader's `performance` scope, by state, by person or department stacked Due, On Time, Late, Missed
+ * and Rescoped, and due and on time by week. Commitments' own figures are `CommitmentSummaryQuery`.
+ */
+const CommitmentDeliverySummaryBy = z.enum(["person", "department", "state", "week"]);
+const CommitmentDeliverySummaryQuery = z
+  .object({
+    month: MonthKey.optional(),
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    by: CommitmentDeliverySummaryBy.default("person"),
+  })
+  .strict();
+
 const TABLES = {
+  ScorecardSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's scorecards summary; figures, never a row" },
+  CommitmentDeliverySummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's commitments summary; figures, never a row" },
   ScorecardImportRow: { table: null, reason: "a scorecard line of the scorecards workbook as the importer reads it" },
   KeyResultRef: { table: "okr_key_result" },
   KpiRef: { table: "kpi_definition" },
@@ -592,6 +623,10 @@ const TABLES = {
 };
 
 module.exports = {
+  ScorecardSummaryBy,
+  ScorecardSummaryQuery,
+  CommitmentDeliverySummaryBy,
+  CommitmentDeliverySummaryQuery,
   TABLES,
   ScorecardImportRow,
   ScorecardStatus,

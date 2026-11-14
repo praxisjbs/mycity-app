@@ -305,7 +305,13 @@ People's or a manager's. The workbook opens for the person it is about and the C
   list's filters, a department, a year or a period, `by` status, type, person, department or month):
   requests by status, days approved, taken, booked ahead and waiting, people, on leave today; by
   status and type always, then by person or department (20) or by month as series. One SQL over the
-  requests (`leave.repo.aiSummary`), figures never rows.
+  requests (`leave.repo.aiSummary`), figures never rows. The caller's own year in figures is
+  `my_leave.summary` (`ess.ai.js`, `docs/guides/praxis-ai.md` §6.13, Appendix B PR 7;
+  `MyLeaveSummaryQuery`: a year, this Lagos year unless given): days entitled, taken, booked, waiting
+  and left, the year's requests; each leave type stacked Taken, Booked, Waiting and Left; days taken
+  by month. One SQL (`leave.repo.mySummary`) reading the year as My Leave's balances do (the shared
+  `BALANCES`); `my_leave.list` names it, and its matrix probe asks for the year of its own day. Their
+  own days and pay items are `my_attendance.summary` (`attendance.md` §9).
   Still to come: the caller's own profile summary and open queries count (the
   caller's own payslips and deductions are `payslips.mine` and `deductions.mine`, M6 PR 6). Never another person's record. Paged at 25.
 - **AI actions** (`docs/guides/praxis-ai.md` §6.11): `my_leave.request` (`ess.ai.js`; `ess` create,
@@ -447,6 +453,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · Praxis AI's summary of the person's own leave (`praxis-ai.md` Appendix B PR 7, §9): a year by leave type, stacked Taken, Booked, Waiting and Left, read with My Leave's own balances SQL (`leave.repo` `BALANCES`, shared now). No screen changed.
 - 13/11/2026 · JP · M6 PR 8: the stale payroll lines brought to what M6 built (the `payslip` row's columns and `published` rule, the `payslip.published` event in place of `payroll.run_approved`, the Coming Soon examples as past); Download My Data keeps no payslips, which My Payslips' Download All hands over (`docs/guides/payroll.md` §13.2 item 45).
 - 13/11/2026 · TB · ESS · My Training (#110): Download Word under My Notes saves the note and downloads it as a Word file, the person's alone (`knowledge.md` §6.13, §5).
 - 12/11/2026 · TB · ESS · My Training (#110): Take Notes opens My Notes, the person's own running note on the course, floating over it (`knowledge.md` §6.13, §10).
