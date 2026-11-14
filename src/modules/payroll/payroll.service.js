@@ -138,6 +138,7 @@ async function summary(user) {
 /** What each problem says and what to do about it (§6.15); the person is named in the message. */
 const PROBLEM_WORDS = Object.freeze({
   NO_SALARY: { message: (n) => `No Salary Set for ${n.name}`, action: "Set the pay, or exclude them" },
+  NO_START_DATE: { message: (n) => `No Start Date for ${n.name}`, action: "Set it on People · Employees, or exclude them" },
   NEGATIVE_NET: { message: (n) => `${n.name} would be paid less than nothing`, action: "Spread a deduction, add an adjustment or exclude them" },
   NO_RATES: { message: () => "Statutory figures are missing", action: "Enter them on Configurations" },
   EARLIER_RUN_OPEN: {

@@ -97,7 +97,8 @@ async function yearToDate(client, ids, period) {
 async function buildPayslip(client, person, number, month) {
   const { first, last, shared, prices } = month;
   const mine = { itemIds: [], instalmentIds: [] };
-  if (person.gross_monthly === null || person.gross_monthly === undefined) return { row: emptyRow(person, number), lines: [], ...mine };
+  // No pay or no start date: a payslip with no lines, whose blocking problem names the person (§6.15).
+  if (person.gross_monthly === null || person.gross_monthly === undefined || !person.start_date) return { row: emptyRow(person, number), lines: [], ...mine };
 
   const rates = await attendancePay.monthRates(client, person, first, shared);
   const part = calc.paidPart(rates.working_dates, { first, last, from: person.start_date, to: person.left_on || last });

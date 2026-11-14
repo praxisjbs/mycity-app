@@ -54,12 +54,14 @@ problem stops **Submit for Approval** until it is fixed. A warning never stops i
 2. For **No Salary Set**, set the person's pay on
    [People · Employees](/people?tab=employees), as [Add an employee](#people-add-employee) shows.
    Or leave them out of the run.
-3. For a net pay below zero, spread a deduction over more months on
+3. For **No Start Date**, set the person's start date on their record on
+   [People · Employees](/people?tab=employees), or leave them out of the run.
+4. For a net pay below zero, spread a deduction over more months on
    [Payroll · Deductions](/payroll?tab=deductions), or add an adjustment.
-4. For no bank details, add them on the person's record. With **Bank Details Required** on, this
+5. For no bank details, add them on the person's record. With **Bank Details Required** on, this
    is blocking.
-5. For fines waiting, accept, spread or waive them on [Payroll · Deductions](/payroll?tab=deductions).
-6. Press **Compute Run** again. The line goes once nothing is left.
+6. For fines waiting, accept, spread or waive them on [Payroll · Deductions](/payroll?tab=deductions).
+7. Press **Compute Run** again. The line goes once nothing is left.
 
 ### Leave someone out, or put them back {#payroll-runs-exclude needs="payroll edit"}
 

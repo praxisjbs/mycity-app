@@ -170,6 +170,9 @@ mycity-app/
 │   │                         m4-recruitment-2.js (M4 part 2, Assessments and Interviews),
 │   │                         m5-offers-1.js (M5 part 1, Offers),
 │   │                         m5-onboarding-2.js (M5 part 2, Documentation and Onboarding),
+│   │                         m6-payroll-1.js (M6 part 1, Running the Month, with the `prepare`
+│   │                         both M6 parts film on: make.js m6-payroll-1 prepare),
+│   │                         m6-payroll-2.js (M6 part 2, Payslips and Pay Day),
 │   │                         m8-expenses-1.js (M8 part 1, Raising and Approving, with the `prepare`
 │   │                         both M8 parts film on: make.js m8-expenses-1 prepare),
 │   │                         m8-expenses-2.js (M8 part 2, Paying and Budgets),

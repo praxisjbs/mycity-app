@@ -260,7 +260,10 @@ async function orgProfile(client) {
  * @param {object} context   { org, number, today, doc }
  */
 function renderDocumentHtml(template, data, context) {
-  const values = { ...data, ...context, staging: config.APP_ENV === "staging" };
+  // A type numbered by its own record (a payslip, a contract) has no number of the engine's: its data's
+  // number is the document's, in the letterhead and the body alike, never blanked by the engine's null.
+  const number = context.number ?? data.number ?? null;
+  const values = { ...data, ...context, number, staging: config.APP_ENV === "staging" };
   const body = template.format === "markdown" ? renderMarkdown(template.body, values) : render(template.body, values);
   const page = render(templates.layout("document").body, values, { body });
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${brand().fontCss}</style></head><body>${page}</body></html>`;

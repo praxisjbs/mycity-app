@@ -27,13 +27,16 @@ async function ready(emails, password) {
   const names = {};
   for (const email of emails) {
     const { rows } = await pool.query(
-      `SELECT u.user_id, u.status, e.first_name, e.last_name FROM app_user u
+      `SELECT u.user_id, u.status, u.password_hash, e.first_name, e.last_name FROM app_user u
          JOIN employee e ON e.employee_id = u.employee_id WHERE lower(u.email::text) = lower($1)`,
       [email],
     );
     if (!rows[0]) throw new Error(`No login for ${email}: run load-staff and the staging seed first (runbook §4.1).`);
     names[email] = `${rows[0].first_name} ${rows[0].last_name}`;
-    const ok = await identity.login({ email, password, ip: "127.0.0.1", userAgent: "video" }).then(() => true, () => false);
+    // The password is checked against its hash, never by signing in: a sign-in from a new device tells
+    // the person "New sign-in to your account", which a shot of their bell would then show.
+    const hash = rows[0].password_hash;
+    const ok = typeof hash === "string" && hash.startsWith("$argon2") && (await require("argon2").verify(hash, password).catch(() => false));
     if (ok) continue;
     const token = crypto.randomBytes(32).toString("base64url");
     await repo.upsertLink(pool, {

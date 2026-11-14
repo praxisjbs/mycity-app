@@ -353,6 +353,9 @@ describeDb("payslips from an approved run to the person", () => {
     for (const text of ["October 2026", "Musa Danjuma", "Monthly Pay", "₦450,000.00", "Spot Bonus", "Salary Advance Repayment", "₦95,423.07", "₦365,076.93", "Ending 1122", "30/10/2026", "26 of 26"])
       expect([text, html.includes(text)]).toEqual([text, true]);
     expect(html).not.toMatch(STATUTORY);
+    // Its number, the payslip's own, printed in the letterhead (the engine numbers no payslip itself).
+    const mine = docs.find((d) => d.employee_id === employeeId("staff")).number;
+    expect(html).toMatch(new RegExp(`<strong>${mine}</strong>`));
 
     // Until the worker has rendered it the PDF is Preparing, for the person and for Payroll alike.
     const early = await as("staff").get(`/ess/payslips/${ids.musaPayslip}/pdf`);

@@ -589,7 +589,10 @@ business dates (`shared/time/lagos`).
    people being paid) and whether their `status` is `active` or `suspended`.
 2. A person in that group gets a payslip when Compute runs. A person with no `gross_monthly` gets a payslip
    with the blocking problem No Salary Set and no lines; Operations & People set the pay on People ·
-   Employees and press Compute again, or exclude the person with a reason.
+   Employees and press Compute again, or exclude the person with a reason. A person with no `start_date` is in
+   the group too, whatever the month, with the blocking problem No Start Date and no lines, until People set
+   the date or the person is excluded: a record with no start date is never left out unseen (found filming
+   the M6 video, 14/11/2026: three of MyCity's own staff were on the register with none).
 3. An excluded person has a payslip with status `excluded` and its reason, no lines and no number counted in
    the headcount; including them again and computing builds their lines.
 4. A person with no `bank_name` or `account_number` gets the warning No Bank Details (not blocking: they may
@@ -1083,6 +1086,7 @@ is still 450,000.00 (s.120), and the net is 450,000.00 less 90,200.00, **₦359,
 | Code | Severity | Raised when | Fix |
 |---|---|---|---|
 | `NO_SALARY` | Blocking | A person in the run has no `gross_monthly` | Set the pay, or exclude them |
+| `NO_START_DATE` | Blocking | A person in the run has no `start_date` (§6.1 rule 2) | Set it on People · Employees, or exclude them |
 | `NEGATIVE_NET` | Blocking | A payslip's net is below zero | Spread a deduction, add an adjustment, exclude |
 | `NO_RATES` | Blocking | Advanced mode and Compute found a figure missing: no PAYE table, no minimum wage beside PAYE or NHF, or a version on a base its item no longer allows | Enter them on Configurations |
 | `EARLIER_RUN_OPEN` | Blocking | Advanced mode and a run of an earlier month of the same year is still a Draft or Computed one | Send them for approval first |
@@ -1487,6 +1491,8 @@ still open", Fix "Send them for approval first"; No Rates Set reads "Statutory f
 
 - **No salary yet.** Staff are loaded without pay until MyCity enters it; the first run shows No Salary Set for
   each, blocking Submit, with Open on the person. Nobody is ever paid zero silently.
+- **No start date.** The roster loads some people with none; each is in every run with No Start Date, blocking
+  Submit, until People set it (§6.1 rule 2). Nobody is left out of a run silently either.
 - **A joiner or leaver mid-month** is prorated by working days (§6.3); a leaver's outstanding instalments are taken
   in their last run (§6.6 rule 9). A person who joins after a run is Submitted is in the next run; the approved
   run is not reopened.
@@ -2355,6 +2361,18 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · Found filming the M6 videos: a person with no start date was left out of every run without a word
+  (`payroll.inputs.peopleFor` read `start_date <= the month's last day`), and the roster loads Operations & People's
+  lead, the CTO and the Program Manager with none. §6.1 rule 2, §6.15 and §11: such a person is in the run with a
+  payslip of no lines and the blocking problem `NO_START_DATE` ("No Start Date for …", fix "Set it on People ·
+  Employees, or exclude them"), as No Salary Set is. Contract `ProblemCode`, `payroll.inputs`, `payroll.run`,
+  `payroll.repo`'s problems, `payroll.service`'s words; `tests/integration/payroll-run.test.js`.
+- 14/11/2026 · JP · Found filming the M6 videos: every payslip PDF read "November 2026 ·" with no number. The document
+  engine passed its own number (none for a payslip, whose number is the payslip's) over the payslip's own, so
+  `{{ number }}` printed nothing; an employment contract's "reference" was blank the same way. `renderDocumentHtml` now
+  keeps the data's number when the engine numbers nothing, so the payslip's number prints in the letterhead above the
+  date, as the agreed sample has it, and the template's subtitle is the month alone (§6.10;
+  `tests/integration/payslips.test.js`).
 - 13/11/2026 · JP · Praxis AI's payroll summaries (`praxis-ai.md` Appendix B PR 4, §9): `payroll.month` gains its payslips by department and by status and reads its money as naira; `payroll.trend`, `deductions.summary` and `my_pay.summary` added, each read naming its summary; money only with the salary grant, a person's own pay never hidden from them.
 - 13/11/2026 · TB · Send Back on a run's approval no longer tells its approvers "Withdrawn: The requester withdrew this before it was decided": the handler withdraws the approval with `engine.cancel(..., sentBack: true)`, which tells nobody (the requester is told of the Send Back with its reason). Found filming M8 on Expenses, the same handler (`docs/runbooks/training-videos.md` §7).
 
