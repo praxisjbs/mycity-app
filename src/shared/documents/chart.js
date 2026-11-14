@@ -90,14 +90,16 @@ function tickText(v, unit) {
   return unit === "ngn" ? `₦${short}` : short;
 }
 
-/** A round top for the axis, and its four steps. */
-function niceMax(max) {
-  if (!(max > 0)) return 1;
+/** A round top for the axis, and how many even steps reach it (₦0, ₦1M ... ₦5M, never ₦1.3M). */
+function niceAxis(max) {
+  if (!(max > 0)) return { top: 1, steps: 4 };
   const step = 10 ** Math.floor(Math.log10(max));
   const m = max / step;
   const nice = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10;
-  return nice * step;
+  return { top: nice * step, steps: nice === 2 || nice === 1 ? 4 : 5 };
 }
+/** A tick's anchor: the last one ends at the edge, so it is never cut off. */
+const anchorAt = (t, steps) => (t === steps ? "end" : t === 0 ? "start" : "middle");
 
 /** A chart block's chart as drawn, or null when it is not one the code built. */
 function checked(chart) {
@@ -132,16 +134,16 @@ function barsSvg(ch, c) {
   const stacked = ch.kind === "stacked_bar";
   const parts = stacked ? ch.series : [ch.series[0]];
   const totals = ch.labels.map((_, i) => parts.reduce((n, s) => n + positive(s.values[i]), 0));
-  const top = niceMax(Math.max(...totals));
+  const { top, steps } = niceAxis(Math.max(...totals));
   const labelW = 170;
   const plotW = WIDTH - labelW - 8;
   const rowH = 22;
   const head = 8;
   const out = [];
-  for (let t = 0; t <= 4; t += 1) {
-    const x = labelW + (plotW * t) / 4;
+  for (let t = 0; t <= steps; t += 1) {
+    const x = round1(labelW + (plotW * t) / steps);
     out.push(`<line x1="${x}" y1="${head - 4}" x2="${x}" y2="${head + rowH * ch.labels.length}" stroke="${c.rule}" stroke-width="1"/>`);
-    out.push(`<text x="${x}" y="${head + rowH * ch.labels.length + 14}" font-size="9" fill="${c.muted}" text-anchor="middle">${esc(tickText((top * t) / 4, ch.unit))}</text>`);
+    out.push(`<text x="${x}" y="${head + rowH * ch.labels.length + 14}" font-size="9" fill="${c.muted}" text-anchor="${anchorAt(t, steps)}">${esc(tickText((top * t) / steps, ch.unit))}</text>`);
   }
   ch.labels.forEach((label, i) => {
     const y = head + rowH * i;
@@ -165,7 +167,7 @@ function barsSvg(ch, c) {
 /** One line a series along its labels, every few labels named under the axis. */
 function linesSvg(ch, c) {
   const all = ch.series.flatMap((s) => s.values);
-  const top = niceMax(Math.max(...all, 0));
+  const { top, steps } = niceAxis(Math.max(...all, 0));
   const low = Math.min(...all, 0);
   const left = 56;
   const plotW = WIDTH - left - 10;
@@ -175,8 +177,8 @@ function linesSvg(ch, c) {
   const xOf = (i) => left + (ch.labels.length === 1 ? plotW / 2 : (plotW * i) / (ch.labels.length - 1));
   const yOf = (v) => head + plotH - (plotH * (v - low)) / span;
   const out = [];
-  for (let t = 0; t <= 4; t += 1) {
-    const v = low + (span * t) / 4;
+  for (let t = 0; t <= steps; t += 1) {
+    const v = low + (span * t) / steps;
     const y = yOf(v);
     out.push(`<line x1="${left}" y1="${round1(y)}" x2="${WIDTH - 10}" y2="${round1(y)}" stroke="${c.rule}" stroke-width="1"/>`);
     out.push(`<text x="${left - 6}" y="${round1(y + 3)}" font-size="9" fill="${c.muted}" text-anchor="end">${esc(tickText(v, ch.unit))}</text>`);
@@ -184,7 +186,7 @@ function linesSvg(ch, c) {
   const every = Math.max(1, Math.ceil(ch.labels.length / 8));
   ch.labels.forEach((label, i) => {
     if (i % every === 0 || i === ch.labels.length - 1)
-      out.push(`<text x="${round1(xOf(i))}" y="${head + plotH + 14}" font-size="9" fill="${c.muted}" text-anchor="middle">${esc(cut(label, 12))}</text>`);
+      out.push(`<text x="${round1(xOf(i))}" y="${head + plotH + 14}" font-size="9" fill="${c.muted}" text-anchor="${ch.labels.length === 1 ? "middle" : anchorAt(i === ch.labels.length - 1 ? 1 : i === 0 ? 0 : 0.5, 1)}">${esc(cut(label, 12))}</text>`);
   });
   ch.series.forEach((s, k) => {
     const points = s.values.map((v, i) => `${round1(xOf(i))},${round1(yOf(v))}`).join(" ");

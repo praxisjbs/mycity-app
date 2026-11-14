@@ -538,6 +538,7 @@ None.
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · `budgets.summary` failed when an allocation carried kobo (₦1,050,000.50): the repo's JSON gave the amount as the number 1050000.5, which money() refuses, and Praxis AI's budget question drew no Overview. Every amount of the summary now leaves the database as text (`budgets.repo.js` `aiSummary`). Found building `praxis-ai.md` Appendix B PR 3; its test (`ai-overview-export.test.js`) holds a budget with kobo.
 - 13/11/2026 · JP · `expenses.summary`, `requisitions.summary` and `disbursements.summary` built (`praxis-ai.md` Appendix B PR 4, §9): Praxis AI charts requests by status, category, department, project or payee type (stacked Paid, Approved, Waiting), requisitions by status and payments by category or month, each within the reader's audience and scope as its list shows it.
 - 13/11/2026 · JP · `budgets.summary` built (`praxis-ai.md` Appendix B PR 1, §9): Praxis AI charts a year's budgets by department or category as stacked bars (Spent, Committed, Remaining, Over Budget), by project for scope all, and reads budget amounts in naira.
 - 13/11/2026 · JP · Charts in the Overview planned (`praxis-ai.md` decisions 49 to 58, Appendix B): Budgets' summary with stacked bars in PR 1, the requests', requisitions' and disbursements' summaries in PR 4 (§9). Nothing built yet.

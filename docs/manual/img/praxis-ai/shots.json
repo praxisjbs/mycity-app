@@ -25,7 +25,7 @@
   },
   "praxis-attach-contract": {
     "spec": "197a60e7ea348f2f",
-    "source": "57c7e2adcc47b446",
+    "source": "70136fa4865f891b",
     "devices": [
       "desktop",
       "phone"
@@ -37,6 +37,13 @@
     "devices": [
       "desktop",
       "phone"
+    ]
+  },
+  "praxis-chart": {
+    "spec": "84879a8370f57cdc",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop"
     ]
   },
   "praxis-figures": {

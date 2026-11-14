@@ -60,6 +60,8 @@ conversations, and one opens full screen when you press it.
 - A list of records shows as a table on a computer and as cards on a phone. Each row starts with
   who or what it is, for example the person's name, and a status reads in words, for example
   *Not In*. When there are more than 25, it says how many, for example *Showing 25 of 312*.
+- An answer with a chart keeps its words in the chat, with its button, **From** and
+  **Open Figures**. Its table is on the pane's **Table**, where it pages 25 at a time.
 - Ask who is absent and the answer counts everyone who has not clocked in yet, by name. Nobody is
   marked *Absent* until the day closes.
 - {needs="praxis_ai create"} Press **Show Next 25** under the newest answer for the next 25. It asks
@@ -88,18 +90,24 @@ conversations, and one opens full screen when you press it.
    bars are stacked: *Spent*, *Committed* and *Remaining* make up each allocation, and *Over Budget*
    shows how far one went past it. The legend under the chart names each colour. Until an answer
    has figures, **Overview** is greyed out.
-3. **Table** lists every row the answer was read from, 25 to a page. Press **Next** and
+3. Under a chart, press **View Data** to see its figures on **Table**. When the chart was drawn
+   from totals alone, **Table** lists each bar with its figures, and a *Total* for a stacked bar.
+4. Press **Download PDF** to save the chart as a PDF on this device, on MyCity's letterhead. It holds
+   the question, the answer, the figures, the chart with its table, every other grouping with its
+   own chart, and About This File. A message says *PDF downloaded*. The figures are the ones you may
+   see when the file is made.
+5. **Table** lists every row the answer was read from, 25 to a page. Press **Next** and
    **Previous** to page. Past 200 rows it says how many rows there are. Press **Export** to save
    every row as an Excel file on this device; its second sheet, About This File, says who exported
    it, when, the question and what was read.
-4. Press a row to see it on **Record**. Press **Open Record** to open it on its own screen.
-5. **Sources** lists each read: its name, what it was filtered by, how many rows it returned, and
+6. Press a row to see it on **Record**. Press **Open Record** to open it on its own screen.
+7. **Sources** lists each read: its name, what it was filtered by, how many rows it returned, and
    whether it was read or not available to you. **Masked** names the fields you may not see. Press
    **Open Table** to see its rows.
-6. Press a chip under **From** on any answer to show those records in the pane. Press
+8. Press a chip under **From** on any answer to show those records in the pane. Press
    **Open Figures** under an earlier answer with a table or figures to bring its pane back. An
    answer of words alone has no **Open Figures**; its chips still open the pane.
-7. On a phone, press **Close** or swipe the sheet down to return to the conversation.
+9. On a phone, press **Close** or swipe the sheet down to return to the conversation.
 
 ![The pane on a phone](shot:praxis-figures)
 
@@ -112,6 +120,8 @@ conversations, and one opens full screen when you press it.
    press **Open Figures**.
 4. A short list charts too, from its own rows. For example: *How many people work at each worksite?*,
    *My leave days left by type* or *How many people hold each role?* Amounts read in naira.
+
+![A budget charted, with View Data and Download PDF](shot:praxis-chart)
 
 > **Tip:** Ask by department, by type, by person or by month. A question about one record answers in
 > words, without a chart. A list longer than one page is charted from its totals, never from its
@@ -576,6 +586,20 @@ marks:
   2: tab "Table" | Every row, 25 to a page
   3: tab "Sources" | What was read
   4: button "Recent" | Your conversations
+```
+
+```shot praxis-chart
+open: /praxis-ai?tab=ask&from=%2Fexpenses%3Ftab%3Dbudgets
+as: operations
+device: desktop
+do:
+  - fill: label "Ask a Question" = Our budget by department this year
+  - click: button "Send"
+  - wait: button "Download PDF"
+marks:
+  1: tab "Overview" | Figures and the chart
+  2: button "View Data" | The chart's figures
+  3: button "Download PDF" | Save it as a PDF
 ```
 
 ```shot praxis-figures

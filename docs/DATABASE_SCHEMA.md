@@ -706,8 +706,10 @@ hand, with its status, how many attacks were asked and passed, a line per leak a
 AI Control · Spend shows the last run · `10360` `ai_action_draft.names` (`docs/guides/praxis-ai.md` §4,
 decision 31): the people, departments and projects a card's fields hold, by name, apart from the
 records a press acts on, so an id reads as a name and a card's verb never counts a person named on
-it. An answer's Excel file (§6.16) is a `document` of type `ai_answer_export`, no table of its own,
-and a question asked before a card keeps what it asked for in the answer's `metadata.ask`.
+it. An answer's Excel file (§6.16) is a `document` of type `ai_answer_export`, and its Overview's PDF
+(§6.19 item 8) one of type `ai_answer_overview`, no table of their own; a question asked before a card
+keeps what it asked for in the answer's `metadata.ask`, and an answer its Overview's spec in
+`metadata.overview_spec`.
 
 **Built 11/11/2026, M10 PR 1** (`docs/guides/knowledge.md` §4):
 - `10400` SOPs: `sop`, `sop_version`, `sop_step` (a department's structured, versioned procedures).
