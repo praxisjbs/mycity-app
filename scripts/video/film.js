@@ -14,6 +14,12 @@ const path = require("node:path");
 const { appSettle } = require("../check/lib/screens");
 const { DESKTOP, PHONE } = require("./style");
 
+/** The browsers filming presents as: Chrome on a Windows computer and on an Android phone. */
+const UA = Object.freeze({
+  desktop: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  phone: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+});
+
 /** The pause after a sentence, measured on the Milestone 3 video (median 0.74 s). */
 const GAP = 0.74;
 /** Before a shot's first line, and after its last, so a cut never clips a word. */
@@ -157,6 +163,34 @@ function devices(out) {
   };
 }
 
+/**
+ * Each person's passkeys, kept between shots (and runs, in <out>/passkeys.json): a shot that names
+ * `passkey` gets a virtual authenticator, the phone's or computer's own fingerprint reader, holding
+ * the passkeys that person made in an earlier shot (runbook §6.31).
+ */
+function passkeys(out) {
+  const file = path.join(out, "passkeys.json");
+  let known = {};
+  try { known = JSON.parse(fs.readFileSync(file, "utf8")); } catch { known = {}; }
+  return {
+    get: (who) => known[who] || [],
+    keep: (who, credentials) => { known[who] = credentials; fs.writeFileSync(file, JSON.stringify(known, null, 1)); },
+  };
+}
+
+async function authenticator(context, page, keys, who) {
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("WebAuthn.enable", { enableUI: false });
+  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+  for (const credential of keys.get(who)) await cdp.send("WebAuthn.addCredential", { authenticatorId, credential });
+  return async () => {
+    const { credentials } = await cdp.send("WebAuthn.getCredentials", { authenticatorId });
+    keys.keep(who, credentials);
+  };
+}
+
 async function signIn(page, origin, email, password) {
   await page.goto(origin + "/login");
   // A browser the app knows greets its person once /auth/device answers, and that render clears what
@@ -174,18 +208,31 @@ async function signIn(page, origin, email, password) {
 
 /**
  * Film one shot. `shot` is { kind: "desktop"|"phone", site: "hub"|"go", as, start, setup, lines },
- * each line { id, duration, before, do, after, hold }.
+ * each line { id, duration, before, do, after, hold }. A shot with no `as` is filmed signed out
+ * (a sign-in shown on camera); `device` then names whose device cookie the browser carries, so the
+ * sign-in page knows the browser as theirs. `geolocation` ({ latitude, longitude }) is where the
+ * device says it is, allowed; `passkey` names whose passkeys its authenticator holds; `still` asks
+ * for reduced motion (the sign-in page).
  */
-async function filmShot(browser, shot, dir, { origins, password, emailOf, known }) {
+async function filmShot(browser, shot, dir, { origins, password, emailOf, known, keys }) {
   const phone = shot.kind === "phone";
   const site = shot.site || "hub";
   const origin = origins[site];
   const context = await browser.newContext({
     ...(phone ? { viewport: PHONE.viewport, deviceScaleFactor: PHONE.deviceScaleFactor, isMobile: true, hasTouch: true }
       : { viewport: DESKTOP.viewport, deviceScaleFactor: DESKTOP.deviceScaleFactor }),
+    // A person's own browser, as the hub names it on My Security ("Chrome on Windows"): the headless
+    // browser's own name is no browser a person uses.
+    userAgent: phone ? UA.phone : UA.desktop,
     locale: "en-GB",
     timezoneId: "Africa/Lagos",
     acceptDownloads: true,
+    // Copy Codes and other copy buttons write to the clipboard as they do for a person.
+    permissions: [...(shot.geolocation ? ["geolocation"] : []), ...(phone ? [] : ["clipboard-read", "clipboard-write"])],
+    ...(shot.geolocation ? { geolocation: shot.geolocation } : {}),
+    // The sign-in page's drifting photographs and ticking clocks halve the captures a second: a shot
+    // of it (`still`) asks for reduced motion, and the photograph stands still (runbook §6.32).
+    ...(shot.still ? { reducedMotion: "reduce" } : {}),
   });
   if (!phone) await context.addInitScript(CURSOR);
   // No red underline under words the dictionary lacks ("MyCityApp's") as a person types: the
@@ -193,6 +240,8 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known 
   await context.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.setAttribute("spellcheck", "false")));
   const page = await context.newPage();
   page.setDefaultTimeout(20000);
+  const keepKeys = shot.passkey ? await authenticator(context, page, keys, shot.passkey) : null;
+  if (!shot.as && shot.device && known) await context.addCookies(known.get(emailOf(shot.device)));
   if (shot.as) {
     const email = emailOf(shot.as);
     if (known) await context.addCookies(known.get(email));
@@ -234,6 +283,8 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known 
     }
   }
   const s = hands(page, { phone, origin });
+  // The filming password, for a password a person types on camera (dots on screen).
+  s.password = password;
   if (shot.setup) await shot.setup(s);
   await sleep(0.6);
 
@@ -278,6 +329,8 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known 
   rolling = false;
   await camera;
   fs.writeFileSync(path.join(dir, "take.json"), JSON.stringify(take, null, 1));
+  if (keepKeys) await keepKeys();
+  if (!shot.as && shot.device && known) known.keep(emailOf(shot.device), await context.cookies());
   await context.close();
   return take;
 }
@@ -286,11 +339,12 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known 
 async function film(plan, out, opts) {
   const browser = await browserFor(opts.origins, opts.port);
   const known = devices(out);
+  const keys = passkeys(out);
   try {
     for (const shot of plan.shots) {
       if (shot.kind === "card" || (opts.only && !opts.only.has(shot.id))) continue;
       process.stdout.write(`filming ${shot.id} (${shot.kind}, ${shot.lines.length} lines) ... `);
-      const take = await filmShot(browser, shot, path.join(out, "shots", shot.id), { ...opts, known });
+      const take = await filmShot(browser, shot, path.join(out, "shots", shot.id), { ...opts, known, keys });
       console.log(`${(take.end - take.start).toFixed(1)}s, ${take.frames.length} frames`);
     }
   } finally {

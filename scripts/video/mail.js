@@ -59,10 +59,33 @@ async function message(email, template, { seconds = 30, match } = {}) {
   return { template: job.template, subject: rendered.subject, html: rendered.html, data: job.data };
 }
 
+/**
+ * The newest email to `email` the mail catcher kept (scripts/video/mail-catcher.js), newer than
+ * `after` (milliseconds since the epoch), waiting up to `seconds`: { subject, html }. For the mail
+ * whose job is dropped once sent: an invitation and a password reset.
+ */
+async function caught(email, { after = 0, seconds = 30, subject } = {}) {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const dir = process.env.VIDEO_MAIL_CAUGHT;
+  if (!dir) throw new Error("Set VIDEO_MAIL_CAUGHT, and preload scripts/video/mail-catcher.js into the worker (runbook §4.5).");
+  const to = (m) => [].concat(m.to || []).map((t) => String((t && t.address) || t || "").toLowerCase());
+  const until = Date.now() + seconds * 1000;
+  for (;;) {
+    const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => Number(f.split("-")[0]) > after).sort().reverse() : [];
+    for (const f of files) {
+      const m = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+      if (to(m).includes(email.toLowerCase()) && (!subject || subject.test(m.subject || ""))) return { subject: m.subject, html: m.html };
+    }
+    if (Date.now() > until) throw new Error(`No mail to ${email} was caught: is the worker running with the mail catcher?`);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
 /** The first link in a message that starts with `origin` (go.mycityapp.io's, for a candidate). */
 function linkIn(html, origin) {
   const found = String(html).match(new RegExp(`href="(${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^"]+)"`));
   return found ? found[1].replace(/&amp;/g, "&") : null;
 }
 
-module.exports = { lastTo, message, linkIn };
+module.exports = { lastTo, message, caught, linkIn };

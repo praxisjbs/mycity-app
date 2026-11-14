@@ -186,7 +186,10 @@ function SignInForm({
       if (next) onStep(next);
     } catch (err) {
       const a = err as ApiError;
+      // The refused password is cleared for the next try, unmarked: the bar below says why it failed,
+      // and the field never says it was left empty.
       setPass("");
+      setTouched((t) => ({ ...t, pass: false }));
       const title = a.code === "ACCOUNT_SUSPENDED" ? "Account suspended." : a.code === "LOGIN_THROTTLED" ? "Too many tries." : a.status === 0 ? "Offline." : "Not signed in.";
       setProblem({ title, text: a.message });
       document.getElementById("pass")?.focus();
@@ -647,7 +650,7 @@ function LinkForm({ token, onDone, onExpired }: { token: string; onDone: (email:
       <p className="text-sm text-muted-foreground wrap-any">{invite ? `Welcome, ${check.first_name}` : check.email}</p>
       <h2 className="mt-1 text-3xl font-strong">{invite ? "Set Your Password" : "New Password"}</h2>
       <LoginField id="new-pass" label="New Password" type="password" autoComplete="new-password" value={next} onChange={(v) => (setNext(v), setServerErr(""))} onBlur={() => setTouched((t) => ({ ...t, next: true }))} error={touched.next ? nErr : ""} good={!nErr} buzz={touched.next && nErr ? buzz : 0} />
-      <LoginField id="new-again" label="Confirm Password" type="password" autoComplete="new-password" value={again} onChange={setAgain} onBlur={() => setTouched((t) => ({ ...t, again: true }))} error={touched.again ? aErr || (again ? "" : "Enter it again") : ""} good={!!again && !aErr} buzz={touched.again && aErr ? buzz : 0} />
+      <LoginField id="new-again" label="Confirm Password" type="password" autoComplete="new-password" value={again} onChange={setAgain} onBlur={() => setTouched((t) => ({ ...t, again: true }))} error={touched.again ? (again ? aErr : "Enter it again") : ""} good={!!again && !aErr} buzz={touched.again && (aErr || !again) ? buzz : 0} />
       <BigButton type="submit" icon="tick" busy={busy}>
         {invite ? "Set Password" : "Save Password"}
       </BigButton>
