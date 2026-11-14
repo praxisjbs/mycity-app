@@ -849,7 +849,7 @@ date, the branch and the PR when it merges.
 - [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
 - [x] 13/11/2026 · PR 4 · Finance and pay summaries: `expenses.summary`, `requisitions.summary`, `disbursements.summary`, `payroll.month` by department and status, `payroll.trend`, `deductions.summary`, `my_pay.summary`; ten reads off the gaps file (built in its own chat on `claude/serene-shannon-ek7yft`)
 - [x] 13/11/2026 · PR 5 · Recruitment and onboarding summaries: vacancies, candidates, interviews, assessments, offers, onboarding and the talent pool, the matrix's summary probes (built on `claude/affectionate-sagan-vxaysr`)
-- [ ] PR 6 · Partnerships summaries (`m10/summaries-partnerships`)
+- [x] 13/11/2026 · PR 6 · Partnerships summaries: leads, partners, proposals, agreements and interactions, their six reads off the gaps file, Partnerships' built summaries in `ngn` (built in its own chat on `claude/praxis-ai-partnerships-pr6-z2sywn` rather than `m10/summaries-partnerships`)
 - [x] 13/11/2026 · PR 7 · People, performance and queries summaries: exceptions, pay items, temporary sites, devices, seats, my attendance, my leave, KPIs, scorecards, commitments, queries and sanctions; thirteen reads off the gaps file (built in its own chat on the session's branch `ccr-3a67294a-v7s2ck` rather than `m10/summaries-people`, praxisjbs/mycity-app#153)
 - [ ] PR 8 · Workspace, Knowledge Hub, Community, Home and Settings summaries; the gaps file deleted (`m10/summaries-close`)
 - [ ] On staging: the budget question by department draws stacked bars, and its Download PDF opens on the letterhead
@@ -872,7 +872,7 @@ date, the branch and the PR when it merges.
   list's own reach (Attendance's and Devices' on the employee, the whole structure for Seats, the
   person's own for the two `my_` summaries, the functions reached for KPIs, the scorecards and
   commitments in scope, `queries.md` §6.1 for queries and sanctions); thirteen reads named and off
-  `scripts/check/ai-summary-gaps.json` (18 left, PR 6's and PR 8's); twelve evaluation cases;
+  `scripts/check/ai-summary-gaps.json` (12 left with PR 6's off too, PR 8's alone); twelve evaluation cases;
   `tests/integration/ai-summaries-people.test.js`. Found on the way and written into `praxis-ai.md`
   §6.13 before the code: the planned table's states were not the data's (an exception is Open or
   Accepted, Rejected or Corrected; a device Registered, New or Removed; a seat has no acting state,
@@ -882,7 +882,17 @@ date, the branch and the PR when it merges.
   outsider out of Annual days, so the matrix probes with Unpaid leave. Staff are offered seven more
   summaries, so `ai-summaries.test.js`'s list gains them. The container again lacked pgvector
   (installed by hand after `apt-get update`), Node 20 (`node@20` in the scratchpad) and `node_modules`.
-
+- 13/11/2026 · JP · Charts in the Overview, PR 6 built (§6.12): five summaries in the partnerships
+  modules' repos (`leads`, `partners`, `proposals`, `agreements`, `interactions`), each with the one rule
+  every Partnerships list keeps (`recordSeen`, `dealSeen`); `leads.list`, `partners.list`,
+  `proposals.list`, `agreements.list`, `agreements.renewals` and `interactions.list` off the gaps file (25
+  left); `tests/integration/ai-summaries-partnerships.test.js` and five evaluation cases. Found on the way
+  and written into `praxis-ai.md` §6.13: the Leads list hides the lost ones but its summary counts them;
+  no figure here is hidden from a reader of the list; a proposal's count and value by status are two
+  groupings; `partnerships.summary` and `partnership_returns.summary` gave their money as `NGN` and give
+  `ngn` now. Staff now see the five offered, so `ai-summaries.test.js`'s list of the summaries offered to
+  staff gains them. The container again lacked Node 20, `node_modules` and pgvector (installed by hand:
+  `node@20` in the scratchpad, `npm ci`, `postgresql-16-pgvector`).
 - 13/11/2026 · JP · Charts in the Overview, PR 5 built (§6.12): seven summaries in the recruitment
   modules' repos, their seven reads off the gaps file, `askedPeriod` and `stacked` in
   `shared/ai/summary.js`, the matrix's summary branch (a summary's total counted around its probe's

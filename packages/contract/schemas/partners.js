@@ -15,7 +15,7 @@
  * Statuses: active while any deal is live; dormant when none is; closed by Close Partner.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
+const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn, summaryPeriod } = require("./common");
 const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
 const { PlaceInput, PlaceView, PlaceToken } = require("./maps");
@@ -609,7 +609,29 @@ const PartnershipExportRequest = z
   })
   .strict();
 
+/**
+ * The assistant's partner summary (docs/guides/praxis-ai.md §6.13, Partnerships): the partners the reader may
+ * see in figures, by status, then by category, region, owner or their furthest live deal's health stacked
+ * Active, Dormant and Closed, and partners added by month. `quiet` is the list's own rule (§6.12), a JSON
+ * boolean here. A period (added) narrows it only when asked. Figures, never a row.
+ */
+const PartnerSummaryBy = z.enum(["status", "category", "region", "owner", "health"]);
+const PartnerSummaryQuery = z
+  .object({
+    status: PartnerStatus.optional(),
+    partner_category_id: uuid.optional(),
+    owner_id: uuid.optional(),
+    region_scope: RegionScope.optional(),
+    stage: listCode.optional(),
+    health: DealHealth.optional(),
+    quiet: z.boolean().optional(),
+    ...summaryPeriod,
+    by: PartnerSummaryBy.default("category"),
+  })
+  .strict();
+
 const TABLES = {
+  PartnerSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's partner summary; figures, never a row" },
   TrackerImportRow: { table: null, reason: "one row of MyCity's tracker workbook as the importer reads it; written as a lead or a partner" },
   PartnershipExportRequest: { table: null, reason: "which list to export and its filters; nothing is kept but the file" },
   RegionInput: { table: null, reason: "a record's region_scope and the place rows of its cities" },
@@ -704,6 +726,8 @@ module.exports = {
   TrackerImportRow,
   PartnershipExportRequest,
   TABLES,
+  PartnerSummaryBy,
+  PartnerSummaryQuery,
   PartnerStatus,
   RegionInput,
   RegionView,

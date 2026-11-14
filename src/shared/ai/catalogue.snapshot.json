@@ -1538,7 +1538,8 @@
       "bulk": null,
       "schema": "agreements.AgreementListQuery",
       "schema_sha": "9f87a20111fd770c",
-      "screen": null
+      "screen": null,
+      "summary": "agreements.summary"
     },
     {
       "key": "agreements.renewals",
@@ -1549,7 +1550,8 @@
       "bulk": null,
       "schema": "agreements.RenewalQuery",
       "schema_sha": "4c6b8d294ce83781",
-      "screen": null
+      "screen": null,
+      "summary": "agreements.summary"
     },
     {
       "key": "alerts.mine",
@@ -2036,7 +2038,8 @@
       "bulk": null,
       "schema": "interactions.InteractionListQuery",
       "schema_sha": "897d58ffdc4d066a",
-      "screen": null
+      "screen": null,
+      "summary": "interactions.summary"
     },
     {
       "key": "interviews.list",
@@ -2083,7 +2086,8 @@
       "bulk": null,
       "schema": "leads.LeadListQuery",
       "schema_sha": "85294e8f5f7ee9ca",
-      "screen": null
+      "screen": null,
+      "summary": "leads.summary"
     },
     {
       "key": "leave.requests",
@@ -2214,7 +2218,8 @@
       "bulk": null,
       "schema": "partners.PartnerListQuery",
       "schema_sha": "ffe2bf894a6f1134",
-      "screen": null
+      "screen": null,
+      "summary": "partners.summary"
     },
     {
       "key": "payroll.runs",
@@ -2307,7 +2312,8 @@
       "bulk": null,
       "schema": "proposals.ProposalListQuery",
       "schema_sha": "a9535cfd812e2930",
-      "screen": null
+      "screen": null,
+      "summary": "proposals.summary"
     },
     {
       "key": "queries.get",
@@ -4092,6 +4098,17 @@
       "screen": "workspace.projects"
     },
     {
+      "key": "agreements.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "agreements.AgreementSummaryQuery",
+      "schema_sha": "4160503d4857f534",
+      "screen": null
+    },
+    {
       "key": "approvals.summary",
       "kind": "summary",
       "module_key": "settings",
@@ -4246,6 +4263,17 @@
       "screen": null
     },
     {
+      "key": "interactions.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "interactions.InteractionSummaryQuery",
+      "schema_sha": "2bcf399cba584d49",
+      "screen": null
+    },
+    {
       "key": "interviews.summary",
       "kind": "summary",
       "module_key": "recruitment",
@@ -4265,6 +4293,17 @@
       "bulk": null,
       "schema": "kpis.KpiResultSummaryQuery",
       "schema_sha": "5de4390b38917ea4",
+      "screen": null
+    },
+    {
+      "key": "leads.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "leads.LeadSummaryQuery",
+      "schema_sha": "06793369473d63b2",
       "screen": null
     },
     {
@@ -4334,6 +4373,17 @@
       "screen": null
     },
     {
+      "key": "partners.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "partners.PartnerSummaryQuery",
+      "schema_sha": "8b7ce5dda7226f6f",
+      "screen": null
+    },
+    {
       "key": "partnership_returns.summary",
       "kind": "summary",
       "module_key": "partnerships",
@@ -4386,6 +4436,17 @@
       "bulk": null,
       "schema": "payroll.PayrollTrendQuery",
       "schema_sha": "f60e7abd9631009c",
+      "screen": null
+    },
+    {
+      "key": "proposals.summary",
+      "kind": "summary",
+      "module_key": "partnerships",
+      "permission": "partnerships.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "proposals.ProposalSummaryQuery",
+      "schema_sha": "882890e0fe220602",
       "screen": null
     },
     {

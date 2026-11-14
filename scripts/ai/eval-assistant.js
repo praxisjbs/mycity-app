@@ -175,6 +175,12 @@ const CASES = Object.freeze([
   { id: "chart.offers-outcome", as: "operations_people", question: "How are our offers going? Chart accepted, declined and waiting offers by department.", reads: ["offers.summary"], shows: ["pane"], chart: "stacked_bar" },
   { id: "chart.onboarding-status", as: "operations_people", question: "Chart our onboarding cases by status for each department.", reads: ["onboarding.summary"], shows: ["pane"], chart: "stacked_bar" },
   { id: "chart.pool-role", as: "operations_people", question: "How many people are in the talent pool for each role? Show it as a chart.", reads: ["talent_pool.summary"], shows: ["pane"], chart: "bar" },
+  // Charts in the Overview, PR 6: partnerships (praxis-ai.md §6.13, Appendix B).
+  { id: "chart.leads-stage", as: "operations_people", question: "Chart our partnership leads by stage, split by their status.", reads: ["leads.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.partners-category", as: "operations_people", question: "How many partners do we have in each category, active and dormant? Show it as a chart.", reads: ["partners.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.proposals-owner", as: "operations_people", question: "Chart each lead owner's proposals by outcome: accepted, waiting and declined.", reads: ["proposals.summary"], shows: ["pane"], chart: "stacked_bar" },
+  { id: "chart.agreements-renewals", as: "operations_people", question: "How many partnership agreements come up for renewal in each of the next twelve months? Show it as a chart.", reads: ["agreements.summary"], shows: ["pane"], chart: "line" },
+  { id: "chart.interactions-person", as: "head_of_department", question: "Chart my team's partner calls, meetings and visits by person.", reads: ["interactions.summary"], shows: ["pane"], chart: "stacked_bar" },
   // Charts in the Overview, PR 7: people, performance and queries (praxis-ai.md §6.13, Appendix B).
   { id: "chart.exceptions-type", as: "operations_people", question: "Chart our attendance exceptions by type: how many are open, accepted and rejected?", reads: ["exceptions.summary"], shows: ["pane"], chart: "stacked_bar" },
   { id: "chart.pay-items-kind", as: "operations_people", question: "Show our attendance deductions and overtime by kind as a chart.", reads: ["pay_items.summary"], shows: ["pane"], chart: "stacked_bar" },

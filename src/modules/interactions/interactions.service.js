@@ -88,4 +88,51 @@ async function moveToPartner(client, leadId, partnerId) {
   await require("../mailbox/binding/convert.service").moveToPartnerIn(client, leadId, partnerId);
 }
 
-module.exports = { list, latestOf, create, logMailIn, moveToPartner, GRACE_MS };
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Partnerships)
+ * ------------------------------------------------------------------ */
+
+/** An interaction's type as a person reads it, in the order Log Interaction offers them. */
+const TYPE_WORDS = Object.freeze({ call: "Call", meeting: "Meeting", email: "Email", visit: "Visit", note: "Note" });
+
+/**
+ * The interactions on the partners and leads the reader may see, in figures: every interaction unless a
+ * period is asked, by type, by the person who logged them stacked by type, the partners and leads most
+ * reached (the grouping asked first), and by month, or by week when asked. Runs on the client the
+ * assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   InteractionSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, top, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const week = params.by === "week";
+  const r = await repo.aiSummary(client, { ...params, from: period && period.from, to: period && period.to, week }, scope);
+  const f = r.figures;
+  const types = Object.keys(TYPE_WORDS);
+  const groups = {
+    type: group("type", "Interactions by type", types.map((k) => r.by_type.find((x) => x.key === k)).filter(Boolean).map((x) => ({ key: x.key, label: TYPE_WORDS[x.key], value: x.value }))),
+    person: group("person", "Interactions by who logged them", stacked(r.by_person, types.map((key) => ({ key, label: TYPE_WORDS[key], optional: true })))),
+    partner: top("partner", "Partners and leads most reached", r.by_record),
+  };
+  const first = groups[params.by] ? params.by : "type";
+  return {
+    figures: [
+      figure("interactions", "Interactions", f.interactions || 0),
+      figure("calls", "Calls", f.calls || 0),
+      figure("meetings", "Meetings", f.meetings || 0),
+      figure("emails", "Emails", f.emails || 0),
+      figure("visits", "Visits", f.visits || 0),
+      figure("notes", "Notes", f.notes || 0),
+      figure("people", "People who logged them", f.people || 0),
+      figure("partners", "Partners reached", f.partners || 0),
+      figure("leads", "Leads reached", f.leads || 0),
+    ],
+    groups: [groups[first], ...Object.keys(groups).filter((k) => k !== first).map((k) => groups[k])],
+    series: [series(week ? "by_week" : "by_month", week ? "Interactions by week" : "Interactions by month", r.buckets)],
+    total: f.interactions || 0,
+  };
+}
+
+module.exports = { list, aiSummary, latestOf, create, logMailIn, moveToPartner, GRACE_MS };

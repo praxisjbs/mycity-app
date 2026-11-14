@@ -58,6 +58,71 @@ function list(db, query, scope) {
   );
 }
 
+/**
+ * The interactions in figures for the assistant (docs/guides/praxis-ai.md §6.13, Partnerships), in one
+ * statement over those whose record the reader may see (§6.1, as list() keeps it): the counts by type,
+ * the people who logged them and the partners and leads reached; by type; by the person who logged them,
+ * each row's types for a stacked bar (20); the partners and leads most reached (10); and by Lagos month,
+ * or by week (its Monday) when `week`. A period on the day it happened narrows it only when `from` and
+ * `to` are given. Figures, never a row.
+ * @param {{partner_id?: string, lead_id?: string, deal_id?: string, interaction_type?: string, from?: string, to?: string, week?: boolean}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.partner_id || null, q.lead_id || null, q.deal_id || null, q.interaction_type || null, q.from || null, q.to || null];
+  const seen = seenOf(scope, params);
+  const bucket = q.week
+    ? "to_char(date_trunc('week', occurred_at AT TIME ZONE 'Africa/Lagos'), 'YYYY-MM-DD')"
+    : "to_char(occurred_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM')";
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT pi.partner_interaction_id, pi.interaction_type, pi.occurred_at, pi.partner_id, pi.lead_id, pi.owner_id,
+              NULLIF(btrim(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')), '') AS owner,
+              COALESCE(p.partner_id, l.lead_id) AS record_id,
+              CASE WHEN p.partner_id IS NOT NULL THEN p.name ELSE l.name || ' (lead)' END AS record
+         ${FROM}
+        WHERE ($1::uuid IS NULL OR pi.partner_id = $1) AND ($2::uuid IS NULL OR pi.lead_id = $2)
+          AND ($3::uuid IS NULL OR pi.partnership_opportunity_id = $3) AND ($4::text IS NULL OR pi.interaction_type = $4)
+          AND ($5::date IS NULL OR (pi.occurred_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $5::date AND $6::date)
+          ${seen}
+     ), figures AS (
+       SELECT count(*)::int AS interactions,
+              count(*) FILTER (WHERE interaction_type = 'call')::int AS calls,
+              count(*) FILTER (WHERE interaction_type = 'meeting')::int AS meetings,
+              count(*) FILTER (WHERE interaction_type = 'email')::int AS emails,
+              count(*) FILTER (WHERE interaction_type = 'visit')::int AS visits,
+              count(*) FILTER (WHERE interaction_type = 'note')::int AS notes,
+              count(DISTINCT owner_id)::int AS people,
+              count(DISTINCT partner_id)::int AS partners,
+              count(DISTINCT lead_id)::int AS leads
+         FROM x
+     ), by_person AS (
+       SELECT COALESCE(owner_id::text, 'none') AS key, COALESCE(min(owner), 'No One') AS label,
+              count(*) FILTER (WHERE interaction_type = 'call')::int AS call,
+              count(*) FILTER (WHERE interaction_type = 'meeting')::int AS meeting,
+              count(*) FILTER (WHERE interaction_type = 'email')::int AS email,
+              count(*) FILTER (WHERE interaction_type = 'visit')::int AS visit,
+              count(*) FILTER (WHERE interaction_type = 'note')::int AS note,
+              row_number() OVER (ORDER BY count(*) DESC, min(owner), owner_id) AS rank
+         FROM x GROUP BY owner_id
+     ), by_record AS (
+       SELECT record_id::text AS key, min(record) AS label, count(*)::int AS value,
+              row_number() OVER (ORDER BY count(*) DESC, min(record), record_id) AS rank
+         FROM x GROUP BY record_id
+     ), buckets AS (
+       SELECT ${bucket} AS at, count(*)::int AS value FROM x GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', interaction_type, 'value', n)) FROM (SELECT interaction_type, count(*)::int AS n FROM x GROUP BY interaction_type) s) AS by_type,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'call', call, 'meeting', meeting, 'email', email, 'visit', visit, 'note', note) ORDER BY rank)
+               FROM by_person WHERE rank <= 20) AS by_person,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank) FROM by_record WHERE rank <= 10) AS by_record,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM buckets) AS buckets`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_type: row.by_type || [], by_person: row.by_person || [], by_record: row.by_record || [], buckets: row.buckets || [] };
+}
+
 /** A record's latest interactions (the first page, newest first). */
 function latestOf(db, { kind, id }) {
   return pageQuery(
@@ -100,4 +165,4 @@ async function insertMail(client, row) {
   return rows[0] ? rows[0].partner_interaction_id : null;
 }
 
-module.exports = { list, latestOf, get, insert, insertMail };
+module.exports = { list, aiSummary, latestOf, get, insert, insertMail };

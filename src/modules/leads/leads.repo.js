@@ -105,6 +105,87 @@ async function summary(db, scope, { monthStart }) {
   return { ...rows[0], by_source: bySource.data.map((r) => ({ source: r.source ? String(r.source) : null, label: r.label, leads: r.leads })) };
 }
 
+/** The assistant summary's second grouping: the key, name and order each `by` maps to (never the caller's words). */
+const SUMMARY_BY = Object.freeze({
+  stage: { key: "x.stage", label: "x.stage_label", none: "No Stage", order: "min(x.stage_order) NULLS LAST, min(x.stage_label)" },
+  category: { key: "x.partner_category_id", label: "x.category", none: "No Category", order: "count(*) DESC, min(x.category)" },
+  region: { key: "x.region", label: "x.region", none: "No Region", order: "count(*) DESC, min(x.region)" },
+  owner: { key: "x.owner_id", label: "x.owner", none: "No Owner", order: "count(*) DESC, min(x.owner)" },
+  source: { key: "x.source", label: "x.source_label", none: "No Source", order: "count(*) DESC, min(x.source_label)" },
+});
+
+/**
+ * The leads in figures for the assistant (docs/guides/praxis-ai.md §6.13, Partnerships), in one statement
+ * with the reader's scope as list() applies it (§6.1): the counts by status (lost ones too, which the list
+ * hides unless asked); by status; by stage (in the list's order), category, region as the list shows it,
+ * owner or source, each row's statuses for a stacked bar (20); identified and converted by Lagos month. A
+ * period on the day identified (else made) narrows it only when `from` and `to` are given. Figures, never a row.
+ * @param {{status?: string, partner_category_id?: string, owner_id?: string, source?: string, region_scope?: string, stage?: string, health?: string, from?: string, to?: string, by: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const dim = SUMMARY_BY[q.by] || SUMMARY_BY.stage;
+  const params = [q.status || null, q.partner_category_id || null, q.owner_id || null, q.source || null, q.region_scope || null, q.stage || null, q.health || null, q.from || null, q.to || null, dim.none];
+  const seen = deals.recordSeen(scope, { alias: "l", kind: "lead" }, params);
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT DISTINCT ON (l.lead_id) l.lead_id, l.status, dl.stage, COALESCE(rv.label, dl.stage) AS stage_label, rv.display_order AS stage_order,
+              l.partner_category_id, pc.name::text AS category,
+              ${deals.regionLabel("l.region_scope", "lead.cities", "l.lead_id")} AS region,
+              l.owner_id, NULLIF(btrim(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')), '') AS owner,
+              l.source, COALESCE(src.label, l.source) AS source_label,
+              COALESCE(l.identified_on, (l.created_at AT TIME ZONE 'Africa/Lagos')::date) AS identified, l.converted_at
+         FROM lead l
+         LEFT JOIN partnership_opportunity dl ON dl.lead_id = l.lead_id
+         LEFT JOIN reference_value rv ON rv.domain = 'partnership_stage' AND rv.code = dl.stage
+         LEFT JOIN reference_value src ON src.domain = 'lead_source' AND src.code = l.source
+         LEFT JOIN partner_category pc ON pc.partner_category_id = l.partner_category_id
+         LEFT JOIN employee e ON e.employee_id = l.owner_id
+        WHERE ($1::text IS NULL OR l.status = $1)
+          AND ($2::uuid IS NULL OR l.partner_category_id = $2)
+          AND ($3::uuid IS NULL OR l.owner_id = $3)
+          AND ($4::text IS NULL OR l.source = $4)
+          AND ($5::text IS NULL OR l.region_scope = $5)
+          AND ($6::text IS NULL OR dl.stage = $6)
+          AND ($7::text IS NULL OR dl.health = $7)
+          AND ($8::date IS NULL OR COALESCE(l.identified_on, (l.created_at AT TIME ZONE 'Africa/Lagos')::date) BETWEEN $8::date AND $9::date)
+          ${seen}
+        ORDER BY l.lead_id, dl.created_at
+     ), figures AS (
+       SELECT count(*)::int AS leads,
+              count(*) FILTER (WHERE status = 'new')::int AS new,
+              count(*) FILTER (WHERE status = 'contacted')::int AS contacted,
+              count(*) FILTER (WHERE status = 'qualified')::int AS qualified,
+              count(*) FILTER (WHERE status = 'converted')::int AS converted,
+              count(*) FILTER (WHERE status = 'lost')::int AS lost
+         FROM x
+     ), by_dim AS (
+       SELECT COALESCE(${dim.key}::text, 'none') AS key, COALESCE(min(${dim.label}), $10) AS label,
+              count(*) FILTER (WHERE x.status = 'new')::int AS new,
+              count(*) FILTER (WHERE x.status = 'contacted')::int AS contacted,
+              count(*) FILTER (WHERE x.status = 'qualified')::int AS qualified,
+              count(*) FILTER (WHERE x.status = 'converted')::int AS converted,
+              count(*) FILTER (WHERE x.status = 'lost')::int AS lost,
+              row_number() OVER (ORDER BY ${dim.order}, ${dim.key}) AS rank
+         FROM x GROUP BY ${dim.key}
+     ), identified AS (
+       SELECT to_char(identified, 'YYYY-MM') AS at, count(*)::int AS value FROM x GROUP BY 1
+     ), converted AS (
+       SELECT to_char(converted_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value
+         FROM x WHERE status = 'converted' AND converted_at IS NOT NULL GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM x GROUP BY status) s) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'new', new, 'contacted', contacted, 'qualified', qualified,
+                                               'converted', converted, 'lost', lost) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM identified) AS identified,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM converted) AS converted`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_status: row.by_status || [], by_dim: row.by_dim || [], identified: row.identified || [], converted: row.converted || [] };
+}
+
 const COLUMNS = ["name", "partner_category_id", "industry", "region_scope", "website", "objective", "source", "owner_id", "identified_on", "impact", "impact_rating", "impact_note", "comments", "custom"];
 
 /** A new lead; returns its id. */
@@ -143,4 +224,4 @@ async function remove(client, id) {
   await client.query("DELETE FROM lead WHERE lead_id = $1", [id]);
 }
 
-module.exports = { list, get, summary, insert, update, lock, remove, COLUMNS };
+module.exports = { list, get, summary, aiSummary, insert, update, lock, remove, COLUMNS };

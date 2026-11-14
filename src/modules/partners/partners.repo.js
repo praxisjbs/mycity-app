@@ -121,6 +121,79 @@ async function figures(db, id, { yearStart, yearEnd }, scope = null) {
   return rows[0];
 }
 
+/** The assistant summary's second grouping: the key, name and order each `by` maps to (never the caller's words). */
+const SUMMARY_BY = Object.freeze({
+  category: { key: "x.partner_category_id", label: "x.category", none: "No Category", order: "count(*) DESC, min(x.category)" },
+  region: { key: "x.region", label: "x.region", none: "No Region", order: "count(*) DESC, min(x.region)" },
+  owner: { key: "x.owner_id", label: "x.owner", none: "No Owner", order: "count(*) DESC, min(x.owner)" },
+  health: {
+    key: "x.health",
+    label: "x.health",
+    none: "No Open Deal",
+    order: "min(CASE x.health WHEN 'on_track' THEN 1 WHEN 'follow_up_required' THEN 2 WHEN 'stalled' THEN 3 ELSE 4 END)",
+  },
+});
+
+/**
+ * The partners in figures for the assistant (docs/guides/praxis-ai.md §6.13, Partnerships), in one
+ * statement with the reader's scope as list() applies it (§6.1): the counts by status, the quiet ones by the
+ * list's own rule (§6.12, `$quietFrom`), those with a live deal; by status; by category, region as the list
+ * shows it, owner, or the health of the partner's furthest open or live deal as the list shows it, each row's
+ * statuses for a stacked bar (20); partners added (since, else made) by Lagos month. A period on the day
+ * added narrows it only when `from` and `to` are given. Figures, never a row.
+ * @param {{quietFrom: Date}} on
+ */
+async function aiSummary(db, q, scope, { quietFrom }) {
+  const dim = SUMMARY_BY[q.by] || SUMMARY_BY.category;
+  const params = [quietFrom, q.status || null, q.partner_category_id || null, q.owner_id || null, q.region_scope || null, q.stage || null, q.health || null, q.quiet === true, q.from || null, q.to || null, dim.none];
+  const seen = deals.recordSeen(scope, { alias: "p", kind: "partner" }, params);
+  const added = "COALESCE(p.since, (p.created_at AT TIME ZONE 'Africa/Lagos')::date)";
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT p.partner_id, p.status, p.partner_category_id, pc.name::text AS category,
+              ${deals.regionLabel("p.region_scope", "partner.cities", "p.partner_id")} AS region,
+              p.owner_id, NULLIF(btrim(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')), '') AS owner,
+              fd.health, ${added} AS added, (${QUIET(1)}) AS quiet,
+              EXISTS (SELECT 1 FROM partnership_opportunity lv WHERE lv.partner_id = p.partner_id AND lv.status = 'live') AS live
+         ${FROM}
+        WHERE ($2::text IS NULL OR p.status = $2)
+          AND ($3::uuid IS NULL OR p.partner_category_id = $3)
+          AND ($4::uuid IS NULL OR p.owner_id = $4)
+          AND ($5::text IS NULL OR p.region_scope = $5)
+          AND ($6::text IS NULL OR EXISTS (SELECT 1 FROM partnership_opportunity sx WHERE sx.partner_id = p.partner_id AND sx.status IN ('open', 'live') AND sx.stage = $6))
+          AND ($7::text IS NULL OR EXISTS (SELECT 1 FROM partnership_opportunity hx WHERE hx.partner_id = p.partner_id AND hx.status IN ('open', 'live') AND hx.health = $7))
+          AND (NOT $8::boolean OR (${QUIET(1)}))
+          AND ($9::date IS NULL OR ${added} BETWEEN $9::date AND $10::date)
+          ${seen}
+     ), figures AS (
+       SELECT count(*)::int AS partners,
+              count(*) FILTER (WHERE status = 'active')::int AS active,
+              count(*) FILTER (WHERE status = 'dormant')::int AS dormant,
+              count(*) FILTER (WHERE status = 'closed')::int AS closed,
+              count(*) FILTER (WHERE quiet)::int AS quiet,
+              count(*) FILTER (WHERE live)::int AS live
+         FROM x
+     ), by_dim AS (
+       SELECT COALESCE(${dim.key}::text, 'none') AS key, COALESCE(min(${dim.label}), $11) AS label,
+              count(*) FILTER (WHERE x.status = 'active')::int AS active,
+              count(*) FILTER (WHERE x.status = 'dormant')::int AS dormant,
+              count(*) FILTER (WHERE x.status = 'closed')::int AS closed,
+              row_number() OVER (ORDER BY ${dim.order}, ${dim.key}) AS rank
+         FROM x GROUP BY ${dim.key}
+     ), added AS (
+       SELECT to_char(added, 'YYYY-MM') AS at, count(*)::int AS value FROM x GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM x GROUP BY status) s) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'active', active, 'dormant', dormant, 'closed', closed) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM added) AS added`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_status: row.by_status || [], by_dim: row.by_dim || [], added: row.added || [] };
+}
+
 const COLUMNS = ["name", "legal_name", "partner_category_id", "region_scope", "industry", "website", "logo_document_id", "owner_id", "since", "custom", "lead_id"];
 
 /** A new partner; returns its id. */
@@ -446,6 +519,7 @@ async function contactsNamed(db, words, scope) {
 }
 
 module.exports = {
+  aiSummary,
   remove,
   trackerRows,
   employeeNamed,

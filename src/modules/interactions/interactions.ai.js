@@ -4,7 +4,8 @@
  * record's calls, meetings, emails, visits and notes the asker may see, a page of 25 at a time; and,
  * as a card the person confirms (docs/guides/praxis-ai.md §6.11, decision 33), Log Interaction,
  * through its form's own request and the screen's own service function. A linked mail thread is
- * logged by the mailbox binding (M7 PR 8), never by a card.
+ * logged by the mailbox binding (M7 PR 8), never by a card. Summary: the interactions in figures by type,
+ * by person as stacked bars of type, and by month or week (praxis-ai.md §6.13, Partnerships).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -40,11 +41,22 @@ module.exports = defineManifest({
   reads: [
     {
       key: "interactions.list",
+      summary: "interactions.summary",
       description: "List a partner's or lead's calls, meetings, emails, visits and notes, newest first: kind, subject, summary, when and who logged it",
       params: c.interactions.InteractionListQuery,
       permission: ["partnerships", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite: (row) => ({ type: "partner_interaction", id: row.partner_interaction_id, label: row.subject }),
+    },
+  ],
+  summaries: [
+    {
+      key: "interactions.summary",
+      description:
+        "Interactions in figures: calls, meetings, emails, visits, notes, who logged them, partners and leads reached; by type, by person stacked by type, most reached; by month or week",
+      params: c.interactions.InteractionSummaryQuery,
+      permission: ["partnerships", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
   ],
   routes: [{ intent: "log a call or meeting with a partner", screen: "partnerships.partners" }],
