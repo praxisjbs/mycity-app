@@ -21,7 +21,12 @@ const ORG = "/ess?tab=org-chart";
 const GUIDE = "/knowledge?tab=user-guide";
 
 /** The search window, opened with Ctrl and K. */
-const searchBox = (s) => s.page.locator('input[aria-label="Search"]').first();
+const searchBox = (s) => s.page.getByRole("dialog", { name: "Search" }).getByRole("combobox", { name: "Search" });
+/** Type into the search box, which has focus once open (it redraws as results come). */
+async function typeSearch(s, text) {
+  await s.page.keyboard.press("Control+a");
+  await s.page.keyboard.type(text, { delay: 85 });
+}
 async function openSearch(s) {
   await s.page.keyboard.press("Control+k");
   await searchBox(s).waitFor({ state: "visible", timeout: 5000 });
@@ -99,16 +104,16 @@ module.exports = {
           as: "aaron",
           start: HOME,
           lines: [
-            { say: "The dark menu on the left lists the modules Aaron can open. Home, My Workspace and Self-Service come first.", do: (s) => s.hover(h.link(s, "Home")) },
-            { say: "The rest are grouped under Work, People, Business and System.", do: (s) => s.hover(h.link(s, "Staff Community")) },
+            { say: "The dark menu on the left lists the modules Aaron can open. Home, My Workspace and Self-Service come first.", do: (s) => h.soft(s, h.link(s, "Home")) },
+            { say: "The rest are grouped under Work, People, Business and System.", do: (s) => h.soft(s, h.link(s, "Staff Community")) },
             "Each person sees only the modules their roles open. Cynthia's menu is longer than Aaron's.",
-            { say: "A number beside a module counts what waits for him there.", do: (s) => s.hover(s.page.getByRole("link", { name: /^Employee Self-Service \d/ })) },
+            { say: "A number beside a module counts what waits for him there.", do: (s) => h.soft(s, s.page.getByRole("navigation", { name: "Modules" }).getByRole("link", { name: / \d+$/ }).first()) },
             { say: "He opens Employee Self-Service. Its screens are tabs along the top, each with its own share of the count.", do: (s) => s.click(s.page.getByRole("link", { name: /^Employee Self-Service/ })) },
             { say: "Collapse Menu makes the menu narrow, to give the page more room. Expand Menu widens it again.", do: async (s) => { await s.click(h.button(s, "Collapse Menu")); await s.wait(0.8); await s.click(h.button(s, "Expand Menu")); } },
-            { say: "Refresh reloads the numbers on the screen and keeps his place.", do: (s) => s.hover(h.button(s, "Refresh")) },
-            { say: "Search Anything finds any screen, action or record.", do: (s) => s.hover(s.page.getByRole("button", { name: /^Search Anything/ })) },
-            { say: "The clock sits at the top right. Today it reads On Leave Today: Aaron's leave is approved.", do: (s) => s.hover(s.page.getByRole("button", { name: /^(Clock In|Done For Today|On Leave Today)$/ }).first()) },
-            { say: "The bell holds his notifications. And his name at the foot of the menu opens his account menu.", do: (s) => s.hover(h.button(s, "Notifications")) },
+            { say: "Refresh reloads the numbers on the screen and keeps his place.", do: (s) => h.soft(s, h.button(s, "Refresh")) },
+            { say: "Search Anything finds any screen, action or record.", do: (s) => h.soft(s, s.page.getByRole("button", { name: /^Search Anything/ })) },
+            { say: "The clock sits at the top right. Today it reads On Leave Today: Aaron's leave is approved.", do: (s) => h.soft(s, s.page.getByRole("button", { name: /^(Clock In|Done For Today|On Leave Today)$/ }).first()) },
+            { say: "The bell holds his notifications. And his name at the foot of the menu opens his account menu.", do: (s) => h.soft(s, h.button(s, "Notifications")) },
           ],
         },
       ],
@@ -129,7 +134,7 @@ module.exports = {
             { say: "Help opens the User Guide at the section about the screen he is on. Hide Here tucks the button away.", do: async (s) => { await s.wait(1.2); await s.click(h.button(s, "Quick Actions")); } },
             { say: "A module's screens are tabs under its name. He opens Self-Service, and swipes them sideways.", do: (s) => s.click(s.page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: /Self-Service/ })) },
             { say: "His picture at the top opens More: every other module as a tile, his display, and Sign Out.", do: (s) => s.click(h.button(s, "Your Account")) },
-            { say: "Tiles use short names: Knowledge is the Knowledge Hub, Assistant is Praxis AI.", do: (s) => s.hover(s.page.getByRole("link", { name: "Knowledge" })) },
+            { say: "Tiles use short names: Knowledge is the Knowledge Hub, Assistant is Praxis AI.", do: (s) => h.soft(s, s.page.getByRole("link", { name: "Knowledge" })) },
             { say: "Pulling a page down refreshes it. His phone's own Back gesture goes back a screen.", do: (s) => s.page.keyboard.press("Escape") },
           ],
         },
@@ -145,9 +150,9 @@ module.exports = {
           lines: [
             { say: "Search finds every screen, action and record he may open. Ctrl and K opens it from anywhere.", do: (s) => openSearch(s) },
             { say: "With nothing typed, it lists what waits on him first, then the screens and actions he can open.", do: (s) => s.wait(0.5) },
-            { say: "He types leave.", do: (s) => s.type(searchBox(s), "leave", { delay: 90 }) },
+            { say: "He types leave.", do: (s) => typeSearch(s, "leave") },
             { say: "Results come in groups: Screens, Actions, his own records, and the User Guide.", do: (s) => h.soft(s, s.page.getByText("Screens", { exact: true }).first()) },
-            { say: "Some actions happen at once, wherever he is. He types change password.", do: (s) => s.type(searchBox(s), "change password", { delay: 70 }) },
+            { say: "Some actions happen at once, wherever he is. He types change password.", do: (s) => typeSearch(s, "change password") },
             { say: "One typing slip is forgiven. Escape closes it.", do: async (s) => { await s.wait(0.8); await s.page.keyboard.press("Escape"); } },
           ],
         },
@@ -156,9 +161,9 @@ module.exports = {
           as: "cynthia",
           start: HOME,
           lines: [
-            { say: "Cynthia may see everyone, so her search finds people too. She types Bassey.", do: async (s) => { await openSearch(s); await s.type(searchBox(s), "Bassey", { delay: 90 }); } },
+            { say: "Cynthia may see everyone, so her search finds people too. She types Bassey.", do: async (s) => { await openSearch(s); await typeSearch(s, "Bassey"); } },
             { say: "Bassey Ekpe comes first, then his three latest attendance days, each with its status.", do: (s) => h.soft(s, s.page.getByRole("option", { name: /Bassey Ekpe/ }).first()) },
-            { say: "Starting with a word narrows the search: guide leave finds only the User Guide's parts about leave.", do: async (s) => { await s.type(searchBox(s), "guide leave", { delay: 70 }); await s.wait(0.8); } },
+            { say: "Starting with a word narrows the search: guide leave finds only the User Guide's parts about leave.", do: async (s) => { await typeSearch(s, "guide leave"); await s.wait(0.8); } },
             { say: "Escape closes it.", do: (s) => s.page.keyboard.press("Escape") },
           ],
         },
@@ -175,7 +180,7 @@ module.exports = {
             { say: "The bell tells Aaron when something needs him. A dot means something is unread.", do: (s) => s.click(h.button(s, "Notifications")) },
             { say: "Unread shows only what he hasn't read. All shows everything, grouped Today, Yesterday and Earlier.", do: (s) => h.soft(s, s.page.getByRole("radio", { name: "All" }).or(s.page.getByRole("button", { name: "All", exact: true })).first()) },
             "Pressing a notification opens what it is about, and marks it read.",
-            { say: "Mark All Read marks everything read at once, on all his devices.", do: (s) => s.hover(h.button(s, "Mark All Read")) },
+            { say: "Mark All Read marks everything read at once, on all his devices.", do: (s) => h.soft(s, h.button(s, "Mark All Read")) },
             { say: "The cog, Notification Settings, chooses how he is told.", do: (s) => s.click(h.button(s, "Notification Settings")) },
             { say: "This Device says whether this computer gets notifications. Turn On asks the browser.", do: (s) => h.soft(s, s.page.getByText("This Device", { exact: true }).first()) },
             { say: "Under Notice Categories, In App, Email and Push for each kind of notice. Security is always on.", do: (s) => h.soft(s, s.page.getByText("Notice Categories", { exact: true }).first()) },
@@ -212,7 +217,7 @@ module.exports = {
           as: "aaron",
           start: PROFILE,
           lines: [
-            { say: "My Profile, in Self-Service, shows Aaron's record as People keep it.", do: (s) => s.hover(h.heading(s, "My Profile")) },
+            { say: "My Profile, in Self-Service, shows Aaron's record as People keep it.", do: (s) => h.soft(s, h.heading(s, "My Profile")) },
             { say: "Personal, then Employment: his job, department, line manager and start date.", do: (s) => h.soft(s, h.heading(s, "Employment")) },
             { say: "His Work Schedule sets the hours the hub measures lateness against.", do: async (s) => { await s.scroll(500); await h.soft(s, h.heading(s, "Work Schedule")); } },
             "Bank Details shows only the last four digits. Next of Kin is who to call in an emergency.",
@@ -227,7 +232,7 @@ module.exports = {
           lines: [
             { say: "The Org Chart shows who works at MyCity, and who reports to whom, from the CEO down.", do: (s) => s.wait(0.6) },
             { say: "He types Chinyere in Name or role.", do: (s) => s.type(s.page.getByRole("searchbox").first(), "Chinyere", { delay: 90 }) },
-            { say: "Her card is outlined. He opens it: her department, who she reports to, and her team.", do: async (s) => { await s.click(s.page.getByRole("button", { name: /Chinyere Elechi/ }).first()); await s.wait(0.8); } },
+            { say: "Her card is outlined. He opens it: her department, who she reports to, and her team.", do: async (s) => { await s.click(s.page.getByRole("button", { name: "Chinyere Elechi", exact: true })); await s.wait(0.8); } },
             "Send Message writes to her in Staff Community. Download PDF saves the whole chart.",
           ],
         },
@@ -242,8 +247,8 @@ module.exports = {
           start: GUIDE,
           setup: () => fs.writeFileSync(process.env.VIDEO_AI_REPLIES, JSON.stringify(ANSWER)),
           lines: [
-            { say: "The User Guide lives in the Knowledge Hub. He sees only the parts about what he can open.", do: (s) => s.hover(h.tab(s, "User Guide")) },
-            { say: "Quick Start has short illustrated cards. Full Guide has every chapter in full.", do: (s) => s.hover(s.page.getByRole("radio", { name: "Full Guide" })) },
+            { say: "The User Guide lives in the Knowledge Hub. He sees only the parts about what he can open.", do: (s) => h.soft(s, h.tab(s, "User Guide")) },
+            { say: "Quick Start has short illustrated cards. Full Guide has every chapter in full.", do: (s) => h.soft(s, s.page.getByRole("radio", { name: "Full Guide" })) },
             { say: "He asks it a question in his own words: How do I request leave?", do: (s) => s.type(s.page.getByRole("searchbox").first(), "How do I request leave?", { delay: 55 }) },
             { say: "The results appear as he types, the best first, with the step that answers it.", do: (s) => h.soft(s, s.page.getByRole("list", { name: "Guide Results" })) },
             { say: "Get Answer writes a short answer from the guide.", do: (s) => s.click(h.button(s, "Get Answer")) },
@@ -261,7 +266,7 @@ module.exports = {
           as: "bode",
           start: "/settings?tab=organisation",
           lines: [
-            { say: "Settings is where the hub is set up. Bode, as System Administrator, keeps it.", do: (s) => s.hover(s.page.getByRole("link", { name: /^Settings/ })) },
+            { say: "Settings is where the hub is set up. Bode, as System Administrator, keeps it.", do: (s) => h.soft(s, s.page.getByRole("link", { name: /^Settings/ })) },
             { say: "Organisation holds the company's details. Naira and Lagos time are fixed for the hub.", do: (s) => h.soft(s, h.heading(s, "Company")) },
             { say: "The Working Week: Monday to Friday, 09:00 to 17:00, and Saturday, 09:00 to 15:00.", do: async (s) => { await s.scroll(500); await h.soft(s, h.heading(s, "Working Week")); } },
             "Attendance, leave and every deadline count from it. Edit Week changes any day, with no new release.",
@@ -277,8 +282,8 @@ module.exports = {
             { say: "Security sets how long a session lasts, the idle lock, and the shortest password allowed.", do: (s) => h.soft(s, h.heading(s, "Sessions and Passwords")) },
             { say: "Two-Step by Role can require an authenticator app for a whole role. Its people set it up at their next sign-in.", do: (s) => h.soft(s, h.heading(s, "Two-Step by Role")) },
             { say: "Failed Sign-Ins lists the week's refused sign-ins, and why.", do: async (s) => { await s.scroll(700); await h.soft(s, h.heading(s, "Failed Sign-Ins")); } },
-            { say: "Appearance picks the dark theme's colours, the fonts, and the theme everyone starts with.", do: (s) => s.click(h.tab(s, "Appearance")) },
-            { say: "And the Audit Log records who did what, when, to which record. Nobody can change it.", do: (s) => s.click(h.tab(s, "Audit Log")) },
+            { say: "Appearance picks the dark theme's colours, the fonts, and the theme everyone starts with.", do: async (s) => { await s.scroll(-1400); await s.click(h.tab(s, "Appearance")); } },
+            { say: "And the Audit Log records who did what, when, to which record. Nobody can change it.", do: async (s) => { await s.click(h.button(s, "More Tabs")); await s.click("Audit Log"); } },
           ],
         },
       ],
@@ -291,7 +296,7 @@ module.exports = {
           as: "aaron",
           start: HOME,
           lines: [
-            { say: "That's finding your way, from the menu to Settings.", do: (s) => s.hover(h.link(s, "Home")) },
+            { say: "That's finding your way, from the menu to Settings.", do: (s) => h.soft(s, h.link(s, "Home")) },
             "Part 4 is Home, the dashboards, and clocking in and out.",
           ],
         },
