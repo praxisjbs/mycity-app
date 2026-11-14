@@ -59,6 +59,17 @@ describe("error reporter", () => {
     expect(await reporter.flush()).toBe(0);
   });
 
+  test("reports made while the database is down are held and written once it answers", async () => {
+    let down = true;
+    reporter.__reset({ query: async (sql, params) => { if (down) { const e = new Error("connect ECONNREFUSED"); e.code = "ECONNREFUSED"; throw e; } inserts.push({ sql, params }); return { rows: [] }; } });
+    await reporter.report(new Error("during the outage"), { origin: "server", severity: "notice" });
+    expect(await reporter.flush()).toBe(0);
+    down = false;
+    await reporter.report(new Error("after it"), { origin: "server", severity: "notice" });
+    expect(await reporter.flush()).toBe(2);
+    expect(inserts[0].params.join(" ")).toContain("during the outage");
+  });
+
   test("fingerprints ignore ids and numbers", () => {
     const a = reporter.fingerprint({ name: "Error", message: "Employee 3f2a1c4e-0000-4000-8000-000000000001 has 3 items", stack: "" });
     const b = reporter.fingerprint({ name: "Error", message: "Employee 9e9e9e9e-0000-4000-8000-000000000002 has 7 items", stack: "" });

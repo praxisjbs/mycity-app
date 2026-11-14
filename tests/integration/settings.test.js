@@ -339,6 +339,10 @@ describeDb("access, settings and audit against the real migrations", () => {
       );
       expect(audit.is_sensitive).toBe(true);
       expect(audit.after.grants.people).toBe("view, approve · team");
+      // The Audit Log names the record: the role by its name, never by its id alone.
+      const listed = await as("ops").get(`/audit?entity_id=${studio.role_id}`);
+      expect(listed.status).toBe(200);
+      expect(listed.body.data[0].record_name).toBe("Studio Lead");
       await drain();
       const told = await one(
         `SELECT count(*)::int AS n FROM notification n

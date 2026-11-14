@@ -327,6 +327,7 @@ describe("a person's sheet", () => {
         photo_url: null,
         is_ceo: false,
         grants: settings ? { ...grants, settings: ["view"] } : grants,
+        scopes: {},
         capabilities: ["home.team"],
         roles: [{ code: "manager", name: "Line Manager" }],
         home_view: "staff",

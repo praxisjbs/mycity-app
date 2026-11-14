@@ -7,6 +7,7 @@ import { ModalProvider } from "@mycity/ui";
 
 const m = vi.hoisted(() => ({
   reload: vi.fn(),
+  run: vi.fn(async () => ({})),
   call: vi.fn(async () => ({ document_id: "d1", file_name: "mycity-status.md", status: "done" })),
   saveExport: vi.fn(async () => true),
   can: vi.fn(() => true),
@@ -15,14 +16,14 @@ const m = vi.hoisted(() => ({
 vi.mock("@/api/hooks", () => ({
   invalidate: vi.fn(),
   useApi: (key: string) => ({ data: m.reads[key], error: null, loading: false, reload: m.reload }),
-  useMutation: () => ({ run: vi.fn(), pending: false }),
+  useMutation: () => ({ run: m.run, pending: false }),
   usePaged: () => ({ rows: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false }, loading: false, error: null, q: "", setQ: () => undefined, setPage: () => undefined }),
 }));
 vi.mock("@/api/client", () => ({ api: { call: m.call }, ApiError: class ApiError extends Error {} }));
 vi.mock("@/api/exports", () => ({ saveExport: m.saveExport }));
-vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: m.can }) }));
+vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: m.can }), useMe: () => ({ user_id: "00000000-0000-4000-8000-0000000000b1" }) }));
 
-import { StatusTab } from "./SystemHealth";
+import { Fault, StatusTab } from "./SystemHealth";
 
 const check = (over: Partial<HealthCheck> = {}): HealthCheck => ({
   key: "postgres",
@@ -154,5 +155,52 @@ describe("Settings · Status", () => {
     render(<ModalProvider><StatusTab /></ModalProvider>);
     expect(screen.queryByRole("button", { name: "Download Brief" })).toBeNull();
     m.can.mockReturnValue(true);
+  });
+});
+
+describe("Settings · Faults, one fault", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    m.reads = {};
+  });
+
+  const fault = {
+    error_group_id: "00000000-0000-4000-8000-0000000000f1",
+    title: "Error: connect ECONNREFUSED 127.0.0.1:5432",
+    name: "Error",
+    last_message: "connect ECONNREFUSED 127.0.0.1:5432",
+    severity: "error",
+    origin: "server",
+    route: "POST /api/v1/auth/login",
+    frame: null,
+    status: "open",
+    assigned_to: null,
+    assigned_name: null,
+    first_seen_at: "2026-11-14T17:41:00.000Z",
+    last_seen_at: "2026-11-14T17:41:30.000Z",
+    first_release: "local",
+    last_release: "local",
+    regressions: 0,
+    came_back: false,
+    today: 5,
+    total: 5,
+    people: 0,
+    plainly: "Something the app depends on did not answer.",
+    daily: [],
+    occurrences: [],
+    notes: [],
+  };
+
+  it("Take It On keeps the fault open for the note that follows; Mark Fixed closes it", async () => {
+    m.reads["GET /api/v1/system-health/faults/:id"] = fault;
+    const close = vi.fn();
+    render(<ModalProvider><Fault id={fault.error_group_id} canEdit close={close} /></ModalProvider>);
+    await userEvent.click(screen.getByRole("button", { name: "Take It On" }));
+    expect(m.run).toHaveBeenCalledWith(expect.objectContaining({ body: expect.objectContaining({ status: "handling", assigned_to: "00000000-0000-4000-8000-0000000000b1" }) }));
+    expect(close).not.toHaveBeenCalled();
+    expect(m.reload).toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Mark Fixed" }));
+    expect(close).toHaveBeenCalled();
   });
 });

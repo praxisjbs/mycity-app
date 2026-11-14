@@ -36,6 +36,7 @@ function entry(i: number, when: string, actor: string, action: string, entity: s
     module_key: moduleKey,
     entity_type: rest.length ? slug(type) : "record",
     entity_id: rest.length ? rest.join(" · ") : entity,
+    record_name: rest.length ? rest.join(" · ") : null,
     link: null,
     before: before === null ? null : { value: before },
     after: after === null && reason === null ? null : { ...(after === null ? {} : { value: after }), ...(reason === null ? {} : { reason }) },

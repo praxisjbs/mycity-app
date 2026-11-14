@@ -33,6 +33,7 @@ import {
   useModal,
   Who,
 } from "@mycity/ui";
+import { valueLines } from "./auditValues";
 
 type Filters = { module?: string; from?: string; to?: string };
 const RESTRICTED = "Your roles cannot see this value.";
@@ -41,7 +42,6 @@ const RESTRICTED = "Your roles cannot see this value.";
 const typeLabel = (t: string) => (t.charAt(0).toUpperCase() + t.slice(1)).replace(/_/g, " ");
 /** A long id shortened for a list; names and numbers stay whole. */
 const shortId = (id: string) => (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(id) ? id.slice(0, 8) : id);
-const valueText = (v: unknown) => (v === null || v === undefined ? null : typeof v === "object" ? JSON.stringify(v) : String(v));
 
 /**
  * Settings · Audit Log (docs/guides/foundation.md §10): every write in every module,
@@ -149,7 +149,7 @@ export function AuditLog() {
           { key: "occurred_at", label: "When", sortable: true, render: (a) => formatDateTime(a.occurred_at) },
           { key: "who", label: "Who", render: (a) => (a.actor_name ? <Who name={a.actor_name} sub={a.actor_email ?? undefined} /> : "System") },
           { key: "what", label: "What", render: (a) => <b>{a.summary}</b> },
-          { key: "record", label: "Record", render: (a) => `${typeLabel(a.entity_type)} · ${shortId(a.entity_id)}` },
+          { key: "record", label: "Record", render: (a) => `${typeLabel(a.entity_type)} · ${a.record_name ?? shortId(a.entity_id)}` },
           { key: "module", label: "Module", desktop: true, render: (a) => s?.modules.find((m) => m.key === a.module_key)?.label ?? a.module_key },
           { key: "flags", label: "", desktop: true, render: (a) => (a.masked.length ? <Pill tone="warn">Restricted</Pill> : a.is_sensitive ? <Pill tone="info">Sensitive</Pill> : null) },
         ]}
@@ -179,7 +179,17 @@ function EntryDetail({ entry, close }: { entry: AuditEntry; close: () => void })
     if (!side || !(k in side)) return null;
     const v = side[k];
     if (restricted.has(k) && (v === null || v === undefined)) return <HelpTerm help={RESTRICTED}>Restricted</HelpTerm>;
-    return <span data-copy="content" className="wrap-any">{valueText(v)}</span>;
+    const lines = valueLines(v);
+    if (lines.length < 2) return <span data-copy="content" className="wrap-any">{lines[0] ?? null}</span>;
+    return (
+      <span data-copy="content" className="wrap-any">
+        {lines.map((l) => (
+          <span key={l} className="block">
+            {l}
+          </span>
+        ))}
+      </span>
+    );
   };
   return (
     <>
@@ -187,7 +197,7 @@ function EntryDetail({ entry, close }: { entry: AuditEntry; close: () => void })
         items={[
           ["When", formatDateTime(entry.occurred_at)],
           ["Who", entry.actor_name ? `${entry.actor_name}${entry.actor_email ? `, ${entry.actor_email}` : ""}` : "System"],
-          ["Record", `${typeLabel(entry.entity_type)} · ${entry.entity_id}`],
+          ["Record", `${typeLabel(entry.entity_type)} · ${entry.record_name ?? entry.entity_id}`],
           ["Action", <code key="a" className="text-xs">{entry.action}</code>],
           ["Address", entry.actor_ip],
         ]}

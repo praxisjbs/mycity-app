@@ -81,6 +81,13 @@ describe("an entry as a reader sees it", () => {
     const [none] = present([row({ entity_type: "audit_export" })], [], null);
     expect(none.link).toBeNull();
   });
+
+  test("the record is named as the ledger read it, or left to the screen's id", () => {
+    const [named] = present([row({ entity_type: "account", record_name: "Bode Oluwasanmi" })], [], null);
+    expect(named.record_name).toBe("Bode Oluwasanmi");
+    const [unnamed] = present([row()], [], null);
+    expect(unnamed.record_name).toBeNull();
+  });
 });
 
 describe("the export's filters, as the email says them", () => {

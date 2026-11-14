@@ -181,6 +181,7 @@ describeDb("identity against the real migrations", () => {
       expect(me.body.is_ceo).toBe(true);
       expect(me.body.home_view).toBe("ceo");
       expect(me.body.grants.payroll).toEqual(["view", "create", "edit", "delete", "approve", "export"]);
+      expect(me.body.scopes.people).toBe("all");
       const every = (await q("SELECT code::text AS code FROM capability ORDER BY code")).rows.map((r) => r.code);
       expect(every).toEqual(expect.arrayContaining(catalog.CAPABILITIES));
       expect(me.body.capabilities).toEqual(every);
@@ -477,6 +478,9 @@ describeDb("identity against the real migrations", () => {
       expect(res.body.user.home_view).toBe("staff");
       expect(res.body.user.grants.settings).toBeUndefined();
       expect(res.body.user.grants.ess).toEqual(["view", "create", "edit"]);
+      // Staff reach their own records only, so People's Employees list stays closed to them.
+      expect(res.body.user.scopes.ess).toBe("own");
+      expect(res.body.user.scopes.people).toBeUndefined();
       expect(res.body.user.capabilities).toEqual([]);
 
       const row = await asOps(request(app).get(`/api/v1/users/${people.staffUserId}`));

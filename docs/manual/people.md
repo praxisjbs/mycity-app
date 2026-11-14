@@ -8,6 +8,8 @@ icon: users
 
 People is where MyCity keeps its staff register. Operations and People, Management and the CEO
 use it every day. A line manager sees the people who report to them on the screens their role opens.
+A role that may view People over everyone, such as a Regional Lead, also opens Employees, with what
+the role masks reading **Restricted**.
 
 ## Employees {#people-employees screen=people/employees icon=users}
 

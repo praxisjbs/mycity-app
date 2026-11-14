@@ -88,6 +88,11 @@ const Me = z
     /** Module key → the actions the person may take there. Hiding is a courtesy; the API enforces. */
     grants: z.record(ModuleKey, z.array(Action)),
     /**
+     * Module key → whose records the person reaches there (all, team or own), the widest any of
+     * their roles gives: People's Employees list is for whoever views People over everyone.
+     */
+    scopes: z.record(ModuleKey, z.enum(["all", "team", "own"])),
+    /**
      * The capabilities the person holds, through a role or given to them, A to Z; the
      * CEO holds every one there is. Opens Home's Team, Alerts and Reports tabs.
      */

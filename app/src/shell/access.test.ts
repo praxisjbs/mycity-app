@@ -19,6 +19,7 @@ function person(capabilities: string[], over: Partial<Me> = {}): Me {
     photo_url: null,
     is_ceo: false,
     grants: { home: ["view"], people: ["view"] },
+    scopes: { home: "own", people: "team" },
     capabilities,
     roles: [{ code: "employee", name: "Staff" }],
     home_view: "staff",
@@ -75,6 +76,12 @@ describe("shell access", () => {
   it("a line manager opens People · Leave to decide their team's leave; anyone else without Settings does not", () => {
     expect(visibleTabs(person([], { manages_people: true }), people).map((t) => t.slug)).toEqual(["organogram", "attendance", "leave"]);
     expect(visibleTabs(person([]), people).map((t) => t.slug)).not.toContain("leave");
+  });
+
+  it("a role viewing People over everyone opens the Employees list without Settings; over a team it does not", () => {
+    const regional = person([], { scopes: { home: "own", people: "all" } });
+    expect(visibleTabs(regional, people).map((t) => t.slug)).toEqual(["employees", "organogram", "attendance"]);
+    expect(visibleTabs(person([]), people).map((t) => t.slug)).not.toContain("employees");
   });
 
   it("every other module's tabs are gated as before", () => {

@@ -820,14 +820,15 @@ Who did what, when, to which record. Nobody can change it.
 - The tiles count the entries **Today**, **This Week** and **This Month**, and the **Sensitive**
   ones this month, such as a pay or bank change.
 - Each entry says **When**, **Who** did it (**System** when the hub did it itself), **What** was
-  done and to which **Record**. A computer also shows its **Module** and **Entries by Module**.
+  done and to which **Record**, by its name or number, such as *Role · Regional Lead*. A computer
+  also shows its **Module** and **Entries by Module**.
 
 1. Search by person or what was done, or choose a **Module** and the **Dates**, **From** and
    **To**. A day typed wrong is marked under its own box, such as **Not a real date**. On a phone,
    press **Filter**, choose them, and press **Show Entries**. **Clear Filters** removes them.
 2. Press an entry. It shows **When**, **Who**, the **Record**, the **Action** and the **Address** it
-   came from, then each **Field** **Before** and **After**. A value your role does not see reads
-   **Restricted**.
+   came from, then each **Field** **Before** and **After**, a list or a set of values one line each.
+   A value your role does not see reads **Restricted**.
 3. **Open Record** opens the record it is about, when it has a screen. **Close** goes back.
 4. {needs="settings export"} On a computer, **Export** (shown only with the right to export) saves the filtered entries as a
    spreadsheet, up to 10,000 entries. A message says **Export downloaded**. For more, narrow the

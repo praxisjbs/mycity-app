@@ -148,13 +148,20 @@ async function me(db, userId) {
     throw new AppError("AUTH_REQUIRED", "Sign in to continue", 401);
   const roles = await repo.rolesOf(db, userId);
   const grants = {};
+  const scopes = {};
   if (row.is_ceo === true) {
-    for (const m of catalog.MODULES) grants[m] = [...catalog.ACTIONS];
+    for (const m of catalog.MODULES) {
+      grants[m] = [...catalog.ACTIONS];
+      scopes[m] = "all";
+    }
   } else {
     for (const g of await repo.grantsOf(db, roles.map((r) => r.role_id))) {
       if (!catalog.isModule(g.module_key)) continue;
       const actions = catalog.ACTIONS.filter((a) => g[`can_${a}`] === true);
-      if (actions.length) grants[g.module_key] = actions;
+      if (!actions.length) continue;
+      grants[g.module_key] = actions;
+      // The widest record scope any of the person's roles gives on the module, as the API applies it.
+      scopes[g.module_key] = g.scope;
     }
   }
   const view = row.is_ceo
@@ -177,6 +184,7 @@ async function me(db, userId) {
     photo_url: photoUrl(row.photo_document_id),
     is_ceo: row.is_ceo === true,
     grants,
+    scopes,
     capabilities,
     roles: roles.map((r) => ({ code: r.code, name: r.name })),
     home_view: view,

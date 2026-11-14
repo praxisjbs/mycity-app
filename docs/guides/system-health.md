@@ -206,6 +206,9 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
   `first_seen_at`. It fires `system_health.fault_unattended`, which carries email among its default
   channels, and repeats every 24 hours until the status changes. `escalated_at` records the last
   firing.
+- **Held through an outage.** A report the database cannot take (it is restarting, or down) is kept
+  in the process, 200 at most, and written once it answers, with the time it happened; so a database
+  outage reaches Faults as the 500s it caused, not only the log (TB, 14/11/2026, found filming M9).
 - **Counts** on the list are aggregated from `error_event` for the window asked for: Today is the
   last 24 hours, In All is every event still kept. They are never incremented into `error_group`.
 - **Recording, not quiet.** Performance with no sample in the last 3 minutes says the one-minute
@@ -532,3 +535,5 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
   registered device, email only after 24 hours unattended, an 08:00 digest, and no WhatsApp; a
   Markdown brief whose instructions require 4 to 10 clarity questions before any fix.
 - 20/10/2026 · TB · §3, §6, §7: only `fatal` and `error` are told. A new, returning or spiking `warning` or `notice` group no longer pushes (the roll-up pushed every new group whatever its severity, though §6 said a notice never alerts). An `AppError` may name its own severity, which the error handler records in place of `error`; Geoapify not answering (`MAPS_UNAVAILABLE`) is a `warning`, since the `maps` check carries the outage (fault #1 on staging; `docs/guides/addresses.md` §6.5).
+- 14/11/2026 · TB · §6 Held through an outage: `error-reporter.js` kept no report the database refused, so a database outage never reached Faults (found filming the Milestone 9 video, `docs/runbooks/training-videos.md` §7); a failed flush now keeps its batch and tries again. `observability.test.js`.
+- 14/11/2026 · TB · Faults: Take It On closed the fault, where the User Guide's next step is a note in it; it now stays open, Held By naming the reader, and only Mark Fixed and Ignore Fault close it (found filming M9; `SystemHealth.test.tsx`).

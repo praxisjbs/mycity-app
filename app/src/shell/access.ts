@@ -47,8 +47,12 @@ export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
     if (mod.key === "settings" && SYSTEM_HEALTH_TABS.includes(t.slug)) return healthView(me);
     if (mod.key === "settings" && t.slug === "integrations") return integrationsView(me);
     if (mod.key === "settings") return !!FULL(me);
-    /* A line manager decides their team's leave on People · Leave, the list scoped to their team (docs/guides/ess.md §2). */
-    if (mod.key === "people" && !FULL(me)) return t.slug === "attendance" || t.slug === "organogram" || (t.slug === "leave" && me.manages_people);
+    /*
+     * A line manager decides their team's leave on People · Leave, the list scoped to their team (docs/guides/ess.md §2).
+     * The Employees list is for whoever views People over everyone, a custom role too, not only Settings.
+     */
+    if (mod.key === "people" && !FULL(me))
+      return t.slug === "attendance" || t.slug === "organogram" || (t.slug === "employees" && me.scopes?.people === "all") || (t.slug === "leave" && me.manages_people);
     /* Announcements is the posting and read-tracking side, for those who post (`announcements.post`, as every route asks); staff read them in #announcements. */
     if (mod.key === "community" && t.slug === "announcements") return hasCapability(me, "announcements.post");
     if (mod.key === "queries" && !FULL(me)) return t.slug === "queries";
