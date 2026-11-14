@@ -1,0 +1,35 @@
+<style>
+  .ov-meta { margin: 0 0 12px 0; font-size: 9pt; color: #71717A; }
+  .ov-meta span { margin-right: 14px; }
+  .ov-meta strong { color: #014339; font-weight: 600; }
+  .ov-answer { margin: 0 0 14px 0; white-space: pre-line; }
+  .ov-tiles { display: flex; gap: 8px; margin: 0 0 16px 0; }
+  .ov-tile { flex: 1 1 0; border: 1px solid #E4E4E7; border-radius: 6px; padding: 8px 10px; }
+  .ov-tile-label { font-size: 8.5pt; color: #71717A; }
+  .ov-tile-value { font-size: 14pt; font-weight: 700; color: #014339; font-variant-numeric: tabular-nums; }
+  .ov-section { margin: 0 0 16px 0; break-inside: avoid; page-break-inside: avoid; }
+  .ov-section h2 { font-size: 11.5pt; margin: 0 0 6px 0; }
+  .ov-section .doc-chart { margin: 0 0 6px 0; }
+  .ov-section table { font-size: 9pt; margin: 4px 0 0 0; }
+  .ov-section td + td, .ov-section th + th { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ov-note { margin: 0 0 6px 0; font-size: 9.5pt; color: #71717A; }
+  .ov-about { margin-top: 18px; break-inside: avoid; page-break-inside: avoid; }
+  .ov-about h2 { font-size: 11.5pt; margin: 0 0 6px 0; }
+  .ov-about td { font-size: 9pt; }
+  .ov-about td:first-child { width: 38mm; color: #71717A; }
+</style>
+<p class="ov-meta"><span><strong>Asked By</strong> {{ asked_by }}</span><span><strong>Asked On</strong> {{ datetime asked_on }}</span><span><strong>As At</strong> {{ datetime as_at }}</span></p>
+<p class="ov-answer">{{ answer }}</p>
+{{#if figures}}<div class="ov-tiles">{{#each figures}}<div class="ov-tile"><div class="ov-tile-label">{{ label }}</div><div class="ov-tile-value">{{#if money}}{{ money value }}{{else}}{{ value }}{{/if}}</div></div>{{/each}}</div>{{/if}}
+{{#each sections}}
+<section class="ov-section">
+  <h2>{{ title }}</h2>
+  {{#if note}}<p class="ov-note">{{ note }}</p>{{/if}}
+  {{#if chart}}{{ chart }}{{/if}}
+  {{#if table}}{{ table }}{{/if}}
+</section>
+{{/each}}
+<section class="ov-about">
+  <h2>About This File</h2>
+  <table>{{#each about}}<tr><td>{{ item }}</td><td>{{ value }}</td></tr>{{/each}}</table>
+</section>

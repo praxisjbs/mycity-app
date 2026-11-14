@@ -366,7 +366,7 @@ the summaries, and Appendix B the build plan.
 | Every module's manifest | Backend | | The reads, summaries and actions Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9), summaries for its big tables (§6.13, PR3) and actions for the changes people ask for (§6.11, PR4) |
 | An action card | Inside an answer, on the full screen and in the phone's chat | The person who asked, for an action their grant allows | The action's name, the fields its form offers as it will receive them (as a person reads them: people, departments and projects by name, decision 31), the records it acts on named and linked, a problem on its field, the buttons; the result line after the press, one line per record; Expired with Draw It Again | Press the verb (with the count when it acts on several; Confirm It's You first for a sensitive class; not offered while a field shows a problem, Edit standing in its place), Edit (the fields through the form system, people, departments and projects with the screen's own pickers, Save Changes), Cancel; a suggested card reads as a question with Not Now |
 | Praxis AI · Ask, Attach Document (Appendix A: invoices and payment receipts built in PR 1, contracts and MoUs in PR 2) | Staff app: beside the question box, on the full screen and in the phone's chat | `praxis_ai` create, and the grant each kind needs (decision 41) | A modal: the kinds the person may attach as tiles, then the file; the question's bubble then carries the file; a contract's terms on the pane's Record tab | Attach an invoice, a payment receipt, or a contract or MoU, and get its card (§6.18) |
-| Praxis AI · Ask, the Overview's charts and foot (Appendix B: stacked bars built in PR 1, a whole list's chart in PR 2; the foot planned) | Staff app: the pane's Overview on the full screen, the Figures sheet on a phone | `praxis_ai` view; each figure through the grant of the summary or read it came from | Up to three figures and one chart, a stacked bar with its legend where a summary's rows carry parts (§6.19 item 1), or a chart of a whole list's own columns, amounts in naira (item 6); a charted answer's table in the pane rather than the chat (item 7, planned) | View Data, Download PDF (item 8, planned) |
+| Praxis AI · Ask, the Overview's charts and foot (Appendix B: stacked bars built in PR 1, a whole list's chart in PR 2, the foot and the PDF in PR 3) | Staff app: the pane's Overview on the full screen, the Figures sheet on a phone | `praxis_ai` view; each figure through the grant of the summary or read it came from | Up to three figures and one chart, a stacked bar with its legend where a summary's rows carry parts (§6.19 item 1), or a chart of a whole list's own columns, amounts in naira (item 6); a charted answer's table in the pane rather than the chat, and an answer from a summary alone with the chart's figures on Table (item 7) | View Data, Download PDF (item 8) |
 
 ## 3 · How the screens relate
 
@@ -436,7 +436,9 @@ Migration `10340_praxis_read_timeout.sql` (PR3) widens `ai_message_read.outcome`
 or summary the database cut at the 3 second statement timeout (§6.3 step 8), so the Sources tab can
 say the question covered too much. An answer's Excel file (§6.16) is a `document` of type
 `ai_answer_export` (`export: true`, personal, the asker's own, kept 24 hours by the vault's sweep),
-reserved in the request and filled by the worker; no table of its own.
+reserved in the request and filled by the worker; no table of its own. An Overview's PDF (§6.19 item
+8) is a `document` of type `ai_answer_overview` the same way, and an answer keeps the spec its Overview
+was drawn from in `metadata.overview_spec` (the contract's `AiOverviewSpec`).
 
 Migration `10360_praxis_card_names.sql` (decision 31) adds `ai_action_draft.names` (jsonb, an empty
 list by default, never null): the people, departments and projects a card's fields hold, each as
@@ -459,7 +461,7 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 | `POST /ask` | `AiAsk` (`question` up to 500 characters, empty only beside an `attachment` (`{ document_id, kind }`, §6.18), `ai_conversation_id` optional, `context` optional: the screen asked from, `shows`: what the asking screen can draw, `cards` and `pane`) → `AiAnswer` (adds `card`, `context`, `attachment` (the file the question carried), and `choices`, the answers to tap under a question asked before a card; `reads` carry `n`, `module_key`, `params`, `outcome` (`read`, `refused`, `invalid`, `failed` or `timed_out`) and `masked`; a `table` names the `read` it was drawn from) | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed, with `ai:progress` on the person's realtime room before each read (§6.1.8). The full screen sends `context` and `shows: ["pane"]`. A screen that does not say `shows: ["cards"]` is offered no action, and one without `"pane"` gets no overview spec (§6.11, §6.13) |
 | `GET /answers/:id/reads/:n` (`page`) | `PageQuery` → `AiReadRows` | `praxis_ai` view · own | yes, 25 | Read `n` of the answer run again with its stored parameters and the caller's rights now (§6.12): the Table's later pages, the Sources tab and Excel come from here. 404 for a summary or a read that was refused or timed out |
 | `POST /answers/:id/reads/:n/export` | `EmptyBody` → `documents.ExportFile`, 202 | `praxis_ai` view · own | | Download Excel (§6.16): every row of read `n`, replayed in the worker with the caller's rights and masks as they stand then, at most 25,000 rows, with an About This File sheet; the screen waits on `GET /exports/:id` and downloads as every export does (`foundation.md` §6.12). 404 as the replay is |
-| `POST /answers/:id/overview/export` (planned, Appendix B PR 3) | `EmptyBody` → `documents.ExportFile`, 202 | `praxis_ai` view · own | | Download PDF (§6.19 item 8): the answer's Overview as a PDF, made in the worker with the caller's rights at the build; 404 for an answer that is not the caller's or has no Overview |
+| `POST /answers/:id/overview/export` | `IdParams`, `EmptyBody` → `documents.ExportFile`, 202 | `praxis_ai` view · own | | Download PDF (§6.19 item 8): the answer's Overview as a PDF on the letterhead, made in the worker with the caller's rights at the build; 404 for an answer that is not the caller's or has no Overview chart |
 | `GET /cards/:id` | → `AiActionCard` | `praxis_ai` view · own | | The card as the person sees it (§6.11): its fields (`AiCardField`, each with its kind, whether it is `long`, a box of several lines, and `picks`, the picker an id field is chosen with on Edit), its records (what a press acts on) and its `names` (the ids its fields hold, by name), named through the module's own repo, its problems; a status past `shown` is read only |
 | `PUT /cards/:id` | `AiActionEdit` (`values`) → `AiActionCard` | `praxis_ai` create · own | | The person's edits, re-validated with the action's schema; problems and names updated; a value for a field the card does not carry is dropped; 409 `CARD_NOT_OPEN` past `shown` |
 | `POST /cards/:id/confirm` | `AiActionConfirm` (`values` optional) → `AiActionResult` | `praxis_ai` create · own; the action's own grant inside | | `Idempotency-Key`. 403 `REAUTH_REQUIRED` for a sensitive class without Confirm It's You in the last 5 minutes; 403 `ACTION_FORBIDDEN` when the grant or scope is gone; 409 `CARD_EXPIRED`, `CARD_DONE`, `CARD_RUNNING`, `CARD_CANCELLED`; 422 on the fields; 422 `TOO_MANY_RECORDS` past 25 |
@@ -1760,7 +1762,7 @@ naming `file.<kind>` and an evaluation case with `file: "<kind>"` (a made-up sam
 
 ### 6.19 Charts in the Overview (decisions 49 to 58; Appendix B)
 
-**Items 1 to 5 built (Appendix B PR 1, 13/11/2026), item 6 built (PR 2, 13/11/2026), item 9's finance and pay summaries built (PR 4, 13/11/2026), its recruitment and onboarding summaries (PR 5, 13/11/2026), its partnerships summaries (PR 6, 13/11/2026), its people, performance and queries summaries (PR 7, 13/11/2026) and its workspace, Knowledge Hub, community, home and settings summaries (PR 8, 14/11/2026), so every read names its summary or why it needs none; items 7 and 8 planned.** Each PR of Appendix B
+**Items 1 to 5 built (Appendix B PR 1, 13/11/2026), item 6 built (PR 2, 13/11/2026), items 7 and 8 built (PR 3, 14/11/2026), item 9's finance and pay summaries built (PR 4, 13/11/2026), its recruitment and onboarding summaries (PR 5, 13/11/2026), its partnerships summaries (PR 6, 13/11/2026), its people, performance and queries summaries (PR 7, 13/11/2026) and its workspace, Knowledge Hub, community, home and settings summaries (PR 8, 14/11/2026), so every read names its summary or why it needs none. All built.** Each PR of Appendix B
 writes what it built here as built. Where the build shows the design wrong, the change goes here and in the Change log, never
 silently.
 
@@ -1830,8 +1832,8 @@ how the pane works, and the model repeated that to the person.
      `{ of: "rows" }`, `{ of: "sum", field }` or `{ of: "count", field, value }` (`AiRowFigure`), a
      summary's being its figure keys as before. `AiOverview` gains `read` beside `summary`, each
      nullable, one of them set. `AiOverviewChart` gains `unit` (`ngn` when every value is money,
-     else null), so the chart reads naira as its figures do (decision 56); a summary's chart carries
-     null, as its groups name no unit.
+     else null), so the chart reads naira as its figures do (decision 56); a summary's chart carried
+     null until PR 3, which marks it `ngn` when its values are amounts (item 7).
    - **The server** (`engine/pane.js`, `overviewOfRows`; `answer.build` chooses: the summary's
      Overview when the draft names one that answered, else the rows'): only for a list read that
      returned, on its first page, whose rows are its whole list (`page.number` 1, no next page,
@@ -1856,45 +1858,67 @@ how the pane works, and the model repeated that to the person.
    - **The prompt** (version 12, and the system turn's pane line): when a list's whole answer is on
      one page and no summary fits, the Overview may chart that read's own columns; a longer list is
      charted from its summary.
-7. **The chat and the Overview's foot (PR 3).**
-   - **The bubble**: an answer that carries an Overview chart shows its words, From, its screen
-     button and Open Figures. Its table, Showing 25 of 312 and Show Next 25 are left out of the
-     bubble (the pane's Table pages them). An answer without a chart is unchanged.
+7. **The chat and the Overview's foot (PR 3, built 14/11/2026).**
+   - **The bubble**: an answer that carries an Overview chart (`overview.chart` set) shows its words,
+     From, its screen button and Open Figures. Its table, Showing 25 of 312 and Show Next 25 are left
+     out of the bubble (the pane's Table pages them). An answer without a chart is unchanged, and so
+     is one whose Overview holds figures alone.
    - **Where the pane opens**: on Overview for such an answer, on desktop as today (`defaultTab`);
      on a phone Open Figures opens the sheet on Overview.
-   - **The foot**, under the chart: **View Data** opens Table. For an answer with a read's rows,
-     Table shows them as today. For an answer drawn from a summary alone, Table shows the chart's
-     figures: its labels down the side and a column for each series or part, with a total column
-     for a stacked bar, and no Export (the PDF carries them). **Download PDF** makes the file (item
-     8). On a phone both are full width, 44 px, View Data first.
-   - `PaneTabs` enables Table for an answer with an Overview even when no read returned rows.
-8. **Download PDF (PR 3).**
-   1. `POST /ai/answers/:id/overview/export` (`EmptyBody` → `documents.ExportFile`, 202; `praxis_ai`
-      view · own) finds the caller's answer with an Overview (404 otherwise), reserves an
-      `ai_answer_overview` document pending in the request's transaction (`documents.generate()`, as
-      §6.12 says of a PDF) and emits `assistant.overview_export_requested` (the asker, the document,
-      the answer; never the words).
+   - **The foot**, under the chart (`OverviewPane`'s `onViewData` and `onDownload`, the two buttons
+     in an `ActionGroup`, one press one request, F26): **View Data** opens Table. For an answer with
+     a read's rows (the answer's table's read, else the Overview's `read`, else the first read that
+     returned rows), Table shows them as today. For an answer drawn from a summary alone, Table shows
+     the chart's figures (`chartRows`, `packages/ui/src/assistant/pane.ts`): its labels down the side
+     under the chart's grouping, a column for each series or part, a Total column for a stacked bar,
+     amounts in naira when the chart's unit is `ngn`, no Export and no pager (the PDF carries them).
+     **Download PDF** makes the file (item 8). On a phone both are full width, 44 px, View Data first.
+     The foot is drawn only where a chart is; an Overview of figures alone has none.
+   - `PaneTabs` enables Table for an answer with an Overview chart even when no read returned rows.
+   - **A summary's chart reads naira** (decision 56; the build found PR 1's `unit: null` left a
+     budget's bars and the figures' Table as bare numbers): `engine/pane.js` marks a summary's chart
+     `ngn` when every value it draws (each row's value and parts, or each point) is an amount with two
+     places and the summary holds a figure in `ngn`, so a score's average ("72.50") in a summary of
+     counts stays a number.
+8. **Download PDF (PR 3, built 14/11/2026).**
+   1. `POST /ai/answers/:id/overview/export` (`IdParams`, `EmptyBody` → `documents.ExportFile`, 202;
+      `praxis_ai` view · own) finds the caller's answer with an Overview chart (404 otherwise: someone
+      else's answer, one with no Overview, or figures alone), reserves an `ai_answer_overview` PDF
+      pending in the request's transaction and emits `assistant.overview_export_requested` (the
+      asker, the document, the answer; never the words). It is reserved with `exports.reserve`, not
+      `documents.generate()`: `generate()` draws the document inside the request from data given
+      there, and this file's figures must be drawn with the asker's rights at the build.
    2. The outbox handler (`assistant.export.js`, `buildOverviewPdf`) runs in the worker after commit.
-      The asker must still be active and the answer still theirs. The summary runs again through
-      `authorise.runSummary` with the asker's rights now, and the Overview is drawn again from the
-      stored spec. A table Overview runs its read's first page again through `authorise.runRead`; it
-      is charted only while that page is still the whole list, otherwise the file carries the
-      figures and the rows with "The list now has 312 rows." in place of the chart.
-   3. The document (`templates/documents/ai-overview.html` on `letterhead.html`, A4 portrait): the
-      question as the title; Asked By, Asked On and As At (Lagos, day first); the answer's words; the
-      figures as tiles (money through the template's `money`); the chart, with its figures as a
-      table under it; then each other group and series of the summary, a section each, a chart with
-      its table; last, About This File: each read and summary with its filters, the masked fields by
-      name, and the environment (a staging file says so in its name and its header). A page break
-      never parts a chart from its table.
+      The asker must still be active and the answer still theirs. The Overview is drawn again from the
+      draft's own spec, kept with the answer since this PR (`metadata.overview_spec`, the contract's
+      `AiOverviewSpec`); an answer kept before has none, so its spec is rebuilt from the Overview it
+      kept (its figure keys, the grouping or series whose labels its chart drew). A summary runs again
+      through `authorise.runSummary` with the parameters it ran with (`ai_message_read`) and the
+      asker's rights now. A table Overview runs its read's first page again through
+      `authorise.runRead`; it is charted only while that page is still the whole list; otherwise the
+      file carries the rows of its first page, How Many as the list's total now, and "The list now has
+      312 rows." in place of the chart (a sum or a count over the rows is left out, since the rows are
+      no longer all there). The HTML is drawn from `templates/documents/ai-overview.html` on the
+      letterhead and made a PDF as Letter Templates' preview makes one (`documents.previewPdf`:
+      nothing numbered, nothing locked), and `exports.make` fills the reserved file.
+   3. The document (`templates/documents/ai-overview.html` on `letterhead.html`, A4 portrait; its
+      variables `AiOverviewDocumentVars`): the question as the title; Asked By, Asked On and As At
+      (Lagos, day first); the answer's words; the figures as tiles (money through the template's
+      `money`); the chart, with its figures as a table under it; then each other group and series of
+      the summary, a section each, a chart with its table (a group with parts as a stacked bar, else
+      a bar; a series as a line); last, About This File: each read and summary with its filters, the
+      masked fields by name, and the environment (a staging file says so in its name and its
+      header). A page break never parts a chart from its table (`break-inside: avoid`).
    4. **A chart in a document** (`src/shared/documents/chart.js`, the one place a document draws a
       chart). The renderer gains a chart block, a value the code built
-      (`{ chart: { kind, title, labels, series } }`), as a grid and a signature already are. It is
-      drawn as SVG from its numbers with every label escaped, so nothing a template or a person
+      (`{ chart: { kind, title, labels, series, unit } }`), as a grid and a signature already are. It
+      is drawn as SVG from its numbers with every label escaped, so nothing a template or a person
       writes reaches the markup (`render.js` keeps "there is no raw output"). Bar, stacked bar, line
-      and donut, with a legend for a stacked bar or several lines. The series colours are read once
-      from the light theme's series tokens in `packages/ui/src/styles/tokens.css`, so a colour still
-      lives in one place.
+      and donut, with a legend for a stacked bar, a donut or several lines. The series colours are
+      read once from the light theme's series tokens (`--chart-1` to `--chart-6` of `:root`) in
+      `packages/ui/src/styles/tokens.css`, so a colour still lives in one place; a release carries
+      that one file (`scripts/deploy/release-manifest.js`), since it carries no other part of
+      `packages/ui`.
    5. The screen waits on `GET /exports/:id` and downloads `GET /documents/:id/content`
       (`app/src/api/exports.ts`); the toast reads "PDF downloaded". The vault keeps the file 24 hours
       (`export-cleanup`). Only the asker, and the CEO as for every document, may open it.
@@ -1923,7 +1947,7 @@ how the pane works, and the model repeated that to the person.
 | `assistant.feedback_given` | Helpful or Not Helpful | Audit only |
 | `assistant.export_requested` | Export on History | Outbox: the workbook of the person's questions, made after commit (`assistant.export_history`); a person no longer active gets a failed file |
 | `assistant.read_export_requested` | Download Excel on an answer's Table (§6.16) | Outbox: every row of the read, replayed with the asker's rights now, into the file the request reserved (`assistant.export_read`); at most 25,000 rows; a person no longer active, or an answer that is gone, gets a failed file |
-| `assistant.overview_export_requested` (planned, Appendix B PR 3) | Download PDF on an answer's Overview (§6.19 item 8) | Outbox: the summary, or the read of a table Overview, run again with the asker's rights now and drawn into the PDF the request reserved (`assistant.export_overview`); a person no longer active, or an answer that is gone, gets a failed file |
+| `assistant.overview_export_requested` | Download PDF on an answer's Overview (§6.19 item 8) | Outbox: the summary, or the read of a table Overview, run again with the asker's rights now and drawn into the PDF the request reserved (`assistant.export_overview`); a person no longer active, or an answer that is gone, gets a failed file |
 | `assistant.card_drafted` | An answer carried a card (§6.11) | Audit only: the card, the action key, the records; never the words |
 | `assistant.action_confirmed` | A card pressed and its action run (§6.11 step 6) | Audit only: the card, the run, how it was confirmed, the result lines; the module's own event carries the change |
 | `assistant.action_failed` | A press whose action refused or failed | Audit only: the card, the error code |
@@ -1987,7 +2011,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Praxis AI · Ask (`ask`) | Praxis AI as the title; Back (on desktop the screen it returns to under the title, "From People · Leave"; opened from the menu, ⌘K or History it goes to History and the line is left out); Recent, a toggle that shows the person's conversations as a column beside the chat (titles and when last asked, newest first, 25 a page; empty, No Questions Yet); New Conversation once a conversation is open; on a phone opened from the menu, the conversations first (title, questions, when last asked; Search Conversations; No Conversations Yet, "Start one with New Conversation.") with New Conversation always, and the chat full screen over them with Back, Conversations and New Conversation; the conversation (on desktop about two fifths, on the left): empty, an illustration and Try Asking with up to 6 questions to tap; Show Earlier when older questions remain, each question as the person's bubble, each answer with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, Open Figures on an answer with a table or figures whose pane is not the one shown (none under an answer of words alone, whose chips still open the pane), From with the kinds of record read as chips ("partnership ×4", "employee ×2"; a chip shows those records in the pane; the one record, named, when the answer rests on one, shown on Record), Helpful and Not Helpful (pressed again, taken back); a question Praxis AI asks before a card ("What is the task?", "When is it due?", "Which Tunde?", "Which leave type?"; decisions 28, 29 and 32), its words alone with no From and no Open Figures, with its answers as buttons under it on the newest answer (Today, Tomorrow, Friday, No Due Day; Low, Normal, High, Urgent; 30 Minutes, 1 Hour, 2 Hours; Just Me; each person by name and job title; each leave type with the days left, "Annual Leave, 12 days left"), a tap asking it; an answer's card (§6.11): the action's name (a suggested card's as a question, "Send Message?"), each field's label and value as a person reads it (people, departments, projects and leave types by name, never an id, "For: JBS Praxis Team", "Watchers: Tobiloba Dada, Bassey Ekpe"), a problem beside its value ("Say why", "Fill the gap"; Pick one alone where an id names nothing), the records as chips ("Ayo Bello, Annual, 3 days"), the buttons (the verb with the count, "Approve Leave ×4", a lock on one that asks Confirm It's You, none while a field shows a problem; Edit, the primary button then, with Save Changes and Cancel on its fields, people, departments, projects and leave types picked as on the screen's own form; Cancel, or Not Now on a suggested card), a refusal under the card in the server's words with Open Mailbox where the mailbox is not connected, then Done or Could Not Finish with a line per record and Open, or Expired with "This card has expired." and Draw It Again; Confirm It's You (`identity.md` §10) before a sensitive card, and the toast "Set a passkey for next time" with Set Passkey once; while waiting, Reading Your Records, then Reading leave requests · 2 of 5 as each read runs; a refused answer in plain words; a failed one with its reason and Try Again; the pane (on desktop about three fifths, on the right) for the latest answer that read records or has figures (a conversation opened from Recent or History shows its own; an answer with neither, such as a card drawn from what was said, leaves the pane as it was, never blank), or the one whose chip or Open Figures was pressed (drawn in the accent): tabs Overview, Table, Record and Sources, an empty one disabled; Overview: up to three figures and one chart when a summary read answered (§6.13); Table: the read's rows, 25 a page (Previous, Next, Page 1 of 13), Export (every row of the read as an Excel file, made for the person and saved on this device, §6.16; toast "Export downloaded"), a row opening the Record, past 200 rows "Showing the first 200 of 1,240 rows"; Record: the row's or the record's fields and Open Record; Sources: each read numbered and named ("1. Leave Requests"), Read, Not Available, Not Run, Failed or Too Much (the read covered more than the database allows at once, §6.3 step 8), "25 of 312 rows", its filters, Masked with the fields emptied, Open Table; before any answer, No Answer Yet, "Ask a question to fill this pane."; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them; a chip opens them in the pane) | How reads, the context, permissions, redaction, the loop, the progress events and a card's re-check work: §1.1, §6 here and the manual |
 | Praxis AI · History (`history`) | History as the title, Export and Clear History; for AI Control: Questions This Month (everyone's), Your Questions, Spend and Monthly Cap, each captioned with the month or All AI; for everyone else: Questions This Month, Your Questions (all time) and Your Spend; Your Questions, 25 a page: Question, Asked, Sources Read, Tokens, Cost, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog; Search Questions; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Spend per Month, Naira (six months; for AI Control, "Against a ₦25,000 monthly cap" when one is set); Questions by Module; toasts "Conversation deleted", "History cleared", the export's own | Help terms on Spend (what Praxis AI's questions cost this month, priced as AI Control prices them) and Monthly Cap (the most all AI may spend in a month, set in AI Control) | Where everyone's spend by action is (AI Control · Spend), what deleting keeps: §6.5 |
 | Praxis AI · Ask, Attach Document (Appendix A) | Attach Document, a paperclip icon button with its Tooltip, left of the question box; its modal, Attach Document: What Is It? with three tiles (**Invoice**, **Payment Receipt**, **Contract or MoU**, each with its icon and a caption of at most four words: Bill to pay, Proof of a transfer, Signed or to sign), only those the person may use; then the file through `UploadField` (PDF, JPEG, PNG, WebP, HEIC, HEIF; at most 10 MB), its name and size with Remove; Question, Optional, filled with the kind's own question; Cancel and **Read Document** in the footer. While reading is off, Attach Document is off with the Tooltip Reading Documents Is Off. The question's bubble carries a chip with the file's name that opens it. The answer: its card, or one sentence when the file cannot be read. A contract or MoU: a summary of at most five sentences; its terms on the pane's Record tab, titled by the document's title (Kind, Parties, Signed On, Starts On, Ends On, Notice, Value, Renewal, each party's obligations under its name, Signed By), opened first and again from the file's From chip; its card, **Record Signed Copy** (the agreement as its chip, a lock for Confirm It's You) or **Add Partner Document**; for a reader without Partnerships edit, the summary and the terms alone | help on the modal's file field: "PDF or a photo, up to 10 MB." | why the kinds are picked first, how the server checks the figures, the jobs: decisions 41 to 48, §6.18 here, the manual |
-| Praxis AI · Ask, the Overview's charts and foot (Appendix B: stacked bars built in PR 1, a whole list's chart in PR 2; the rest planned) | On Overview: up to three figures and one chart; a stacked bar with its legend (Spent, Committed, Remaining, Over Budget for budgets); a short list's chart from its own columns (people at each worksite), its amounts in naira (₦3,500,000.00); at its foot **View Data** and **Download PDF**; a charted answer's bubble: its words, From, its screen button and Open Figures, its table on the pane's Table; Table for an answer drawn from a summary alone: the chart's figures, a row for each label, a column for each series or part, Total for a stacked bar; toast "PDF downloaded"; a failed file's reason | none | How the Overview is drawn, which summary answered, why a chart is missing: §6.13 and §6.19 here and the manual; never in an answer's words (decision 55) |
+| Praxis AI · Ask, the Overview's charts and foot (Appendix B: stacked bars built in PR 1, a whole list's chart in PR 2, the foot and the PDF in PR 3) | On Overview: up to three figures and one chart; a stacked bar with its legend (Spent, Committed, Remaining, Over Budget for budgets); a short list's chart from its own columns (people at each worksite), its amounts in naira (₦3,500,000.00); at its foot **View Data** and **Download PDF**; a charted answer's bubble: its words, From, its screen button and Open Figures, its table on the pane's Table; Table for an answer drawn from a summary alone: the chart's figures, Name (When for a line) and a row for each label, a column for each series or part, Total for a stacked bar, no Export; toast "PDF downloaded"; a failed file's reason ("That file could not be made. Try again.") | none | How the Overview is drawn, which summary answered, why a chart is missing: §6.13 and §6.19 here and the manual; never in an answer's words (decision 55) |
 
 ### 10.2 Phone layout
 
@@ -1996,7 +2020,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Praxis AI · Ask (`ask`) | Opened from a screen (⌘K on a screen, a link with `from`): Back and Praxis AI as the title, New Conversation once a conversation is open, the conversation full width with the box pinned at the foot (the microphone and Send as 44 px targets); a question's answers one under the other, full width (44 px); an answer's card inside the bubble, its fields one under the other, the verb full width at its foot with Edit and Cancel above it (44 px), Edit's pickers full width, Confirm It's You as a sheet; Open Figures under an answer with a table or figures opens the pane as a sheet, Figures, with the four tabs: the Table as cards (44 px rows, Previous and Next full width), Open Record full width. Opened from the menu or History: Praxis AI as the title with New Conversation, then the person's conversations, newest first (title; questions and when last asked), Search Conversations, 25 a page; empty, No Conversations Yet. A conversation, or New Conversation, opens the chat full screen over the list: Back, Praxis AI as the title, Conversations (the other conversations as a sheet, as a channel's switcher is) and New Conversation; the conversation fills the screen; empty, Try Asking as a tap list; an answer's table as cards | The pane beside the chat (a sheet from Open Figures instead); Recent and its toggle (the list is the landing page instead); the screen's name under the title | New Conversation under the title and in the floating button; inside a chat, Conversations and New Conversation in its header; Open Figures under an answer | The floating button's Praxis AI opens this screen from any other, with that screen as the question's context and where Back returns (§3 step 8, decision 27); More, then Praxis AI; tabs Ask and History; Back, the phone's own Back and Escape return to the screen it was opened from |
 | Praxis AI · History (`history`) | The figure cards two to a row, then your questions as cards (question, asked, cost) | Sources Read and Tokens on each question; Spend per Month; Questions by Module | Tap a card to open its conversation on Ask; Delete Conversation in its menu's sheet; Export and Clear History in the page's menu | As above |
 | Praxis AI · Ask, Attach Document (Appendix A) | Attach Document as a 44 px icon button left of the box; the modal as a full sheet: the three tiles one under the other, full width, then the file field (the phone's picker offers the camera); a contract's terms on Record in the Figures sheet that Open Figures opens, label above value | the file's size | **Read Document**, full width at the foot of the sheet | the sheet's Back or Cancel returns to the chat |
-| Praxis AI · Ask, the Overview's charts and foot (Appendix B, planned) | Open Figures under a charted answer opens the sheet on Overview: the figures two to a row, the chart full width with a stacked bar's legend under it, then **View Data** and **Download PDF** full width, 44 px, one under the other | the chart's caption | **Download PDF** | View Data moves to Table in the same sheet; Close or a swipe down returns to the chat |
+| Praxis AI · Ask, the Overview's charts and foot (Appendix B, built in PR 3) | Open Figures under a charted answer opens the sheet on Overview: the figures two to a row, the chart full width with a stacked bar's legend under it, then **View Data** and **Download PDF** full width, 44 px, one under the other | the chart's caption | **Download PDF** | View Data moves to Table in the same sheet; Close or a swipe down returns to the chat |
 
 ## 11 · Edge cases
 
@@ -2031,8 +2055,17 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   goes below zero (decision 51).
 - **A figure a role half sees** (pay without the salary grant): left out of that reader's figures,
   parts and series, never shown as zero (decision 58).
-- **A complete table that grows before Download PDF**: the PDF carries the figures and the rows
-  with "The list now has 312 rows." in place of the chart (§6.19 item 8).
+- **A complete table that grows before Download PDF**: the PDF carries How Many (the list's total
+  now), the first page's rows and "The list now has 312 rows." in place of the chart; a sum or a
+  count over the rows is left out (§6.19 item 8).
+- **Download PDF after the grant went** (the summary's or the read's): the file fails with "Those
+  figures are no longer available to you." and the screen says it could not be made; a narrower
+  scope gives the figures it holds now.
+- **An answer kept before Download PDF was built**: its spec is rebuilt from the Overview it kept
+  (the grouping or series whose labels its chart drew); a table Overview's chart cannot be, so its
+  PDF carries its rows.
+- **An Overview of figures alone** (no chart): no foot; Download PDF is not offered and the route
+  answers 404.
 - **A read that would scan too much** (a year of attendance by person for the whole company on a
   slow night): the database cuts it at 3 seconds (§6.3 step 8); the model is told "too much" and
   asks for a shorter period, a department or a person, or uses a summary; the Sources tab shows the
@@ -2499,6 +2532,9 @@ the pull request.
 
 #### PR 3 · The chat, the Overview's foot and Download PDF (`m10/overview-pdf`)
 
+Built 14/11/2026 on the session's branch, as §6.19 items 7 and 8 now say; the handoff (§6.12 there)
+names the pull request.
+
 - **Contract first:** the route's contract (`EmptyBody` → `documents.ExportFile`, 202) in the
   route contracts; the document kind `ai_answer_overview`; `npm run gen:contract`.
 - **Backend:** `POST /ai/answers/:id/overview/export` (`praxis_ai` view · own) reserving the file
@@ -2615,6 +2651,7 @@ area and guides from B.4:
 ## 14 · Change log
 
 - 14/11/2026 · JP · Charts in the Overview, PR 8 built (Appendix B; §6.13 Workspace, Knowledge Hub, Community, Home and Settings, §6.19 items 3 and 9): ten summaries, `projects.summary`, `calendar.summary`, `training.summary`, `policies.summary`, `sops.summary`, `announcements.summary`, `activity.summary`, `alerts.summary`, `runs.summary` and `imports.summary`, each one SQL with its list's own reach, stacked where a grouping has parts; their twelve reads name them, so every read names its summary or why it needs none, `scripts/check/ai-summary-gaps.json` is deleted and gate 23 rule 9 runs with no list. Try Asking gains a chart question for each area, by its summary, two of the six shown (§6.8, rule 5 holding each to a summary that exists); the User Guide's See figures as a chart an example for each area. The build taught §6.13 six things, written there: these lists show every record, so a period narrows only when asked, but Calendar is a month and Activity a day; a summary over a list that answers only a capability's holders answers only them, except Training (anyone else's own places, as My Training) and Announcements (anyone else's own received, the read rates being the tab's, decision 58); a project's Open and Overdue are apart, so its parts sum; an SOP is Published, a Draft never published or Archived, a published one being changed a figure of its own; Activity Today's six events from two modules group by kind; Calendar's kinds are five, to keep within a stacked bar's six parts. `calendar.summary` and `activity.summary` carry their reads' probes, each making its record today (§6.17); the calendar's month and its summary read one list of items (`calendar.repo` `ITEMS`).
+- 14/11/2026 · JP · Charts in the Overview, PR 3 built (Appendix B; §6.19 items 7 and 8): a charted answer keeps its words, From, its screen button and Open Figures in the chat, its table and paging the pane's; the Overview's foot, View Data and Download PDF (`OverviewPane`'s `onViewData` and `onDownload`), and an answer from a summary alone shows the chart's figures on Table (`chartRows`); `POST /ai/answers/:id/overview/export` reserves an `ai_answer_overview` PDF and `assistant.overview_export_requested`'s handler `buildOverviewPdf` draws it after commit with the asker's rights now on `templates/documents/ai-overview.html` (`AiOverviewDocumentVars`), the chart drawn by `src/shared/documents/chart.js` through the renderer's new chart block. The build taught §6.19 five things the plan was silent on or had wrong, written there: the file is reserved with `exports.reserve`, since `documents.generate()` draws inside the request; the draft's spec is kept with the answer (`metadata.overview_spec`, `AiOverviewSpec`) and rebuilt from the kept Overview for an older answer; a summary's chart reads naira when its values are amounts and the summary holds a figure in naira (PR 1 left budgets' bars bare numbers); a release carries `tokens.css`, the chart's colours; a grown table keeps its rows and How Many, never a sum over rows no longer all there. Found on the way: `budgets.summary` failed on an allocation with kobo (JSON carried ₦1,050,000.50 as a number money() refuses); its amounts now leave the database as text (`expenses.md` §14).
 - 14/11/2026 · JP · PR 7, before its merge (the planning chat, from #155's review): the matrix's probe day passes 31 December from early December, so a year's summary would stop counting its probe. `my_leave.summary` counts every request unless a year is asked, so it keeps counting; §6.17 says so and a case proves it with a request in January. The year's balance SQL is kept once (`leave.repo` `BALANCES`), shared by `balances()` and `aiMine()`.
 - 13/11/2026 · JP · Charts in the Overview, PR 7 built (Appendix B; §6.13 People, performance and queries, §6.19 item 9): twelve summaries, `exceptions.summary`, `pay_items.summary`, `temporary_sites.summary`, `devices.summary`, `seats.summary`, `my_attendance.summary`, `my_leave.summary`, `kpis.summary`, `scorecards.summary`, `commitments.summary`, `queries.summary` and `sanctions.summary`, each one SQL with its list's own reach, stacked where a grouping has parts; their thirteen reads name them and leave the gaps file (12 left with PR 6's off too, PR 8's alone). The plan's table was corrected as built: an exception is Open or a resolved one's outcome (Accepted, Rejected, Corrected), not waiting, approved and rejected; a device is Registered, New or Removed; a seat is Open, Filled or Closed, Acting being a department's (a figure); a scorecard's score is a fraction, so its average reads as a per cent; `KpiSummaryQuery` and `CommitmentSummaryQuery` were taken by the screens, so these are `KpiResultSummaryQuery` and `CommitmentStateSummaryQuery`; pay items' figures keep to 12. My Attendance is a month and My Leave a year's days with every request counted unless a year is asked; `my_leave.summary` carries `my_leave.list`'s probe, and the matrix's probes ask for Unpaid leave so the extra requests never run out of days (§6.17). Staff are offered seven more summaries (their own two, performance's three, queries' and sanctions' over what they raised).
 - 13/11/2026 · JP · Charts in the Overview, PR 6 built (Appendix B; §6.13 Partnerships, §6.19 item 9): five summaries, `leads.summary`, `partners.summary`, `proposals.summary`, `agreements.summary` and `interactions.summary`, each one SQL in its module's repo with the one rule every Partnerships list keeps, stacked where a grouping has parts (leads by stage, category, region, owner or source stacked by status, partners by category, region, owner or deal health stacked Active, Dormant and Closed, each owner's sent proposals by outcome, interactions by person and type); their six reads (`agreements.renewals` too) name them and leave the gaps file. The build taught §6.13 five things, written there: the lists show every record, so a period narrows only when asked; the lost leads the list hides are counted as their own figure; no figure here is hidden from a reader of the list; a proposal's count and value by status are two groupings; Partnerships' two built summaries gave their money as `NGN` and give `ngn` now.

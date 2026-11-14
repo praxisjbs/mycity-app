@@ -48,8 +48,9 @@ const num = (v) => {
  * one series per part, in the order of the first row's parts (§6.19 item 1); a stacked bar over rows
  * without parts is drawn as a bar; any other kind draws the rows' values (a row with parts: their sum).
  */
-function chartOfGroup(spec, group) {
+function chartOfGroup(spec, group, result = null) {
   const rows = group.rows.slice(0, MAX_POINTS);
+  const unit = moneyChart(result, rows.flatMap((r) => [r.value, ...(r.parts || []).map((p) => p.value)]));
   const labels = rows.map((r) => r.label);
   const parts = (rows.find((r) => Array.isArray(r.parts) && r.parts.length) || {}).parts;
   if (spec.kind === "stacked_bar" && parts) {
@@ -57,21 +58,32 @@ function chartOfGroup(spec, group) {
       label: p.label,
       values: rows.map((r) => num(((r.parts || []).find((x) => x.key === p.key) || {}).value)),
     }));
-    return { kind: "stacked_bar", title: spec.title, labels, series, unit: null };
+    return { kind: "stacked_bar", title: spec.title, labels, series, unit };
   }
   const kind = spec.kind === "stacked_bar" ? "bar" : spec.kind;
-  return { kind, title: spec.title, labels, series: [{ label: group.label, values: rows.map((r) => num(r.value)) }], unit: null };
+  return { kind, title: spec.title, labels, series: [{ label: group.label, values: rows.map((r) => num(r.value)) }], unit };
+}
+
+/**
+ * A summary's chart reads naira (decision 56; §6.19 item 7) when every value it draws is an amount
+ * with two places and the summary holds a figure in naira, so a score's average ("72.50") in a summary
+ * of counts stays a number. Null otherwise.
+ */
+function moneyChart(result, values) {
+  if (!result || !(result.figures || []).some((f) => f.unit === "ngn")) return null;
+  return values.length && values.every((v) => typeof v === "string" && TWO_PLACES.test(v)) ? "ngn" : null;
 }
 
 /** A chart over a summary's series: their points' labels, one line per series. */
-function chartOfSeries(spec, series) {
+function chartOfSeries(spec, series, result = null) {
   const labels = series[0].points.slice(0, MAX_POINTS).map((p) => p.at);
+  const unit = moneyChart(result, series.slice(0, 6).flatMap((s) => s.points.slice(0, MAX_POINTS).map((p) => p.value)));
   return {
     kind: spec.kind,
     title: spec.title,
     labels,
     series: series.slice(0, 6).map((s) => ({ label: s.label, values: labels.map((at) => num((s.points.find((p) => p.at === at) || {}).value)) })),
-    unit: null,
+    unit,
   };
 }
 
@@ -137,10 +149,10 @@ function overviewOf(spec, reads) {
   if (c && CHART_KINDS.has(c.kind) && c.title) {
     if (c.group) {
       const g = groups.find((x) => x.by === c.group);
-      if (g && g.rows.length) chart = chartOfGroup(c, g);
+      if (g && g.rows.length) chart = chartOfGroup(c, g, made.result);
     } else if (Array.isArray(c.series) && c.series.length) {
       const s = c.series.map((k) => series.find((x) => x.key === k)).filter(Boolean);
-      if (s.length && s[0].points.length) chart = chartOfSeries(c, s);
+      if (s.length && s[0].points.length) chart = chartOfSeries(c, s, made.result);
     }
     if (chart && titleNamesAValueNotShown(chart.title, chart, picked, made.result)) chart = { ...chart, title: chartLabel(chart) };
   }
@@ -325,4 +337,4 @@ function overviewOfRows(spec, reads, { cell, moneyField = () => false, sumMoney 
   return { summary: null, read: made.n, title: null, figures, chart };
 }
 
-module.exports = { sourcesOf, overviewOf, overviewOfRows, wholeList, chartOfRows, rowFigures, chartOfGroup, chartOfSeries, titleNamesAValueNotShown, valuesOf, CHART_KINDS };
+module.exports = { sourcesOf, overviewOf, overviewOfRows, wholeList, chartOfRows, rowFigures, chartOfGroup, chartOfSeries, moneyChart, titleNamesAValueNotShown, valuesOf, CHART_KINDS };

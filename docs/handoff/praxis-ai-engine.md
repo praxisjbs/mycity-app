@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B, PR 2 praxisjbs/mycity-app#150, PR 7 praxisjbs/mycity-app#153 and PR 8 praxisjbs/mycity-app#157 (§6.12) (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B, PR 2 praxisjbs/mycity-app#150, PR 3 praxisjbs/mycity-app#156, PR 7 praxisjbs/mycity-app#153 and PR 8 praxisjbs/mycity-app#157 (§6.12) (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -846,7 +846,7 @@ date, the branch and the PR when it merges.
 
 - [x] 13/11/2026 · PR 1 · Stacked bars, Budgets' summary and every read naming its summary, gate 23 rule 9 with `scripts/check/ai-summary-gaps.json`, money in naira, no mechanics in an answer (built in the planning chat on `claude/bold-hawking-byligf`)
 - [x] 13/11/2026 · PR 2 · Charts from a complete table: the draft's `read` Overview drawn by the server from the rows (`overviewOfRows`), `AiRowFigure`, `AiOverview.read`, `AiOverviewChart.unit`, prompt version 12 (built in its own chat on the session's branch `claude/brave-cori-1cd0l4` rather than `m10/overview-tables`, praxisjbs/mycity-app#150)
-- [ ] PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF, `shared/documents/chart.js` (`m10/overview-pdf`)
+- [x] 14/11/2026 · PR 3 · A charted answer's table in the pane, the Overview's View Data and Download PDF (`POST /ai/answers/:id/overview/export`, `buildOverviewPdf`, `ai_answer_overview`, `templates/documents/ai-overview.html`), the chart's figures on Table for an answer from a summary alone, `shared/documents/chart.js` and the renderer's chart block; `budgets.summary`'s kobo fixed on the way (built in its own chat on the session's branch `ccr-8cb65fd0-85fhse` rather than `m10/overview-pdf`, praxisjbs/mycity-app#156)
 - [x] 13/11/2026 · PR 4 · Finance and pay summaries: `expenses.summary`, `requisitions.summary`, `disbursements.summary`, `payroll.month` by department and status, `payroll.trend`, `deductions.summary`, `my_pay.summary`; ten reads off the gaps file (built in its own chat on `claude/serene-shannon-ek7yft`)
 - [x] 13/11/2026 · PR 5 · Recruitment and onboarding summaries: vacancies, candidates, interviews, assessments, offers, onboarding and the talent pool, the matrix's summary probes (built on `claude/affectionate-sagan-vxaysr`)
 - [x] 13/11/2026 · PR 6 · Partnerships summaries: leads, partners, proposals, agreements and interactions, their six reads off the gaps file, Partnerships' built summaries in `ngn` (built in its own chat on `claude/praxis-ai-partnerships-pr6-z2sywn` rather than `m10/summaries-partnerships`)
@@ -854,17 +854,17 @@ date, the branch and the PR when it merges.
 - [x] 14/11/2026 · PR 8 · Workspace, Knowledge Hub, Community, Home and Settings summaries: projects, calendar, training, policies, SOPs, announcements, activity, alerts, report files and imports; their twelve reads named, `scripts/check/ai-summary-gaps.json` deleted and rule 9 run with no list; Try Asking's chart for each area; the User Guide's example for each area (built in its own chat on the session's branch `ccr-ec7394ad-8tdm80` rather than `m10/summaries-close`, praxisjbs/mycity-app#157)
 - [ ] On staging: the budget question by department draws stacked bars, and its Download PDF opens on the letterhead
 
-**Closed for the summaries, 14/11/2026 (PR 8).** Every read of the 94 names its summary or why it needs
-none (62 by a summary, 32 why not; 41 summaries built across PRs 1 and 4 to 8, 52 in all), the gaps file is gone and gate 23
-rule 9 holds the rule with no list. What remains of this plan is PR 3 (the Overview's foot and Download
-PDF), which needs PR 2 alone, and the staging check above, which waits on PR 3.
+**Closed, 14/11/2026 (PR 8, the last of the eight).** Every PR of Appendix B is built. Every read of the
+94 names its summary or why it needs none (62 by a summary, 32 why not; 41 summaries built across PRs 1
+and 4 to 8, 52 in all), the gaps file is gone and gate 23 rule 9 holds the rule with no list. What stays
+open is the check on staging above, once these PRs reach it.
 
 ## 7 · Gates this work adds
 
 | Gate | Script | Refuses |
 |---|---|---|
 | 19 (rewritten) · AI manifests: reads and declared actions only | `scripts/check/ai-no-writes.js` | A manifest key that is a write by another name (`write`, `writes`, `executor`, `execute`, `mutations`, `sql`, `query`); an `.ai.js` that holds SQL or calls `.query(`; an action whose `run` or `check` is not a function; a manifest that does not load through `defineManifest` |
-| 23 · AI awareness | `scripts/check/ai-awareness.js` | (1) `src/shared/ai/catalogue.snapshot.json` differs from `registry.catalogue()` (keys, kinds, modules, permissions, risk, the hash of each parameter, input and prefill schema): run `npm run gen:ai-catalogue` and review the diff. (2) An action's `input` is not a schema the module's own feature folder validates a form with (`useContractForm(..., <schema>)`), unless the action says `form: "none: <reason>"`. (3) An action key that no integration test exercises, or that the evaluation set (`scripts/ai/eval-assistant.js`) does not grade. (4) A module that declares `actions` and leaves a `<Thing>Create` schema of its contract neither offered nor in `not_offered` with a reason (PR5 makes this rule universal). (5) A Try Asking line (`assistant.suggestions.js`) naming a read that does not exist. Planned in `praxis-ai.md` Appendix B PR 1: (9) a read with no `summary` that is not in `scripts/check/ai-summary-gaps.json`, a `summary` naming no summary, and a gap that is now answered or that the change's base did not hold |
+| 23 · AI awareness | `scripts/check/ai-awareness.js` | (1) `src/shared/ai/catalogue.snapshot.json` differs from `registry.catalogue()` (keys, kinds, modules, permissions, risk, the hash of each parameter, input and prefill schema): run `npm run gen:ai-catalogue` and review the diff. (2) An action's `input` is not a schema the module's own feature folder validates a form with (`useContractForm(..., <schema>)`), unless the action says `form: "none: <reason>"`. (3) An action key that no integration test exercises, or that the evaluation set (`scripts/ai/eval-assistant.js`) does not grade. (4) A module that declares `actions` and leaves a `<Thing>Create` schema of its contract neither offered nor in `not_offered` with a reason (PR5 makes this rule universal). (5) A Try Asking line (`assistant.suggestions.js`) naming a read that does not exist, or a chart line a summary that does not exist (Appendix B PR 8). (9) A read with no `summary`, or a `summary` naming no summary (Appendix B PR 1 with `scripts/check/ai-summary-gaps.json`, a list that only shrank; PR 8 answered its last read and deleted it) |
 | 24 · AI engine boundary | `scripts/check/ai-engine-boundary.js` | A file under `src/services/ai/engine/` that requires anything but Node's builtins and its sibling files; a file outside it that reaches into the engine's internals rather than its `index.js` |
 | The matrix | `tests/integration/ai-matrix.test.js` | Any read, summary or action a role may run that `scopeFor` would refuse, or the reverse; a scoped person's rows that the CEO's do not contain; a masked field reaching a person without the field grant; a probe's outside record returned or acted on (PR5) |
 | The attack suite | `tests/integration/ai-cards.test.js` (PR1), `ai-attacks.test.js` (PR5), nightly `scripts/ai/attack-assistant.js` through `deploy-gate attack` and `.github/workflows/ai-nightly.yml` (PR5) | A card run twice, expired, after a grant was removed, over 25 records, or sensitive without a fresh confirm; and from PR5 every attack of §5's PR5 prompt: another person's pay, a guessed id, instructions planted in a message, a note and a policy, an action outside scope, self-approval, a card after the grant went, a bulk card over 25, a mail outside from a suggested card, a read never offered. With the real model a leak fails the nightly and is an urgent notice; AI Control · Spend shows the last run |
@@ -873,7 +873,7 @@ PDF), which needs PR 2 alone, and the staging check above, which waits on PR 3.
 
 ## 8 · Log
 
-- 14/11/2026 · JP · Charts in the Overview, PR 8 built (§6.12), and §6.12 closed for the summaries: ten
+- 14/11/2026 · JP · Charts in the Overview, PR 8 built (§6.12), and §6.12 closed, PR 3 having merged first: ten
   summaries (`projects`, `calendar`, `training`, `policies`, `sops`, `announcements`, `activity`, `alerts`,
   `runs`, `imports`), each one SQL with its list's own reach; their twelve reads named, so every read names
   a summary or why it needs none; `scripts/check/ai-summary-gaps.json` deleted and rule 9 run with no list
@@ -889,6 +889,17 @@ PDF), which needs PR 2 alone, and the staging check above, which waits on PR 3.
   fresh day three weeks ahead, so `calendar.summary`'s probe books today and `activity.summary`'s records
   today's leave, with no outside record (§6.17). The container again lacked pgvector (installed by hand),
   Node 20 (`node@20` in the scratchpad) and `node_modules`.
+- 14/11/2026 · JP · Charts in the Overview, PR 3 built (§6.12): a charted answer's table moves to the
+  pane, the Overview's foot (View Data, Download PDF), the chart's figures on Table for an answer from a
+  summary alone, and the PDF made in the worker with the asker's rights at the build on
+  `templates/documents/ai-overview.html`, its charts drawn by `src/shared/documents/chart.js`.
+  Written into `praxis-ai.md` §6.19 first: the file is reserved with `exports.reserve` (not
+  `documents.generate()`, which draws inside the request); the draft's spec is kept with the answer
+  (`metadata.overview_spec`) and rebuilt for an older answer; a summary's chart reads naira when its
+  values are amounts; a release carries `tokens.css`; a grown table keeps its rows and How Many.
+  Found on the way: `budgets.summary` failed on an allocation with kobo (JSON numbers), fixed in its
+  repo. The container lacked Node 20, `node_modules` and pgvector again (`node@20` in the scratchpad,
+  `npm ci`, `postgresql-16-pgvector`).
 
 - 14/11/2026 · JP · PR 7, before its merge: checked the planning chat's concern from #155 (the matrix's
   probe day passing into next year from December). `my_leave.summary` counts every request unless a

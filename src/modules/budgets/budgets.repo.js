@@ -280,6 +280,8 @@ async function project(db, id) {
  * over the budgets' lines, the lines by department and by category, what was paid by month (requests
  * disbursed against those lines), and, only when `projects` is true (a reader whose scope is all), the
  * projects with a budget. Groups cut to 20 rows, the months to the year's 12. Figures, never a row.
+ * Every amount leaves as text: JSON would carry ₦1,050,000.50 as the number 1050000.5, which money()
+ * refuses.
  */
 async function aiSummary(db, q, scope) {
   const params = [COMMITTED, SPENT, q.year, q.department_id || null, q.projects === true];
@@ -299,9 +301,9 @@ async function aiSummary(db, q, scope) {
          JOIN expense_category ec ON ec.expense_category_id = bl.expense_category_id
      ), figures AS (
        SELECT (SELECT count(*) FROM b)::int AS budgets,
-              COALESCE(sum(amount), 0)::numeric(18,2) AS allocated,
-              COALESCE(sum(committed_amount), 0)::numeric(18,2) AS committed,
-              COALESCE(sum(spent_amount), 0)::numeric(18,2) AS spent,
+              COALESCE(sum(amount), 0)::numeric(18,2)::text AS allocated,
+              COALESCE(sum(committed_amount), 0)::numeric(18,2)::text AS committed,
+              COALESCE(sum(spent_amount), 0)::numeric(18,2)::text AS spent,
               count(*) FILTER (WHERE committed_amount + spent_amount > amount)::int AS lines_over,
               count(*) FILTER (WHERE amount > 0 AND committed_amount + spent_amount >= amount * 0.8)::int AS lines_past_80
          FROM l
@@ -334,13 +336,13 @@ async function aiSummary(db, q, scope) {
         GROUP BY 1
      )
      SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
-            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated, 'committed', committed, 'spent', spent) ORDER BY rank)
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated::text, 'committed', committed::text, 'spent', spent::text) ORDER BY rank)
                FROM by_department WHERE rank <= 20) AS by_department,
-            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated, 'committed', committed, 'spent', spent) ORDER BY rank)
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated::text, 'committed', committed::text, 'spent', spent::text) ORDER BY rank)
                FROM by_category WHERE rank <= 20) AS by_category,
-            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated, 'committed', committed, 'spent', spent) ORDER BY rank)
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'allocated', allocated::text, 'committed', committed::text, 'spent', spent::text) ORDER BY rank)
                FROM by_project WHERE rank <= 20) AS by_project,
-            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM paid) AS paid`,
+            (SELECT json_agg(json_build_object('at', at, 'value', value::text) ORDER BY at) FROM paid) AS paid`,
     params,
   );
   const row = rows[0] || {};
