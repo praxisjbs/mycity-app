@@ -199,6 +199,16 @@ async function signIn(page, origin, email, password) {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  // Two-step on (a person who turned it on in an earlier shot): the code their app shows now.
+  const step = page.getByRole("group", { name: "Sign-In Code", exact: true });
+  const asked = await Promise.race([
+    step.waitFor({ state: "visible", timeout: 20000 }).then(() => true, () => false),
+    page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 }).then(() => false, () => false),
+  ]);
+  if (asked) {
+    await step.getByRole("textbox").first().click();
+    await page.keyboard.type(await require("./people").codeFor(email), { delay: 60 });
+  }
   await page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 });
   await appSettle(page);
   // The offer to turn on notifications, answered as a person would before a demonstration.

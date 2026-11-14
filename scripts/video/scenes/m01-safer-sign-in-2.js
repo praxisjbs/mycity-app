@@ -39,8 +39,12 @@ async function codeNow(s) {
 
 /** Type digits into a group of one-digit boxes (a PIN, a code), from its first box. */
 async function digits(s, group, value) {
-  const first = group.getByRole("textbox").first();
+  const boxes = group.getByRole("textbox");
+  const first = boxes.first();
   if (s.phone) await first.tap(); else { await s.hover(first); await first.click(); }
+  // Boxes already filled (a PIN tried before) are emptied first, as a person deletes them.
+  for (let i = (await boxes.count()) - 1; i >= 0; i--) if (await boxes.nth(i).inputValue()) await boxes.nth(i).fill("");
+  await first.focus();
   await s.page.keyboard.type(value, { delay: 160 });
 }
 
@@ -203,6 +207,7 @@ module.exports = {
             { say: "Each one signs him in once if he loses his phone. He presses Copy Codes, and keeps them safe, away from it.", do: async (s) => { await s.click(h.button(s, "Copy Codes")); await s.wait(1); } },
             { say: "Close. The card reads On, with ten recovery codes left.", do: (s) => s.click(h.button(s, "Close", s.page.getByRole("dialog").last())) },
             { say: "Ask for a Code chooses how often this browser asks: Every Sign-In, Once a Day, or Once a Month.", do: (s) => h.soft(s, s.page.getByText("Ask for a Code").first()) },
+            { say: "Bode wants it every time. He picks Every Sign-In.", do: async (s) => { await s.click(s.page.getByRole("radio", { name: "Every Sign-In" }).or(s.page.getByRole("button", { name: "Every Sign-In", exact: true })).first()); await s.wait(1); } },
             { say: "He signs out, to see it work.", do: async (s) => { await h.accountMenu(s); await s.click(s.page.getByRole("menuitem", { name: "Sign Out" })); } },
           ],
         },
