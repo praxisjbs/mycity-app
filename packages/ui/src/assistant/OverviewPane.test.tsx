@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { chartValue, figureText, OverviewPane } from "./OverviewPane";
+import { chartRows } from "./pane";
 
 const OVERVIEW = {
   title: "Seven late arrivals this month, most in Operations.",
@@ -78,6 +80,48 @@ describe("OverviewPane", () => {
     expect(screen.getByText("Technology: Spent 1,100,000, Committed 400,000, Remaining 0, Over Budget 300,000, Total 1,800,000")).toBeInTheDocument();
     // Every part above 0 is drawn, not just the first series.
     await waitFor(() => expect(container.querySelectorAll("path")).toHaveLength(6));
+  });
+
+  it("draws View Data and Download PDF under a chart, each pressed once", async () => {
+    let views = 0;
+    let downloads = 0;
+    let done: () => void = () => undefined;
+    render(
+      <OverviewPane
+        overview={STACKED}
+        onViewData={() => {
+          views += 1;
+        }}
+        onDownload={() => {
+          downloads += 1;
+          return new Promise<void>((resolve) => {
+            done = resolve;
+          });
+        }}
+      />,
+    );
+    const pdf = screen.getByRole("button", { name: "Download PDF" });
+    await userEvent.click(pdf);
+    // Busy until the file lands: a second press asks nothing more (F26), and View Data waits beside it.
+    await userEvent.click(pdf);
+    expect(downloads).toBe(1);
+    done();
+    await waitFor(() => expect(pdf).not.toHaveAttribute("aria-busy", "true"));
+    await userEvent.click(screen.getByRole("button", { name: "View Data" }));
+    expect(views).toBe(1);
+  });
+
+  it("draws no foot without a chart", () => {
+    render(<OverviewPane overview={{ ...OVERVIEW, chart: null }} onViewData={() => undefined} onDownload={() => Promise.resolve()} />);
+    expect(screen.queryByRole("button", { name: "View Data" })).toBeNull();
+  });
+
+  it("gives a chart's figures as a table, a Total for a stacked bar", () => {
+    const t = chartRows(STACKED.chart, "Department", (v) => String(v));
+    expect(t.columns).toEqual(["Department", "Spent", "Committed", "Remaining", "Over Budget", "Total"]);
+    expect(t.rows[1]).toEqual(["Technology", "1100000", "400000", "0", "300000", "1800000"]);
+    expect(t.numeric).toEqual([1, 2, 3, 4, 5]);
+    expect(chartRows(OVERVIEW.chart, "Department", String).columns).toEqual(["Department", "By Department"]);
   });
 
   it("has no accessibility violations", async () => {

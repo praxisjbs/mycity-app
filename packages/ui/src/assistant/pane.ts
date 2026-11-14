@@ -84,3 +84,28 @@ export function paneValue(value: unknown): string {
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
+
+/** A chart's figures as the Table shows them (TablePane's columns, rows and numeric columns). */
+export interface PaneChartRows {
+  columns: string[];
+  rows: string[][];
+  numeric: number[];
+}
+
+/**
+ * The chart's figures as a table, for the Table of an answer drawn from a summary alone
+ * (docs/guides/praxis-ai.md §6.19 item 7): its labels down the side under `side`, a column for each
+ * series or part (a bar and a donut draw their first), a Total for a stacked bar, each figure read by
+ * `show` (naira with kobo when the chart's unit is `ngn`).
+ */
+export function chartRows(chart: PaneChart, side: string, show: (v: number) => string): PaneChartRows {
+  const used = chart.kind === "bar" || chart.kind === "donut" ? chart.series.slice(0, 1) : chart.series.slice(0, 6);
+  const stacked = chart.kind === "stacked_bar" && used.length > 1;
+  const at = (s: { values: number[] }, i: number) => {
+    const v = s.values[i];
+    return typeof v === "number" && Number.isFinite(v) ? v : 0;
+  };
+  const columns = [side, ...used.map((s) => s.label || "Value"), ...(stacked ? ["Total"] : [])];
+  const rows = chart.labels.map((label, i) => [label, ...used.map((s) => show(at(s, i))), ...(stacked ? [show(used.reduce((n, s) => n + Math.max(0, at(s, i)), 0))] : [])]);
+  return { columns, rows, numeric: columns.map((_, i) => i).slice(1) };
+}

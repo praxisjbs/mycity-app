@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { useApi } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
 import type { AiAnswer } from "@mycity/contract/contract.gen.ts";
-import { EmptyState, formatDateTime, OverviewPane, PaneSheet, PaneTabs, paneValue, paneWords, RecordPane, SourcesPane, TablePane, type PaneRead, type PaneRecord, type PaneTab } from "@mycity/ui";
+import { chartRows, chartValue, EmptyState, formatDateTime, OverviewPane, PaneSheet, PaneTabs, paneValue, paneWords, RecordPane, SourcesPane, TablePane, toast, type PaneRead, type PaneRecord, type PaneTab } from "@mycity/ui";
 
 /**
  * The right pane (docs/guides/praxis-ai.md §6.13, decision 13): Overview, Table, Record and Sources
@@ -15,7 +15,10 @@ import { EmptyState, formatDateTime, OverviewPane, PaneSheet, PaneTabs, paneValu
  * Export asks for every row of that read as a workbook (POST /ai/answers/:id/reads/:n/export, §6.16),
  * made in the worker and saved on this device like every export (foundation.md §6.12). A document
  * attached to the question (§6.18) is read as `file.<kind>`, which is never replayed: it never opens a
- * Table, and a contract's terms (`attachment.record`) open on Record instead.
+ * Table, and a contract's terms (`attachment.record`) open on Record instead. Under the Overview's
+ * chart, View Data opens the Table and Download PDF asks for the Overview as a PDF (POST
+ * /ai/answers/:id/overview/export, §6.19 item 8), saved like every export; an answer drawn from a
+ * summary alone shows the chart's figures on its Table (§6.19 item 7).
  */
 
 /** The answer in the pane, which view, which of its reads the Table pages, and the record picked. */
@@ -39,8 +42,8 @@ const isFileRead = (key: string): boolean => key.startsWith("file.");
 /** A read the Table can page again: a list or record read that returned rows, never a document's. */
 const replayable = (r: AiAnswer["reads"][number]): boolean => r.kind === "read" && r.outcome === "read" && r.rows > 0 && !isFileRead(r.key);
 
-/** The read the Table pages first: the one the answer's table came from, else the first that returned rows. */
-const firstReadN = (a: AiAnswer): number | null => a.table?.read ?? a.reads.find(replayable)?.n ?? null;
+/** The read the Table pages first: the one the answer's table came from, else the Overview's, else the first that returned rows. */
+const firstReadN = (a: AiAnswer): number | null => a.table?.read ?? (a.overview?.read && a.reads.some((r) => r.n === a.overview!.read && replayable(r)) ? a.overview.read : null) ?? a.reads.find(replayable)?.n ?? null;
 
 /** A document's terms as the Record tab shows them (a contract or MoU, §6.18), or null. */
 export function fileRecordOf(a: AiAnswer): PaneRecord | null {
@@ -132,6 +135,25 @@ function ReplayTable({ id, n, onOpenRow }: { id: string; n: number; onOpenRow: (
   );
 }
 
+/** Where an answer drawn from a summary alone puts its chart's labels: the side column's heading. */
+const sideOf = (chart: NonNullable<NonNullable<AiAnswer["overview"]>["chart"]>): string => (chart.kind === "line" ? "When" : "Name");
+
+/** The chart's figures as the Table of an answer drawn from a summary alone (§6.19 item 7): no pager, no Export. */
+function FiguresTable({ a }: { a: AiAnswer }) {
+  const chart = a.overview!.chart!;
+  const t = chartRows(chart, sideOf(chart), chartValue(chart));
+  return <TablePane caption={chart.title} columns={t.columns} rows={t.rows} numeric={t.numeric} links={t.rows.map(() => null)} />;
+}
+
+/** Download PDF on the Overview: the PDF made for the person and saved on this device (§6.19 item 8). */
+async function downloadPdf(id: string): Promise<void> {
+  try {
+    if ((await saveExport(api.call("POST /api/v1/ai/answers/:id/overview/export", { params: { id }, body: {} }))) !== false) toast("PDF downloaded");
+  } catch (e) {
+    toast.error(e instanceof ApiError ? e.message : "Download failed. Try again.");
+  }
+}
+
 /** The pane's views for the answer shown, or the empty pane before any answer. */
 export function AnswerPane({ pane }: { pane: Pane }) {
   const { navigate } = useRouter();
@@ -142,8 +164,8 @@ export function AnswerPane({ pane }: { pane: Pane }) {
     <PaneTabs
       value={s.tab}
       onValueChange={pane.setTab}
-      overview={a.overview ? <OverviewPane overview={a.overview} /> : undefined}
-      table={s.readN ? <ReplayTable key={`${a.ai_message_id}:${s.readN}`} id={a.ai_message_id} n={s.readN} onOpenRow={pane.openRecord} /> : undefined}
+      overview={a.overview ? <OverviewPane overview={a.overview} onViewData={a.overview.chart ? () => pane.setTab("table") : undefined} onDownload={a.overview.chart ? () => downloadPdf(a.ai_message_id) : undefined} /> : undefined}
+      table={s.readN ? <ReplayTable key={`${a.ai_message_id}:${s.readN}`} id={a.ai_message_id} n={s.readN} onOpenRow={pane.openRecord} /> : a.overview?.chart ? <FiguresTable a={a} /> : undefined}
       record={s.record ? <RecordPane record={s.record} onOpen={navigate} /> : undefined}
       sources={a.reads.length ? <SourcesPane reads={paneReadsOf(a)} when={formatDateTime(a.created_at)} onOpenTable={pane.openTable} /> : undefined}
     />

@@ -15,6 +15,7 @@
  *   POST   /answers/:id/feedback     create  Helpful or Not Helpful
  *   GET    /answers/:id/reads/:n     view    read n of an answer run again, 25 a page (§6.12)
  *   POST   /answers/:id/reads/:n/export  view  every row of that read as a workbook (202, made in the worker, §6.16)
+ *   POST   /answers/:id/overview/export  view  the answer's Overview as a PDF (202, made in the worker, §6.19 item 8)
  *   GET    /cards/:id                view    a card the caller's answer drew (§6.11)
  *   PUT    /cards/:id                create  the caller's edits to its values
  *   POST   /cards/:id/confirm        create  the press: the action runs with the caller's rights
@@ -88,6 +89,10 @@ route(router, "get", "/answers/:id/reads/:n",
 route(router, "post", "/answers/:id/reads/:n/export",
   { params: a.AiReadParams, body: c.common.EmptyBody, response: c.documents.ExportFile, summary: "Every row of one read of an answer as a workbook" },
   view, controller.exportRead);
+
+route(router, "post", "/answers/:id/overview/export",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: c.documents.ExportFile, summary: "An answer's Overview as a PDF" },
+  view, controller.exportOverview);
 
 route(router, "get", "/cards/:id",
   { params: c.common.IdParams, response: a.AiActionCard, summary: "A card one of my answers drew" },
