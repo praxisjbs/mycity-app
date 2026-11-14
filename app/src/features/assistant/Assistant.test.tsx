@@ -550,6 +550,93 @@ describe("The full screen: Back, the context and the pane", () => {
     expect(screen.queryByText(/^Reading /)).toBeNull();
   });
 
+  /** Budgets by department from a summary alone (§6.19 item 7): a stacked bar in naira, no read's rows. */
+  const BUDGET_OVERVIEW = {
+    summary: "budgets.summary",
+    read: null,
+    title: null,
+    figures: [{ key: "allocated", label: "Allocated", value: "5500000.00", unit: "ngn" }],
+    chart: {
+      kind: "stacked_bar" as const,
+      title: "Budget by department",
+      labels: ["Programmes", "Operations"],
+      series: [
+        { label: "Spent", values: [2000000, 1500000] },
+        { label: "Remaining", values: [1500000, 500000] },
+      ],
+      unit: "ngn",
+    },
+  };
+  const summaryOnly = () =>
+    answer({
+      content: "Programmes has the most left to spend.",
+      table: null,
+      reads: [{ n: 1, key: "budgets.summary", kind: "summary", module_key: "expenses", params: { by: "department" }, outcome: "read", rows: 0, total: 2, first: null, masked: [] }],
+      overview: BUDGET_OVERVIEW,
+    });
+
+  it("a charted answer keeps its words in the chat: its table, Showing 25 of 312 and Show Next 25 are the pane's; an answer with no chart keeps its table (decision 52)", async () => {
+    m.data["GET /api/v1/ai/answers/:id/reads/:n"] = rows;
+    const charted = answer({
+      ai_message_id: "00000000-0000-4000-8000-0000000000a2",
+      content: "Most leave this year was in Programmes.",
+      more: true,
+      reads: [{ n: 1, key: "leave.requests", kind: "read", module_key: null, params: {}, outcome: "read", rows: 2, total: 312, first: 1, masked: [] }],
+      overview: { ...BUDGET_OVERVIEW, chart: { ...BUDGET_OVERVIEW.chart, title: "Leave by department" } },
+    });
+    m.turns[CONV] = [charted, answer()];
+    ui("ask", CONV);
+    const newest = screen.getByText("Most leave this year was in Programmes.").closest("article")!;
+    const older = screen.getByText("Two requests wait on you.").closest("article")!;
+    expect(within(newest).queryByText("Ayo Bello")).toBeNull();
+    expect(within(newest).queryByText(/Showing 2 of 312/)).toBeNull();
+    expect(within(newest).queryByRole("button", { name: "Show Next 25" })).toBeNull();
+    expect(within(newest).getByRole("button", { name: "Open Leave" })).toBeTruthy();
+    expect(within(older).getByText("Ayo Bello")).toBeTruthy();
+  });
+
+  it("from a summary alone: View Data opens Table with the chart's figures and a Total, no Export; Download PDF asks once and saves it (§6.19 items 7 and 8)", async () => {
+    m.turns[CONV] = [summaryOnly()];
+    let land: () => void = () => undefined;
+    m.saveExport.mockImplementationOnce(async (asked: Promise<unknown>) => {
+      await asked;
+      await new Promise<void>((resolve) => {
+        land = resolve;
+      });
+      return true;
+    });
+    ui("ask", CONV);
+    const pane = screen.getByRole("region", { name: "Pane" });
+    expect(within(pane).getByRole("tab", { name: "Table" }).hasAttribute("disabled") || within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-disabled") === "true").toBe(false);
+    const pdf = within(pane).getByRole("button", { name: "Download PDF" });
+    await userEvent.click(pdf);
+    await userEvent.click(pdf);
+    const pdfCalls = () => m.call.mock.calls.filter(([key]) => key === "POST /api/v1/ai/answers/:id/overview/export");
+    expect(pdfCalls()).toHaveLength(1);
+    expect(pdfCalls()[0]![1]).toEqual({ params: { id: "00000000-0000-4000-8000-0000000000a1" }, body: {} });
+    await act(async () => land());
+    await userEvent.click(within(pane).getByRole("button", { name: "View Data" }));
+    expect(within(pane).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+    const table = await within(pane).findByRole("table");
+    expect(within(table).getByRole("columnheader", { name: "Total" })).toBeTruthy();
+    expect(within(table).getByText("₦3,500,000.00")).toBeTruthy();
+    expect(within(pane).queryByRole("button", { name: "Export" })).toBeNull();
+    expect(m.call.mock.calls.some(([key]) => key === "GET /api/v1/ai/answers/:id/reads/:n")).toBe(false);
+  });
+
+  it("on a phone, Open Figures under a charted answer opens the sheet on Overview with View Data and Download PDF; View Data moves to Table", async () => {
+    setViewport(390);
+    m.params = new URLSearchParams({ from: FROM });
+    m.turns[CONV] = [summaryOnly()];
+    ui("ask", CONV);
+    await userEvent.click(screen.getByRole("button", { name: "Open Figures" }));
+    const sheet = await screen.findByRole("dialog", { name: "Figures" });
+    expect(within(sheet).getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(sheet).getByRole("button", { name: "Download PDF" })).toBeTruthy();
+    await userEvent.click(within(sheet).getByRole("button", { name: "View Data" }));
+    expect(within(sheet).getByRole("tab", { name: "Table" }).getAttribute("aria-selected")).toBe("true");
+  });
+
   it("on a phone, opened from a screen: the conversation full width with Back, and Open Figures opens the pane as a sheet", async () => {
     setViewport(390);
     m.params = new URLSearchParams({ from: FROM });

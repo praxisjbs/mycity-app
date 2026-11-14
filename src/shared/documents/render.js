@@ -24,7 +24,9 @@
  *    signature the hub stamped (`{ signature: "data:image/png;base64,…", typed, name }`) as its
  *    image, or its typed name in a signature face. Every cell and clause is escaped as any value
  *    is; a signature's picture is only ever a PNG data URL (docs/guides/partnerships.md §6.8, an
- *    agreement's options, its delivery checklist and its execution block).
+ *    agreement's options, its delivery checklist and its execution block). A chart
+ *    (`{ chart: { kind, title, labels, series, unit } }`) prints as SVG drawn from its numbers by
+ *    shared/documents/chart.js, every label escaped (docs/guides/praxis-ai.md §6.19 item 8.4).
  *  - A name that walks the prototype ("__proto__", "constructor") is refused when the
  *    template is parsed, and a value is only read from an object's own properties.
  *  - A template that does not parse fails at parse time, naming the line: in Settings
@@ -201,6 +203,8 @@ const truthy = (v) =>
 /** A signature's picture: a PNG the signing pad drew and the vault re-encoded, nothing else. */
 const PNG_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
 
+const isChart = (v) =>
+  v !== null && typeof v === "object" && !Array.isArray(v) && v.chart !== null && typeof v.chart === "object" && !Array.isArray(v.chart) && Array.isArray(v.chart.labels);
 const isGrid = (v) =>
   v !== null && typeof v === "object" && !Array.isArray(v) && Array.isArray(v.head) && Array.isArray(v.rows);
 const isSignature = (v) =>
@@ -219,6 +223,7 @@ function signatureHtml(v) {
 
 /** A block value in an HTML template. */
 function blockHtml(v) {
+  if (isChart(v)) return require("./chart").chartSvg(v.chart);
   if (isGrid(v)) {
     const row = (cells, tag) => `<tr>${cells.map((c) => `<${tag}>${escapeHtml(cellText(c))}</${tag}>`).join("")}</tr>`;
     return `<table>${row(v.head, "th")}${v.rows.map((r) => row(Array.isArray(r) ? r : [], "td")).join("")}</table>`;
@@ -233,6 +238,10 @@ function blockHtml(v) {
  * is (holdMarkdown), on lines of their own. A signature leaves a marker the HTML step stamps.
  */
 function blockMarkdown(v, hold, stamps) {
+  if (isChart(v)) {
+    stamps.push(require("./chart").chartSvg(v.chart));
+    return `${STAMP_OPEN}${stamps.length - 1}${STAMP_CLOSE}`;
+  }
   if (isGrid(v)) {
     const width = Math.max(v.head.length, 1);
     const line = (cells) => `| ${Array.from({ length: width }, (_, k) => hold(cellText(cells[k])) || " ").join(" | ")} |`;

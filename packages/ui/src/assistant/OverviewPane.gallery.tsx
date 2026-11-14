@@ -44,6 +44,13 @@ export default {
         }}
       />
     ),
+    "With Its Foot": () => (
+      <OverviewPane
+        overview={{ title: null, figures: budgetFigures, chart: { kind: "stacked_bar", title: "Budget by department", labels: BUDGETS.map((b) => b.label), series: byDepartmentParts, unit: "ngn" } }}
+        onViewData={() => undefined}
+        onDownload={() => new Promise((resolve) => setTimeout(resolve, 800))}
+      />
+    ),
     "No Figures Yet": () => <OverviewPane overview={null} />,
   },
 } satisfies GalleryEntry;

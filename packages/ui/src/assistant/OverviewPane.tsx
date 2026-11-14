@@ -1,14 +1,16 @@
 /**
  * @component OverviewPane
  * @group Assistant
- * @summary The pane's Overview: up to three figures and one chart the server drew from a summary read or a short list's own rows (a bar, a stacked bar with its key, a line or a ring); nothing until an answer has figures.
- * @use In PaneTabs' overview slot with the answer's `overview` (AiAnswer.overview); the tab is disabled while it is null. The figures and the chart come from the server (docs/guides/praxis-ai.md §6.13, §6.19 item 6); a chart whose `unit` is `ngn` reads its values in naira, as the figures do.
+ * @summary The pane's Overview: up to three figures and one chart the server drew from a summary read or a short list's own rows (a bar, a stacked bar with its key, a line or a ring), with View Data and Download PDF at its foot; nothing until an answer has figures.
+ * @use In PaneTabs' overview slot with the answer's `overview` (AiAnswer.overview); the tab is disabled while it is null. The figures and the chart come from the server (docs/guides/praxis-ai.md §6.13, §6.19 item 6); a chart whose `unit` is `ngn` reads its values in naira, as the figures do. Under a chart, `onViewData` (opens Table) and `onDownload` (the PDF, §6.19 items 7 and 8) draw the foot; each hands back its work, so the button spins and the other waits (F26).
  * @avoid Figures a screen worked out itself; a dashboard (Home's KpiGrid and its charts); a table (TablePane).
- * @phone The figures two to a row, the chart below, inside the pane sheet; no chart caption.
+ * @phone The figures two to a row, the chart below, inside the pane sheet; no chart caption; View Data and Download PDF full width, 44 px, one under the other.
  * @a11y The figures are KpiCards (a named figure each); the chart is one of the shared charts, read out as a list of label and figure, a stacked bar as each part and its total.
  * @status beta
- * @example <OverviewPane overview={answer.overview} />
+ * @example <OverviewPane overview={answer.overview} onViewData={() => setTab("table")} onDownload={downloadPdf} />
  */
+import { ActionGroup } from "../actions/ActionGroup";
+import { Button } from "../actions/Button";
 import { cn } from "../lib/cn";
 import { formatMoney, formatNumber } from "../lib/format";
 import { EmptyState } from "../display/EmptyState";
@@ -22,6 +24,10 @@ import type { PaneChart, PaneFigure, PaneOverview } from "./pane";
 export interface OverviewPaneProps {
   /** The Overview the answer carried, or null when no summary read answered. */
   overview: PaneOverview | null;
+  /** View Data, under a chart: opens the pane's Table (the read's rows, or the chart's figures). No button without it. */
+  onViewData?: () => void;
+  /** Download PDF, under a chart: makes the Overview a PDF and saves it; hands back its work so the button spins. No button without it. */
+  onDownload?: () => Promise<unknown>;
   /** Layout classes only (spacing). */
   className?: string;
 }
@@ -72,7 +78,7 @@ function Chart({ chart }: { chart: PaneChart }) {
   return <BarChart title={nameOf(chart)} bars={chart.labels.map((label, i) => ({ label, value: first.values[i] ?? 0 }))} colourPerBar={chart.labels.length <= 6} format={show} />;
 }
 
-export function OverviewPane({ overview, className }: OverviewPaneProps) {
+export function OverviewPane({ overview, onViewData, onDownload, className }: OverviewPaneProps) {
   if (!overview || (!overview.figures.length && !overview.chart)) return <EmptyState bare title="No Figures Yet" className={className} />;
   return (
     <div className={cn("flex flex-col gap-3", className)}>
@@ -94,6 +100,22 @@ export function OverviewPane({ overview, className }: OverviewPaneProps) {
             {overview.chart.title}
           </p>
           <Chart chart={overview.chart} />
+        </div>
+      )}
+      {overview.chart && (onViewData || onDownload) && (
+        <div className="flex flex-wrap gap-2 phone:flex-col phone:items-stretch">
+          <ActionGroup>
+            {onViewData && (
+              <Button icon="table" className="phone:w-full" onClick={onViewData}>
+                View Data
+              </Button>
+            )}
+            {onDownload && (
+              <Button icon="download" className="phone:w-full" onClick={onDownload}>
+                Download PDF
+              </Button>
+            )}
+          </ActionGroup>
         </div>
       )}
     </div>

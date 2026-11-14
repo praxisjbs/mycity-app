@@ -517,6 +517,37 @@ const AiRowFigure = z
   .strict();
 
 /**
+ * The Overview the model asks the pane to draw (§6.13, §6.19 item 6), as the draft names it and the
+ * answer keeps it (`ai_message.metadata.overview_spec`), so Download PDF draws it again with the
+ * person's rights at the build (§6.19 item 8). From a summary: which of the turn's summaries (by key),
+ * up to three of its figures by key, and one chart over one of its groups (`group`) or series
+ * (`series`). From a list whose whole answer is on one page: which read (by `n`), up to three figures
+ * the server works out from its rows (`AiRowFigure`), and one chart of its rows: `label` the field each
+ * bar is named by, and `values` (number or money fields) or `count` (a code field whose rows are
+ * counted).
+ */
+const AiOverviewSpec = z
+  .object({
+    summary: z.string().max(80).nullable().default(null),
+    read: z.number().int().min(1).max(5).nullable().default(null),
+    figures: z.array(z.union([z.string().max(64), AiRowFigure])).max(3).default([]),
+    chart: z
+      .object({
+        kind: AiChartKind,
+        title: z.string().trim().min(1).max(120),
+        group: z.string().max(64).nullable().default(null),
+        series: z.array(z.string().max(64)).max(6).nullable().default(null),
+        label: z.string().min(1).max(64).nullable().default(null),
+        values: z.array(z.string().min(1).max(64)).max(6).nullable().default(null),
+        count: z.string().min(1).max(64).nullable().default(null),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+  })
+  .strict();
+
+/**
  * What the model returns as its answer (§6.4); the server turns it into AiAnswer. Never sent
  * over HTTP: it is the output schema of the assistant's last round.
  */
@@ -566,36 +597,47 @@ const AiAnswerDraft = z
       .strict()
       .nullable()
       .default(null),
-    /**
-     * The Overview the pane draws (§6.13, §6.19 item 6). From a summary: which of this turn's
-     * summaries (by key), up to three of its figures by key, and one chart over one of its groups
-     * (`group`) or series (`series`). From a list whose whole answer is on one page: which read (by
-     * `n`), up to three figures the server works out from its rows (`AiRowFigure`), and one chart of
-     * its rows: `label` the field each bar is named by, and `values` (number or money fields) or
-     * `count` (a code field whose rows are counted).
-     */
-    overview: z
-      .object({
-        summary: z.string().max(80).nullable().default(null),
-        read: z.number().int().min(1).max(5).nullable().default(null),
-        figures: z.array(z.union([z.string().max(64), AiRowFigure])).max(3).default([]),
-        chart: z
-          .object({
-            kind: AiChartKind,
-            title: z.string().trim().min(1).max(120),
-            group: z.string().max(64).nullable().default(null),
-            series: z.array(z.string().max(64)).max(6).nullable().default(null),
-            label: z.string().min(1).max(64).nullable().default(null),
-            values: z.array(z.string().min(1).max(64)).max(6).nullable().default(null),
-            count: z.string().min(1).max(64).nullable().default(null),
-          })
-          .strict()
-          .nullable()
-          .default(null),
-      })
-      .strict()
-      .nullable()
-      .default(null),
+    /** The Overview the pane draws (§6.13, §6.19 item 6): AiOverviewSpec. */
+    overview: AiOverviewSpec.nullable().default(null),
+  })
+  .strict();
+
+/**
+ * templates/documents/ai-overview.html (§6.19 item 8): an answer's Overview as a PDF on the
+ * letterhead, drawn in the worker with the asker's rights at the build. Every value is already a
+ * person's words or a block the code built (a chart, a grid); nothing here is a row of a table.
+ */
+const AiOverviewDocumentFigure = z
+  .object({
+    label: z.string().min(1).max(60),
+    /** The figure's value: an amount (with `money`) as the wire carries it, else already in words ("12", "84%"). */
+    value: z.string().max(40),
+    money: z.boolean(),
+  })
+  .strict();
+
+const AiOverviewDocumentSection = z
+  .object({
+    title: z.string().min(1).max(120),
+    /** A chart block (`{ chart: { kind, title, labels, series, unit } }`, shared/documents/chart.js), or null. */
+    chart: z.object({ chart: z.object({ kind: AiChartKind, title: z.string(), labels: z.array(z.string()), series: z.array(z.object({ label: z.string(), values: z.array(z.number()) }).strict()), unit: z.string().nullable() }).strict() }).strict().nullable(),
+    /** The chart's figures, or a list's rows, as a grid block (`{ head, rows }`). */
+    table: z.object({ head: z.array(z.string()), rows: z.array(z.array(z.string())) }).strict().nullable(),
+    /** A line in place of the chart ("The list now has 312 rows."), or null. */
+    note: z.string().max(200).nullable(),
+  })
+  .strict();
+
+const AiOverviewDocumentVars = z
+  .object({
+    question: z.string().min(1),
+    asked_by: z.string(),
+    asked_on: isoDateTime,
+    as_at: isoDateTime,
+    answer: z.string(),
+    figures: z.array(AiOverviewDocumentFigure).max(3),
+    sections: z.array(AiOverviewDocumentSection).min(1).max(12),
+    about: z.array(z.object({ item: z.string(), value: z.string() }).strict()),
   })
   .strict();
 
@@ -746,6 +788,10 @@ const TABLES = {
   AiSummaryResult: { table: null, reason: "what a summary read returns: figures, never rows" },
   AiOverviewChart: { table: null, reason: "a chart drawn from a summary, kept in ai_message.metadata" },
   AiOverview: { table: null, reason: "the pane's Overview, kept in ai_message.metadata" },
+  AiOverviewSpec: { table: null, reason: "the Overview the model asked for, kept in ai_message.metadata.overview_spec" },
+  AiOverviewDocumentFigure: { table: null, reason: "a figure of templates/documents/ai-overview.html, not a row" },
+  AiOverviewDocumentSection: { table: null, reason: "a chart and its table in templates/documents/ai-overview.html, not a row" },
+  AiOverviewDocumentVars: { table: null, reason: "the variables of templates/documents/ai-overview.html, not a row" },
   AiCardRecord: { table: null, reason: "a record a card touches, kept in ai_action_draft.records" },
   AiCardField: { table: null, reason: "a card's field as the action's schema takes it, from the schema itself" },
   AiActionLine: { table: null, reason: "one record's outcome of a press, kept in ai_action_run.result" },
@@ -849,6 +895,10 @@ module.exports = {
   AiChartKind,
   AiOverviewChart,
   AiOverview,
+  AiOverviewSpec,
+  AiOverviewDocumentFigure,
+  AiOverviewDocumentSection,
+  AiOverviewDocumentVars,
   AiRisk,
   AiConfirm,
   AiCardStatus,

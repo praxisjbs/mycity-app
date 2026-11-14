@@ -9,7 +9,10 @@
  * own whatever the grant (§1.1 decision 7), the CEO's included.
  */
 const { defineEvents } = require("../../shared/events/catalogue");
+const c = require("@mycity/contract");
 const { defineDocumentType } = require("../../shared/documents/types");
+const { defineDocType } = require("../../shared/documents/generate");
+const { defineVariables } = require("../../shared/templates/variables");
 const vault = require("../../shared/documents/vault");
 
 /** The document type and the record type a spoken question is stored under (its id: the speaker's login). */
@@ -18,6 +21,8 @@ const VOICE_QUESTION = "ai_voice_question";
 const HISTORY_EXPORT = "ai_history_export";
 /** Download Excel on an answer's Table (§6.16): one read of the answer, every row, read by the person who asked. */
 const ANSWER_EXPORT = "ai_answer_export";
+/** Download PDF on an answer's Overview (§6.19 item 8): the Overview on the letterhead, read by the person who asked. */
+const OVERVIEW_EXPORT = "ai_answer_overview";
 /**
  * Progress over realtime (§1.2 decision 23): pushed to the asking person's room before each read
  * of a question runs, with the question's Idempotency-Key, which read it is of the five and its
@@ -32,6 +37,7 @@ const EVENTS = defineEvents("praxis_ai", {
   "assistant.feedback_given": { summary: "A person marked an answer of the assistant Helpful or Not Helpful" },
   "assistant.export_requested": { summary: "A person asked for their questions to the assistant as a workbook" },
   "assistant.read_export_requested": { summary: "A person asked for every row of one of an answer's reads as a workbook" },
+  "assistant.overview_export_requested": { summary: "A person asked for an answer's Overview as a PDF" },
   // Cards (docs/guides/praxis-ai.md §6.11, §7): the card, how it was confirmed and the result; never the words.
   "assistant.card_drafted": { summary: "An answer of the assistant drew an action card for the person to confirm" },
   "assistant.action_confirmed": { summary: "A person pressed an assistant's card and its action ran with their rights" },
@@ -65,7 +71,22 @@ defineDocumentType(ANSWER_EXPORT, {
   export: true,
 });
 
-module.exports = { EVENTS, VOICE_QUESTION, HISTORY_EXPORT, ANSWER_EXPORT, PROGRESS_EVENT };
+/**
+ * An answer's Overview as a PDF (§6.19 item 8): reserved in the request with exports.reserve and drawn
+ * in the worker from templates/documents/ai-overview.html with the asker's rights at the build. A copy
+ * made for one person, kept a day like every export and never numbered or locked.
+ */
+defineDocType(OVERVIEW_EXPORT, {
+  label: "Praxis AI overview",
+  module: "praxis_ai",
+  template: "ai-overview",
+  sensitivity: "personal",
+  export: true,
+  title: (data) => String(data.question || "Praxis AI overview").slice(0, 200),
+});
+defineVariables("document", "ai-overview", c.assistant.AiOverviewDocumentVars);
+
+module.exports = { EVENTS, VOICE_QUESTION, HISTORY_EXPORT, ANSWER_EXPORT, OVERVIEW_EXPORT, PROGRESS_EVENT };
 
 // History's Export, registered with the worker's outbox here because the worker loads each module's
 // events file (src/worker.js).
