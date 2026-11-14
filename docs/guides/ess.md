@@ -305,7 +305,13 @@ People's or a manager's. The workbook opens for the person it is about and the C
   list's filters, a department, a year or a period, `by` status, type, person, department or month):
   requests by status, days approved, taken, booked ahead and waiting, people, on leave today; by
   status and type always, then by person or department (20) or by month as series. One SQL over the
-  requests (`leave.repo.aiSummary`), figures never rows.
+  requests (`leave.repo.aiSummary`), figures never rows. `my_leave.summary` (`ess.ai.js`, `ess` view,
+  the person's own only; `praxis-ai.md` §6.13, People, performance and queries, Appendix B PR 7, built
+  13/11/2026; `MyLeaveSummaryQuery`: a year): their requests (every one unless a year is asked, as My
+  Leave lists them) and those waiting; the year's days entitled, taken, booked, waiting and left by
+  leave type as stacked bars (Left never below zero); days taken by month (`leave.repo.aiMine`). It
+  carries `my_leave.list`'s matrix probe; `my_leave.list` names it. `my_attendance.summary` is the
+  person's own month (`attendance.md` §9).
   Still to come: the caller's own profile summary and open queries count (the
   caller's own payslips and deductions are `payslips.mine` and `deductions.mine`, M6 PR 6). Never another person's record. Paged at 25.
 - **AI actions** (`docs/guides/praxis-ai.md` §6.11): `my_leave.request` (`ess.ai.js`; `ess` create,
@@ -447,6 +453,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · §9: `my_leave.summary`, the person's own leave in figures by type for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7). No screen of ESS changed.
 - 13/11/2026 · JP · M6 PR 8: the stale payroll lines brought to what M6 built (the `payslip` row's columns and `published` rule, the `payslip.published` event in place of `payroll.run_approved`, the Coming Soon examples as past); Download My Data keeps no payslips, which My Payslips' Download All hands over (`docs/guides/payroll.md` §13.2 item 45).
 - 13/11/2026 · TB · ESS · My Training (#110): Download Word under My Notes saves the note and downloads it as a Word file, the person's alone (`knowledge.md` §6.13, §5).
 - 12/11/2026 · TB · ESS · My Training (#110): Take Notes opens My Notes, the person's own running note on the course, floating over it (`knowledge.md` §6.13, §10).

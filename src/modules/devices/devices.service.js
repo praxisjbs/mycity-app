@@ -191,7 +191,54 @@ async function removeFor(actor, scope, id, body) {
   return getFor(id, scope);
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A device's status as People · Devices reads it, and its parts: Removed only where some row has one. */
+const STATUS_WORDS = Object.freeze({ registered: "Registered", observed: "New", removed: "Removed" });
+const STATUS_PARTS = Object.freeze([
+  { key: "registered", label: "Registered" },
+  { key: "observed", label: "New" },
+  { key: "removed", label: "Removed", optional: true },
+]);
+
+/**
+ * The devices in the reader's `people` scope, in figures: by status, by department stacked by status,
+ * who has one registered and who has none, devices first seen by month. Runs on the client the
+ * assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   DeviceSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope) {
+  const { figure, group, series, stacked } = require("../../shared/ai/summary");
+  const r = await repo.aiSummary(client, { status: params.status }, scope);
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const groups = [
+    group("status", "Devices by status", Object.keys(STATUS_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATUS_WORDS[k], value: counted.get(k) }))),
+    group("department", "Devices by department", stacked(r.by_dept, STATUS_PARTS)),
+  ];
+  if (params.by === "department") groups.reverse();
+  return {
+    figures: [
+      figure("devices", "Devices", f.devices || 0),
+      figure("registered", "Registered", f.registered || 0),
+      figure("observed", "New", f.observed || 0),
+      figure("removed", "Removed", f.removed || 0),
+      figure("people_registered", "People with a registered device", f.people_registered || 0),
+      figure("none_registered", "Staff with none registered", f.none_registered || 0),
+    ],
+    groups,
+    series: [series("first_seen", "Devices first seen by month", r.by_month)],
+    total: f.devices || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
+
   observeForPunch,
   notePunch,
   statusForSession,

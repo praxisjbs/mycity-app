@@ -388,7 +388,68 @@ async function roleHolders(db, roleCode) {
   return rows.map((r) => r.employee_id);
 }
 
+/** The assistant summary's second grouping: the column and name each `by` maps to (never the caller's words). */
+const AI_BY = Object.freeze({
+  department: { key: "COALESCE(department_id::text, 'none')", label: "COALESCE(department, 'No department')" },
+  reviewer: { key: "COALESCE(reviewer_employee_id::text, 'none')", label: "COALESCE(reviewer, 'No reviewer')" },
+});
+
+/**
+ * The scorecards in figures for the assistant (docs/guides/praxis-ai.md §6.13, People, performance and
+ * queries), in one statement with list()'s reach (the reader's scope, and those naming them as reviewer
+ * or dotted manager): by status and rating, and the average score to date as a per cent (a score is a
+ * fraction) by department or reviewer (a grouping with no score yet left out). Figures, never a row: never a line or its evidence.
+ * @param {{period_id?, department_id?, status?, by: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const dim = AI_BY[q.by === "reviewer" ? "reviewer" : "department"];
+  const params = [q.period_id || null, q.department_id || null, q.status || null];
+  const s = scopeClause(scope, { column: "s.employee_id" }, params);
+  let who = "";
+  if (s.and) {
+    params.push(scope.employee_id || null);
+    const n = params.length;
+    who = `AND (${s.and.slice(4)} OR s.reviewer_employee_id = $${n}::uuid OR s.dotted_employee_id = $${n}::uuid)`;
+  }
+  const { rows } = await db.query(
+    `WITH v AS (
+       SELECT s.status, s.rating, s.score_to_date, s.department_id, d.name AS department, s.reviewer_employee_id,
+              CASE WHEN r.employee_id IS NULL THEN NULL ELSE btrim(r.first_name || ' ' || r.last_name) END AS reviewer
+         FROM scorecard s
+         LEFT JOIN department d ON d.department_id = s.department_id
+         LEFT JOIN employee r ON r.employee_id = s.reviewer_employee_id
+        WHERE ($1::uuid IS NULL OR s.performance_period_id = $1)
+          AND ($2::uuid IS NULL OR s.department_id = $2)
+          AND ($3::text IS NULL OR s.status = $3)
+          ${who}
+     ), figures AS (
+       SELECT count(*)::int AS scorecards,
+              count(*) FILTER (WHERE status = 'draft')::int AS draft,
+              count(*) FILTER (WHERE status = 'binding')::int AS binding,
+              count(*) FILTER (WHERE status = 'agreed')::int AS agreed,
+              count(*) FILTER (WHERE status = 'closed')::int AS closed,
+              count(*) FILTER (WHERE rating IS NOT NULL)::int AS rated,
+              round(avg(score_to_date) * 100, 1)::float AS average_score
+         FROM v
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, min(${dim.label}) AS label, round(avg(score_to_date) * 100, 1)::float AS value, count(*)::int AS count,
+              row_number() OVER (ORDER BY avg(score_to_date) DESC NULLS LAST, min(${dim.label}), ${dim.key}) AS rank
+         FROM v GROUP BY ${dim.key}
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM v GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('key', rating, 'value', n)) FROM (SELECT rating, count(*)::int AS n FROM v WHERE rating IS NOT NULL GROUP BY rating) x) AS by_rating,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value, 'count', count) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20 AND value IS NOT NULL) AS by_dim`,
+    params,
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, by_status: r.by_status || [], by_rating: r.by_rating || [], by_dim: r.by_dim || [] };
+}
+
 module.exports = {
+  aiSummary,
+
   roleHolders,
   contributionsPage,
   list,

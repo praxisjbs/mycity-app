@@ -10,7 +10,7 @@ and its record. It follows the shape of `docs/handoff/notifications-everywhere.m
 | | |
 |---|---|
 | Branch | One branch per PR, from the latest `main` (§4). PR1 was built on `claude/engine-upgrade-guide-xf4ynp` |
-| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B, PR 2 praxisjbs/mycity-app#150 (§6.12) (§6 holds each PR's state) |
+| Pull requests | PR1 praxisjbs/mycity-app#49, merged 01/11/2026; PR2 praxisjbs/mycity-app#50, merged 01/11/2026; PR3 praxisjbs/mycity-app#51, merged 01/11/2026; PR4 praxisjbs/mycity-app#53, merged 01/11/2026; PR5 praxisjbs/mycity-app#56, merged 01/11/2026; after PR5, seamless tasks and meetings praxisjbs/mycity-app#57, merged 02/11/2026; documents in the chat, PR 1 praxisjbs/mycity-app#144, merged 13/11/2026, and PR 2 praxisjbs/mycity-app#146 (§6.11); charts in the Overview, eight PRs planned in `praxis-ai.md` Appendix B, PR 2 praxisjbs/mycity-app#150 and PR 7 praxisjbs/mycity-app#153 (§6.12) (§6 holds each PR's state) |
 | Owner | JBS Praxis (the owner), with TB and GE as the module's owners |
 | Type | Full stack (CLAUDE.md step 1): backend, contract, migrations, screens, gates and documents |
 | Started | 01/11/2026 |
@@ -850,7 +850,7 @@ date, the branch and the PR when it merges.
 - [x] 13/11/2026 · PR 4 · Finance and pay summaries: `expenses.summary`, `requisitions.summary`, `disbursements.summary`, `payroll.month` by department and status, `payroll.trend`, `deductions.summary`, `my_pay.summary`; ten reads off the gaps file (built in its own chat on `claude/serene-shannon-ek7yft`)
 - [x] 13/11/2026 · PR 5 · Recruitment and onboarding summaries: vacancies, candidates, interviews, assessments, offers, onboarding and the talent pool, the matrix's summary probes (built on `claude/affectionate-sagan-vxaysr`)
 - [x] 13/11/2026 · PR 6 · Partnerships summaries: leads, partners, proposals, agreements and interactions, their six reads off the gaps file, Partnerships' built summaries in `ngn` (built in its own chat on `claude/praxis-ai-partnerships-pr6-z2sywn` rather than `m10/summaries-partnerships`)
-- [ ] PR 7 · People, performance and queries summaries (`m10/summaries-people`)
+- [x] 13/11/2026 · PR 7 · People, performance and queries summaries: exceptions, pay items, temporary sites, devices, seats, my attendance, my leave, KPIs, scorecards, commitments, queries and sanctions; thirteen reads off the gaps file (built in its own chat on the session's branch `ccr-3a67294a-v7s2ck` rather than `m10/summaries-people`, praxisjbs/mycity-app#153)
 - [ ] PR 8 · Workspace, Knowledge Hub, Community, Home and Settings summaries; the gaps file deleted (`m10/summaries-close`)
 - [ ] On staging: the budget question by department draws stacked bars, and its Download PDF opens on the letterhead
 
@@ -868,6 +868,26 @@ date, the branch and the PR when it merges.
 
 ## 8 · Log
 
+- 14/11/2026 · JP · PR 7, before its merge: checked the planning chat's concern from #155 (the matrix's
+  probe day passing into next year from December). `my_leave.summary` counts every request unless a
+  year is asked, so its probe keeps counting; a case proves it with a request in January, and
+  `praxis-ai.md` §6.17 says so. `leave.repo`'s year balance SQL is one constant (`BALANCES`) shared by
+  `balances()` and the summary.
+
+- 13/11/2026 · JP · Charts in the Overview, PR 7 built (§6.12): twelve summaries, each one SQL with its
+  list's own reach (Attendance's and Devices' on the employee, the whole structure for Seats, the
+  person's own for the two `my_` summaries, the functions reached for KPIs, the scorecards and
+  commitments in scope, `queries.md` §6.1 for queries and sanctions); thirteen reads named and off
+  `scripts/check/ai-summary-gaps.json` (12 left with PR 6's off too, PR 8's alone); twelve evaluation cases;
+  `tests/integration/ai-summaries-people.test.js`. Found on the way and written into `praxis-ai.md`
+  §6.13 before the code: the planned table's states were not the data's (an exception is Open or
+  Accepted, Rejected or Corrected; a device Registered, New or Removed; a seat has no acting state,
+  a department does); a scorecard's score is a fraction; `KpiSummaryQuery` and
+  `CommitmentSummaryQuery` were the screens' (`KpiResultSummaryQuery`, `CommitmentStateSummaryQuery`).
+  `my_leave.summary` carries its list's probe, which doubled the matrix's leave requests and ran the
+  outsider out of Annual days, so the matrix probes with Unpaid leave. Staff are offered seven more
+  summaries, so `ai-summaries.test.js`'s list gains them. The container again lacked pgvector
+  (installed by hand after `apt-get update`), Node 20 (`node@20` in the scratchpad) and `node_modules`.
 - 13/11/2026 · JP · Charts in the Overview, PR 6 built (§6.12): five summaries in the partnerships
   modules' repos (`leads`, `partners`, `proposals`, `agreements`, `interactions`), each with the one rule
   every Partnerships list keeps (`recordSeen`, `dealSeen`); `leads.list`, `partners.list`,

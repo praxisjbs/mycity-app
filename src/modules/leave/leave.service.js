@@ -609,7 +609,48 @@ async function assertCardRecord(db, { employee_id: employeeId }, actor) {
   if (person.status !== "active") throw new AppError("EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", 422, { employee_id: ["Not active"] });
 }
 
+/**
+ * The person's own leave in figures for the assistant (praxis-ai.md §6.13, People, performance and
+ * queries): their requests, every one unless a year is asked (as My Leave lists them), and the year's
+ * days (this year unless asked) entitled, taken, booked, waiting and left, by leave type as stacked
+ * bars (Left never below zero), days taken by month. Their own only, whatever their grant.
+ * @param {{query: Function}} client
+ * @param {object} params   MyLeaveSummaryQuery, parsed
+ * @param {{employee_id?: string|null}} actor
+ */
+async function aiMine(client, params, actor, now = new Date()) {
+  const { figure, group, part, series } = require("../../shared/ai/summary");
+  const today = lagos.today(now);
+  const year = params.year || Number(today.slice(0, 4));
+  const r = actor && actor.employee_id
+    ? await repo.aiMine(client, actor.employee_id, { year, asked: Boolean(params.year), today })
+    : { requests: 0, waiting: 0, types: [], taken_by_month: [] };
+  const sum = (k) => r.types.reduce((n, t) => n + Number(t[k] || 0), 0);
+  const leftOf = (t) => (t.entitled === null || t.entitled === undefined ? 0 : Math.max(0, Number(t.entitled) - t.taken - t.booked - t.waiting));
+  const rows = r.types.map((t) => ({
+    key: t.key,
+    label: t.label,
+    parts: [part("taken", "Taken", t.taken), part("booked", "Booked", t.booked), part("waiting", "Waiting", t.waiting), part("left", "Left", leftOf(t))],
+  }));
+  return {
+    figures: [
+      figure("requests", "Requests", r.requests),
+      figure("waiting_requests", "Requests waiting", r.waiting),
+      figure("entitled", `Days entitled in ${year}`, sum("entitled"), "days"),
+      figure("taken", "Days taken", sum("taken"), "days"),
+      figure("booked", "Days booked ahead", sum("booked"), "days"),
+      figure("waiting", "Days waiting", sum("waiting"), "days"),
+      figure("left", "Days left", r.types.reduce((n, t) => n + leftOf(t), 0), "days"),
+    ],
+    groups: [group("type", `My leave by type, ${year}`, rows.filter((x) => x.parts.some((p) => p.value > 0)))],
+    series: [series("taken", `Days taken by month, ${year}`, r.taken_by_month)],
+    total: r.requests,
+  };
+}
+
 module.exports = {
+  aiMine,
+
   aiSummary,
   MAX_ACTIVE_TYPES,
   list,

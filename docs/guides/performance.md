@@ -10,7 +10,7 @@
 | Capabilities | `goals.organisation` (record the organisational goals), `goals.company` (set the company objectives and key results), `goals.function` (set a function's objectives, key results and KPIs and send its quarter plan), `goals.confirm` (confirm the month's key result scores), `goals.view_all` (read the whole organisational and company plan, §6.23), `performance.manage` (run the cycle: quarters and their rules, monthly rounds, reviewer changes, conduct, PIPs, probation outcomes, imports) |
 | Screens (PROGRESS.md rows) | #29 Goals, #30 Targets (labelled Scorecards), #31 KPIs, #32 Reviews, #33 Analytics, #10 My Performance |
 | Status | Agreed |
-| Last changed | 28/10/2026 |
+| Last changed | 13/11/2026 |
 
 Sources, all read in full on 22/10/2026: MyCity's own **MyCityApp Q4 2026 OKRs V2** workbook (11
 sheets: the CEO's decisions, Company OKRs, the Q4 Scorecard roll-up, the four function sheets with
@@ -1583,6 +1583,20 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
   round, a kind, a department, `by` stage, rating, department or round) counts the reviews the reader
   may list: at each stage, waiting on them, the average closed score; by stage and rating always,
   then by department or round; never a check-in's words. Figures, never rows.
+  Appendix B PR 7 (built 13/11/2026) adds three: `kpis.summary` (`kpis.ai.js`;
+  `KpiResultSummaryQuery`, since `KpiSummaryQuery` is the screen's month: a quarter, a function,
+  `by` function or result) counts the active KPIs of the functions the reader reaches (§6.23) by
+  each one's latest result to the quarter's end, by function stacked Met, Not Met, N/A and Not
+  Entered, met as a per cent by month (`kpis.repo.aiSummary`). `scorecards.summary`
+  (`targets.ai.js`; a quarter, a function, a status, `by` status, department, reviewer or rating)
+  counts the scorecards the reader may list (scope, or naming them as reviewer or dotted manager):
+  by status and rating, the average score to date as a per cent by department or reviewer, never a
+  line or its evidence (`targets.repo.aiSummary`). `commitments.summary` (`CommitmentStateSummaryQuery`,
+  since `CommitmentSummaryQuery` is the Commitments view's month: a month, a function, a person,
+  `by` state, person, department or week) counts the commitments in scope, every month unless one
+  is asked: by state, by department or person stacked Due, On Time, Late, Missed and Rescoped, the
+  on-time rate, due and on time by week (`targets.commitments.aiSummary`). `kpis.list`,
+  `scorecards.list` and `commitments.list` name them.
 - **Reach** (§6.23, P25): the assistant's `goals.okrs`, `goals.trace` and `kpis.list`, and ⌘K's key results,
   objectives, organisational goals and KPIs, read only what the asker may read on Goals and KPIs: a
   department's, what is shared with them, the key results they own; whoever reads the whole plan (§6.25) everything. A
@@ -1893,6 +1907,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · §9: `kpis.summary`, `scorecards.summary` and `commitments.summary` for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7), within the reader's reach and scope. Nothing on screen changes.
 - 08/11/2026 · JP · M7 PR 8 (`partnerships.md` §6.18): `reviews.service.ratingsFor` gives Partnership Analytics each lead owner's latest closed monthly rating in its period, in Performance's words, only for the people whose reviews the reader may list (Performance's own `readable` rule, `reviews.repo.latestRatings`). Nothing on the Performance screens changes.
 - 03/11/2026 · JP · From the evaluation set on staging: a figure is read as the number in the person's words, so Set KPI's "95%" is 95 (`named.quantityOf`, on every figure a card carries), and Save Key Result offers only the key results it can change (`listKeyResultRefs`' `plan_statuses`). Nothing on the Performance screens changes.
 - 03/11/2026 · JP · Every Performance form in the chat (`praxis-ai.md` decisions 33 and 40, §6.11): 23

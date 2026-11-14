@@ -10,7 +10,7 @@
 | Capabilities | none; the builder and People · Departments are the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026), #103 People · Departments (JBS Praxis, 27/10/2026) |
 | Status | Built |
-| Last changed | 11/11/2026 |
+| Last changed | 13/11/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -340,6 +340,12 @@ every capability and every field until handover, and training runs from it (TB, 
   days, no line manager, departments; by department and status always, then by the dimension asked
   (managers 20, the confirmation bands). One SQL over the register (`organisation.repo.aiSummary`),
   figures never rows.
+- **AI summary of the structure** (`organisation.ai.js`; `praxis-ai.md` §6.13, People, performance
+  and queries; Appendix B PR 7, built 13/11/2026): `seats.summary` (`people` view, the whole
+  structure as `seats.list` reads it; `SeatSummaryQuery`: a department, `by` department or status):
+  roles open and filled (closed ones apart), by department stacked Filled and Open, by status, the
+  people reporting to an open role and the departments with an acting head (their head role open,
+  §6). One SQL (`organisation.repo.aiSeats`), figures never rows; `seats.list` names it.
 - **AI routes**: "show me the org chart" opens ESS · Org Chart (or People · Organogram for HR),
   optionally focused on a named person; "add an employee" opens People · Employees on
   `new=1` (`useNewLink`), Add Employee filled with the names and the job the person gave
@@ -504,6 +510,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 13/11/2026 · JP · §9: `seats.summary`, the structure's roles in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7). Nothing on screen changes.
 - 12/11/2026 · JP · Nothing on the Organogram or Org Chart changed. Beside them in `app/src/features/people/`, the employee record gains a Tax and Pension tab after Job and Add Employee and Edit Record a Tax and Pension step (`Employee360.tsx`, `EmployeeForm.tsx`, the new `TaxAndPension.tsx`; `docs/guides/foundation.md` §14, `docs/guides/payroll.md` §13.1 items 41, 44 and 46). Like the other restricted fields, the numbers, the NHF choice, the State and the declared rent are never on an organogram card, a person's sheet or the PDF (§6).
 - 12/11/2026 · AJ · Nothing on the Organogram or Org Chart changed. Beside them, the employee record's Documents tab opens a document beside the list (`ListDetail`, F31; `foundation.md` §14), and M5 now creates a hire with a placeholder work email until Complete Onboarding (`offers.md` §3 step 5) and keeps the hire's home address through `organisation.updateEmployee` from the upload page.
 

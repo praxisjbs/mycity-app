@@ -4,7 +4,8 @@
  * People the devices within their own `people` scope, a page of 25 at a time. A row
  * carries the label, the owner and the status, never an identifier of the device
  * itself. It never registers or removes a device (A23); it sends the person to the
- * screen that does.
+ * screen that does. Summary: the devices in figures, by status and by department as stacked bars,
+ * and the staff with none registered (docs/guides/praxis-ai.md §6.13, People, performance and queries).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -12,6 +13,15 @@ const service = require("./devices.service");
 
 module.exports = defineManifest({
   module: "people",
+  summaries: [
+    {
+      key: "devices.summary",
+      description: "Clock-in devices in figures: registered, new, removed, staff with none registered; by status, by department as stacked bars, first seen by month",
+      params: c.devices.DeviceSummaryQuery,
+      permission: ["people", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
+    },
+  ],
   reads: [
     {
       key: "devices.mine",
@@ -24,6 +34,7 @@ module.exports = defineManifest({
     },
     {
       key: "devices.list",
+      summary: "devices.summary",
       description: "List the devices staff clock in from, with who owns each and whether it is registered",
       params: c.devices.DeviceListQuery,
       permission: ["people", "view"],

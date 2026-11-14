@@ -1082,6 +1082,19 @@ const AdminBootstrap = z
  * department_name is the one key that is not a column: create-admin finds or creates the
  * department by that name and stores its department_id.
  */
+/**
+ * The assistant's seat summary (docs/guides/praxis-ai.md §6.13, People, performance and queries): the
+ * structure's roles by department or status, open and filled, and the departments whose head role is
+ * open. Figures, never a row.
+ */
+const SeatSummaryBy = z.enum(["department", "status"]);
+const SeatSummaryQuery = z
+  .object({
+    department_id: uuid.optional(),
+    by: SeatSummaryBy.default("department"),
+  })
+  .strict();
+
 const TABLES = {
   EmployeeCreate: { table: "employee" },
   EmployeeAdd: { table: "employee" },
@@ -1193,6 +1206,7 @@ const TABLES = {
     },
   },
   OrgSeatListQuery: { table: null, reason: "list controls and the status filter, not a row" },
+  SeatSummaryQuery: { table: null, reason: "the filter and grouping of the assistant's seat summary; figures, never a row" },
   OrgSeatPage: { table: null, reason: "a page of seats" },
   OrgSeatCreate: { table: "org_seat" },
   OrgSeatUpdate: { table: "org_seat" },
@@ -1279,6 +1293,8 @@ module.exports = {
   DepartmentMerge,
   OrgSeat,
   OrgSeatListQuery,
+  SeatSummaryBy,
+  SeatSummaryQuery,
   OrgSeatPage,
   OrgSeatCreate,
   OrgSeatUpdate,

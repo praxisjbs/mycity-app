@@ -262,6 +262,13 @@ module.exports = defineManifest({
       permission: ["people", "view"],
       run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
+    {
+      key: "seats.summary",
+      description: "The structure's roles in figures: open, filled, closed, people reporting to an open role, departments with an acting head; by department as stacked bars, by status",
+      params: c.organisation.SeatSummaryQuery,
+      permission: ["people", "view"],
+      run: (client, params) => service.aiSeats(client, params),
+    },
   ],
   reads: [
     {
@@ -286,6 +293,7 @@ module.exports = defineManifest({
     },
     {
       key: "seats.list",
+      summary: "seats.summary",
       description: "List the seats in the structure, including the roles nobody holds yet",
       params: c.organisation.OrgSeatListQuery,
       permission: ["people", "view"],

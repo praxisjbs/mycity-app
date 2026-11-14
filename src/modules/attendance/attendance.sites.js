@@ -581,7 +581,83 @@ async function zoneAt(db, person, instant, fallback) {
 /** The approved site a person is still on for a work date, or null (the clock's read). */
 const siteOn = (db, employeeId, date) => sitesRepo.siteOn(db, employeeId, date);
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A site's purpose and state as the screens name them. */
+const PURPOSE_WORDS = Object.freeze({
+  client_visit: "Client Visit",
+  partner_meeting: "Partner Meeting",
+  training_delivering: "Training (Delivering)",
+  training_attending: "Training (Attending)",
+  event: "Event",
+  conference: "Conference",
+  workshop: "Workshop",
+  exhibition: "Exhibition",
+  market_activation: "Market Activation",
+  field_survey: "Field Survey",
+  site_inspection: "Site Inspection",
+  media_engagement: "Media Engagement",
+  government_visit: "Government Visit",
+  out_of_station: "Out-of-Station Assignment",
+  coworking_space: "Coworking Space",
+  temporary_home: "Temporary Home",
+  other: "Other",
+});
+const STATE_WORDS = Object.freeze({
+  submitted: "Awaiting Approval",
+  upcoming: "Upcoming",
+  in_progress: "In Progress",
+  done: "Done",
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
+  cancelled: "Cancelled",
+});
+
+/**
+ * The sites with anyone in the reader's `people` scope on them, in figures: every one unless a period
+ * is asked (the sites whose days meet it), as the list shows them; by purpose, by state, by the month
+ * they start, the people on a site today and the person-days. Never an address, a point or a
+ * description. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   TemporarySiteSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series, askedPeriod } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const r = await sitesRepo.aiSummary(
+    client,
+    { purpose: params.purpose, state: params.state, employee_id: params.employee_id, from: period && period.from, to: period && period.to, today: lagos.today(now) },
+    scope,
+  );
+  const f = r.figures;
+  const counted = new Map(r.by_state.map((x) => [x.key, x.value]));
+  const groups = [
+    group("purpose", "Sites by purpose", r.by_purpose.map((x) => ({ key: x.key, label: PURPOSE_WORDS[x.key] || x.key, value: x.value }))),
+    group("state", "Sites by state", Object.keys(STATE_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATE_WORDS[k], value: counted.get(k) }))),
+  ];
+  if (params.by === "state") groups.reverse();
+  return {
+    figures: [
+      figure("sites", "Sites", f.sites || 0),
+      figure("waiting", "Awaiting approval", f.waiting || 0),
+      figure("upcoming", "Upcoming", f.upcoming || 0),
+      figure("in_progress", "In progress", f.in_progress || 0),
+      figure("done", "Done", f.done || 0),
+      figure("on_site", "People on a site today", f.on_site || 0),
+      figure("person_days", "Person-days", f.person_days || 0, "days"),
+    ],
+    groups,
+    series: [series("started", "Sites by the month they start", r.by_month)],
+    total: f.sites || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
+
   AHEAD_DAYS,
   MAX_DAYS,
   OWNER,

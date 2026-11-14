@@ -288,4 +288,67 @@ async function settle(id, outcome) {
 const listMine = (employeeId, query) => repo.listMine(pool, employeeId, query);
 const mineSummary = (employeeId) => repo.mineSummary(pool, employeeId);
 
-module.exports = { list, summary, get, nextStep, standing, propose, approve, reject, settle, listMine, mineSummary };
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** A sanction's status as its pill reads, and a grouping's parts: Rejected and Withdrawn only where some row has one. */
+const SANCTION_WORDS = Object.freeze({ issued: "Issued", pending_approval: "Awaiting Approval", rejected: "Rejected", withdrawn: "Withdrawn" });
+const SANCTION_PARTS = Object.freeze([
+  { key: "issued", label: "Issued" },
+  { key: "pending_approval", label: "Awaiting Approval" },
+  { key: "rejected", label: "Rejected", optional: true },
+  { key: "withdrawn", label: "Withdrawn", optional: true },
+]);
+
+/**
+ * The sanctions whose query the reader may see, in figures: every one unless a period (proposed) is
+ * asked, as the history shows them; by step of the chain and by department as stacked bars, by status,
+ * issued by month. The fines in naira only for a reader whose role sees pay, left out (never zero)
+ * for anyone else (praxis-ai.md decision 58); their count stays. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   SanctionSummaryQuery, parsed
+ * @param {object} actor    the asking person with their `queries` scope
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const { canSee } = require("../../shared/rbac/field-mask");
+  const m = require("../../shared/money/money");
+  const period = askedPeriod(params, now);
+  const [r, pay] = await Promise.all([
+    repo.aiSummary(
+      client,
+      { status: params.status, department_id: params.department_id, from: period && period.from, to: period && period.to, today: lagos.today(now) },
+      visibility.readerOf(actor.scope, actor),
+    ),
+    canSee(client, actor, "employee.salary"),
+  ]);
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const groups = {
+    step: group("step", "Sanctions by step", stacked(r.by_step, SANCTION_PARTS)),
+    status: group("status", "Sanctions by status", Object.keys(SANCTION_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: SANCTION_WORDS[k], value: counted.get(k) }))),
+    department: group("department", "Sanctions by department", stacked(r.by_department, SANCTION_PARTS)),
+  };
+  const first = groups[params.by] ? params.by : "step";
+  const figures = [
+    figure("sanctions", "Sanctions", f.sanctions || 0),
+    figure("issued", "Issued", f.issued || 0),
+    figure("pending_approval", "Awaiting approval", f.pending_approval || 0),
+    figure("rejected", "Rejected", f.rejected || 0),
+    figure("withdrawn", "Withdrawn", f.withdrawn || 0),
+    figure("in_force", "In force", f.in_force || 0),
+    figure("fines", "With a fine", f.fines || 0),
+  ];
+  if (pay) figures.push(figure("fines_amount", "Fines issued", m.toWire(f.fines_amount || "0.00"), "ngn"), figure("fines_recovered", "Fines recovered", m.toWire(f.fines_recovered || "0.00"), "ngn"));
+  return {
+    figures,
+    groups: [groups[first], ...Object.keys(groups).filter((k) => k !== first).map((k) => groups[k])],
+    series: [series("issued", "Sanctions issued by month", r.by_month)],
+    total: f.sanctions || 0,
+  };
+}
+
+module.exports = {
+  aiSummary,
+ list, summary, get, nextStep, standing, propose, approve, reject, settle, listMine, mineSummary };

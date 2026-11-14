@@ -496,6 +496,36 @@ const SCORECARD_VIRTUAL = {
   dotted: "the person in scorecard.dotted_employee_id",
   line_count: "how many lines it has, counted",
 };
+/**
+ * The assistant's scorecard summary (docs/guides/praxis-ai.md §6.13, People, performance and queries):
+ * the scorecards the reader may list by status, rating, and the average score to date by department or
+ * reviewer. Figures, never a row: never a line's evidence.
+ */
+const ScorecardSummaryBy = z.enum(["status", "department", "reviewer", "rating"]);
+const ScorecardSummaryQuery = z
+  .object({
+    period_id: uuid.optional(),
+    department_id: uuid.optional(),
+    status: ScorecardStatus.optional(),
+    by: ScorecardSummaryBy.default("status"),
+  })
+  .strict();
+
+/**
+ * The assistant's commitments summary (praxis-ai.md §6.13): the commitments in the reader's scope by
+ * state, department or person, due and on time by week; every month unless one is asked.
+ * CommitmentSummaryQuery is the Commitments view's own month's figures. Figures, never a row.
+ */
+const CommitmentStateSummaryBy = z.enum(["state", "person", "department", "week"]);
+const CommitmentStateSummaryQuery = z
+  .object({
+    month: MonthKey.optional(),
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+    by: CommitmentStateSummaryBy.default("state"),
+  })
+  .strict();
+
 const TABLES = {
   ScorecardImportRow: { table: null, reason: "a scorecard line of the scorecards workbook as the importer reads it" },
   KeyResultRef: { table: "okr_key_result" },
@@ -506,6 +536,8 @@ const TABLES = {
   Scorecard: { table: "scorecard", virtual: SCORECARD_VIRTUAL },
   ScorecardPage: { table: null, reason: "a page of scorecards" },
   ScorecardListQuery: { table: null, reason: "list controls and filters for the scorecards" },
+  ScorecardSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's scorecard summary; figures, never a row" },
+  CommitmentStateSummaryQuery: { table: null, reason: "the month, filters and grouping of the assistant's commitments summary; figures, never a row" },
   WeightProblem: { table: null, reason: "a section whose lines do not fill its weight, worked out" },
   ContributionShare: {
     table: "employee_target",
@@ -607,6 +639,10 @@ module.exports = {
   Scorecard,
   ScorecardPage,
   ScorecardListQuery,
+  ScorecardSummaryBy,
+  ScorecardSummaryQuery,
+  CommitmentStateSummaryBy,
+  CommitmentStateSummaryQuery,
   WeightProblem,
   ContributionShare,
   ContributionStatus,

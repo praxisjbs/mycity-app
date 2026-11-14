@@ -6,6 +6,8 @@
  * §6.11, decision 33), Chain Settings' Add Step and a step's change (Move Up, Move Down, Retire,
  * Restore, and its name, letter, effect and days), through the chain's own functions, for a holder
  * of `queries.configure` as the routes hold it. It never proposes or approves a sanction (A23).
+ * Summary: the sanctions in figures, by step and department as stacked bars (docs/guides/praxis-ai.md
+ * §6.13, People, performance and queries).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -68,9 +70,19 @@ module.exports = defineManifest({
   not_offered: {
     ConsequenceStepUpdate: "via chain.edit_step: a step's own change (Move Up, Move Down, Retire, Restore), which never names its step; the card is ConsequenceStepChange",
   },
+  summaries: [
+    {
+      key: "sanctions.summary",
+      description: "Sanctions in figures: issued, awaiting approval, in force, with a fine; by step of the chain and by department as stacked bars, by status, issued by month; fines where pay is seen",
+      params: c.sanctions.SanctionSummaryQuery,
+      permission: ["queries", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "sanctions.list",
+      summary: "sanctions.summary",
       description: "List sanctions: who, which step of the chain, the reason, any fine, and whether it is issued or waiting for approval",
       params: c.sanctions.SanctionListQuery,
       permission: ["queries", "view"],

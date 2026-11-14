@@ -275,14 +275,13 @@ async function overlapping(db, employeeId, startsOn, endsOn, exceptId = null) {
 }
 
 /**
- * One person's year, per leave type: the allowance and the days used. A retired type
- * still shows while the year has days on it.
+ * One person's year, per leave type: the allowance and the days used ($1 the person, $2 the year,
+ * $3 today), as balances() and the assistant's aiMine() read it, so the entitlement rule is written
+ * once. A retired type still shows while the year has days on it.
  *   entitled  People's figure for this person and year (leave_balance), else the type's
  *             days_per_year, else null (no allowance)
  */
-async function balances(db, employeeId, year, today) {
-  const { rows } = await db.query(
-    `SELECT t.leave_type_id, t.code::text AS code, t.name,
+const BALANCES = `SELECT t.leave_type_id, t.code::text AS code, t.name,
             COALESCE(b.entitled, (t.policy ->> 'days_per_year')::numeric)::float8 AS entitled,
             COALESCE(sum(v.days) FILTER (WHERE v.status = 'approved' AND v.starts_on <= $3::date), 0)::int AS taken,
             COALESCE(sum(v.days) FILTER (WHERE v.status = 'approved' AND v.starts_on > $3::date), 0)::int AS booked,
@@ -298,10 +297,10 @@ async function balances(db, employeeId, year, today) {
          ON v.leave_type_id = t.leave_type_id AND v.employee_id = $1
         AND date_part('year', v.starts_on)::int = $2
       GROUP BY t.leave_type_id, t.code, t.name, t.policy, t.active, b.entitled
-     HAVING t.active OR count(v.leave_request_id) > 0
-      ORDER BY t.name, t.leave_type_id`,
-    [employeeId, year, today],
-  );
+     HAVING t.active OR count(v.leave_request_id) > 0`;
+
+async function balances(db, employeeId, year, today) {
+  const { rows } = await db.query(`${BALANCES} ORDER BY t.name, t.leave_type_id`, [employeeId, year, today]);
   return rows.map((r) => {
     const entitled = r.entitled === null ? null : Number(r.entitled);
     return {
@@ -517,7 +516,38 @@ async function statusesOf(db, ids) {
   return rows;
 }
 
+/**
+ * The person's own leave in figures for the assistant (docs/guides/praxis-ai.md §6.13, People,
+ * performance and queries), in one statement over their own requests only: their requests (every one,
+ * or the year's when `asked`) and those waiting; each leave type's year through BALANCES, as balances()
+ * reads it (the allowance, taken, booked ahead and waiting); and the days taken by Lagos month of the year.
+ * @param {string} employeeId
+ * @param {{year: number, asked: boolean, today: string}} q
+ */
+async function aiMine(db, employeeId, q) {
+  const { rows } = await db.query(
+    `WITH r AS (
+       SELECT v.leave_request_id, v.leave_type_id, v.status, v.days, v.starts_on
+         FROM (${ROWS}) v WHERE v.employee_id = $1
+     ), types AS (
+       ${BALANCES}
+     )
+     SELECT (SELECT count(*)::int FROM r WHERE NOT $4::boolean OR date_part('year', r.starts_on)::int = $2) AS requests,
+            (SELECT count(*)::int FROM r WHERE r.status = 'submitted' AND (NOT $4::boolean OR date_part('year', r.starts_on)::int = $2)) AS waiting,
+            (SELECT json_agg(json_build_object('key', x.leave_type_id, 'label', x.name, 'entitled', x.entitled, 'taken', x.taken, 'booked', x.booked, 'waiting', x.pending) ORDER BY x.name, x.leave_type_id) FROM types x) AS types,
+            (SELECT json_agg(json_build_object('at', at, 'value', d) ORDER BY at)
+               FROM (SELECT to_char(r.starts_on, 'YYYY-MM') AS at, sum(r.days)::int AS d FROM r
+                      WHERE r.status = 'approved' AND r.starts_on <= $3::date AND date_part('year', r.starts_on)::int = $2
+                      GROUP BY 1) m) AS taken_by_month`,
+    [employeeId, q.year, q.today, q.asked],
+  );
+  const r = rows[0] || {};
+  return { requests: r.requests || 0, waiting: r.waiting || 0, types: r.types || [], taken_by_month: r.taken_by_month || [] };
+}
+
 module.exports = {
+  aiMine,
+
   statusesOf,
   list,
   aiSummary,

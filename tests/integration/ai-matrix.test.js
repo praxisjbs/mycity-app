@@ -171,7 +171,9 @@ describeDb("the access matrix on the real migrations and the staging seeds", () 
     outsider = await login("outsider-matrix@mycity.test");
     outsider.scope = await scopeFor(outsider.user, "workspace", "create");
     people.set("ceo", await grantsCache.getAuthUser(pool, ceo.user_id));
-    leaveTypeId = (await q("SELECT leave_type_id FROM leave_type WHERE code = 'annual' AND active")).rows[0].leave_type_id;
+    // Unpaid leave has no allowance: the probes ask for a day for every role (the reads', the summaries' and the
+    // actions'), and a type with days a year would run out before the last (Appendix B PR 7 added my_leave.summary's).
+    leaveTypeId = (await q("SELECT leave_type_id FROM leave_type WHERE code = 'unpaid' AND active")).rows[0].leave_type_id;
     calendar = await workingWeek.loadCalendar(pool);
     await drainOutbox();
     registry.load();

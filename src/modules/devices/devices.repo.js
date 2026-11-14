@@ -187,7 +187,61 @@ async function statusesOf(db, ids) {
   return rows;
 }
 
+/**
+ * The devices in the reader's `people` scope (on the owner, as list() applies it), in figures for the
+ * assistant (docs/guides/praxis-ai.md §6.13, People, performance and queries), in one statement: by
+ * status and by department, each department's devices by status for a stacked bar, the people with a
+ * registered one, the active staff in scope with a login and none registered, and devices first seen by
+ * Lagos month. Figures, never a row: never a device's identifier or label.
+ * @param {{status?: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.status || null];
+  const s = scopeClause(scope, { column: "ad.employee_id" }, params);
+  const staff = scopeClause(scope, { column: "e.employee_id" }, params);
+  const { rows } = await db.query(
+    `WITH v AS (
+       SELECT ad.status, ad.employee_id, ad.first_seen_at, e.department_id, d.name AS department
+         FROM attendance_device ad
+         JOIN employee e ON e.employee_id = ad.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+        WHERE ($1::text IS NULL OR ad.status = $1)
+          ${s.and}
+     ), figures AS (
+       SELECT count(*)::int AS devices,
+              count(*) FILTER (WHERE status = 'registered')::int AS registered,
+              count(*) FILTER (WHERE status = 'observed')::int AS observed,
+              count(*) FILTER (WHERE status = 'removed')::int AS removed,
+              count(DISTINCT employee_id) FILTER (WHERE status = 'registered')::int AS people_registered
+         FROM v
+     ), by_dept AS (
+       SELECT COALESCE(department_id::text, 'none') AS key, COALESCE(min(department), 'No department') AS label,
+              count(*) FILTER (WHERE status = 'registered')::int AS registered,
+              count(*) FILTER (WHERE status = 'observed')::int AS observed,
+              count(*) FILTER (WHERE status = 'removed')::int AS removed,
+              row_number() OVER (ORDER BY count(*) DESC, min(department), department_id) AS rank
+         FROM v GROUP BY department_id
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT count(*)::int FROM employee e
+              WHERE e.status = 'active'
+                AND EXISTS (SELECT 1 FROM app_user u WHERE u.employee_id = e.employee_id AND u.status = 'active')
+                AND NOT EXISTS (SELECT 1 FROM attendance_device r WHERE r.employee_id = e.employee_id AND r.status = 'registered')
+                ${staff.and}) AS none_registered,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM v GROUP BY status) x) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'registered', registered, 'observed', observed, 'removed', removed) ORDER BY rank)
+               FROM by_dept WHERE rank <= 20) AS by_dept,
+            (SELECT json_agg(json_build_object('at', at, 'value', n) ORDER BY at)
+               FROM (SELECT to_char(first_seen_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS n FROM v GROUP BY 1) x) AS by_month`,
+    params,
+  );
+  const r = rows[0] || {};
+  return { figures: { ...(r.figures || {}), none_registered: r.none_registered || 0 }, by_status: r.by_status || [], by_dept: r.by_dept || [], by_month: r.by_month || [] };
+}
+
 module.exports = {
+  aiSummary,
+
   statusesOf,
   lockEmployee,
   forKnownDevice,

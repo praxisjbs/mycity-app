@@ -709,7 +709,106 @@ async function buildReport(event, ctx) {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, People, performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** An approved commitment's parts of a bar, in STATE_WORDS' words. */
+const STATE_PARTS = Object.freeze([
+  { key: "due", label: "Due" },
+  { key: "on_time", label: "On Time" },
+  { key: "late", label: "Late" },
+  { key: "missed", label: "Missed" },
+  { key: "rescoped", label: "Rescoped", optional: true },
+]);
+/** The second grouping: the column and name each `by` maps to (never the caller's words). */
+const AI_BY = Object.freeze({
+  department: { key: "COALESCE(department_id::text, 'none')", label: "COALESCE(department, 'No department')" },
+  person: { key: "primary_assignee_id::text", label: "btrim(first_name || ' ' || last_name)" },
+});
+
+/**
+ * The commitments in the reader's `performance` scope (on the assignee, as the list's filters apply
+ * it), in figures for the assistant, in one statement: every month unless one is asked; by state, by
+ * department or person with each one's approved commitments by state for a stacked bar, the on-time
+ * rate (on time of those on time, late or missed), and due and on time by the Lagos week they fall
+ * due. Figures, never a row.
+ * @param {{query: Function}} client
+ * @param {object} params   CommitmentStateSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope) {
+  const { figure, group, series, stacked } = require("../../shared/ai/summary");
+  const sql = [];
+  const where = await filtersOf(client, { month: params.month, department_id: params.department_id, employee_id: params.employee_id }, scope, null, sql);
+  const dim = AI_BY[params.by === "person" ? "person" : "department"];
+  const week = "to_char(date_trunc('week', original_due_at AT TIME ZONE 'Africa/Lagos'), 'YYYY-MM-DD')";
+  const r = await one(
+    client,
+    `WITH c AS (
+       SELECT v.state, v.department_id, v.department, v.primary_assignee_id, v.first_name, v.last_name, v.original_due_at
+         FROM (${ROW}) v ${where}
+     ), figures AS (
+       SELECT count(*)::int AS commitments,
+              count(*) FILTER (WHERE state = 'awaiting_approval')::int AS awaiting_approval,
+              count(*) FILTER (WHERE state = 'due')::int AS due,
+              count(*) FILTER (WHERE state = 'on_time')::int AS on_time,
+              count(*) FILTER (WHERE state = 'late')::int AS late,
+              count(*) FILTER (WHERE state = 'missed')::int AS missed,
+              count(*) FILTER (WHERE state = 'rescoped')::int AS rescoped
+         FROM c
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, min(${dim.label}) AS label,
+              count(*) FILTER (WHERE state = 'due')::int AS due,
+              count(*) FILTER (WHERE state = 'on_time')::int AS on_time,
+              count(*) FILTER (WHERE state = 'late')::int AS late,
+              count(*) FILTER (WHERE state = 'missed')::int AS missed,
+              count(*) FILTER (WHERE state = 'rescoped')::int AS rescoped,
+              row_number() OVER (ORDER BY count(*) DESC, min(${dim.label}), ${dim.key}) AS rank
+         FROM c WHERE state <> 'awaiting_approval' GROUP BY ${dim.key}
+     ), by_week AS (
+       SELECT ${week} AS at, count(*)::int AS due, count(*) FILTER (WHERE state = 'on_time')::int AS on_time
+         FROM c WHERE state IN ('due', 'on_time', 'late', 'missed') AND original_due_at IS NOT NULL GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', state, 'value', n)) FROM (SELECT state, count(*)::int AS n FROM c GROUP BY state) x) AS by_state,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'due', due, 'on_time', on_time, 'late', late, 'missed', missed, 'rescoped', rescoped) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(row_to_json(w) ORDER BY w.at) FROM by_week w) AS by_week`,
+    sql,
+  );
+  const f = (r && r.figures) || {};
+  const counted = new Map(((r && r.by_state) || []).map((x) => [x.key, x.value]));
+  const weeks = (r && r.by_week) || [];
+  const judged = (f.on_time || 0) + (f.late || 0) + (f.missed || 0);
+  const groups = [
+    group("state", "Commitments by state", Object.keys(STATE_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATE_WORDS[k], value: counted.get(k) }))),
+    group(params.by === "person" ? "person" : "department", params.by === "person" ? "Commitments by person" : "Commitments by department", stacked((r && r.by_dim) || [], STATE_PARTS)),
+  ];
+  if (params.by === "person" || params.by === "department") groups.reverse();
+  return {
+    figures: [
+      figure("commitments", "Commitments", f.commitments || 0),
+      figure("awaiting_approval", "Awaiting approval", f.awaiting_approval || 0),
+      figure("due", "Due", f.due || 0),
+      figure("on_time", "On time", f.on_time || 0),
+      figure("late", "Late", f.late || 0),
+      figure("missed", "Missed", f.missed || 0),
+      figure("rescoped", "Rescoped", f.rescoped || 0),
+      figure("on_time_rate", "On-time rate", judged ? Math.round((1000 * (f.on_time || 0)) / judged) / 10 : 0, "percent"),
+    ],
+    groups,
+    series: [
+      series("due", "Due by week", weeks.map((w) => ({ at: w.at, value: w.due }))),
+      series("on_time", "On time by week", weeks.map((w) => ({ at: w.at, value: w.on_time }))),
+    ],
+    total: f.commitments || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
+
   FLOW,
   list,
   summary,

@@ -734,7 +734,123 @@ async function breachForQuery(client, breachId) {
 /** Keep the query raised for a breach on it, in the caller's transaction. */
 const attachQuery = (client, breachId, queryId) => repo.setBreachQuery(client, breachId, queryId);
 
+/* ------------------------------------------------------------------ *
+ * The assistant's exception and own-month summaries (docs/guides/praxis-ai.md §6.13, People,
+ * performance and queries)
+ * ------------------------------------------------------------------ */
+
+/** An exception's type as People · Attendance names it. */
+const EXCEPTION_WORDS = Object.freeze({
+  outside_worksite: "Outside Worksite",
+  outside_home: "Outside Home",
+  location_unverified: "Location Unclear",
+  unknown_device: "Unknown Device",
+  suspicious_timestamp: "Device Time Ahead",
+  missing_clock_out: "Missing Clock-Out",
+  automatic_clock_out: "System Clock-Out",
+});
+/** Where an exception stands: open, or a resolved one's outcome, as its pill reads; the last two only where some row has one. */
+const EXCEPTION_STATES = Object.freeze([
+  { key: "open", label: "Open" },
+  { key: "accepted", label: "Accepted" },
+  { key: "rejected", label: "Rejected", optional: true },
+  { key: "corrected", label: "Corrected", optional: true },
+]);
+
+/**
+ * The exceptions in the reader's `people` scope, in figures: every one unless a period (the work date)
+ * is asked, as the list shows them; by type and by department stacked by state (Open, Accepted,
+ * Rejected, Corrected), or by person (top 10) when asked; by status; by day, or by week when asked.
+ * Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   ExceptionSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiExceptions(client, params, scope, now = new Date()) {
+  const { figure, group, top, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const r = await repo.aiExceptions(
+    client,
+    {
+      status: params.status,
+      exception_type: params.exception_type,
+      department_id: params.department_id,
+      employee_id: params.employee_id,
+      from: period && period.from,
+      to: period && period.to,
+      by: params.by,
+      week: params.by === "week",
+    },
+    scope,
+  );
+  const f = r.figures;
+  const groups = {
+    type: group("type", "Exceptions by type", stacked(r.by_type.map((x) => ({ ...x, label: EXCEPTION_WORDS[x.key] || x.key })), EXCEPTION_STATES)),
+    status: group("status", "Exceptions by status", EXCEPTION_STATES.filter((p) => f[p.key] > 0).map((p) => ({ key: p.key, label: p.label, value: f[p.key] }))),
+    dim:
+      params.by === "person"
+        ? top("person", "Exceptions by person", r.by_dim)
+        : group("department", "Exceptions by department", stacked(r.by_dim, EXCEPTION_STATES)),
+  };
+  const first = params.by === "status" ? "status" : params.by === "person" || params.by === "department" ? "dim" : "type";
+  return {
+    figures: [
+      figure("exceptions", "Exceptions", f.exceptions || 0),
+      figure("open", "Open", f.open || 0),
+      figure("accepted", "Accepted", f.accepted || 0),
+      figure("rejected", "Rejected", f.rejected || 0),
+      figure("corrected", "Corrected", f.corrected || 0),
+      figure("people", "People", f.people || 0),
+    ],
+    groups: [groups[first], ...Object.keys(groups).filter((k) => k !== first).map((k) => groups[k])],
+    series: [params.by === "week" ? series("week", "Exceptions by week", r.by_time) : series("day", "Exceptions by day", r.by_time)],
+    total: f.exceptions || 0,
+  };
+}
+
+/** A day's parts on the person's own chart, as My Attendance names them. */
+const DAY_PARTS = Object.freeze([
+  { key: "on_time", label: "On Time" },
+  { key: "late", label: "Late" },
+  { key: "absent", label: "Absent" },
+  { key: "on_leave", label: "On Leave" },
+]);
+
+/**
+ * The person's own month in figures (My Attendance): this month in Lagos unless a period is asked;
+ * their days by week or month as On Time, Late, Absent and On Leave, minutes late by day, their
+ * deductions pending. Their own rows only, whatever their grant; nobody else's.
+ * @param {{query: Function}} client
+ * @param {object} params   MyAttendanceSummaryQuery, parsed
+ * @param {{employee_id?: string|null}} actor
+ */
+async function aiMine(client, params, actor, now = new Date()) {
+  const { figure, group, series, periodOf, stacked } = require("../../shared/ai/summary");
+  const by = params.by === "month" ? "month" : "week";
+  const r = actor && actor.employee_id ? await repo.aiMine(client, actor.employee_id, { ...periodOf(params, now), by }) : { figures: {}, buckets: [], late_by_day: [] };
+  const f = r.figures;
+  return {
+    figures: [
+      figure("worked", "Days worked", f.worked || 0, "days"),
+      figure("on_time", "On time", f.on_time || 0, "days"),
+      figure("late", "Late days", f.late || 0, "days"),
+      figure("absent", "Absent days", f.absent || 0, "days"),
+      figure("on_leave", "Days on leave", f.on_leave || 0, "days"),
+      figure("late_minutes", "Minutes late", f.late_minutes || 0, "minutes"),
+      figure("worked_minutes", "Minutes worked", f.worked_minutes || 0, "minutes"),
+      figure("overtime_minutes", "Overtime minutes", f.overtime_minutes || 0, "minutes"),
+      figure("deductions_pending", "Deductions pending", f.deductions_pending || 0),
+    ],
+    groups: [group(by, by === "month" ? "My days by month" : "My days by week", stacked(r.buckets.map((b) => ({ ...b, label: b.key })), DAY_PARTS))],
+    series: [series("late_minutes", "Minutes late by day", r.late_by_day)],
+    total: f.days || 0,
+  };
+}
+
 module.exports = {
+  aiExceptions,
+  aiMine,
+
   breachForQuery,
   attachQuery,
   openSession,
