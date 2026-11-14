@@ -868,6 +868,12 @@ date, the branch and the PR when it merges.
 
 ## 8 · Log
 
+- 14/11/2026 · JP · PR 7, before its merge: checked the planning chat's concern from #155 (the matrix's
+  probe day passing into next year from December). `my_leave.summary` counts every request unless a
+  year is asked, so its probe keeps counting; a case proves it with a request in January, and
+  `praxis-ai.md` §6.17 says so. `leave.repo`'s year balance SQL is one constant (`BALANCES`) shared by
+  `balances()` and the summary.
+
 - 13/11/2026 · JP · Charts in the Overview, PR 7 built (§6.12): twelve summaries, each one SQL with its
   list's own reach (Attendance's and Devices' on the employee, the whole structure for Seats, the
   person's own for the two `my_` summaries, the functions reached for KPIs, the scorecards and

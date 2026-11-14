@@ -346,6 +346,23 @@ describeDb("People, performance and queries summaries against the real migration
     expect((await summaryOf("ops", "my_leave.summary")).total).toBe(0);
   });
 
+  test("my_leave.summary counts a request dated next year unless a year is asked: the matrix's probe day may fall in January (§6.17)", async () => {
+    // Through the summary's own run, as the matrix counts it, so the summary cache never answers.
+    const tool = registry.tool("my_leave.summary");
+    const staff = await userOf("staff");
+    const totalOf = async (params = {}) => (await tool.run(pool, tool.params.parse(params), { ...staff, scope: { scope: "own", scope_ids: [staff.employee_id] } })).total;
+    const before = await totalOf();
+    const unpaid = (await one("SELECT leave_type_id FROM leave_type WHERE code = 'unpaid'")).leave_type_id;
+    await q("INSERT INTO leave_request (employee_id, leave_type_id, starts_on, ends_on, amount, status) VALUES ($1, $2, $3, $3, 1, 'submitted')", [
+      staff.employee_id,
+      unpaid,
+      `${year + 1}-01-05`,
+    ]);
+    expect(await totalOf()).toBe(before + 1);
+    expect(await totalOf({ year })).toBe(3);
+    expect(await totalOf({ year: year + 1 })).toBe(1);
+  });
+
   test("kpis.summary: by function stacked by latest result, Not Entered where some row has one; the head reaches their function", async () => {
     const all = await summaryOf("ops", "kpis.summary");
     expect(figuresOf(all)).toMatchObject({ kpis: 3, met: 1, not_met: 1, not_entered: 1, met_share: 50 });
