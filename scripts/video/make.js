@@ -130,7 +130,10 @@ async function main() {
     for (const [key, find] of Object.entries(plan.people || {})) emails[key] = typeof find === "function" ? find(staff) : find;
     const used = [...new Set(plan.shots.map((s) => s.as).filter(Boolean))];
     for (const u of used) if (!emails[u]) throw new Error(`The scene films as "${u}" but its people do not name them.`);
-    await people.ready(used.map((u) => emails[u]), password);
+    // A person the scene shows signing in for the first time (an invitation accepted on camera) is
+    // left as they are: they choose the filming password on camera.
+    const fresh = new Set(plan.fresh || []);
+    await people.ready(used.filter((u) => !fresh.has(u)).map((u) => emails[u]), password);
     const only = rest.find((a) => a.startsWith("--only="));
     await require("./film").film(plan, out, {
       origins: { hub: config.STAFF_ORIGIN, go: config.PUBLIC_ORIGIN },

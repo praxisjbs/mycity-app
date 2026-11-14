@@ -235,8 +235,8 @@ module.exports = {
           lines: [
             { say: "Ifeoma Mbonu signs in on her phone with her email and password.", do: async (s) => { await s.type("Email", "ifeoma@mycityapp.io", { delay: 45 }); await s.type("Password", process.env.VIDEO_PASSWORD || process.env.SEED_PASSWORD, { delay: 45 }); } },
             { say: "She taps Sign In. Her role now needs two-step, so the hub asks her to set it up.", do: (s) => s.click(button(s, "Sign In")) },
-            { say: "She scans the square code with her authenticator app, or types the key under it.", do: async (s) => { await s.page.getByRole("heading", { name: "Set Up Two-Step" }).waitFor(); s.key = await s.page.getByText(/^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/).first().innerText(); s.authenticator.keep("ifeoma@mycityapp.io", s.key); } },
-            { say: "The app shows six digits. She types them in Code From App, and it turns on.", do: async (s) => s.typeCode(s.page.getByRole("group", { name: "Code From App" }), await s.authenticator.code("ifeoma@mycityapp.io")) },
+            { say: "She scans the square code with her authenticator app, or types the key under it.", do: async (s) => { await s.page.getByRole("heading", { name: "Set Up Two-Step" }).waitFor(); s.key = (await s.page.getByText(/^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/).first().innerText()).replace(/\s+/g, ""); } },
+            { say: "The app shows six digits. She types them in Code From App, and it turns on.", do: (s) => s.typeCode(s.page.getByRole("group", { name: "Code From App" }), require("../../../src/modules/security/security.mfa").codeAt(s.key)) },
             { say: "Ten Recovery Codes, shown this once. Each signs her in once without her phone.", do: (s) => s.page.getByRole("heading", { name: "Recovery Codes" }).waitFor({ timeout: 20000 }) },
             { say: "She presses Copy Codes and keeps them somewhere safe, away from her phone.", do: async (s) => { await s.click(button(s, "Copy Codes")); await s.wait(0.8); } },
             { say: "Continue, and she's in.", do: (s) => s.click(button(s, "Continue")) },

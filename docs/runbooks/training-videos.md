@@ -24,6 +24,11 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M9 Settings, part 2: Running the Hub (7:56, 11 chapters) | `m9-settings-2.js` | Made 14/11/2026, sent to TB; to upload (§5) | |
 | M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 | M10 Praxis AI, part 2: Praxis AI and AI Control (7:00, 10 chapters) | `m10-praxis-ai.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
+| M0 and M1, part 1: Signing In (5:16, 8 chapters) | `m01-signing-in-1.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
+| M0 and M1, part 2: Safer Sign-In (4:42, 8 chapters) | `m01-safer-sign-in-2.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
+| M0 and M1, part 3: Finding Your Way (6:48, 10 chapters) | `m01-finding-your-way-3.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
+| M0 and M1, part 4: Home and Attendance | not written yet | To film on a working morning (§8) | |
+| M0 and M1, part 5: Community and Mail | `m01-community-mailbox-5.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
 
 ---
 
@@ -62,6 +67,20 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
    into the filming `.env` without printing it.
 7. **pgvector.** Where the image's PostgreSQL lacks it (`pg_available_extensions` has no `vector`),
    `apt-get install postgresql-16-pgvector` before `CREATE EXTENSION vector`.
+8. **A mail server, when a video shows Mailbox** (M0 and M1, part 5). Mailbox signs in to a real IMAP
+   and SMTP server. On the filming machine only, run GreenMail's standalone jar from Maven Central
+   (`java -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=127.0.0.1
+   -Dgreenmail.auth.disabled -jar greenmail-standalone-2.1.2.jar`: SMTP 3025, IMAP 3143, any login
+   accepted) and point the filming `.env` at it: `MAILBOX_IMAP_HOST`/`MAILBOX_SMTP_HOST=127.0.0.1`,
+   ports 3143 and 3025, `MAILBOX_TLS=false`. Nothing it holds leaves the machine. Its own API takes
+   port 8080, so the app runs on another (`PORT=8090`). It keeps mail across database restores:
+   empty it before a scene's `prepare` runs again (`curl -X POST 127.0.0.1:8080/api/mail/purge`).
+9. **No AI key at all.** Where the session has no Gemini key and the person asks for the AI to be
+   shown anyway (JBS Praxis, 14/11/2026), preload `scripts/video/ai-stand-in.js` into the API and
+   the worker (`node -r ./scripts/video/ai-stand-in.js src/server.js`), with
+   `VIDEO_AI_REPLIES=<file>` and `GEMINI_API_KEY` set to any placeholder (§6.30).
+10. **Invitations and resets on screen.** Preload `scripts/video/mail-catcher.js` into the worker with
+    `VIDEO_MAIL_CAUGHT=<folder>` (§4.5).
 
 ## 2 · The pattern (measured from the Milestone 3 video, 04/11/2026)
 
@@ -218,6 +237,12 @@ template, { match })`) and renders it with the app's own template: a phone shot 
 `s.page.setContent(html)`, and a link in it (an assessment's `assess_url`) is opened as the candidate
 would. Never type or invent a link.
 
+An invitation's or a reset's job is removed the moment it is sent, since its link is a secret, so
+the queue has nothing to read back. With `scripts/video/mail-catcher.js` preloaded into the worker,
+each message the hub captures (no mail server, as on a laptop) is also kept as JSON in
+`VIDEO_MAIL_CAUGHT`; `mail.caught(email, { subject })` opens the newest (M0 and M1, part 1: the
+invitation Aaron accepts and the reset he asks for).
+
 ## 5 · Delivering
 
 The MP4 goes to the Drive folder **My City App H/O and Training Videos**, shared as anyone with the
@@ -321,19 +346,45 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
     Finish Your Day opens over the first screen; filming closes it (`film.js`), as it answers Not Now to Clock In.
     Film a part in one sitting where you can: a take after the shift's end meets it, a take before it does not.
 
-30. **Two-step on camera.** A role that requires it (M9 part 1 requires it for Management) asks Bode and Ifeoma for a
-    code at every later sign-in. `film.js` keeps each person's authenticator in `<VIDEO_OUT>/authenticator.json`: a Set
-    Up Two-Step screen's key, read as an app scans it, and the code it shows now, never one already used in the same
-    30 seconds. A shot filmed by hand reads the key and types the code itself (`s.authenticator`, `s.typeCode`). Copy
-    the file to the next part's folder with `devices.json`.
-31. **The browser a shot says it is.** Headless Chromium calls itself HeadlessChrome, which the hub reads as "Safari on
-    Linux" on Signed In and Recent Sign-Ins; `film.js` sends a real Chrome's string, and an Android phone's on a phone
-    shot.
-32. **A real outage, on the filming database only.** Stop PostgreSQL for under a minute while requests arrive (the
+30. **The AI stand-in** (`scripts/video/ai-stand-in.js`). With no key (§1.9) it answers the app's
+    calls to Gemini on the filming machine: the model list (so Integrations' Test passes) and chat
+    completions, each with the first reply in `VIDEO_AI_REPLIES` whose `match` is found in the
+    request. A scene writes its replies in `setup`. Write each reply from what the request really
+    sends: empty the file, take the step once, and read `<replies>.unmatched.jsonl` (a call nothing
+    matches is refused as a busy service and logged there). The guide's answer may say only what its
+    passages say, as the real prompt requires. The person decides whether the video says so; JBS
+    Praxis chose not to (14/11/2026), and the scene's header records it.
+31. **Passkeys.** A shot that names `passkey: "<who>"` gets Chromium's virtual authenticator (the
+    device's fingerprint reader), and the passkeys it holds are kept in `<VIDEO_OUT>/passkeys.json`
+    for the person's next shot. Copy it to the next part's folder, with `devices.json`.
+32. **The sign-in page is slow to film.** Its drifting photographs and ticking clocks halve the
+    captures a second (about 6 against 19 elsewhere). A shot of it sets `still: true` (reduced
+    motion: the photograph stands still).
+33. **The browser's own name.** Headless Chromium calls itself HeadlessChrome, which My Security read
+    as "Safari on Linux". Filming presents as Chrome on Windows and Chrome on Android (`film.js` `UA`).
+34. **Signed-out shots.** A shot with no `as` films a sign-in on camera; `device: "<who>"` gives the
+    browser that person's device cookie, so the page greets them by name and offers Use PIN. A person
+    the scene shows accepting an invitation is listed in the scene's `fresh`, so `make.js` does not
+    give them the filming password first.
+35. **Two-step on, off camera.** Once someone turns on two-step in a shot, every later sign-in of
+    theirs asks for a code: `film.js` answers it from their key (`people.codeFor`, development
+    databases only), waiting for a fresh 30-second code when the last was taken.
+36. **Restoring a snapshot with the API and worker running** kills their connections; once the worker
+    stopped syncing mail. Stop both, restore, start them again. `DROP DATABASE ... WITH (FORCE)`
+    stops a reconnecting pool from blocking the restore.
+37. **A first mailbox sync takes a moment** (the outbox hands it to the worker): a shot that connects
+    a mailbox ends there, and the next shot reads the mail.
+38. **One wait per take, not per glance.** A line that only points at something uses `soft()`; a
+    pointer that misses a renamed heading should never cost a whole take. Presses stay strict.
+39. **Two-step required on camera.** A role that comes to require two-step (M9 part 1 requires it for Management)
+    shows Set Up Two-Step at each holder's next sign-in. `film.js` answers it off camera as an app would: the key read
+    off the screen, its code, Continue past the recovery codes; from then on §6.35's `codeFor` answers Enter Code. A
+    set-up filmed on camera reads the key itself and types its code with `s.typeCode` (`m9-settings-1.js`).
+40. **A real outage, on the filming database only.** Stop PostgreSQL for under a minute while requests arrive (the
     reporter holds the faults and writes them once it is back), and stop the worker for 100 seconds (its heartbeat lasts
     90) before Status. Snapshot the database straight after the outage, so a retake does not need another. A Redis
     outage makes requests wait, not fail, and records nothing (§7).
-33. **Probes trip the sign-in limit.** Wrong passwords sent while testing an outage slow the account down (429 at
+41. **Probes trip the sign-in limit.** Wrong passwords sent while testing an outage slow the account down (429 at
     sign-in): never send them for a person the video signs in as, and clear the filming Redis database before a take.
 
 ## 7 · Bugs found while filming
@@ -343,6 +394,11 @@ listed here and in `docs/PROGRESS.md`.
 
 | Date | Screen | What filming showed | Fix |
 |---|---|---|---|
+| 14/11/2026 | Sign In | After a wrong password, the emptied Password field also read **Enter your password** in red under the real reason, as if it had been left empty | Fixed the same day: the field is cleared unmarked, as the PIN and code steps already were (`Login.tsx`); `Login.test.tsx` |
+| 14/11/2026 | Set Your Password, New Password | **Confirm Password** visited and left empty read **Does not match**; **Enter it again**, which the User Guide promises, could never show while New Password held anything | Fixed the same day: an empty confirmation asks for it again, a different one does not match; `Login.test.tsx`. The guide's "as you type" for the password rules now says they show once you move on |
+| 14/11/2026 | Home · Overview, Clocked In Today (staging) | "22 of 17 clocked in": the attendance seed punched the payroll seed's invented employees, whom the register never expects (no login) | Fixed the same day: the seed punches only people with a login (`seeds/staging/lib/attendance.js`); `home-staging-seed.test.js` |
+| 14/11/2026 | ESS · Org Chart, People · Organogram (desktop) | A person's card was a focusable box with no role or name: a screen reader read it as text, not something to open | Fixed the same day: the person's name is the card's button, described by their job; a press anywhere on the card still opens them; `OrgTree.test.tsx` |
+| 14/11/2026 | My Security | The headless browser's name read "Safari on Linux" | Not code: no person's browser is named HeadlessChrome; filming presents as a real one (§6.33) |
 | 10/11/2026 | Recruitment · New Vacancy (#38) | A salary typed as people write it (`350,000`, or `350000`) was refused as "Check the format", so the salary question could not be passed: the band went to the contract as typed, not with two places | Fixed the same day: the questions, the draft request and the editor send it through `toMoneyString`; a test types `350,000` through to a saved draft |
 | 10/11/2026 | Recruitment · Candidates (#39) | A candidate opened in a dialog at every desktop width, where F31 and the User Guide put them beside the board | Fixed: beside the board on a wide desktop, the board keeping its full width until a card is pressed (`ListDetail` `fillUntilPicked`, new); forms return to the candidate in place; headings one level down, the two score cards stacked |
 | 10/11/2026 | Recruitment · Assessments (#40), Talent Pool (#44) | An assessment, a sitting and a person in the pool opened in a dialog on desktop, as candidates did | Fixed the same way, the first record shown until another is pressed; a long assessment name leads its card, under the title Assessment (four words a card title) |
@@ -385,7 +441,7 @@ first): two videos; MyCity's real staff by name (an internal video); Bode Oluwas
 runs the IT tabs, Cynthia Osakunih the people and company tabs, and two-step is required for Management so Ifeoma
 Mbonu sets it up on her phone; a custom role, Regional Lead, for Tochukwu Ifeanyi (Marketing Lead, Abuja), who signs in
 on her phone to show what it opens with pay and bank details masked; and system health shown with real faults caused
-before filming (the worker stopped, Redis stopped), never invented. The chapters follow MILESTONES §14's definition of
+before filming (the worker stopped, the database restarted), never invented. The chapters follow MILESTONES §14's definition of
 done and the User Guide's Settings chapter, whose bold names are the screens' own words. Tochukwu has nobody reporting
 to her, so Team would show her alone: the role opens People as View over All, with the sensitive fields masked, and
 Partnerships over Team.
@@ -408,13 +464,36 @@ hours (version 2), reminds approvers every 8 hours, reads Appearance and the num
 again (its repository copy has no phones and birthdays carry no year, so the preview says why, row by row; nothing
 saved). Bode tests Gemini, reads the failing Staff Mail Server, finds the worker stopped on Status and back up, reads
 Performance, and takes on the five sign-ins the database restart failed, notes and fixes them. Seven findings (§7):
-five fixed on the branch, two for GE and TB. The tooling learnt §6.30 to §6.33. The videos were sent in the chat (20 MB
+five fixed on the branch, two for GE and TB. The tooling learnt §6.39 to §6.41. The videos were sent in the chat (20 MB
 each; the Drive connector takes 10 MB).
 
 - [x] Plan both M9 videos (14/11/2026).
 - [x] Write, film and check both (14/11/2026).
 - [ ] Upload both to Drive (§5) and add their links to the table at the top.
 - [ ] GE: a Redis outage makes requests wait rather than fail (§7).
+
+**14/11/2026 · JP (with Claude). Milestones 0 and 1, four of five parts.** Decided by JBS Praxis (questions asked
+first): five parts by topic (Signing In; Safer Sign-In; Finding Your Way, with Settings for administrators; Home and
+Attendance; Community and Mail); MyCity's real staff by name, Aaron Agama the person followed; Mailbox on a mail server
+on the filming machine; with no Gemini key here, the AI's answers simulated by a stand-in, nothing on screen saying so
+(§6.30); the files sent in the chat. Filmed on one development database, the same day, in order: part 1 (Cynthia
+Osakunih sends Aaron's invitation; he sets his password on his phone, signs in, resets it, meets the lock screen, signs
+out), part 2 (Aaron's PIN and passkey; Bode Oluwasanmi turns on two-step and signs in with a code), part 3 (both shells,
+search, notifications, display, My Profile and the Org Chart, the User Guide's answer, Bode's Settings), part 5 (from
+its own `prepare`: #general, Brand Team, a message from Precious Iyeserhen, Aaron's mail; a recognition, Cynthia's poll
+and announcement, Summarise Thread and Write With AI, a message scheduled to Ifeoma Mbonu). All at -16.3 or -16.4 LUFS.
+Four bugs fixed on the branch (§7). The tooling learnt §1.8 to §1.10 and §6.30 to §6.38.
+
+Part 4 is not filmed: clocking in must be filmed in real working hours, never on a faked clock (§6.19). Plan, on a
+working morning, from a fresh seed of that day (the seed writes only the punches whose time has come): a colleague not on
+leave clocks in on their phone before 09:00 (Aaron's seeded leave runs to 18/11/2026), Cynthia's Overview and its cards,
+Ifeoma's, Team, Alerts and Reports once the team is in, People · Attendance and an exception decided, My Attendance, and
+Finish Your Day at the shift's end. The office needs a worksite first (none is seeded): check how People · Worksites
+places one with address search unavailable (F27) before scripting it.
+
+- [x] Write, film and check parts 1, 2, 3 and 5 (14/11/2026).
+- [ ] Write and film part 4 on a working morning; add its row above.
+- [ ] Upload all five to Drive (§5) and add their links to the table at the top.
 
 **14/11/2026 · JP (with Claude).** Both Milestone 6 videos written, filmed and assembled on one development
 database, the same day, from M6's own `prepare` (§4.1): part 1, Running the Month (6:04, 8 chapters, -16.4 LUFS) and

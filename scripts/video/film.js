@@ -14,6 +14,12 @@ const path = require("node:path");
 const { appSettle } = require("../check/lib/screens");
 const { DESKTOP, PHONE } = require("./style");
 
+/** The browsers filming presents as: Chrome on a Windows computer and on an Android phone. */
+const UA = Object.freeze({
+  desktop: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  phone: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+});
+
 /** The pause after a sentence, measured on the Milestone 3 video (median 0.74 s). */
 const GAP = 0.74;
 /** Before a shot's first line, and after its last, so a cut never clips a word. */
@@ -158,65 +164,52 @@ function devices(out) {
 }
 
 /**
- * Each person's authenticator app (<out>/authenticator.json): the key a Set Up Two-Step screen showed
- * them, as the app on their phone keeps it once scanned, and the last 30-second step they used, since a
- * code is accepted once. Only for a person whose role needs two-step (Settings · Security).
+ * Each person's passkeys, kept between shots (and runs, in <out>/passkeys.json): a shot that names
+ * `passkey` gets a virtual authenticator, the phone's or computer's own fingerprint reader, holding
+ * the passkeys that person made in an earlier shot (runbook §6.31).
  */
-function authenticator(out) {
-  const file = path.join(out, "authenticator.json");
-  let keys = {};
-  try { keys = JSON.parse(fs.readFileSync(file, "utf8")); } catch { keys = {}; }
-  const { codeAt } = require("../../src/modules/security/security.mfa");
-  const save = () => fs.writeFileSync(file, JSON.stringify(keys, null, 1));
+function passkeys(out) {
+  const file = path.join(out, "passkeys.json");
+  let known = {};
+  try { known = JSON.parse(fs.readFileSync(file, "utf8")); } catch { known = {}; }
   return {
-    has: (email) => Boolean(keys[email]),
-    keep: (email, key) => { keys[email] = { key: key.replace(/\s+/g, ""), step: null }; save(); },
-    /** The code the app shows now, waiting for the next one if this one was already used. */
-    code: async (email) => {
-      const k = keys[email];
-      let step = Math.floor(Date.now() / 30000);
-      if (k.step !== null && step <= k.step) { await sleep((k.step + 1) * 30 - Date.now() / 1000 + 0.5); step = Math.floor(Date.now() / 30000); }
-      k.step = step;
-      save();
-      return codeAt(k.key);
-    },
+    get: (who) => known[who] || [],
+    keep: (who, credentials) => { known[who] = credentials; fs.writeFileSync(file, JSON.stringify(known, null, 1)); },
+  };
+}
+
+async function authenticator(context, page, keys, who) {
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("WebAuthn.enable", { enableUI: false });
+  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+  for (const credential of keys.get(who)) await cdp.send("WebAuthn.addCredential", { authenticatorId, credential });
+  return async () => {
+    const { credentials } = await cdp.send("WebAuthn.getCredentials", { authenticatorId });
+    keys.keep(who, credentials);
   };
 }
 
 /** Type six digits into a code group ("Code From App", "Sign-In Code"), one box after another. */
-async function typeCode(page, group, code, delay = 0) {
+async function typeCode(page, group, code, delay = 60) {
   await group.getByRole("textbox").first().click();
   await page.keyboard.type(code, { delay });
 }
 
 /**
- * What the sign-in asks after the password when the person's role needs two-step: Set Up Two-Step the
- * first time (the key read off the screen, as an app scans it; the recovery codes copied, then
- * Continue), or Enter Code after that. Nothing when the role needs none.
+ * A role that now needs two-step (Settings · Security) asks its people to set it up at their next
+ * sign-in: the key the screen shows, read as an app scans it, its code, then Continue past the
+ * recovery codes, as a person does before a demonstration (runbook §6.30).
  */
-async function answerTwoStep(page, email, keys) {
-  const setup = page.getByRole("heading", { name: "Set Up Two-Step", exact: true });
-  const enter = page.getByRole("group", { name: "Sign-In Code" });
-  const left = page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 }).then(() => "in", () => "stuck");
-  const asked = await Promise.race([
-    left,
-    setup.waitFor({ timeout: 20000 }).then(() => "setup", () => "stuck"),
-    enter.waitFor({ timeout: 20000 }).then(() => "enter", () => "stuck"),
-  ]);
-  if (asked === "in" || !keys) return;
-  if (asked === "setup") {
-    const key = await page.getByText(/^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/).first().innerText();
-    keys.keep(email, key);
-    await typeCode(page, page.getByRole("group", { name: "Code From App" }), await keys.code(email));
-    await page.getByRole("button", { name: "Continue", exact: true }).click({ timeout: 20000 });
-  } else if (asked === "enter") {
-    if (!keys.has(email)) throw new Error(`${email} needs a code, but filming has no key for them: film their Set Up Two-Step first.`);
-    await typeCode(page, enter, await keys.code(email));
-  }
-  await page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 });
+async function setUpTwoStep(page) {
+  const { codeAt } = require("../../src/modules/security/security.mfa");
+  const key = (await page.getByText(/^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/).first().innerText()).replace(/\s+/g, "");
+  await typeCode(page, page.getByRole("group", { name: "Code From App" }), codeAt(key));
+  await page.getByRole("button", { name: "Continue", exact: true }).click({ timeout: 20000 });
 }
 
-async function signIn(page, origin, email, password, keys) {
+async function signIn(page, origin, email, password) {
   await page.goto(origin + "/login");
   // A browser the app knows greets its person once /auth/device answers, and that render clears what
   // was typed before it: wait for the page to settle first.
@@ -224,7 +217,18 @@ async function signIn(page, origin, email, password, keys) {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  await answerTwoStep(page, email, keys);
+  // Two-step on (a person who turned it on in an earlier shot): the code their app shows now. A role
+  // that requires it of someone without it yet: Set Up Two-Step first.
+  const step = page.getByRole("group", { name: "Sign-In Code", exact: true });
+  const setup = page.getByRole("heading", { name: "Set Up Two-Step", exact: true });
+  const asked = await Promise.race([
+    step.waitFor({ state: "visible", timeout: 20000 }).then(() => "code", () => null),
+    setup.waitFor({ state: "visible", timeout: 20000 }).then(() => "setup", () => null),
+    page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 }).then(() => null, () => null),
+  ]);
+  if (asked === "code") await typeCode(page, step, await require("./people").codeFor(email));
+  if (asked === "setup") await setUpTwoStep(page);
+  await page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 });
   await appSettle(page);
   // The offer to turn on notifications, answered as a person would before a demonstration.
   const later = page.getByRole("button", { name: "Not Now", exact: true });
@@ -233,31 +237,31 @@ async function signIn(page, origin, email, password, keys) {
 
 /**
  * Film one shot. `shot` is { kind: "desktop"|"phone", site: "hub"|"go", as, start, setup, lines },
- * each line { id, duration, before, do, after, hold }.
+ * each line { id, duration, before, do, after, hold }. A shot with no `as` is filmed signed out
+ * (a sign-in shown on camera); `device` then names whose device cookie the browser carries, so the
+ * sign-in page knows the browser as theirs. `geolocation` ({ latitude, longitude }) is where the
+ * device says it is, allowed; `passkey` names whose passkeys its authenticator holds; `still` asks
+ * for reduced motion (the sign-in page).
  */
-/**
- * The browser a shot says it is. Headless Chromium calls itself "HeadlessChrome", which no person's
- * browser does, so Signed In and Recent Sign-Ins would read "Safari on Linux". A desktop shot says
- * what it is, Chrome; a phone shot, the phone it is filmed as.
- */
-function userAgentFor(browser, phone) {
-  const version = browser.version().split(".")[0];
-  return phone
-    ? `Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Mobile Safari/537.36`
-    : `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Safari/537.36`;
-}
-
 async function filmShot(browser, shot, dir, { origins, password, emailOf, known, keys }) {
   const phone = shot.kind === "phone";
   const site = shot.site || "hub";
   const origin = origins[site];
   const context = await browser.newContext({
-    userAgent: userAgentFor(browser, phone),
     ...(phone ? { viewport: PHONE.viewport, deviceScaleFactor: PHONE.deviceScaleFactor, isMobile: true, hasTouch: true }
       : { viewport: DESKTOP.viewport, deviceScaleFactor: DESKTOP.deviceScaleFactor }),
+    // A person's own browser, as the hub names it on My Security ("Chrome on Windows"): the headless
+    // browser's own name is no browser a person uses.
+    userAgent: phone ? UA.phone : UA.desktop,
     locale: "en-GB",
     timezoneId: "Africa/Lagos",
     acceptDownloads: true,
+    // Copy Codes and other copy buttons write to the clipboard as they do for a person.
+    permissions: [...(shot.geolocation ? ["geolocation"] : []), ...(phone ? [] : ["clipboard-read", "clipboard-write"])],
+    ...(shot.geolocation ? { geolocation: shot.geolocation } : {}),
+    // The sign-in page's drifting photographs and ticking clocks halve the captures a second: a shot
+    // of it (`still`) asks for reduced motion, and the photograph stands still (runbook §6.32).
+    ...(shot.still ? { reducedMotion: "reduce" } : {}),
   });
   if (!phone) await context.addInitScript(CURSOR);
   // No red underline under words the dictionary lacks ("MyCityApp's") as a person types: the
@@ -265,10 +269,12 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known,
   await context.addInitScript(() => document.addEventListener("DOMContentLoaded", () => document.documentElement.setAttribute("spellcheck", "false")));
   const page = await context.newPage();
   page.setDefaultTimeout(20000);
+  const keepKeys = shot.passkey ? await authenticator(context, page, keys, shot.passkey) : null;
+  if (!shot.as && shot.device && known) await context.addCookies(known.get(emailOf(shot.device)));
   if (shot.as) {
     const email = emailOf(shot.as);
     if (known) await context.addCookies(known.get(email));
-    await signIn(page, origins.hub, email, password, keys);
+    await signIn(page, origins.hub, email, password);
     if (known) known.keep(email, await context.cookies());
   }
   if (site !== "hub" || shot.start) await page.goto(origin + (shot.start || "/"));
@@ -306,8 +312,9 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known,
     }
   }
   const s = hands(page, { phone, origin });
-  // The authenticator app of whoever a shot signs in by hand (a first two-step set-up on camera).
-  s.authenticator = keys;
+  // The filming password, for a password a person types on camera (dots on screen).
+  s.password = password;
+  // Six digits typed into a code group on camera, at a person's pace (a two-step set-up filmed by hand).
   s.typeCode = (group, code) => typeCode(page, group, code, phone ? 140 : 110);
   if (shot.setup) await shot.setup(s);
   await sleep(0.6);
@@ -353,6 +360,8 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known,
   rolling = false;
   await camera;
   fs.writeFileSync(path.join(dir, "take.json"), JSON.stringify(take, null, 1));
+  if (keepKeys) await keepKeys();
+  if (!shot.as && shot.device && known) known.keep(emailOf(shot.device), await context.cookies());
   await context.close();
   return take;
 }
@@ -361,7 +370,7 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known,
 async function film(plan, out, opts) {
   const browser = await browserFor(opts.origins, opts.port);
   const known = devices(out);
-  const keys = authenticator(out);
+  const keys = passkeys(out);
   try {
     for (const shot of plan.shots) {
       if (shot.kind === "card" || (opts.only && !opts.only.has(shot.id))) continue;

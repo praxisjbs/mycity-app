@@ -770,8 +770,9 @@ and Move Down rather than bare arrows.
   found by post as `seeds/staff/roles.json` names it (`seeds/staging/lib/staff.js`), never by name,
   and adds nobody. It writes, in order:
   - **attendance** for today and the 14 working days before it, through the attendance module's own
-    day writer and day-close (`seeds/staging/lib/attendance.js`): each person's day drawn from their
-    work email and the date, so the same on every run (in on time, late, no clock-out, absent), and a
+    day writer and day-close (`seeds/staging/lib/attendance.js`), for people with a login only, as
+    the register expects nobody else (another seed's invented employees are never punched, so present
+    never outruns expected): each person's day drawn from their work email and the date, so the same on every run (in on time, late, no clock-out, absent), and a
     punch only once its time has come. A seeded punch is source `import` with the idempotency key
     `staging-home:<date>:<type>`; a day holding the person's own punch, or one the day-close already
     closed, is left alone. `attendance_event` is append-only, so these stay;
@@ -874,6 +875,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · §11: the attendance seed punches only people with a login. On staging it had punched the payroll seed's invented employees, whom the register never expects, and Home read "22 of 17 clocked in" (found filming the Milestones 0 and 1 videos).
 - 14/11/2026 · JP · §9: `activity.summary`, `alerts.summary` and `runs.summary`, Activity Today, the alerts one may clear and the report files received in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8). Nothing on screen changes.
 - 09/11/2026 · JP · M6 PR 2 (`payroll.md` §3.8, §10.1): Payroll In Progress is live. `payroll.source.js` counts the runs that are a Draft, Computed, Submitted or Approved (only Paid ends one, so an unpaid October still shows in December) for a reader whose `payroll` view reaches everyone, and pages them newest month first (Run, Month, Status, Staff, Net), each opening Payroll · Payroll Runs; it owes nothing now. The card keeps `employee.salary` as its sensitive field, so a reader who may not see pay never sees it. The last hidden card is gone: the catalogue holds 29 cards, all live.
 - 08/11/2026 · JP · M7 PR 8 (`partnerships.md` §6.10, §6.17): Proposals Out's records show Last Viewed (Not Yet until the link is opened) and Views, the views the public link recorded. §11: Home's staging seed writes no partners, deals, proposals, agreements or interactions any more (`seeds/staging/lib/forward-rows.js` writes no row at all now); M7's `70_partnerships.js` removes them with `removeHomeStagingRows` and writes its own synthetic tracker through the services, so the partnership cards, the pipeline chart and the Quiet Partners alert read M7's rows on staging. Home's seed tests no longer count Partnerships' figures.

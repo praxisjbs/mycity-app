@@ -313,13 +313,11 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       );
     return (
       <div
-        tabIndex={0}
         data-top={n.node_id === top ? "" : undefined}
         draggable={shapes && !n.is_ceo}
         onDragStart={() => setDragging(n)}
         onDragEnd={() => (setDragging(null), setOver(null))}
         onClick={() => openPerson(n)}
-        onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && openPerson(n)}
         className={cn(
           "og-card relative w-44 cursor-pointer rounded-card border bg-card px-3 py-2.5 text-center shadow-1 transition hover:border-input hover:shadow-2",
           n.is_ceo ? "border-primary shadow-1 ring-2 ring-primary-tint" : "border-border",
@@ -328,8 +326,19 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         )}
       >
         <Avatar name={n.display_name} src={photo(n.photo_url)} size="lg" tone={n.is_ceo ? "brand" : "soft"} className="mx-auto mb-2" />
-        <b className="block text-sm leading-tight font-strong">{n.display_name}</b>
-        <span className="mt-0.5 block text-2xs text-muted-foreground">{n.job_title}</span>
+        {/* The person's name is the card's button: a screen reader and the keyboard open them by it, and a
+            press anywhere else on the card opens them too. The fold button below stays its own control. */}
+        <button
+          type="button"
+          aria-describedby={`og-${n.node_id}-job`}
+          onClick={(e) => (e.stopPropagation(), openPerson(n))}
+          className="block w-full text-sm leading-tight font-strong focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          {n.display_name}
+        </button>
+        <span id={`og-${n.node_id}-job`} className="mt-0.5 block text-2xs text-muted-foreground">
+          {n.job_title}
+        </span>
         <span className="mt-2 flex flex-wrap items-center justify-center gap-1">
           <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{n.department}</span>
           <HeadMarks n={n} />

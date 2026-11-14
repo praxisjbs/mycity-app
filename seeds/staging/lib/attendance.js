@@ -146,10 +146,14 @@ function daysOf(today, cal) {
  * Fill the register for every person: their punches on each day, then every day before today
  * closed by the day-close.
  * @param {{db: import("pg").Pool, people: object[], now: Date, log?: Function}} opts
- *   people  staff.everyone (lib/staff.js)
+ *   people  staff.everyone (lib/staff.js); only those with a login are punched
  * @returns {Promise<{from: string, to: string, punches: number, closed: number}>}
  */
-async function seedAttendance({ db, people, now, log = () => {} }) {
+async function seedAttendance({ db, people: everyone, now, log = () => {} }) {
+  // Only people with a login clock in: the register expects nobody else (attendance.repo.js
+  // EXPECTED_ON), so a punch for someone without one, such as another seed's invented employee, would
+  // count them present but never expected, and Home would read more clocked in than expected.
+  const people = everyone.filter((p) => p.user_id);
   const today = lagos.today(now);
   const days = daysOf(today, await workingWeek.loadCalendar(db));
   let punches = 0;
