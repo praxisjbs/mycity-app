@@ -2,7 +2,8 @@
 /**
  * What the assistant may read about agreements (docs/guides/partnerships.md §9): the agreements the
  * asker may see, a page of 25 at a time, and the renewals coming due, by the rule Contracts & MOUs keeps
- * (an agreement follows its deal, §6.1).
+ * (an agreement follows its deal, §6.1). Summary: the agreements in figures by status, kind and owner,
+ * and the renewals due by month (praxis-ai.md §6.13, Partnerships).
  *
  * An agreement is generated, edited, submitted, sent, renewed and closed on Contracts & MOUs, where the
  * person reads the wording and confirms each step (praxis-ai.md decision 33, `design`); a signature is
@@ -76,6 +77,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "agreements.list",
+      summary: "agreements.summary",
       description: "List partnership agreements, MOUs and contracts: number, title, the lead or partner, kind, status (draft to signed, active, expiring, renewed, closed), term, renewal date and owner",
       params: c.agreements.AgreementListQuery,
       permission: ["partnerships", "view"],
@@ -84,11 +86,22 @@ module.exports = defineManifest({
     },
     {
       key: "agreements.renewals",
+      summary: "agreements.summary",
       description: "Signed agreements coming up for renewal: number, title, the partner, when each ends, its renewal date and the days left, soonest first",
       params: c.agreements.RenewalQuery,
       permission: ["partnerships", "view"],
       run: (_client, params, actor) => service.renewals(params, actor.scope),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "agreements.summary",
+      description:
+        "Agreements, MOUs and contracts in figures: drafts, in approval, waiting for signature, signed, active, ending soon, renewed, closed; by status, kind and owner; renewals due by month",
+      params: c.agreements.AgreementSummaryQuery,
+      permission: ["partnerships", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
   ],
   routes: [

@@ -124,6 +124,61 @@ async function summary(db, scope) {
   );
 }
 
+/**
+ * The agreements in figures for the assistant (docs/guides/praxis-ai.md §6.13, Partnerships), in one
+ * statement with the reader's scope as list() applies it (an agreement follows its deal, §6.1): the counts
+ * by where each stands, those in force ending within 60 days; by status, by kind and by owner (20); the
+ * agreements in force ending in each of the next 12 Lagos months (the renewals due, as Renewals lists
+ * them). A period on the day made narrows it only when `from` and `to` are given. Figures, never a row.
+ * @param {{status?: string, kind?: string, partner_id?: string, lead_id?: string, deal_id?: string, owner_id?: string, from?: string, to?: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.status || null, q.kind || null, q.partner_id || null, q.lead_id || null, q.deal_id || null, q.owner_id || null, q.from || null, q.to || null];
+  const seen = dealSeen(scope, "po", params);
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT a.partnership_agreement_id, a.status, a.kind, a.ends_on, a.owner_id,
+              NULLIF(btrim(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')), '') AS owner,
+              (a.status IN ('signed', 'active', 'expiring') AND a.ends_on IS NOT NULL AND a.ends_on >= ${TODAY}) AS in_force_ahead
+         ${FROM}
+        WHERE ($1::text IS NULL OR a.status = $1)
+          AND ($2::text IS NULL OR a.kind = $2)
+          AND ($3::uuid IS NULL OR a.partner_id = $3)
+          AND ($4::uuid IS NULL OR a.lead_id = $4)
+          AND ($5::uuid IS NULL OR a.partnership_opportunity_id = $5)
+          AND ($6::uuid IS NULL OR a.owner_id = $6)
+          AND ($7::date IS NULL OR (a.created_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $7::date AND $8::date)
+          ${seen}
+     ), figures AS (
+       SELECT count(*)::int AS agreements,
+              count(*) FILTER (WHERE status = 'draft')::int AS draft,
+              count(*) FILTER (WHERE status IN ('review', 'approval'))::int AS in_approval,
+              count(*) FILTER (WHERE status IN ('sent', 'viewed'))::int AS awaiting_signature,
+              count(*) FILTER (WHERE status = 'signed')::int AS signed,
+              count(*) FILTER (WHERE status IN ('active', 'expiring'))::int AS active,
+              count(*) FILTER (WHERE in_force_ahead AND ends_on <= ${TODAY} + 60)::int AS ending_soon,
+              count(*) FILTER (WHERE status = 'renewed')::int AS renewed,
+              count(*) FILTER (WHERE status = 'closed')::int AS closed
+         FROM x
+     ), by_owner AS (
+       SELECT COALESCE(owner_id::text, 'none') AS key, COALESCE(min(owner), 'No Owner') AS label, count(*)::int AS value,
+              row_number() OVER (ORDER BY count(*) DESC, min(owner), owner_id) AS rank
+         FROM x GROUP BY owner_id
+     ), renewals AS (
+       SELECT to_char(ends_on, 'YYYY-MM') AS at, count(*)::int AS value
+         FROM x WHERE in_force_ahead AND ends_on < (${TODAY} + interval '12 months')::date GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM x GROUP BY status) s) AS by_status,
+            (SELECT json_agg(json_build_object('key', kind, 'value', n)) FROM (SELECT kind, count(*)::int AS n FROM x GROUP BY kind) k) AS by_kind,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank) FROM by_owner WHERE rank <= 20) AS by_owner,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM renewals) AS renewals`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_status: row.by_status || [], by_kind: row.by_kind || [], by_owner: row.by_owner || [], renewals: row.renewals || [] };
+}
+
 /** Renewals due: signed agreements ending within `days`, the soonest renewal first. */
 function renewals(db, query, scope) {
   const params = [query.within_days || 180];
@@ -264,6 +319,7 @@ module.exports = {
   get,
   awaitingSignature,
   summary,
+  aiSummary,
   renewals,
   dealFacts,
   signatoryOf,

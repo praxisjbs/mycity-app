@@ -584,8 +584,79 @@ async function saveTemplate(actor, id, body, scope) {
 
 const listTemplates = (query) => repo.listTemplates(pool, query);
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Partnerships)
+ * ------------------------------------------------------------------ */
+
+/** A proposal's status as a person reads it, in the order a proposal moves. */
+const STATUS_WORDS = Object.freeze({
+  brief: "Brief",
+  questions: "Questions",
+  writing: "Writing",
+  draft: "Draft",
+  sent: "Sent",
+  viewed: "Viewed",
+  accepted: "Accepted",
+  declined: "Declined",
+  expired: "Expired",
+  withdrawn: "Withdrawn",
+});
+const STATUS_ORDER = Object.freeze(Object.keys(STATUS_WORDS));
+
+/**
+ * The proposals the reader may see (the newest version of each), in figures: every proposal unless a
+ * period (sent) is asked, by status (how many, and their value in Naira), the sent ones by owner stacked
+ * Accepted, Waiting, Declined, and Expired or Withdrawn where some row has one, sent and accepted by month.
+ * The acceptance rate is accepted of those accepted, declined or expired. Runs on the client the assistant
+ * hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   ProposalSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, at = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const money = require("../../shared/money/money");
+  const period = askedPeriod(params, at);
+  const r = await repo.aiSummary(client, { ...params, from: period && period.from, to: period && period.to }, scope);
+  const f = r.figures;
+  const decided = (f.accepted || 0) + (f.declined || 0) + (f.expired || 0);
+  const statuses = STATUS_ORDER.map((k) => r.by_status.find((x) => x.key === k)).filter(Boolean);
+  const parts = [
+    { key: "accepted", label: "Accepted" },
+    { key: "waiting", label: "Waiting" },
+    { key: "declined", label: "Declined" },
+    { key: "ended", label: "Expired or Withdrawn", optional: true },
+  ];
+  const groups = {
+    status: group("status", "Proposals by status", statuses.map((x) => ({ key: x.key, label: STATUS_WORDS[x.key], value: x.proposals }))),
+    value: group(
+      "value",
+      "Value by status (NGN)",
+      statuses.filter((x) => x.valued > 0).map((x) => ({ key: x.key, label: STATUS_WORDS[x.key], value: money.toWire(x.value), count: x.proposals })),
+    ),
+    owner: group("owner", "Sent proposals by owner", stacked(r.by_owner, parts)),
+  };
+  return {
+    figures: [
+      figure("proposals", "Proposals", f.proposals || 0),
+      figure("sent", "Sent", f.sent || 0),
+      figure("viewed", "Viewed", f.viewed || 0),
+      figure("accepted", "Accepted", f.accepted || 0),
+      figure("declined", "Declined", f.declined || 0),
+      figure("expired", "Expired", f.expired || 0),
+      figure("acceptance_rate", "Acceptance rate", decided ? Math.round(((f.accepted || 0) * 100) / decided) : 0, "percent"),
+      figure("value_sent", "Value sent", money.toWire(f.value_sent || "0.00"), "ngn"),
+      figure("value_accepted", "Value accepted", money.toWire(f.value_accepted || "0.00"), "ngn"),
+    ],
+    groups: params.by === "owner" ? [groups.owner, groups.status, groups.value] : [groups.status, groups.value, groups.owner],
+    series: [series("sent", "Proposals sent by month", r.sent), series("accepted", "Proposals accepted by month", r.accepted)],
+    total: f.proposals || 0,
+  };
+}
+
 module.exports = {
   list,
+  aiSummary,
   summary,
   get,
   previewOf,

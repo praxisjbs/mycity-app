@@ -4,7 +4,9 @@
  * §9): the partners the asker may see, a page of 25 at a time, and one Partner 360, by the rule the
  * screen keeps (§6.1), money left out without `partnerships.money`; and, as cards the person
  * confirms (docs/guides/praxis-ai.md §6.11, decision 33), New Partner (signed before the hub), Edit
- * Partner, Add Contact and Edit Contact, each through the screen's own service function.
+ * Partner, Add Contact and Edit Contact, each through the screen's own service function. Summary: the
+ * partners in figures, by status and by category, region, owner or deal health as stacked bars of
+ * status, quiet by the list's own rule (praxis-ai.md §6.13, Partnerships).
  *
  * A signed copy and a logo are files, never in the chat; Close Partner loses every open deal with it,
  * so it stays on the Partner 360. Upload Document is reached from a contract or MoU attached on Ask
@@ -187,6 +189,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "partners.list",
+      summary: "partners.summary",
       description: "List partners: name, category, region, status (active, dormant, closed), their furthest deal's stage and health, owner and last contact",
       params: c.partners.PartnerListQuery,
       permission: ["partnerships", "view"],
@@ -201,6 +204,16 @@ module.exports = defineManifest({
       permission: ["partnerships", "view"],
       run: (_client, params, actor) => service.get360(params.id, actor.scope, actor),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "partners.summary",
+      description:
+        "Partners in figures: active, dormant, closed, quiet, with a live deal; by status, then by category, region, owner or deal health stacked by status; partners added by month",
+      params: c.partners.PartnerSummaryQuery,
+      permission: ["partnerships", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
   ],
   routes: [

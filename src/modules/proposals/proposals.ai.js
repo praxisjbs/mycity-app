@@ -5,6 +5,8 @@
  * §6.1); and, as a card the person confirms (docs/guides/praxis-ai.md §6.11, decision 33), New
  * Proposal: the deal and the notes from the conversation, which open the Proposal Studio with that
  * brief while Claude asks its questions. "Write a proposal for X" offers the card or opens the studio.
+ * Summary: the proposals in figures, by status and value, and each owner's sent proposals as stacked
+ * bars of their outcome (praxis-ai.md §6.13, Partnerships).
  *
  * Nothing else about a proposal is done from the chat: its questions, pages and Send are the studio's,
  * where the person reads what Claude wrote and confirms where it goes (§6.10); proof points and saved
@@ -51,11 +53,22 @@ module.exports = defineManifest({
   reads: [
     {
       key: "proposals.list",
+      summary: "proposals.summary",
       description: "List partnership proposals: number, title, the lead or partner, deal, status (brief to sent, viewed, accepted, declined), value, when sent and how often viewed",
       params: c.proposals.ProposalListQuery,
       permission: ["partnerships", "view"],
       run: (_client, params, actor) => service.list(params, actor.scope),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "proposals.summary",
+      description:
+        "Proposals in figures: sent, viewed, accepted, declined, expired, acceptance rate, value sent and accepted; by status and value; by owner stacked by outcome; sent and accepted by month",
+      params: c.proposals.ProposalSummaryQuery,
+      permission: ["partnerships", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
   ],
   routes: [

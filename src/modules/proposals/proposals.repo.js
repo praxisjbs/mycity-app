@@ -154,6 +154,72 @@ function listProposals(db, query, scope) {
   );
 }
 
+/**
+ * The proposals in figures for the assistant (docs/guides/praxis-ai.md §6.13, Partnerships), in one
+ * statement over the newest version of each, with the reader's scope as listProposals() applies it (a
+ * proposal follows its deal, §6.1): the counts sent, opened and decided, their value in Naira (a proposal
+ * without a currency is its deal's, Naira); by status, how many and their value; the sent ones by the
+ * deal's owner, each row's outcomes for a stacked bar (20); sent and accepted by Lagos month. A period on
+ * the day sent narrows it only when `from` and `to` are given. Figures, never a row.
+ * @param {{status?: string, deal_id?: string, partner_id?: string, lead_id?: string, owner_id?: string, from?: string, to?: string}} q
+ */
+async function aiSummary(db, q, scope) {
+  const params = [q.status || null, q.deal_id || null, q.partner_id || null, q.lead_id || null, q.owner_id || null, q.from || null, q.to || null];
+  const seen = deals.dealSeen(scope, "po", params);
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT pp.partnership_proposal_id, pp.status, pp.sent_at, pp.first_viewed_at, pp.accepted_at,
+              CASE WHEN pp.currency IS NULL OR btrim(pp.currency::text) = 'NGN' THEN pp.value END AS value,
+              po.owner_id, NULLIF(btrim(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')), '') AS owner
+         ${P_FROM}
+        WHERE ${NEWEST}
+          AND ($1::text IS NULL OR pp.status = $1)
+          AND ($2::uuid IS NULL OR pp.partnership_opportunity_id = $2)
+          AND ($3::uuid IS NULL OR po.partner_id = $3)
+          AND ($4::uuid IS NULL OR po.lead_id = $4)
+          AND ($5::uuid IS NULL OR po.owner_id = $5)
+          AND ($6::date IS NULL OR (pp.sent_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $6::date AND $7::date)
+          ${seen}
+     ), figures AS (
+       SELECT count(*)::int AS proposals,
+              count(*) FILTER (WHERE sent_at IS NOT NULL)::int AS sent,
+              count(*) FILTER (WHERE first_viewed_at IS NOT NULL)::int AS viewed,
+              count(*) FILTER (WHERE status = 'accepted')::int AS accepted,
+              count(*) FILTER (WHERE status = 'declined')::int AS declined,
+              count(*) FILTER (WHERE status = 'expired')::int AS expired,
+              COALESCE(sum(value) FILTER (WHERE sent_at IS NOT NULL), 0)::numeric(18,2)::text AS value_sent,
+              COALESCE(sum(value) FILTER (WHERE status = 'accepted'), 0)::numeric(18,2)::text AS value_accepted
+         FROM x
+     ), by_status AS (
+       SELECT status AS key, count(*)::int AS proposals, count(value)::int AS valued,
+              COALESCE(sum(value), 0)::numeric(18,2)::text AS value
+         FROM x GROUP BY status
+     ), by_owner AS (
+       SELECT COALESCE(owner_id::text, 'none') AS key, COALESCE(min(owner), 'No Owner') AS label,
+              count(*) FILTER (WHERE status = 'accepted')::int AS accepted,
+              count(*) FILTER (WHERE status IN ('sent', 'viewed'))::int AS waiting,
+              count(*) FILTER (WHERE status = 'declined')::int AS declined,
+              count(*) FILTER (WHERE status IN ('expired', 'withdrawn'))::int AS ended,
+              row_number() OVER (ORDER BY count(*) DESC, min(owner), owner_id) AS rank
+         FROM x WHERE status IN ('sent', 'viewed', 'accepted', 'declined', 'expired', 'withdrawn') GROUP BY owner_id
+     ), sent AS (
+       SELECT to_char(sent_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value FROM x WHERE sent_at IS NOT NULL GROUP BY 1
+     ), accepted AS (
+       SELECT to_char(accepted_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS value
+         FROM x WHERE status = 'accepted' AND accepted_at IS NOT NULL GROUP BY 1
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'proposals', proposals, 'valued', valued, 'value', value)) FROM by_status) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'accepted', accepted, 'waiting', waiting, 'declined', declined, 'ended', ended) ORDER BY rank)
+               FROM by_owner WHERE rank <= 20) AS by_owner,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM sent) AS sent,
+            (SELECT json_agg(json_build_object('at', at, 'value', value) ORDER BY at) FROM accepted) AS accepted`,
+    params,
+  );
+  const row = rows[0] || {};
+  return { figures: row.figures || {}, by_status: row.by_status || [], by_owner: row.by_owner || [], sent: row.sent || [], accepted: row.accepted || [] };
+}
+
 /** The figures above Proposals, this calendar year in Lagos, within the reader's scope. */
 async function proposalFigures(db, scope, year) {
   const params = [year];
@@ -430,6 +496,7 @@ module.exports = {
   homeOutCount,
   homeOutPage,
   listProposals,
+  aiSummary,
   proposalFigures,
   getProposal,
   proposalOfDocument,

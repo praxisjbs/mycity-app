@@ -15,7 +15,7 @@
  * the two verdicts, never the content; opened from its QR, the document too (§6.9, A9, A12).
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, isoDate, isoDateTime, money, blank, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, email, isoDate, isoDateTime, money, blank, listQuery, Paged, summaryPeriod } = require("./common");
 const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
 const { RecordRef, TemplateKind } = require("./partner_pipeline");
@@ -395,7 +395,27 @@ const ROW = {
   renewal_on: "ends_on less renewal_notice_days",
   owner: "the person, from employee and department",
 };
+/**
+ * The assistant's agreement summary (docs/guides/praxis-ai.md §6.13, Partnerships): the agreements the reader
+ * may see in figures, by status, by kind and by owner (the grouping asked first), and the signed agreements
+ * ending in each of the next 12 months. A period (made) narrows it only when asked. Figures, never a row.
+ */
+const AgreementSummaryBy = z.enum(["status", "kind", "owner", "renewal_month"]);
+const AgreementSummaryQuery = z
+  .object({
+    status: AgreementStatus.optional(),
+    kind: TemplateKind.optional(),
+    partner_id: uuid.optional(),
+    lead_id: uuid.optional(),
+    deal_id: uuid.optional(),
+    owner_id: uuid.optional(),
+    ...summaryPeriod,
+    by: AgreementSummaryBy.default("status"),
+  })
+  .strict();
+
 const TABLES = {
+  AgreementSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's agreement summary; figures, never a row" },
   AgreementVars: { table: null, reason: "the names a category template may read, declared for the template engine" },
   AgreementGenerate: {
     table: "partnership_agreement",
@@ -445,6 +465,8 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  AgreementSummaryBy,
+  AgreementSummaryQuery,
   AgreementStatus,
   SignerSide,
   SignerState,

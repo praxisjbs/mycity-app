@@ -3,8 +3,10 @@
  * What the assistant may read and do about leads (docs/guides/partnerships.md §9): the leads the
  * asker may see, a page of 25 at a time, and one Lead 360, by the rule the screen keeps (§6.1); and,
  * as cards the person confirms (docs/guides/praxis-ai.md §6.11, decision 33), New Lead, Edit Lead and
- * Close as Lost, each through the screen's own service function. Moving its deal is the deals'
- * card; Convert to Partner needs the signed copy, a file, so it stays on the Lead 360.
+ * Close as Lost, each through the screen's own service function. Summary: the leads in figures, by
+ * status and by stage, category, region, owner or source as stacked bars of status (praxis-ai.md §6.13,
+ * Partnerships). Moving its deal is the deals' card; Convert to Partner needs the signed copy, a file,
+ * so it stays on the Lead 360.
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -142,6 +144,7 @@ module.exports = defineManifest({
   reads: [
     {
       key: "leads.list",
+      summary: "leads.summary",
       description: "List partnership leads: name, category, region, status (new, contacted, qualified, lost, converted), stage, health, owner and last contact",
       params: c.leads.LeadListQuery,
       permission: ["partnerships", "view"],
@@ -156,6 +159,16 @@ module.exports = defineManifest({
       permission: ["partnerships", "view"],
       run: (_client, params, actor) => service.get360(params.id, actor.scope, actor),
       cite,
+    },
+  ],
+  summaries: [
+    {
+      key: "leads.summary",
+      description:
+        "Leads in figures: new, contacted, qualified, converted, lost, conversion rate; by status, then by stage, category, region, owner or source stacked by status; identified and converted by month",
+      params: c.leads.LeadSummaryQuery,
+      permission: ["partnerships", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor.scope),
     },
   ],
   routes: [

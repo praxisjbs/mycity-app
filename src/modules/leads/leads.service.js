@@ -253,4 +253,48 @@ async function removeImportedIn(client, actor, id) {
   });
 }
 
-module.exports = { removeImportedIn, assertOwner, list, summary, get360, createIn, create, update, syncStatus, lose, convert };
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Partnerships)
+ * ------------------------------------------------------------------ */
+
+/** A lead's status as a person reads it, in the order the leads move. */
+const STATUS_WORDS = Object.freeze({ new: "New", contacted: "Contacted", qualified: "Qualified", converted: "Converted", lost: "Lost" });
+const STATUS_ORDER = Object.freeze(["new", "contacted", "qualified", "converted", "lost"]);
+const BY_WORDS = Object.freeze({ stage: "stage", category: "category", region: "region", owner: "owner", source: "source" });
+
+/**
+ * The leads the reader may see, in figures: every lead (the lost ones too) unless a period (identified) is
+ * asked, by status, then by stage, category, region, owner or source stacked by status, and identified and
+ * converted by month. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   LeadSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const by = BY_WORDS[params.by] ? params.by : "stage";
+  const r = await repo.aiSummary(client, { ...params, from: period && period.from, to: period && period.to, by }, scope);
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const parts = STATUS_ORDER.map((key) => ({ key, label: STATUS_WORDS[key], optional: true }));
+  return {
+    figures: [
+      figure("leads", "Leads", f.leads || 0),
+      figure("new", "New", f.new || 0),
+      figure("contacted", "Contacted", f.contacted || 0),
+      figure("qualified", "Qualified", f.qualified || 0),
+      figure("converted", "Converted", f.converted || 0),
+      figure("lost", "Lost", f.lost || 0),
+      figure("conversion_rate", "Conversion rate", f.leads ? Math.round(((f.converted || 0) * 100) / f.leads) : 0, "percent"),
+    ],
+    groups: [
+      group("status", "Leads by status", STATUS_ORDER.filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATUS_WORDS[k], value: counted.get(k) }))),
+      group(by, `Leads by ${BY_WORDS[by]}`, stacked(r.by_dim, parts)),
+    ],
+    series: [series("identified", "Leads identified by month", r.identified), series("converted", "Leads converted by month", r.converted)],
+    total: f.leads || 0,
+  };
+}
+
+module.exports = { removeImportedIn, assertOwner, list, summary, aiSummary, get360, createIn, create, update, syncStatus, lose, convert };

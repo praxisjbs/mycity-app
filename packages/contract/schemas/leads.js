@@ -14,7 +14,7 @@
  * partner.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
+const { uuid, text, optionalText, email, phone, isoDate, isoDateTime, money, blank, listQuery, Paged, recordId, changesBeside, nothingOn, summaryPeriod } = require("./common");
 const { PlaceToken } = require("./maps");
 const { PersonRef } = require("./organisation");
 const { RegionScope, DealHealth, DealFields, DealDetail, ImpactRating, Field, CustomValues, CustomFilter, listCode, listWords } = require("./partner_pipeline");
@@ -249,7 +249,29 @@ const ROW = {
   owner: "the person, from employee and department",
   last_contact_at: "its latest interaction",
 };
+/**
+ * The assistant's lead summary (docs/guides/praxis-ai.md §6.13, Partnerships): the leads the reader may see
+ * in figures, by status, then by stage, category, region, owner or source stacked by status, and identified
+ * and converted by month. Lost leads count as their own figure (the list hides them unless asked). A period
+ * (identified, else made) narrows it only when asked. Figures, never a row.
+ */
+const LeadSummaryBy = z.enum(["status", "stage", "category", "region", "owner", "source", "month"]);
+const LeadSummaryQuery = z
+  .object({
+    status: LeadStatus.optional(),
+    partner_category_id: uuid.optional(),
+    owner_id: uuid.optional(),
+    source: listCode.optional(),
+    region_scope: RegionScope.optional(),
+    stage: listCode.optional(),
+    health: DealHealth.optional(),
+    ...summaryPeriod,
+    by: LeadSummaryBy.default("stage"),
+  })
+  .strict();
+
 const TABLES = {
+  LeadSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's lead summary; figures, never a row" },
   LeadFields: { table: "lead", virtual: { region: REGION } },
   LeadCreate: {
     table: "lead",
@@ -291,6 +313,8 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  LeadSummaryBy,
+  LeadSummaryQuery,
   LeadStatus,
   LeadFields,
   LeadCreate,

@@ -237,6 +237,63 @@ async function moveToPartnerIn(client, leadId, partnerId) {
   await client.query("UPDATE partnership_agreement SET partner_id = $2, lead_id = NULL WHERE lead_id = $1", [leadId, partnerId]);
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Partnerships)
+ * ------------------------------------------------------------------ */
+
+/** An agreement's status and kind as a person reads them, in the lifecycle's order (§6.8). */
+const STATUS_WORDS = Object.freeze({
+  draft: "Draft",
+  review: "In Review",
+  approval: "In Approval",
+  sent: "Sent",
+  viewed: "Viewed",
+  signed: "Signed",
+  active: "Active",
+  expiring: "Expiring",
+  renewed: "Renewed",
+  closed: "Closed",
+});
+const KIND_WORDS = Object.freeze({ deal_merchant: "Deal Merchant", mou: "MOU", service_agreement: "Service Agreement", contract: "Contract" });
+
+/**
+ * The agreements the reader may see, in figures: every agreement unless a period (made) is asked, by
+ * status, by kind and by owner (the grouping asked first), and those in force ending in each of the next
+ * 12 months. Runs on the client the assistant hands over, inside its read timeout.
+ * @param {{query: Function}} client
+ * @param {object} params   AgreementSummaryQuery, parsed
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function aiSummary(client, params, scope, now = new Date()) {
+  const { figure, group, series, askedPeriod } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const r = await repo.aiSummary(client, { ...params, from: period && period.from, to: period && period.to }, scope);
+  const f = r.figures;
+  const inOrder = (rows, words) => Object.keys(words).map((k) => rows.find((x) => x.key === k)).filter(Boolean).map((x) => ({ key: x.key, label: words[x.key], value: x.value }));
+  const groups = {
+    status: group("status", "Agreements by status", inOrder(r.by_status, STATUS_WORDS)),
+    kind: group("kind", "Agreements by kind", inOrder(r.by_kind, KIND_WORDS)),
+    owner: group("owner", "Agreements by owner", r.by_owner),
+  };
+  const first = groups[params.by] ? params.by : "status";
+  return {
+    figures: [
+      figure("agreements", "Agreements", f.agreements || 0),
+      figure("draft", "Drafts", f.draft || 0),
+      figure("in_approval", "In approval", f.in_approval || 0),
+      figure("awaiting_signature", "Waiting for signature", f.awaiting_signature || 0),
+      figure("signed", "Signed", f.signed || 0),
+      figure("active", "Active", f.active || 0),
+      figure("ending_soon", "Ending within 60 days", f.ending_soon || 0),
+      figure("renewed", "Renewed", f.renewed || 0),
+      figure("closed", "Closed", f.closed || 0),
+    ],
+    groups: [groups[first], ...Object.keys(groups).filter((k) => k !== first).map((k) => groups[k])],
+    series: [series("renewals", "Renewals due by month, next 12 months", r.renewals)],
+    total: f.agreements || 0,
+  };
+}
+
 module.exports = {
   tx,
   visibleIn,
@@ -246,6 +303,7 @@ module.exports = {
   list,
   get,
   summary,
+  aiSummary,
   renewals,
   documentOf,
   mayOpenFile,
