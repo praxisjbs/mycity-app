@@ -76,9 +76,27 @@ describe("Try Asking", () => {
     expect(suggestions.forReads(reads, { is_ceo: true })).toEqual(["Who is in today, and who is late?", "What happened today?", "Which alerts are open right now?"]);
   });
 
-  test("every question belongs to a read some module declares", () => {
+  test("every question belongs to a read some module declares, and every chart to a summary", () => {
     const registry = require("../../shared/ai/registry");
     for (const [key] of suggestions.QUESTIONS) expect(registry.read(key)).not.toBeNull();
+    const summaries = new Set(registry.summaries().map((s) => s.key));
+    for (const [key] of suggestions.CHARTS) expect([key, summaries.has(key)]).toEqual([key, true]);
+  });
+
+  test("a chart for each area (Appendix B PR 8): four of the reads' questions, then two charts the summaries allow", () => {
+    const reads = suggestions.QUESTIONS.map(([key]) => ({ key }));
+    const charts = suggestions.CHARTS.map(([key]) => ({ key }));
+    const shown = suggestions.forReads(reads, { capabilities: ["home.team"] }, charts);
+    expect(shown).toHaveLength(6);
+    expect(shown.slice(0, 4)).toEqual(suggestions.forReads(reads, { capabilities: ["home.team"] }).slice(0, 4));
+    expect(shown.slice(4)).toEqual(["Chart lateness by department this month", "Chart my tasks by status"]);
+    // Fewer questions than four: the charts fill the six; no chart: the questions do.
+    expect(suggestions.forReads([{ key: "holidays.list" }], {}, charts)).toEqual(["When is the next public holiday?", ...suggestions.CHARTS.slice(0, 5).map(([, q]) => q)]);
+    expect(suggestions.forReads(reads, { capabilities: ["home.team"] }, [])).toHaveLength(6);
+    // A chart held to a capability waits for it, as a question does; the CEO holds every one.
+    expect(suggestions.forReads([], {}, [{ key: "policies.summary" }])).toEqual([]);
+    expect(suggestions.forReads([], { capabilities: ["policies.manage"] }, [{ key: "policies.summary" }])).toEqual(["Chart who has acknowledged each policy"]);
+    expect(suggestions.forReads([], { is_ceo: true }, [{ key: "alerts.summary" }])).toEqual(["Chart open alerts by category and severity"]);
   });
 });
 

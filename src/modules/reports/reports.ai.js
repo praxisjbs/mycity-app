@@ -7,6 +7,8 @@
  *                  one's schedule and status; an empty page without `home.reports`
  *   runs.mine      the files the asker received, newest first, a page of 25: which are done,
  *                  waiting, failed or skipped; an empty page without `home.reports`
+ *   runs.summary   the same files in figures, by status, report, format or month; no figures
+ *                  without `home.reports` (docs/guides/praxis-ai.md §6.13)
  *
  * Every login holds `home` view, which is all the assistant checks, so each read asks what
  * the Reports tab asks (reports.service.js): the capability, then the reports the asker may
@@ -103,6 +105,15 @@ module.exports = defineManifest({
       labels: { saved_report_id: "Report", freq: "How Often", by_weekday: "Days", by_month_day: "Day Of Month", working_days_only: "Working Days Only", starts_on: "From", run_time: "At", formats: "Formats", recipient_user_ids: "Recipients" },
     },
   ],
+  summaries: [
+    {
+      key: "runs.summary",
+      description: "The report files I received in figures: done, waiting, failed, skipped, emailed; by status, report, format or month",
+      params: c.reports.HomeReportRunSummaryQuery,
+      permission: ["home", "view"],
+      run: (client, params, actor) => service.runSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "reports.mine",
@@ -115,6 +126,7 @@ module.exports = defineManifest({
     },
     {
       key: "runs.mine",
+      summary: "runs.summary",
       description: "List the report files I received, newest first, and whether each is done, waiting, failed or skipped",
       params: c.reports.HomeReportRunQuery,
       permission: ["home", "view"],

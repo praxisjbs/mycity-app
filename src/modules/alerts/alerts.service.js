@@ -615,7 +615,73 @@ async function updateRule(actor, id, body) {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+const SEVERITY_PARTS = Object.freeze([
+  { key: "high", label: "High", optional: true },
+  { key: "medium", label: "Medium", optional: true },
+  { key: "low", label: "Low", optional: true },
+]);
+const AGE_WORDS = Object.freeze({ day: "Under a Day", three: "1 to 3 Days", week: "3 to 7 Days", older: "7 Days or More" });
+const words = (key) => key.charAt(0).toUpperCase() + key.slice(1);
+
+/**
+ * The alerts the reader may clear, in figures, as `alerts.mine` lists them: a holder of `alerts.clear`
+ * (and the CEO); anyone else gets no figures. The figures over every one they see; the groupings over the
+ * state asked (open unless given): by category stacked by severity, by severity, by rule or by age; the
+ * alerts raised by day over a period (this month to today unless asked). Never an alert's title. Runs on
+ * the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   HomeAlertSummaryQuery, parsed
+ * @param {object} actor    the asking person
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, periodOf, stacked } = require("../../shared/ai/summary");
+  const reader = await readerOf(client, actor);
+  if (!reader.may_clear) return { figures: [], groups: [], series: [], total: 0 };
+  const today = lagos.today(now);
+  const period = periodOf(params, now);
+  const r = await repo.aiSummary(client, reader.seen, {
+    state: params.state || "open",
+    severity: params.severity || null,
+    metrics: params.category ? metrics.metricsIn(params.category) : null,
+    now,
+    agedBefore: agedBefore(now),
+    weekStart: lagos.startOfDay(lagos.addDays(today, 1 - lagos.weekday(today))),
+    from: lagos.startOfDay(period.from),
+    to: lagos.endOfDayExclusive(period.to),
+  });
+  const byCategory = new Map();
+  for (const m of r.by_metric) {
+    const category = metrics.categoryOf(m.key) || "other";
+    const row = byCategory.get(category) || { key: category, label: words(category), high: 0, medium: 0, low: 0 };
+    for (const s of ["high", "medium", "low"]) row[s] += m[s] || 0;
+    byCategory.set(category, row);
+  }
+  const severity = SEVERITY_PARTS.map((s) => ({ key: s.key, label: s.label, value: r.by_metric.reduce((n, m) => n + (m[s.key] || 0), 0) })).filter((s) => s.value > 0);
+  const groups = [
+    group("category", "Alerts by category", stacked([...byCategory.values()].sort((a, b) => b.high + b.medium + b.low - (a.high + a.medium + a.low) || a.label.localeCompare(b.label)), SEVERITY_PARTS)),
+    group("severity", "Alerts by severity", severity),
+  ];
+  if (params.by === "severity") groups.reverse();
+  if (params.by === "rule") groups.unshift(group("rule", "Alerts by rule", r.by_rule));
+  if (params.by === "age") groups.unshift(group("age", "Alerts by age", Object.keys(AGE_WORDS).map((k) => ({ key: k, label: AGE_WORDS[k], value: (r.by_age.find((b) => b.key === k) || {}).value || 0 })).filter((b) => b.value > 0)));
+  const f = r.figures;
+  const figures = [
+    figure("open", "Open", f.open || 0),
+    figure("overdue", `Open ${OVERDUE_DAYS} days or more`, f.overdue || 0),
+    figure("high", "High, open", f.high || 0),
+    figure("cleared_week", "Cleared this week", f.cleared_week || 0),
+    figure("dismissed_week", "Dismissed this week", f.dismissed_week || 0),
+  ];
+  if (f.oldest_days !== null && f.oldest_days !== undefined) figures.push(figure("oldest_days", "Oldest open", f.oldest_days, "days"));
+  return { figures, groups, series: [series("raised", "Raised by day", r.by_day)], total: r.total };
+}
+
 module.exports = {
+  aiSummary,
   OVERDUE_DAYS,
   whoCanClear,
   overByText,

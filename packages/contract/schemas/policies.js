@@ -231,6 +231,20 @@ const PolicyListQuery = listQuery(
   ["title", "number", "updated_at"],
 );
 
+/**
+ * The assistant's policy summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community,
+ * Home and Settings), for `policies.manage`: the policies by state, and who has acknowledged the newest
+ * published version of each, by policy or by the department of the people asked. Figures, never a row.
+ */
+const PolicySummaryBy = z.enum(["policy", "department", "state"]);
+const PolicySummaryQuery = z
+  .object({
+    kind: PolicyKind.optional(),
+    state: PolicyState.optional(),
+    by: PolicySummaryBy.default("policy"),
+  })
+  .strict();
+
 /** The settings every draft carries; the body or the rules travel beside them. */
 const draftSettings = {
   title: text(150).refine(minLength(3), "At least 3 characters"),
@@ -501,6 +515,7 @@ const TABLES = {
   },
   PolicyPage: { table: null, reason: "a page of policies" },
   PolicyListQuery: { table: null, reason: "list controls for policies" },
+  PolicySummaryQuery: { table: null, reason: "the filters and grouping of the assistant's policy summary; figures, never a row" },
   PolicyCreate: {
     table: "policy_version",
     virtual: { applies_to: "applies_to_everyone and policy_audience rows" },
@@ -597,6 +612,8 @@ module.exports = {
   PolicyRow,
   PolicyPage,
   PolicyListQuery,
+  PolicySummaryBy,
+  PolicySummaryQuery,
   PolicyCreate,
   POLICY_START,
   PolicyStart,

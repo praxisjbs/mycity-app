@@ -1,7 +1,8 @@
 "use strict";
 /**
  * What the assistant may read and do about projects: the list, one page of 25 at a time, with the
- * open and done tasks in each the asker can see; and, as cards the person confirms
+ * open and done tasks in each the asker can see, and the same in figures (projects.summary,
+ * docs/guides/praxis-ai.md §6.13); and, as cards the person confirms
  * (docs/guides/praxis-ai.md §6.11, decision 33), New Project and Edit Project, Complete Project and
  * Reopen Project among them, each through the service function the page's own button calls.
  */
@@ -79,9 +80,19 @@ module.exports = defineManifest({
   not_offered: {
     ProjectEdit: "via projects.edit: Edit Project's own form, which never names its project; the card is ProjectChange",
   },
+  summaries: [
+    {
+      key: "projects.summary",
+      description: "Projects in figures: active, completed, past their due day; their tasks I can see, done, open and overdue; by project or status",
+      params: c.projects.ProjectSummaryQuery,
+      permission: ["workspace", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "projects.list",
+      summary: "projects.summary",
       description: "The projects, active or completed, with how many of their tasks are open and done",
       params: c.projects.ProjectListQuery,
       permission: ["workspace", "view"],

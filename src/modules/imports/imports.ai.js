@@ -1,7 +1,8 @@
 "use strict";
 /**
  * What the assistant may read about imports: the history, so "did the staff
- * sheet go in?" is answered without opening a screen. It reads, it never runs
+ * sheet go in?" is answered without opening a screen, and the same in figures
+ * (imports.summary, docs/guides/praxis-ai.md §6.13). It reads, it never runs
  * one (A23); starting or committing an import is a route to the screen where
  * the person does it themselves.
  */
@@ -15,9 +16,19 @@ module.exports = defineManifest({
   not_offered: {
     ImportCreate: "file: an import starts on Settings, Imports with the spreadsheet uploaded and its preview in view",
   },
+  summaries: [
+    {
+      key: "imports.summary",
+      description: "Imports in figures: committed, reverted, failed, in progress, the rows imported and refused, records created and updated; by importer, status or month",
+      params: c.imports.ImportSummaryQuery,
+      permission: ["settings", "view"],
+      run: (client, params) => service.aiSummary(client, params),
+    },
+  ],
   reads: [
     {
       key: "imports.history",
+      summary: "imports.summary",
       description:
         "List imports, newest first, with what each one created and updated",
       params: c.imports.ImportListQuery,

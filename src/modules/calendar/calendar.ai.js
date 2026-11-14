@@ -1,6 +1,7 @@
 "use strict";
 /**
- * What the assistant may read of the asker's calendar: their own month (events,
+ * What the assistant may read of the asker's calendar (and, as calendar.summary, the same month in
+ * figures, docs/guides/praxis-ai.md §6.13): their own month (events,
  * invitations, task deadlines, approved leave), one page of 25 at a time; and, as cards the
  * person confirms (docs/guides/praxis-ai.md §6.11, decision 33), an event with its attendees,
  * created through the same service function New Event's Create Event calls, and a change to an
@@ -58,6 +59,16 @@ const probe = {
     const id = await meeting(ctx.outsider.user, `Outsider's meeting, seen by ${ctx.role}`, at);
     return { type: "calendar_event", id, params: { month: at.month }, values: { calendar_event_id: id, location: "Room 2" } };
   },
+};
+
+/**
+ * The summary's probes: it counts this month, so the meeting is booked today rather than on the fresh day
+ * weeks ahead (docs/guides/praxis-ai.md §6.17); the person's own is counted, the outsider's own never.
+ */
+const today = () => require("../../shared/time/lagos").today();
+const summaryProbe = {
+  inside: async (ctx) => ({ type: "calendar_event", id: await meeting(ctx.actor, `Matrix meeting today for ${ctx.role}`, slotOf(today(), 7)) }),
+  outside: async (ctx) => ({ type: "calendar_event", id: await meeting(ctx.outsider.user, `Outsider's meeting today, seen by ${ctx.role}`, slotOf(today(), 7)) }),
 };
 
 // Connect to Partner on the card (M7, workspace.md §9): Partnerships names and finds the partner, lead and deal.
@@ -124,9 +135,20 @@ module.exports = defineManifest({
   not_offered: {
     CalendarEventEdit: "via calendar.edit: Edit Event's own form, which never names its event; the card is CalendarEventChange",
   },
+  summaries: [
+    {
+      key: "calendar.summary",
+      description: "My calendar month in figures: meetings and their hours, invitations waiting, task deadlines, leave days, performance dates; by kind or week",
+      params: c.calendar.CalendarSummaryQuery,
+      permission: ["workspace", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+      matrix: summaryProbe,
+    },
+  ],
   reads: [
     {
       key: "calendar.month",
+      summary: "calendar.summary",
       description: "What is on my calendar in a month: meetings, invitations, task deadlines and leave",
       params: c.calendar.CalendarListQuery,
       permission: ["workspace", "view"],

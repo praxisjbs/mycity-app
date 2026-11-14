@@ -108,9 +108,27 @@ conversations, and one opens full screen when you press it.
 1. Ask for figures grouped the way you want to compare them. For example: *Our budget by department
    this year*, *Leave days by type this year* or *Lateness by department this month*.
 2. Saying *as a chart* works too, for example *Show this year's budget by category as a chart*.
-3. On a computer the pane opens on **Overview**: up to three figures, then the chart. On a phone,
+3. Every area you can open answers in figures. For example:
+   - People: *Chart lateness by department this month* or *Our headcount by department*;
+   - Leave: *Show my leave this year by type as a chart*;
+   - My Workspace: *Chart my tasks by status*, *Chart our projects: done, open and overdue tasks* or
+     *Chart my calendar this month by kind*;
+   - Finance: *Chart our expense requests by category*;
+   - Pay: *Chart my pay this year month by month*;
+   - Recruitment: *Chart our candidates by stage*;
+   - Partnerships: *Chart our leads by stage*;
+   - Performance: *Chart our KPIs by function: met and not met*;
+   - Queries & Sanctions: *Chart our queries by department*;
+   - Knowledge Hub: *Chart training by course: completed and overdue*, *Chart our SOPs by department* or
+     *Chart who has acknowledged each policy*;
+   - Staff Community: *Chart the latest announcements: read and not read*;
+   - Home: *Chart today's activity by hour*, *Chart open alerts by category and severity* or *Chart the
+     report files I received by status*;
+   - Settings: *Chart our imports by importer*.
+4. A new conversation's **Try Asking** offers a chart question too, from the areas you can open.
+5. On a computer the pane opens on **Overview**: up to three figures, then the chart. On a phone,
    press **Open Figures**.
-4. A short list charts too, from its own rows. For example: *How many people work at each worksite?*,
+6. A short list charts too, from its own rows. For example: *How many people work at each worksite?*,
    *My leave days left by type* or *How many people hold each role?* Amounts read in naira.
 
 > **Tip:** Ask by department, by type, by person or by month. A question about one record answers in

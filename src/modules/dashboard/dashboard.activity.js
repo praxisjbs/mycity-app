@@ -180,4 +180,114 @@ async function forAssistant(client, actor, query, { now = new Date() } = {}) {
   };
 }
 
-module.exports = { ALLOWED, MODULES, visibleWhere, today, forAssistant };
+/** Each allow-listed event as a person reads it, in the assistant's summary. */
+const KIND_WORDS = Object.freeze({
+  "employee.created": "New Employee",
+  "leave_request.approved": "Leave Approved",
+  "leave_request.recorded": "Leave Recorded",
+  "attendance.review_required": "Attendance To Review",
+  "recognition.posted": "Recognition",
+  "celebration.posted": "Celebration",
+});
+
+/**
+ * Activity Today's events in figures for the assistant (docs/guides/praxis-ai.md §6.13, Workspace,
+ * Knowledge Hub, Community, Home and Settings), by the same allow-list and the reader's scope on each
+ * module (visibleWhere), in one statement: the events, the people who acted and those they were
+ * about; by kind, by module, by who acted (the ten most), by Lagos day and by Lagos hour. With
+ * `employeeId`, only what that person did or what is about them. Null when the reader may open none of
+ * the modules. Figures, never a row.
+ * @param {{query: Function}} client
+ * @param {object} user  the asking person
+ * @param {{from: Date, to: Date, employeeId?: string|null}} on  the instants, the second not kept
+ */
+async function summaryOf(client, user, { from, to, employeeId = null }) {
+  const params = [from, to];
+  const visible = visibleWhere(await scopesOf(user), params);
+  if (!visible) return null;
+  let person = "";
+  if (employeeId) {
+    params.push(employeeId);
+    person = ` AND (ae.employee_id = $${params.length}::uuid OR se.employee_id = $${params.length}::uuid)`;
+  }
+  const { rows } = await client.query(
+    `WITH x AS (
+       SELECT l.event_key, l.module_key, l.occurred_at, ae.employee_id AS actor_id, ${nameOf("ae")} AS actor_name,
+              se.employee_id AS subject_id
+         FROM event_log l
+         LEFT JOIN app_user au ON au.user_id = l.actor_user_id
+         LEFT JOIN employee ae ON ae.employee_id = au.employee_id
+         LEFT JOIN employee se ON se.employee_id::text = ${SUBJECT}
+        WHERE l.occurred_at >= $1::timestamptz AND l.occurred_at < $2::timestamptz
+          AND ${visible}${person}
+     ), by_person AS (
+       SELECT actor_id::text AS key, min(actor_name) AS label, count(*)::int AS value,
+              row_number() OVER (ORDER BY count(*) DESC, min(actor_name), actor_id) AS rank
+         FROM x WHERE actor_id IS NOT NULL GROUP BY actor_id
+     )
+     SELECT (SELECT json_build_object('events', count(*), 'actors', count(DISTINCT actor_id),
+                                      'subjects', count(DISTINCT subject_id), 'kinds', count(DISTINCT event_key)) FROM x) AS figures,
+            (SELECT json_agg(json_build_object('key', event_key, 'value', n) ORDER BY n DESC, event_key)
+               FROM (SELECT event_key, count(*)::int AS n FROM x GROUP BY event_key) k) AS by_kind,
+            (SELECT json_agg(json_build_object('key', module_key, 'value', n) ORDER BY n DESC, module_key)
+               FROM (SELECT module_key, count(*)::int AS n FROM x GROUP BY module_key) m) AS by_module,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank)
+               FROM by_person WHERE rank <= 10) AS by_person,
+            (SELECT json_agg(json_build_object('at', at, 'value', n) ORDER BY at)
+               FROM (SELECT to_char(occurred_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM-DD') AS at, count(*)::int AS n FROM x GROUP BY 1) d) AS by_day,
+            (SELECT json_agg(json_build_object('at', at, 'value', n) ORDER BY at)
+               FROM (SELECT to_char(occurred_at AT TIME ZONE 'Africa/Lagos', 'HH24') || ':00' AS at, count(*)::int AS n FROM x GROUP BY 1) h) AS by_hour`,
+    params,
+  );
+  const r = rows[0] || {};
+  return {
+    figures: r.figures || {},
+    by_kind: r.by_kind || [],
+    by_module: r.by_module || [],
+    by_person: r.by_person || [],
+    by_day: r.by_day || [],
+    by_hour: r.by_hour || [],
+  };
+}
+
+/**
+ * The assistant's `activity.summary`: Activity Today's events in figures, for one Lagos day (today
+ * unless `date`) or, when one is asked, a period of at most a year; one person's with `employee_id`.
+ * By kind always, then by module, by who acted or by day when asked; by hour of the day for one day,
+ * by day for a period. No figures for a reader who may open none of the modules.
+ * @param {{query: Function}} client
+ * @param {object} actor  the asking person
+ * @param {object} params  HomeActivitySummaryQuery, parsed
+ */
+async function aiSummary(client, actor, params, { now = new Date() } = {}) {
+  const { figure, group, top, series, periodOf } = require("../../shared/ai/summary");
+  const catalog = require("../../shared/access/access.catalog");
+  const day = params.date || lagos.today(now);
+  const days = params.from || params.to || params.month ? periodOf(params, now) : { from: day, to: day };
+  const r = await summaryOf(client, actor, {
+    from: lagos.startOfDay(days.from),
+    to: lagos.endOfDayExclusive(days.to),
+    employeeId: params.employee_id || null,
+  });
+  if (!r) return { figures: [], groups: [], series: [], total: 0 };
+  const f = r.figures;
+  const dayLabel = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+  const moduleWord = (key) => (catalog.MODULE_META[key] && catalog.MODULE_META[key].label) || key;
+  const groups = [group("kind", "Events by kind", r.by_kind.map((x) => ({ key: x.key, label: KIND_WORDS[x.key] || x.key, value: x.value })))];
+  if (params.by === "module") groups.unshift(group("module", "Events by module", r.by_module.map((x) => ({ key: x.key, label: moduleWord(x.key), value: x.value }))));
+  if (params.by === "person") groups.unshift(top("person", "Events by who acted", r.by_person));
+  if (params.by === "day") groups.unshift(group("day", "Events by day", r.by_day.slice(-20).map((x) => ({ key: x.at, label: dayLabel(x.at), value: x.value }))));
+  return {
+    figures: [
+      figure("events", "Events", f.events || 0),
+      figure("actors", "People who acted", f.actors || 0),
+      figure("subjects", "People they were about", f.subjects || 0),
+      figure("kinds", "Kinds", f.kinds || 0),
+    ],
+    groups,
+    series: [days.from === days.to ? series("hour", "Events by hour", r.by_hour) : series("day", "Events by day", r.by_day)],
+    total: f.events || 0,
+  };
+}
+
+module.exports = { ALLOWED, MODULES, KIND_WORDS, visibleWhere, today, forAssistant, aiSummary };

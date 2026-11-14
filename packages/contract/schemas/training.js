@@ -10,7 +10,7 @@
  * and on completion receives a numbered certificate.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDate, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, listQuery, Paged, summaryPeriod } = require("./common");
 const { PersonRef } = require("./organisation");
 const { RichTextBlock, SignaturePng } = require("./policies");
 
@@ -130,6 +130,22 @@ const CourseRow = z
 const CoursePage = Paged(CourseRow);
 
 const CourseListQuery = listQuery({ state: CourseState.optional() }, ["title", "number", "updated_at"]);
+
+/**
+ * The assistant's training summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community,
+ * Home and Settings): with `training.manage` every place on a course, otherwise the reader's own; by
+ * course or department stacked by where each person stands, completions by month. A period (enrolled)
+ * narrows it only when asked. Figures, never a row.
+ */
+const TrainingSummaryBy = z.enum(["course", "department", "month"]);
+const TrainingSummaryQuery = z
+  .object({
+    state: CourseState.optional(),
+    department_id: uuid.optional(),
+    ...summaryPeriod,
+    by: TrainingSummaryBy.default("course"),
+  })
+  .strict();
 
 const courseTitle = text(120).refine(longEnough(4), "At least 4 characters");
 
@@ -380,6 +396,7 @@ const TABLES = {
   },
   CoursePage: { table: null, reason: "a page of courses" },
   CourseListQuery: { table: null, reason: "list controls, not a row" },
+  TrainingSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's training summary; figures, never a row" },
   CourseCreate: { table: "training_course" },
   CourseUpdate: { table: "training_course" },
   CoursePublish: { table: null, reason: "the signature, stored in the vault as training_course.signature_document_id" },
@@ -481,6 +498,8 @@ module.exports = {
   CourseRow,
   CoursePage,
   CourseListQuery,
+  TrainingSummaryBy,
+  TrainingSummaryQuery,
   CourseCreate,
   CourseUpdate,
   CoursePublish,

@@ -243,7 +243,56 @@ async function due(db) {
   return rows.map((r) => r.announcement_id);
 }
 
+/**
+ * The announcements in figures for the assistant (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge
+ * Hub, Community, Home and Settings), in one statement. With no `userId`, every announcement as the
+ * Announcements tab tracks it: published and scheduled, the people each reached and how many read it
+ * (DONE: acknowledged when urgent), the tab's Average Read. With `userId`, only the published ones that
+ * person received (their own read row) and whether they read each, never anyone else's reading. The ten
+ * newest published with read and not read for a stacked bar, by urgency, published by Lagos month. A
+ * period (the Lagos day published, or due) narrows it only when given. Figures, never a row: never a message.
+ * @param {{urgency?, from?, to?}} q
+ * @param {{userId?: string|null}} reader
+ */
+async function aiSummary(db, q, { userId = null } = {}) {
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT a.announcement_id, a.title, a.status, a.urgency, a.published_at,
+              CASE WHEN $1::uuid IS NULL THEN a.audience_size ELSE 1 END AS audience,
+              (SELECT count(*)::int FROM announcement_read r
+                WHERE r.announcement_id = a.announcement_id AND ($1::uuid IS NULL OR r.user_id = $1) AND ${DONE}) AS reads
+         FROM announcement a
+        WHERE a.status IN ('scheduled', 'published')
+          AND ($1::uuid IS NULL OR (a.status = 'published' AND EXISTS (
+                SELECT 1 FROM announcement_read m WHERE m.announcement_id = a.announcement_id AND m.user_id = $1)))
+          AND ($2::text IS NULL OR a.urgency = $2)
+          AND ($3::date IS NULL OR (COALESCE(a.published_at, a.publish_at) AT TIME ZONE 'Africa/Lagos')::date BETWEEN $3::date AND $4::date)
+     ), p AS (SELECT * FROM x WHERE status = 'published'),
+     newest AS (
+       SELECT announcement_id, title, reads, GREATEST(audience - reads, 0) AS not_read,
+              row_number() OVER (ORDER BY published_at DESC, announcement_id) AS rank
+         FROM p
+     )
+     SELECT (SELECT json_build_object(
+               'published', (SELECT count(*) FROM p), 'scheduled', count(*) FILTER (WHERE status = 'scheduled'),
+               'urgent', (SELECT count(*) FROM p WHERE urgency = 'urgent'),
+               'reached', (SELECT COALESCE(sum(audience), 0) FROM p),
+               'read', (SELECT COALESCE(sum(reads), 0) FROM p),
+               'urgent_waiting', (SELECT count(*) FROM p WHERE urgency = 'urgent' AND reads = 0),
+               'average_read', (SELECT round(avg(reads * 100.0 / audience) FILTER (WHERE audience > 0), 1) FROM p)) FROM x) AS figures,
+            (SELECT json_agg(json_build_object('key', urgency, 'value', n)) FROM (SELECT urgency, count(*)::int AS n FROM p GROUP BY urgency) u) AS by_urgency,
+            (SELECT json_agg(json_build_object('key', announcement_id, 'label', title, 'read', reads, 'not_read', not_read) ORDER BY rank)
+               FROM newest WHERE rank <= 10) AS newest,
+            (SELECT json_agg(json_build_object('at', at, 'value', n) ORDER BY at)
+               FROM (SELECT to_char(published_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS n FROM p GROUP BY 1) m) AS by_month`,
+    [userId, q.urgency || null, q.from || null, q.to || null],
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, by_urgency: r.by_urgency || [], newest: r.newest || [], by_month: r.by_month || [] };
+}
+
 module.exports = {
+  aiSummary,
   archivePublished,
   stats,
   updateScheduled,

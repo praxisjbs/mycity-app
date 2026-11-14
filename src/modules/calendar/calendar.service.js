@@ -429,4 +429,57 @@ async function relinkIn(client, actor, { lead_id: leadId, partner_id: partnerId 
 /** The event a partner keeps for a signed deal's days, or null: for the module whose record it is. */
 const keptForDeal = (db, dealId) => repo.keptForDeal(db, dealId);
 
-module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, createIn, edit, editIn, cancel, cancelIn, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf, relinkIn, keptForDeal };
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+/** An item's kind as a person reads it, in the order the month's legend names them. */
+const KIND_PARTS = Object.freeze([
+  { key: "meeting", label: "Meeting", optional: true },
+  { key: "event", label: "Event", optional: true },
+  { key: "deadline", label: "Deadline", optional: true },
+  { key: "leave", label: "Leave", optional: true },
+  { key: "performance", label: "Performance Date", optional: true },
+]);
+
+/**
+ * The person's own month as Calendar draws it, in figures: this Lagos month unless `month` says; by
+ * kind, and by week stacked by kind (a kind no week has left out of the legend). Never an item's title.
+ * Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   CalendarSummaryQuery, parsed
+ * @param {object} actor    the asking person
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, stacked } = require("../../shared/ai/summary");
+  const employeeId = actor.employee_id || (actor.scope && actor.scope.employee_id) || null;
+  const first = `${params.month || lagos.today(now).slice(0, 7)}-01`;
+  const last = lagos.addDays(lagos.addMonths(first, 1), -1);
+  const r = employeeId
+    ? await repo.aiSummary(client, { employee_id: employeeId, from: lagos.instant(first), to: lagos.instant(lagos.addDays(last, 1)), fromDay: first, toDay: last })
+    : { figures: {}, by_kind: [], by_week: [] };
+  const f = r.figures;
+  const counted = new Map(r.by_kind.map((x) => [x.key, x.value]));
+  const weekLabel = (day) => `Week of ${day.slice(8, 10)}/${day.slice(5, 7)}`;
+  const groups = [
+    group("kind", "Items by kind", KIND_PARTS.filter((k) => counted.has(k.key)).map((k) => ({ key: k.key, label: k.label, value: counted.get(k.key) }))),
+    group("week", "Items by week", stacked(r.by_week.map((w) => ({ ...w, label: weekLabel(w.key) })), KIND_PARTS)),
+  ];
+  if (params.by === "week") groups.reverse();
+  return {
+    figures: [
+      figure("items", "Items", f.items || 0),
+      figure("meetings", "Meetings", f.meetings || 0),
+      figure("invitations", "Invitations waiting", f.invitations || 0),
+      figure("task_deadlines", "Task deadlines", f.task_deadlines || 0),
+      figure("leave_days", "Leave days", f.leave_days || 0, "days"),
+      figure("performance", "Performance dates", f.performance || 0),
+      figure("meeting_hours", "Hours in meetings", f.meeting_hours || 0, "hours"),
+    ],
+    groups,
+    series: [],
+    total: f.items || 0,
+  };
+}
+
+module.exports = { aiSummary, toItem, whenOf, month, day: oneDay, getFor, create, createIn, edit, editIn, cancel, cancelIn, respond, reminderCheck, cardRecords, assertCardEvent, eventChoices, eventIdOf, relinkIn, keptForDeal };

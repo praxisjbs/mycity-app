@@ -66,19 +66,12 @@ const PERFORMANCE_DATES = `
                              WHERE pr.performance_review_id = ip.performance_review_id AND pr.reviewer_employee_id = $1))`;
 
 /**
- * One page of a month (or any run of days): the reader's events, the deadlines of the open tasks
- * they lead or share, the days of their approved leave and their performance dates, by start.
- * @param {{query: Function}} db
- * @param {{employee_id: string, from: Date, to: Date, fromDay: string, toDay: string}} at
- * @param {{item_kind?: string, q?: string, sort?: object, page?: number}} query
+ * The items of a run of days, one row each: the reader's events, the deadlines of the open tasks
+ * they lead or share, the days of their approved leave and their performance dates. $1 the reader,
+ * $2 and $3 the run's first and next instants, $4 and $5 its first and last day. The month's list
+ * and the assistant's summary read the same items.
  */
-function month(db, at, query) {
-  const params = [at.employee_id, at.from, at.to, at.fromDay, at.toDay, query.item_kind || null, query.q || null];
-  return pageQuery(
-    db,
-    `SELECT v.item_kind, v.item_id, v.title, v.starts_at, v.ends_at, v.all_day, v.event_type,
-            v.location, v.my_response, v.link_type, v.link_self, v.performance_kind, ${TOTAL_COL}
-       FROM (
+const ITEMS = `
          SELECT 'event' AS item_kind, ce.calendar_event_id AS item_id, ce.title, ce.starts_at,
                 ce.ends_at, ce.all_day, ce.event_type, ce.location,
                 (SELECT a.response FROM calendar_event_attendee a
@@ -102,8 +95,22 @@ function month(db, at, query) {
           WHERE lr.employee_id = $1 AND lr.status = 'approved'
             AND lr.starts_on <= $5::date AND lr.ends_on >= $4::date
          UNION ALL
-         ${PERFORMANCE_DATES}
-       ) v
+         ${PERFORMANCE_DATES}`;
+
+/**
+ * One page of a month (or any run of days): the reader's events, the deadlines of the open tasks
+ * they lead or share, the days of their approved leave and their performance dates, by start.
+ * @param {{query: Function}} db
+ * @param {{employee_id: string, from: Date, to: Date, fromDay: string, toDay: string}} at
+ * @param {{item_kind?: string, q?: string, sort?: object, page?: number}} query
+ */
+function month(db, at, query) {
+  const params = [at.employee_id, at.from, at.to, at.fromDay, at.toDay, query.item_kind || null, query.q || null];
+  return pageQuery(
+    db,
+    `SELECT v.item_kind, v.item_id, v.title, v.starts_at, v.ends_at, v.all_day, v.event_type,
+            v.location, v.my_response, v.link_type, v.link_self, v.performance_kind, ${TOTAL_COL}
+       FROM (${ITEMS}) v
       WHERE ($6::text IS NULL OR v.item_kind = $6)
         AND ($7::text IS NULL OR search_fold(v.title) LIKE '%' || search_fold($7) || '%')
       ORDER BY ${orderBy(query, { starts_at: "v.starts_at" }, "v.item_id")}`,
@@ -269,4 +276,59 @@ async function keptForDeal(db, dealId) {
   return rows[0] || null;
 }
 
-module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf, namesOf, relinkLead, keptForDeal };
+/**
+ * An item's kind in the assistant's summary: a meeting or an interview, an event or a campaign, a
+ * deadline (an event of that kind, or a task due, which the month draws as one), leave, a performance date.
+ */
+const KIND = `CASE WHEN v.item_kind = 'event' AND v.event_type IN ('meeting', 'interview') THEN 'meeting'
+                   WHEN v.item_kind = 'event' AND v.event_type IN ('event', 'campaign') THEN 'event'
+                   WHEN v.item_kind IN ('event', 'task') THEN 'deadline'
+                   WHEN v.item_kind = 'leave' THEN 'leave'
+                   ELSE 'performance' END`;
+
+/**
+ * The reader's month as Calendar draws it, in figures for the assistant (docs/guides/praxis-ai.md
+ * §6.13, Workspace, Knowledge Hub, Community, Home and Settings), in one statement over the month's own
+ * items (ITEMS): the meetings not declined and their hours (not all day), the invitations waiting for an
+ * answer, the task deadlines, the days of leave and the performance dates, each clipped to the month;
+ * by kind, and by week (its Monday, from the item's first day in the month) by kind. Figures, never a row.
+ * @param {{query: Function}} db
+ * @param {{employee_id: string, from: Date, to: Date, fromDay: string, toDay: string}} at
+ */
+async function aiSummary(db, at) {
+  const { rows } = await db.query(
+    `WITH v AS (SELECT * FROM (${ITEMS}) i),
+     x AS (
+       SELECT ${KIND} AS kind, v.item_kind, v.my_response, v.all_day,
+              GREATEST(v.starts_at, $2) AS from_at, LEAST(v.ends_at, $3) AS to_at,
+              date_trunc('week', (GREATEST(v.starts_at, $2) AT TIME ZONE 'Africa/Lagos'))::date AS week
+         FROM v
+     ), figures AS (
+       SELECT count(*)::int AS items,
+              count(*) FILTER (WHERE kind = 'meeting' AND my_response IS DISTINCT FROM 'declined')::int AS meetings,
+              count(*) FILTER (WHERE my_response = 'pending')::int AS invitations,
+              count(*) FILTER (WHERE item_kind = 'task')::int AS task_deadlines,
+              COALESCE(round(sum(date_part('epoch', to_at - from_at) / 86400) FILTER (WHERE kind = 'leave')), 0)::int AS leave_days,
+              count(*) FILTER (WHERE kind = 'performance')::int AS performance,
+              COALESCE(round((sum(date_part('epoch', to_at - from_at) / 3600)
+                FILTER (WHERE kind = 'meeting' AND NOT all_day AND my_response IS DISTINCT FROM 'declined'))::numeric, 1), 0)::float AS meeting_hours
+         FROM x
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', kind, 'value', n)) FROM (SELECT kind, count(*)::int AS n FROM x GROUP BY kind) k) AS by_kind,
+            (SELECT json_agg(json_build_object('key', week, 'meeting', meeting, 'event', event, 'deadline', deadline,
+                                               'leave', leave, 'performance', performance) ORDER BY week)
+               FROM (SELECT to_char(week, 'YYYY-MM-DD') AS week,
+                            count(*) FILTER (WHERE kind = 'meeting')::int AS meeting,
+                            count(*) FILTER (WHERE kind = 'event')::int AS event,
+                            count(*) FILTER (WHERE kind = 'deadline')::int AS deadline,
+                            count(*) FILTER (WHERE kind = 'leave')::int AS leave,
+                            count(*) FILTER (WHERE kind = 'performance')::int AS performance
+                       FROM x GROUP BY week) w) AS by_week`,
+    [at.employee_id, at.from, at.to, at.fromDay, at.toDay],
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, by_kind: r.by_kind || [], by_week: r.by_week || [] };
+}
+
+module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf, namesOf, relinkLead, keptForDeal, aiSummary };

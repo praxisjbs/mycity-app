@@ -21,6 +21,7 @@ const {
   isoDateTime,
   listQuery,
   Paged,
+  summaryPeriod,
 } = require("./common");
 
 const ImporterFieldType = z.enum([
@@ -315,6 +316,25 @@ const ImportListQuery = listQuery(
 );
 const ImportPage = Paged(ImportBatch);
 
+/**
+ * The assistant's import summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community,
+ * Home and Settings): every import as Import History lists them, by importer stacked by the rows
+ * imported and refused, by status, by month. A period (started) narrows it only when asked. Figures,
+ * never a row.
+ */
+const ImportSummaryBy = z.enum(["importer", "status", "month"]);
+const ImportSummaryQuery = z
+  .object({
+    importer: z
+      .string()
+      .regex(/^[a-z][a-z0-9_]*$/, "Pick an import that exists")
+      .optional(),
+    status: ImportBatchStatus.optional(),
+    ...summaryPeriod,
+    by: ImportSummaryBy.default("importer"),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   ImporterField: {
@@ -372,6 +392,7 @@ const TABLES = {
     table: null,
     reason: "list controls and the filters for the import history",
   },
+  ImportSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's import summary; figures, never a row" },
   ImportPage: { table: null, reason: "a page of the import history" },
 };
 
@@ -404,5 +425,7 @@ module.exports = {
   ImportRowListQuery,
   ImportRowPage,
   ImportListQuery,
+  ImportSummaryBy,
+  ImportSummaryQuery,
   ImportPage,
 };

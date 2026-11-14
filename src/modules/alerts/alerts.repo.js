@@ -430,7 +430,70 @@ async function placesOf(db, ids) {
   return rows;
 }
 
+/**
+ * The alerts a reader may see, in figures for the assistant (docs/guides/praxis-ai.md §6.13, Workspace,
+ * Knowledge Hub, Community, Home and Settings), in one statement over seenWhere(): open, open since
+ * before `agedBefore`, open high, cleared and dismissed since `weekStart`, the oldest open in days; then,
+ * over the alerts in `state` (open unless given) of a severity and the category's metrics, by metric with
+ * each severity (the service files a metric under its category), by rule (20) and by age band; and the
+ * alerts raised by Lagos day from `from` to before `to`, whatever became of them. Figures, never a row:
+ * never an alert's title.
+ * @param {{query: Function}} db
+ * @param {object} seen  see seenWhere()
+ * @param {{state: string, severity?: string|null, metrics: string[]|null, now: Date, agedBefore: Date,
+ *          weekStart: Date, from: Date, to: Date}} q
+ */
+async function aiSummary(db, seen, q) {
+  const params = [q.severity || null, q.metrics, q.now, q.agedBefore, q.weekStart, q.from, q.to];
+  const seenSql = seenWhere(seen, params);
+  const { rows } = await db.query(
+    `WITH a AS (
+       SELECT a.home_alert_id, a.home_alert_rule_id, r.name AS rule_name, r.metric, a.severity, a.raised_at,
+              a.cleared_at, a.outcome
+         ${ALERTS_FROM}
+        WHERE ${seenSql}
+     ), s AS (
+       SELECT * FROM a
+        WHERE ${STATE[q.state] || OPEN}
+          AND ($1::text IS NULL OR a.severity = $1)
+          AND ($2::text[] IS NULL OR a.metric = ANY($2::text[]))
+     ), by_rule AS (
+       SELECT home_alert_rule_id::text AS key, min(rule_name) AS label, count(*)::int AS value,
+              row_number() OVER (ORDER BY count(*) DESC, min(rule_name), home_alert_rule_id) AS rank
+         FROM s GROUP BY home_alert_rule_id
+     )
+     SELECT (SELECT json_build_object(
+               'open', count(*) FILTER (WHERE a.cleared_at IS NULL),
+               'overdue', count(*) FILTER (WHERE a.cleared_at IS NULL AND a.raised_at <= $4::timestamptz),
+               'high', count(*) FILTER (WHERE a.cleared_at IS NULL AND a.severity = 'high'),
+               'cleared_week', count(*) FILTER (WHERE a.outcome = 'cleared' AND a.cleared_at >= $5::timestamptz),
+               'dismissed_week', count(*) FILTER (WHERE a.outcome = 'dismissed' AND a.cleared_at >= $5::timestamptz),
+               'oldest_days', floor(max(date_part('epoch', $3::timestamptz - a.raised_at)) FILTER (WHERE a.cleared_at IS NULL) / 86400))
+               FROM a) AS figures,
+            (SELECT count(*)::int FROM s) AS total,
+            (SELECT json_agg(json_build_object('key', metric, 'high', high, 'medium', medium, 'low', low) ORDER BY metric)
+               FROM (SELECT metric, count(*) FILTER (WHERE severity = 'high')::int AS high,
+                            count(*) FILTER (WHERE severity = 'medium')::int AS medium,
+                            count(*) FILTER (WHERE severity = 'low')::int AS low
+                       FROM s GROUP BY metric) m) AS by_metric,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'value', value) ORDER BY rank)
+               FROM by_rule WHERE rank <= 20) AS by_rule,
+            (SELECT json_agg(json_build_object('key', band, 'value', n))
+               FROM (SELECT CASE WHEN age < 1 THEN 'day' WHEN age < 3 THEN 'three' WHEN age < 7 THEN 'week' ELSE 'older' END AS band,
+                            count(*)::int AS n
+                       FROM (SELECT date_part('epoch', COALESCE(cleared_at, $3::timestamptz) - raised_at) / 86400 AS age FROM s) g
+                      GROUP BY 1) b) AS by_age,
+            (SELECT json_agg(json_build_object('at', at, 'value', n) ORDER BY at)
+               FROM (SELECT to_char(raised_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM-DD') AS at, count(*)::int AS n
+                       FROM a WHERE raised_at >= $6::timestamptz AND raised_at < $7::timestamptz GROUP BY 1) d) AS by_day`,
+    params,
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, total: r.total || 0, by_metric: r.by_metric || [], by_rule: r.by_rule || [], by_age: r.by_age || [], by_day: r.by_day || [] };
+}
+
 module.exports = {
+  aiSummary,
   placesOf,
   permissionKeys,
   seenWhere,

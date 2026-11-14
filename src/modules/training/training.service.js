@@ -1124,7 +1124,63 @@ async function overdue(query) {
   return repo.overdueAcross(pool, query, lagos.today());
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+/** Where a person stands on a course, as People's Status chips read it; a grouping's parts. */
+const STANDING = Object.freeze([
+  { key: "completed", label: "Completed" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "overdue", label: "Overdue", optional: true },
+  { key: "not_started", label: "Not Started" },
+]);
+const DIM_WORDS = Object.freeze({ course: "Places by course", department: "Places by department" });
+
+/**
+ * The places on courses in figures: with `training.manage` (and the CEO) every place, as Training counts
+ * them; anyone else their own, as My Training shows them. Every place unless a period (enrolled) is
+ * asked; by course or department stacked by where each person stands, by status, completions by month.
+ * Never a person's proof or notes. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   TrainingSummaryQuery, parsed
+ * @param {object} actor    the asking person
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, series, askedPeriod, stacked } = require("../../shared/ai/summary");
+  const period = askedPeriod(params, now);
+  const by = DIM_WORDS[params.by] ? params.by : "course";
+  const manager = await canManage(client, actor);
+  if (!manager && !actor.employee_id) return { figures: [], groups: [], series: [], total: 0 };
+  const r = await repo.aiSummary(
+    client,
+    { state: params.state, department_id: params.department_id, from: period && period.from, to: period && period.to, by },
+    { employeeId: manager ? null : actor.employee_id, today: lagos.today(now) },
+  );
+  const f = r.figures;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const places = f.places || 0;
+  const groups = [
+    group(by, DIM_WORDS[by], stacked(r.by_dim, STANDING)),
+    group("status", "Places by status", STANDING.filter((s) => counted.has(s.key)).map((s) => ({ key: s.key, label: s.label, value: counted.get(s.key) }))),
+  ];
+  const figures = [
+    figure("courses", "Courses", f.courses || 0),
+    figure("library", "Library courses", f.library || 0),
+    figure("people", "People", f.people || 0),
+    figure("places", "Places", places),
+    figure("completed", "Completed", f.completed || 0),
+    figure("in_progress", "In progress", f.in_progress || 0),
+    figure("overdue", "Overdue", f.overdue || 0),
+    figure("not_started", "Not started", f.not_started || 0),
+    figure("certificates", "Certificates issued", f.certificates || 0),
+  ];
+  if (places) figures.push(figure("completion_rate", "Completion rate", Math.round(((f.completed || 0) * 1000) / places) / 10, "percent"));
+  return { figures, groups, series: [series("completed", "Completions by month", r.by_month)], total: places };
+}
+
 module.exports = {
+  aiSummary,
   certificateHash,
   openable,
   youtubeIdOf,

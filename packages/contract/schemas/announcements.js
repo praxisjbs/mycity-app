@@ -8,7 +8,7 @@
  * is its urgency (TB, 19/10/2026): an urgent one counts as read only once acknowledged.
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
+const { uuid, text, isoDateTime, listQuery, Paged, recordId, changesBeside, nothingOn, summaryPeriod } = require("./common");
 const { PersonRef } = require("./organisation");
 const { NotificationUrgency } = require("./notifications");
 
@@ -46,6 +46,22 @@ const Announcement = z
   .strict();
 
 const AnnouncementListQuery = listQuery();
+
+/**
+ * The assistant's announcement summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub,
+ * Community, Home and Settings): with `announcements.post` every announcement as the tab tracks it,
+ * otherwise the ones the reader received; the newest stacked Read and Not Read, by urgency, by month. A
+ * period (published) narrows it only when asked. Figures, never a row: never an announcement's message.
+ */
+const AnnouncementSummaryBy = z.enum(["announcement", "urgency", "month"]);
+const AnnouncementSummaryQuery = z
+  .object({
+    urgency: NotificationUrgency.optional(),
+    ...summaryPeriod,
+    by: AnnouncementSummaryBy.default("announcement"),
+  })
+  .strict();
+
 const AnnouncementPage = Paged(Announcement);
 
 /**
@@ -152,6 +168,7 @@ const TABLES = {
     },
   },
   AnnouncementListQuery: { table: null, reason: "list controls for the tracking tab" },
+  AnnouncementSummaryQuery: { table: null, reason: "the filters, period and grouping of the assistant's announcement summary; figures, never a row" },
   AnnouncementPage: { table: null, reason: "a page of announcements" },
   AnnouncementCreate: { table: "announcement" },
   AnnouncementUpdate: { table: "announcement" },
@@ -181,6 +198,8 @@ module.exports = {
   Audience,
   Announcement,
   AnnouncementListQuery,
+  AnnouncementSummaryBy,
+  AnnouncementSummaryQuery,
   AnnouncementPage,
   AnnouncementCreate,
   AnnouncementUpdate,

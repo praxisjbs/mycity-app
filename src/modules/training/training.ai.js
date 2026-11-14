@@ -7,6 +7,7 @@
  *   training.progress  every course with assigned, completed and overdue, for `training.manage`;
  *                      anyone else is answered with nothing
  *   training.overdue   the people overdue on any course, for `training.manage`
+ *   training.summary   the places in figures: everyone's for `training.manage`, otherwise the asker's own
  *
  * Every list is a page of 25 through the same service as the screen. No actions (§9): building
  * a course is design work on the screen, publishing needs the publisher's signature, and an
@@ -30,6 +31,15 @@ module.exports = defineManifest({
     AssignmentCreate: "design: Assign Training reaches many people at once with a task and a notice each, so it is pressed on the screen",
     TrainingNoteSave: "personal: My Notes are the person's own words on a course, read and written by them alone on ESS, My Training",
   },
+  summaries: [
+    {
+      key: "training.summary",
+      description: "Training in figures: places, completed, in progress, overdue, the completion rate, certificates; by course, department or month (everyone's for training managers, else my own)",
+      params: c.training.TrainingSummaryQuery,
+      permission: ["knowledge", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "training.mine",
@@ -42,6 +52,7 @@ module.exports = defineManifest({
     },
     {
       key: "training.library",
+      summary: "training.summary",
       description: "List the open Library courses anyone may take that I have not started",
       params: c.training.MyTrainingQuery,
       permission: ["ess", "view"],
@@ -50,6 +61,7 @@ module.exports = defineManifest({
     },
     {
       key: "training.progress",
+      summary: "training.summary",
       description: "List every training course with how many people are assigned, completed and overdue (for people who manage training)",
       params: c.training.CourseListQuery,
       permission: ["knowledge", "view"],
@@ -58,6 +70,7 @@ module.exports = defineManifest({
     },
     {
       key: "training.overdue",
+      summary: "training.summary",
       description: "List the people overdue on a training course, with the course and its due date (for people who manage training)",
       params: c.common.PageQuery,
       permission: ["knowledge", "view"],

@@ -10,7 +10,7 @@
 | Capabilities | `sops.manage` (write, publish and archive any department's SOPs; Knowledge Hub · SOPs) · `training.manage` (build, publish, assign and archive courses, and see everyone's progress; Knowledge Hub · Training) |
 | Screens (PROGRESS.md rows) | #63 SOPs, #65 Training, #110 ESS · My Training; #64 FAQs and #66 Announcements are Dropped |
 | Status | Agreed |
-| Last changed | 12/11/2026 |
+| Last changed | 14/11/2026 |
 
 This guide is **M10 Knowledge Hub's single source of truth**: the rules, the data, the API, the
 screens and the build plan (Appendix A). The build tracker is `docs/handoff/m10-knowledge-hub.md`.
@@ -485,6 +485,19 @@ else's training in M10 (§13).
   `training.mine` (the reader's enrolments with status and due date), `training.library` (Library
   courses), `training.progress` (`training.manage`: courses with assigned, completed, overdue),
   `training.overdue` (`training.manage`: people overdue, paged). Paged at 25.
+- **AI summaries** (`docs/guides/praxis-ai.md` §6.13, Workspace, Knowledge Hub, Community, Home and
+  Settings; Appendix B PR 8, built 14/11/2026), `knowledge` view, figures never rows. `sops.summary`
+  (`knowledge.ai.js`; `SopSummaryQuery`: a department, the list's `state`, `by` department or state): the
+  SOPs the reader may read as the list shows them (every published one, and a writer's drafts and
+  archived ones of the departments they write, §6.2), each Published, a Draft never published or
+  Archived, by department stacked, by state; a published one with a draft counted as being changed,
+  and those published within 90 days (`knowledge.repo.aiSummary`). `training.summary`
+  (`training.ai.js`; `TrainingSummaryQuery`: a course's `state`, a department, a period enrolled when
+  asked, `by` course, department or month): for `training.manage` (and the CEO) every place, as
+  Training counts them; anyone else their own, as My Training shows them (no draft course); by course
+  or department stacked Completed, In Progress, Overdue and Not Started, by status, the completion
+  rate, certificates issued, completions by month (`training.repo.aiSummary`). `sops.list`,
+  `training.library`, `training.progress` and `training.overdue` name them.
 - **My Notes** are never read by Praxis AI (§6.13).
 - **AI actions**: none in M10. Assigning and publishing need a signature or reach many people and
   stay on the screen; the module's `.ai.js` says so with `design:` (gate 19).
@@ -601,6 +614,7 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · §9: `sops.summary` and `training.summary`, the SOPs and the places on courses in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8): the SOPs as each reader may read them; every place for `training.manage`, otherwise the reader's own. Nothing on screen changes.
 - 13/11/2026 · TB · My Notes on desktop (§6.13): Minimise Notes, Open Notes, Close Notes and Try Again did nothing on desktop. A press anywhere on the bar took the pointer for dragging, so the button's click went to the bar. `NoteTaker` now starts a drag only from the bar itself or Move Notes; a test presses each button with the pointer. The phone was not affected.
 - 12/11/2026 · TB · Training · Settings: the Library and Proof Required switches are named by their words again (a screen reader heard "Switch", since their titles carry a help term); `ToggleRow` takes a `label` for its switch. Found while filming the Milestone 10 video (`docs/runbooks/training-videos.md` §7).
 - 13/11/2026 · TB · Download Word on My Notes (§6.13, §5, §7), at TB's request: `POST /training/me/courses/:id/note/export` answers an `ExportFile` (202); `training.note_export` builds the note as a Word file with the new `shared/documents/docx` (jszip, now a direct dependency); `training_note_export`'s read rule is the person who asked alone. `NoteTaker` gains `onDownload` (Download Word under the note); My Training saves before it asks.

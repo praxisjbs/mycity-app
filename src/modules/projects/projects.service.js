@@ -207,4 +207,52 @@ async function assertOpen(db, id) {
   if (status !== "active") throw invalid("project_id", "Project is closed");
 }
 
-module.exports = { list, getFor, create, edit, setBudget, assertOpen, toProject, cardRecords, assertCardProject, linkOf, ofDeal, relinkIn };
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+const STATUS_WORDS = Object.freeze({ active: "Active", completed: "Completed" });
+const TASK_PARTS = Object.freeze([
+  { key: "done", label: "Done" },
+  { key: "open", label: "Open" },
+  { key: "overdue", label: "Overdue", optional: true },
+]);
+
+/**
+ * Every project in figures, its tasks only those the reader could open on Tasks (§6 Projects): every
+ * project unless a status is asked, by project stacked Done, Open and Overdue, by status. Runs on the
+ * client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   ProjectSummaryQuery, parsed
+ * @param {object} actor    the asking person with their `workspace` scope
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, stacked } = require("../../shared/ai/summary");
+  const lagos = require("../../shared/time/lagos");
+  const r = await repo.aiSummary(client, params, actor.scope, { now, today: lagos.today(now) });
+  const p = r.projects;
+  const t = r.tasks;
+  const counted = new Map(r.by_status.map((x) => [x.key, x.value]));
+  const groups = [
+    group("project", "Tasks by project", stacked(r.by_project, TASK_PARTS)),
+    group("status", "Projects by status", Object.keys(STATUS_WORDS).filter((k) => counted.has(k)).map((k) => ({ key: k, label: STATUS_WORDS[k], value: counted.get(k) }))),
+  ];
+  if (params.by === "status") groups.reverse();
+  return {
+    figures: [
+      figure("projects", "Projects", p.projects || 0),
+      figure("active", "Active", p.active || 0),
+      figure("completed", "Completed", p.completed || 0),
+      figure("past_due", "Active past their due day", p.past_due || 0),
+      figure("tasks", "Tasks", t.tasks || 0),
+      figure("open", "Tasks open", t.open || 0),
+      figure("done", "Tasks done", t.done || 0),
+      figure("overdue", "Tasks overdue", t.overdue || 0),
+    ],
+    groups,
+    series: [],
+    total: p.projects || 0,
+  };
+}
+
+module.exports = { list, getFor, create, edit, setBudget, assertOpen, toProject, cardRecords, assertCardProject, linkOf, ofDeal, relinkIn, aiSummary };

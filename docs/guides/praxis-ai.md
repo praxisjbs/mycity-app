@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | Praxis AI · Ask and History (#67, #68) |
 | Status | Built |
-| Last changed | 13/11/2026 |
+| Last changed | 14/11/2026 |
 
 Sources: MILESTONES §15 (M10's assistant, its definition of done) and A23 (it reads; since
 01/11/2026 it acts only through a declared action a person confirms, §1.2), BACKEND_STRUCTURE §14
@@ -722,6 +722,16 @@ run that answers only for holders of a capability names it (`team.today` needs `
 `alerts.mine` needs `alerts.clear`), and its question waits for the capability too; the CEO holds
 every one. "What happened today?" (`activity.list`) is offered to everyone.
 
+**A chart for each area** (Appendix B PR 8, 14/11/2026). Beside the questions, one chart question
+for each area a summary answers (`CHARTS`: Workspace, People, Finance, Pay, Recruitment,
+Partnerships, Performance, Queries, Knowledge Hub, Staff Community, Home and Settings), each naming
+its summary ("Chart my tasks by status", `tasks.summary`) and offered only when the person is
+offered that summary (`authorise.allowedSummaries`), with a capability where the summary answers
+only its holders (`policies.summary` with `policies.manage`). Of the six shown, the first four are
+the questions above the person's reads allow, then the first two chart questions their summaries
+allow, and the rest of the six from whichever list has more; so a new conversation always offers a
+chart where one can be drawn.
+
 ### 6.9 Reads this build adds
 
 Praxis AI answers what the manifests offer; it does not add reads to other modules on its own.
@@ -1329,20 +1339,41 @@ and sanctions' fines in naira are left out, never zero, for a reader whose role 
 | `queries.summary` | `queries` view, the queries the reader may see (`queries.md` §6.1) | `QuerySummaryQuery`: `status`, `department_id`, a period (raised), `by` status (the default), rule, department, raised by or month | Queries, awaiting response, past the response time, under review, closed, sanctioned, the average days to close; by status; by department (20) with parts Awaiting Response, Under Review and Closed, or by rule (the rule's name, Attendance Policy or Raised by a Person) or by who raised them when asked; raised by month |
 | `sanctions.summary` | `queries` view, the sanctions whose query the reader may see; fines in naira only for a reader who sees pay | `SanctionSummaryQuery`: `status`, `department_id`, a period (proposed), `by` step (the default), status, department or month | Sanctions, issued, awaiting approval, rejected, withdrawn, in force, with a fine; with the salary grant the fines issued and recovered in naira; by step of the chain (in its order, 20) with parts Issued and Awaiting Approval (Rejected and Withdrawn where some row has one); by status; by department (20) with the same parts; issued by the month they take effect |
 
-*Workspace, Knowledge Hub, Community, Home and Settings (planned, PR 8)*
+*Workspace, Knowledge Hub, Community, Home and Settings (built, PR 8, 14/11/2026)*
+
+Each answers the list it names with the list's own reach: every project, its tasks counted only
+where the reader could open them on Tasks (`projects.repo`'s `seen`, `workspace.md` §6 Projects);
+the person's own month as Calendar draws it, from the month's own items (`calendar.repo`'s
+`ITEMS`); Knowledge Hub's lists as their screens show them; the announcements, events, alerts, files
+and imports each Home or Settings list shows its reader. The build taught six things, written here.
+These lists show every record, so a period narrows a summary only when asked (`askedPeriod`, as PR
+5's), except Calendar, which is a month (this one unless asked), and Activity, which is a day (today
+unless `date` or a period is asked) as Activity Today is. Where a list answers only the holders of a
+capability (`training.manage`, `policies.manage`, `alerts.clear`, `home.reports`), its summary does
+too: a policy reader without it gets no figures, as `policies.list` gives them an empty page;
+Training gives anyone else their own places, as My Training shows them, and Announcements its own
+received ones, since the read rates are the tracking tab's (`announcements.post`, decision 58). A
+project's Open and Overdue are apart, so its three parts sum to its tasks. An SOP is Published (a
+version in force), a Draft never published, or Archived, so a department's parts sum; a published
+SOP being changed is a figure of its own, as the Draft chip lists both. Activity Today's six events
+come from two modules, so its grouping is the event's kind ("Leave Approved"), by module or person
+when asked. Calendar's kinds are five, so a week's stacked bar keeps to a stacked bar's six parts:
+Meeting (a meeting or an interview), Event (an event or a campaign), Deadline (an event of that kind,
+or a task due, which the month draws as one), Leave and Performance Date. `calendar.summary` and
+`activity.summary` carry their reads' matrix probes (§6.17).
 
 | Summary | Module, grant | Params | Figures, groups and series |
 |---|---|---|---|
-| `projects.summary` | `workspace` view, the projects the reader sees, counting only tasks they can see | `ProjectSummaryQuery`: `status`, `partner_id`, `by` project or status | Projects, active, completed, tasks open, done and overdue; by project (20) with parts Done, Open, Overdue; by status |
-| `calendar.summary` | `workspace` view, the person's own calendar | `CalendarSummaryQuery`: `month` (this month), `by` kind or week | Meetings, invitations waiting, deadlines, leave days, hours in meetings; by kind; by week with parts by kind |
-| `training.summary` | `knowledge` view, the readers Training's management shows | `TrainingSummaryQuery`: `state`, `department_id`, a period, `by` course, department or month | Courses, people assigned, completed, in progress, overdue, the completion rate, certificates issued; by course or department (20) with parts Completed, In Progress, Overdue, Not Started; completions by month |
-| `policies.summary` | `knowledge` view, the policy writers Policies shows | `PolicySummaryQuery`: `kind`, `state`, `by` policy, department or state | Policies, in force, drafts, acknowledgements due and overdue, acknowledged as a per cent; by policy or department (20) with parts Acknowledged, Waiting, Overdue; by state |
-| `sops.summary` | `knowledge` view, the SOPs the reader may read | `SopSummaryQuery`: `department_id`, `state`, `by` department or state | SOPs, in force, drafts, archived, updated within 90 days; by department (20) with parts In Force, Draft; by state |
-| `announcements.summary` | `community` view, the announcements the reader's audience receives | `AnnouncementSummaryQuery`: a period, `by` announcement or month | Published, scheduled, read as a per cent; by announcement (top 10) with parts Read, Not Read; published by month |
-| `activity.summary` | `home` view, the reader's Activity reach | `HomeActivitySummaryQuery`: `date` or a period, `employee_id`, `by` module, person or day | Events, people acting, modules; by module (20); by person (top 10); events by hour of the day or by day |
-| `alerts.summary` | `home` view, the alerts the reader may clear | `HomeAlertSummaryQuery`: `category`, `severity`, `state`, `by` category, severity, rule or age | Open alerts, overdue, cleared this week, the oldest in days; by category with parts by severity; by rule (20); opened by day |
-| `runs.summary` | `home` view, the person's own report files | `HomeReportRunSummaryQuery`: `saved_report_id`, `status`, a period, `by` status, report, format or month | Files, done, waiting, failed, skipped; by status; by report (20); files by month |
-| `imports.summary` | `settings` view, as Import History | `ImportSummaryQuery`: `importer`, `status`, a period, `by` importer, status or month | Imports, rows imported, rows refused, failed; by importer (20) with parts Imported, Refused; imports by month |
+| `projects.summary` | `workspace` view, every project as Projects lists them, counting only the tasks the reader could open on Tasks | `ProjectSummaryQuery`: the list's filters (`status`, `partner_id`, `lead_id`; every project unless a status is asked), `by` project (the default) or status | Projects, active, completed, active past their due day; tasks, open, done and overdue (open past their due); by project (20, most tasks first) with parts Done, Open (not overdue) and Overdue; by status (Active, Completed) |
+| `calendar.summary` | `workspace` view, the person's own month as Calendar draws it (their events, invitations, task deadlines, approved leave and performance dates) | `CalendarSummaryQuery`: `month` (YYYY-MM, this Lagos month), `by` kind (the default) or week | Items, meetings (meetings and interviews, not declined), invitations waiting for an answer, task deadlines, leave days in the month, performance dates, hours in meetings (not all day, not declined), each clipped to the month; by kind (Meeting, Event, Deadline, Leave, Performance Date); by week (its Monday, "Week of 02/03") with parts by kind, a kind no week has left out of the legend |
+| `training.summary` | `knowledge` view; with `training.manage` (and the CEO) every place, as Training lists its courses and their people; anyone else their own places, as My Training shows them | `TrainingSummaryQuery`: `state` (the course's), `department_id`, a period (enrolled, only when asked), `by` course (the default), department or month | Courses with a place, Library courses, people, places, completed, in progress, overdue, not started, the completion rate (completed of the places, a per cent), certificates issued; by course or department (20) with parts Completed, In Progress, Overdue and Not Started; by status; completions by month |
+| `policies.summary` | `knowledge` view; holders of `policies.manage` (and the CEO), as Knowledge Hub · Policies; anyone else no figures | `PolicySummaryQuery`: `kind`, `state`, `by` policy (the default), department or state | Policies, in force, awaiting approval, waiting to start, drafts, archived; people asked to acknowledge (the newest published version of each policy not archived that asks for it), acknowledged, waiting (not yet due), overdue, acknowledged as a per cent; by state; by policy or department (20, the people asked by their department) with parts Acknowledged, Waiting and Overdue |
+| `sops.summary` | `knowledge` view, the SOPs the reader may read as SOPs lists them: every published one, and a writer's (a department's head, `sops.manage`) drafts and archived ones of the departments they write | `SopSummaryQuery`: `department_id`, `state` (the list's chips), `by` department (the default) or state | SOPs, published, being changed (published with a draft), drafts never published, archived, published within 90 days; by department (20) with parts Published, Draft, and Archived where some row has one; by state |
+| `announcements.summary` | `community` view; for `announcements.post` (and the CEO) every announcement as the Announcements tab tracks it; anyone else the ones they received, read by them or not | `AnnouncementSummaryQuery`: `urgency`, a period (published, only when asked), `by` announcement (the default), urgency or month | With the capability: published, scheduled, urgent, the people they reached, read as a per cent (the tab's Average Read, an urgent one read once acknowledged); the newest published (top 10) with parts Read and Not Read; by urgency; published by month. Anyone else: received, read, not read, urgent waiting for my acknowledgement; the newest received (top 10) with the same parts; by urgency; received by month |
+| `activity.summary` | `home` view, the events the reader's Activity Today reaches (its allow-list and their scope on each module) | `HomeActivitySummaryQuery`: `date` (today in Lagos) or a period, `employee_id`, `by` kind (the default), module, person or day | Events, people who acted, people they were about, kinds; by kind (the event's words: New Employee, Leave Approved, Leave Recorded, Attendance To Review, Recognition, Celebration); by module, by who acted (top 10) or by day (20) when asked; events by hour of the day for one day, by day for a period |
+| `alerts.summary` | `home` view, the alerts the reader may clear as `alerts.mine` lists them (`alerts.clear`, and the CEO); anyone else no figures | `HomeAlertSummaryQuery`: `category`, `severity`, `state` (open unless asked), a period for the alerts raised (this month to today unless asked), `by` category (the default), severity, rule or age | Open, overdue (open 7 days or more), high, cleared this week, dismissed this week, the oldest open in days; by category with parts High, Medium and Low; by severity; by rule (20) or by age (Under a Day, 1 to 3 Days, 3 to 7 Days, 7 Days or More) when asked; raised by day as a series |
+| `runs.summary` | `home` view, the report files the person received, as `runs.mine` (`home.reports`, and the CEO); anyone else no figures | `HomeReportRunSummaryQuery`: `saved_report_id`, `status`, `format`, a period (made, only when asked), `by` status (the default), report, format or month | Files, done, waiting, failed, skipped, emailed; by status; by report (20) with parts Done, Waiting, Failed and Skipped, each drawn only where some row has one; by format; files by month |
+| `imports.summary` | `settings` view, as Import History (every import) | `ImportSummaryQuery`: `importer`, `status`, a period (started, only when asked), `by` importer (the default), status or month | Imports, committed, reverted, failed, in progress, rows imported (created or updated by a committed import), rows refused (errors and duplicates a committed import left out), records created, records updated; by importer (20, the rows as its value, the imports as its count) with parts Imported and Refused; by status; imports by month |
 
 **The summary cache** (`shared/ai/summary-cache.js`): the same summary with the same parameters
 and the same scope asked again within 60 seconds is served from Redis, keyed by the asking person's
@@ -1394,7 +1425,8 @@ PR there.
    `scripts/ai/eval-assistant.js`;
 4. a module that declares `actions` leaves a `<Thing>Create` schema of its contract neither offered
    nor in `not_offered` with a reason (PR5 makes this universal: every module with such a schema);
-5. a Try Asking line names a read that does not exist;
+5. a Try Asking line names a read that does not exist, or a chart line a summary that does not
+   exist (§6.8);
 6. a create or edit form is not in the chat (decision 33): a `<Thing>Create`, `Edit`, `Update`,
    `Patch` or `Save` schema of a built module's contract that is no action's input, whose module's
    `not_offered` reason does not start with `via <action key>:` (an action that exists) or one of
@@ -1463,11 +1495,16 @@ refused by `authorise.checkAction` or the action's own `check`; a summary must c
 record (its `total` one more once it is made) and never the outside one (no more once that is
 made), run through its own `run` so the summary cache never answers (Appendix B PR 5:
 `vacancies.summary`, `candidates.summary`, `assessments.summary`, `talent_pool.summary`; PR 7:
-`my_leave.summary`). The matrix asks a summary with no parameters, and a probe's fresh working day
+`my_leave.summary`; PR 8: `calendar.summary`, `activity.summary`). The matrix asks a summary with no parameters, and a probe's fresh working day
 moves on with every probe, so from December it falls in the next year: `my_leave.summary` counts
 every request unless a year is asked, so its total moves whichever year the day is in (a case in
 `ai-summaries-people.test.js` makes one in January and counts it); no summary probe needs its own
-parameters. Probed: Workspace (`tasks.list`,
+parameters. A summary of one month or one day counts what its probe makes in it, never on the
+fresh day three weeks ahead: `calendar.summary`'s probe books a meeting today (the person's own,
+counted; the outsider's own, never), and `activity.summary`'s records a day of unpaid leave for the
+report (Record Leave, so Activity Today has its event today) for a reader who may record it, and has
+no outside record: no service a probe may call leaves an allow-listed event about the outsider for a
+reader whose reach stops short of them. Probed: Workspace (`tasks.list`,
 `tasks.complete`, `tasks.comment`, `tasks.edit`, `tasks.add_step`, `tasks.edit_step`,
 `tasks.wait_on`, `projects.edit`, `calendar.month`, `calendar.edit`), People (`employees.list`, `leave.requests`,
 `leave.approve`, `leave.reject`, `attendance.register`, `overtime.approve`, `leave.record`,
@@ -1723,7 +1760,7 @@ naming `file.<kind>` and an evaluation case with `file: "<kind>"` (a made-up sam
 
 ### 6.19 Charts in the Overview (decisions 49 to 58; Appendix B)
 
-**Items 1 to 5 built (Appendix B PR 1, 13/11/2026), item 6 built (PR 2, 13/11/2026), item 9's finance and pay summaries built (PR 4, 13/11/2026), its recruitment and onboarding summaries (PR 5, 13/11/2026), its partnerships summaries (PR 6, 13/11/2026) and its people, performance and queries summaries (PR 7, 13/11/2026); items 7 and 8 and the rest of 9 planned.** Each PR of Appendix B
+**Items 1 to 5 built (Appendix B PR 1, 13/11/2026), item 6 built (PR 2, 13/11/2026), item 9's finance and pay summaries built (PR 4, 13/11/2026), its recruitment and onboarding summaries (PR 5, 13/11/2026), its partnerships summaries (PR 6, 13/11/2026), its people, performance and queries summaries (PR 7, 13/11/2026) and its workspace, Knowledge Hub, community, home and settings summaries (PR 8, 14/11/2026), so every read names its summary or why it needs none; items 7 and 8 planned.** Each PR of Appendix B
 writes what it built here as built. Where the build shows the design wrong, the change goes here and in the Change log, never
 silently.
 
@@ -1769,12 +1806,11 @@ how the pane works, and the model repeated that to the person.
      so the model reaches for the summary when a question counts, totals or compares.
    - The catalogue snapshot (`registry.snapshot()`, gate 23 rule 1) carries each read's `summary`;
      `catalogue()`, which is synced to a table, does not.
-   - Rule 9 of `scripts/check/ai-awareness.js` fails a read with no `summary`, a `summary` naming a
-     summary that does not exist, and a read in `scripts/check/ai-summary-gaps.json` that now names
-     one. The gaps file lists each read still waiting for its summary with the PR that brings it
-     (PR 1 writes it from Appendix B.3, one entry a line: `{ "read", "summary", "pr" }`, 48 of them).
-     A waiting read carries no `summary` and stands in the gaps file; `none:` never means "not yet". The file only shrinks: an entry the change's base did not
-     hold fails, as rule 6's list does. PR 8 deletes it once it is empty.
+   - Rule 9 of `scripts/check/ai-awareness.js` fails a read with no `summary` and a `summary` naming a
+     summary that does not exist; `none:` never means "not yet". From PR 1 to PR 7 a read still
+     waiting for its summary stood in `scripts/check/ai-summary-gaps.json` with the PR that brought
+     it (48 of them, a list that only shrank); PR 8 answered the last twelve and deleted the file
+     (14/11/2026), so rule 9 runs with no list: a new read comes with its summary or its reason.
 4. **Money reads as money (PR 1).** `MONEY_FIELD` (`assistant/answer.js`) takes allocated,
    committed, spent, remaining, gross, net, due, paid, owed, outstanding, commission, sales and fine
    as well. A two-place string in such a column reads "₦3,500,000.00" in the bubble's table, the
@@ -1977,15 +2013,16 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **A huge list** ("all our staff"): the first 25 and the total; Show Next 25 asks for the next page
   as a follow-up in the same conversation.
 - **A question that needs a total over more than one page** (a sum of 400 records): answered from
-  the module's summary read (§6.13: attendance, tasks, leave, approvals, performance, reviews,
-  employees, the Audit Log, budgets, and Recruitment's vacancies, candidates, interviews,
-  assessments, offers, onboarding and talent pool); where a module has none, the answer gives the total, says it looked at
-  the first 25 and names the screen (the prompt says so and never to estimate the rest). A module
-  adds a summary read when its questions need one; Appendix B adds one for every list that can
-  grow (decision 49, §6.13's planned tables).
-- **A list longer than a page whose summary is not built yet** (until Appendix B's PRs land): no
-  chart; the Overview stays disabled and the answer says nothing about charts (decision 55). A list
-  of 30 whose first 25 came back is never charted from those 25 (decision 50).
+  the summary the list's read names (§6.13; since Appendix B PR 8 every list that can grow names
+  one, decision 49). A read whose list needs none (one record, a search, configuration, a person's
+  own short list, a picker's list) says why, and its answer gives the total, says it looked at the
+  first 25 and names the screen (the prompt says so and never to estimate the rest). A new read
+  comes with its summary or its reason (gate 23 rule 9).
+- **A summary a reader gets no figures from** (Policies without `policies.manage`, Alerts without
+  `alerts.clear`, report files without `home.reports`, requisitions and disbursements without
+  `expenses.finance`): the figures are empty, as the list's read gives an empty page; no chart, and
+  the answer says nothing about charts (decision 55). A list of 30 whose first 25 came back is never
+  charted from those 25 (decision 50).
 - **A short list with no summary** (the worksites, a person's leave balances, the roles): charted
   from its own rows when they are the whole list (§6.19 item 6); a field the person's role masks is
   never charted, and a chart whose fields the rows do not hold is dropped, leaving Overview greyed
@@ -2521,8 +2558,8 @@ Each summary PR's own points:
   naira only for a reader who sees pay; `my_attendance.summary` and `my_leave.summary` are the
   person's own (the matrix gives them every role). Guides: `attendance.md`, `organogram.md`,
   `ess.md`, `performance.md`, `queries.md`.
-- **PR 8 · Workspace, Knowledge Hub, Community, Home and Settings (`m10/summaries-close`).**
-  `projects.summary` counts only the tasks the reader may see; `calendar.summary` is the person's
+- **PR 8 · Workspace, Knowledge Hub, Community, Home and Settings (`m10/summaries-close`).** Built
+  14/11/2026 (§6.13's table as built; §6.8's charts in Try Asking). `projects.summary` counts only the tasks the reader may see; `calendar.summary` is the person's
   own; then the gaps file is deleted and rule 9 runs with no list; a Try Asking line for a chart in
   each area the person's reads reach (gate 23 rule 5); the User Guide's See figures as a chart gains
   an example question for every area; the handoff's §6.12 closed. Guides: `workspace.md`,
@@ -2577,6 +2614,7 @@ area and guides from B.4:
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · Charts in the Overview, PR 8 built (Appendix B; §6.13 Workspace, Knowledge Hub, Community, Home and Settings, §6.19 items 3 and 9): ten summaries, `projects.summary`, `calendar.summary`, `training.summary`, `policies.summary`, `sops.summary`, `announcements.summary`, `activity.summary`, `alerts.summary`, `runs.summary` and `imports.summary`, each one SQL with its list's own reach, stacked where a grouping has parts; their twelve reads name them, so every read names its summary or why it needs none, `scripts/check/ai-summary-gaps.json` is deleted and gate 23 rule 9 runs with no list. Try Asking gains a chart question for each area, by its summary, two of the six shown (§6.8, rule 5 holding each to a summary that exists); the User Guide's See figures as a chart an example for each area. The build taught §6.13 six things, written there: these lists show every record, so a period narrows only when asked, but Calendar is a month and Activity a day; a summary over a list that answers only a capability's holders answers only them, except Training (anyone else's own places, as My Training) and Announcements (anyone else's own received, the read rates being the tab's, decision 58); a project's Open and Overdue are apart, so its parts sum; an SOP is Published, a Draft never published or Archived, a published one being changed a figure of its own; Activity Today's six events from two modules group by kind; Calendar's kinds are five, to keep within a stacked bar's six parts. `calendar.summary` and `activity.summary` carry their reads' probes, each making its record today (§6.17); the calendar's month and its summary read one list of items (`calendar.repo` `ITEMS`).
 - 14/11/2026 · JP · PR 7, before its merge (the planning chat, from #155's review): the matrix's probe day passes 31 December from early December, so a year's summary would stop counting its probe. `my_leave.summary` counts every request unless a year is asked, so it keeps counting; §6.17 says so and a case proves it with a request in January. The year's balance SQL is kept once (`leave.repo` `BALANCES`), shared by `balances()` and `aiMine()`.
 - 13/11/2026 · JP · Charts in the Overview, PR 7 built (Appendix B; §6.13 People, performance and queries, §6.19 item 9): twelve summaries, `exceptions.summary`, `pay_items.summary`, `temporary_sites.summary`, `devices.summary`, `seats.summary`, `my_attendance.summary`, `my_leave.summary`, `kpis.summary`, `scorecards.summary`, `commitments.summary`, `queries.summary` and `sanctions.summary`, each one SQL with its list's own reach, stacked where a grouping has parts; their thirteen reads name them and leave the gaps file (12 left with PR 6's off too, PR 8's alone). The plan's table was corrected as built: an exception is Open or a resolved one's outcome (Accepted, Rejected, Corrected), not waiting, approved and rejected; a device is Registered, New or Removed; a seat is Open, Filled or Closed, Acting being a department's (a figure); a scorecard's score is a fraction, so its average reads as a per cent; `KpiSummaryQuery` and `CommitmentSummaryQuery` were taken by the screens, so these are `KpiResultSummaryQuery` and `CommitmentStateSummaryQuery`; pay items' figures keep to 12. My Attendance is a month and My Leave a year's days with every request counted unless a year is asked; `my_leave.summary` carries `my_leave.list`'s probe, and the matrix's probes ask for Unpaid leave so the extra requests never run out of days (§6.17). Staff are offered seven more summaries (their own two, performance's three, queries' and sanctions' over what they raised).
 - 13/11/2026 · JP · Charts in the Overview, PR 6 built (Appendix B; §6.13 Partnerships, §6.19 item 9): five summaries, `leads.summary`, `partners.summary`, `proposals.summary`, `agreements.summary` and `interactions.summary`, each one SQL in its module's repo with the one rule every Partnerships list keeps, stacked where a grouping has parts (leads by stage, category, region, owner or source stacked by status, partners by category, region, owner or deal health stacked Active, Dormant and Closed, each owner's sent proposals by outcome, interactions by person and type); their six reads (`agreements.renewals` too) name them and leave the gaps file. The build taught §6.13 five things, written there: the lists show every record, so a period narrows only when asked; the lost leads the list hides are counted as their own figure; no figure here is hidden from a reader of the list; a proposal's count and value by status are two groupings; Partnerships' two built summaries gave their money as `NGN` and give `ngn` now.

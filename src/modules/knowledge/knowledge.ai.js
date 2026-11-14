@@ -6,6 +6,7 @@
  *               and a writer's drafts and archived ones when asked for by state, as the screen lists them
  *   sops.read   one SOP's version in force with its steps, who does each and the screen it happens on;
  *               cited with its version
+ *   sops.summary the SOPs the asker may read, in figures: by department and state
  *
  * Every list is a page of 25 through the same service as the screen. No action: an SOP is written
  * whole on its own screen, every step in view, and published to its department from there; the
@@ -24,9 +25,19 @@ module.exports = defineManifest({
     SopCreate: "design: an SOP is started for its department on Knowledge Hub, SOPs, where its draft is written whole with every step in view",
     SopDraftSave: "design: a draft's purpose, roles and numbered steps, each with its screen and file, are written together on the SOP's own editor",
   },
+  summaries: [
+    {
+      key: "sops.summary",
+      description: "Department procedures (SOPs) in figures: published, being changed, drafts, archived, published lately; by department or state",
+      params: c.knowledge.SopSummaryQuery,
+      permission: ["knowledge", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "sops.list",
+      summary: "sops.summary",
       description: "List the department procedures (SOPs) I may read, by department and words, with their versions",
       params: c.knowledge.SopListQuery,
       permission: ["knowledge", "view"],

@@ -125,6 +125,20 @@ const SopListQuery = listQuery(
   ["title", "number", "updated_at"],
 );
 
+/**
+ * The assistant's SOP summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home
+ * and Settings): the SOPs the reader may read, by department stacked Published, Draft and Archived, or by
+ * state. Figures, never a row: never an SOP's words.
+ */
+const SopSummaryBy = z.enum(["department", "state"]);
+const SopSummaryQuery = z
+  .object({
+    department_id: uuid.optional(),
+    state: SopState.optional(),
+    by: SopSummaryBy.default("department"),
+  })
+  .strict();
+
 /** The SOPs a step of whose version in force names this screen. */
 const SopScreenQuery = listQuery({ screen_key: ScreenKey });
 
@@ -266,6 +280,7 @@ const TABLES = {
   },
   SopPage: { table: null, reason: "a page of SOPs" },
   SopListQuery: { table: null, reason: "list controls, not a row" },
+  SopSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's SOP summary; figures, never a row" },
   SopScreenQuery: { table: null, reason: "list controls, not a row" },
   SopDepartment: { table: "department" },
   SopDepartmentPage: { table: null, reason: "a page of departments" },
@@ -292,6 +307,8 @@ module.exports = {
   SopRow,
   SopPage,
   SopListQuery,
+  SopSummaryBy,
+  SopSummaryQuery,
   SopScreenQuery,
   SopDepartment,
   SopDepartmentPage,

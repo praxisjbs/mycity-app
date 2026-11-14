@@ -347,7 +347,55 @@ async function archive(user, id, body) {
   return get(user, sopId);
 }
 
+/* ------------------------------------------------------------------ *
+ * The assistant's summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community, Home and Settings)
+ * ------------------------------------------------------------------ */
+
+/** An SOP's state in the summary, and a department's parts. */
+const STATES = Object.freeze([
+  { key: "published", label: "Published" },
+  { key: "draft", label: "Draft", optional: true },
+  { key: "archived", label: "Archived", optional: true },
+]);
+/** How recent a published version counts as recent. */
+const RECENT_DAYS = 90;
+
+/**
+ * The SOPs the reader may read, in figures: as SOPs lists them, every published one and a writer's
+ * drafts and archived ones of the departments they write; by department stacked Published, Draft and
+ * Archived, by state. Never an SOP's words. Runs on the client the assistant hands over.
+ * @param {{query: Function}} client
+ * @param {object} params   SopSummaryQuery, parsed
+ * @param {object} actor    the asking person
+ */
+async function aiSummary(client, params, actor, now = new Date()) {
+  const { figure, group, stacked } = require("../../shared/ai/summary");
+  const since = new Date(now.getTime() - RECENT_DAYS * 86_400_000);
+  const r = await repo.aiSummary(client, params, await reachOf(client, actor), since);
+  const f = r.figures;
+  const counted = new Map(r.by_state.map((x) => [x.key, x.value]));
+  const groups = [
+    group("department", "SOPs by department", stacked(r.by_department, STATES)),
+    group("state", "SOPs by state", STATES.filter((s) => counted.has(s.key)).map((s) => ({ key: s.key, label: s.label, value: counted.get(s.key) }))),
+  ];
+  if (params.by === "state") groups.reverse();
+  return {
+    figures: [
+      figure("sops", "SOPs", f.sops || 0),
+      figure("published", "Published", f.published || 0),
+      figure("changing", "Being changed", f.changing || 0),
+      figure("draft", "Drafts never published", f.draft || 0),
+      figure("archived", "Archived", f.archived || 0),
+      figure("recent", `Published in the last ${RECENT_DAYS} days`, f.recent || 0),
+    ],
+    groups,
+    series: [],
+    total: f.sops || 0,
+  };
+}
+
 module.exports = {
+  aiSummary,
   reachOf,
   mayWrite,
   mayArchive,

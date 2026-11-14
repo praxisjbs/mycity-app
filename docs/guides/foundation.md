@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 13/11/2026 |
+| Last changed | 14/11/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -1041,7 +1041,11 @@ Approvals (`workflow.repo.waitingSummary`). `audit` carries `audit.ai.js` (PR3):
 entry, and `audit.summary` for a reader of the whole log alone (`settings` view with scope `all`,
 and the CEO; anyone else is told it is not available): entries of a period (the last 30 days unless
 the log's filters say) by action, by person, by module or record type, and by day, never an entry's
-words (`audit.repo.aiSummary`). `documents` carries `ai:none`: a document is a
+words (`audit.repo.aiSummary`). `imports.ai.js` carries `imports.summary` (Appendix B PR 8, built
+14/11/2026; `settings` view, as Import History; `ImportSummaryQuery`: importer, status, a period started
+when asked, `by` importer, status or month): every import by status, the records a committed import
+created and updated, the rows it imported and refused, by importer stacked Imported and Refused, by
+month (`imports.repo.aiSummary`); `imports.history` names it. `documents` carries `ai:none`: a document is a
 file, and what it says about a person is read through that person's own module.
 
 Settings' own forms are Praxis AI cards too (`settings.ai.js`, `docs/guides/praxis-ai.md` §6.11,
@@ -1191,6 +1195,7 @@ screen.
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · §9: `imports.summary`, Import History in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8). Nothing on screen changes.
 - 13/11/2026 · JP · `organisation.ai.js` declares `seats.summary` beside `employees.summary` (`SeatSummaryQuery`; `organisation.repo.aiSeats`, `organisation.service.aiSeats`): the structure's roles open and filled by department, the people reporting to an open role and the departments with an acting head, for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7; `organogram.md` §9). Nothing on screen changes.
 - 13/11/2026 · TB · Upload purpose `ai_attachment` (`documents.js` `UploadPurpose`, 10 MB in `body-limits.js`, the AI client's `FILE_MAX_BYTES`; PDF, JPEG, PNG, WebP and HEIC in `mime-policy.js`, a HEIF photo sniffing as HEIC; never Word or a sheet) for a document attached to a question on Praxis AI (`docs/guides/praxis-ai.md` §6.18). The file stays a staged upload until the card the person presses claims it.
 - 12/11/2026 · JP · People · Employees for M6 PR 11 (`docs/guides/payroll.md` §13.1 items 41, 44 and 46): Add Employee and Edit Record gain a Tax and Pension step after Pay and Bank (Tax ID, Pension PIN, Pension Administrator, NHF Number, Contributes to NHF, State of Residence; letters, digits and a dash for the numbers), left out for a role that hides `employee.statutory`, as every hidden field is (§6.16); the record gains a Tax and Pension tab after Job for a viewer who sees them, with the person's rent declared for each tax year (Declare Rent: the rent, the months it covers, the legal tenant, the landlord with a mobile number, Tax ID or NIN, the property's address picked as F27 asks, and the evidence through the upload engine; this year or next); the staff importer takes the same six columns, masked as the record. Contract: `nhf_contributes` and `state_of_residence` on `EmployeeCreate`, `EmployeeUpdate`, `Employee360` and `EmployeeImportRow`, `NigerianState`, the `RentDeclaration` schemas; migration `6050` (`employee.nhf_contributes`, `employee.state_of_residence`, `employee_rent_declaration`, owned here in `employee.rent.js`). The rent routes refuse a role that hides `employee.statutory` (403 `FIELD_RESTRICTED`) unless the record is the reader's own. Nothing else changes for an existing caller.

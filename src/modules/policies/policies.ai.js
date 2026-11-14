@@ -80,6 +80,15 @@ module.exports = defineManifest({
     PolicyCreate: "via policies.start: New Policy's own request, the sheet asking the title and sending its start settings; the card is PolicyStart",
     PolicyDraftSave: "via policies.draft: Save Draft's own request, which never names its policy and sends every field; the card is PolicyDraftChange",
   },
+  summaries: [
+    {
+      key: "policies.summary",
+      description: "Policies in figures: in force, awaiting approval, drafts; who has acknowledged, waiting and overdue, by policy, department or state (for people who write policies)",
+      params: c.policies.PolicySummaryQuery,
+      permission: ["knowledge", "view"],
+      run: (client, params, actor) => service.aiSummary(client, params, actor),
+    },
+  ],
   reads: [
     {
       key: "policies.mine",
@@ -102,6 +111,7 @@ module.exports = defineManifest({
     },
     {
       key: "policies.list",
+      summary: "policies.summary",
       description: "List every company policy with its state, the version in force and how many have acknowledged it (for people who write policies)",
       params: c.policies.PolicyListQuery,
       permission: ["knowledge", "view"],

@@ -669,7 +669,58 @@ function runReaders(db, runId) {
   );
 }
 
+/**
+ * The files a reader received, in figures for the assistant (docs/guides/praxis-ai.md §6.13, Workspace,
+ * Knowledge Hub, Community, Home and Settings), in one statement over runPage()'s own WHERE with
+ * `received`: by status, by report with each one's statuses for a stacked bar (20), by format, by
+ * Lagos month made, and those emailed. A period (the Lagos day made) narrows it only when given.
+ * Figures, never a row.
+ * @param {{query: Function}} db
+ * @param {object} seen  see runSeenWhere()
+ * @param {{saved_report_id?, status?, format?, from?, to?}} q
+ */
+async function aiRunSummary(db, seen, q) {
+  const params = [q.saved_report_id || null, q.status || null, q.format || null, q.from || null, q.to || null, seen.user_id];
+  const seenSql = runSeenWhere(seen, params);
+  const { rows } = await db.query(
+    `WITH f AS (
+       SELECT x.saved_report_id, r.name, x.format, x.status, x.run_at, x.emailed_at
+         ${RUN_FROM}
+        WHERE ${seenSql}
+          AND x.recipient_user_id = $6::uuid
+          AND ($1::uuid IS NULL OR x.saved_report_id = $1::uuid)
+          AND ($2::text IS NULL OR x.status = $2)
+          AND ($3::text IS NULL OR x.format = $3)
+          AND ($4::date IS NULL OR (x.run_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $4::date AND $5::date)
+     ), by_report AS (
+       SELECT saved_report_id::text AS key, min(name) AS label,
+              count(*) FILTER (WHERE status = 'done')::int AS done,
+              count(*) FILTER (WHERE status = 'pending')::int AS pending,
+              count(*) FILTER (WHERE status = 'failed')::int AS failed,
+              count(*) FILTER (WHERE status = 'skipped')::int AS skipped,
+              row_number() OVER (ORDER BY count(*) DESC, min(name), saved_report_id) AS rank
+         FROM f GROUP BY saved_report_id
+     )
+     SELECT (SELECT json_build_object('files', count(*), 'done', count(*) FILTER (WHERE status = 'done'),
+                                      'pending', count(*) FILTER (WHERE status = 'pending'),
+                                      'failed', count(*) FILTER (WHERE status = 'failed'),
+                                      'skipped', count(*) FILTER (WHERE status = 'skipped'),
+                                      'emailed', count(emailed_at)) FROM f) AS figures,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'done', done, 'pending', pending, 'failed', failed,
+                                               'skipped', skipped) ORDER BY rank)
+               FROM by_report WHERE rank <= 20) AS by_report,
+            (SELECT json_agg(json_build_object('key', format, 'value', n) ORDER BY n DESC, format)
+               FROM (SELECT format, count(*)::int AS n FROM f GROUP BY format) t) AS by_format,
+            (SELECT json_agg(json_build_object('at', at, 'value', n) ORDER BY at)
+               FROM (SELECT to_char(run_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS n FROM f GROUP BY 1) m) AS by_month`,
+    params,
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, by_report: r.by_report || [], by_format: r.by_format || [], by_month: r.by_month || [] };
+}
+
 module.exports = {
+  aiRunSummary,
   OVERVIEW,
   PERSONAL,
   seenWhere,

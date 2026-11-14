@@ -10,7 +10,7 @@
 | Capabilities | `home.team` (open the Team tab and its figures), `home.reports` (build, schedule, run and receive reports), `alerts.manage` (create, change and switch off alert rules), `alerts.clear` (clear or dismiss an alert, together with the rule's own grant) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 06/11/2026 |
+| Last changed | 14/11/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -666,6 +666,25 @@ never reaches Home.
     `runs.mine` (`HomeReportRunQuery`): the files the asker received, newest first; both empty
     without `home.reports`.
   Clearing an alert and running a report stay on their tabs.
+- **AI summaries** (`docs/guides/praxis-ai.md` §6.13, Workspace, Knowledge Hub, Community, Home and
+  Settings; Appendix B PR 8, built 14/11/2026), `home` view, figures never rows, the capability checked
+  inside as each read checks it:
+  - `dashboard.ai.js` · `activity.summary` (`HomeActivitySummaryQuery`: a `date`, today unless given, or
+    a period, `employee_id`, `by` kind, module, person or day): Activity Today's events by its allow-list
+    and the reader's scope on each module (§6 Overview; `dashboard.activity.aiSummary` beside its own
+    query): the events, the people who acted and whom they were about, by kind ("Leave Approved"), by
+    module, who acted or day when asked, by hour for one day or by day for a period. It carries a probe
+    for the matrix, a day of leave recorded for the reader's report (`praxis-ai.md` §6.17).
+  - `alerts.ai.js` · `alerts.summary` (`HomeAlertSummaryQuery`: category, severity, state, a period for
+    the alerts raised, `by` category, severity, rule or age): the alerts the reader may clear, as
+    `alerts.mine` lists them (seenWhere; no figures without `alerts.clear`): open, open 7 days or more,
+    high, cleared and dismissed this week, the oldest; by category stacked by severity, by severity, by
+    rule or by age; raised by day (`alerts.repo.aiSummary`).
+  - `reports.ai.js` · `runs.summary` (`HomeReportRunSummaryQuery`: report, status, format, a period made
+    when asked, `by` status, report, format or month): the files the reader received, as `runs.mine`
+    lists them (no figures without `home.reports`), by status, by report stacked, by format, by month
+    (`reports.repo.aiRunSummary`).
+  `activity.list`, `alerts.mine` and `runs.mine` name them.
 - **AI actions** (`docs/guides/praxis-ai.md` §6.11, decision 33): cards the person confirms, each the
   screen's own service function, under Home view and the capability the route asks: Create Alert Rule
   and Save Alert Rule (`alerts.ai.js`, `alerts.manage`; `HomeAlertRuleCreate`, who clears it the
@@ -855,6 +874,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 14/11/2026 · JP · §9: `activity.summary`, `alerts.summary` and `runs.summary`, Activity Today, the alerts one may clear and the report files received in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8). Nothing on screen changes.
 - 09/11/2026 · JP · M6 PR 2 (`payroll.md` §3.8, §10.1): Payroll In Progress is live. `payroll.source.js` counts the runs that are a Draft, Computed, Submitted or Approved (only Paid ends one, so an unpaid October still shows in December) for a reader whose `payroll` view reaches everyone, and pages them newest month first (Run, Month, Status, Staff, Net), each opening Payroll · Payroll Runs; it owes nothing now. The card keeps `employee.salary` as its sensitive field, so a reader who may not see pay never sees it. The last hidden card is gone: the catalogue holds 29 cards, all live.
 - 08/11/2026 · JP · M7 PR 8 (`partnerships.md` §6.10, §6.17): Proposals Out's records show Last Viewed (Not Yet until the link is opened) and Views, the views the public link recorded. §11: Home's staging seed writes no partners, deals, proposals, agreements or interactions any more (`seeds/staging/lib/forward-rows.js` writes no row at all now); M7's `70_partnerships.js` removes them with `removeHomeStagingRows` and writes its own synthetic tracker through the services, so the partnership cards, the pipeline chart and the Quiet Partners alert read M7's rows on staging. Home's seed tests no longer count Partnerships' figures.
 - 06/11/2026 · TB · M7's audit after PR 3 (`partnerships.md` §6.1, §13.2): a deal is also seen through its lead's or partner's owner, so Home's partnership cards (Open Opportunities, Signed Value and the pipeline chart) count a deal on a record the reader's scope owns; `partners.source.js` names `lead.owner_id` in `TABLES` (§4.1).

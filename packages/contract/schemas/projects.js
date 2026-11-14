@@ -99,6 +99,22 @@ const ProjectEdit = linkEditRules(ProjectEditFields.refine((v) => Object.keys(v)
  */
 const ProjectChange = linkEditRules(ProjectEditFields.extend({ project_id: recordId("project") }).refine(changesBeside(["project_id"]), nothingOn("project_id")));
 
+/**
+ * The assistant's project summary (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub, Community,
+ * Home and Settings): every project as Projects lists them, with the tasks in each the reader could open
+ * on Tasks; by project stacked Done, Open and Overdue, or by status. Every project unless a status is
+ * asked. Figures, never a row.
+ */
+const ProjectSummaryBy = z.enum(["project", "status"]);
+const ProjectSummaryQuery = z
+  .object({
+    status: ProjectStatus.optional(),
+    partner_id: uuid.optional(),
+    lead_id: uuid.optional(),
+    by: ProjectSummaryBy.default("project"),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   ProjectRef: { table: "project" },
@@ -114,6 +130,7 @@ const TABLES = {
   },
   ProjectPage: { table: null, reason: "a page of projects" },
   ProjectListQuery: { table: null, reason: "list controls and filters for the projects" },
+  ProjectSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's project summary; figures, never a row" },
   ProjectCreate: { table: "project" },
   ProjectPrefill: { table: "project" },
   ProjectEdit: { table: "project" },
@@ -127,6 +144,8 @@ module.exports = {
   Project,
   ProjectPage,
   ProjectListQuery,
+  ProjectSummaryBy,
+  ProjectSummaryQuery,
   ProjectCreate,
   ProjectPrefill,
   ProjectEdit,

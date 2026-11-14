@@ -745,7 +745,76 @@ const saveNote = (client, courseId, employeeId, body) =>
     [courseId, employeeId, body],
   );
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI: the places on courses in figures
+ * ------------------------------------------------------------------ */
+
+/** The assistant summary's grouping: the column and name each `by` maps to (never the caller's words). */
+const AI_BY = Object.freeze({
+  course: { key: "x.training_course_id::text", label: "x.number || ' ' || x.title" },
+  department: { key: "COALESCE(x.department_id::text, 'none')", label: "COALESCE(x.department, 'No department')" },
+});
+
+/**
+ * The places on courses, in figures for the assistant (docs/guides/praxis-ai.md §6.13, Workspace,
+ * Knowledge Hub, Community, Home and Settings), in one statement: every place as Training counts them
+ * (COUNTS), or with `employeeId` one person's as My Training shows them (no draft course); where each
+ * stands on `today` (STATUS), the certificates issued, the Library's published courses; by course or
+ * department with each one's statuses for a stacked bar, completions by Lagos month. A period (the Lagos
+ * day enrolled) narrows it only when given. Figures, never a row: never a person's proof or notes.
+ * @param {{state?, department_id?, from?, to?, by: string}} q
+ * @param {{employeeId?: string|null, today: string}} on
+ */
+async function aiSummary(db, q, { employeeId = null, today }) {
+  const dim = AI_BY[q.by] || AI_BY.course;
+  const { rows } = await db.query(
+    `WITH x AS (
+       SELECT te.employee_id, c.training_course_id, c.number::text AS number, c.title, e.department_id, d.name AS department,
+              ${STATUS("te", "$6::date")} AS status, te.completed_at, te.certificate_number
+         FROM training_enrolment te
+         JOIN training_course c ON c.training_course_id = te.training_course_id
+         JOIN employee e ON e.employee_id = te.employee_id
+         LEFT JOIN department d ON d.department_id = e.department_id
+        WHERE ($1::text IS NULL OR c.status = $1)
+          AND ($2::uuid IS NULL OR e.department_id = $2)
+          AND ($3::date IS NULL OR (te.created_at AT TIME ZONE 'Africa/Lagos')::date BETWEEN $3::date AND $4::date)
+          AND ($5::uuid IS NULL OR (te.employee_id = $5 AND c.status <> 'draft'))
+     ), figures AS (
+       SELECT count(DISTINCT training_course_id)::int AS courses, count(DISTINCT employee_id)::int AS people,
+              count(*)::int AS places,
+              count(*) FILTER (WHERE status = 'completed')::int AS completed,
+              count(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+              count(*) FILTER (WHERE status = 'overdue')::int AS overdue,
+              count(*) FILTER (WHERE status = 'not_started')::int AS not_started,
+              count(certificate_number)::int AS certificates,
+              (SELECT count(*)::int FROM training_course lc
+                WHERE lc.status = 'published' AND lc.library AND ($1::text IS NULL OR lc.status = $1)) AS library
+         FROM x
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, min(${dim.label}) AS label,
+              count(*) FILTER (WHERE status = 'completed')::int AS completed,
+              count(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+              count(*) FILTER (WHERE status = 'overdue')::int AS overdue,
+              count(*) FILTER (WHERE status = 'not_started')::int AS not_started,
+              row_number() OVER (ORDER BY count(*) DESC, min(${dim.label}), ${dim.key}) AS rank
+         FROM x GROUP BY ${dim.key}
+     )
+     SELECT (SELECT row_to_json(f) FROM figures f) AS figures,
+            (SELECT json_agg(json_build_object('key', status, 'value', n)) FROM (SELECT status, count(*)::int AS n FROM x GROUP BY status) s) AS by_status,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'completed', completed, 'in_progress', in_progress,
+                                               'overdue', overdue, 'not_started', not_started) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim,
+            (SELECT json_agg(json_build_object('at', at, 'value', n) ORDER BY at)
+               FROM (SELECT to_char(completed_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') AS at, count(*)::int AS n
+                       FROM x WHERE completed_at IS NOT NULL GROUP BY 1) m) AS by_month`,
+    [q.state || null, q.department_id || null, q.from || null, q.to || null, employeeId, today],
+  );
+  const r = rows[0] || {};
+  return { figures: r.figures || {}, by_status: r.by_status || [], by_dim: r.by_dim || [], by_month: r.by_month || [] };
+}
+
 module.exports = {
+  aiSummary,
   AT_WORK,
   REACHES,
   STATUS,

@@ -811,7 +811,76 @@ async function citationOfVersion(db, versionId) {
   return rows[0] || null;
 }
 
+/* ------------------------------------------------------------------ *
+ * Praxis AI: the policies in figures
+ * ------------------------------------------------------------------ */
+
+/** The assistant summary's grouping of the people asked: the column and name each `by` maps to. */
+const AI_BY = Object.freeze({
+  policy: { key: "policy_id::text", label: "number || ' ' || title" },
+  department: { key: "COALESCE(department_id::text, 'none')", label: "COALESCE(department, 'No department')" },
+});
+
+/**
+ * The policies in figures for the assistant (docs/guides/praxis-ai.md §6.13, Workspace, Knowledge Hub,
+ * Community, Home and Settings), in one statement: each policy's state on `today` (POLICY_STATE, as the
+ * list's chips), and everyone asked to acknowledge the newest published version of each policy not
+ * archived that asks for it (ASKED, as the list's counts), acknowledged, waiting (not yet due) or overdue
+ * (DUE_ON); by policy or by the department of the people asked, each with its three for a stacked bar.
+ * Figures, never a row: never a policy's text or a person's name.
+ * @param {{kind?, state?, by: string}} q
+ * @param {string} today
+ */
+async function aiSummary(db, q, today) {
+  const dim = AI_BY[q.by] || AI_BY.policy;
+  const { rows } = await db.query(
+    `WITH p AS (
+       SELECT p.policy_id, p.number::text AS number, p.title, p.kind, ${POLICY_STATE} AS state,
+              (SELECT (array_agg(n.policy_version_id ORDER BY n.version DESC))[1]
+                 FROM policy_version n WHERE n.policy_id = p.policy_id AND n.status = 'published') AS newest_version_id
+         FROM policy p
+     ), f AS (
+       SELECT * FROM p WHERE ($2::text IS NULL OR kind = $2) AND ($3::text IS NULL OR state = $3)
+     ), asked AS (
+       SELECT f.policy_id, f.number, f.title, e.department_id, d.name AS department,
+              CASE WHEN a.acknowledged_at IS NOT NULL THEN 'acknowledged'
+                   WHEN ${DUE_ON("v", "e")} < $1::date THEN 'overdue' ELSE 'waiting' END AS standing
+         FROM f
+         JOIN policy_version v ON v.policy_version_id = f.newest_version_id AND v.needs_acknowledgement
+         JOIN employee e ON ${ASKED("v", "e", "$1::date")}
+         LEFT JOIN department d ON d.department_id = e.department_id
+         LEFT JOIN policy_acknowledgement a ON a.policy_version_id = v.policy_version_id AND a.employee_id = e.employee_id
+        WHERE f.state <> 'archived'
+     ), by_dim AS (
+       SELECT ${dim.key} AS key, min(${dim.label}) AS label,
+              count(*) FILTER (WHERE standing = 'acknowledged')::int AS acknowledged,
+              count(*) FILTER (WHERE standing = 'waiting')::int AS waiting,
+              count(*) FILTER (WHERE standing = 'overdue')::int AS overdue,
+              row_number() OVER (ORDER BY count(*) DESC, min(${dim.label}), ${dim.key}) AS rank
+         FROM asked GROUP BY ${dim.key}
+     )
+     SELECT (SELECT json_build_object(
+               'policies', count(*), 'in_force', count(*) FILTER (WHERE state = 'in_force'),
+               'awaiting_approval', count(*) FILTER (WHERE state = 'awaiting_approval'),
+               'waiting', count(*) FILTER (WHERE state = 'waiting'),
+               'draft', count(*) FILTER (WHERE state = 'draft'),
+               'archived', count(*) FILTER (WHERE state = 'archived')) FROM f) AS policies,
+            (SELECT json_build_object(
+               'asked', count(*), 'acknowledged', count(*) FILTER (WHERE standing = 'acknowledged'),
+               'waiting', count(*) FILTER (WHERE standing = 'waiting'),
+               'overdue', count(*) FILTER (WHERE standing = 'overdue')) FROM asked) AS acks,
+            (SELECT json_agg(json_build_object('key', state, 'value', n)) FROM (SELECT state, count(*)::int AS n FROM f GROUP BY state) s) AS by_state,
+            (SELECT json_agg(json_build_object('key', key, 'label', label, 'acknowledged', acknowledged, 'waiting', waiting,
+                                               'overdue', overdue) ORDER BY rank)
+               FROM by_dim WHERE rank <= 20) AS by_dim`,
+    [today, q.kind || null, q.state || null],
+  );
+  const r = rows[0] || {};
+  return { policies: r.policies || {}, acks: r.acks || {}, by_state: r.by_state || [], by_dim: r.by_dim || [] };
+}
+
 module.exports = {
+  aiSummary,
   statesOf,
   myViewsOf,
   lock,
