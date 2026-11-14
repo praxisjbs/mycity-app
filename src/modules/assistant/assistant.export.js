@@ -398,12 +398,12 @@ async function overviewDocument(kept, reads, reader, now = new Date()) {
     figures = drawn.figures;
     const c = spec.chart || {};
     const mainGroup = c.group ? res.result.groups.find((g) => g.by === c.group) : null;
-    const main = chartSection(drawn.chart, mainGroup ? mainGroup.label : "When");
+    const main = chartSection(drawn.chart, mainGroup || !c.series ? "Name" : "When");
     if (main) sections.push(main);
     for (const g of res.result.groups) {
       if (!g.rows.length || (drawn.chart && g.by === c.group)) continue;
       const parts = g.rows.some((r) => Array.isArray(r.parts) && r.parts.length);
-      sections.push(chartSection(engine.pane.chartOfGroup({ kind: parts ? "stacked_bar" : "bar", title: g.label }, g, res.result), g.label));
+      sections.push(chartSection(engine.pane.chartOfGroup({ kind: parts ? "stacked_bar" : "bar", title: g.label }, g, res.result), "Name"));
     }
     const shown = new Set(drawn.chart && Array.isArray(c.series) ? c.series : []);
     for (const s of res.result.series) {
@@ -423,7 +423,7 @@ async function overviewDocument(kept, reads, reader, now = new Date()) {
     const drawn = answer.overviewFor(spec, [made]);
     if (drawn && drawn.chart) {
       figures = drawn.figures;
-      sections.push(chartSection(drawn.chart, ""));
+      sections.push(chartSection(drawn.chart, "Name"));
     } else {
       // The list is no longer all on its first page (or its chart cannot be drawn again): its rows,
       // How Many as its total now, and no sum or count over rows that are no longer all there.

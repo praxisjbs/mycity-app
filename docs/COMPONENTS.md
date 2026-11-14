@@ -201,7 +201,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Assistant | [ActionCard](#actioncard) | `ActionCard` | An action Praxis AI drafted for the person to confirm: every field as the action will receive it, the records it touches named and linked, problems on their fields, and the buttons (the verb with the count, Edit, Cancel; while a field shows a problem, Edit in the verb's place, since the press would be refused); busy while it runs, the result line under it, Draw It Again once it has expired. | beta |
 | Assistant | [AnswerBubble](#answerbubble) | `AnswerBubble`, `QuestionBubble` | One answer of Praxis AI: its words, the answers to tap when it asks a question, its table, Showing 25 of 312 with Show Next 25, the screen button, From with its source chips, Open Figures and Helpful or Not Helpful. | beta |
 | Assistant | [AssistantShell](#assistantshell) | `AssistantShell` | The full-screen Praxis AI: Back to the screen it was opened from, the title and its actions, the conversation beside the pane on desktop (about two fifths and three fifths), the conversation alone on a phone. | beta |
-| Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read or a short list's own rows (a bar, a stacked bar with its key, a line or a ring); nothing until an answer has figures. | beta |
+| Assistant | [OverviewPane](#overviewpane) | `OverviewPane` | The pane's Overview: up to three figures and one chart the server drew from a summary read or a short list's own rows (a bar, a stacked bar with its key, a line or a ring), with View Data and Download PDF at its foot; nothing until an answer has figures. | beta |
 | Assistant | [PaneSheet](#panesheet) | `PaneSheet` | The phone's pane: a full-height sheet that holds the four views (PaneTabs) for one answer, opened from Open Figures under it. | beta |
 | Assistant | [PaneTabs](#panetabs) | `PaneTabs` | The pane's four views, Overview, Table, Record and Sources, as tabs; a view with nothing to show stays, disabled, so the layout never jumps. | beta |
 | Assistant | [ProgressLine](#progressline) | `ProgressLine` | What Praxis AI is doing while a question runs: Reading leave requests, 2 of 5; nothing is streamed, the answer lands whole. | beta |
@@ -6891,13 +6891,13 @@ The full-screen Praxis AI: Back to the screen it was opened from, the title and 
 
 ### OverviewPane
 
-The pane's Overview: up to three figures and one chart the server drew from a summary read or a short list's own rows (a bar, a stacked bar with its key, a line or a ring); nothing until an answer has figures.
+The pane's Overview: up to three figures and one chart the server drew from a summary read or a short list's own rows (a bar, a stacked bar with its key, a line or a ring), with View Data and Download PDF at its foot; nothing until an answer has figures.
 
 | | |
 |---|---|
-| Use | In PaneTabs' overview slot with the answer's `overview` (AiAnswer.overview); the tab is disabled while it is null. The figures and the chart come from the server (docs/guides/praxis-ai.md §6.13, §6.19 item 6); a chart whose `unit` is `ngn` reads its values in naira, as the figures do. |
+| Use | In PaneTabs' overview slot with the answer's `overview` (AiAnswer.overview); the tab is disabled while it is null. The figures and the chart come from the server (docs/guides/praxis-ai.md §6.13, §6.19 item 6); a chart whose `unit` is `ngn` reads its values in naira, as the figures do. Under a chart, `onViewData` (opens Table) and `onDownload` (the PDF, §6.19 items 7 and 8) draw the foot; each hands back its work, so the button spins and the other waits (F26). |
 | Avoid | Figures a screen worked out itself; a dashboard (Home's KpiGrid and its charts); a table (TablePane). |
-| Phone | The figures two to a row, the chart below, inside the pane sheet; no chart caption. |
+| Phone | The figures two to a row, the chart below, inside the pane sheet; no chart caption; View Data and Download PDF full width, 44 px, one under the other. |
 | Accessibility | The figures are KpiCards (a named figure each); the chart is one of the shared charts, read out as a list of label and figure, a stacked bar as each part and its total. |
 | Status | beta |
 | Exports | `OverviewPane` |
@@ -6911,10 +6911,12 @@ The pane's Overview: up to three figures and one chart the server drew from a su
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `overview` | `PaneOverview \| null` | yes | The Overview the answer carried, or null when no summary read answered. |
+| `onViewData` | `() => void` |  | View Data, under a chart: opens the pane's Table (the read's rows, or the chart's figures). No button without it. |
+| `onDownload` | `() => Promise<unknown>` |  | Download PDF, under a chart: makes the Overview a PDF and saves it; hands back its work so the button spins. No button without it. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
-<OverviewPane overview={answer.overview} />
+<OverviewPane overview={answer.overview} onViewData={() => setTab("table")} onDownload={downloadPdf} />
 ```
 
 ### PaneSheet
