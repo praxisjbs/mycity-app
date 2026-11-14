@@ -164,7 +164,11 @@ mycity-app/
 │   │                         (script, narrate, film, assemble), style.js (the look measured from the
 │   │                         M3 video), cards.js, film.js, assemble.js, people.js (filming's sign-ins),
 │   │                         mail.js (the mail the app sent, shown and its links opened),
-│   │                         sign.js (a signature drawn in a signature box),
+│   │                         sign.js (a signature drawn in a signature box), helpers.js (the M0 and
+│   │                         M1 scenes' shared moves), mail-catcher.js (a copy of each mail the
+│   │                         worker captures, for an invitation or a reset whose job is dropped
+│   │                         once sent) and ai-stand-in.js (Gemini's answers written for a filming
+│   │                         session with no key), each preloaded on a filming machine only,
 │   │                         narrate.py and requirements.txt (the voice, Kokoro); scenes/, one a video:
 │   │                         m4-recruitment-1.js (M4 part 1, Vacancies and Candidates),
 │   │                         m4-recruitment-2.js (M4 part 2, Assessments and Interviews),
@@ -177,7 +181,10 @@ mycity-app/
 │   │                         both M8 parts film on: make.js m8-expenses-1 prepare),
 │   │                         m8-expenses-2.js (M8 part 2, Paying and Budgets),
 │   │                         m10-knowledge-hub.js (M10 part 1, Policies, SOPs and Training),
-│   │                         m10-praxis-ai.js (M10 part 2, Praxis AI and AI Control)
+│   │                         m10-praxis-ai.js (M10 part 2, Praxis AI and AI Control),
+│   │                         m01-signing-in-1.js, m01-safer-sign-in-2.js, m01-finding-your-way-3.js
+│   │                         and m01-community-mailbox-5.js (M0 and M1, parts 1, 2, 3 and 5, the last
+│   │                         with the `prepare` it films on)
 │   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging;
 │   │                         attack-assistant.js: its attack suite, asked of the real model on staging
 │   │                         nightly through deploy-gate attack (docs/guides/praxis-ai.md §6.17)

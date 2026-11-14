@@ -99,6 +99,7 @@ const cardsOf = (o) => Object.fromEntries(o.cards.map((card) => [card.key, card]
 
 describeDb("Home's staging seed against the real migrations", () => {
   let staff;
+  let noLogin;
   let first;
   let second;
 
@@ -124,6 +125,11 @@ describeDb("Home's staging seed against the real migrations", () => {
     // Requests and budgets come from M8's own seed (80_expenses.js), which takes Home's away first.
     await runFile(expensesSeed, { now: NOW });
     staff = await realStaff(pool);
+    // One person on the register whose login is suspended, as another seed's invented employee has
+    // none: the register never expects them, so the seed must never punch them in.
+    const taken = new Set([staff.operations, staff.ceo, staff.head, staff.manager, staff.reportsOf(staff.head)[0]].filter(Boolean).map((p) => p.employee_id));
+    noLogin = staff.everyone.find((p) => p.user_id && !taken.has(p.employee_id));
+    await q("UPDATE app_user SET status = 'suspended' WHERE employee_id = $1", [noLogin.employee_id]);
     await runFile(home, { now: NOW });
     first = await counts();
     await runFile(home, { now: NOW });
@@ -271,6 +277,11 @@ describeDb("Home's staging seed against the real migrations", () => {
     expect(queued.n).toBe(4);
   });
 
+  test("punches only people with a login, so Home never reads more clocked in than expected", async () => {
+    const { n } = await one("SELECT count(*)::int AS n FROM attendance_event WHERE employee_id = $1", [noLogin.employee_id]);
+    expect(n).toBe(0);
+  });
+
   describe("the Overview of each Home view has something in every section it draws", () => {
     test("Operations: its cards, Clocked In, the attendance chart and donut, the pipeline, the goals and the week", async () => {
       const o = await overviewOf(staff.operations);
@@ -279,6 +290,7 @@ describeDb("Home's staging seed against the real migrations", () => {
       // Partnerships' figures are M7's own seed's (70_partnerships.js), which this run does not load.
       for (const card of o.cards.filter((k) => k.key !== "partnerships_active")) expect([card.key, figure(card) > 0]).toEqual([card.key, true]);
       expect(o.clocked_in.present).toBeGreaterThan(0);
+      expect(o.clocked_in.present).toBeLessThanOrEqual(o.clocked_in.expected);
       expect(o.chart.kind).toBe("attendance_days");
       expect(o.chart.days).toHaveLength(14);
       expect(o.chart.days.every((day) => day.present > 0 && day.present <= day.expected)).toBe(true);

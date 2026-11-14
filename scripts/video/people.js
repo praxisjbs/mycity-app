@@ -67,6 +67,28 @@ async function caughtUp(pool, email) {
   await notifications.markAllRead(user);
 }
 
+/**
+ * The six digits a person's authenticator app shows now, for a sign-in filming makes off camera once
+ * they have turned on two-step (part 2 of Milestones 0 and 1): their key read as the server reads it,
+ * and a code from a later 30-second step than the last one accepted, since each is taken once. Null
+ * when two-step is off. Development databases only, like everything here.
+ */
+async function codeFor(email) {
+  const { config } = require("../../src/config/env");
+  guard(config);
+  const { pool } = require("../../src/config/db");
+  const encryption = require("../../src/services/secrets/encryption.service");
+  const mfa = require("../../src/modules/security/security.mfa");
+  const { rows } = await pool.query(
+    "SELECT mfa_secret_enc, mfa_last_step FROM app_user WHERE lower(email::text) = lower($1) AND mfa_enrolled_at IS NOT NULL",
+    [email],
+  );
+  if (!rows[0] || !rows[0].mfa_secret_enc) return null;
+  const last = rows[0].mfa_last_step === null ? -1 : Number(rows[0].mfa_last_step);
+  while (Math.floor(Date.now() / 30000) <= last) await new Promise((r) => setTimeout(r, 1000));
+  return mfa.codeAt(encryption.decrypt(rows[0].mfa_secret_enc));
+}
+
 /** Find people by their post (seeds/staging/lib/staff.js), so a video never hard-codes a name. */
 async function posts() {
   const { pool } = require("../../src/config/db");
@@ -74,4 +96,4 @@ async function posts() {
   return realStaff(pool);
 }
 
-module.exports = { ready, posts, guard };
+module.exports = { ready, posts, guard, codeFor };

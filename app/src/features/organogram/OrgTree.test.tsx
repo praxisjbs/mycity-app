@@ -149,6 +149,17 @@ describe("People · Organogram on desktop", () => {
     expect(screen.getByText(report.display_name)).toBeTruthy();
   }, 30000);
 
+  it("a person's name is their card's button, for the keyboard and a screen reader, and opens their sheet", async () => {
+    setViewport(1440);
+    await organogramAsOperations();
+    const name = screen.getByRole("button", { name: "Tolu Adeyemi" });
+    expect(document.getElementById(name.getAttribute("aria-describedby")!)?.textContent).toBeTruthy();
+    expect(name.closest(".og-card")!.hasAttribute("tabindex")).toBe(false);
+    fireEvent.click(name);
+    await settled();
+    expect(within(sheet()).getByText("Head Of")).toBeTruthy();
+  }, 30000);
+
   it("a card opens the person's sheet with Open Record and Change Manager for Operations, and Download PDF asks the server", async () => {
     setViewport(1440);
     await organogramAsOperations();

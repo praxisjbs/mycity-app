@@ -23,7 +23,8 @@ ready*.
 
 1. Open the email and press **Set Your Password**. The hub opens in your browser.
 2. Type a new password in **New Password**. It needs at least 8 characters, with a capital letter,
-   a small letter, a number and a symbol. The field says what is missing as you type.
+   a small letter, a number and a symbol. Once you move on, the field says what is missing, and
+   keeps saying it as you type until the password is right.
 3. Type it again in **Confirm Password**.
 4. Press **Set Password**. The sign-in screen opens with your email filled in and a green bar:
    **Password saved. Sign in with it now.**
