@@ -638,7 +638,8 @@ const words = (key) => key.charAt(0).toUpperCase() + key.slice(1);
  * @param {object} actor    the asking person
  */
 async function aiSummary(client, params, actor, now = new Date()) {
-  const { figure, group, series, periodOf, stacked } = require("../../shared/ai/summary");
+  const ai = require("../../shared/ai/summary");
+  const { group, series, periodOf, stacked } = ai;
   const reader = await readerOf(client, actor);
   if (!reader.may_clear) return { figures: [], groups: [], series: [], total: 0 };
   const today = lagos.today(now);
@@ -670,13 +671,13 @@ async function aiSummary(client, params, actor, now = new Date()) {
   if (params.by === "age") groups.unshift(group("age", "Alerts by age", Object.keys(AGE_WORDS).map((k) => ({ key: k, label: AGE_WORDS[k], value: (r.by_age.find((b) => b.key === k) || {}).value || 0 })).filter((b) => b.value > 0)));
   const f = r.figures;
   const figures = [
-    figure("open", "Open", f.open || 0),
-    figure("overdue", `Open ${OVERDUE_DAYS} days or more`, f.overdue || 0),
-    figure("high", "High, open", f.high || 0),
-    figure("cleared_week", "Cleared this week", f.cleared_week || 0),
-    figure("dismissed_week", "Dismissed this week", f.dismissed_week || 0),
+    ai.figure("open", "Open", f.open || 0),
+    ai.figure("overdue", `Open ${OVERDUE_DAYS} days or more`, f.overdue || 0),
+    ai.figure("high", "High, open", f.high || 0),
+    ai.figure("cleared_week", "Cleared this week", f.cleared_week || 0),
+    ai.figure("dismissed_week", "Dismissed this week", f.dismissed_week || 0),
   ];
-  if (f.oldest_days !== null && f.oldest_days !== undefined) figures.push(figure("oldest_days", "Oldest open", f.oldest_days, "days"));
+  if (f.oldest_days !== null && f.oldest_days !== undefined) figures.push(ai.figure("oldest_days", "Oldest open", f.oldest_days, "days"));
   return { figures, groups, series: [series("raised", "Raised by day", r.by_day)], total: r.total };
 }
 
