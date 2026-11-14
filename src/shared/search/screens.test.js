@@ -21,6 +21,13 @@ describe("People's tabs for a reader without Settings", () => {
     expect(tabVisible(people("attendance"), staff)).toBe(true);
   });
 
+  test("a role viewing People over everyone opens the Employees list, as the shell does", () => {
+    const regional = reader({ people: ["view"] }, { scopes: { people: "all" } });
+    expect(["employees", "organogram", "attendance"].every((tab) => tabVisible(people(tab), regional))).toBe(true);
+    expect(tabVisible(people("devices"), regional)).toBe(false);
+    expect(tabVisible(people("employees"), reader({ people: ["view"] }, { scopes: { people: "team" } }))).toBe(false);
+  });
+
   test("Operations, with Settings, sees every People tab", () => {
     const ops = reader({ people: ["view", "create"], settings: ["view"] });
     expect(["employees", "leave", "devices", "worksites"].every((tab) => tabVisible(people(tab), ops))).toBe(true);

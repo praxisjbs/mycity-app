@@ -180,6 +180,8 @@ mycity-app/
 │   │                         m8-expenses-1.js (M8 part 1, Raising and Approving, with the `prepare`
 │   │                         both M8 parts film on: make.js m8-expenses-1 prepare),
 │   │                         m8-expenses-2.js (M8 part 2, Paying and Budgets),
+│   │                         m9-settings-1.js (M9 part 1, People and Access),
+│   │                         m9-settings-2.js (M9 part 2, Running the Hub),
 │   │                         m10-knowledge-hub.js (M10 part 1, Policies, SOPs and Training),
 │   │                         m10-praxis-ai.js (M10 part 2, Praxis AI and AI Control),
 │   │                         m01-signing-in-1.js, m01-safer-sign-in-2.js, m01-finding-your-way-3.js

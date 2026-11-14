@@ -177,7 +177,8 @@ async function grantsOf(db, roleIds) {
     `SELECT module_key,
             bool_or(can_view) AS can_view, bool_or(can_create) AS can_create,
             bool_or(can_edit) AS can_edit, bool_or(can_delete) AS can_delete,
-            bool_or(can_approve) AS can_approve, bool_or(can_export) AS can_export
+            bool_or(can_approve) AS can_approve, bool_or(can_export) AS can_export,
+            CASE WHEN bool_or(scope = 'all') THEN 'all' WHEN bool_or(scope = 'team') THEN 'team' ELSE 'own' END AS scope
        FROM permission
       WHERE role_id = ANY($1::uuid[])
       GROUP BY module_key

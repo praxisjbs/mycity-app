@@ -18,6 +18,7 @@ function person(over: Partial<Me> = {}): Me {
     photo_url: null,
     is_ceo: false,
     grants: { home: ["view"], workspace: ["view", "create"], ess: ["view", "create"] },
+    scopes: { home: "own", workspace: "own", ess: "own" },
     capabilities: [],
     roles: [{ code: "employee", name: "Staff" }],
     home_view: "staff",

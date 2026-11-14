@@ -1012,8 +1012,17 @@ About thirty selects across the hub read their options that way. JBS Praxis's an
 
 ## 8 · Permissions and visibility by role
 
-- `people`: Employees, the 360 and the Organogram, by scope (`all`, `team`, `own`).
-- `settings`: every Settings screen; the Audit Log needs scope `all` (and the CEO passes).
+- `people`: Employees, the 360 and the Organogram, by scope (`all`, `team`, `own`). The Employees
+  tab shows to whoever holds Settings view or `people` view over `all`, a custom role included;
+  `/auth/me` gives each module's widest scope (`scopes`) so the shell and ⌘K can tell. Without either,
+  People opens on Organogram and Attendance (and Leave for a line manager) (TB, 14/11/2026).
+- `settings`: every Settings screen; the Audit Log needs scope `all` (and the CEO passes). An entry
+  names its record (`record_name`): a login or an employee by the person, a role by its name, anything
+  else by the number, name or title its entry recorded, else the id; a value stored as an object or a
+  list reads one line a key, never as JSON (TB, 14/11/2026).
+- Settings · Users: a login reads Invited from the moment its invitation is requested
+  (`auth.link_requested` with purpose `invite`), not only once the worker has minted the link, so the
+  list is right as soon as Invite All Pending answers and a second press sends nobody a second link.
 - Nobody can save a role change that takes away their own Settings edit over everything
   (`LOCKOUT`); the CEO is exempt. A built-in role keeps its name and cannot be deleted; a role somebody
   holds cannot be deleted either.
@@ -1453,3 +1462,4 @@ screen.
 - 26/10/2026 · GE · The employee record gains Queries and Sanctions tabs for a viewer holding `queries` view (meeting 26/10/2026: TB saw them mixed with no distinction); each lists that person's records within the viewer's query visibility, and a row opens its query on Queries & Sanctions (§10.1).
 - 29/10/2026 · JP · §5, §6.5, §7, §10 and §11: Settings · Approvals gains New Flow (`POST /settings/approvals`, `settings` create): a name, a module, up to 5 values and the stages, saved as version 1 with the key `<module>.<name>`. The flow lists as Not Used Yet until a module opens it; the guide's earlier "the flow's key, name and values are the code's" now holds for the flows the code ships.
 - 04/11/2026 · AJ · Settings · Documents & Numbering lists M8's Budget (`budget`, BUD-2027-0001, yearly), seeded in 8099 and now in `shared/numbering/schemes.js` and the contract's `DOC_TYPES` with its label; 8100 takes out 8099's unused `expense_request` scheme (docs/guides/expenses.md §4).
+- 14/11/2026 · TB · Found filming the Milestone 9 video (`docs/runbooks/training-videos.md` §7), §8: a custom role viewing People over everyone (Regional Lead) found no Employees tab, which only Settings holders saw; `/auth/me` and search's reader gain `scopes`, and the tab follows `people` view over `all`. The Audit Log named a record by an id's first eight characters ("Account · b225a5ee") and showed a role's grants as JSON: `AuditEntry.record_name` and values in words (`features/settings/auditValues.ts`); the export gains Record beside Record ID. Invite All Pending left every row Not Sent until a reload: Invited follows the request.

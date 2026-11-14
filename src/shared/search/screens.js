@@ -139,7 +139,7 @@ const SCREENS = Object.freeze([
 ]);
 
 /**
- * @typedef {{grants: Record<string, string[]>, capabilities: string[], is_ceo: boolean, manages_people: boolean, heads_department?: boolean}} Reader
+ * @typedef {{grants: Record<string, string[]>, scopes?: Record<string, "all"|"team"|"own">, capabilities: string[], is_ceo: boolean, manages_people: boolean, heads_department?: boolean}} Reader
  */
 
 /**
@@ -182,8 +182,10 @@ function tabVisible(screen, reader) {
   if (module === "knowledge" && tab === "policies") return hasCapability(reader, "policies.manage");
   // Knowledge Hub · Training is for those who build and assign courses; everyone takes theirs on My Training.
   if (module === "knowledge" && tab === "training") return hasCapability(reader, "training.manage");
-  // A line manager decides their team's leave on People · Leave (docs/guides/ess.md §2).
-  if (module === "people" && !full) return tab === "attendance" || tab === "organogram" || (tab === "leave" && reader.manages_people);
+  // A line manager decides their team's leave on People · Leave (docs/guides/ess.md §2). The
+  // Employees list is for whoever views People over everyone, a custom role too, not only Settings.
+  if (module === "people" && !full)
+    return tab === "attendance" || tab === "organogram" || (tab === "employees" && reader.scopes?.people === "all") || (tab === "leave" && reader.manages_people);
   // Announcements is for those who post them (`announcements.post`, as every route asks).
   if (module === "community" && tab === "announcements") return hasCapability(reader, "announcements.post");
   if (module === "queries" && !full) return tab === "queries";

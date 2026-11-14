@@ -15,7 +15,8 @@
  *  - fingerprinting with ids and numbers normalised, so one fault is one group
  *    with a count, not a thousand rows;
  *  - a five-minute de-duplication window and a 20-per-minute cap on alerts;
- *  - writes batched off the request path, flushed every few seconds;
+ *  - writes batched off the request path, flushed every few seconds, and held (200 at most) to
+ *    try again while the database does not answer;
  *  - it never throws. A reporter that breaks the thing it reports on is worse
  *    than none; if the table is missing (a database before migration 0030) it
  *    says so once and carries on logging.
@@ -193,9 +194,14 @@ async function flush() {
         "error_event table missing; errors are logged but not stored until migration 0030 runs",
       );
     } else {
+      // The database did not answer (a restart, an outage): keep the batch, newest kept first when
+      // full, and write it once the database is back, so the outage itself reaches Faults with the
+      // times it happened, as Performance holds its samples (docs/guides/system-health.md §6).
+      buffer = batch.concat(buffer).slice(-MAX_BUFFER);
+      schedule();
       logger.warn(
-        { err },
-        "could not store error reports; they are in the log",
+        { err, held: buffer.length },
+        "could not store error reports yet; holding them to try again",
       );
     }
     return 0;

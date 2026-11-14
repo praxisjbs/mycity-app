@@ -96,4 +96,4 @@ async function posts() {
   return realStaff(pool);
 }
 
-module.exports = { ready, posts, guard, codeFor };
+module.exports = { ready, posts, guard, caughtUp, codeFor };

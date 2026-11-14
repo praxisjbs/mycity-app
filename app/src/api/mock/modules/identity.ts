@@ -54,6 +54,7 @@ export function me(key: string): Me {
     photo_url: null,
     is_ceo: isCeo,
     grants: grantsFor(key) as Me["grants"],
+    scopes: Object.fromEntries(Object.keys(grantsFor(key)).map((m) => [m, isCeo || SEES_ALL.includes(role.code) ? "all" : "own"])) as Me["scopes"],
     capabilities: capabilitiesOf([role.code], isCeo, p.department === byKey("ifeoma")?.department),
     roles: [role],
     home_view: SIGN_INS[key]?.view ?? "staff",

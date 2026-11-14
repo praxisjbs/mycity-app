@@ -259,20 +259,25 @@ function pageOfMatches(entries, term, page) {
 }
 
 /**
- * What the shell would show this person: their actions per module and their
- * capabilities (as /auth/me gives them), and whether anyone reports to them.
+ * What the shell would show this person: their actions and record scope per module and
+ * their capabilities (as /auth/me gives them), and whether anyone reports to them.
  * @returns {Promise<import("./screens").Reader>}
  */
 async function readerOf(db, user) {
   const grants = {};
+  const scopes = {};
+  const WIDTH = { own: 0, team: 1, all: 2 };
   for (const module of catalog.MODULES) {
     if (user.is_ceo === true) {
       grants[module] = [...catalog.ACTIONS];
+      scopes[module] = "all";
       continue;
     }
     const rows = await grantsCache.getGrants(db, { role_ids: user.role_ids || [], module });
     const actions = catalog.ACTIONS.filter((a) => rows.some((r) => r[`can_${a}`] === true));
-    if (actions.length) grants[module] = actions;
+    if (!actions.length) continue;
+    grants[module] = actions;
+    scopes[module] = rows.reduce((w, r) => ((WIDTH[r.scope] ?? 0) > WIDTH[w] ? r.scope : w), "own");
   }
   let managesPeople = false;
   if (user.employee_id) {
@@ -286,6 +291,7 @@ async function readerOf(db, user) {
   }
   return {
     grants,
+    scopes,
     capabilities: await grantsCache.getCapabilities(db, user.user_id),
     is_ceo: user.is_ceo === true,
     manages_people: managesPeople,

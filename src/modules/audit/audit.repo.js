@@ -11,8 +11,30 @@ const one = async (db, sql, params) =>
 
 const TZ = "Africa/Lagos";
 
+/** The record's id as a uuid, or NULL for a key that is not one ("partnership_stage:prospect"). */
+const ENTITY_UUID = `CASE WHEN a.entity_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN a.entity_id::uuid END`;
+
+/**
+ * What a person calls the record: a login or an employee by the person's name, a role by its name,
+ * anything else by the number, name or title its own entry recorded. NULL when it recorded none;
+ * the screen then shows the id.
+ */
+const RECORD_NAME = `COALESCE(
+    CASE WHEN a.entity_type IN ('app_user', 'account') THEN
+      (SELECT concat_ws(' ', e.first_name, e.last_name) FROM app_user u JOIN employee e ON e.employee_id = u.employee_id
+        WHERE u.user_id = ${ENTITY_UUID}) END,
+    CASE WHEN a.entity_type = 'role' THEN
+      (SELECT r.name FROM role r WHERE r.role_id = ${ENTITY_UUID}) END,
+    CASE WHEN a.entity_type = 'employee' THEN
+      (SELECT concat_ws(' ', e.first_name, e.last_name) FROM employee e WHERE e.employee_id = ${ENTITY_UUID}) END,
+    NULLIF(COALESCE(a.after, a.before) ->> 'number', ''),
+    NULLIF(COALESCE(a.after, a.before) ->> 'name', ''),
+    NULLIF(COALESCE(a.after, a.before) ->> 'title', ''),
+    NULLIF(COALESCE(a.after, a.before) ->> 'label', '')
+  ) AS record_name`;
+
 const ENTRY = `a.audit_ledger_id, a.occurred_at, a.actor_user_id, a.actor_name, a.actor_email::text AS actor_email,
-  host(a.actor_ip) AS actor_ip, a.action, a.module_key, a.entity_type, a.entity_id, a.before, a.after,
+  host(a.actor_ip) AS actor_ip, a.action, a.module_key, a.entity_type, a.entity_id, ${RECORD_NAME}, a.before, a.after,
   a.changed_fields, a.is_sensitive`;
 
 const SORTS = { occurred_at: "a.occurred_at" };

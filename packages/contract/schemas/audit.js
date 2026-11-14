@@ -44,6 +44,8 @@ const AuditEntry = z
     module_key: z.string(),
     entity_type: z.string(),
     entity_id: z.string(),
+    /** What a person calls the record: a login or an employee by name, else its number, name or title; null when its entry recorded none. */
+    record_name: z.string().nullable(),
     /** Where the record opens in the app, when it has a screen. */
     link: z.string().nullable(),
     before: z.record(z.string(), z.unknown()).nullable(),
@@ -96,6 +98,7 @@ const TABLES = {
     table: "audit_ledger",
     virtual: {
       summary: "the event key's summary in the event catalogue",
+      record_name: "the record's person, or the number, name or title its entry recorded",
       link: "where the record opens, from shared/route-map",
       masked: "the fields of before and after masked for this reader",
     },

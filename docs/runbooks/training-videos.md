@@ -20,6 +20,8 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M6 Payroll, part 2: Payslips and Pay Day (4:23, 7 chapters) | `m6-payroll-2.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
 | M8 Expenses, part 1: Raising and Approving (8:19, 9 chapters) | `m8-expenses-1.js` | Made 13/11/2026, sent to TB; to upload (§5) | |
 | M8 Expenses, part 2: Paying and Budgets (6:04, 10 chapters) | `m8-expenses-2.js` | Made 13/11/2026, sent to TB; to upload (§5) | |
+| M9 Settings, part 1: People and Access (8:18, 12 chapters) | `m9-settings-1.js` | Made 14/11/2026, sent to TB; to upload (§5) | |
+| M9 Settings, part 2: Running the Hub (7:56, 11 chapters) | `m9-settings-2.js` | Made 14/11/2026, sent to TB; to upload (§5) | |
 | M10 Knowledge Hub, part 1: Policies, SOPs and Training (8:34, 11 chapters) | `m10-knowledge-hub.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 | M10 Praxis AI, part 2: Praxis AI and AI Control (7:00, 10 chapters) | `m10-praxis-ai.js` | Made 12/11/2026, sent to TB; to upload (§5) | |
 | M0 and M1, part 1: Signing In (5:16, 8 chapters) | `m01-signing-in-1.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
@@ -374,6 +376,16 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
     a mailbox ends there, and the next shot reads the mail.
 38. **One wait per take, not per glance.** A line that only points at something uses `soft()`; a
     pointer that misses a renamed heading should never cost a whole take. Presses stay strict.
+39. **Two-step required on camera.** A role that comes to require two-step (M9 part 1 requires it for Management)
+    shows Set Up Two-Step at each holder's next sign-in. `film.js` answers it off camera as an app would: the key read
+    off the screen, its code, Continue past the recovery codes; from then on §6.35's `codeFor` answers Enter Code. A
+    set-up filmed on camera reads the key itself and types its code with `s.typeCode` (`m9-settings-1.js`).
+40. **A real outage, on the filming database only.** Stop PostgreSQL for under a minute while requests arrive (the
+    reporter holds the faults and writes them once it is back), and stop the worker for 100 seconds (its heartbeat lasts
+    90) before Status. Snapshot the database straight after the outage, so a retake does not need another. A Redis
+    outage makes requests wait, not fail, and records nothing (§7).
+41. **Probes trip the sign-in limit.** Wrong passwords sent while testing an outage slow the account down (429 at
+    sign-in): never send them for a person the video signs in as, and clear the filming Redis database before a take.
 
 ## 7 · Bugs found while filming
 
@@ -413,9 +425,52 @@ listed here and in `docs/PROGRESS.md`.
 | 14/11/2026 | Payroll · Payroll Runs (#45) | A person with no start date was left out of every run without a word (`payroll.inputs` read `start_date <=` the month's end), and the roster loads Operations & People's lead, the CTO and the Program Manager with none: the first real run would have skipped them | Fixed the same day: such a person is in the run with a payslip of no lines and the blocking problem No Start Date (`NO_START_DATE`; `payroll.md` §6.1, §6.15, §11; the User Guide's Deal with problems); `payroll-run.test.js`. People to set the three dates before the first real run |
 | 14/11/2026 | Every payslip PDF; an employment contract | The payslip read "November 2026 ·" with no number, and a contract's "reference" was blank: the document engine's own number, none for these types, overwrote the number their data carries | Fixed the same day: `renderDocumentHtml` keeps the data's number when the engine numbers nothing; the payslip's number prints in the letterhead above the date, as the agreed sample has it, and its subtitle is the month alone; `payslips.test.js` |
 | 14/11/2026 | Workflow notices (every approval) | "Approval needed: Payroll Run. CEO is waiting on you.", sent to the CEO, reads as if the CEO waits on herself: the body names the stage, not the record | Not fixed: for GE (`shared/notifications/fanout.js`; tests pin the wording across modules) |
+| 14/11/2026 | Settings · Users (#70) | After Invite All Pending (*14 invitations sent*) every row still read **Not Sent**, and the login's button **Send Invitation**, until the page was reloaded: the links are minted by the worker after the press answers, and the list asked at once. A second press in those seconds would have mailed everyone twice | Fixed the same day: a login reads Invited from the moment its invitation is requested (`auth.link_requested`), and Invite All Pending skips it (`users.repo.js`); `logins.test.js` |
+| 14/11/2026 | Settings · Audit Log (#79) | Every record read as its type and eight characters of an id (**Account · b225a5ee**), and an entry's Before and After showed a role's grants and masked fields as JSON | Fixed the same day: `AuditEntry.record_name` (a login or employee by the person, a role by its name, else the number, name or title its entry recorded); values one line a key (`features/settings/auditValues.ts`); the export gains Record beside Record ID. `audit.test.js`, `settings.test.js`, `auditValues.test.ts` |
+| 14/11/2026 | Settings · Roles & Permissions (#71), People · Employees (#24) | A custom role granted People **View** over **All** (Regional Lead) opened People on Organogram and Attendance only: the Employees tab followed Settings view, not the role's grant, so MILESTONES §14's "sees exactly those modules" failed | Fixed the same day: `/auth/me` and search's reader carry each module's widest scope (`Me.scopes`); Employees shows for `people` view over `all` (`shell/access.ts`, `search/screens.js`); `access.test.ts`, `screens.test.js`, `identity.test.js` |
+| 14/11/2026 | Settings · Faults (#97) | A real database outage (PostgreSQL stopped for 40 seconds while people signed in) left nothing on Faults: the reporter dropped every report the database refused | Fixed the same day: a failed flush keeps its batch (200 at most) and writes it once the database answers (`error-reporter.js`, `system-health.md` §6); `observability.test.js`. The outage's five failed sign-ins are what part 2's Faults chapter works through |
+| 14/11/2026 | Settings · Faults (#97) | **Take It On** closed the fault, where the User Guide's next step is a note written in it: the person had to find it again | Fixed the same day: Take It On keeps it open, Held By naming them; Mark Fixed and Ignore Fault close it (`SystemHealth.tsx`, `SystemHealth.test.tsx`) |
+| 14/11/2026 | Every screen, during a Redis outage | With Redis stopped, requests did not fail: they waited until Redis came back (the client queues commands while offline), so the hub hangs rather than saying anything | Not fixed: for GE (architecture: fail fast, or keep waiting by design) |
+| 14/11/2026 | Settings · Integrations, Gemini's Models | **Antigravity Agent Preview** is listed twice | Not fixed: for TB (two ids with one display name, or one model listed twice) |
 | 10/11/2026 | Recruitment · Vacancies (#38) | A vacancy opened in a dialog at every desktop width (`modal.open`), not beside the list as F31 and the User Guide say; once beside it, its section headings skipped a level and its two small cards broke words | Fixed the same day: `ListDetail` on a wide desktop (the first role shown until another is pressed), its forms return to it in place; the dialog stays on a phone and where two columns do not fit; headings `h3`; the cards stack in the pane. Tests and the User Guide's pictures follow |
 
 ## 8 · Where the work stands
+
+**14/11/2026 · TB (with Claude). The Milestone 9 plan**, Settings & Governance. Decided by TB (four questions asked
+first): two videos; MyCity's real staff by name (an internal video); Bode Oluwasanmi, the CTO and System Administrator,
+runs the IT tabs, Cynthia Osakunih the people and company tabs, and two-step is required for Management so Ifeoma
+Mbonu sets it up on her phone; a custom role, Regional Lead, for Tochukwu Ifeanyi (Marketing Lead, Abuja), who signs in
+on her phone to show what it opens with pay and bank details masked; and system health shown with real faults caused
+before filming (the worker stopped, the database restarted), never invented. The chapters follow MILESTONES §14's definition of
+done and the User Guide's Settings chapter, whose bold names are the screens' own words. Tochukwu has nobody reporting
+to her, so Team would show her alone: the role opens People as View over All, with the sensitive fields masked, and
+Partnerships over Team.
+
+Part 1, People and Access (`m9-settings-1.js`): Welcome; Users (Invite All Pending, a login); Roles & Permissions (a
+role's Access, Details, People, the Matrix); New Role (Regional Lead); giving it to Tochukwu; what Tochukwu sees on her
+phone; Security (the rules, Require Two-Step for Management); the CEO's two-step on her phone; ending a session; My
+Security; Audit Log; Wrapping Up.
+
+Part 2, Running the Hub (`m9-settings-2.js`): Welcome; Organisation; Approvals; Notifications; Appearance; Documents &
+Numbering; Integrations; Status (the worker down, then back); Performance; Faults (take one on, note it, mark it fixed);
+Imports (MyCity's own staff list imported again, every row Unchanged); Wrapping Up.
+
+Made the same day on one development database: part 1 (8:18, 12 chapters, -16.4 LUFS) and part 2 (7:56, 11
+chapters, -16.3 LUFS). Part 1: Cynthia sends the staff list's invitations, reads Staff, creates Regional Lead and gives it
+to Tochukwu, who finds pay, bank and personal details Restricted on her phone; Bode requires two-step for Management;
+Ifeoma sets hers up on her phone and reads My Security; Bode, set up in turn, ends Tochukwu's phone session and reads the
+Audit Log. Part 2: Cynthia enters the company's details and uploads MyCity's logo, gives Leave Request's line manager 24
+hours (version 2), reminds approvers every 8 hours, reads Appearance and the numbering, and imports MyCity's staff list
+again (its repository copy has no phones and birthdays carry no year, so the preview says why, row by row; nothing
+saved). Bode tests Gemini, reads the failing Staff Mail Server, finds the worker stopped on Status and back up, reads
+Performance, and takes on the five sign-ins the database restart failed, notes and fixes them. Seven findings (§7):
+five fixed on the branch, two for GE and TB. The tooling learnt §6.39 to §6.41. The videos were sent in the chat (20 MB
+each; the Drive connector takes 10 MB).
+
+- [x] Plan both M9 videos (14/11/2026).
+- [x] Write, film and check both (14/11/2026).
+- [ ] Upload both to Drive (§5) and add their links to the table at the top.
+- [ ] GE: a Redis outage makes requests wait rather than fail (§7).
 
 **14/11/2026 · JP (with Claude). Milestones 0 and 1, four of five parts.** Decided by JBS Praxis (questions asked
 first): five parts by topic (Signing In; Safer Sign-In; Finding Your Way, with Settings for administrators; Home and

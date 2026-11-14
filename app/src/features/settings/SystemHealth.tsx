@@ -606,7 +606,7 @@ function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }
 }
 
 /** One fault: what it is, when, the latest occurrences, and what the team decided. */
-function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: () => void }) {
+export function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: () => void }) {
   const me = useMe();
   const f = useApi("GET /api/v1/system-health/faults/:id", { params: { id } });
   const patch = useMutation("PATCH /api/v1/system-health/faults/:id");
@@ -618,12 +618,16 @@ function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: ()
   if (f.error) return <ErrorState error={f.error} onRetry={f.reload} />;
   if (!d) return <LoadingRows count={6} />;
 
-  // Take It On makes the reader its holder too (§2, §10.1): Held By names them.
+  // Take It On makes the reader its holder too (§2, §10.1): Held By names them. It keeps the fault open,
+  // since what comes next is a note (the User Guide's Work through the faults); Fixed and Ignored close it.
   const set = async (status: FaultDetail["status"]) => {
     try {
       await patch.run({ params: { id }, body: { status, ...(status === "handling" ? { assigned_to: me.user_id } : {}), ...(note.trim() ? { note: note.trim() } : {}) } });
       invalidate("/api/v1/system-health");
-      close();
+      if (status === "handling") {
+        setNote("");
+        f.reload();
+      } else close();
       toast(`Marked ${FAULT_STATUS[status].text.toLowerCase()}`);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Not changed. Try again.");

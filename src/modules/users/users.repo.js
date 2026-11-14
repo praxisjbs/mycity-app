@@ -16,11 +16,22 @@ const STATUS = `CASE WHEN e.status IN ('archived', 'left') THEN 'left'
                      WHEN u.status = 'active' AND u.password_changed_at IS NULL THEN 'invited'
                      ELSE u.status END`;
 
+/**
+ * When the person was last sent an invitation: the link the worker minted, or the request for one
+ * when the worker has not minted it yet. Invite All Pending answers before the worker runs, so a
+ * list read at once still reads Invited, and a second press sends nobody a second link.
+ */
+const INVITED_AT = `GREATEST(
+    (SELECT max(p.created_at) FROM password_reset p WHERE p.user_id = u.user_id AND p.purpose = 'invite'),
+    (SELECT max(a.occurred_at) FROM audit_ledger a JOIN event_log el ON el.event_id = a.event_id
+      WHERE a.entity_type = 'account' AND a.entity_id = u.user_id::text
+        AND a.action = 'auth.link_requested' AND el.payload->>'purpose' = 'invite'))`;
+
 const ROW = `
   u.user_id, u.employee_id, trim(e.first_name || ' ' || e.last_name) AS display_name,
   u.email::text AS email, e.work_email::text AS work_email, e.job_title, d.name AS department, u.is_ceo,
   ${STATUS} AS status, (u.mfa_enrolled_at IS NOT NULL) AS two_step,
-  (SELECT max(p.created_at) FROM password_reset p WHERE p.user_id = u.user_id AND p.purpose = 'invite') AS invited_at,
+  ${INVITED_AT} AS invited_at,
   COALESCE((SELECT json_agg(json_build_object('code', r.code::text, 'name', r.name) ORDER BY r.rank DESC, r.name)
               FROM user_role ur JOIN role r ON r.role_id = ur.role_id
              WHERE ur.user_id = u.user_id
@@ -67,7 +78,7 @@ async function pendingInvites(db) {
     db,
     `SELECT u.user_id ${FROM}
       WHERE u.status = 'active' AND u.password_changed_at IS NULL AND e.status = 'active'
-        AND NOT EXISTS (SELECT 1 FROM password_reset p WHERE p.user_id = u.user_id AND p.purpose = 'invite')
+        AND ${INVITED_AT} IS NULL
       ORDER BY u.created_at, u.user_id`,
     [],
     { label: "logins waiting for an invitation" },

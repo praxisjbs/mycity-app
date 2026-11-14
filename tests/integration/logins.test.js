@@ -242,9 +242,15 @@ describeDb("an employee's login, from invitation to leaving", () => {
       const first = await as(ops)(request(app).post("/api/v1/users/invite-pending")).send({});
       expect(first.status).toBe(200);
       expect(first.body.sent).toBeGreaterThanOrEqual(2);
+      // Before the worker mints the links: the list already reads Invited, and a second press
+      // (the screen answers at once) sends nobody a second invitation.
+      const early = await as(ops)(request(app).get(`/api/v1/users/${b.user.user_id}`));
+      expect(early.body.invited_at).not.toBeNull();
+      expect((await as(ops)(request(app).post("/api/v1/users/invite-pending")).send({})).body.sent).toBe(0);
       await drain();
       const invited = sent.filter((s) => s.data && s.data.template === "user-invite").map((s) => s.data.to.email);
       expect(invited).toEqual(expect.arrayContaining(["femi@mycity.test", "gbenga@mycity.test"]));
+      expect(invited.filter((e) => e === "femi@mycity.test")).toHaveLength(1);
       const row = await as(ops)(request(app).get(`/api/v1/users/${a.user.user_id}`));
       expect(row.body.invited_at).not.toBeNull();
       const second = await as(ops)(request(app).post("/api/v1/users/invite-pending")).send({});

@@ -115,6 +115,7 @@ function present(rows, maskedKeys, ownEmployeeId) {
       module_key: r.module_key,
       entity_type: r.entity_type,
       entity_id: r.entity_id,
+      record_name: r.record_name || null,
       link: linkOf(r.entity_type, r.entity_id),
       before: masked.length ? fieldMask.applyMask(r.before, hide) : r.before,
       after: masked.length ? fieldMask.applyMask(r.after, hide) : r.after,

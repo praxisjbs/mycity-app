@@ -191,6 +191,24 @@ async function authenticator(context, page, keys, who) {
   };
 }
 
+/** Type six digits into a code group ("Code From App", "Sign-In Code"), one box after another. */
+async function typeCode(page, group, code, delay = 60) {
+  await group.getByRole("textbox").first().click();
+  await page.keyboard.type(code, { delay });
+}
+
+/**
+ * A role that now needs two-step (Settings · Security) asks its people to set it up at their next
+ * sign-in: the key the screen shows, read as an app scans it, its code, then Continue past the
+ * recovery codes, as a person does before a demonstration (runbook §6.30).
+ */
+async function setUpTwoStep(page) {
+  const { codeAt } = require("../../src/modules/security/security.mfa");
+  const key = (await page.getByText(/^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/).first().innerText()).replace(/\s+/g, "");
+  await typeCode(page, page.getByRole("group", { name: "Code From App" }), codeAt(key));
+  await page.getByRole("button", { name: "Continue", exact: true }).click({ timeout: 20000 });
+}
+
 async function signIn(page, origin, email, password) {
   await page.goto(origin + "/login");
   // A browser the app knows greets its person once /auth/device answers, and that render clears what
@@ -199,16 +217,17 @@ async function signIn(page, origin, email, password) {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  // Two-step on (a person who turned it on in an earlier shot): the code their app shows now.
+  // Two-step on (a person who turned it on in an earlier shot): the code their app shows now. A role
+  // that requires it of someone without it yet: Set Up Two-Step first.
   const step = page.getByRole("group", { name: "Sign-In Code", exact: true });
+  const setup = page.getByRole("heading", { name: "Set Up Two-Step", exact: true });
   const asked = await Promise.race([
-    step.waitFor({ state: "visible", timeout: 20000 }).then(() => true, () => false),
-    page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 }).then(() => false, () => false),
+    step.waitFor({ state: "visible", timeout: 20000 }).then(() => "code", () => null),
+    setup.waitFor({ state: "visible", timeout: 20000 }).then(() => "setup", () => null),
+    page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 }).then(() => null, () => null),
   ]);
-  if (asked) {
-    await step.getByRole("textbox").first().click();
-    await page.keyboard.type(await require("./people").codeFor(email), { delay: 60 });
-  }
+  if (asked === "code") await typeCode(page, step, await require("./people").codeFor(email));
+  if (asked === "setup") await setUpTwoStep(page);
   await page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 });
   await appSettle(page);
   // The offer to turn on notifications, answered as a person would before a demonstration.
@@ -295,6 +314,8 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known,
   const s = hands(page, { phone, origin });
   // The filming password, for a password a person types on camera (dots on screen).
   s.password = password;
+  // Six digits typed into a code group on camera, at a person's pace (a two-step set-up filmed by hand).
+  s.typeCode = (group, code) => typeCode(page, group, code, phone ? 140 : 110);
   if (shot.setup) await shot.setup(s);
   await sleep(0.6);
 
