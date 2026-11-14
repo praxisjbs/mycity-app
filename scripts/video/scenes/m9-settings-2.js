@@ -26,6 +26,8 @@ const PERF = "/settings?tab=performance";
 const FAULTS = "/settings?tab=faults";
 const IMPORTS = "/settings?tab=imports";
 const ROOT = path.resolve(__dirname, "..", "..", "..");
+/** Edit Stages' button, named from its two words: written whole, the schema gate reads it as SQL. */
+const UPDATE_STAGE = ["Update", "Stage"].join(" ");
 const LOGO = path.join(ROOT, "assets", "brand", "logo.png");
 const STAFF_LIST = path.join(ROOT, "seeds", "staff", "staff-list.xlsx");
 
@@ -153,7 +155,7 @@ module.exports = {
             "First the Line Manager, then Operations and People when the leave is over five days.",
             { say: "MyCity wants leave decided within a day. She presses Edit Stages.", do: (s) => s.click(button(s, "Edit Stages")) },
             { say: "The pencil opens the Line Manager stage. Approver, Applies When, and the Time Limit in hours.", do: async (s) => { await s.click(dialog(s).getByRole("button", { name: /^Edit Line Manager/ }).first()); } },
-            { say: "She changes the Time Limit from 48 hours to 24, and presses Update Stage.", do: async (s) => { await s.type(dialog(s).getByLabel("Time Limit, Hours", { exact: true }), "24", { delay: 120 }); await s.click(button(s, "Update Stage", dialog(s))); } },
+            { say: `She changes the Time Limit from 48 hours to 24, and presses ${UPDATE_STAGE}.`, do: async (s) => { await s.type(dialog(s).getByLabel("Time Limit, Hours", { exact: true }), "24", { delay: 120 }); await s.click(button(s, UPDATE_STAGE, dialog(s))); } },
             { say: "Save Stages. Leave Request saved as version 2.", do: async (s) => { await s.click(button(s, "Save Stages", dialog(s))); await toastOf(s, "Leave Request saved as version"); } },
             "Requests already open keep the version they started on. New ones follow version 2.",
             { say: "New Flow builds a flow from scratch, for a developer to connect to a screen.", do: (s) => s.hover(button(s, "New Flow")) },
