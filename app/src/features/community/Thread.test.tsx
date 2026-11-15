@@ -12,7 +12,8 @@ import { Composer, ThreadBody, useThread } from "./Chat";
  * A conversation's thread against a stand-in server (docs/guides/community.md §3 steps 10 and
  * 20): a receipt is read but never answered, a new message from the other person is said
  * delivered once, a quiet read never empties the screen, the first unread is reached, older
- * pages lay in above, and pushes at once make one more read, not one each. The composer says why a
+ * pages lay in above, pushes at once make one more read, not one each, and an urgent announcement
+ * reads Acknowledged once pressed. The composer says why a
  * message was refused and keeps its words.
  */
 
@@ -56,6 +57,10 @@ function server(initial: Message[]) {
     }
     if (key === "GET /api/v1/community/channels/:id/pins") return { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
     if (key === "POST /api/v1/community/channels/:id/delivered") return null;
+    if (key === "POST /api/v1/community/announcements/:id/acknowledge") {
+      store.msgs = store.msgs.map((m) => (m.announcement ? { ...m, announcement: { ...m.announcement, acknowledged_at: new Date(DAY).toISOString() } } : m));
+      return null;
+    }
     throw new Error(`unexpected ${key}`);
   }) as unknown as typeof api.call);
   const count = (key: string) => calls.filter((c) => c === key).length;
@@ -169,6 +174,29 @@ describe("a conversation's thread", () => {
     expect(result.current.msgs[0]!.body).toBe("Message 13");
     expect(result.current.msgs[result.current.msgs.length - 1]!.body).toBe("Message 60");
     expect(result.current.hasOlder).toBe(true);
+  });
+
+  it("turns an urgent announcement's Acknowledge into Acknowledged once pressed", async () => {
+    const urgent = {
+      ...message(1, false),
+      message_type: "announcement",
+      body: "Leave by the east stairs.",
+      announcement: { announcement_id: "22222222-2222-4222-8222-222222222222", title: "Fire drill at 11", urgency: "urgent", in_audience: true, acknowledged_at: null },
+    } as unknown as Message;
+    const s = server([urgent]);
+    function Harness() {
+      const t = useThread(ID);
+      return <ThreadBody t={t} />;
+    }
+    render(
+      <ModalProvider>
+        <Harness />
+      </ModalProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Acknowledge" }));
+    await screen.findByText(/^Acknowledged /);
+    expect(screen.queryByRole("button", { name: "Acknowledge" })).toBeNull();
+    expect(s.count("POST /api/v1/community/announcements/:id/acknowledge")).toBe(1);
   });
 
   it("shows the unread line and each day's label in the thread", async () => {

@@ -449,7 +449,7 @@ in #announcements, which every member of staff reads.
 | `channel_message.posted`, `direct_message.sent` for a forward | Each forwarded copy, after the forward commits | As any post: realtime push and notifications. The payload carries `forwarded_from` (the message and its first sender), so the audit log keeps who first sent it |
 | `announcement.published` | On publish, or when a scheduled one is released | Message in #announcements; notification and push to the audience at its level (urgent ones need Acknowledge); an Important one queues `announcement-remind` for 4 hours later |
 | `announcement-remind` (delayed job) | 4 hours after an Important announcement went out | Reminds, as the system, whoever has not opened it (`announcement.reminded`) |
-| `announcement.acknowledged` | Acknowledge on the card or, through `notification.acknowledged`, on the urgent bar | Records it on the reads; the person's notices of it close on every device |
+| `announcement.acknowledged` | Acknowledge on the card or, through `notification.acknowledged`, on the urgent bar | Records it on the reads; the person's notices of it close on every device; `community.message_updated` to that person, so their open #announcements reads the card again and it shows Acknowledged wherever it was pressed |
 | `announcement-publish` (delayed job) | At `publish_at` | Releases a scheduled announcement (README §5.15) if it is still scheduled and due |
 | `announcement.updated` | A scheduled announcement edited | A new delayed release at its new `publish_at`; audit |
 | `announcement.cancelled` | A scheduled announcement cancelled | Audit; nothing is posted |
@@ -664,6 +664,12 @@ fields, never in a toast.
 
 ## 14 · Change log
 
+- 15/11/2026 · JP · From staff on staging: pressing **Acknowledge** on an urgent card in #announcements
+  recorded it but the card kept asking. The thread holds its messages itself and the card only
+  refreshed the cached reads, so it now reads the thread again once the press lands (the button
+  spins until the card says Acknowledged); `announcement.acknowledged` now pushes
+  `community.message_updated` to the person (§7), so a press on the urgent bar or another device
+  turns the card too, as §11 always said. Tests: `Thread.test.tsx`, `community.test.js`.
 - 14/11/2026 · JP · §9: `announcements.summary`, the announcements in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8): read rates for `announcements.post`, anyone else their own received and read. Nothing on screen changes.
 - 03/11/2026 · JP · From the evaluation set on staging: Send Wishes' card says "wish her a happy birthday" already gives the wish ("Happy birthday!"), so the card is drawn rather than asking for words the person said. Nothing on the Staff Community screens changes.
 - 03/11/2026 · JP · Every Staff Community form in the chat (`praxis-ai.md` decisions 33 and 40, §6.11):

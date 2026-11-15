@@ -571,15 +571,22 @@ function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
 /**
  * An announcement in #announcements, at its level: amber when important, red and pulsing when
  * urgent, with Acknowledge for each person in its audience until they press it (community.md §3).
+ * The thread holds its messages itself, so once pressed the card is read again from the server
+ * and the button spins until it reads Acknowledged.
  */
-function AnnouncementPost({ m, q }: { m: Message; q: string }) {
+function AnnouncementPost({ m, q, onReload }: { m: Message; q: string; onReload?: () => unknown }) {
   const a = m.announcement;
   const asks = a?.urgency === "urgent" && a.in_audience;
-  const acknowledge = () =>
-    api
-      .call("POST /api/v1/community/announcements/:id/acknowledge", { params: { id: a!.announcement_id }, body: {} })
-      .then(() => invalidate("/api/v1/community", "/api/v1/notifications"))
-      .catch((e: unknown) => toast.error(e instanceof ApiError ? e.message : "Not acknowledged. Try again."));
+  const acknowledge = async () => {
+    try {
+      await api.call("POST /api/v1/community/announcements/:id/acknowledge", { params: { id: a!.announcement_id }, body: {} });
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not acknowledged. Try again.");
+      return;
+    }
+    invalidate("/api/v1/community", "/api/v1/notifications");
+    await onReload?.();
+  };
   return (
     <Card urgency={a?.urgency ?? "normal"} className="max-w-152">
       <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground">
@@ -663,7 +670,7 @@ export function AlbumPost({ ms, q, dm, onView, menu }: { ms: Message[]; q: strin
 }
 
 /** One post in a channel or a conversation. */
-export function Post({ m, q, dm, onCelebrate, onVote, onView, onChange, onReload, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => Promise<unknown>; onVote: (i: number) => void; onView?: (key: string) => void; onChange?: (m: Message) => void; onReload?: () => void; menu?: ReactNode }) {
+export function Post({ m, q, dm, onCelebrate, onVote, onView, onChange, onReload, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => Promise<unknown>; onVote: (i: number) => void; onView?: (key: string) => void; onChange?: (m: Message) => void; onReload?: () => unknown; menu?: ReactNode }) {
   const authorPhoto = usePhoto(m.mine ? null : m.author?.photo_url);
   const toPhoto = usePhoto(m.recognition?.to.photo_url);
   /* A card keeps its look; its menu sits beside it. */
@@ -707,7 +714,7 @@ export function Post({ m, q, dm, onCelebrate, onVote, onView, onChange, onReload
     /* A poll reads as a block up to 560 px, as in the demo, not shrunk to its words. */
     return <div className={cn("flex w-full max-w-140 items-start gap-1", m.mine && "flex-row-reverse")}>{card}{menu}</div>;
   }
-  if (m.message_type === "announcement") return <AnnouncementPost m={m} q={q} />;
+  if (m.message_type === "announcement") return <AnnouncementPost m={m} q={q} onReload={onReload} />;
   /* A photo, a video or a file fills its bubble, its caption under it; a text carries its first link's card above it. */
   const media = !m.deleted && m.message_type !== "audio" && Boolean(m.document);
   let inner: ReactNode;
