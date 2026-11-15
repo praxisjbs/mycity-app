@@ -958,12 +958,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 15/11/2026 |
 | 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 25/10/2026 |
 | 17 | Announcements | `announcements` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 15/11/2026 · JP · Channels (#15), #announcements, reported by staff on staging: **Acknowledge** on an urgent card was recorded (the urgent bar closed) but the card kept asking, so it looked as if nothing happened. The thread keeps its own messages and the card only refreshed the cached reads; it now reads the thread again once the press lands, and `announcement.acknowledged` pushes `community.message_updated` to the person, so a press on the urgent bar or a second device turns the card too (`docs/guides/community.md` §7, §11). Tests: `Thread.test.tsx`, `community.test.js`. No ticks change. Left: nothing.
 - 14/11/2026 · JP · Announcements (#17) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 8, §6.13 Workspace, Knowledge Hub, Community, Home and Settings; `docs/guides/community.md` §9): `announcements.summary`, read rates and the ten newest stacked Read and Not Read for `announcements.post`, anyone else only what they received and read; `announcements.list` names it. No ticks change; nothing on screen changes. Left: nothing.
 - 26/10/2026 · JP · Channels (#15), QA DEF-09: a poll's options must differ, compared with spaces and case ignored: "Already an option" on the field as typed, refused by the contract, the service and the mock on Start Poll and Edit Poll. QA DEF-12: the shell's offers no longer cover the composer · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects: Remove Member asks first; reactions, votes, unpin, Add People, polls, Send Files, wishes and Acknowledge say why a refusal failed; Channel Details' Purpose shows its mark; New Announcement and Edit toast every refusal; the profile's Message reaches the box and Mute follows the switch; messages show their 4,000 characters and notes 500; a deleted message reads "That message is no longer here"; Read and Not Read page by 25; the Announcements tab follows `announcements.post` in the menu and ⌘K (`screens.test.js`). Tests: `forms.test.tsx`, `community.test.js`. Left: nothing.

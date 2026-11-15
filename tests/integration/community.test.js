@@ -803,9 +803,15 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).toContain(bola.notification_id);
     expect((await as("ceo").get(`/community/announcements/${id}/reads?read=not_read`)).body.data.map((r) => r.person.display_name).sort()).toEqual(["Bola Ade", "Tunde Ola"]);
 
-    // Bola presses Acknowledge on the card: the reads row and the notice close together.
+    // Bola presses Acknowledge on the card: the reads row and the notice close together, and her
+    // open #announcements is told to read the card again, on every device.
+    const card = { community_channel_id: ann.community_channel_id, community_message_id: msgs.body.data.find((m) => m.announcement && m.announcement.announcement_id === id).community_message_id };
+    realtime.toUser.mockClear();
     expect((await as("bola").post(`/community/announcements/${id}/acknowledge`).send({})).status).toBe(204);
     expect((await as("bola").post(`/community/announcements/${id}/acknowledge`).send({})).status).toBe(204);
+    await drain();
+    expect(realtime.toUser).toHaveBeenCalledWith(people.bola.user.user_id, "community.message_updated", expect.objectContaining(card));
+    expect(realtime.toUser.mock.calls.filter((c) => c[1] === "community.message_updated")).toHaveLength(1);
     expect((await noticeOf("bola")).acknowledged_at).not.toBeNull();
     expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).not.toContain(bola.notification_id);
     const after = await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`);
@@ -818,6 +824,7 @@ describeDb("Staff Community against the real migrations", () => {
     expect(pressed.body).toMatchObject({ notification_id: tunde.notification_id, urgency: "urgent", acknowledge_required: true });
     expect(pressed.body.acknowledged_at).not.toBeNull();
     await drain();
+    expect(realtime.toUser).toHaveBeenCalledWith(people.tunde.user.user_id, "community.message_updated", expect.objectContaining(card));
     const reads = await as("ceo").get(`/community/announcements/${id}/reads`);
     expect(reads.body.data.every((r) => r.acknowledged_at)).toBe(true);
     expect((await as("ceo").get("/community/announcements")).body.data.find((a) => a.announcement_id === id)).toMatchObject({ reads: 3 });

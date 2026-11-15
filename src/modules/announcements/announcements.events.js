@@ -147,6 +147,23 @@ outbox.register(
   },
 );
 
+/*
+ * Acknowledged, on the card or on the urgent bar: the person's open #announcements reads the
+ * card again on every device, so it says Acknowledged wherever it was pressed.
+ */
+outbox.register(EVENTS.ANNOUNCEMENT_ACKNOWLEDGED, "announcements.push_acknowledged", async (event) => {
+  const p = event.payload || {};
+  if (!p.user_id || !p.announcement_id) return;
+  const { rows } = await pool.query(
+    `SELECT m.community_channel_id, m.community_message_id
+       FROM announcement a JOIN community_message m ON m.community_message_id = a.community_message_id
+      WHERE a.announcement_id = $1`,
+    [p.announcement_id],
+  );
+  if (!rows[0]) return;
+  realtime.toUser(p.user_id, "community.message_updated", rows[0]);
+});
+
 defineNotification(EVENTS.ANNOUNCEMENT_REMINDED, {
   to: [{ users: (e) => e.payload.user_ids || [] }],
   title: (e) => `Reminder: ${e.payload.title}`,
