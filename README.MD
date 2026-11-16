@@ -184,9 +184,10 @@ mycity-app/
 │   │                         m9-settings-2.js (M9 part 2, Running the Hub),
 │   │                         m10-knowledge-hub.js (M10 part 1, Policies, SOPs and Training),
 │   │                         m10-praxis-ai.js (M10 part 2, Praxis AI and AI Control),
-│   │                         m01-signing-in-1.js, m01-safer-sign-in-2.js, m01-finding-your-way-3.js
-│   │                         and m01-community-mailbox-5.js (M0 and M1, parts 1, 2, 3 and 5, the last
-│   │                         with the `prepare` it films on)
+│   │                         m01-signing-in-1.js, m01-safer-sign-in-2.js, m01-finding-your-way-3.js,
+│   │                         m01-home-attendance-4.js (with `morning`, the seed's attendance step run
+│   │                         again once the team is in) and m01-community-mailbox-5.js (M0 and M1,
+│   │                         parts 1 to 5, the last with the `prepare` it films on)
 │   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging;
 │   │                         attack-assistant.js: its attack suite, asked of the real model on staging
 │   │                         nightly through deploy-gate attack (docs/guides/praxis-ai.md §6.17)

@@ -231,7 +231,8 @@ async function signIn(page, origin, email, password) {
   await page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 20000 });
   await appSettle(page);
   // The offer to turn on notifications, answered as a person would before a demonstration.
-  const later = page.getByRole("button", { name: "Not Now", exact: true });
+  // The notifications bar's, never the clock's own Not Now in its window.
+  const later = page.getByRole("button", { name: "Not Now", exact: true }).and(page.locator(":not([role=dialog] *)"));
   if (await later.isVisible().catch(() => false)) await later.click();
 }
 
@@ -292,8 +293,9 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known,
     }
   }
   // The offer to clock in, which opens over the first screen of a working day: Not Now, as a
-  // person would before a demonstration (clocking in is theirs to do, never filming's).
-  if (shot.as) {
+  // person would before a demonstration (clocking in is theirs to do, never filming's). A shot that
+  // films the clock itself (`clock: true`) leaves it open.
+  if (shot.as && !shot.clock) {
     const notNow = page.getByRole("dialog", { name: "Clock In" }).getByRole("button", { name: "Not Now", exact: true });
     if (await notNow.waitFor({ timeout: 2500 }).then(() => true, () => false)) {
       await notNow.click({ timeout: 3000 }).catch(() => null);
@@ -302,8 +304,9 @@ async function filmShot(browser, shot, dir, { origins, password, emailOf, known,
     }
   }
   // The offer to clock out, which opens over the screen once a shift has ended: closed, as a person
-  // would before a demonstration (clocking out is theirs to do, never filming's).
-  if (shot.as) {
+  // would before a demonstration (clocking out is theirs to do, never filming's), unless the shot
+  // films the clock (`clock: true`).
+  if (shot.as && !shot.clock) {
     const out = page.getByRole("dialog", { name: "Clock Out" });
     if (await out.waitFor({ timeout: 2500 }).then(() => true, () => false)) {
       await out.getByRole("button", { name: "Close", exact: true }).click({ timeout: 3000 }).catch(() => null);
