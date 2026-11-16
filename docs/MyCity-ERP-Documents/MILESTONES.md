@@ -1679,6 +1679,21 @@ Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.j
 `src/shared/search/screens.js`, the app's catalogue and `docs/PROGRESS.md` (row #64 Dropped, #110 added). Its
 engineering shape is in `docs/guides/knowledge.md`.
 
+**Ratified 16/11/2026 (TB).** A module joins the rail and two screens the inventory: **Document Centre**
+(permission key `documents`, area Work, after Mailbox), with **Document Centre · Library** (`library`) and
+**Document Centre · Categories** (`categories`), M10. The Library is one place to find, preview and download
+every business document a person may already open from its own module (agreements, partner documents,
+proposals, offers, contracts, letters, staff records, invoices and receipts), with four KPI cards, filters,
+search inside files, ⌘K and Praxis AI, and it is where the company's own papers are kept in categories with
+an audience (the CAC certificate, the status report, licences) and a letterhead is downloaded as PDF or Word.
+Nobody sees a document there they could not open before. It is the first rail module added since the
+inventory was approved, and its key is new: `documents`, with the capability `documents.manage` for the
+categories. It takes `docs/PROGRESS.md` from 107 screens to 109 (the staff app from 97 to 99). It is
+deliberately not yet applied to the table below, `docs/PROGRESS.md`, `scripts/check/progress.js`,
+`src/shared/route-map.js`, `src/shared/search/screens.js` or the app's catalogue: the Document Centre's PR 1
+applies Library (row #113 while free) and PR 2 Categories (#114). Its engineering shape and build plan are
+in `docs/guides/document-centre.md`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries eight of the
 screens (six of the 92 approved, Proposal, ratified 05/11/2026, and Home, ratified 06/11/2026) and those screens need names too. Nothing in the admin rail links to it, and a member of
