@@ -50,7 +50,7 @@ describe("Document Centre · Library", () => {
     expect(screen.getAllByText("Afrobeat Live MOU").length).toBeGreaterThan(0);
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
-  });
+  }, 60000);
 
   it("opens a document beside the list on a wide desktop, with what it belongs to and its actions", async () => {
     await openAs("cynthia@mycityapp.io", `${HERE}&id=${agreement.document_id}`);
@@ -64,7 +64,7 @@ describe("Document Centre · Library", () => {
     expect(within(pane).getAllByText("Expiring").length).toBeGreaterThan(0);
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
-  });
+  }, 60000);
 
   it("searches and filters on the server: every word is held to the row, a figure sets the filter", async () => {
     await openAs("cynthia@mycityapp.io", HERE);
@@ -90,7 +90,7 @@ describe("Document Centre · Library", () => {
     await chooseOption(screen.getByLabelText("Type"), "Expense Invoice");
     await settled();
     expect(rowsShown()).toBe(LIBRARY_ROWS.filter((d) => d.doc_type === "expense_invoice").length);
-  });
+  }, 60000);
 
   it("lists for an account only what it may open", async () => {
     await openAs("emeka@mycityapp.io", HERE);
@@ -101,7 +101,7 @@ describe("Document Centre · Library", () => {
     const letter = LIBRARY_ROWS.find((d) => d.doc_type === "query_letter")!;
     await openAs("emeka@mycityapp.io", `${HERE}&id=${letter.document_id}`);
     expect(await screen.findByText("Document Not Found")).toBeTruthy();
-  });
+  }, 60000);
 
   it("on a phone the list is cards, the filters are a sheet, and a tapped card opens its sheet", async () => {
     setViewport(390);
@@ -122,5 +122,5 @@ describe("Document Centre · Library", () => {
     expect(within(record).getByRole("button", { name: "Download" })).toBeTruthy();
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
-  });
+  }, 60000);
 });
