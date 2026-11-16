@@ -12,7 +12,7 @@ the date, and add a line to §3.
 | Owner | TB (Tom-Blake Asaah) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Branches | PR 1 `m10/document-centre-library`, PR 2 `m10/document-centre-company` (a cloud session uses the branch it was given) |
-| Pull requests | PR 0 (the plan) praxisjbs/mycity-app#163; PR 1 PRNUM; PR 2 adds its number here |
+| Pull requests | PR 0 (the plan) praxisjbs/mycity-app#163; PR 1 praxisjbs/mycity-app#164; PR 2 adds its number here |
 
 ---
 
