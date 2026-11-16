@@ -14,7 +14,6 @@ import {
   DocumentFrame,
   formatMoneyShort,
   formatWhen,
-  ListDetail,
   LoadingRows,
   Menu,
   PageHeader,
@@ -24,10 +23,10 @@ import {
   useConfirm,
   useIsPhone,
   useModal,
-  useSideBySide,
   Who,
 } from "@mycity/ui";
 import { fail, useMay } from "./lib";
+import { RecordPage } from "./record";
 import { Brief } from "./studio/Brief";
 import { Draft } from "./studio/Draft";
 import { Edit } from "./studio/Edit";
@@ -112,7 +111,7 @@ function Studio({ id }: { id: string }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-lg font-semibold text-foreground" data-copy="content">{p.title ?? p.deal_title}</h2>
+          <h1 className="truncate text-lg font-semibold text-foreground" data-copy="content">{p.title ?? p.deal_title}</h1>
           <p className="text-sm text-muted-foreground" data-copy="content">{`${p.number}${p.version > 1 ? ` v${p.version}` : ""} · ${p.record.name}`}</p>
         </div>
         <StatusPill status={PILL[p.status]} />
@@ -165,14 +164,24 @@ function Studio({ id }: { id: string }) {
 }
 
 /**
- * Partnerships · Proposals (#53, docs/guides/partnerships.md §2, §6.10, §10): the proposal list beside
- * the proposal in the studio (`?id=`), side by side on a wide desktop and in a full sheet on a phone
- * (F31). New Proposal opens the brief; a 360's New Proposal arrives as `?new=<lead or partner>`.
+ * Partnerships · Proposals (#53, docs/guides/partnerships.md §2, §6.10, §10): the proposal list across the
+ * page; a pressed proposal opens in the studio as a page of its own (`?id=`, Back to Proposals; F31 amended
+ * 16/11/2026). New Proposal opens the brief; a 360's New Proposal arrives as `?new=<lead or partner>`.
  */
 export function Proposals({ id }: { id: string | null }) {
+  if (id) {
+    return (
+      <RecordPage back="Back to Proposals" to="/partnerships?tab=proposals">
+        <Studio key={id} id={id} />
+      </RecordPage>
+    );
+  }
+  return <ProposalList />;
+}
+
+function ProposalList() {
   const modal = useModal();
   const phone = useIsPhone();
-  const beside = useSideBySide();
   const { location, navigate } = useRouter();
   const mayCreate = useMay("create");
   const s = useApi("GET /api/v1/partnerships/proposals/summary");
@@ -191,7 +200,6 @@ export function Proposals({ id }: { id: string | null }) {
     brief({ type: kind, id: preset });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset]);
-  const shown = id ?? (beside ? (list.rows[0]?.partnership_proposal_id ?? null) : null);
   return (
     <>
       <PageHeader title="Proposals" sub="Written with Claude, sent by you" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newProposal}>New Proposal</Button> : undefined} />
@@ -205,31 +213,21 @@ export function Proposals({ id }: { id: string | null }) {
           ]}
         />
       )}
-      <ListDetail
-        open={Boolean(id)}
-        onClose={() => navigate("/partnerships?tab=proposals")}
-        title="Proposal"
-        cols="1/1.5"
-        full
-        list={
-          <PagedTable<ProposalRow>
-            title="Proposals"
-            list={list}
-            search="Search proposals"
-            rowKey={(p) => p.partnership_proposal_id}
-            noun="proposal"
-            onRowClick={(p) => openProposal(p.partnership_proposal_id)}
-            empty={{ title: "No Proposals Yet", text: "Start one from a deal." }}
-            columns={[
-              { key: "t", label: "Proposal", render: (p) => <Who name={p.title ?? p.deal_title} sub={p.number} /> },
-              { key: "p", label: "Partner", render: (p) => p.record.name, desktop: true },
-              { key: "v", label: "Value", align: "n", render: (p) => (p.value ? formatMoneyShort(p.value) : "None"), desktop: true },
-              { key: "s", label: "Status", render: (p) => <StatusPill status={PILL[p.status]} /> },
-              { key: "w", label: "Viewed", render: (p) => (p.first_viewed_at ? formatWhen(p.first_viewed_at) : "Not Yet"), desktop: true },
-            ]}
-          />
-        }
-        detail={shown && <Studio key={shown} id={shown} />}
+  <PagedTable<ProposalRow>
+        title="Proposals"
+        list={list}
+        search="Search proposals"
+        rowKey={(p) => p.partnership_proposal_id}
+        noun="proposal"
+        onRowClick={(p) => openProposal(p.partnership_proposal_id)}
+        empty={{ title: "No Proposals Yet", text: "Start one from a deal." }}
+        columns={[
+          { key: "t", label: "Proposal", render: (p) => <Who name={p.title ?? p.deal_title} sub={p.number} /> },
+          { key: "p", label: "Partner", render: (p) => p.record.name, desktop: true },
+          { key: "v", label: "Value", align: "n", render: (p) => (p.value ? formatMoneyShort(p.value) : "None"), desktop: true },
+          { key: "s", label: "Status", render: (p) => <StatusPill status={PILL[p.status]} /> },
+          { key: "w", label: "Viewed", render: (p) => (p.first_viewed_at ? formatWhen(p.first_viewed_at) : "Not Yet"), desktop: true },
+        ]}
       />
     </>
   );

@@ -1,5 +1,5 @@
 import { useApi } from "@/api/hooks";
-import { DesktopOnly, FilterSelect, Grid } from "@mycity/ui";
+import { DesktopOnly, FilterSelect } from "@mycity/ui";
 import { SCOPES, useCategoryOptions, useOwnerOptions, useStages } from "./lib";
 
 /**
@@ -41,7 +41,7 @@ export function filterQuery(v: RecordFilterValue, withCustom = true) {
   };
 }
 
-/** The filter row, desktop only. `kind` names whose filterable custom fields join it; Pipeline passes none. */
+/** The filter row, one line above the list (§10), desktop only. `kind` names whose filterable custom fields join it; Pipeline passes none. */
 export function RecordFilters({ value, onChange, kind }: { value: RecordFilterValue; onChange: (v: RecordFilterValue) => void; kind?: "lead" | "partner" }) {
   const { stages } = useStages();
   const categories = useCategoryOptions();
@@ -51,7 +51,7 @@ export function RecordFilters({ value, onChange, kind }: { value: RecordFilterVa
   const set = (k: Exclude<keyof RecordFilterValue, "custom">) => (v: string) => onChange({ ...value, [k]: v });
   return (
     <DesktopOnly>
-      <Grid cols={4} className="mb-3">
+      <div className="mb-3 flex flex-wrap items-end gap-3">
         <FilterSelect label="Stage" value={value.stage} onChange={set("stage")} options={[["", "Every Stage"], ...stages.map((s) => [s.code, s.label] as [string, string])]} />
         <FilterSelect label="Category" value={value.partner_category_id} onChange={set("partner_category_id")} options={[["", "Every Category"], ...categories.options]} more={categories.more} onMore={categories.onMore} />
         <FilterSelect label="Region" value={value.region_scope} onChange={set("region_scope")} options={[["", "Every Region"], ...SCOPES]} />
@@ -76,7 +76,7 @@ export function RecordFilters({ value, onChange, kind }: { value: RecordFilterVa
             options={[["", "Any"], ...(d.field_type === "yes_no" ? ([["yes", "Yes"], ["no", "No"]] as Array<[string, string]>) : ((d.options as string[] | null) ?? []).map((o) => [o, o] as [string, string]))]}
           />
         ))}
-      </Grid>
+      </div>
     </DesktopOnly>
   );
 }

@@ -10,7 +10,7 @@
 | Capabilities | `partnerships.configure` (the Categories tab: categories, their agreement templates, delivery checklists and custom fields; pipeline stages and lists; proof points; saved proposal templates); `partnerships.money` (see and enter commission, the merchant's take and returns; import returns) |
 | Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026; PR 1 registers them in the next two free PROGRESS rows, #104 and #105 while free, and corrects this guide if another milestone took one first); changes to My Workspace (#4 Today, #5 Tasks, #6 Calendar, #101 Projects), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
 | Status | Built |
-| Last changed | 13/11/2026 |
+| Last changed | 16/11/2026 |
 
 ---
 
@@ -106,11 +106,11 @@ verification page.
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | Partnerships · Pipeline (`pipeline`) | Staff app | `partnerships` view, within scope (§6.1) | KPI strip (open deals, signed this year, signed value, stalled), deals by stage, longest at a stage, stalled with their blockers | Filter by stage, category, region, owner, health; open a record; New Lead |
-| Partnerships · Categories (`categories`), new, second tab | Staff app | `partnerships` view; writes need `partnerships.configure` | Categories; for the picked one: defaults, agreement templates, delivery checklist, custom fields, its partners and leads; Pipeline Settings; Proof Points | New Category, Edit, Add Template, Tidy With AI, Add Item, Add Field, Retire, Restore, Start From Tracker |
-| Partnerships · Partners (`partners`) and the Partner 360 (`?id=`) | Staff app | `partnerships` view, within scope | The partner list beside the 360: header, four KPI cards, tabs Overview, Deals, Documents, Returns, Work, Activity, Contacts, Details | New Partner, New Deal, the stage switcher, Set Health, Log Interaction, Upload Document, Generate Agreement, New Proposal, Enter Returns, New Project, New Task, New Event, Add Contact, Export |
-| Partnerships · Leads (`leads`) and the Lead 360 (`?id=`) | Staff app | `partnerships` view, within scope | The lead list (status from its deal) beside the Lead 360: header, KPI cards, tabs Overview, Deal, Documents, Work, Activity, Contacts, Details | New Lead, the stage switcher, Set Health, Log Interaction, New Proposal, Close as Lost, Convert to Partner |
-| Partnerships · Proposals (`proposals`) and the Proposal Studio (`?id=`, `?new=`) | Staff app | `partnerships` view, within scope | The proposal list beside the proposal as it will be seen; the studio's Brief, Questions, Draft, Edit and Send steps | New Proposal, Write Draft, Reshuffle, Rewrite Section, Change Layout, Replace Image, Send Proposal, Download PDF, Copy Link, Mark Accepted, Mark Declined, Save as Template, Withdraw |
-| Partnerships · Contracts & MOUs (`contracts-and-mous`) | Staff app | `partnerships` view, within scope | KPI strip, the lifecycle, agreements beside the picked one (approval, signers, verification, renewal) | Generate Agreement, Submit for Approval, Send for Signature, Record Signed Copy, Send Again, Renew, Close Agreement |
+| Partnerships · Categories (`categories`), new, second tab | Staff app | `partnerships` view; writes need `partnerships.configure` | Categories across the page; a category opens on its own page (`?id=`, Back to Categories): defaults, agreement templates, delivery checklist, custom fields, its partners and leads; Pipeline Settings; Proof Points | New Category, Edit, Add Template, Tidy With AI, Add Item, Add Field, Retire, Restore, Start From Tracker |
+| Partnerships · Partners (`partners`) and the Partner 360 (`?id=`) | Staff app | `partnerships` view, within scope | The partner list across the page; a pressed partner opens the 360 on its own page (Back to Partners): header, four KPI cards, tabs Overview, Deals, Documents, Returns, Work, Activity, Contacts, Details | New Partner, New Deal, the stage switcher, Set Health, Log Interaction, Upload Document, Generate Agreement, New Proposal, Enter Returns, New Project, New Task, New Event, Add Contact, Export |
+| Partnerships · Leads (`leads`) and the Lead 360 (`?id=`) | Staff app | `partnerships` view, within scope | The lead list (status from its deal) across the page; a pressed lead opens the Lead 360 on its own page (Back to Leads): header, KPI cards, tabs Overview, Deal, Documents, Work, Activity, Contacts, Details | New Lead, the stage switcher, Set Health, Log Interaction, New Proposal, Close as Lost, Convert to Partner |
+| Partnerships · Proposals (`proposals`) and the Proposal Studio (`?id=`, `?new=`) | Staff app | `partnerships` view, within scope | The proposal list across the page; a pressed proposal opens on its own page (Back to Proposals) as it will be seen, with the studio's Brief, Questions, Draft, Edit and Send steps | New Proposal, Write Draft, Reshuffle, Rewrite Section, Change Layout, Replace Image, Send Proposal, Download PDF, Copy Link, Mark Accepted, Mark Declined, Save as Template, Withdraw |
+| Partnerships · Contracts & MOUs (`contracts-and-mous`) | Staff app | `partnerships` view, within scope | KPI strip, the lifecycle, the agreements across the page; a pressed agreement opens on its own page (Back to Agreements: approval, signers, verification, renewal) | Generate Agreement, Submit for Approval, Send for Signature, Record Signed Copy, Send Again, Renew, Close Agreement |
 | Partnerships · Analytics (`analytics`) | Staff app | `partnerships` view, within scope; money needs `partnerships.money`; ratings follow Performance's rules | The period; per lead owner the performance sheet's eight measures; signed and returns per month; by category, region and stage | Pick a period, Export |
 | My Workspace · Projects (#101), Tasks (#5), Calendar (#6), Today (#4) | Staff app | Workspace's own rules (A24) | A project, task or event connected to a partner shows it; a signed deal's event days on its team's calendar | **Connect to Partner** on New Project, New Task and New Event; a Partner filter on the lists |
 | Settings · Approvals (#72) | Staff app | `settings` view; edit to change | The Partner Agreement flow (§6.9) | Edit Stages, Applies When, as every flow |
@@ -1183,6 +1183,23 @@ the Board button, the Lead to Partner card, the note above the proposal paper, t
 label below follows the word limits (page title 3, card title 4, button 3, toast 8, help 35), Title Case,
 Verb Noun buttons, Lucide icons.
 
+**A list fills the page; a record is a page of its own** (F31 amended 16/11/2026, TB, after MyCity found
+the side-by-side 360s too congested). Partners, Leads, Proposals, Contracts & MOUs and Categories show
+their list at the page's full width, with nothing opened beside it. Pressing a row opens the record on its
+own page at the record's address (`?id=`): **Back to Partners** (Leads, Proposals, Agreements, Categories)
+above it, the record's name as the page's heading and in the trail, and its content across the page.
+Pipeline, Home, ⌘K, the bell and Praxis AI reach the same page through the same address. The phone is
+the same: the list, then the record filling the screen, Back returning to the list. A list's filters sit
+in one row above it (Stage, Category, Region, Owner, Health, then any filterable custom fields).
+
+**The stage is a seven-step bar, not fifteen buttons** (TB, 16/11/2026). A deal's stage shows as a bar
+of the seven steps a stage counts as (Prospect, Contacted, Meeting, Proposal, Negotiation, Signed, Active),
+done, current and ahead, with MyCity's exact stage named beside it ("Contract Review"). **Next Stage**
+moves it to the next stage in MyCity's order in one press, the next stage named beside it; **Change
+Stage** lists every stage, On Hold and Closed Lost among them, for the rarer moves. A deal On Hold or
+Closed Lost shows the bar with no step current and that stage named. Moving back, to On Hold or to Closed Lost
+still asks why, and a first signed stage still asks for the signed copy (§6.5).
+
 ### 10.1 Content tiers
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
@@ -1191,11 +1208,11 @@ Verb Noun buttons, Lucide icons.
 | Categories | Category list (name, partners, leads, default commission); the picked category: Defaults (Default Commission, Default Validity, Counts as Vendor), Templates (name, kind, default, version; Add Template, Tidy With AI, Edit), Delivery Checklist (item, due; Add Item, Move Up, Move Down, Retire), Custom Fields (label, type, applies to, filterable; Add Field); Pipeline Settings (stages with what each counts as; impact; sources; document kinds); Proof Points; New Category; Start From Tracker | Help on Counts As; help on Counts as Vendor | Why lists are data (A26): §6.3 |
 | Partner 360 | Header (logo, name, category, region, owner, status); KPI cards (§6.2); tabs; on Overview each deal's stage switcher, Health, Blockers, Next Action, Expected Close; New Deal, Log Interaction, New Proposal, Generate Agreement, Upload Document, Enter Returns, New Project, New Task, New Event, Add Contact; on Documents (the Lead 360's too) a row opens its file in the viewer (a file it cannot show downloads), Download on each row, Remove Document on an upload | Help on Days Since Last Contact; help on Dormant | How the 360 is assembled: §6.2 |
 | Lead 360 | Header with the status from the deal; KPI cards (Projected Value, Days at Stage, Health, Days Since Last Contact); tabs; the stage switcher; Log Interaction, New Proposal, Close as Lost, Convert to Partner | Help on Status: read from the deal's stage | The conversion transaction: §6.4 |
-| Stage switcher, Set Health | Stages in order, the current marked; Why (required back, On Hold, Closed Lost); Health; Blockers (required for Stalled); Attach Signed Copy when moving to a signed stage | Help on a stage: what it counts as | History mechanics: §6.5 |
-| Partners and Leads lists | List (name, category, region, stage, health, owner, last contact; leads: status); search; filters incl. filterable custom fields; Export; New Partner or New Lead; Lost chip on Leads | None | Dedup scoring: §6.2 |
+| Stage switcher, Set Health | The seven-step bar with the current stage named; Next Stage with the next stage named; Change Stage (every stage, On Hold, Closed Lost); Why (required back, On Hold, Closed Lost); Health; Blockers (required for Stalled); Attach Signed Copy when moving to a signed stage | None: the bar shows the step a stage counts as | History mechanics: §6.5 |
+| Partners and Leads lists | List across the page (name, category, region, stage, health, owner, last contact; leads: status); search; filters in one row incl. filterable custom fields; Export; New Partner or New Lead; Lost chip on Leads | None | Dedup scoring: §6.2 |
 | New Lead, New Partner, New Deal | Organisation (Name, Category, Region, Industry); Contact (Name, Position, Email, Phone); Deal (Title, Objective, Stage, Projected Value, Expected Close, Event Dates, Venue); Advanced (Legal Name, Website, Headquarters, Impact, Impact Rating, Impact Note, Expected Attendance, Source, Comments, custom fields); Deal Options on New Deal (up to five rows); a duplicate warning naming the match | Help on Projected Value; help on Commission when it differs from the category's | Dedup signals: §6.2 |
-| Proposals, Studio | List (proposal, partner, value, status, viewed) beside the proposal as it will be seen; New Proposal; studio steps: Brief (Notes, Transcript, Images, Template), Questions (cards by group, progress, Use Suggestion, Skip, Reshuffle, Write Draft), Draft progress, Edit (Change Layout, Move Up, Move Down, Hide, Replace Image, Rewrite Section), Send (To, Cc, Subject, Message, the stand-ins and unconfirmed figures, Confirm and Send); Download PDF, Copy Link, Mark Accepted, Mark Declined, Withdraw, Revise, Save as Template | Help on a card's Why; help on a stand-in image | Prompts, figure checks, the job: §6.10, §6.11; no reassurance about AI on screen |
-| Contracts & MOUs | KPI strip (Active, In Approval, Awaiting Signature, Renewals 180 Days); lifecycle bar; list (agreement, partner, kind, status, renewal); the picked agreement: the document, approval (stage, waiting on), signers and their state, reference and QR, renewal; Generate Agreement, Submit for Approval, Approve and Reject (when the waiting stage names the reader; Reject asks its Reason), Send for Signature, Record Signed Copy, Send Again, Renew, Close Agreement | Help on Renewal: the notice period | Hashes and evidence: §6.9, the manual |
+| Proposals, Studio | List across the page (proposal, partner, value, status, viewed); a proposal's own page with the proposal as it will be seen; New Proposal; studio steps: Brief (Notes, Transcript, Images, Template), Questions (cards by group, progress, Use Suggestion, Skip, Reshuffle, Write Draft), Draft progress, Edit (Change Layout, Move Up, Move Down, Hide, Replace Image, Rewrite Section), Send (To, Cc, Subject, Message, the stand-ins and unconfirmed figures, Confirm and Send); Download PDF, Copy Link, Mark Accepted, Mark Declined, Withdraw, Revise, Save as Template | Help on a card's Why; help on a stand-in image | Prompts, figure checks, the job: §6.10, §6.11; no reassurance about AI on screen |
+| Contracts & MOUs | KPI strip (Active, In Approval, Awaiting Signature, Renewals 180 Days); lifecycle bar; list across the page (agreement, partner, kind, status, renewal); an agreement's own page: the document, approval (stage, waiting on), signers and their state, reference and QR, renewal; Generate Agreement, Submit for Approval, Approve and Reject (when the waiting stage names the reader; Reject asks its Reason), Send for Signature, Record Signed Copy, Send Again, Renew, Close Agreement | Help on Renewal: the notice period | Hashes and evidence: §6.9, the manual |
 | Analytics | Period; KPI strip (New Prospects, Meetings Held, Proposals Sent, Partnerships Signed); per lead owner table (the eight measures); Signed per Month; Returns per Month (money); By Category; By Region; Stage Conversion; Export | Help on each measure | Definitions: §6.18 |
 | My Workspace forms | Connect to Partner; then Partner and Deal; on edit, Disconnect | None | Visibility: §6.16, workspace.md |
 | Public · Proposal | The proposal as designed; Download PDF; the owner's contact | None | Tracking: §6.10 |
@@ -1207,11 +1224,11 @@ Verb Noun buttons, Lucide icons.
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Pipeline | Two KPI cards (Open Deals, Stalled), the filter chips, then deal cards (record, stage pill, health dot, days at stage) | Signed Value; stage bars beyond the top six | New Lead, full width | Bottom bar More → Partnerships; seven tabs scroll sideways |
-| Categories | Category cards (name, partners, commission) | Pipeline Settings and Proof Points behind their own rows | New Partner Category, the floating button's action | A category opens as a sheet, its four sections (Defaults, Templates, Checklist, Fields) one at a time behind a segmented control |
-| Partners, Partner 360 | Two KPI cards (Active, Quiet), then partner cards; a tapped partner opens the 360 full screen | Export; Owner and Region columns | On the 360, the next stage full width at the foot; Log Interaction in the page menu | The 360's tabs as a scrolling segmented control; Back closes it |
-| Leads, Lead 360 | Two KPI cards (New, Qualified), then lead cards with a status pill | Leads by source | New Lead; on the 360 the next stage at the foot | As the Partner 360 |
+| Categories | Category cards (name, partners, commission) | Pipeline Settings and Proof Points behind their own rows | New Partner Category, the floating button's action | A category opens as its own page, its four sections (Defaults, Templates, Checklist, Fields) one at a time behind a segmented control; Back returns to the list |
+| Partners, Partner 360 | Two KPI cards (Active, Quiet), then partner cards; a tapped partner opens the 360 full screen | Export; Owner and Region columns | On the 360, the deal's Next Stage full width under its step bar; Log Interaction in the page menu | The 360's tabs as a scrolling segmented control; Back to Partners returns to the list |
+| Leads, Lead 360 | Two KPI cards (New, Qualified), then lead cards with a status pill | Leads by source | New Lead; on the 360 the deal's Next Stage under its step bar | As the Partner 360 |
 | Proposals, Studio | Proposal cards (partner, status, viewed); the studio one step a screen; question cards one at a time, Skip and Reshuffle under the answer | Change Layout and Move (desktop only; the phone edits text and images) | Write Draft, then Send Proposal at the foot | StepBar at the top; Back steps back |
-| Contracts & MOUs | Two KPI cards (Awaiting Signature, Renewals), then agreement cards with status and renewal date | The lifecycle bar | The agreement's next step at the foot of its sheet | Tabs scroll sideways |
+| Contracts & MOUs | Two KPI cards (Awaiting Signature, Renewals), then agreement cards with status and renewal date | The lifecycle bar | The agreement's next step at the foot of its page | Tabs scroll sideways |
 | Analytics | The period, two KPI cards, then one card per lead owner with the eight measures | Charts beyond Signed per Month | Pick the period | Tabs scroll sideways |
 | Public · Proposal | The cover, then sections in one column | Nothing | Download PDF | One page |
 | Public · Sign | The agreement, then the code, then the signature pad full width | Nothing | Sign Agreement, full width | One step at a time |
@@ -1227,8 +1244,8 @@ From `@mycity/ui` (docs/COMPONENTS.md): `ListDetail`, `DetailPane`, `DataView`, 
 `Paper`, `RichText`, `ComboField` (Upload Document's Kind, a lead's Source) and `ComboListField` (Impact,
 §6.3); and the app's own `ExportAction` (`app/src/features/shared/sections.tsx`), as
 every screen's Export already uses. **New**, each added with `npm run new:component` (header, test,
-gallery page), never inside the feature: `StageSwitcher` (stages in order, one press to move, keyboard
-and 44 px targets), `QuestionCard` (a studio card: question, why, answer control by kind, suggestion,
+gallery page), never inside the feature: `StageSwitcher` (the seven-step bar with the stage named, Next Stage and Change Stage;
+44 px targets; reworked 16/11/2026 from a button a stage), `QuestionCard` (a studio card: question, why, answer control by kind, suggestion,
 Skip, Reshuffle), `DocumentFrame` (a sandboxed, token-styled preview of server HTML with section
 overlays for the studio's edit controls). `DocumentEditor` (built in PR 2: headings, numbered clauses,
 tables and field chips, with Insert Field) is the template editor, beside `RichTextField`.
@@ -1640,6 +1657,17 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
   Head of Department at stage one, the CEO at both, the submitter and staff never). The demo's Write Draft now
   walks its steps over a few seconds, so the studio's progress can be pictured.
 
+- **16/11/2026 (TB): a list fills the page and a record opens on its own page** (§10). MyCity found the
+  360s beside their lists too congested (Partners, Leads, Categories at 1440 px: the list, five filter
+  boxes and the record in half the width each, fifteen stage buttons over three lines). F31 is amended:
+  Partners, Leads, Proposals, Contracts & MOUs and Categories open a record as a page of its own at its
+  `?id=` address (Back to Partners, Leads, Proposals, Agreements, Categories), as Recruitment's vacancy
+  does; nothing opens beside a list or unasked; the phone shows the same page full screen. The filters sit
+  in one row. `StageSwitcher` became the seven-step bar of what a stage counts as, the exact stage named,
+  **Next Stage** and **Change Stage** (the phone's separate Next Stage at the record's foot is gone: the
+  bar's is full width there). TB chose all five screens, the one-row filters and the bar over a stage
+  pill alone or a step a press.
+
 ### 13.3 Still open
 
 - **AI jobs:** settled. `template-tidy` is Default (JP, 06/11/2026) and `proposal-message` is Default (TB,
@@ -1956,6 +1984,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 16/11/2026 · TB · A list fills the page and a record opens on its own page (§2, §10, §13.2; F31 amended): Partners, Leads, Proposals, Contracts & MOUs and Categories, desktop and phone; the filters in one row; `StageSwitcher` reworked into the seven-step bar with Next Stage and Change Stage. The chapter's steps and pictures follow.
 - 13/11/2026 · JP · Praxis AI's partnerships summaries (`praxis-ai.md` Appendix B PR 6, §9): leads, partners, proposals, agreements and interactions in figures for the Overview's charts, within §6.1's one rule; `partnerships.summary` and `partnership_returns.summary` give their money as `ngn`, so the Overview reads it as naira. No screen of Partnerships changed.
 - 13/11/2026 · JP · A record's documents open (§5, §7, §10.1): on the Partner 360's and the Lead 360's Documents tab a row opens its file in the app's file viewer (`useFileViewer`, `GET /documents/:id/content` under the vault's read rule), each row has Download, and an upload has Remove Document after a confirm (`DELETE /partnerships/documents/:id`, `partner_document.removed`, the file out of the vault); a signed copy, an agreement or a proposal is kept (`DOCUMENT_KEPT`). Found the same day: an upload could be listed but neither opened nor downloaded.
 - 13/11/2026 · JP · Open lists (§6.3): Upload Document's Kind, a lead's Source and Impact on New Lead, New Partner, New Deal, Edit Lead and Edit Deal are typed or picked; a name the list does not hold joins it, and Pipeline Settings still renames, moves and retires every value. New `GET /lists/:list/suggestions`; `PartnerDocumentAttach.kind`, `LeadCreate`/`LeadUpdate` `source` and every `impact` take `listWords`; `LeadDetail` and `DealDetail` gain `impact_labels`; new shared component `ComboListField` (`ComboField` gained `onPick`). Found on Praxis AI: an Add Partner Document card holding a kind MyCity's list lacked ("Service Agreement") showed Pick from the list with no list to pick from; it now files and the kind joins the list, the card unchanged.

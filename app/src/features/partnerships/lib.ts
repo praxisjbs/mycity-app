@@ -5,6 +5,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { paging } from "@/features/shared/wire";
 import { hasCapability } from "@/shell/access";
 import { toast, type DocumentEditorField } from "@mycity/ui";
+import { useState } from "react";
 
 /**
  * Wiring the Partnerships screens share (docs/guides/partnerships.md §10): MyCity's lists and
@@ -182,7 +183,19 @@ export const SCOPES: Array<["cities" | "national" | "africa" | "worldwide", stri
 /** Days as a person reads them. */
 export const daysWord = (n: number | null | undefined) => (n === null || n === undefined ? "None" : n === 0 ? "Today" : n === 1 ? "1 day" : `${n} days`);
 
-/** Where a record opens: a lead's 360 or a partner's, beside its list. */
+/**
+ * A list's chips and filters, kept while the person is on a record's own page (§10): Back returns to the list
+ * as they left it. Held for the session in memory only.
+ */
+const kept = new Map<string, unknown>();
+export function useKept<T>(key: string, initial: T): [T, (next: T) => void] {
+  const [value, setValue] = useState<T>(() => (kept.has(key) ? (kept.get(key) as T) : initial));
+  return [value, (next: T) => (kept.set(key, next), setValue(next))];
+}
+/** Forgets every kept list state (a test's fresh start). */
+export const forgetKept = () => kept.clear();
+
+/** Where a record opens: a lead's 360 or a partner's, on its own page. */
 export const recordHref = (r: { type: "lead" | "partner"; id: string }) => `/partnerships?tab=${r.type === "lead" ? "leads" : "partners"}&id=${r.id}`;
 
 /* Categories (M7 PR 2): the setup screens' labels and the template editor's fields. */

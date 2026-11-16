@@ -357,7 +357,9 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   Candidates, Assessments, Interviews, Offers and, once built, Onboarding (F31 amended 08/11/2026 and
   11/11/2026, GE). So do both payslips, Payroll · Payslips and ESS · My Payslips: the centred dialog
   at every desktop width and a full sheet on a phone (F31 amended 11/11/2026, JBS Praxis;
-  `docs/guides/payroll.md` §10.3).
+  `docs/guides/payroll.md` §10.3). Partnerships' Partners, Leads, Proposals, Contracts & MOUs and
+  Categories fill the page with their list and open a record as a page of its own (`?id=`, a Back
+  button above it), on desktop and phone (F31 amended 16/11/2026, TB; `docs/guides/partnerships.md` §10).
 - **The main action within thumb reach**: at the bottom of the screen or the sheet, full width.
 - **Tap targets at least 44 × 44 px.** Inline help terms inside a sentence or heading are the only
   exception.

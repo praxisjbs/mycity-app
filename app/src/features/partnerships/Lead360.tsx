@@ -12,7 +12,7 @@ import { LoseLead } from "./forms/LoseLead";
 import { EditLead } from "./forms/RecordForm";
 import { UploadDocument } from "./forms/UploadDocument";
 import { daysWord, HEALTH, leadPill, useHoldsMoney, useMay } from "./lib";
-import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP } from "./record";
+import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, RecordState, SINCE_CONTACT_HELP } from "./record";
 import { NextEvents, WorkTab } from "./WorkTab";
 
 const TABS = ["overview", "deal", "documents", "work", "activity", "contacts", "details"] as const;
@@ -59,7 +59,7 @@ export function Lead360({ id }: { id: string }) {
       )}
       <ProfileHeader
         brand
-        level={2}
+        level={1}
         name={lead.name}
         role={[lead.category, lead.region, lead.owner?.display_name].filter(Boolean).join(" · ")}
         chips={
@@ -120,7 +120,6 @@ export function Lead360({ id }: { id: string }) {
           />
         )}
       </div>
-      {tab === "overview" && <NextStage deal={x.deal} readOnly={readOnly || done} />}
     </>
   );
 }

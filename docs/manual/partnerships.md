@@ -70,11 +70,12 @@ Partnerships can read them. Only people allowed to set Partnerships up can chang
 
 1. Open [Partnerships · Categories](/partnerships?tab=categories).
 2. Use **Status** to show the categories **In Use**, **Retired** or **All**.
-3. Press a category. On a computer it opens beside the list. On a phone it opens as a sheet.
+3. Press a category. It opens on its own page.
    ![A category open](shot:partnerships-category-open)
 4. Read its sections: **Defaults**, **Templates**, **Checklist** and **Fields**. On a computer they sit
    one below another. On a phone, press a name above them to switch.
 5. **In This Category** lists its partners and its leads, with their owners.
+6. Press **Back to Categories** to return to the list.
 
 ### Add a category {#partnerships-categories-add needs="cap partnerships.configure"}
 
@@ -218,7 +219,8 @@ returns, work, activity and contacts.
 3. On a computer, use the filters above the list. They work as on
    [the Pipeline](#partnerships-pipeline-filter).
 4. Type in **Search partners** to find one by name or number.
-5. Press a partner. On a computer its 360 opens beside the list. On a phone it fills the screen.
+5. Press a partner. Its 360 opens on its own page. **Back to Partners** returns to the list, with your
+   filters as you left them.
    ![A partner's 360](shot:partnerships-partner-360)
 6. Read the header: the name, category, region and owner, with its status. **Signed Before the Hub**
    marks a partner that signed before MyCity used this system.
@@ -270,17 +272,20 @@ If you press **Add Partner** with neither a copy nor the tick, the form says *At
 
 ### Move a deal's stage {#partnerships-partners-stage needs="partnerships edit"}
 
-The stages sit in a row on the deal. There is no board. You move a deal with one press.
+Each deal shows its **Stage** by name, over a bar of seven steps: **Prospect**, **Contacted**, **Meeting**,
+**Proposal**, **Negotiation**, **Signed** and **Active**. The bar shows how far the deal has come. There is
+no board. You move a deal with one press.
 
 1. Open the partner or the lead. The deal is on **Overview**.
-   ![The stage switcher](shot:partnerships-stage-switcher)
-2. Press the stage to move to. The message reads *Moved to* and the stage's name. On a phone, press
-   **Next Stage** at the bottom of the screen.
-3. Moving back, to **On Hold** or to **Closed Lost** asks you to explain. Type the **Why**, at least
+   ![The stage and its steps](shot:partnerships-stage-switcher)
+2. Read **Next** under the stage's name. Press **Next Stage** to move the deal there. The message reads
+   *Moved to* and the stage's name.
+3. To move anywhere else, press **Change Stage** and pick the stage. **On Hold** and **Closed Lost** are
+   at the end of its list.
+4. Moving back, to **On Hold** or to **Closed Lost** asks you to explain. Type the **Why**, at least
    ten characters, then press **Move Stage**.
    ![Why a deal moves back](shot:partnerships-stage-why)
-4. The first move to a signed stage asks for the **Signed Copy**. Upload it and press **Move Stage**.
-5. Hover over the **Stage** row to read what the stage counts as in totals and reports.
+5. The first move to a signed stage asks for the **Signed Copy**. Upload it and press **Move Stage**.
 
 When someone else moves a deal, its owner is told. Moves are listed under **Stage History** on
 **Activity**.
@@ -405,7 +410,7 @@ that deal's stage, so you never type it.
    leaves **Open**. **Lost** shows it again.
 3. Read the cards: **New**, **Qualified**, **Contacted** and **Converted This Month**.
 4. On a computer, **Leads by Source** shows where leads come from.
-5. Press a lead to open its 360.
+5. Press a lead. Its 360 opens on its own page. **Back to Leads** returns to the list.
    ![A lead's 360](shot:partnerships-lead-360)
 6. Hover over the status to read it: read from its deal's stage. **On Hold** marks a deal that waits.
 7. Read the cards: **Projected Value**, **Days at Stage**, **Health** and **Days Since Last Contact**.
@@ -472,7 +477,7 @@ It asks for what is missing, writes the proposal, and you edit it before you sen
 
 1. Open [Partnerships · Proposals](/partnerships?tab=proposals).
 2. Read the cards: **Sent This Year**, **Viewed, No Reply**, **Accepted** and **Acceptance Rate**.
-3. Press a proposal. On a computer it opens beside the list. On a phone it fills the screen.
+3. Press a proposal. It opens on its own page. **Back to Proposals** returns to the list.
 4. Read its status:
 
 | Status | What it means |
@@ -591,7 +596,7 @@ sealed with a reference and a QR code anyone can check.
    Hover over **Renewals 180 Days** to read what it counts.
 3. Press **All**, **Draft**, **In Review**, **In Approval**, **Sent**, **Active**, **Expiring** or
    **Closed** to narrow the list.
-4. Press an agreement.
+4. Press an agreement. It opens on its own page. **Back to Agreements** returns to the list.
    ![An agreement open](shot:partnerships-agreement)
 5. On a computer, the line at the top follows it from **Draft** to **Renewed**.
 6. **Approval** shows the **Stage** and who it is **Waiting On**. **Signers** shows each signer's state.
@@ -993,9 +998,10 @@ open: /partnerships?tab=leads
 as: operations
 do:
   - click: row 1
-  - wait: button "Set Health"
+  - wait: button "Change Stage"
 marks:
-  1: button "Set Health" | Say how the deal is going
+  1: button "Change Stage" | Pick any stage
+  2: button "Set Health" | Say how the deal is going
 ```
 
 ```shot partnerships-stage-why
@@ -1003,7 +1009,8 @@ open: /partnerships?tab=leads
 as: operations
 do:
   - click: row 1
-  - click: button "Move to On Hold"
+  - click: button "Change Stage"
+  - click: text "On Hold"
   - wait: label "Why"
 crop: modal
 marks:
