@@ -204,6 +204,7 @@ const MODULE_TO_CATEGORY = Object.freeze({
   ess: "people",
   community: "comms",
   mailbox: "comms",
+  documents: "system",
   people: "people",
   performance: "performance",
   queries: "queries",

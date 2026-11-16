@@ -10,7 +10,7 @@
 | Capabilities | `sops.manage` (write, publish and archive any department's SOPs; Knowledge Hub · SOPs) · `training.manage` (build, publish, assign and archive courses, and see everyone's progress; Knowledge Hub · Training) |
 | Screens (PROGRESS.md rows) | #63 SOPs, #65 Training, #110 ESS · My Training; #64 FAQs and #66 Announcements are Dropped |
 | Status | Agreed |
-| Last changed | 14/11/2026 |
+| Last changed | 16/11/2026 |
 
 This guide is **M10 Knowledge Hub's single source of truth**: the rules, the data, the API, the
 screens and the build plan (Appendix A). The build tracker is `docs/handoff/m10-knowledge-hub.md`.
@@ -614,6 +614,7 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 
 ## 14 · Change log
 
+- 16/11/2026 · TB · §9: the Document Centre's Library lists a training certificate for the person it was awarded to and the holders of `training.manage`, and an SOP's files for everyone who opens the Knowledge Hub (`training.library.js`, `knowledge.library.js`; `document-centre.md` §6.2), the vault's own rules for them written once more for a list. Nothing on a Knowledge Hub screen changed.
 - 14/11/2026 · JP · §9: `sops.summary` and `training.summary`, the SOPs and the places on courses in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8): the SOPs as each reader may read them; every place for `training.manage`, otherwise the reader's own. Nothing on screen changes.
 - 13/11/2026 · TB · My Notes on desktop (§6.13): Minimise Notes, Open Notes, Close Notes and Try Again did nothing on desktop. A press anywhere on the bar took the pointer for dragging, so the button's click went to the bar. `NoteTaker` now starts a drag only from the bar itself or Move Notes; a test presses each button with the pointer. The phone was not affected.
 - 12/11/2026 · TB · Training · Settings: the Library and Proof Required switches are named by their words again (a screen reader heard "Switch", since their titles carry a help term); `ToggleRow` takes a `label` for its switch. Found while filming the Milestone 10 video (`docs/runbooks/training-videos.md` §7).

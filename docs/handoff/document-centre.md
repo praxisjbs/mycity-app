@@ -12,7 +12,7 @@ the date, and add a line to §3.
 | Owner | TB (Tom-Blake Asaah) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Branches | PR 1 `m10/document-centre-library`, PR 2 `m10/document-centre-company` (a cloud session uses the branch it was given) |
-| Pull requests | PR 0 (this documentation); PR 1 and PR 2 add their numbers here |
+| Pull requests | PR 0 (the plan) praxisjbs/mycity-app#163; PR 1 PRNUM; PR 2 adds its number here |
 
 ---
 
@@ -58,17 +58,17 @@ Praxis AI's read.
 
 ### PR 1 · The library over what exists
 
-- [ ] Contract `library.js`; `SECTIONS` in `plan.js`
-- [ ] The `documents` key, its grants (`10590`), README §5.2, the settings test's counts
-- [ ] `10500`: the two indexes on `document`
-- [ ] The registry `shared/documents/library.js`: sources, the default rule as SQL, `NOT_IN_LIBRARY`
-- [ ] The 13 `<module>.library.js` sources of the guide's §6.2
-- [ ] `src/modules/library/`: list, summary, one document, filters
-- [ ] `library-access.test.js`, both directions, every system role
-- [ ] ⌘K: `library.search.js`, `library_item`, the screen's entry; the empty `documents.search.js` deleted
-- [ ] Document Centre · Library on both shells, on the contract; the mock
-- [ ] PROGRESS section and row #113, the counts; MILESTONES §18's table; the guides of the modules touched
-- [ ] The User Guide chapter and its pictures
+- [x] 16/11/2026 · Contract `library.js`; `SECTIONS` in `plan.js`
+- [x] 16/11/2026 · The `documents` key, its grants (`10590`), README §5.2, the settings test's counts
+- [x] 16/11/2026 · `10500`: the two indexes on `document`
+- [x] 16/11/2026 · The registry `shared/documents/library.js`: sources, the default rule as SQL, `NOT_IN_LIBRARY`
+- [x] 16/11/2026 · The `<module>.library.js` sources of the guide's §6.2: 15 sources in 13 modules, 17 document types
+- [x] 16/11/2026 · `src/modules/library/`: list, summary, one document, filters
+- [x] 16/11/2026 · `library-access.test.js`, both directions, the seven system roles, the CEO and three made-up roles
+- [x] 16/11/2026 · ⌘K: `library.search.js`, `library_item`, the screen's entry; the empty `documents.search.js` deleted
+- [x] 16/11/2026 · Document Centre · Library on both shells, on the contract; the mock
+- [x] 16/11/2026 · PROGRESS section and row #113, the counts; MILESTONES §18's table; the guides of the modules touched
+- [x] 16/11/2026 · The User Guide chapter and its pictures
 - [ ] `npm run ci` green; PR opened, ready, green on GitHub, merged
 
 ### PR 2 · Company documents and the extras
@@ -87,4 +87,5 @@ Praxis AI's read.
 
 ## 3 · Log
 
+- 16/11/2026 · TB · PR 1 built, in the planning chat as TB asked (the same model and effort): the `documents` key, the registry and its 15 sources, the `library` module, Document Centre · Library (#113) on both shells, ⌘K's Documents group, the chapter and its pictures. What the build settled beyond the plan, now in the guide: a row is a file that can be opened (scanned and drawn, §6.1); a source names its entity types and may give a finer `kind`, a `listed` narrowing and an `expires` date (§6.2); Expiring shows before Signed and an agreement's term counts (§6.6); a search holds every word to the row (§6.7); the filters offer only the types a reader holds (§5). What PR 2 should know: `library.readable()` already takes `{ listed: false }` for the access test; `vault.hasAccess()` exists; `NOT_IN_LIBRARY` must lose nothing when `company_document` joins; the mock's ⌘K does not list documents (the real API does). Left: PR 2.
 - 16/11/2026 · TB · Planned in one chat from a study of the vault (63 document types, 25 read rules) and TB's nine answers: the guide with its Appendix A, MILESTONES §18 ratified, this tracker. No code. Left: PR 1, then PR 2.

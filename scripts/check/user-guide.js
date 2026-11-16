@@ -71,6 +71,7 @@ const SECTION_KEYS = {
   "Knowledge Hub": "knowledge",
   "Praxis AI": "praxis_ai",
   "AI Control": "ai_control",
+  "Document Centre": "documents",
   Settings: "settings",
 };
 

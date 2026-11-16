@@ -737,6 +737,14 @@ keeps what it asked for in the answer's `metadata.ask`, and an answer its Overvi
 - `10440` `training_note`: one running note per person and course (unique on `employee_id`,
   `training_course_id`), `body` up to 20,000 characters, the person's alone; `updated_at` trigger.
 
+**Built 16/11/2026, Document Centre PR 1** (`docs/guides/document-centre.md` §4):
+- `10500` two indexes on `document` and nothing else: `document_library_idx` (`doc_type`, `created_at DESC`
+  where `is_current`), a type's current files newest first, as the Library lists them; and
+  `document_entity_idx` (`entity_type`, `entity_id`), a record's files, which had no index. The Library
+  reads `document` where it is: no table of its own until its PR 2.
+- `10590` seed: the `documents` grants (every system role views the Library; create and edit for the
+  heads and those who run the company; delete for those who keep it), `ON CONFLICT DO NOTHING`.
+
 ### M11 Handover · 11000 to 11999 · TB
 
 No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `restore-drill.js`).

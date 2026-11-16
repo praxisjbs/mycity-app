@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 14/11/2026 |
+| Last changed | 16/11/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -1205,6 +1205,7 @@ screen.
 
 ## 14 · Change log
 
+- 16/11/2026 · TB · §9: the Document Centre's Library lists what is filed on an employee's record (a document, an identification, a certificate: `documents.library.js`; rent evidence: `organisation.library.js`; `document-centre.md` §6.2), each for the readers `vault.canRead` already lets open it. `vault.hasAccess()` says whether an entity type has a read rule of its own, and `shared/documents/library.js` is the library's registry. The `documents` module's empty `documents.search.js` is deleted: ⌘K finds documents through the library (`library.search.js`). Nothing on a People or Self-Service screen changed.
 - 14/11/2026 · JP · §9: `imports.summary`, Import History in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8). Nothing on screen changes.
 - 14/11/2026 · JP · §6.12: Praxis AI's Download PDF joins the list (`praxis-ai.md` §6.19 item 8): a PDF reserved with `exports.reserve` and drawn in the worker, since its figures are the asker's at the build, not at the press.
 - 13/11/2026 · JP · `organisation.ai.js` declares `seats.summary` beside `employees.summary` (`SeatSummaryQuery`; `organisation.repo.aiSeats`, `organisation.service.aiSeats`): the structure's roles open and filled by department, the people reporting to an open role and the departments with an acting head, for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7; `organogram.md` §9). Nothing on screen changes.

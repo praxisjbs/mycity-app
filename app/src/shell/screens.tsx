@@ -18,6 +18,7 @@ export const SCREENS: Record<string, Loader> = {
   ess: lazy(() => import("@/features/ess")),
   community: lazy(() => import("@/features/community")),
   mailbox: lazy(() => import("@/features/mailbox")),
+  documents: lazy(() => import("@/features/documents")),
   people: lazy(() => import("@/features/people")),
   performance: lazy(() => import("@/features/performance")),
   queries: lazy(() => import("@/features/queries")),

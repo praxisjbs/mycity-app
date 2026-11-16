@@ -1,0 +1,25 @@
+{
+  "document-centre-document": {
+    "spec": "db126740919472ea",
+    "source": "5473645a9ff2efa0",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "document-centre-filters": {
+    "spec": "595baeeb9666fd9b",
+    "source": "5473645a9ff2efa0",
+    "devices": [
+      "phone"
+    ]
+  },
+  "document-centre-library": {
+    "spec": "b8930b54ae403452",
+    "source": "5473645a9ff2efa0",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

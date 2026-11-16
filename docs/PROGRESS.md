@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 107 screens (97 in the staff app, 10 on the public site) plus
+**The single record of what is built.** 108 screens (98 in the staff app, 10 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -52,8 +52,8 @@ saying who agreed and when.
 | M7 Partnerships, CRM & Trackers | 8 | 0 | 0 | 8 | 0 | 0 |
 | M8 Expenses & Budget Control | 7 | 0 | 0 | 7 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
-| M10 Staff Knowledge Hub & AI Assistance | 8 | 0 | 0 | 8 | 0 | 0 |
-| **Total** | **107** | **0** | **0** | **107** | **0** | **0** |
+| M10 Staff Knowledge Hub & AI Assistance | 9 | 0 | 0 | 9 | 0 | 0 |
+| **Total** | **108** | **0** | **0** | **108** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Five ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6), My Requests (M8),
@@ -1026,6 +1026,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 - 15/10/2026 · AJ · Frontend built in `app/src/features/mailbox/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/mailbox.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · GE · Demo composer added (rich text, recipient chips, attachments with progress, schedule,
   inline discard), reader full screen on mobile. Engineering guide `docs/guides/mailbox.md` written.
+
+### Document Centre
+
+| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
+|---|---|---|---|---|---|---|---|---|---|
+| 113 | Library | `library` | M10 | TB | ☑ | ☑ | ☑ | Built | 16/11/2026 |
+
+**Notes**
+
+- 16/11/2026 · TB · Document Centre PR 1, Library (#113) API, UI and Mobile (`docs/guides/document-centre.md`, Appendix A): a new rail module with its own key, `documents` (every system role views it, seed `10590`). The Library lists the business documents a reader may already open from their own modules, read from the vault's `document` table where they are: 17 document types from 13 modules (agreements, partner documents, proposals, offer letters, employment contracts, query and sanction letters, staff record documents, expense invoices, disbursement receipts, statutory sources, leaving certificates, training certificates, SOP files), each through its module's `<module>.library.js` and the registry `shared/documents/library.js`. Four KPI cards that set the list's filter (All Documents, Added This Month, Expiring Soon, Signed), a search that holds every word to the row, the filters Area, Type, Status and Added, and a document beside the list on a wide desktop and in a full sheet on a phone with its preview, View File, Download and Open Record. ⌘K finds the same documents (group Documents). The one rule, that the library never lists what `vault.canRead` refuses, is held both ways for the seven system roles, the CEO and three made-up roles by `tests/integration/library-access.test.js`. Migration `10500` adds two indexes on `document`. The empty `documents.search.js` is deleted. User Guide: the Document Centre chapter with its pictures. Left: PR 2 (company documents in categories with an audience, tags, Upload Document, versions, archive, Categories #114, the letterhead, search inside files, expiry reminders, Praxis AI's read).
 
 ### People
 

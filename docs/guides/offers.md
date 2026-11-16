@@ -10,7 +10,7 @@
 | Capabilities | none; who approves an offer is the `recruitment.offer` flow on Settings · Approvals, not a capability |
 | Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, #112 Upload Documents (added with PR 6a; `new:screen` makes staff-app tabs only); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
 | Status | Built |
-| Last changed | 13/11/2026 |
+| Last changed | 16/11/2026 |
 
 The public pages (`public-app/src/pages/SignOffer.tsx`, `Verify.tsx`) joined **Frontend paths** with
 PR 4, which wired them; Upload Documents with PR 7. The People 360 Documents tab joined with PR 7 as
@@ -557,6 +557,7 @@ Decided 12/11/2026 (AJ), found filming the Milestone 5 video:
 
 ## 14 · Change log
 
+- 16/11/2026 · TB · §9: the Document Centre's Library lists the letter an offer holds and the contract a hire holds, the sealed copy once signed (`offers.library.js`, `employment_contracts.library.js`; `document-centre.md` §6.2), by the vault's default rule. Nothing on Offers or Onboarding changed.
 - 13/11/2026 · JP · Praxis AI's offer and onboarding summaries (`praxis-ai.md` Appendix B PR 5, §9): offers and cases in figures for the Overview's charts, within the lists' own scope, an offer's pay only for a reader who sees pay. No screen changed.
 
 - 13/11/2026 · AJ · The click-through's findings (§3, §6, §7, §13): the sealed offer filed on the hire

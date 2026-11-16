@@ -10,7 +10,7 @@
 | Capabilities | `partnerships.configure` (the Categories tab: categories, their agreement templates, delivery checklists and custom fields; pipeline stages and lists; proof points; saved proposal templates); `partnerships.money` (see and enter commission, the merchant's take and returns; import returns) |
 | Screens (PROGRESS.md rows) | #50 Pipeline, #51 Partners, #52 Leads, #53 Proposals, #54 Contracts & MOUs, #55 Analytics; new: Partnerships · Categories and Public · Proposal (ratified 05/11/2026; PR 1 registers them in the next two free PROGRESS rows, #104 and #105 while free, and corrects this guide if another milestone took one first); changes to My Workspace (#4 Today, #5 Tasks, #6 Calendar, #101 Projects), Settings · Approvals (#72), Settings · Imports (#93), Home, Mailbox, Public · Sign Offer and Verify Document |
 | Status | Built |
-| Last changed | 13/11/2026 |
+| Last changed | 16/11/2026 |
 
 ---
 
@@ -1956,6 +1956,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 16/11/2026 · TB · §9: the Document Centre's Library lists an agreement's PDF (the sealed copy once signed, named by its kind), a lead's or a partner's documents and a proposal as sent (`agreements.library.js`, `partners.library.js`, `proposals.library.js`; `document-centre.md` §6.2). An agreement and a record's documents follow §6.1 as their own screens do (`dealSeen`, `recordSeen`); a proposal's PDF follows the vault's default rule, so a reader whose scope is not `all` does not find it there (`document-centre.md` §13, question 5). Nothing on a Partnerships screen changed.
 - 13/11/2026 · JP · Praxis AI's partnerships summaries (`praxis-ai.md` Appendix B PR 6, §9): leads, partners, proposals, agreements and interactions in figures for the Overview's charts, within §6.1's one rule; `partnerships.summary` and `partnership_returns.summary` give their money as `ngn`, so the Overview reads it as naira. No screen of Partnerships changed.
 - 13/11/2026 · JP · A record's documents open (§5, §7, §10.1): on the Partner 360's and the Lead 360's Documents tab a row opens its file in the app's file viewer (`useFileViewer`, `GET /documents/:id/content` under the vault's read rule), each row has Download, and an upload has Remove Document after a confirm (`DELETE /partnerships/documents/:id`, `partner_document.removed`, the file out of the vault); a signed copy, an agreement or a proposal is kept (`DOCUMENT_KEPT`). Found the same day: an upload could be listed but neither opened nor downloaded.
 - 13/11/2026 · JP · Open lists (§6.3): Upload Document's Kind, a lead's Source and Impact on New Lead, New Partner, New Deal, Edit Lead and Edit Deal are typed or picked; a name the list does not hold joins it, and Pipeline Settings still renames, moves and retires every value. New `GET /lists/:list/suggestions`; `PartnerDocumentAttach.kind`, `LeadCreate`/`LeadUpdate` `source` and every `impact` take `listWords`; `LeadDetail` and `DealDetail` gain `impact_labels`; new shared component `ComboListField` (`ComboField` gained `onPick`). Found on Praxis AI: an Add Partner Document card holding a kind MyCity's list lacked ("Service Agreement") showed Pick from the list with no list to pick from; it now files and the kind joins the list, the card unchanged.

@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/documents/` |
 | Permission key(s) | `documents` |
 | Capabilities | `documents.manage` (the Categories tab: categories and who sees each; see, edit, replace and archive every company document) |
-| Screens (PROGRESS.md rows) | new: Document Centre · Library and Document Centre · Categories (ratified 16/11/2026; PR 1 registers Library and PR 2 Categories in the next free PROGRESS rows, #113 and #114 while free, and corrects this guide if another change takes a number first) |
+| Screens (PROGRESS.md rows) | #113 Library (PR 1, built 16/11/2026); new: Document Centre · Categories (ratified 16/11/2026; PR 2 registers it in the next free PROGRESS row, #114 while free, and corrects this guide if another change takes the number first) |
 | Status | Agreed |
 | Last changed | 16/11/2026 |
 
@@ -151,10 +151,10 @@ view first; the reader's documents are then narrowed by §6.3, never by the `doc
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /library/documents` | `LibraryListQuery` → `LibraryPage` | `documents` view · §6.3 | yes, 25 | Filters: `q`, `area`, `type`, `status` (`signed`, `expiring`), `from`, `to` (added on), `added` (`this_month`). Sort: `-created_at` (default), `title`, `expires_on`. PR 2 adds `category_id`, `tag`, `archived` |
+| `GET /library/documents` | `LibraryListQuery` → `LibraryPage` (rows are `LibraryDocument`) | `documents` view · §6.3 | yes, 25 | Filters: `q` (§6.7), `area` (a module key), `doc_type`, `status` (`signed`, `expiring`), `added` (`this_month`, `last_90_days`, `this_year`, Lagos time). Sort: `created_at` (newest first when none is asked), `title`, `expires_on`. PR 2 adds `category_id`, `tag`, `archived` |
 | `GET /library/documents/summary` | → `LibrarySummary` | `documents` view · §6.3 | | The four figures over every document the reader may see, not the page |
 | `GET /library/documents/:id` | `IdParams` → `LibraryDocument` | `documents` view · §6.3 | | A document id of any version answers its current version. 404 when the reader may not read it, never 403 |
-| `GET /library/filters` | → `LibraryFilters` | `documents` view | | The areas and types the reader can reach: a code list from the registry of §6.2, not a list of records |
+| `GET /library/filters` | → `LibraryFilters` | `documents` view · §6.3 | | The types the reader holds at least one document of, and their areas, in the rail's order: a code list from the registry of §6.2, not a list of records, so a filter never offers a type that would list nothing |
 
 A file's bytes stay on the vault's routes (`GET /documents/:id/content`, `/variant/:kind`,
 `/versions`), unchanged.
@@ -178,13 +178,18 @@ Every list is paged at 25 through `shared/http/paged.js`. No route takes a page 
 
 ### 6.1 What a library row is
 
-One row is one current file: `document.is_current`, `scan_status <> 'infected'`, a type of §6.2, and
-readable by §6.3. A superseded version is reached from its document's history, never listed. A staged
-upload (`staged_upload`) is never listed. A company document that is archived is listed only with the
-Archived filter, for a holder of `documents.manage`.
+One row is one file that can be opened now: `document.is_current`, scanned clean or never needing a
+scan (`scan_status` `clean` or `skipped`), drawn (`render_status` null or `done`), of a type of §6.2
+stored against an entity its source names, and readable by §6.3 (`BASE` in the registry). A
+stranger's upload still being scanned, a PDF still being drawn and an infected file are not rows: the
+vault would refuse to serve them. A superseded version is reached from its document's history, never
+listed. A staged upload (`staged_upload`) is never listed. A company document that is archived is
+listed only with the Archived filter, for a holder of `documents.manage` (PR 2).
 
-A source may narrow further to the files its record still holds (`listed`): a regenerated agreement
-draft the agreement no longer points at is not a library row.
+A source narrows further to the files its record still holds (`listed`): an agreement lists its
+sealed copy once signed and the copy sent for signature until then, so a draft drawn again leaves the
+one before it behind; an offer, a contract, an invoice, a receipt, a letter and a certificate list the
+file their record points at.
 
 ### 6.2 Library sources
 
@@ -194,28 +199,42 @@ register in):
 
 ```js
 module.exports = librarySource({
-  types: ["partner_document"],            // registered doc types
-  area: "partnerships",                   // the module key; its label is the Area filter's
-  label: "Partner Document",              // the Type filter's, Title Case
-  record: {                               // the record the file belongs to, as SQL over alias d
-    type: "CASE WHEN pd.partner_id IS NULL THEN 'lead' ELSE 'partner' END",
-    id: "COALESCE(pd.partner_id, pd.lead_id)",
-    label: "COALESCE(p.name, l.name)",
-    ref: "NULL",
-    join: "JOIN partner_document pd ON pd.partner_document_id = d.entity_id::uuid LEFT JOIN ...",
+  area: "partnerships",                            // the module key; its label is the Area filter's
+  types: { partner_document: "Partner Document" }, // registered doc types, each with the Type filter's name
+  entity: "partner_document",                      // the entity type(s) the vault stores them against
+  kind: "(SELECT ...)",                            // optional: a finer name for the row (MOU, Service Agreement)
+  record: {                                        // the record the file belongs to, each SQL over `d`
+    type: "(SELECT CASE WHEN pd.partner_id IS NOT NULL THEN 'partner' ELSE 'lead' END FROM ...)",
+    id: "(SELECT COALESCE(pd.partner_id, pd.lead_id) FROM ...)",
+    label: "(SELECT COALESCE(p.name, l.name) FROM ...)",
+    ref: "(SELECT COALESCE(p.number, l.number) FROM ...)",
   },
+  listed: "EXISTS (...)",                          // optional: only the files the record still holds (§6.1)
+  expires: "(SELECT a.ends_on ...)",               // optional: when it ends, where the record says so (§6.6)
+  default: true,                                   // the vault's default rule, written as SQL by the registry
+  // or, for an entity the module gave vault.defineAccess():
   reach: (client, user) => scopeFor(user, "partnerships", "view"),   // once per request
-  readable: (reach, params) => recordSeenSql(reach, params),         // or `default: true`
+  readable: (scope, params) => "EXISTS (...)",                        // a condition over `d`
 });
 ```
 
-- `readable` is a condition over `d` that pushes its own parameters, as a search provider's does.
-  `default: true` takes the vault's default rule from the registry (§6.3) and needs no SQL.
-- The registry wraps every source's SQL in `CASE WHEN d.doc_type = ANY(<its types>) THEN ... END`, so
-  an `entity_id::uuid` cast is never evaluated for another type's row (a brand slot or a hash is not
-  a uuid, and a `WHERE` gives no order of evaluation).
-- **Every registered doc type is accounted for.** A unit test fails a type that no source lists and
-  `NOT_IN_LIBRARY` (in the registry, each with its reason) does not name. A new type must choose.
+- `readable` is a condition over `d` that pushes its own parameters, as a search provider's does; a
+  reach of nothing (no grant on the module) reaches nothing and the source is not asked. `default:
+  true` takes the vault's default rule from the registry (§6.3) and needs no SQL.
+- **A source's rule is the vault's kind.** Loading refuses a `default: true` source whose entity has
+  a `vault.defineAccess()` rule (`vault.hasAccess`), and a source with its own rule whose entity has
+  none, so a rule added to the vault later cannot leave the library on the old one.
+- The registry puts every source's SQL behind `CASE WHEN d.doc_type = ANY(<its types>) AND
+  d.entity_type = ANY(<its entities>) THEN ... END`, so an `entity_id::uuid` cast is never evaluated
+  for another type's row (a brand slot or a hash is not a uuid, and a `WHERE` gives no order of
+  evaluation where a `CASE` does). A library type stored against an entity its source does not name
+  is not that source's to list.
+- `kind` names a row more finely than its type: an agreement reads MOU, Service Agreement, Contract
+  or Deal Merchant Agreement, and a partner's document reads the kind MyCity gave it (Signed Copy
+  for a signing's paper copy). The Type filter keeps the type's own name.
+- **Every registered doc type is accounted for.** A unit test (`library.test.js`, `unaccounted()`)
+  fails a type that no source lists and `NOT_IN_LIBRARY` (in the registry, each with its reason)
+  does not name. An export or a transient type is never a library type. A new type must choose.
 
 | Area | Type (doc type) | Belongs to | Rule | PR |
 |---|---|---|---|---|
@@ -223,14 +242,14 @@ module.exports = librarySource({
 | Partnerships | Partner Document (`partner_document`) | The partner or lead | `partner_document`: `recordSeen` | 1 |
 | Partnerships | Proposal (`proposal`) | The proposal, its number, its partner or lead | default | 1 |
 | Recruitment | Offer Letter (`offer_letter`) | The offer, its candidate | default | 1 |
-| Recruitment | Employment Contract (`employment_contract`) | The employee | default | 1 |
+| Recruitment | Employment Contract (`employment_contract`) | The employee it made (the hire's name until then), the contract's number | default | 1 |
 | Queries & Sanctions | Query Letter (`query_letter`), Sanction Letter (`sanction_letter`) | The employee, the query number | default | 1 |
 | People | Employee Document (`employee_document`), Identification (`employee_identification`), Certificate (`employee_certificate`), Rent Evidence (`rent_evidence`) | The employee | default | 1 |
 | Expenses | Expense Invoice (`expense_invoice`) | The request, its number | default | 1 |
 | Expenses | Disbursement Receipt (`disbursement_receipt`) | The disbursement, its number | default | 1 |
 | Payroll | Statutory Source (`statutory_source`) | The statutory rate it evidences | default | 1 |
-| Payroll | Leaving Certificate (`leaving_certificate`) | The employee | default | 1 |
-| Knowledge Hub | Training Certificate (`training_certificate`) | The employee, the course | `training_enrolment`: the employee, or `training.manage` | 1 |
+| Payroll | Leaving Certificate (`leaving_certificate`) | The employee (stored against their pay record, whose id is theirs) | default | 1 |
+| Knowledge Hub | Training Certificate (`training_certificate`) | The person it names, its certificate number | `training_enrolment`: the employee, or `training.manage` | 1 |
 | Knowledge Hub | SOP File (`sop_file`) | The SOP | `sop`: any `knowledge` view | 1 |
 | Company | Company Document (`company_document`) | Its category | `company_document`: §6.4 | 2 |
 
@@ -256,11 +275,16 @@ read all use it; nothing else decides.
   uses where one exists.
 - `reach` runs once per request per source (scopes, the team, capabilities, role ids) and is bound
   as parameters; no rule runs per row in JavaScript.
-- **Proved, not asserted.** `tests/integration/library-access.test.js` stores one document of every
-  library type, with and without a subject, normal and restricted, and for every system role and
-  scope checks both ways: a listed row passes `vault.canRead`, and a row of a library type that
-  passes `canRead` and is `listed` is in the library. The first direction is the security rule; the
-  second is completeness. A source whose rule drifts from its `defineAccess` fails here.
+- **Proved, not asserted.** `tests/integration/library-access.test.js` stores documents of every
+  library type: about nobody and about three different people, uploaded by three more, normal and
+  restricted, on partners and deals a reader owns, works or does not. For the seven system roles, the
+  CEO and three made-up roles holding the scopes the system roles lack (a module seen without `edit`,
+  seen over a team, and Partnerships over one's own records), it compares the library's condition
+  with `vault.canRead` on every document and requires the two sets equal: never more than the vault
+  allows (the security rule), never less (completeness). It compares the read rule alone
+  (`readable(reach, params, { listed: false })`), since `listed` only narrows; `listed` has its own
+  cases. A source whose rule drifts from its `defineAccess` fails here: dropping the restricted
+  check from the default rule fails three of its tests.
 - Opening, previewing and downloading still go through `vault.getReadable`, so a file is checked
   again by the vault at the moment it is read.
 
@@ -307,16 +331,22 @@ one of them. This is `vault.defineAccess("company_document", ...)` and the same 
 | Expiring Soon | Rows whose `expires_on` is within the Expiring window or has passed | `status=expiring` |
 | Signed | Rows with `locked_at`: signed, sent or filed, never replaceable | `status=signed` |
 
-The Expiring window is the one the Vault lists already use (60 days,
-`docs/guides/foundation.md` §6.9), read from the same place. A row's status pill is worked out, never
-stored: Signed, then Expiring, then none, by that section's order. Archived shows on an archived
-company document.
+The Expiring window is the one the Vault lists already use (60 days, `EXPIRING_WITHIN_DAYS` in the
+documents contract, `docs/guides/foundation.md` §6.9). When a document ends is the record's own date
+where its source gives one (`expires`: a signed agreement's `ends_on` while it is in force), else the
+file's `expires_on`. A row's status pill is worked out, never stored: **Expiring, then Signed, then
+none.** In the library the nearer fact shows, because a signed agreement nearing its end is what the
+card is for; the Signed filter and figure still count every locked document, an expiring one
+included. (The Vault lists of §6.9 keep their own order.) Archived shows on an archived company
+document (PR 2).
 
 ### 6.7 Search (D9)
 
-- `q` is matched folded (`search_fold`), as a prefix and a substring, against the title, the
-  original file name, the number, the type's label, the record's label and reference, and in PR 2 the
-  tags and the file's text.
+- `q` is matched folded (`search_fold`) against the title, the original file name, the number, the
+  type's name (its finer kind where it has one), and the record's label and reference; in PR 2 the
+  tags and the file's text too. **Every word is held to the row, in any order** (the first eight
+  words): "chowdeck service agreement" finds the service agreement with Chowdeck although no one
+  field holds all three. `%` and `_` typed by a person are letters.
 - **The file's text** (PR 2): the `document-text` job reads a library type's PDF with
   `services/media/pdf-text.js` (its limits made a parameter: the first 200 pages and 500,000
   characters for the library, 10 pages for a CV as before) and a Word file's `word/document.xml`
@@ -391,9 +421,11 @@ the `edit` grant on its own module, the subject, the uploader or the CEO.
 ## 9 · AI and search
 
 - **Search** (`library.search.js`, PR 1): one provider, type `library_item`, group **Documents**,
-  words `document`, `file`, `doc`. Its id is the document's id; it opens
+  words `document`, `documents`, `file`, `files`, `doc`. Its id is the document's id; it opens
   `/documents?tab=library&id=<id>`. `reach` and `readable` are §6.3's, so ⌘K lists exactly what the
-  Library does. `library_item` joins `ENTITY_ROUTES`; `document` and `document_request` keep their
+  Library does. ⌘K matches the whole line against one field at a time, and a type word at either end
+  of the line narrows to that type as everywhere ("service agreement" narrows to Agreements); the
+  Library's own search is the one that holds every word. `library_item` joins `ENTITY_ROUTES`; `document` and `document_request` keep their
   routes and their `search:none` markers. PR 2 adds `company_document` (marked `search:none found as
   a library_item`) and a provider for `document_category` (group Document Categories, for
   `documents.manage`).
@@ -419,7 +451,7 @@ the `edit` grant on its own module, the subject, the uploader or the CEO.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Document Centre · Library | The four KPI cards; search; the filters Area, Type, Status, Added and, in PR 2, Category and Tag; the list: Document, Type, Belongs To, Added, Expires, status pill; the record: the preview, Type, Belongs To, Number, Added, Added By, Size, Expires, Version, and View File, Download, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Category, Tags, the words found in the file | A help term on Expiring Soon (the window) and on Signed (a signed document is never replaced); a Details row on the record for the file name and, where a file has no text, that it is found by name | That the library is a view of the vault, how a read rule is applied, why a document is missing for one reader: this guide §6, the User Guide |
+| Document Centre · Library | The four KPI cards, each setting the list's filter; search; the filters Area, Type, Status, Added and, in PR 2, Category and Tag; the list: Document, Type, Belongs To, Added, Expires, status pill; the record: the preview, Type, Belongs To, Number, Added, Added By, Size, Expires, Version, and View File, Download, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Category, Tags, the words found in the file | A help term on Expiring Soon (the window) and on Signed (a signed document is never replaced); a Details row on the record for the file name and, where a file has no text, that it is found by name | That the library is a view of the vault, how a read rule is applied, why a document is missing for one reader: this guide §6, the User Guide |
 | Document Centre · Categories | The categories: Category, Seen By, Documents; the record: name, description, Seen By with its roles; New Category, Edit Category, Archive Category | A help term on Seen By (uploaders and document managers always see their documents) | How audiences are enforced: §6.4 |
 
 Word limits are FRONTEND_GUIDE §5's: the page title is Library, card titles are the four of D7, every
@@ -429,10 +461,10 @@ button is Verb Noun. A file's preview is content (`data-copy="content"`).
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Document Centre · Library | The four KPI cards two to a row, the search, Filter Documents (the filters in a sheet), then document cards: title, type pill, what it belongs to, the date | The subtitle; the Added By, Size and Version columns (they are in the record's sheet) | Download, full width at the foot of the record's full sheet; Upload Document from the screen's New action | Documents in the More tiles; the two tabs scroll sideways; a tapped card opens its sheet and nothing opens before a tap (F31) |
+| Document Centre · Library | The four KPI cards two to a row, Filter Documents (the four filters in a sheet with Show Documents and Clear Filters; the button counts the filters set), the search, then document cards: the title with its status pill, Type, Belongs To, Added | The subtitle; the Expires column (it is in the record's sheet with Added By, Size and Version) | Download, full width at the foot of the record's full sheet; Upload Document from the screen's New action | Documents in the More tiles; the two tabs scroll sideways; a tapped card opens its sheet and nothing opens before a tap (F31) |
 | Document Centre · Categories | Category cards: name, Seen By, the count | The description (in the sheet) | New Category | The second tab |
 
-Desktop is the list beside the record (`ListDetail`, `cols="1/1.5"`, `full`), a table with a sticky
+Desktop is the list beside the record (`ListDetail`, the list the wider of the two, `full`), a table with a sticky
 filter row, the preview drawn in the pane (`DocumentPreview` over `useFileBlob`), View File in the
 full screen viewer (`useFileViewer`). Model the list on `app/src/features/partnerships/Contracts.tsx`
 and `recruitment/TalentPool.tsx`, the record and the upload on `people/EmployeeDocuments.tsx`; do
@@ -448,8 +480,8 @@ input exists and none is added. No folder icon exists; the module's icon is `doc
   says the document was removed.
 - **Not previewable** (Word, Excel): the record shows the file's card with Download; no preview pane
   is faked.
-- **A stranger's file still being scanned** is listed (its source decides) but opens nothing until
-  the scan is clean, as the vault serves it today; an infected file is never listed.
+- **A stranger's file still being scanned, a PDF still being drawn**: not listed until it can be
+  opened (§6.1); an infected file is never listed.
 - **Open Record without the grant** (an employee's own offer letter, in Recruitment): the button is
   not drawn. A document about the reader links to its Self-Service screen where the route map has one.
 - **A record with no name** (a draft with no title): Belongs To shows the record's number.
@@ -497,6 +529,7 @@ None blocks the build. Each is TB's to decide unless it names another owner.
 
 ## 14 · Change log
 
+- 16/11/2026 · TB · PR 1 built: the `documents` key and its grants (`10590`), the two indexes (`10500`), the registry `shared/documents/library.js` with its 15 sources in 13 modules over 17 document types, the `library` module (list, figures, one document, filters, ⌘K) and Document Centre · Library (#113) on both shells. Brought in line with what was built: §5 (the list's filters are `area`, `doc_type`, `status`, `added`; the filters offer only types the reader holds), §6.1 (a row is a file that can be opened: scanned and drawn), §6.2 (the source's shape: `types` with their names, `entity`, `kind`, `listed`, `expires`; a source's rule must be the vault's kind), §6.3 (how the proof compares), §6.6 (Expiring shows before Signed; an agreement's term counts), §6.7 (every word of a search is held to the row), §9, §10 and §11.
 - 16/11/2026 · TB · Written and agreed: the Document Centre, a new module with the `documents` key, planned from the study of the vault and TB's nine answers (§1.1), with the two-PR build plan of Appendix A.
 
 ## Appendix A · The build plan (TB, 16/11/2026)

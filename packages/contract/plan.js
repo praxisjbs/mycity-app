@@ -26,6 +26,7 @@ const SECTIONS = Object.freeze({
   ess: "Employee Self-Service",
   community: "Staff Community",
   mailbox: "Mailbox",
+  documents: "Document Centre",
   people: "People",
   performance: "Performance",
   queries: "Queries & Sanctions",
