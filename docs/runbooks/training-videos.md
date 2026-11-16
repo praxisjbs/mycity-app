@@ -27,7 +27,7 @@ The tooling is `scripts/video/` (README §4). The scenes, one file a video, are
 | M0 and M1, part 1: Signing In (5:16, 8 chapters) | `m01-signing-in-1.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
 | M0 and M1, part 2: Safer Sign-In (4:42, 8 chapters) | `m01-safer-sign-in-2.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
 | M0 and M1, part 3: Finding Your Way (6:48, 10 chapters) | `m01-finding-your-way-3.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
-| M0 and M1, part 4: Home and Attendance | not written yet | To film on a working morning (§8) | |
+| M0 and M1, part 4: Home and Attendance (5:34, 11 chapters) | `m01-home-attendance-4.js` | Made 16/11/2026, sent to JBS Praxis; to upload (§5) | |
 | M0 and M1, part 5: Community and Mail | `m01-community-mailbox-5.js` | Made 14/11/2026, sent to JBS Praxis; to upload (§5) | |
 
 ---
@@ -386,6 +386,15 @@ upload is capped at 30 MB; Drive is not. Add the row to the table at the top of 
     outage makes requests wait, not fail, and records nothing (§7).
 41. **Probes trip the sign-in limit.** Wrong passwords sent while testing an outage slow the account down (429 at
     sign-in): never send them for a person the video signs in as, and clear the filming Redis database before a take.
+42. **Clocking in, on a real morning.** Seed fresh before anyone's seeded clock-in has come (the seed writes only the
+    punches whose time has come), film the clock-in before the shift starts, and run the seed's attendance step again
+    once the team is in (`morning()` in `m01-home-attendance-4.js`; a person's own punch is left alone). A shot that
+    films the clock sets `clock: true`, so filming leaves the clock's own offer open.
+43. **The first sign-in of the day opens the clock once.** A probe that signs the person in spends it: rehearse on a
+    colleague in the same post, never the person the camera follows.
+44. **A day is judged once.** A schedule set after someone's clock-in never moves that day's end (attendance.md §6.4):
+    a half day must be set before they clock in. An early clock-out raises no note while the policy's Early Departure
+    rule is off.
 
 ## 7 · Bugs found while filming
 
@@ -398,6 +407,7 @@ listed here and in `docs/PROGRESS.md`.
 | 14/11/2026 | Set Your Password, New Password | **Confirm Password** visited and left empty read **Does not match**; **Enter it again**, which the User Guide promises, could never show while New Password held anything | Fixed the same day: an empty confirmation asks for it again, a different one does not match; `Login.test.tsx`. The guide's "as you type" for the password rules now says they show once you move on |
 | 14/11/2026 | Home · Overview, Clocked In Today (staging) | "22 of 17 clocked in": the attendance seed punched the payroll seed's invented employees, whom the register never expects (no login) | Fixed the same day: the seed punches only people with a login (`seeds/staging/lib/attendance.js`); `home-staging-seed.test.js` |
 | 14/11/2026 | ESS · Org Chart, People · Organogram (desktop) | A person's card was a focusable box with no role or name: a screen reader read it as text, not something to open | Fixed the same day: the person's name is the card's button, described by their job; a press anywhere on the card still opens them; `OrgTree.test.tsx` |
+| 16/11/2026 | Home · Overview, the Staff day strip | Shift Today read the person's schedule in force: a schedule People changed after the clock-in showed the new hours on Home while the clock and the register kept the hours the day was judged against | Fixed the same day: Shift Today reads today as the clock does (`reconcile.judgedOn`, `dashboard.layout.js`); `home-overview.test.js` |
 | 14/11/2026 | My Security | The headless browser's name read "Safari on Linux" | Not code: no person's browser is named HeadlessChrome; filming presents as a real one (§6.33) |
 | 10/11/2026 | Recruitment · New Vacancy (#38) | A salary typed as people write it (`350,000`, or `350000`) was refused as "Check the format", so the salary question could not be passed: the band went to the contract as typed, not with two places | Fixed the same day: the questions, the draft request and the editor send it through `toMoneyString`; a test types `350,000` through to a saved draft |
 | 10/11/2026 | Recruitment · Candidates (#39) | A candidate opened in a dialog at every desktop width, where F31 and the User Guide put them beside the board | Fixed: beside the board on a wide desktop, the board keeping its full width until a card is pressed (`ListDetail` `fillUntilPicked`, new); forms return to the candidate in place; headings one level down, the two score cards stacked |
@@ -484,15 +494,17 @@ its own `prepare`: #general, Brand Team, a message from Precious Iyeserhen, Aaro
 and announcement, Summarise Thread and Write With AI, a message scheduled to Ifeoma Mbonu). All at -16.3 or -16.4 LUFS.
 Four bugs fixed on the branch (§7). The tooling learnt §1.8 to §1.10 and §6.30 to §6.38.
 
-Part 4 is not filmed: clocking in must be filmed in real working hours, never on a faked clock (§6.19). Plan, on a
-working morning, from a fresh seed of that day (the seed writes only the punches whose time has come): a colleague not on
-leave clocks in on their phone before 09:00 (Aaron's seeded leave runs to 18/11/2026), Cynthia's Overview and its cards,
-Ifeoma's, Team, Alerts and Reports once the team is in, People · Attendance and an exception decided, My Attendance, and
-Finish Your Day at the shift's end. The office needs a worksite first (none is seeded): check how People · Worksites
-places one with address search unavailable (F27) before scripting it.
+**16/11/2026 · JP (with Claude). Part 4, Home and Attendance** (5:34, 11 chapters, -16.3 LUFS), filmed on one real
+working day, never a faked clock (§6.19): the filming database seeded fresh at 07:17, before anyone's seeded clock-in.
+Bassey Ekpe (Aaron is on leave that week) clocks in on his phone at 08:39 from the clock's own Start Your Day; after
+10:00 the seed's attendance step ran again (17 of 17 in, 2 late); Cynthia's Overview and Clocked In Today, Ifeoma's,
+Team, Alerts and Reports (Run Now, Run as PDF), the register and its Exceptions, and Bassey's My Attendance. JBS Praxis
+chose not to wait for 17:00: a half day set by People was tried first, but a day is judged once (§6.44), so Bassey leaves
+early for an appointment at 11:30 and clocks out; Finish Your Day at the shift's end, Remind Me and the system clock-out
+are said. The attempt found and fixed a Home bug (§7). Remote staff need no worksite (Clock Location Not Checked).
 
 - [x] Write, film and check parts 1, 2, 3 and 5 (14/11/2026).
-- [ ] Write and film part 4 on a working morning; add its row above.
+- [x] Write and film part 4 (16/11/2026).
 - [ ] Upload all five to Drive (§5) and add their links to the table at the top.
 
 **14/11/2026 · JP (with Claude).** Both Milestone 6 videos written, filmed and assembled on one development

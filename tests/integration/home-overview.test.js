@@ -493,6 +493,28 @@ describeDb("Home · Overview against the real migrations", () => {
       expect(tuesday.day_strip).toMatchObject({ status: "on_site", worked_minutes: 8 * 60 + 30 });
     });
 
+    test("Staff: a schedule changed after today's clock-in leaves Your Day on the shift the day was judged against, as the clock reads it (attendance.md §6.4)", async () => {
+      // A half day set today, after the 08:50 clock-in: the day stays judged against 09:00 to 17:00.
+      const days = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
+        weekday,
+        working: weekday <= 5,
+        place: "office",
+        starts_at: weekday === 3 ? "09:00" : null,
+        ends_at: weekday === 3 ? "12:00" : null,
+      }));
+      const { rows } = await pool.query(
+        `INSERT INTO attendance_work_schedule (employee_id, days, effective_from, reason, set_at)
+         VALUES ($1, $2, $3, 'A half day, set after the clock-in', now()) RETURNING attendance_work_schedule_id`,
+        [users.staff.employee_id, JSON.stringify(days), TODAY],
+      );
+      try {
+        const o = await at14("staff");
+        expect(o.day_strip).toMatchObject({ starts_at: "09:00", ends_at: "17:00" });
+      } finally {
+        await pool.query("DELETE FROM attendance_work_schedule WHERE attendance_work_schedule_id = $1", [rows[0].attendance_work_schedule_id]);
+      }
+    });
+
     test("Staff: My Goals are their targets due this quarter", async () => {
       const o = await at14("staff");
       expect(o.my_goals).toEqual([

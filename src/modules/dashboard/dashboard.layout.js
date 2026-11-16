@@ -40,6 +40,8 @@ const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const roster = require("../attendance/attendance.roster");
 const schedules = require("../attendance/attendance.schedule");
+const reconcile = require("../attendance/attendance.reconcile");
+const attendanceRepo = require("../attendance/attendance.repo");
 const leave = require("../leave/leave.service");
 const organisation = require("../organisation/organisation.service");
 const calendar = require("./sources/calendar.source");
@@ -268,7 +270,10 @@ async function pipeline(client, { today, scopes }) {
  * the shift's end, and there are none until they clock out.
  */
 async function dayStrip(client, { user, today }) {
-  const shift = user.employee_id ? await schedules.dayOn(client, user.employee_id, today) : null;
+  // Today's shift as the clock reads it (attendance.md §6.4): once the day is judged, the shift it was
+  // judged against, so a schedule changed after the clock-in never makes Your Day and the clock differ.
+  const person = user.employee_id ? await attendanceRepo.person(client, user.employee_id) : null;
+  const shift = person ? (await reconcile.judgedOn(client, person, today)).judged.shift : null;
   const own = { scope: "own", scope_ids: [user.employee_id] };
   const row =
     (await roster.page(client, { date: today }, own, { page: 1 })).data[0] ||

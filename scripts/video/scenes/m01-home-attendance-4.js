@@ -10,12 +10,13 @@
  * Once the team is in (`morning` below runs the seed's own attendance step again, which writes only the
  * punches whose time has come and leaves Bassey's own day alone), Cynthia Osakunih, Operations &
  * People, reads her Overview, Team, Alerts and Reports and the attendance register, and Ifeoma Mbonu,
- * the CEO, her Overview. At the shift's end Bassey finishes his day.
+ * the CEO, her Overview. Late in the morning Bassey leaves early for an appointment and clocks out; the
+ * 17:00 prompt, Remind Me and the system clock-out are said, not shown (JBS Praxis chose not to wait).
  *
  *   node scripts/video/make.js m01-home-attendance-4 film --only=c02s01,c03s01      before 09:00
  *   node -e 'require("./scripts/video/scenes/m01-home-attendance-4").morning()'  after 10:00
  *   node scripts/video/make.js m01-home-attendance-4 film --only=<the day's shots>
- *   node scripts/video/make.js m01-home-attendance-4 film --only=c10s01              at 17:00
+ *   node scripts/video/make.js m01-home-attendance-4 film --only=c10s01              his clock-out
  */
 const path = require("node:path");
 const h = require("../helpers");
@@ -254,12 +255,14 @@ module.exports = {
           start: HOME,
           label: { eyebrow: "On Bassey's phone", title: "Finish Your Day", subtitle: "Bassey Ekpe clocks out" },
           lines: [
-            "At 17:00 his shift ends, and the clock asks him to Finish Your Day.",
-            "Still working? Remind Me asks again in fifteen minutes, thirty, or an hour.",
-            { say: "Bassey is done. He taps Clock Out.", do: (s) => s.click(h.button(s, "Clock Out", clock(s))) },
-            { say: "Day Complete, with his times.", do: (s) => h.soft(s, clock(s).getByText(/Day Complete|Clocked Out/).first(), 10000) },
+            "Late in the morning, Bassey has an appointment, and leaves early.",
+            { say: "He opens Quick Actions, and the clock.", do: async (s) => { await s.click(h.button(s, "Quick Actions")); await s.click(s.page.getByRole("button", { name: /Clock Out/ }).last()); } },
+            { say: "Finish Your Day, with when he clocked in and his Shift, 09:00 to 17:00.", do: (s) => h.soft(s, clock(s).getByText("Shift").first()) },
+            { say: "He taps Clock Out.", do: (s) => s.click(h.button(s, "Clock Out", clock(s))) },
+            { say: "Clocked Out, with the time. His day keeps the time he left.", do: (s) => h.soft(s, clock(s).getByText(/Clocked Out/).first(), 10000) },
+            "Whether leaving early counts against a day is a rule in MyCity's Attendance Policy. Today it is off.",
+            { say: "On an ordinary day, the clock opens by itself at 17:00 with Finish Your Day, and Remind Me asks again later.", do: (s) => s.click(h.button(s, "Done", clock(s))) },
             "Forget to clock out, and the hub reminds him every 30 minutes, then clocks him out itself about 90 minutes after the end.",
-            { say: "Such a day reads System Clock-Out, and he gives the time he really left from My Attendance.", do: (s) => s.click(h.button(s, "Done", clock(s)).or(h.button(s, "Close", clock(s))).first()) },
           ],
         },
       ],
