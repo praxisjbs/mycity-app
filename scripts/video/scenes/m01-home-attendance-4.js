@@ -201,7 +201,7 @@ module.exports = {
             { say: "Alerts holds what needs clearing: a rule broken, a deadline passed. Each is raised by a rule.", do: (s) => h.soft(s, h.heading(s, "Open Alerts")) },
             { say: "Alert Rules lists the rules. Attendance's come from MyCity's Attendance Policy.", do: async (s) => { await s.click(h.button(s, "Alert Rules")); await s.wait(1.2); } },
             { say: "Reports are the reports she receives, by email and here, on a schedule.", do: (s) => s.go(REPORTS) },
-            { say: "Run Now runs Daily Attendance at once.", do: async (s) => { await s.click(h.button(s, "Run Now")); await s.wait(1.5); } },
+            { say: "Run Now runs Daily Attendance at once, as a PDF or a spreadsheet.", do: async (s) => { await s.click(h.button(s, "Run Now")); await s.click("Run as PDF"); await s.wait(1.5); } },
             { say: "Recent Runs lists each file, numbered, with Download.", do: (s) => h.soft(s, h.heading(s, "Recent Runs")) },
             "New Report builds another: what it covers, who receives it, how often, as a PDF or a spreadsheet.",
           ],
