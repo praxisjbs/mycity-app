@@ -9,7 +9,7 @@
   },
   "qs-add-lead": {
     "spec": "48889f8a9b486996",
-    "source": "a1ac65e0d763a00c",
+    "source": "6da0a0557c9d5d5a",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "qs-agreement": {
     "spec": "46d926cf44de79b9",
-    "source": "a1ac65e0d763a00c",
+    "source": "6da0a0557c9d5d5a",
     "devices": [
       "desktop",
       "phone"
@@ -145,7 +145,7 @@
   },
   "qs-log-interaction": {
     "spec": "2866c5e00fda28af",
-    "source": "a1ac65e0d763a00c",
+    "source": "6da0a0557c9d5d5a",
     "devices": [
       "desktop",
       "phone"
@@ -249,7 +249,7 @@
   },
   "qs-send-proposal": {
     "spec": "ebe5e4751c49aeea",
-    "source": "a1ac65e0d763a00c",
+    "source": "6da0a0557c9d5d5a",
     "devices": [
       "desktop",
       "phone"

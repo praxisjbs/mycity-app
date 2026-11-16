@@ -2,34 +2,51 @@ import { useState } from "react";
 import type { GalleryEntry } from "../testing/gallery";
 import { StageSwitcher } from "./StageSwitcher";
 
-/** MyCity's stages as its tracker lists them (docs/guides/partnerships.md §6.3). */
-const STAGES = [
-  { code: "prospect_identified", label: "Prospect Identified" },
-  { code: "initial_contact", label: "Initial Contact" },
-  { code: "intro_meeting_held", label: "Meeting Held" },
-  { code: "proposal_sent", label: "Proposal Sent" },
+/** The seven steps a stage counts as, and MyCity's stages as its tracker lists them (docs/guides/partnerships.md §6.3). */
+const STEPS = [
+  { code: "prospect", label: "Prospect" },
+  { code: "contacted", label: "Contacted" },
+  { code: "meeting", label: "Meeting" },
+  { code: "proposal", label: "Proposal" },
   { code: "negotiation", label: "Negotiation" },
-  { code: "partnership_signed", label: "Partnership Signed" },
-  { code: "active_partnership", label: "Active Partnership" },
-  { code: "closed_lost", label: "Closed Lost" },
-  { code: "on_hold", label: "On Hold" },
+  { code: "signed", label: "Signed" },
+  { code: "active", label: "Active" },
 ];
 
-function Moving() {
-  const [stage, setStage] = useState("proposal_sent");
-  return <StageSwitcher stages={STAGES} value={stage} onMove={(code) => new Promise<void>((resolve) => setTimeout(() => (setStage(code), resolve()), 600))} />;
-}
+const STAGES = [
+  {
+    code: "prospect_identified",
+    label: "Prospect Identified",
+    step: "prospect",
+  },
+  { code: "initial_contact", label: "Initial Contact", step: "contacted" },
+  { code: "intro_meeting_held", label: "Meeting Held", step: "meeting" },
+  { code: "proposal_sent", label: "Proposal Sent", step: "proposal" },
+  { code: "negotiation", label: "Negotiation", step: "negotiation" },
+  { code: "contract_review", label: "Contract Review", step: "negotiation" },
+  { code: "partnership_signed", label: "Partnership Signed", step: "signed" },
+  { code: "active_partnership", label: "Active Partnership", step: "active" },
+  { code: "closed_lost", label: "Closed Lost", step: null },
+  { code: "on_hold", label: "On Hold", step: null },
+];
 
-function Start() {
-  const [stage, setStage] = useState("prospect_identified");
-  return <StageSwitcher stages={STAGES} value={stage} onMove={setStage} />;
+const OPEN = STAGES.filter((s) => s.step);
+const after = (code: string) => {
+  const i = OPEN.findIndex((s) => s.code === code);
+  return OPEN[i + 1]?.code ?? null;
+};
+
+function Moving({ from }: { from: string }) {
+  const [stage, setStage] = useState(from);
+  return <StageSwitcher steps={STEPS} stages={STAGES} value={stage} next={after(stage)} onMove={(code) => new Promise<void>((resolve) => setTimeout(() => (setStage(code), resolve()), 600))} />;
 }
 
 export default {
   component: "StageSwitcher",
   states: {
-    "At Proposal Sent": () => <Moving />,
-    "A New Deal": () => <Start />,
-    "Read Only": () => <StageSwitcher stages={STAGES} value="partnership_signed" onMove={() => undefined} readOnly />,
+    "At Contract Review": () => <Moving from="contract_review" />,
+    "A New Deal": () => <Moving from="prospect_identified" />,
+    "On Hold": () => <Moving from="on_hold" />,
+    "Read Only": () => <StageSwitcher steps={STEPS} stages={STAGES} value="partnership_signed" onMove={() => undefined} readOnly />,
   },
 } satisfies GalleryEntry;

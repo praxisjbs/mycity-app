@@ -90,7 +90,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Navigation | [QuestionMap](#questionmap) | `QuestionMap` | The questions of a sitting as numbered squares: the one in hand in yellow, each answered one in green, a press moving to that question. | beta |
 | Navigation | [SectionNav](#sectionnav) | `SectionNav` | A long page's contents: its sections as links with icons, the one in view marked as the page scrolls, a press scrolling to it. | beta |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
-| Navigation | [StageSwitcher](#stageswitcher) | `StageSwitcher` | A deal's stages in order, the current one marked; one press on another stage moves the deal there. | beta |
+| Navigation | [StageSwitcher](#stageswitcher) | `StageSwitcher` | A deal's stage as a bar of the few steps its stages count as, the exact stage named, with Next Stage and Change Stage. | beta |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
 | Navigation | [TeamList](#teamlist) | `TeamList` | The teams hiring, one picked at a time, each with how many roles it has: a column of rows on desktop (the one picked in Deep Green with a yellow count), a row of pills that scrolls sideways inside itself below 1041 px. | beta |
 | Overlays | [ConfirmDialog](#confirmdialog) | `ConfirmDialog` | A yes or no before an action that cannot be taken back, named for the thing it acts on ("Delete Rule"). | stable |
@@ -2707,14 +2707,14 @@ Two to five views of the same thing side by side in one pill (Mine, My Team; Wee
 
 ### StageSwitcher
 
-A deal's stages in order, the current one marked; one press on another stage moves the deal there.
+A deal's stage as a bar of the few steps its stages count as, the exact stage named, with Next Stage and Change Stage.
 
 | | |
 |---|---|
-| Use | A record that moves through a list of stages one press at a time: a partnership deal on its 360 (docs/guides/partnerships.md §6.5). The screen asks for a reason, or the signed copy, after the press when the move needs one. |
+| Use | A record that moves through a long list of stages: a partnership deal on its 360 (docs/guides/partnerships.md §6.5, §10). The bar shows how far it has come; Next Stage is the usual move in one press; Change Stage lists every stage for the rarer ones. The screen asks for a reason, or the signed copy, after the press when the move needs one. |
 | Avoid | Filtering a list by stage (use Chips or FilterSelect); a board of cards in columns (use Kanban); steps of a form (use Wizard or StepBar). |
-| Phone | One row that scrolls sideways inside itself, the current stage brought into view; each stage is a 44 px target. The screen puts the next stage full width at the foot of the record. |
-| Accessibility | A group named by `label`; each stage is a button, the current one aria-current="step" and refused, the others named "Move to Proposal Sent". Left and Right move between stages. While a move runs its button says aria-busy and the others aria-disabled. |
+| Phone | The bar keeps its width with only the current step named under it; Change Stage and Next Stage stack full width, 44 px each, Change Stage opening as an action sheet. |
+| Accessibility | A region named by `label`; the bar is a list whose current step is aria-current="step"; Next Stage is named "Move to Proposal Sent"; the current stage in Change Stage is shown and not choosable. While a move runs Next Stage says aria-busy and Change Stage waits. |
 | Status | beta |
 | Exports | `StageSwitcher` |
 | Import | `import { StageSwitcher } from "@mycity/ui";` |
@@ -2726,15 +2726,17 @@ A deal's stages in order, the current one marked; one press on another stage mov
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `stages` | `readonly StageOption[]` | yes | The stages in order, the ones a deal may move to (retired stages left out, the current one kept). |
+| `steps` | `readonly StageStep[]` | yes | The bar's steps, in order. |
+| `stages` | `readonly StageOption[]` | yes | Every stage the record may move to, in order (retired stages left out, the current one kept): Change Stage lists them. |
 | `value` | `string` | yes | The code of the stage the record is at. |
-| `onMove` | `(code: string) => unknown` | yes | One press on another stage: hand back the work (a promise) so the stage spins and the others wait until it settles (F26). |
-| `label` | `string` |  | Names the group for assistive technology ("Stage"). |
-| `readOnly` | `boolean` |  | The record is read only (a converted lead): the stages show, none can be pressed. |
+| `next` | `string \| null` |  | The stage Next Stage moves to; none hides the button (the last stage, On Hold, Closed Lost). |
+| `onMove` | `(code: string) => unknown` | yes | One move: hand back the work (a promise) so Next Stage spins and Change Stage waits until it settles (F26). |
+| `label` | `string` |  | Names the region for assistive technology ("Stage of Drive-Time Features"). |
+| `readOnly` | `boolean` |  | The record is read only (a converted lead): the bar and the stage show, nothing moves. |
 | `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
 
 ```tsx
-<StageSwitcher label="Stage" stages={stages} value={deal.stage} onMove={(code) => move(code)} />
+<StageSwitcher steps={steps} stages={stages} value={deal.stage} next="proposal_sent" onMove={(code) => move(code)} />
 ```
 
 ### Tabs

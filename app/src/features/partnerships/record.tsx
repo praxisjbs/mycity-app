@@ -5,8 +5,8 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useFileViewer, viewableFile } from "@/features/shared/files";
 import { PagedTable } from "@/features/shared/sections";
 import { hrefFor } from "@/lib/routes";
-import { Link } from "@/lib/router";
-import { Button, Card, CardHeader, DataView, Details, EmptyState, formatDate, formatDateTime, formatMoney, HelpTerm, IconButton, KeyValue, LoadingRows, PhoneOnly, Pill, StageSwitcher, StatusPill, Timeline, toast, useConfirm, useModal } from "@mycity/ui";
+import { Link, useRouter } from "@/lib/router";
+import { BackButton, Button, Card, CardHeader, DataView, Details, EmptyState, formatDate, formatDateTime, formatMoney, IconButton, KeyValue, LoadingRows, Pill, StageSwitcher, StatusPill, Timeline, toast, useConfirm, useModal } from "@mycity/ui";
 import { ContactForm } from "./forms/ContactForm";
 import { DealForm } from "./forms/DealForm";
 import { MoveStage } from "./forms/MoveStage";
@@ -21,6 +21,20 @@ import { fail, healthPill, MEANING_LABEL, moveNeeds, nextStage, useStages } from
  */
 
 export type RecordKey = { type: "lead" | "partner"; id: string };
+
+/**
+ * A record's own page (F31 amended 16/11/2026, §10): Back to its list above it, then the record across the page.
+ * The record names the page itself (its heading and the trail).
+ */
+export function RecordPage({ back, to, children }: { back: string; to: string; children: ReactNode }) {
+  const { navigate } = useRouter();
+  return (
+    <>
+      <BackButton label={back} onBack={() => navigate(to)} />
+      {children}
+    </>
+  );
+}
 
 /** The stage switcher's press: straight through, or the Why sheet and the signed copy when the move needs them. */
 export function useMover(deal: DealDetail | null) {
@@ -47,20 +61,9 @@ export function useMover(deal: DealDetail | null) {
   };
 }
 
-/** The phone's Next Stage, full width at the foot of the record (§10.2). */
-export function NextStage({ deal, readOnly }: { deal: DealDetail | null; readOnly?: boolean }) {
-  const { stages } = useStages();
-  const onMove = useMover(deal);
-  const next = deal && !readOnly ? nextStage(stages, deal.stage) : null;
-  if (!next) return null;
-  return (
-    <PhoneOnly className="mt-3">
-      <Button variant="primary" className="w-full" icon="forward" aria-label={`Move to ${next.label}`} onClick={() => onMove(next.code)}>
-        Next Stage
-      </Button>
-    </PhoneOnly>
-  );
-}
+/** The bar's seven steps: what a stage counts as, in order; On Hold and Closed Lost sit outside them (§10). */
+const STEPS = (["prospect", "contacted", "meeting", "proposal", "negotiation", "signed", "active"] as const).map((code) => ({ code, label: MEANING_LABEL[code] }));
+const IN_STEPS = new Set<string>(STEPS.map((s) => s.code));
 
 /**
  * One deal on a 360's Overview: its stages, health, blockers, next action and expected close.
@@ -86,20 +89,19 @@ export function DealPanel({ deal, readOnly, money, categoryId }: { deal: DealDet
           )
         }
       />
-      <StageSwitcher label={`Stage of ${deal.title}`} stages={shown.map((s) => ({ code: s.code, label: s.label }))} value={deal.stage} onMove={onMove} readOnly={readOnly} className="mb-3" />
+      <StageSwitcher
+        label={`Stage of ${deal.title}`}
+        steps={STEPS}
+        stages={shown.map((s) => ({ code: s.code, label: s.label, step: "meaning" in s && s.meaning && IN_STEPS.has(s.meaning) ? s.meaning : null }))}
+        value={deal.stage}
+        next={nextStage(stages, deal.stage)?.code ?? null}
+        onMove={onMove}
+        readOnly={readOnly}
+        className="mb-4"
+      />
       <KeyValue
         items={[
           ["Number", deal.number],
-          [
-            "Stage",
-            deal.meaning ? (
-              <HelpTerm key="s" help={`Counts as ${MEANING_LABEL[deal.meaning]} in totals and reports.`}>
-                {deal.stage_label}
-              </HelpTerm>
-            ) : (
-              deal.stage_label
-            ),
-          ],
           ["Health", <StatusPill key="h" status={healthPill(deal.health)} />],
           ...(deal.blockers ? ([["Blockers", deal.blockers]] as Array<[ReactNode, ReactNode]>) : []),
           ["Next Action", deal.next_action ? `${deal.next_action}${deal.next_action_on ? `, ${formatDate(deal.next_action_on)}` : ""}` : "None"],

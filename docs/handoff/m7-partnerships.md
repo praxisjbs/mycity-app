@@ -105,6 +105,11 @@ with the date, and add a line to §3.
 
 ## 3 · Log
 
+- 16/11/2026 · TB · After acceptance, MyCity found the screens too congested: the 360s beside their lists, five filter boxes
+  and fifteen stage buttons over three lines. TB's calls: Partners, Leads, Proposals, Contracts & MOUs and Categories fill the
+  page with their list and open a record on its own page (`?id=`, Back to …), F31 amended; the filters in one row; the stage as
+  a seven-step bar with **Next Stage** and **Change Stage** (`StageSwitcher` reworked). The guide's §2, §10, §13.2, the chapter
+  and its pictures follow. Left: the staging walk (§4) now presses **Next Stage** or **Change Stage** where it moved a stage.
 - 10/11/2026 · TB · PR 9 (`m7/user-guide`): the Partnerships chapter, `docs/manual/partnerships.md`, a section for each of the seven
   screens with a picture of every step on desktop and phone; four Quick Start cards under a new Lead Owners group; the public Help's
   Your Proposal, Sign an Agreement and Check an agreement. TB's calls of 10/11/2026: the partner's pages go in the public Help as well as

@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { CategoryDetail, CategoryRow, CategoryTemplate, ChecklistItem, Field } from "@mycity/contract/contract.gen.ts";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { PagedTable } from "@/features/shared/sections";
-import { useRouter, useSearchParams } from "@/lib/router";
+import { useRouter } from "@/lib/router";
+import { useTrailTitle } from "@/lib/trail";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
@@ -14,7 +15,6 @@ import {
   HelpTerm,
   IconButton,
   KeyValue,
-  ListDetail,
   Menu,
   PageHeader,
   Pill,
@@ -25,7 +25,6 @@ import {
   useConfirm,
   useIsPhone,
   useModal,
-  useSideBySide,
   Who,
 } from "@mycity/ui";
 import { CategoryForm } from "./forms/CategoryForm";
@@ -35,12 +34,13 @@ import { StartFromTracker } from "./forms/StartFromTracker";
 import { TemplateEditor } from "./forms/TemplateEditor";
 import { PipelineSettings } from "./PipelineSettings";
 import { ProofPoints } from "./ProofPoints";
-import { APPLIES_LABEL, dueText, FIELD_TYPE_LABEL, KIND_LABEL, recordHref, refusal, useConfigure } from "./lib";
+import { APPLIES_LABEL, dueText, FIELD_TYPE_LABEL, KIND_LABEL, recordHref, refusal, useConfigure, useKept } from "./lib";
+import { RecordPage } from "./record";
 
 /**
  * Partnerships · Categories (#104, `categories`; docs/guides/partnerships.md §6.3, §10): MyCity's partnership
- * types and the setup the rest of the module reads. A category opens beside the list on desktop and in a sheet
- * on a phone (F31), with its defaults, its agreement templates, its delivery checklist and its custom fields;
+ * types and the setup the rest of the module reads. The categories fill the page; a pressed category opens as a
+ * page of its own (`?id=`, Back to Categories; F31 amended 16/11/2026), with its defaults, its agreement templates, its delivery checklist and its custom fields;
  * Pipeline Settings holds MyCity's stages and lists, and Proof Points the facts a proposal may cite. Holders of
  * `partnerships.configure` add, change, retire and restore; everyone who may open Partnerships reads.
  */
@@ -62,11 +62,22 @@ const SECTIONS: Array<[Section, string]> = [
   ["fields", "Fields"],
 ];
 
-export function Categories() {
+export function Categories({ id }: { id: string | null }) {
+  if (id) {
+    return (
+      <RecordPage back="Back to Categories" to="/partnerships?tab=categories">
+        <CategoryRecord key={id} id={id} />
+      </RecordPage>
+    );
+  }
+  return <CategoriesHome />;
+}
+
+function CategoriesHome() {
   const configure = useConfigure();
   const phone = useIsPhone();
   const modal = useModal();
-  const [view, setView] = useState<View>("categories");
+  const [view, setView] = useKept<View>("categories.view", "categories");
   const add = () => modal.open({ title: "New Category", body: (close) => <CategoryForm close={close} /> });
   const tracker = () => modal.open({ title: "Start From Tracker", wide: true, body: (close) => <StartFromTracker close={close} /> });
   useScreenAction(configure ? { label: "New Partner Category", onSelect: add } : null);
@@ -111,71 +122,46 @@ export function Categories() {
   );
 }
 
-/** The categories, and the one picked (or opened by `?id=`) beside them or in a sheet. */
+/** The categories across the page; a pressed one opens as its own page (`?id=`). */
 function CategoryList() {
-  const [params] = useSearchParams();
-  const beside = useSideBySide();
-  const [shown, setShown] = useState<Shown>("true");
+  const { navigate } = useRouter();
+  const [shown, setShown] = useKept<Shown>("categories.shown", "true");
   const list = usePaged("GET /api/v1/partnerships/categories", { filters: shown === "all" ? {} : { active: shown }, sort: "display_order" });
-  const [picked, setPicked] = useState<string | null>(null);
-  const [closedLink, setClosedLink] = useState(false);
-  const linked = params.get("id");
-  const pinned = picked ?? (!closedLink ? linked : null);
-  // Side by side the first category shows unasked; on a phone nothing opens until a row is tapped (F31).
-  const sel = pinned ?? (beside ? (list.rows[0]?.partner_category_id ?? null) : null);
-  const close = () => (setPicked(null), setClosedLink(true));
 
   return (
-    <ListDetail
-      open={pinned !== null}
-      onClose={close}
-      title="Category"
-      list={
-        <>
-          <Chips
-            label="Status"
-            value={shown}
-            onChange={(v) => setShown(v as Shown)}
-            options={[
-              ["true", "In Use"],
-              ["false", "Retired"],
-              ["all", "All"],
-            ]}
-          />
-          <DataView
-            title="All Categories"
-            list={list}
-            search="Category"
-            rowKey={(c: CategoryRow) => c.partner_category_id}
-            selectedKey={sel}
-            onRowClick={(c) => setPicked(c.partner_category_id)}
-            noun="category"
-            nounPlural="categories"
-            empty={{ icon: "pin", title: "No Categories Yet", text: "Add a type or start from the tracker." }}
-            columns={[
-              { key: "name", label: "Category", sortable: true, render: (c: CategoryRow) => <Who name={c.name} sub={c.active ? undefined : "Retired"} /> },
-              { key: "p", label: "Partners", align: "n", render: (c: CategoryRow) => c.partners },
-              { key: "l", label: "Leads", align: "n", desktop: true, render: (c: CategoryRow) => c.leads },
-              { key: "c", label: "Commission", align: "n", render: (c: CategoryRow) => (c.default_commission_pct ? `${Number(c.default_commission_pct)}%` : null) },
-            ]}
-          />
-        </>
-      }
-      detail={
-        sel ? (
-          <CategoryRecord key={sel} id={sel} onGone={close} />
-        ) : (
-          <Card>
-            <p className="text-xs text-subtle-foreground">Select a category to see its setup.</p>
-          </Card>
-        )
-      }
-    />
+    <>
+      <Chips
+        label="Status"
+        value={shown}
+        onChange={(v) => setShown(v as Shown)}
+        options={[
+          ["true", "In Use"],
+          ["false", "Retired"],
+          ["all", "All"],
+        ]}
+      />
+      <DataView
+        title="All Categories"
+        list={list}
+        search="Category"
+        rowKey={(c: CategoryRow) => c.partner_category_id}
+        onRowClick={(c) => navigate(`/partnerships?tab=categories&id=${c.partner_category_id}`)}
+        noun="category"
+        nounPlural="categories"
+        empty={{ icon: "pin", title: "No Categories Yet", text: "Add a type or start from the tracker." }}
+        columns={[
+          { key: "name", label: "Category", sortable: true, render: (c: CategoryRow) => <Who name={c.name} sub={c.active ? undefined : "Retired"} /> },
+          { key: "p", label: "Partners", align: "n", render: (c: CategoryRow) => c.partners },
+          { key: "l", label: "Leads", align: "n", desktop: true, render: (c: CategoryRow) => c.leads },
+          { key: "c", label: "Commission", align: "n", render: (c: CategoryRow) => (c.default_commission_pct ? `${Number(c.default_commission_pct)}%` : null) },
+        ]}
+      />
+    </>
   );
 }
 
-/** One category: its defaults, templates, checklist and fields, as cards on desktop and one at a time on a phone. */
-function CategoryRecord({ id }: { id: string; onGone: () => void }) {
+/** One category on its own page: its defaults, templates, checklist and fields, as cards on desktop and one at a time on a phone. */
+function CategoryRecord({ id }: { id: string }) {
   const configure = useConfigure();
   const phone = useIsPhone();
   const modal = useModal();
@@ -184,6 +170,7 @@ function CategoryRecord({ id }: { id: string; onGone: () => void }) {
   const read = useApi("GET /api/v1/partnerships/categories/:id", { params: { id } });
   const change = useMutation("PATCH /api/v1/partnerships/categories/:id");
   const d = read.data;
+  useTrailTitle(d?.name);
   if (!d) return read.error ? <Card><p className="text-xs text-subtle-foreground">This category could not be loaded.</p></Card> : <Skeleton shape="block" className="h-48" />;
 
   const reload = () => invalidate("/api/v1/partnerships/categories");
@@ -213,13 +200,10 @@ function CategoryRecord({ id }: { id: string; onGone: () => void }) {
 
   return (
     <div className="grid gap-4">
-      <Card>
-        <CardHeader
-          title={d.name}
-          record
-          level={2}
-          actions={
-            <span className="flex items-center gap-1.5">
+      <PageHeader
+        title={<span data-copy="content">{d.name}</span>}
+        actions={
+          <span className="flex items-center gap-1.5">
               {!d.active && <Pill>Retired</Pill>}
               {configure && (
                 <Menu
@@ -232,12 +216,15 @@ function CategoryRecord({ id }: { id: string; onGone: () => void }) {
                       : { label: "Restore", icon: "refresh", onSelect: () => setActive(true) },
                   ]}
                 />
-              )}
-            </span>
-          }
-        />
-        {d.description && <p className="text-sm" data-copy="content">{d.description}</p>}
-      </Card>
+            )}
+          </span>
+        }
+      />
+      {d.description && (
+        <Card>
+          <p className="text-sm" data-copy="content">{d.description}</p>
+        </Card>
+      )}
       {phone ? (
         <>
           <SegmentedControl label="Category sections" value={section} onChange={(v) => setSection(v as Section)} options={SECTIONS} />
