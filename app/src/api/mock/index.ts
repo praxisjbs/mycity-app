@@ -15,6 +15,7 @@ import "./modules/ess";
 import "./modules/workspace";
 import "./modules/community";
 import "./modules/mailbox";
+import "./modules/library";
 import "./modules/shared";
 import "./modules/performance";
 import "./modules/reviews";

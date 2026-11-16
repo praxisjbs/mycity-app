@@ -278,7 +278,7 @@ describe("route map", () => {
     const md = fs.readFileSync(path.join(__dirname, "..", "..", "..", "docs", "PROGRESS.md"), "utf8");
     const LABEL_TO_MODULE = {
       Home: "home", "My Workspace": "workspace", "Employee Self-Service": "ess", "Staff Community": "community",
-      Mailbox: "mailbox", People: "people", Performance: "performance", "Queries & Sanctions": "queries",
+      Mailbox: "mailbox", "Document Centre": "documents", People: "people", Performance: "performance", "Queries & Sanctions": "queries",
       Recruitment: "recruitment", Payroll: "payroll", Partnerships: "partnerships", Expenses: "expenses",
       "Knowledge Hub": "knowledge", "Praxis AI": "praxis_ai", "AI Control": "ai_control", Settings: "settings",
     };
@@ -292,7 +292,7 @@ describe("route map", () => {
       if (row && !/\| Dropped \|/.test(line)) (found[module] = found[module] || []).push(row[1]);
     }
     expect(found).toEqual(routeMap.SCREENS);
-    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(97);
+    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(98);
   });
 });
 

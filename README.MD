@@ -299,7 +299,9 @@ src/
 │   ├── time/          lagos · working-week · day-first · recurrence
 │   ├── numbering/     numbering · schemes
 │   ├── files/         sniff · mime-policy · hash · safe-name · variant-key
-│   ├── documents/     vault · generate · exports · render · markdown · canonical
+│   ├── documents/     vault · generate · exports · render · markdown · canonical · library (the Document
+│   │                  Centre's registry: each module's `<module>.library.js`, who sees a row as SQL held
+│   │                  equal to vault.canRead, and every doc type listed or named as left out)
 │   ├── templates/     template-store · variables
 │   ├── spreadsheet/   parse · build · csv · cells · day-first-cells · context
 │   ├── import/        engine · mapping · registry · report · revert
@@ -394,6 +396,7 @@ src/modules/<name>/
   <name>.ai.js              AI read manifest (§7.6), or `// ai:none <reason>` in the controller
   <name>.search.js          ⌘K provider, or `// search:none <reason>` in the controller
   <name>.views.js           where its records wait inside the screens they open on (a switch's side, a chip), only where it has any
+  <name>.library.js         the documents it gives the Document Centre's Library, only where it has any (docs/guides/document-centre.md §6.2)
   <name>.import.js          importer, only where records arrive from spreadsheets
   <name>.<topic>.js         the module's own rule files (lifecycle, calc, scoring…)
   <name>.test.js            unit tests beside the code
@@ -405,7 +408,8 @@ services and have no repo of their own.
 
 ### 5.2 Permission keys
 
-The staff app has **15 modules** (MILESTONES §18); those are the permission keys in
+The staff app was approved with **15 modules** (MILESTONES §18); those, and the keys added since
+(`ai_control`, `system_health`, `integrations`, `documents`), are the permission keys in
 `shared/access/access.catalog.js`. A backend module declares which key guards it.
 
 | Permission key | Backend modules |
@@ -415,6 +419,7 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `ess` | `ess` (always `own` scope) |
 | `community` | `community`, `announcements` |
 | `mailbox` | `mailbox` |
+| `documents` | `library` (the Document Centre: each document is listed only for a reader the vault lets open it, so the grant opens the screen and never a file; `docs/guides/document-centre.md`, seed `10590`) |
 | `people` | `organisation`, `attendance`, `devices`, `worksites`, `leave` |
 | `performance` | `goals`, `targets`, `kpis`, `reviews` |
 | `queries` | `queries`, `query_rules`, `sanctions` |
@@ -742,6 +747,7 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 | `knowledge` | SOPs (`docs/guides/knowledge.md`): `.versions` (an SOP's content, its hash and the shapes staff read: steps, screens, versions, the draft), `.draft` (Draft With AI, prompt `services/ai/prompts/sop-draft.md`); `GET /knowledge/sops/for-screen` feeds Procedures under a screen's section of the User Guide (`app/src/features/knowledge/Procedures.tsx`); the SOPs tab is `app/src/features/knowledge/Sops.tsx`; tested on the real migrations by `tests/integration/knowledge-sops.test.js` |
 | `training` | Training and ESS · My Training (`docs/guides/knowledge.md`), built in M10 PR 3: `.service` (courses and their items, publishing with the publisher's signature, assignments and enrolments in one transaction, each place's task through `tasks.service` from the outbox, progress, proof and completion with the certificate's number and hash, Remind Overdue and the `training_due` reminder, joiners and leavers), `.lesson` (Draft Lesson, `training-lesson-draft`, prompt `services/ai/prompts/training-lesson-draft.md`), `.repo`, `.events`, `.routes`, `.controller`, `.ai` (reads only), `.search`; `jobs/schedulers/training-joiners`; migration `10420_training_tasks.sql` (a task may name its enrolment); tested on the real migrations by `tests/integration/training.test.js` (300 people assigned at once among them); `.certificate` (M10 PR 4: the certificate of completion drawn from `templates/documents/training-certificate.html` with Cormorant Garamond in `templates/documents/fonts/` and the proposal kit's Geist, issued from the outbox, Download Certificate, and Verify a Document for `CERT-` numbers through `signatures.verify`); migration `10430_training_certificate_facts.sql` (the name and course title a certificate states); My Notes (a person's own note on a course, `myNote` and `saveNote`, migration `10440_training_notes.sql`, the `training_note` table) |
 | `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read, and a chart for each area by its summary), `.search` (the caller's own conversations), `.events` (audit only, the card events, and the `ai_voice_question`, `ai_history_export`, `ai_answer_export` and `ai_answer_overview` document types), `.cards` (a card's life: read, edited, pressed with the five-minute confirm for a sensitive class, cancelled; `docs/guides/praxis-ai.md` §6.11), `.reads` (a read of an answer run again, 25 a page, §6.12; the replay the export walks), `.export` (History's Export, Download Excel on an answer's read through the one export path with About This File, §6.16, and Download PDF on an answer's Overview, drawn again in the worker with the asker's rights on `templates/documents/ai-overview.html`, §6.19 item 8); the service pushes `ai:progress` to the asker's realtime room before each read (§6.1.8). The adapter in `services/ai/assistant/{orchestrator, answer}.js` over the engine `services/ai/engine/`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read; the screens' views are the Assistant group of `packages/ui`, with `app/src/features/assistant/Card.tsx` wiring an answer's card (Edit, the press through Confirm It's You, Cancel, Draw It Again; `docs/guides/praxis-ai.md` §6.11); tested on the real migrations by `tests/integration/{ai-cards, ai-matrix, ai-summaries, ai-summaries-budgets, ai-summaries-finance, ai-summaries-recruitment, ai-summaries-partnerships, ai-summaries-people, ai-summaries-close, ai-overview-tables, ai-overview-export, ai-actions-workspace, ai-actions-leave, ai-actions-approvals, ai-actions-community, ai-actions-mailbox, ai-actions-people, ai-actions-queries, ai-actions-policies, ai-actions-performance, ai-attacks}.test.js` (the matrix with each scoped module's probes, the attack suite with the model scripted; `docs/guides/praxis-ai.md` §6.17), the action suites sharing `tests/integration/helpers/ai-actions.js` (people, scripted Gemini, the three ways to confirm); `tests/unit/foundation/ai-attacks.test.js` checks the attack suite's grading without a key; `tests/unit/foundation/ai-overview-stacked.test.js` the stacked parts, Budgets' summary, a read's `summary`, gate 23 rule 9 and the chart grading without a database, `ai-overview-tables.test.js` an Overview drawn from a whole list's own rows (§6.19 items 1 to 6), and `ai-overview-pdf.test.js` a chart in a document, the renderer's chart block, a summary's chart in naira and an older answer's spec rebuilt (items 7 and 8) |
+| `library` | The Document Centre's Library (`docs/guides/document-centre.md`, PR 1): `/api/v1/library`, the list, its four figures, one document and the filters' options over the vault's `document` table, read through `shared/documents/library` so a row is listed only for a reader `vault.canRead` lets open it; `.search` (⌘K's Documents group, the same rule). It writes nothing. Thirteen modules give it their documents in a `<module>.library.js` each: `partners`, `agreements`, `proposals`, `offers`, `employment_contracts`, `queries`, `documents`, `organisation`, `expenses`, `disbursements`, `statutory`, `training`, `knowledge`. The screen is `app/src/features/documents/Library.tsx`; the rule is proved for every role by `tests/integration/library-access.test.js` |
 | `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
 The assistant answers from the manifests every module has carried since M1, and acts only through

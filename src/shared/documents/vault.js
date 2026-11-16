@@ -643,6 +643,9 @@ function defineAccess(entityType, fn) {
   ACCESS.set(entityType, fn);
 }
 
+/** Whether an entity type's documents have a read rule of their own (the library's sources check theirs against it). */
+const hasAccess = (entityType) => ACCESS.has(entityType);
+
 async function canRead(client, user, doc) {
   if (!user || !user.user_id || !doc) return false;
   const rule = ACCESS.get(doc.entity_type);
@@ -933,6 +936,7 @@ module.exports = {
   variantOf,
   canRead,
   defineAccess,
+  hasAccess,
   serve,
   parseRange,
   completeScan,

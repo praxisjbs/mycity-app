@@ -10,7 +10,7 @@
 | Capabilities | `payroll.configure` (switch the advanced option on or off, set the pay day, enter statutory rates, bands, salary grades, pay components and a person's Prior Pay; the run itself needs only the `payroll` grant) |
 | Screens (PROGRESS.md rows) | #45 Payroll Runs, #46 Payslips, #48 Deductions, Configurations (new; PR 1 registers it in the next free row, #109 while free (#107 and #108 are the public site's), and marks #47 Salary Structure and #49 Statutory Dropped), #11 My Payslips; changes to Home (the Payroll In Progress card), Settings · Approvals (#72, the `payroll.run` flow), People · Attendance (#25, its Deductions and Overtime views gain a link to the run), Queries & Sanctions · Sanctions (a fine's Payroll state) and the Notification Settings (#74, the Payroll category) |
 | Status | Agreed |
-| Last changed | 13/11/2026 |
+| Last changed | 16/11/2026 |
 
 ---
 
@@ -2361,6 +2361,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 16/11/2026 · TB · §9: the Document Centre's Library lists a statutory rate's source and a joiner's leaving certificate (`statutory.library.js`; `document-centre.md` §6.2), by the vault's default rule: restricted, so Payroll's `edit`, the employee it is about or whoever filed it. Payslips are never listed there (its D4). Nothing on a Payroll screen changed.
 - 14/11/2026 · JP · Found filming the M6 videos: a person with no start date was left out of every run without a word
   (`payroll.inputs.peopleFor` read `start_date <= the month's last day`), and the roster loads Operations & People's
   lead, the CTO and the Program Manager with none. §6.1 rule 2, §6.15 and §11: such a person is in the run with a

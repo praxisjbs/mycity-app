@@ -80,11 +80,11 @@ export const SIGN_INS: Record<string, { view: "operations" | "ceo" | "partnershi
  * Faults tabs and `integrations` its Integrations tab (app/src/shell/access.ts), and
  * `ai_control` is AI Control's own key, so without them the crawl never reaches those.
  */
-export const MODULES_ALL = ["home", "workspace", "ess", "community", "mailbox", "people", "performance", "queries", "recruitment", "payroll", "partnerships", "expenses", "knowledge", "praxis_ai", "ai_control", "settings", "system_health", "integrations"];
+export const MODULES_ALL = ["home", "workspace", "ess", "community", "mailbox", "documents", "people", "performance", "queries", "recruitment", "payroll", "partnerships", "expenses", "knowledge", "praxis_ai", "ai_control", "settings", "system_health", "integrations"];
 
 export function grantsFor(key: string): Record<string, string[]> {
   const all = ["view", "create", "edit", "delete", "approve", "export"];
-  const staff = ["home", "workspace", "ess", "community", "mailbox", "performance", "expenses", "knowledge", "praxis_ai"];
+  const staff = ["home", "workspace", "ess", "community", "mailbox", "documents", "performance", "expenses", "knowledge", "praxis_ai"];
   const pick = (mods: string[], acts = all) => Object.fromEntries(mods.map((m) => [m, acts]));
   if (key === "cynthia" || key === "ifeoma") return pick(MODULES_ALL);
   if (key === "ngozi") return { ...pick(staff), ...pick(["partnerships"]), people: ["view"], queries: ["view", "create"] };

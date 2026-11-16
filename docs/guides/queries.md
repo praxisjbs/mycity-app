@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 13/11/2026 |
+| Last changed | 16/11/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -612,6 +612,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 16/11/2026 · TB · §9: the Document Centre's Library lists the letter a query holds and each letter a sanction issued (`queries.library.js`; `document-centre.md` §6.2), by the vault's default rule: the employee it is about and Queries & Sanctions within scope. Nothing on a Queries & Sanctions screen changed.
 - 13/11/2026 · JP · §9: `queries.summary` and `sanctions.summary` for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7), within §6.1's rule, fines in naira only for a reader who sees pay. Nothing on screen changes.
 - 11/11/2026 · JP · Fault #9 of the 11/11 staging brief (`QUERY_SELF: employee_id` at `POST /queries`): Raise a Query's Employee picker offered the raiser and anyone archived or suspended, and only the server refused them. It now asks for active people with the new `exclude_self` filter on `GET /employees` (`foundation.md` §5), so neither is offered (§6.2).
 - 09/11/2026 · JP · M6 PR 3 (`payroll.md` §6.6, §7): a sanction issued with a fine now tells the holders of `payroll` edit "Fine Waiting for Payroll", from an outbox handler of `deductions.events.js` on `sanction.issued` (§7); the fine's events `sanction_fine.accepted`, `.waived` and `.released` are written by `sanctions.fines` when Payroll · Deductions accepts, waives or releases it. Nothing in the sanctions module changed.

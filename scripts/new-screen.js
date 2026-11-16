@@ -48,7 +48,7 @@ const FILES = {
 const SECTION = {
   home: "Home", workspace: "My Workspace", ess: "Employee Self-Service", community: "Staff Community", mailbox: "Mailbox",
   people: "People", performance: "Performance", queries: "Queries & Sanctions", recruitment: "Recruitment", payroll: "Payroll",
-  partnerships: "Partnerships", expenses: "Expenses", knowledge: "Knowledge Hub", praxis_ai: "Praxis AI", ai_control: "AI Control",
+  partnerships: "Partnerships", expenses: "Expenses", knowledge: "Knowledge Hub", praxis_ai: "Praxis AI", ai_control: "AI Control", documents: "Document Centre",
   settings: "Settings",
 };
 

@@ -60,6 +60,7 @@ const SCREENS = Object.freeze({
   ],
   community: ["channels", "direct-messages", "announcements"],
   mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash", "signature"],
+  documents: ["library"],
   people: ["employees", "attendance", "leave", "devices", "worksites", "organogram", "departments"],
   performance: ["goals", "targets", "kpis", "reviews", "analytics"],
   queries: ["queries", "rules", "sanctions", "letter-templates"],
@@ -158,6 +159,9 @@ const ENTITY_ROUTES = Object.freeze({
   mail_signature: screen("mailbox", "signature"), // search:none one per person, their own; ⌘K finds the Signature tab (shared/search/screens.js)
   mail_signature_config: screen("mailbox", "signature"), // search:none one for the company, opened by Configure on the Signature tab
   mail_signature_image: screen("mailbox", "signature"), // search:none a picture inside every signature, never a record anyone looks up
+
+  // Document Centre: a document of the library, by its file's id (docs/guides/document-centre.md §9).
+  library_item: screen("documents", "library"),
 
   // People
   employee: {

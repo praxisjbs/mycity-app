@@ -2,8 +2,8 @@
 /**
  * The permission vocabulary. Single source of truth for:
  *
- *  - the 15 module keys a route can name in requirePermission(key, action)
- *    (README §5.2; the 15 admin modules of MILESTONES §18),
+ *  - the module keys a route can name in requirePermission(key, action)
+ *    (README §5.2: the 15 admin modules of MILESTONES §18 and the keys added since),
  *  - the six actions and three record scopes,
  *  - the label, area and description the Roles & Permissions screen shows,
  *  - the capabilities: named authorities inside a module, beyond its six actions.
@@ -56,6 +56,12 @@ const MODULE_CATALOG = [
     area: "work",
     label: "Mailbox",
     description: "Your work email",
+  },
+  {
+    key: "documents",
+    area: "work",
+    label: "Document Centre",
+    description: "Every document you may open, in one library",
   },
   {
     key: "people",

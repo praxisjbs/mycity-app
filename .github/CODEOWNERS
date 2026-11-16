@@ -121,6 +121,7 @@
 /src/modules/integrations/                         @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/integrations.js         @tomblakeasaah196 @swizfcodes
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
+/src/modules/library/                              @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
 /src/modules/training/                             @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/training.js             @tomblakeasaah196 @swizfcodes

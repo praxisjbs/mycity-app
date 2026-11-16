@@ -93,6 +93,9 @@ export const COMING: Record<string, string[]> = {
   "partnerships/contracts-and-mous": ["Agreements filled from your templates, then approved", "Signed on a phone with a one-time code, then sealed", "Checked by QR, with a reminder before renewal"],
   "partnerships/analytics": ["Each lead owner's month, as your performance sheet has it", "Deals signed and returns by month", "By category, region and stage"],
 
+  /* Document Centre */
+  "documents/library": ["Every document you may open, in one place", "Search by name, type or who it belongs to", "Preview and download without leaving the list"],
+
   /* Expenses */
   "expenses/approvals": ["Requests waiting on you, oldest first", "Approve, send back or reject with a reason", "The budget each request draws on"],
   "expenses/requisitions": ["Group approved requests into one requisition", "The CEO approves or rejects it whole", "Remove a request before deciding"],
