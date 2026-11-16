@@ -1,5 +1,4 @@
 import type { AgreementDetail, AgreementRow, AgreementStatus } from "@mycity/contract/contract.gen.ts";
-import { useState } from "react";
 import { saveFile } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -22,7 +21,6 @@ import {
   formatMoney,
   HelpTerm,
   KeyValue,
-  ListDetail,
   Menu,
   PageHeader,
   Paper,
@@ -33,13 +31,12 @@ import {
   toast,
   useIsPhone,
   useModal,
-  useSideBySide,
   Who,
 } from "@mycity/ui";
 import { CloseAgreement, EditDraft, GenerateAgreement, RecordSignedCopy, RejectAgreement, RenewAgreement, SendForSignature } from "./forms/AgreementForms";
-import { agreementPill, fail, KIND_LABEL, SIGNER_STATE, useMay } from "./lib";
+import { agreementPill, fail, KIND_LABEL, SIGNER_STATE, useKept, useMay } from "./lib";
 import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
-import { RecordState } from "./record";
+import { RecordPage, RecordState } from "./record";
 
 type View = "all" | AgreementStatus;
 
@@ -70,27 +67,38 @@ const STEPS: Array<[AgreementStatus, string]> = [
 const RENEWAL_HELP = "The owner is reminded this many days before it ends, then 30, 7 and 1 days before.";
 
 /**
- * Partnerships · Contracts & MOUs (#54, docs/guides/partnerships.md §6.8, §6.9, §10.1, §10.2): the KPI strip,
- * the agreements beside the picked one (side by side on a wide desktop, a sheet on a phone, F31) with its
- * lifecycle bar (desktop only), its wording, approval, signers, reference and QR, renewal, and each step.
+ * Partnerships · Contracts & MOUs (#54, docs/guides/partnerships.md §6.8, §6.9, §10.1, §10.2): the KPI strip and
+ * the agreements across the page; a pressed agreement opens as a page of its own (`?id=`, Back to Agreements;
+ * F31 amended 16/11/2026) with its lifecycle bar (desktop only), its wording, approval, signers, reference and
+ * QR, renewal, and each step.
  */
 export function Contracts({ id }: { id: string | null }) {
+  const { navigate } = useRouter();
+  if (id) {
+    return (
+      <RecordPage back="Back to Agreements" to="/partnerships?tab=contracts-and-mous">
+        <AgreementPanel key={id} id={id} onOpen={(aid) => navigate(`/partnerships?tab=contracts-and-mous&id=${aid}`)} page />
+      </RecordPage>
+    );
+  }
+  return <AgreementList />;
+}
+
+function AgreementList() {
   const modal = useModal();
   const phone = useIsPhone();
-  const beside = useSideBySide();
   const { navigate } = useRouter();
   const mayCreate = useMay("create");
-  const [view, setView] = useState<View>("all");
+  const [view, setView] = useKept<View>("agreements.view", "all");
   const s = useApi("GET /api/v1/partnerships/agreements/summary");
   const list = usePaged("GET /api/v1/partnerships/agreements", { filters: view === "all" ? {} : { status: view } });
   // Where news waits (notifications.md §6): each chip carries its share; it opens where the news is.
   const news = useViewNews();
-  useOpenWhereNews({ value: view, onChange: setView, values: VIEWS.map(([v]) => v), all: "all", skip: Boolean(id) });
+  useOpenWhereNews({ value: view, onChange: setView, values: VIEWS.map(([v]) => v), all: "all", skip: false });
   const openOne = (aid: string) => navigate(`/partnerships?tab=contracts-and-mous&id=${aid}`);
   const generate = () => modal.open({ title: "Generate Agreement", body: (close) => <GenerateAgreement close={close} onCreated={openOne} /> });
   useScreenAction(mayCreate ? { label: "Generate Agreement", onSelect: generate } : null);
   useNewLink(mayCreate ? generate : null);
-  const shown = id ?? (beside ? (list.rows[0]?.partnership_agreement_id ?? null) : null);
   return (
     <>
       <PageHeader
@@ -109,31 +117,21 @@ export function Contracts({ id }: { id: string | null }) {
         />
       )}
       <Chips label="Agreements" value={view} onChange={setView} options={withNews(news, VIEWS, { all: "all" })} className="mt-3" />
-      <ListDetail
-        open={Boolean(id)}
-        onClose={() => navigate("/partnerships?tab=contracts-and-mous")}
-        title="Agreement"
-        cols="1/1.5"
-        full
-        list={
-          <PagedTable<AgreementRow>
-            title="Agreements"
-            list={list}
-            search="Search agreements"
-            rowKey={(a) => a.partnership_agreement_id}
-            noun="agreement"
-            onRowClick={(a) => openOne(a.partnership_agreement_id)}
-            empty={{ title: "No Agreements Yet", text: "Generate one from a deal." }}
-            columns={[
-              { key: "a", label: "Agreement", render: (a) => <Who name={a.title} sub={a.number} /> },
-              { key: "p", label: "Partner", render: (a) => a.record.name, desktop: true },
-              { key: "k", label: "Kind", render: (a) => (a.kind ? KIND_LABEL[a.kind] : "None"), desktop: true },
-              { key: "s", label: "Status", render: (a) => <StatusPill status={agreementPill(a.status)} /> },
-              { key: "r", label: "Renewal", render: (a) => (a.renewal_on ? formatDate(a.renewal_on) : "None") },
-            ]}
-          />
-        }
-        detail={shown && <AgreementPanel key={shown} id={shown} onOpen={openOne} />}
+  <PagedTable<AgreementRow>
+        title="Agreements"
+        list={list}
+        search="Search agreements"
+        rowKey={(a) => a.partnership_agreement_id}
+        noun="agreement"
+        onRowClick={(a) => openOne(a.partnership_agreement_id)}
+        empty={{ title: "No Agreements Yet", text: "Generate one from a deal." }}
+        columns={[
+          { key: "a", label: "Agreement", render: (a) => <Who name={a.title} sub={a.number} /> },
+          { key: "p", label: "Partner", render: (a) => a.record.name, desktop: true },
+          { key: "k", label: "Kind", render: (a) => (a.kind ? KIND_LABEL[a.kind] : "None"), desktop: true },
+          { key: "s", label: "Status", render: (a) => <StatusPill status={agreementPill(a.status)} /> },
+          { key: "r", label: "Renewal", render: (a) => (a.renewal_on ? formatDate(a.renewal_on) : "None") },
+        ]}
       />
     </>
   );
@@ -151,7 +149,7 @@ function nextOf(a: AgreementDetail): "edit" | "submit" | "send" | "again" | "ren
 const NEXT_LABEL = { edit: "Edit Draft", submit: "Submit for Approval", send: "Send for Signature", again: "Send Again", renew: "Renew" } as const;
 
 /** One agreement whole: its step, its wording, approval, signers, reference and renewal. */
-function AgreementPanel({ id, onOpen }: { id: string; onOpen: (id: string) => void }) {
+function AgreementPanel({ id, onOpen, page = false }: { id: string; onOpen: (id: string) => void; page?: boolean }) {
   const modal = useModal();
   const mayEdit = useMay("edit");
   const r = useApi("GET /api/v1/partnerships/agreements/:id", { params: { id } });
@@ -199,6 +197,7 @@ function AgreementPanel({ id, onOpen }: { id: string; onOpen: (id: string) => vo
   const at = STEPS.findIndex(([s]) => s === a.status);
   return (
     <div className="grid gap-3">
+      {page && <PageHeader title={<span data-copy="content">{a.title}</span>} />}
       <Card>
         <CardHeader
           title={a.number}

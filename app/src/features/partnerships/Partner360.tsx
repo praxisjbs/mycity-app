@@ -14,7 +14,7 @@ import { EditPartner } from "./forms/RecordForm";
 import { UploadDocument } from "./forms/UploadDocument";
 import { ReturnsTab } from "./Returns";
 import { daysWord, dealPill, healthPill, partnerPill, useHoldsMoney, useMay } from "./lib";
-import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, NextStage, RecordState, SINCE_CONTACT_HELP, useDeal } from "./record";
+import { ActivityTab, ContactsTab, DealPanel, DetailsTab, DocumentsTab, InteractionsCard, RecordState, SINCE_CONTACT_HELP, useDeal } from "./record";
 import { NextEvents, WorkTab } from "./WorkTab";
 
 const TABS = ["overview", "deals", "documents", "returns", "work", "activity", "contacts", "details"] as const;
@@ -66,7 +66,7 @@ export function Partner360({ id }: { id: string }) {
     <>
       <ProfileHeader
         brand
-        level={2}
+        level={1}
         name={partner.name}
         role={[partner.category, partner.region, partner.owner?.display_name].filter(Boolean).join(" · ")}
         chips={
@@ -150,13 +150,6 @@ export function Partner360({ id }: { id: string }) {
           />
         )}
       </div>
-      {tab === "overview" && unfinished.length === 1 && <NextFor id={unfinished[0].deal_id} readOnly={readOnly} />}
     </>
   );
-}
-
-/** The phone's Next Stage for the partner's one open deal. */
-function NextFor({ id, readOnly }: { id: string; readOnly: boolean }) {
-  const d = useDeal(id);
-  return <NextStage deal={d.data ?? null} readOnly={readOnly} />;
 }

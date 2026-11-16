@@ -9,12 +9,13 @@ import { installEditorTestEnv } from "../../../../packages/ui/src/form/test-env"
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
-import { RouterProvider } from "@/lib/router";
+import { RouterProvider, useSearchParams } from "@/lib/router";
 import { Categories } from "./Categories";
+import { forgetKept } from "./lib";
 
 /**
- * Partnerships · Categories (#104) on the in-browser mock, which answers as the API does: the list beside the
- * record on desktop, the sheet on a phone, and what a holder of `partnerships.configure` can do that a member
+ * Partnerships · Categories (#104) on the in-browser mock, which answers as the API does: the list across the
+ * page and a category on its own page (`?id=`, Back to Categories) on desktop and phone, and what a holder of `partnerships.configure` can do that a member
  * of staff cannot (docs/guides/partnerships.md §6.3, §10).
  */
 installMatchMedia();
@@ -31,9 +32,14 @@ beforeAll(() => {
   Element.prototype.scrollIntoView ??= () => undefined;
 });
 beforeEach(() => setViewport(1440));
-afterEach(cleanup);
+afterEach(() => (cleanup(), forgetKept()));
 
 let auth: ReturnType<typeof useAuth> | null = null;
+/** The module reads the record from the address, as the app's routing does. */
+function Screen() {
+  const [params] = useSearchParams();
+  return <Categories id={params.get("id")} />;
+}
 function Harness({ children }: { children?: ReactNode }) {
   auth = useAuth();
   return auth.status === "signed-in" ? <>{children}</> : null;
@@ -48,7 +54,7 @@ async function openAs(email: string) {
       <AuthProvider>
         <ModalProvider>
           <Harness>
-            <Categories />
+            <Screen />
           </Harness>
         </ModalProvider>
       </AuthProvider>
@@ -63,17 +69,27 @@ async function openAs(email: string) {
 
 const asOperations = () => openAs("cynthia@mycityapp.io");
 
+/** Presses a category in the list and waits for its own page. */
+async function openCategory(name: string) {
+  fireEvent.click(await screen.findByText(name, { selector: "td *, td, [data-row-open] *, [data-row-open]" }, { timeout: 5000 }));
+  await screen.findByRole("heading", { name, level: 1 }, { timeout: 5000 });
+}
+
 /** Radix opens a menu on pointer down; its items and our listboxes are chosen with a click. */
 const openMenu = (button: HTMLElement) => fireEvent.pointerDown(button, { button: 0, pointerType: "mouse" });
 const click = (el: HTMLElement) => fireEvent.click(el);
 
 describe("Partnerships · Categories, on desktop", () => {
-  it("lists the categories with their counts, and opens the first beside them with its four sections", async () => {
+  it("lists the categories with their counts across the page; a category opens as its own page with its four sections", async () => {
     await asOperations();
     const table = await screen.findByRole("table", { name: "All Categories" }, { timeout: 5000 });
     expect(within(table).getByText("Event")).toBeTruthy();
     expect(within(table).getByText("Hospitality")).toBeTruthy();
-    await screen.findByRole("heading", { name: "Event", level: 2 }, { timeout: 5000 });
+    // Nothing opens beside the list (F31 amended 16/11/2026).
+    expect(screen.queryByRole("heading", { name: "Defaults" })).toBeNull();
+    await openCategory("Event");
+    expect(screen.queryByRole("table", { name: "All Categories" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Back to Categories" })).toBeTruthy();
     for (const title of ["Defaults", "Templates", "Delivery Checklist", "Custom Fields"]) expect(await screen.findByRole("heading", { name: title })).toBeTruthy();
     expect(screen.getByText("Deal Merchant Agreement")).toBeTruthy();
     expect(screen.getByText(/Deal Merchant · Version 1/)).toBeTruthy();
@@ -85,13 +101,17 @@ describe("Partnerships · Categories, on desktop", () => {
 
   it("a holder of partnerships.configure sees every way to change it; a member of staff sees none", async () => {
     await asOperations();
-    await screen.findByRole("heading", { name: "Event", level: 2 }, { timeout: 5000 });
-    for (const name of ["New Category", "Start From Tracker", "Add Template", "Tidy With AI", "Add Item", "Add Field"]) expect(screen.getByRole("button", { name })).toBeTruthy();
+    for (const name of ["New Category", "Start From Tracker"]) expect(await screen.findByRole("button", { name }, { timeout: 5000 })).toBeTruthy();
+    await openCategory("Event");
+    for (const name of ["Add Template", "Tidy With AI", "Add Item", "Add Field"]) expect(screen.getByRole("button", { name })).toBeTruthy();
     cleanup();
     await openAs("kemi@mycityapp.io");
-    await screen.findByRole("heading", { name: "Event", level: 2 }, { timeout: 5000 });
-    for (const name of ["New Category", "Start From Tracker", "Add Template", "Add Item", "Add Field"]) expect(screen.queryByRole("button", { name })).toBeNull();
+    await openCategory("Event");
+    for (const name of ["Add Template", "Add Item", "Add Field"]) expect(screen.queryByRole("button", { name })).toBeNull();
     expect(screen.getByText("Deal Merchant Agreement")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Categories" }));
+    await screen.findByRole("table", { name: "All Categories" }, { timeout: 5000 });
+    for (const name of ["New Category", "Start From Tracker"]) expect(screen.queryByRole("button", { name })).toBeNull();
   }, 30000);
 
   it("New Category adds one and refuses a name already used, on the field", async () => {
@@ -114,8 +134,7 @@ describe("Partnerships · Categories, on desktop", () => {
   it("retires a category after asking, and restores it", async () => {
     const user = userEvent.setup();
     await asOperations();
-    click(await screen.findByText("Media", { selector: "td *, td" }));
-    await screen.findByRole("heading", { name: "Media", level: 2 });
+    await openCategory("Media");
     openMenu(screen.getByRole("button", { name: "More Actions" }));
     click(await screen.findByRole("menuitem", { name: "Retire" }));
     await user.click(await screen.findByRole("button", { name: "Retire Category" }));
@@ -128,6 +147,7 @@ describe("Partnerships · Categories, on desktop", () => {
   it("moves a checklist item down and adds one", async () => {
     const user = userEvent.setup();
     await asOperations();
+    await openCategory("Event");
     await screen.findByRole("heading", { name: "Delivery Checklist" }, { timeout: 5000 });
     const titles = () => screen.getAllByRole("button", { name: /^Move .* Up$/ }).map((b) => (b.getAttribute("aria-label") ?? "").replace(/^Move | Up$/g, ""));
     expect(titles().slice(0, 2)).toEqual(["Platform and technical partnership", "Amplification"]);
@@ -143,6 +163,7 @@ describe("Partnerships · Categories, on desktop", () => {
   it("Add Field asks for the choices of a pick and keeps the key out of sight", async () => {
     const user = userEvent.setup();
     await asOperations();
+    await openCategory("Event");
     await user.click(await screen.findByRole("button", { name: "Add Field" }));
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByRole("textbox", { name: "Label" }), "Venue Type");
@@ -160,6 +181,7 @@ describe("Partnerships · Categories, on desktop", () => {
   it("the template editor opens with the wording's fields as chips and the asks; Tidy With AI keeps nothing until Use Draft", async () => {
     const user = userEvent.setup();
     await asOperations();
+    await openCategory("Event");
     await screen.findByRole("heading", { name: "Templates" }, { timeout: 5000 });
     await user.click(screen.getByRole("button", { name: "Edit Deal Merchant Agreement" }));
     const dialog = await screen.findByRole("dialog");
@@ -229,21 +251,20 @@ describe("Partnerships · Categories, on desktop", () => {
 describe("Partnerships · Categories, on a phone", () => {
   beforeEach(() => setViewport(390));
 
-  it("lists categories as cards with Pipeline Settings and Proof Points behind their own rows, and opens a category in a sheet", async () => {
+  it("lists categories as cards with Pipeline Settings and Proof Points behind their own rows, and opens a category as its own page", async () => {
     await asOperations();
     expect(await screen.findByRole("button", { name: "Pipeline Settings" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Proof Points" })).toBeTruthy();
     expect(screen.queryByRole("radio", { name: "Pipeline Settings" })).toBeNull();
     // Nothing opens until a row is tapped (F31).
-    expect(screen.queryByRole("heading", { name: "Event", level: 2 })).toBeNull();
-    click(await screen.findByText("Event", { selector: "[data-row-open] *, [data-row-open]" }));
-    const sheet = await screen.findByRole("dialog");
-    expect(await within(sheet).findByRole("heading", { name: "Event", level: 2 })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Event", level: 1 })).toBeNull();
+    await openCategory("Event");
+    expect(screen.queryByRole("dialog")).toBeNull();
     // The sections are one at a time, not a long page.
-    expect(within(sheet).getByRole("radio", { name: "Defaults" })).toBeTruthy();
-    expect(within(sheet).queryByRole("heading", { name: "Templates" })).toBeNull();
-    click(within(sheet).getByRole("radio", { name: "Templates" }));
-    expect(await within(sheet).findByText("Deal Merchant Agreement")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Defaults" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Templates" })).toBeNull();
+    click(screen.getByRole("radio", { name: "Templates" }));
+    expect(await screen.findByText("Deal Merchant Agreement")).toBeTruthy();
   }, 30000);
 
   it("a row opens Pipeline Settings in a sheet", async () => {

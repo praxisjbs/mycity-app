@@ -25,7 +25,7 @@ export default function Partnerships({ tab, id }: ModuleScreenProps) {
     case "analytics":
       return <Analytics />;
     case "categories":
-      return <Categories />;
+      return <Categories id={id} />;
     default:
       return <Pipeline id={id} />;
   }
