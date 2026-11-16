@@ -76,8 +76,11 @@ the saved reports, their schedules and runs, the per-role cards and each person'
    Team roster and the Staff day strip all read the shared attendance roster
    (`src/modules/attendance/attendance.roster.js`), which reads that day's record the way People ·
    Attendance and My Attendance read it, so they move with it, no copy and no second source, and
-   always equal those screens; the day strip's Shift Today and Your Week read the reader's own work
-   schedule (`attendance.schedule.js` `dayOn`, attendance.md §6.13). An Overview on screen reads
+   always equal those screens; Your Week reads the reader's own work schedule
+   (`attendance.schedule.js` `dayOn`, attendance.md §6.13), and the day strip's Shift Today reads
+   today as the clock does (`attendance.reconcile.js` `judgedOn`): once the day is judged, the shift
+   it was judged against, so a schedule changed after the clock-in never makes the two differ
+   (attendance.md §6.4). An Overview on screen reads
    itself again when the reader's own state today changes (after a punch from the panel, at once)
    and on `attendance.updated` (a punch in their People scope, a burst of them read once).
    Attendance's alerts are the Attendance policy's breaches (step 5): Home reads no attendance
@@ -351,9 +354,10 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
     (Deal, Partner, Signed, Value, Owner), the most recent first. Beside it the Partnership
     Pipeline (open opportunities by stage, and active partners with no contact in 30 days) and
     Goals This Quarter.
-  - Staff: the day strip (Shift Today from the reader's own work schedule, `attendance.schedule.js`
-    `dayOn`, or a temporary site's own hours on a day of one (attendance.md §6.11), none on a day
-    they do not work; and the reader's own row of today's roster: status,
+  - Staff: the day strip (Shift Today as the clock reads it, `attendance.reconcile.js` `judgedOn`:
+    the shift today was judged against once it is, else the reader's own work schedule or a
+    temporary site's own hours on a day of one (attendance.md §6.4, §6.11), none on a day they do
+    not work; and the reader's own row of today's roster: status,
     Clock-In, Clock-Out, the worksite of the clock-in, and Hours Today, the day's worked minutes as
     Attendance counts them, so a System Clock-Out counts only to the shift's end, none until they
     clock out), My Goals This Quarter (their targets due this quarter) and Upcoming Leave. A member of staff's Overview is their own day, so it draws no chart,
@@ -875,6 +879,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 16/11/2026 · JP · §3 step 2, §6 Overview: the Staff day strip's Shift Today reads today as the clock does (`reconcile.judgedOn`). A schedule People changed after the person's clock-in showed the new hours on Home while the clock and the register kept the judged ones (a day is judged once, attendance.md §6.4). Found filming the Milestones 0 and 1 videos; `home-overview.test.js`.
 - 14/11/2026 · JP · §11: the attendance seed punches only people with a login. On staging it had punched the payroll seed's invented employees, whom the register never expects, and Home read "22 of 17 clocked in" (found filming the Milestones 0 and 1 videos).
 - 14/11/2026 · JP · §9: `activity.summary`, `alerts.summary` and `runs.summary`, Activity Today, the alerts one may clear and the report files received in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8). Nothing on screen changes.
 - 09/11/2026 · JP · M6 PR 2 (`payroll.md` §3.8, §10.1): Payroll In Progress is live. `payroll.source.js` counts the runs that are a Draft, Computed, Submitted or Approved (only Paid ends one, so an unpaid October still shows in December) for a reader whose `payroll` view reaches everyone, and pages them newest month first (Run, Month, Status, Staff, Net), each opening Payroll · Payroll Runs; it owes nothing now. The card keeps `employee.salary` as its sensitive field, so a reader who may not see pay never sees it. The last hidden card is gone: the catalogue holds 29 cards, all live.

@@ -1065,9 +1065,13 @@ describe("the sections of each Home view", () => {
     ]);
   });
 
-  test("the day strip's Shift Today is the reader's own, and Hours Today the day's worked minutes", async () => {
+  test("the day strip's Shift Today is today as the clock reads it, and Hours Today the day's worked minutes", async () => {
+    const reconcile = require("../attendance/attendance.reconcile");
+    const attendanceRepo = require("../attendance/attendance.repo");
     const shift = rules.shiftFor("2026-10-16", cal, rules.DEFAULT_POLICY);
-    jest.spyOn(schedules, "dayOn").mockResolvedValue({ ...shift, starts_at: "10:00", ends_at: "14:00" });
+    jest.spyOn(attendanceRepo, "person").mockResolvedValue({ employee_id: ID, work_pattern: "on_site" });
+    // The shift the day was judged against (attendance.md §6.4), never a schedule set after the clock-in.
+    const judged = jest.spyOn(reconcile, "judgedOn").mockResolvedValue({ judged: { shift: { ...shift, starts_at: "10:00", ends_at: "14:00" } } });
     const page = jest.spyOn(roster, "page").mockResolvedValue({
       data: [
         {
@@ -1089,6 +1093,7 @@ describe("the sections of each Home view", () => {
       worked_minutes: 240,
     });
     expect(page).toHaveBeenCalledWith(expect.anything(), { date: "2026-10-16" }, { scope: "own", scope_ids: [ID] }, { page: 1 });
+    expect(judged).toHaveBeenCalledWith(expect.anything(), { employee_id: ID, work_pattern: "on_site" }, "2026-10-16");
   });
 
   test("Staff draws its own day and none of the organisation's sections", () => {
