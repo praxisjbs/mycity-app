@@ -399,7 +399,7 @@ The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsin
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `cols` | `1 \| 2 \| 3 \| 4 \| "4m2" \| "1.4/1" \| "1/1.5"` | yes | How many columns on desktop; see GridCols. |
+| `cols` | `1 \| 2 \| 3 \| 4 \| "4m2" \| "1.4/1" \| "1/1.5" \| "2/1"` | yes | How many columns on desktop; see GridCols. |
 | `phoneCols` | `1 \| 2` |  | Columns on a phone: 1 (the default) or 2 (KPI tiles). |
 | `gap` | `"sm" \| "md"` |  | Space between cells: `md` 12 px (the default) or `sm` 8 px. |
 | `flush` | `boolean` |  | Drop the 12 px space under the grid (the merged grids carry it so blocks stack apart). |
@@ -408,6 +408,7 @@ The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsin
 ```tsx
 <Grid cols={4} phoneCols={2}>{kpis}</Grid>
 <Grid cols="1.4/1"><Card /><Card /></Grid>
+<Grid cols="2/1"><DocumentPreview /><Card /></Grid>
 ```
 
 ### ListDetail

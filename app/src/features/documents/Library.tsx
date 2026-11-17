@@ -1,9 +1,10 @@
 /**
  * Document Centre · Library (#113, docs/guides/document-centre.md §2, §6, §10): every business
  * document the reader may already open from its own module, and the company's own papers, in one
- * list. Four figures that set the list's filter, a search that reaches inside files and filters the
- * server answers, and a document beside the list on a wide desktop and in a full sheet on a phone
- * (ListDetail, F31) with its preview, View File, Download and the way to the record it belongs to.
+ * list across the page. Four figures that set the list's filter, a search that reaches inside files
+ * and filters the server answers, and a Download icon at each row's end. A pressed document opens as
+ * a page of its own (`?id=`, Back to Library; F31 amended 17/11/2026): its preview, with its details
+ * and View File, Download and Open Record beside it.
  * A company document is uploaded here (Upload Document), and its uploader or a keeper of the library
  * changes its details, replaces its file and archives it; another module's document is only read.
  * Download Letterhead gives the blank letterhead as PDF or Word.
@@ -16,12 +17,15 @@ import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
 import { useFileViewer, viewableFile } from "@/features/shared/files";
+import { useKept } from "@/features/shared/kept";
 import { paging } from "@/features/shared/wire";
 import { useRouter } from "@/lib/router";
 import { useTrailTitle } from "@/lib/trail";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import {
+  ActionGroup,
+  BackButton,
   Button,
   Card,
   CardHeader,
@@ -38,7 +42,6 @@ import {
   IconButton,
   KeyValue,
   KpiCard,
-  ListDetail,
   LoadingRows,
   Menu,
   PageHeader,
@@ -46,8 +49,8 @@ import {
   Pill,
   toast,
   useConfirm,
+  useIsPhone,
   useModal,
-  useSideBySide,
   type MenuItem,
   type StatusTone,
 } from "@mycity/ui";
@@ -95,21 +98,26 @@ const queryOf = (f: Filters) => ({
 /** Every read of the library, refreshed after a change. */
 const refresh = () => invalidate("/api/v1/library");
 
+/** The vault's own file route, where `vault.canRead` decides once more. */
+const fileUrl = (d: LibraryDocument) => `/api/v1/documents/${d.document_id}/content`;
+const fileName = (d: LibraryDocument) => d.original_name ?? d.title;
+
 export function Library({ id }: { id: string | null }) {
+  return id ? <DocumentPage key={id} id={id} /> : <LibraryList />;
+}
+
+function LibraryList() {
   const { navigate } = useRouter();
   const me = useMe();
   const modal = useModal();
-  const files = useFileViewer();
-  const beside = useSideBySide();
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  // Kept while a document has its page, so Back to Library returns to the list as it was left.
+  const [filters, setFilters] = useKept<Filters>("library.filters", NO_FILTERS);
   const summary = useApi("GET /api/v1/library/documents/summary");
   const options = useApi("GET /api/v1/library/filters");
   const list = usePaged("GET /api/v1/library/documents", { filters: queryOf(filters) });
   const mayUpload = Boolean(me.grants.documents?.includes("create"));
   const keeps = hasCapability(me, "documents.manage");
   const openOne = (documentId: string) => navigate(`${HERE}&id=${documentId}`);
-  // Beside the list the first document shows unasked; on a phone nothing opens until a row is tapped (F31).
-  const shown = id ?? (beside ? (list.rows[0]?.document_id ?? null) : null);
   const s = summary.data;
   const filtered = Object.values(filters).filter(Boolean).length;
   const refine = () =>
@@ -205,61 +213,50 @@ export function Library({ id }: { id: string | null }) {
           {filtered ? `Filters (${filtered})` : "Filter Documents"}
         </Button>
       </PhoneOnly>
-      <ListDetail
+      <DataView<LibraryDocument>
         className="mt-3"
-        open={Boolean(id)}
-        onClose={() => navigate(HERE)}
-        title="Document"
-        full
-        list={
-          <DataView<LibraryDocument>
-            title="Documents"
-            list={list}
-            search="Search documents"
-            rowKey={(d) => d.document_id}
-            noun="document"
-            onRowClick={(d) => openOne(d.document_id)}
-            selectedKey={beside ? shown : null}
-            empty={
-              list.q || filtered
-                ? { title: "No Documents Found", text: "Try another search or filter.", icon: "doc" }
-                : { title: "No Documents Yet", icon: "doc" }
-            }
-            columns={[
-              {
-                key: "title",
-                label: "Document",
-                sortable: true,
-                render: (d) => (
-                  <span className="grid gap-0.5" data-copy="content">
-                    <span className="font-medium">{d.title}</span>
-                    {d.matched_text && <span className="text-subtle-foreground line-clamp-2 text-sm">{d.matched_text}</span>}
-                  </span>
-                ),
-              },
-              { key: "status", label: "Status", badge: true, render: pill },
-              { key: "type", label: "Type", render: (d) => d.type_label },
-              { key: "belongs", label: "Belongs To", render: (d) => <span data-copy="content">{belongsTo(d)}</span> },
-              { key: "created_at", label: "Added", sortable: true, render: (d) => formatDate(d.created_at) },
-              { key: "expires_on", label: "Expires", sortable: true, desktop: true, render: (d) => (d.expires_on ? formatDate(d.expires_on) : null) },
-            ]}
-          />
+        title="Documents"
+        list={list}
+        search="Search documents"
+        rowKey={(d) => d.document_id}
+        noun="document"
+        onRowClick={(d) => openOne(d.document_id)}
+        empty={
+          list.q || filtered
+            ? { title: "No Documents Found", text: "Try another search or filter.", icon: "doc" }
+            : { title: "No Documents Yet", icon: "doc" }
         }
-        detail={
-          shown && (
-            <DocumentPanel
-              key={shown}
-              id={shown}
-              onView={files.view}
-              onGone={() => {
-                refresh();
-                navigate(HERE);
-              }}
-            />
-          )
-        }
+        columns={[
+          {
+            key: "title",
+            label: "Document",
+            sortable: true,
+            render: (d) => (
+              <span className="grid gap-0.5" data-copy="content">
+                <span className="font-medium">{d.title}</span>
+                {d.matched_text && <span className="text-subtle-foreground line-clamp-2 text-sm">{d.matched_text}</span>}
+              </span>
+            ),
+          },
+          { key: "status", label: "Status", badge: true, render: pill },
+          { key: "type", label: "Type", render: (d) => d.type_label },
+          { key: "belongs", label: "Belongs To", render: (d) => <span data-copy="content">{belongsTo(d)}</span> },
+          { key: "created_at", label: "Added", sortable: true, render: (d) => formatDate(d.created_at) },
+          { key: "expires_on", label: "Expires", sortable: true, desktop: true, render: (d) => (d.expires_on ? formatDate(d.expires_on) : null) },
+          {
+            key: "download",
+            label: "",
+            desktop: true,
+            className: "w-px text-right",
+            render: (d) => (
+              // The row opens the document's page; Download is its own press, so it stops here.
+              <span className="flex justify-end" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <IconButton icon="download" size="sm" label={`Download ${d.title}`} onClick={() => saveFile(fileUrl(d), fileName(d))} />
+              </span>
+            ),
+          },
+        ]}
       />
-      {files.viewer}
     </>
   );
 }
@@ -328,9 +325,27 @@ function FilterSheet({ value, options, keeps, onApply, close }: { value: Filters
   );
 }
 
-/** One document: its preview, its facts, and View File, Download and Open Record; a company document's own actions. */
-function DocumentPanel({ id, onView, onGone }: { id: string; onView: ReturnType<typeof useFileViewer>["view"]; onGone: () => void }) {
+/** A document's own page: Back to Library, its name, then the file beside its details. */
+function DocumentPage({ id }: { id: string }) {
   const { navigate } = useRouter();
+  const files = useFileViewer();
+  return (
+    <>
+      <BackButton label="Back to Library" onBack={() => navigate(HERE)} />
+      <DocumentRecord id={id} onView={files.view} />
+      {files.viewer}
+    </>
+  );
+}
+
+/**
+ * One document: the file on the wider side, and its details with Download, View File and Open Record
+ * on the narrower, a company document's own actions in its menu. On a phone the details come first,
+ * Download full width at their foot.
+ */
+function DocumentRecord({ id, onView }: { id: string; onView: ReturnType<typeof useFileViewer>["view"] }) {
+  const { navigate } = useRouter();
+  const phone = useIsPhone();
   const modal = useModal();
   const confirm = useConfirm();
   const read = useApi("GET /api/v1/library/documents/:id", { params: { id } });
@@ -342,7 +357,7 @@ function DocumentPanel({ id, onView, onGone }: { id: string; onView: ReturnType<
     const gone = read.error instanceof ApiError && read.error.status === 404;
     return (
       <Card>
-        <EmptyState bare title={gone ? "Document Not Found" : "Could Not Open"} text={gone ? "It was removed, or is not yours to open." : "Try again in a moment."} icon="doc" action={<Button onClick={onGone}>Back to Library</Button>} />
+        <EmptyState bare level={2} title={gone ? "Document Not Found" : "Could Not Open"} text={gone ? "It was removed, or is not yours to open." : "Try again in a moment."} icon="doc" />
       </Card>
     );
   }
@@ -353,8 +368,8 @@ function DocumentPanel({ id, onView, onGone }: { id: string; onView: ReturnType<
       </Card>
     );
   }
-  const url = `/api/v1/documents/${d.document_id}/content`;
-  const name = d.original_name ?? d.title;
+  const url = fileUrl(d);
+  const name = fileName(d);
   const link = d.record?.link ?? null;
   const company = d.company;
   const saved = (next: LibraryDocument) => {
@@ -385,70 +400,111 @@ function DocumentPanel({ id, onView, onGone }: { id: string; onView: ReturnType<
         ...(company.may_archive ? [company.archived_at ? { label: "Restore Document", icon: "undo" as const, onSelect: bringBack } : { label: "Archive Document", icon: "book" as const, danger: true, onSelect: putAway }] : []),
       ]
     : [];
-  return (
-    <div className="grid gap-3">
-      <Card>
-        <CardHeader
-          record
-          title={d.title}
-          right={
-            <>
-              {pill(d)}
-              {actions.length > 0 && <Menu trigger={(p) => <IconButton {...p} icon="dots" label="Document Actions" />} label="Document Actions" items={actions} />}
-            </>
-          }
-        />
-        <KeyValue
-          items={[
-            ["Type", d.type_label],
-            [company ? "Category" : "Belongs To", <span key="b" data-copy="content">{belongsTo(d) ?? "–"}</span>],
-            ...(d.number ? [["Number", d.number] as [string, string]] : []),
-            ["Added", `${formatDate(d.created_at)}${d.added_by_name ? `, ${d.added_by_name}` : ""}`],
-            [<HelpTerm key="e" help={EXPIRING_HELP}>Expires</HelpTerm>, d.expires_on ? formatDate(d.expires_on) : "None"],
-            ["Size", `${sizeOf(d.bytes)}${d.page_count ? `, ${d.page_count} ${d.page_count === 1 ? "page" : "pages"}` : ""}`],
-            ...(d.version > 1 ? [["Version", String(d.version)] as [string, string]] : []),
-            ...(company && company.tags.length ? [["Tags", <span key="t" data-copy="content">{company.tags.join(", ")}</span>] as [string, JSX.Element]] : []),
-            ...(company?.description ? [["Description", <span key="n" data-copy="content">{company.description}</span>] as [string, JSX.Element]] : []),
-          ]}
-        />
-        <Details items={[["File Name", <span key="f" data-copy="content">{name}</span>]]} />
-        <FormFooter>
-          {link && (
-            <Button icon="external" onClick={() => navigate(link)}>
-              Open Record
-            </Button>
-          )}
-          {viewableFile(d.mime) && (
-            <Button icon="eye" onClick={() => onView(url, { name, mime: d.mime, at: `Added ${formatDate(d.created_at)}` })}>
-              View File
-            </Button>
-          )}
-          <Button variant="primary" icon="download" onClick={() => saveFile(url, name)}>
-            Download
+  const viewable = viewableFile(d.mime);
+  const video = d.mime.startsWith("video/");
+  const buttons = (
+    <ActionGroup>
+      <div className="grid gap-2">
+        <Button variant="primary" block icon="download" onClick={() => saveFile(url, name)}>
+          Download
+        </Button>
+        {viewable && (
+          <Button block icon="eye" onClick={() => onView(url, { name, mime: d.mime, at: `Added ${formatDate(d.created_at)}` })}>
+            View File
           </Button>
-        </FormFooter>
+        )}
+        {link && (
+          <Button block icon="external" onClick={() => navigate(link)}>
+            Open Record
+          </Button>
+        )}
+      </div>
+    </ActionGroup>
+  );
+  const details = (
+    <>
+      <KeyValue
+        items={[
+          ["Type", d.type_label],
+          [company ? "Category" : "Belongs To", <span key="b" data-copy="content">{belongsTo(d) ?? "–"}</span>],
+          ...(d.number ? [["Number", d.number] as [string, string]] : []),
+          ["Added", `${formatDate(d.created_at)}${d.added_by_name ? `, ${d.added_by_name}` : ""}`],
+          [<HelpTerm key="e" help={EXPIRING_HELP}>Expires</HelpTerm>, d.expires_on ? formatDate(d.expires_on) : "None"],
+          ["Size", `${sizeOf(d.bytes)}${d.page_count ? `, ${d.page_count} ${d.page_count === 1 ? "page" : "pages"}` : ""}`],
+          ...(d.version > 1 ? [["Version", String(d.version)] as [string, string]] : []),
+          ...(company && company.tags.length ? [["Tags", <span key="t" data-copy="content">{company.tags.join(", ")}</span>] as [string, JSX.Element]] : []),
+          ...(company?.description ? [["Description", <span key="n" data-copy="content">{company.description}</span>] as [string, JSX.Element]] : []),
+        ]}
+      />
+      <Details items={[["File Name", <span key="f" data-copy="content">{name}</span>]]} />
+    </>
+  );
+  const facts = (
+    <Card>
+      <CardHeader
+        title="Details"
+        right={
+          <>
+            {pill(d)}
+            {actions.length > 0 && <Menu trigger={(p) => <IconButton {...p} icon="dots" label="Document Actions" />} label="Document Actions" items={actions} />}
+          </>
+        }
+      />
+      {phone ? (
+        <>
+          {details}
+          <div className="mt-4">{buttons}</div>
+        </>
+      ) : (
+        <>
+          {buttons}
+          <div className="mt-4">{details}</div>
+        </>
+      )}
+    </Card>
+  );
+  const file =
+    viewable && !video ? (
+      <Preview url={url} name={name} mime={d.mime} bytes={d.bytes} height={phone ? "md" : "lg"} />
+    ) : (
+      <Card>
+        <EmptyState bare level={2} title="No Preview" text={video ? "Press View File to watch it." : "Download the file to read it."} icon="doc" />
       </Card>
-      {viewableFile(d.mime) && !d.mime.startsWith("video/") && <Preview url={url} name={name} mime={d.mime} bytes={d.bytes} />}
-    </div>
+    );
+  return (
+    <>
+      <PageHeader title={<span data-copy="content">{d.title}</span>} />
+      {phone ? (
+        <div className="grid gap-3">
+          {facts}
+          {file}
+        </div>
+      ) : (
+        <Grid cols="2/1">
+          {file}
+          {facts}
+        </Grid>
+      )}
+    </>
   );
 }
 
 /** The file itself: a PDF's pages drawn in the app, a picture as it is. */
-function Preview({ url, name, mime, bytes }: { url: string; name: string; mime: string; bytes: number }) {
+function Preview({ url, name, mime, bytes, height }: { url: string; name: string; mime: string; bytes: number; height: "md" | "lg" }) {
   const { blob, href, failed } = useFileBlob(url);
   if (failed) {
     return (
       <Card>
-        <EmptyState bare title="Preview Unavailable" text="Download the file to read it." icon="doc" />
+        <EmptyState bare level={2} title="Preview Unavailable" text="Download the file to read it." icon="doc" />
       </Card>
     );
   }
   if (!href) {
     return (
       <Card>
-        <EmptyState bare title="Opening" text="This takes a moment." icon="doc" />
+        <EmptyState bare level={2} title="Opening" text="This takes a moment." icon="doc" />
       </Card>
     );
   }
-  return <DocumentPreview name={name} mime={mime} sizeBytes={bytes} href={href} file={blob} />;
+  return <DocumentPreview name={name} mime={mime} sizeBytes={bytes} href={href} file={blob} height={height} />;
 }

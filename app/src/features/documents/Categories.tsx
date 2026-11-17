@@ -1,8 +1,8 @@
 /**
  * Document Centre · Categories (#114, docs/guides/document-centre.md §2, §6.4, §10): the categories
  * company documents are kept in, who sees each (everyone, or named roles) and how many documents it
- * holds, for those who keep the library (`documents.manage`). The list beside the picked category on
- * a wide desktop, a sheet on a phone (ListDetail, F31). New Category, Edit Category, Archive Category
+ * holds, for those who keep the library (`documents.manage`). The list across the page; a pressed
+ * category opens as a page of its own (`?id=`, Back to Categories; F31 amended 17/11/2026). New Category, Edit Category, Archive Category
  * and Restore Category; a category in use is archived, never deleted, and its documents stay.
  */
 import { useState } from "react";
@@ -10,10 +10,12 @@ import librarySchemas from "@mycity/contract/schemas/library.js";
 import type { DocumentCategory, RoleOption } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useKept } from "@/features/shared/kept";
 import { useRouter } from "@/lib/router";
 import { useTrailTitle } from "@/lib/trail";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import {
+  BackButton,
   Button,
   Card,
   CardHeader,
@@ -27,7 +29,6 @@ import {
   FormFooter,
   HelpTerm,
   KeyValue,
-  ListDetail,
   LoadingRows,
   PageHeader,
   Pill,
@@ -38,7 +39,6 @@ import {
   useConfirm,
   useContractForm,
   useModal,
-  useSideBySide,
 } from "@mycity/ui";
 
 const HERE = "/documents?tab=categories";
@@ -55,12 +55,24 @@ const seenBy = (c: DocumentCategory) => (c.audience === "everyone" ? "Everyone" 
 
 export function Categories({ id }: { id: string | null }) {
   const { navigate } = useRouter();
+  if (id) {
+    return (
+      <>
+        <BackButton label="Back to Categories" onBack={() => navigate(HERE)} />
+        <CategoryRecord key={id} id={id} />
+      </>
+    );
+  }
+  return <CategoryList />;
+}
+
+function CategoryList() {
+  const { navigate } = useRouter();
   const modal = useModal();
-  const beside = useSideBySide();
-  const [archived, setArchived] = useState("");
+  // Kept while a category has its page, so Back to Categories returns to the list as it was left.
+  const [archived, setArchived] = useKept("library.categories.archived", "");
   const list = usePaged("GET /api/v1/library/categories", { filters: archived ? { archived: "true" as const } : {} });
   const openOne = (categoryId: string) => navigate(`${HERE}&id=${categoryId}`);
-  const shown = id ?? (beside ? (list.rows[0]?.document_category_id ?? null) : null);
   const add = () =>
     modal.open({
       title: "New Category",
@@ -90,55 +102,46 @@ export function Categories({ id }: { id: string | null }) {
           </DesktopOnly>
         }
       />
-      <ListDetail
-        open={Boolean(id)}
-        onClose={() => navigate(HERE)}
-        title="Category"
-        list={
-          <DataView<DocumentCategory>
-            title="Categories"
-            list={list}
-            search="Search categories"
-            rowKey={(c) => c.document_category_id}
-            noun="category"
-            nounPlural="categories"
-            onRowClick={(c) => openOne(c.document_category_id)}
-            selectedKey={beside ? shown : null}
-            actions={
-              <FilterSelect
-                label="Show"
-                value={archived}
-                onChange={setArchived}
-                options={[
-                  ["", "Current"],
-                  ["true", "Archived"],
-                ]}
-              />
-            }
-            empty={
-              list.q || archived
-                ? { title: "No Categories Found", text: "Try another search.", icon: "doc" }
-                : { title: "No Categories Yet", icon: "doc" }
-            }
-            columns={[
-              { key: "name", label: "Category", sortable: true, render: (c) => <span className="font-medium" data-copy="content">{c.name}</span> },
-              {
-                key: "seen",
-                label: "Seen By",
-                render: (c) => (c.audience === "roles" && c.roles.length === 0 ? <Pill tone="warn">No Roles</Pill> : <span data-copy="content">{seenBy(c)}</span>),
-              },
-              { key: "documents", label: "Documents", render: (c) => String(c.documents) },
+      <DataView<DocumentCategory>
+        title="Categories"
+        list={list}
+        search="Search categories"
+        rowKey={(c) => c.document_category_id}
+        noun="category"
+        nounPlural="categories"
+        onRowClick={(c) => openOne(c.document_category_id)}
+        actions={
+          <FilterSelect
+            label="Show"
+            value={archived}
+            onChange={setArchived}
+            options={[
+              ["", "Current"],
+              ["true", "Archived"],
             ]}
           />
         }
-        detail={shown && <CategoryPanel key={shown} id={shown} onGone={() => navigate(HERE)} />}
+        empty={
+          list.q || archived
+            ? { title: "No Categories Found", text: "Try another search.", icon: "doc" }
+            : { title: "No Categories Yet", icon: "doc" }
+        }
+        columns={[
+          { key: "name", label: "Category", sortable: true, render: (c) => <span className="font-medium" data-copy="content">{c.name}</span> },
+          {
+            key: "seen",
+            label: "Seen By",
+            render: (c) => (c.audience === "roles" && c.roles.length === 0 ? <Pill tone="warn">No Roles</Pill> : <span data-copy="content">{seenBy(c)}</span>),
+          },
+          { key: "documents", label: "Documents", render: (c) => String(c.documents) },
+        ]}
       />
     </>
   );
 }
 
-/** One category: who sees it, how many documents it holds, and Edit Category, Archive or Restore. */
-function CategoryPanel({ id, onGone }: { id: string; onGone: () => void }) {
+/** One category on its own page: who sees it, how many documents it holds, and Edit Category, Archive or Restore. */
+function CategoryRecord({ id }: { id: string }) {
   const modal = useModal();
   const confirm = useConfirm();
   const read = useApi("GET /api/v1/library/categories/:id", { params: { id } });
@@ -149,7 +152,7 @@ function CategoryPanel({ id, onGone }: { id: string; onGone: () => void }) {
   if (read.error) {
     return (
       <Card>
-        <EmptyState bare title="Category Not Found" text="It was removed, or is not yours." icon="doc" action={<Button onClick={onGone}>Back to Categories</Button>} />
+        <EmptyState bare level={2} title="Category Not Found" text="It was removed, or is not yours." icon="doc" />
       </Card>
     );
   }
@@ -173,30 +176,33 @@ function CategoryPanel({ id, onGone }: { id: string; onGone: () => void }) {
     toast("Category restored");
   };
   return (
-    <Card>
-      <CardHeader record title={c.name} right={c.archived_at ? <Pill tone="neutral">Archived</Pill> : null} />
-      <KeyValue
-        items={[
-          [<HelpTerm key="s" help={SEEN_BY_HELP}>Seen By</HelpTerm>, <span key="v" data-copy="content">{seenBy(c)}</span>],
-          ["Documents", String(c.documents)],
-          ...(c.description ? [["Description", <span key="d" data-copy="content">{c.description}</span>] as [string, JSX.Element]] : []),
-        ]}
-      />
-      <FormFooter>
-        {c.archived_at ? (
-          <Button onClick={bringBack}>Restore Category</Button>
-        ) : (
-          <>
-            <Button variant="danger" onClick={putAway}>
-              Archive Category
-            </Button>
-            <Button variant="primary" icon="edit" onClick={edit}>
-              Edit Category
-            </Button>
-          </>
-        )}
-      </FormFooter>
-    </Card>
+    <>
+      <PageHeader title={<span data-copy="content">{c.name}</span>} />
+      <Card>
+        <CardHeader title="Details" right={c.archived_at ? <Pill tone="neutral">Archived</Pill> : null} />
+        <KeyValue
+          items={[
+            [<HelpTerm key="s" help={SEEN_BY_HELP}>Seen By</HelpTerm>, <span key="v" data-copy="content">{seenBy(c)}</span>],
+            ["Documents", String(c.documents)],
+            ...(c.description ? [["Description", <span key="d" data-copy="content">{c.description}</span>] as [string, JSX.Element]] : []),
+          ]}
+        />
+        <FormFooter>
+          {c.archived_at ? (
+            <Button onClick={bringBack}>Restore Category</Button>
+          ) : (
+            <>
+              <Button variant="danger" onClick={putAway}>
+                Archive Category
+              </Button>
+              <Button variant="primary" icon="edit" onClick={edit}>
+                Edit Category
+              </Button>
+            </>
+          )}
+        </FormFooter>
+      </Card>
+    </>
   );
 }
 

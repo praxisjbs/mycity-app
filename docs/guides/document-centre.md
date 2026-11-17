@@ -82,8 +82,8 @@ is copied or moved, and a document's own module stays its owner and its one writ
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Document Centre · Library (`library`), new | Staff app | `documents` view; each row by the vault's rule (D2) | Four KPI cards, search, filters, the documents beside the picked one with its preview | Search, filter, sort, open a document, View File, Download, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Restore Document |
-| Document Centre · Categories (`categories`), new, PR 2 | Staff app | `documents` view and `documents.manage` | The categories beside the picked one: its audience and how many documents it holds | New Category, Edit Category, Archive Category, Restore Category |
+| Document Centre · Library (`library`), new | Staff app | `documents` view; each row by the vault's rule (D2) | Four KPI cards, search, filters, the documents across the page with a Download icon on each row; a document on a page of its own, its preview beside its details | Search, filter, sort, download from a row, open a document, View File, Download, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Restore Document |
+| Document Centre · Categories (`categories`), new, PR 2 | Staff app | `documents` view and `documents.manage` | The categories across the page; a category on a page of its own: its audience and how many documents it holds | New Category, Edit Category, Archive Category, Restore Category |
 | ⌘K | Staff app | Every signed-in person, by the same rule | The Documents group; the screens and actions of §9 | Open a document in the Library |
 | Praxis AI · Ask (#67) | Staff app | `praxis_ai` and `documents` view | Documents found for a question, each with a button to open it (PR 2) | Open the document, or the Library filtered |
 | Home · Alerts | Staff app | As Home's alert rules say | An expiring company document's alert opens the Library, not People · Employees (PR 2, §6.9) | Open the document |
@@ -104,8 +104,10 @@ The file routes of the `documents` module and every record screen that shows its
    readable condition of §6.3.
 3. **They search or filter.** Search, the filters and the sort go to the server (FRONTEND_GUIDE §4).
    A KPI card sets the filter behind its number.
-4. **They open a row.** The record opens beside the list on a wide desktop and in a full sheet on a
-   phone (`ListDetail`, F31), from `GET /library/documents/:id`. Its preview and Download read the
+4. **They open a row.** The document opens as a page of its own at `?tab=library&id=<document id>`,
+   Back to Library above it, on desktop and phone (F31 amended 17/11/2026), from
+   `GET /library/documents/:id`; the list's filters are kept for Back (`useKept`). A row's Download
+   icon saves the file without opening the page. Its preview and Download read the
    vault's own routes (`GET /documents/:id/content`, `/variant/:kind`), where `vault.canRead` decides
    once more.
 5. **Open Record** goes to the record the document belongs to (`shared/route-map.js`), when the
@@ -475,8 +477,8 @@ the `edit` grant on its own module, the subject, the uploader or the CEO.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Document Centre · Library | The four KPI cards, each setting the list's filter; search; the filters Area, Type, Status (Archived too, for `documents.manage`), Added and, in PR 2, Category and Tag; the list: Document, Type, Belongs To, Added, Expires, status pill; the record: the preview, Type, Belongs To, Number, Added, Added By, Size, Expires, Version, and View File, Download, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Category, Tags, the words found in the file | A help term on Expiring Soon (the window) and on Signed (a signed document is never replaced); a Details row on the record for the file name and, where a file has no text, that it is found by name | That the library is a view of the vault, how a read rule is applied, why a document is missing for one reader: this guide §6, the User Guide |
-| Document Centre · Categories | The categories: Category, Seen By, Documents; the record: name, description, Seen By with its roles; New Category, Edit Category, Archive Category | A help term on Seen By (uploaders and document managers always see their documents) | How audiences are enforced: §6.4 |
+| Document Centre · Library | The four KPI cards, each setting the list's filter; search; the filters Area, Type, Status (Archived too, for `documents.manage`), Added and, in PR 2, Category and Tag; the list: Document, Type, Belongs To, Added, Expires, status pill, and a Download icon at the row's end (desktop); the document's page: Back to Library, its title, the preview, Details (Type, Belongs To, Number, Added, Added By, Size, Expires, Version) with Download, View File, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Category, Tags, the words found in the file | A help term on Expiring Soon (the window) and on Signed (a signed document is never replaced); a Details row on the record for the file name and, where a file has no text, that it is found by name | That the library is a view of the vault, how a read rule is applied, why a document is missing for one reader: this guide §6, the User Guide |
+| Document Centre · Categories | The categories: Category, Seen By, Documents; the category's page: Back to Categories, its name, Details (description, Seen By with its roles); New Category, Edit Category, Archive Category | A help term on Seen By (uploaders and document managers always see their documents) | How audiences are enforced: §6.4 |
 
 Word limits are FRONTEND_GUIDE §5's: the page title is Library, card titles are the four of D7, every
 button is Verb Noun. A file's preview is content (`data-copy="content"`).
@@ -485,17 +487,23 @@ button is Verb Noun. A file's preview is content (`data-copy="content"`).
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Document Centre · Library | The four KPI cards two to a row, Filter Documents (the four filters in a sheet with Show Documents and Clear Filters; the button counts the filters set), the search, then document cards: the title with its status pill, Type, Belongs To, Added | The subtitle; the Expires column (it is in the record's sheet with Added By, Size and Version) | Download, full width at the foot of the record's full sheet; Upload Document from the screen's New action | Documents in the More tiles; the two tabs scroll sideways; a tapped card opens its sheet and nothing opens before a tap (F31) |
-| Document Centre · Categories | Category cards: name, Seen By, the count | The description (in the sheet) | New Category | The second tab |
+| Document Centre · Library | The four KPI cards two to a row, Filter Documents (the four filters in a sheet with Show Documents and Clear Filters; the button counts the filters set), the search, then document cards: the title with its status pill, Type, Belongs To, Added | The subtitle; the Expires column and the row's Download icon (Expires is on the document's page with Added By, Size and Version) | Download, full width at the foot of Details on the document's page; Upload Document from the screen's New action | Documents in the More tiles; the two tabs scroll sideways; a tapped card opens the document's page in place of the list, Details first and the preview under them, and Back returns to the list (F31 amended 17/11/2026) |
+| Document Centre · Categories | Category cards: name, Seen By, the count | The description (on the category's page) | New Category | The second tab; a tapped card opens the category's page in place of the list |
 
 Download Letterhead is a menu in the page header (PDF File, Word File) on both shells; Upload Document is
 the header's primary on desktop and the New action on a phone. A company document's Edit Details, Upload
-New Version and Archive Document (or Restore Document) are in the record's Document Actions menu, shown
-only to those who may use them.
+New Version and Archive Document (or Restore Document) are in the Document Actions menu at the top of
+the document's Details, shown only to those who may use them.
 
-Desktop is the list beside the record (`ListDetail`, the list the wider of the two, `full`), a table with a sticky
-filter row, the preview drawn in the pane (`DocumentPreview` over `useFileBlob`), View File in the
-full screen viewer (`useFileViewer`). Model the list on `app/src/features/partnerships/Contracts.tsx`
+Desktop is the list across the page's width (a table with a sticky filter row), each row ending in
+a Download icon (`IconButton`, named Download and the document's title) that saves the file without
+opening the row. A pressed row opens the document as a page of its own (F31 amended 17/11/2026, TB:
+MyCity found the document beside the list too much to take in): Back to Library, the title as the
+page's heading and in the trail, then the preview on two thirds of the width (`DocumentPreview` over
+`useFileBlob`, `lg`) and Details on the third beside it (`Grid` `2/1`), Download, View File and Open
+Record at its top and the facts under them. A file with no preview (Word, Excel, a video) shows No
+Preview in its place. View File opens the full screen viewer (`useFileViewer`). Categories follows the
+same rule: the list across the page, a category on its own page with Back to Categories. Model the list on `app/src/features/partnerships/Contracts.tsx`
 and `recruitment/TalentPool.tsx`, the record and the upload on `people/EmployeeDocuments.tsx`; do
 not copy `ess/Documents.tsx`, which opens its record in a modal (the older pattern). Selects from a
 server list load as they scroll (`useInfinite` with `paging`, F32). Tags use `ComboListField`; no tag
@@ -507,8 +515,8 @@ input exists and none is added. No folder icon exists; the module's icon is `doc
 - **A link to an old version** (`?id=` of a superseded file) opens the current version.
 - **A file removed after the list was read**: the record answers 404; the list refreshes and a toast
   says the document was removed.
-- **Not previewable** (Word, Excel): the record shows the file's card with Download; no preview pane
-  is faked.
+- **Not previewable** (Word, Excel, a video): the page shows No Preview where the file would be, and
+  Download (View File for a video) beside it; no preview is faked.
 - **A stranger's file still being scanned, a PDF still being drawn**: not listed until it can be
   opened (§6.1); an infected file is never listed.
 - **Open Record without the grant** (an employee's own offer letter, in Recruitment): the button is
@@ -559,6 +567,7 @@ None blocks the build. Each is TB's to decide unless it names another owner.
 
 ## 14 · Change log
 
+- 17/11/2026 · TB · The Library made lighter to read: the list takes the page's width and a document opens as a page of its own (`?id=`, Back to Library), the preview on two thirds of the width and Details beside it with Download, View File and Open Record (and PR 2's Document Actions menu) at their top; on a phone the same page replaces the list, Details first. Each desktop row ends in a Download icon. Categories opens a category as its own page too (Back to Categories). The lists' filters are kept for Back. F31 amended for the Document Centre. §2, §3, §10, §11 follow.
 - 17/11/2026 · TB · PR 2 built: company documents, categories with an audience, tags, Upload Document, Edit Details, Upload New Version, Archive and Restore; Document Centre · Categories (#114); the files' text and search inside them; the letterhead as PDF and Word; expiry reminders and Home's alert; Praxis AI's read, summary and three cards; staging's seed. Brought in line with what was built: §2 and the header (row #114), §4 (`company_document`'s CHECK and its uploader), §5 (`GET /categories/:id`, the letterhead's `ExportFile`, `archived` and the roles picker), §6.2 (a source's `number`, `archived`, `area_label`), §6.4 (the rule in `library.access.js`; archived for keepers alone), §6.5 (a new version is claimed and followed, not superseded; `vault.setDetails`; Edit Details' refusals), §6.7 (the job, ⌘K's columns), §6.8 (`blank: true`), §7, §9 (the cards' keys), §10 (where the actions sit) and §11 (empty states).
 
 - 16/11/2026 · TB · PR 1 built: the `documents` key and its grants (`10590`), the two indexes (`10500`), the registry `shared/documents/library.js` with its 15 sources in 13 modules over 17 document types, the `library` module (list, figures, one document, filters, ⌘K) and Document Centre · Library (#113) on both shells. Brought in line with what was built: §5 (the list's filters are `area`, `doc_type`, `status`, `added`; the filters offer only types the reader holds), §6.1 (a row is a file that can be opened: scanned and drawn), §6.2 (the source's shape: `types` with their names, `entity`, `kind`, `listed`, `expires`; a source's rule must be the vault's kind), §6.3 (how the proof compares), §6.6 (Expiring shows before Signed; an agreement's term counts), §6.7 (every word of a search is held to the row), §9, §10 and §11.
