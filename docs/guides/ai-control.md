@@ -416,11 +416,12 @@ changing it is a support step that rebuilds the index first (`docs/runbooks/`).
   | Mailbox · a thread | Summarise Thread | Reading the thread |
   | Queries · New Query, a letter | Write With AI | The query's and the letter's own fields |
   | Recruitment · New Vacancy, Edit | Write With AI | Description, Requirements, Nice to Have |
-  | Recruitment · a vacancy's Apply Questions and Interview | Suggest With AI, Follow-Up questions by AI | Add Question |
+  | Recruitment · a vacancy's Apply Questions | Suggest With AI | Add Question |
+  | Recruitment · New Vacancy's interview | The two follow-up questions | The eight fixed questions; Draft Vacancy writes plainly from the answers (`recruitment.md` §9) |
   | Recruitment · Assessments | Suggest With AI | Add Question |
   | Recruitment · Candidates | Screen With AI (and the phone's screen action), Score With AI | Reading the CV; the form-only score stays |
   | Recruitment · an interview card | Tidy With AI | The card's own comments |
-  | Partnerships · Proposals | the Proposal Studio's questions, Write Proposal, Rewrite and the message's Write With AI | Upload a proposal as a file; Send Proposal's own fields |
+  | Partnerships · Proposals | Rewrite Section, Send Proposal's Write With AI; the questions are not asked | Build by Hand fills the kit's pages from the record to edit; Send Proposal's own fields |
   | Partnerships · Categories, an agreement template | Tidy With AI | The template's editor |
   | Knowledge Hub · SOPs | Draft With AI | The SOP's own form |
   | Knowledge Hub · Training, a lesson | Draft Lesson | The lesson's own text |

@@ -13,7 +13,7 @@ import type {
   ModelCapability,
 } from "@mycity/contract/contract.gen.ts";
 import { fail, invalid, mockSession, noContent, ok, paged, route, sid } from "../core";
-import { byKey } from "../data/people";
+import { byKey as personByKey } from "../data/people";
 
 /**
  * AI Control on the mock (packages/contract/schemas/ai_control.js): the seven jobs and the four
@@ -548,7 +548,7 @@ route("PUT /api/v1/ai-control/switch", (req) => {
   const enabled = req.body.enabled === true;
   if (enabled !== SWITCH.enabled) {
     SWITCH.enabled = enabled;
-    const who = byKey(mockSession.get());
+    const who = personByKey(mockSession.get());
     SWITCH.switched_by = who ? { user_id: who.employee_id.replace(/^.{4}/, "u5e7"), display_name: who.display_name } : null;
     SWITCH.switched_at = new Date().toISOString();
   }
