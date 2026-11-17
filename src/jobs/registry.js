@@ -174,6 +174,12 @@ const JOBS = Object.freeze([
     summary: "A proposal written by Claude into the design kit's layouts, its figures checked",
   },
   // proposal-questions and proposal-draft are queued by src/modules/proposals/proposals.events.js.
+  {
+    queue: "document-text",
+    concurrency: 1,
+    summary: "A library file's text read, so a word inside it finds it (PDF and Word)",
+  },
+  // document-text is queued by src/modules/library/library.events.js and the document-text-sweep schedule.
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -217,6 +223,7 @@ const SCHEDULERS = Object.freeze([
   "signature-reminders",
   "onboarding-dispatch",
   "training-joiners",
+  "document-text-sweep",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

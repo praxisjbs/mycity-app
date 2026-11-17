@@ -100,7 +100,8 @@ describe("who sees a row", () => {
 describe("what a row shows", () => {
   test("the filters' options follow the rail's order, each type under its area", () => {
     const { areas, types } = library.options();
-    expect(areas.map((a) => a.label)).toEqual(["People", "Queries & Sanctions", "Recruitment", "Payroll", "Partnerships", "Expenses", "Knowledge Hub"]);
+    // The company's own documents sit under Company, the Document Centre's place on the rail (after Mailbox).
+    expect(areas.map((a) => a.label)).toEqual(["Company", "People", "Queries & Sanctions", "Recruitment", "Payroll", "Partnerships", "Expenses", "Knowledge Hub"]);
     expect(types.find((t) => t.doc_type === "partner_document")).toEqual({ doc_type: "partner_document", label: "Partner Document", area: "partnerships" });
     for (const t of types) expect(t.label).toMatch(/^[A-Z]/);
   });
@@ -128,9 +129,74 @@ describe("the list", () => {
 });
 
 describe("routes", () => {
-  test("every route needs the documents view grant, and none writes", () => {
+  test("reads need the documents view grant; company writes their own action; categories documents.manage too", () => {
     const rs = routesOf(routes.router);
-    expect(rs.map((r) => `${r.method} ${r.path}`)).toEqual(["GET /documents", "GET /documents/summary", "GET /documents/:id", "GET /filters"]);
-    for (const r of rs) expect([r.path, r.permission.key, r.permission.action]).toEqual([r.path, "documents", "view"]);
+    const by = Object.fromEntries(rs.map((r) => [`${r.method} ${r.path}`, [r.permission.key, r.permission.action, r.capability || null]]));
+    expect(by).toEqual({
+      "GET /documents": ["documents", "view", null],
+      "GET /documents/summary": ["documents", "view", null],
+      "GET /documents/:id": ["documents", "view", null],
+      "GET /filters": ["documents", "view", null],
+      "POST /documents": ["documents", "create", null],
+      "PATCH /documents/:id": ["documents", "edit", null],
+      "POST /documents/:id/versions": ["documents", "edit", null],
+      "POST /documents/:id/archive": ["documents", "delete", null],
+      "POST /documents/:id/restore": ["documents", "delete", null],
+      "GET /categories": ["documents", "view", null],
+      "GET /categories/:id": ["documents", "view", null],
+      "POST /categories": ["documents", "edit", "documents.manage"],
+      "PATCH /categories/:id": ["documents", "edit", "documents.manage"],
+      "POST /categories/:id/archive": ["documents", "edit", "documents.manage"],
+      "POST /categories/:id/restore": ["documents", "edit", "documents.manage"],
+      "GET /tags": ["documents", "view", null],
+      "POST /letterhead": ["documents", "view", null],
+    });
+  });
+});
+
+describe("company documents", () => {
+  const access = require("./library.access");
+
+  test("a keeper of the library reads every company document; nobody without a user id reads any", () => {
+    expect(access.readable({ all: true }, [])).toBe("TRUE");
+    expect(access.readable(null, [])).toBe("FALSE");
+    expect(access.readable({ all: false, view: true, user_id: null, role_ids: [] }, [])).toBe("FALSE");
+  });
+
+  test("the uploader reads their own; the documents grant adds a category's audience; an archived one is the keepers' alone", () => {
+    const own = [];
+    const sql = access.readable({ all: false, view: false, user_id: "u-1", role_ids: ["r-1"] }, own);
+    expect(own).toEqual(["u-1"]);
+    expect(sql).toContain("cd.archived_at IS NULL");
+    expect(sql).not.toContain("audience");
+    const seen = [];
+    expect(access.readable({ all: false, view: true, user_id: "u-1", role_ids: ["r-1"] }, seen)).toContain("dc.audience = 'everyone'");
+    expect(seen).toEqual(["u-1", ["r-1"]]);
+  });
+
+  test("the expiry reminder tells 60, 30 and 7 days ahead and on the day", () => {
+    expect(service.AHEAD).toEqual([60, 30, 7, 0]);
+  });
+
+  test("the text of a Word file is its paragraphs, in order", async () => {
+    const { buildDocx } = require("../../shared/documents/docx");
+    const text = require("./library.text");
+    const file = await buildDocx({ title: "Service Agreement", body: "Chowdeck agrees.\n\tDelivery in Lekki & Ikeja." });
+    expect(await text.wordText(file)).toBe("Service Agreement\nChowdeck agrees.\n Delivery in Lekki & Ikeja.");
+    expect(text.isLibraryType("company_document")).toBe(true);
+    expect(text.isLibraryType("community_media")).toBe(false);
+  });
+
+  test("the Word letterhead carries its header, its picture and its footer on every page", async () => {
+    const JSZip = require("jszip");
+    const { buildDocx } = require("../../shared/documents/docx");
+    const png = Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex");
+    const zip = await JSZip.loadAsync(
+      await buildDocx({ header: { picture: { buffer: png, width: 120, height: 40 }, text: "MyCity", rule: "FFDF55" }, footer: "MyCity App Ltd · Lagos" }),
+    );
+    expect(Object.keys(zip.files)).toEqual(expect.arrayContaining(["word/header1.xml", "word/footer1.xml", "word/media/logo.png", "word/_rels/header1.xml.rels"]));
+    expect(await zip.file("word/header1.xml").async("string")).toContain('w:color="FFDF55"');
+    expect(await zip.file("word/footer1.xml").async("string")).toContain("MyCity App Ltd · Lagos");
+    expect(await zip.file("word/document.xml").async("string")).toContain('<w:headerReference w:type="default" r:id="rIdHeader"/>');
   });
 });

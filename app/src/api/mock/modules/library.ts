@@ -4,13 +4,18 @@
  * contract's shapes. Laptops and CI only; a release build never carries it (F12).
  *
  * The mock's two full accounts see every row; everyone else sees the company-wide ones and their
- * own, standing in for the vault's rule the real API applies per document.
+ * own, standing in for the vault's rule the real API applies per document. Company documents (PR 2)
+ * live in categories: one seen by everyone, one by named roles, kept by documents.manage.
  */
-import type { LibraryDocument, LibraryFilters, LibrarySummary } from "@mycity/contract/contract.gen.ts";
-import { daysAgo, fail, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
+import type { DocumentCategory, LibraryDocument, LibraryFilters, LibrarySummary } from "@mycity/contract/contract.gen.ts";
+import { created, daysAgo, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, type Req } from "../core";
 import { grantsFor } from "../data/people";
+import { UPLOADS } from "../uploads";
+import { me } from "./identity";
+import { exportFile } from "./shared";
 
 const AREA_LABEL: Record<string, string> = {
+  documents: "Company",
   people: "People",
   queries: "Queries & Sanctions",
   recruitment: "Recruitment",
@@ -21,6 +26,7 @@ const AREA_LABEL: Record<string, string> = {
 };
 
 const TYPES: Array<{ doc_type: string; label: string; area: string }> = [
+  { doc_type: "company_document", label: "Company Document", area: "documents" },
   { doc_type: "employee_certificate", label: "Certificate", area: "people" },
   { doc_type: "employee_document", label: "Employee Document", area: "people" },
   { doc_type: "employee_identification", label: "Identification", area: "people" },
@@ -118,19 +124,114 @@ const ROWS: LibraryDocument[] = SEEDS.map((s) => {
     locked_at: s.locked ? daysAgo(s.added).toISOString() : null,
     created_at: daysAgo(s.added).toISOString(),
     added_by_name: s.by,
+    company: null,
+    matched_text: null,
   };
 });
+/* ------------------------------------------------------------------ *
+ * Company documents and their categories (§6.4, §6.5)
+ * ------------------------------------------------------------------ */
+
+const role = (code: string, name: string) => ({ role_id: sid(`role:${code}`), name });
+const CATEGORIES: DocumentCategory[] = [
+  { name: "Registration & Statutory", description: "Incorporation, status reports and filings.", audience: "everyone" as const, roles: [] },
+  { name: "Licences & Permits", description: "Operating licences and permits.", audience: "everyone" as const, roles: [] },
+  { name: "Finance Records", description: "Audited accounts and tax filings.", audience: "roles" as const, roles: [role("management", "Management"), role("operations_people", "Operations & People")] },
+].map((c, i) => ({
+  document_category_id: sid(`document_category:${c.name}`),
+  ...c,
+  documents: 0,
+  archived_at: null,
+  created_at: daysAgo(90 - i).toISOString(),
+  updated_at: daysAgo(90 - i).toISOString(),
+}));
+
+/** Who made each company document (the mock's account key), for Edit Details' rule. */
+const OWNER = new Map<string, string>();
+let numbered = 0;
+
+function companyRow(input: { title: string; category: DocumentCategory; tags: string[]; expires_on: string | null; description: string | null; by: string; byName: string; added: number; mime?: string; id?: string }): LibraryDocument {
+  numbered += 1;
+  const id = input.id ?? sid(`library:company:${input.title}`);
+  OWNER.set(id, input.by);
+  const mime = input.mime ?? "application/pdf";
+  const expiring = Boolean(input.expires_on && input.expires_on <= isoDaysAhead(60));
+  return {
+    document_id: id,
+    title: input.title,
+    original_name: `${input.title.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}.pdf`,
+    doc_type: "company_document",
+    type_label: "Company Document",
+    area: "documents",
+    area_label: "Company",
+    record: { type: "document_category", id: input.category.document_category_id, label: input.category.name, ref: null, link: null },
+    number: `DOC-${String(numbered).padStart(4, "0")}`,
+    mime,
+    bytes: 96_000,
+    page_count: mime === "application/pdf" ? 1 : null,
+    version: 1,
+    status: expiring ? "expiring" : null,
+    expires_on: input.expires_on,
+    locked_at: null,
+    created_at: daysAgo(input.added).toISOString(),
+    added_by_name: input.byName,
+    company: {
+      company_document_id: sid(`company_document:${id}`),
+      category: { document_category_id: input.category.document_category_id, name: input.category.name },
+      tags: input.tags,
+      description: input.description,
+      archived_at: null,
+      may_edit: false,
+      may_archive: false,
+    },
+    matched_text: null,
+  };
+}
+
+ROWS.push(
+  companyRow({ title: "Certificate of Incorporation", category: CATEGORIES[0]!, tags: ["cac", "incorporation"], expires_on: null, description: null, by: "cynthia", byName: "Cynthia Okafor", added: 60 }),
+  companyRow({ title: "Business Premises Permit", category: CATEGORIES[1]!, tags: ["permit", "lagos"], expires_on: isoDaysAhead(45), description: "Lagos office.", by: "cynthia", byName: "Cynthia Okafor", added: 20 }),
+  companyRow({ title: "Annual Status Report", category: CATEGORIES[2]!, tags: ["cac", "status report"], expires_on: null, description: null, by: "cynthia", byName: "Cynthia Okafor", added: 35 }),
+);
+
 const RESTRICTED = new Set(SEEDS.filter((s) => s.restricted).map((s) => sid(`library:${s.title}`)));
 
 const denied = () => fail(403, "PERMISSION_DENIED", "You do not have access to this");
-const may = (req: Req) => Boolean(req.user && (grantsFor(req.user).documents ?? []).includes("view"));
-/** What this account sees: everything for the two full accounts, the unrestricted rows for everyone else. */
-const seenBy = (req: Req) => (req.user === "cynthia" || req.user === "ifeoma" ? ROWS : ROWS.filter((d) => !RESTRICTED.has(d.document_id)));
+const may = (req: Req, action = "view") => Boolean(req.user && (grantsFor(req.user).documents ?? []).includes(action));
+const full = (req: Req) => req.user === "cynthia" || req.user === "ifeoma";
+/** Whether the account keeps the library (documents.manage). */
+const keeps = (req: Req) => {
+  if (!req.user) return false;
+  const m = me(req.user);
+  return m.is_ceo || m.capabilities.includes("documents.manage");
+};
+const refused = () => fail(403, "CAPABILITY_REQUIRED", "You need Manage Documents for this.");
+const categoryOf = (id: string) => CATEGORIES.find((c) => c.document_category_id === id);
+/** Whether the account sees a category: everyone's, or the full accounts standing in for its roles. */
+const seesCategory = (req: Req, c: DocumentCategory) => keeps(req) || (!c.archived_at && (c.audience === "everyone" || full(req)));
+/** A company row as this account reads it: what it may do with it. */
+const forReader = (req: Req, d: LibraryDocument): LibraryDocument => {
+  if (!d.company) return d;
+  const mine = OWNER.get(d.document_id) === req.user;
+  return { ...d, company: { ...d.company, may_edit: may(req, "edit") && (keeps(req) || mine), may_archive: may(req, "delete") && (keeps(req) || mine) } };
+};
+/** What this account sees: everything for the two full accounts, the unrestricted rows for everyone else; archived company documents for keepers alone. */
+const visible = (req: Req, archived = false) =>
+  ROWS.filter((d) => {
+    if (d.company) {
+      if (Boolean(d.company.archived_at) !== archived) return false;
+      if (archived) return keeps(req);
+      const c = categoryOf(d.company.category.document_category_id);
+      return keeps(req) || OWNER.get(d.document_id) === req.user || Boolean(c && (c.audience === "everyone" || full(req)));
+    }
+    if (archived) return false;
+    return full(req) || !RESTRICTED.has(d.document_id);
+  }).map((d) => forReader(req, d));
 const since = (added: string) => (added === "this_month" ? new Date(new Date().getFullYear(), new Date().getMonth(), 1) : added === "this_year" ? new Date(new Date().getFullYear(), 0, 1) : daysAgo(90));
 
 route("GET /api/v1/library/documents/summary", (req) => {
   if (!may(req)) return denied();
-  const rows = seenBy(req);
+  const rows = visible(req);
   const month = since("this_month").toISOString();
   const body: LibrarySummary = {
     documents: rows.length,
@@ -143,7 +244,7 @@ route("GET /api/v1/library/documents/summary", (req) => {
 
 route("GET /api/v1/library/filters", (req) => {
   if (!may(req)) return denied();
-  const held = new Set(seenBy(req).map((d) => d.doc_type));
+  const held = new Set(visible(req).map((d) => d.doc_type));
   const types = TYPES.filter((t) => held.has(t.doc_type));
   const body: LibraryFilters = {
     areas: Object.keys(AREA_LABEL).filter((a) => types.some((t) => t.area === a)).map((a) => ({ area: a, label: AREA_LABEL[a]! })),
@@ -154,7 +255,7 @@ route("GET /api/v1/library/filters", (req) => {
 
 route("GET /api/v1/library/documents/:id", (req) => {
   if (!may(req)) return denied();
-  const found = seenBy(req).find((d) => d.document_id === req.params.id);
+  const found = [...visible(req), ...visible(req, true)].find((d) => d.document_id === req.params.id);
   return found ? ok(found) : notFound();
 });
 
@@ -162,9 +263,9 @@ route("GET /api/v1/library/documents", (req) => {
   if (!may(req)) return denied();
   // Every word of a search is held to the row, as the API holds it.
   const words = (req.query.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
-  const text = (d: LibraryDocument) => [d.title, d.original_name, d.number, d.type_label, d.record?.label, d.record?.ref].join(" ").toLowerCase();
-  const rows = seenBy(req).filter((d) => words.every((w) => text(d).includes(w)));
-  const { q: _q, ...query } = req.query;
+  const text = (d: LibraryDocument) => [d.title, d.original_name, d.number, d.type_label, d.record?.label, d.record?.ref, ...(d.company?.tags ?? [])].join(" ").toLowerCase();
+  const rows = visible(req, req.query.archived === "true").filter((d) => words.every((w) => text(d).includes(w)));
+  const { q: _q, archived: _a, ...query } = req.query;
   return paged(
     rows,
     { ...req, query: { sort: "-created_at", ...query } },
@@ -174,6 +275,8 @@ route("GET /api/v1/library/documents", (req) => {
         doc_type: (d, v) => d.doc_type === v,
         status: (d, v) => (v === "signed" ? d.locked_at !== null : d.status === "expiring"),
         added: (d, v) => d.created_at >= since(v).toISOString(),
+        category_id: (d, v) => d.company?.category.document_category_id === v,
+        tag: (d, v) => Boolean(d.company?.tags.includes(v.toLowerCase())),
       },
       sort: {
         created_at: (a, b) => a.created_at.localeCompare(b.created_at),
@@ -182,6 +285,164 @@ route("GET /api/v1/library/documents", (req) => {
       },
     },
   );
+});
+
+/* Upload Document, Edit Details, Upload New Version, Archive and Restore. */
+
+route("POST /api/v1/library/documents", (req) => {
+  if (!may(req, "create")) return denied();
+  const b = req.body as { document_id?: string; title?: string; document_category_id?: string; tags?: string[]; expires_on?: string | null; description?: string | null };
+  const category = b.document_category_id ? categoryOf(b.document_category_id) : undefined;
+  if (!category || !seesCategory(req, category) || category.archived_at) return invalid({ document_category_id: ["Pick another category"] });
+  const file = b.document_id ? UPLOADS.get(b.document_id) : undefined;
+  if (!file) return invalid({ document_id: ["Upload it again"] });
+  const who = me(req.user!);
+  const row = companyRow({
+    id: b.document_id,
+    title: String(b.title ?? "").trim(),
+    category,
+    tags: (b.tags ?? []).map((t) => t.toLowerCase()),
+    expires_on: b.expires_on || null,
+    description: b.description || null,
+    by: req.user!,
+    byName: who.display_name,
+    added: 0,
+    mime: file.mime_type,
+  });
+  ROWS.unshift(row);
+  return created(forReader(req, row));
+});
+
+/** A company document the account may change, by any id it is known by. */
+function changeable(req: Req, action: "edit" | "delete") {
+  const d = [...visible(req), ...visible(req, true)].find((x) => x.document_id === req.params.id);
+  if (!d) return { problem: notFound() };
+  if (!d.company) return { problem: fail(409, "DOCUMENT_NOT_YOURS", "This document is changed where it was made") };
+  if (!may(req, action) || !(keeps(req) || OWNER.get(d.document_id) === req.user)) return { problem: fail(403, "FORBIDDEN", "Only its uploader or a document manager may change it") };
+  return { row: ROWS.find((x) => x.document_id === d.document_id)! };
+}
+
+route("PATCH /api/v1/library/documents/:id", (req) => {
+  const { row, problem } = changeable(req, "edit");
+  if (problem) return problem;
+  const b = req.body as { title?: string; document_category_id?: string; tags?: string[]; expires_on?: string | null; description?: string | null };
+  if (b.document_category_id) {
+    const c = categoryOf(b.document_category_id);
+    if (!c || c.archived_at) return invalid({ document_category_id: ["Pick another category"] });
+    row!.company!.category = { document_category_id: c.document_category_id, name: c.name };
+    row!.record = { type: "document_category", id: c.document_category_id, label: c.name, ref: null, link: null };
+  }
+  if (b.title !== undefined) row!.title = b.title;
+  if (b.tags !== undefined) row!.company!.tags = b.tags.map((t) => t.toLowerCase());
+  if (b.description !== undefined) row!.company!.description = b.description || null;
+  if (b.expires_on !== undefined) {
+    row!.expires_on = b.expires_on || null;
+    row!.status = row!.expires_on && row!.expires_on <= isoDaysAhead(60) ? "expiring" : null;
+  }
+  return ok(forReader(req, row!));
+});
+
+route("POST /api/v1/library/documents/:id/versions", (req) => {
+  const { row, problem } = changeable(req, "edit");
+  if (problem) return problem;
+  const file = UPLOADS.get(String(req.body.document_id ?? ""));
+  if (!file) return invalid({ document_id: ["Upload it again"] });
+  const next = { ...row!, document_id: file.document_id, mime: file.mime_type, version: row!.version + 1, created_at: new Date().toISOString() };
+  OWNER.set(next.document_id, OWNER.get(row!.document_id) ?? req.user!);
+  ROWS.splice(ROWS.indexOf(row!), 1, next);
+  return created(forReader(req, next));
+});
+
+for (const [verb, archived] of [["archive", true], ["restore", false]] as const) {
+  route(`POST /api/v1/library/documents/:id/${verb}`, (req) => {
+    const { row, problem } = changeable(req, "delete");
+    if (problem) return problem;
+    row!.company!.archived_at = archived ? new Date().toISOString() : null;
+    row!.status = archived ? "archived" : row!.expires_on && row!.expires_on <= isoDaysAhead(60) ? "expiring" : null;
+    return ok(forReader(req, row!));
+  });
+}
+
+/* Categories and tags. */
+
+const counted = (c: DocumentCategory): DocumentCategory => ({
+  ...c,
+  documents: ROWS.filter((d) => d.company && !d.company.archived_at && d.company.category.document_category_id === c.document_category_id).length,
+});
+
+route("GET /api/v1/library/categories", (req) => {
+  if (!may(req)) return denied();
+  const archived = req.query.archived === "true";
+  const rows = archived && !keeps(req) ? [] : CATEGORIES.filter((c) => Boolean(c.archived_at) === archived && seesCategory(req, c)).map(counted);
+  const { archived: _a, ...query } = req.query;
+  return paged(rows, { ...req, query: { sort: "name", ...query } }, { search: (c) => [c.name], sort: { name: (a, b) => a.name.localeCompare(b.name), created_at: (a, b) => a.created_at.localeCompare(b.created_at) } });
+});
+
+route("GET /api/v1/library/categories/:id", (req) => {
+  if (!may(req)) return denied();
+  const c = categoryOf(req.params.id);
+  return c && seesCategory(req, c) ? ok(counted(c)) : notFound();
+});
+
+const ROLE_NAMES: Record<string, string> = {
+  implementation: "Implementation Team",
+  operations_people: "Operations & People",
+  management: "Management",
+  head_of_department: "Head of Department",
+  administrator: "System Administrator",
+  manager: "Line Manager",
+  employee: "Staff",
+};
+const rolesNamed = (ids: string[]) =>
+  ids.map((id) => Object.entries(ROLE_NAMES).find(([code]) => sid(`role:${code}`) === id)).filter(Boolean).map((x) => role(x![0], x![1]));
+
+function saveCategory(req: Req, c: DocumentCategory | null) {
+  if (!may(req, "edit")) return denied();
+  if (!keeps(req)) return refused();
+  const b = req.body as { name?: string; description?: string | null; audience?: "everyone" | "roles"; role_ids?: string[] };
+  const name = (b.name ?? c?.name ?? "").trim();
+  if (CATEGORIES.some((x) => x !== c && x.name.toLowerCase() === name.toLowerCase())) return invalid({ name: ["Name already used"] });
+  const audience = b.audience ?? c?.audience ?? "everyone";
+  const roles = audience === "roles" ? rolesNamed(b.role_ids ?? c?.roles.map((r) => r.role_id) ?? []) : [];
+  if (audience === "roles" && roles.length === 0) return invalid({ role_ids: ["Pick a role"] });
+  const now = new Date().toISOString();
+  if (c) {
+    Object.assign(c, { name, description: b.description === undefined ? c.description : b.description || null, audience, roles, updated_at: now });
+    return ok(counted(c));
+  }
+  const made: DocumentCategory = { document_category_id: sid(`document_category:${name}:${now}`), name, description: b.description || null, audience, roles, documents: 0, archived_at: null, created_at: now, updated_at: now };
+  CATEGORIES.push(made);
+  return created(made);
+}
+
+route("POST /api/v1/library/categories", (req) => saveCategory(req, null));
+route("PATCH /api/v1/library/categories/:id", (req) => {
+  const c = categoryOf(req.params.id);
+  return c ? saveCategory(req, c) : notFound();
+});
+for (const [verb, archived] of [["archive", true], ["restore", false]] as const) {
+  route(`POST /api/v1/library/categories/:id/${verb}`, (req) => {
+    if (!keeps(req)) return refused();
+    const c = categoryOf(req.params.id);
+    if (!c) return notFound();
+    c.archived_at = archived ? new Date().toISOString() : null;
+    return ok(counted(c));
+  });
+}
+
+route("GET /api/v1/library/tags", (req) => {
+  if (!may(req)) return denied();
+  const counts = new Map<string, number>();
+  for (const d of visible(req)) for (const t of d.company?.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+  const rows = [...counts].map(([tag, documents]) => ({ tag, documents })).sort((a, b) => b.documents - a.documents || a.tag.localeCompare(b.tag));
+  return paged(rows, req, { search: (t) => [t.tag] });
+});
+
+/* Download Letterhead: an export, as every Download button's (shared.ts). */
+route("POST /api/v1/library/letterhead", (req) => {
+  if (!may(req)) return denied();
+  const format = req.body.format === "docx" ? "docx" : "pdf";
+  return exportFile(req.user!, "letterhead", format);
 });
 
 export const LIBRARY_ROWS = ROWS;

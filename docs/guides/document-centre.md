@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/documents/` |
 | Permission key(s) | `documents` |
 | Capabilities | `documents.manage` (the Categories tab: categories and who sees each; see, edit, replace and archive every company document) |
-| Screens (PROGRESS.md rows) | #113 Library (PR 1, built 16/11/2026); new: Document Centre · Categories (ratified 16/11/2026; PR 2 registers it in the next free PROGRESS row, #114 while free, and corrects this guide if another change takes the number first) |
+| Screens (PROGRESS.md rows) | #113 Library (PR 1, built 16/11/2026; PR 2's writes 17/11/2026); #114 Categories (PR 2, built 17/11/2026) |
 | Status | Agreed |
 | Last changed | 17/11/2026 |
 
@@ -83,7 +83,7 @@ is copied or moved, and a document's own module stays its owner and its one writ
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | Document Centre · Library (`library`), new | Staff app | `documents` view; each row by the vault's rule (D2) | Four KPI cards, search, filters, the documents across the page with a Download icon on each row; a document on a page of its own, its preview beside its details | Search, filter, sort, download from a row, open a document, View File, Download, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Restore Document |
-| Document Centre · Categories (`categories`), new, PR 2 | Staff app | `documents` view and `documents.manage` | The categories beside the picked one: its audience and how many documents it holds | New Category, Edit Category, Archive Category, Restore Category |
+| Document Centre · Categories (`categories`), new, PR 2 | Staff app | `documents` view and `documents.manage` | The categories across the page; a category on a page of its own: its audience and how many documents it holds | New Category, Edit Category, Archive Category, Restore Category |
 | ⌘K | Staff app | Every signed-in person, by the same rule | The Documents group; the screens and actions of §9 | Open a document in the Library |
 | Praxis AI · Ask (#67) | Staff app | `praxis_ai` and `documents` view | Documents found for a question, each with a button to open it (PR 2) | Open the document, or the Library filtered |
 | Home · Alerts | Staff app | As Home's alert rules say | An expiring company document's alert opens the Library, not People · Employees (PR 2, §6.9) | Open the document |
@@ -106,7 +106,7 @@ The file routes of the `documents` module and every record screen that shows its
    A KPI card sets the filter behind its number.
 4. **They open a row.** The document opens as a page of its own at `?tab=library&id=<document id>`,
    Back to Library above it, on desktop and phone (F31 amended 17/11/2026), from
-   `GET /library/documents/:id`. The list's filters are kept for Back (`useKept`). A row's Download
+   `GET /library/documents/:id`; the list's filters are kept for Back (`useKept`). A row's Download
    icon saves the file without opening the page. Its preview and Download read the
    vault's own routes (`GET /documents/:id/content`, `/variant/:kind`), where `vault.canRead` decides
    once more.
@@ -131,7 +131,7 @@ No table of another module changes except two indexes on `document`.
 | `document` (0080, M0) | `doc_type`, `entity_type`, `entity_id`, `subject_employee_id`, `uploaded_by`, `is_current`, `scan_status`, `locked_at`, `expires_on`, `title`, `original_name`, `number` | Read only by the library. PR 1 adds `document_library_idx (doc_type, created_at DESC) WHERE is_current` and `document_entity_idx (entity_type, entity_id)` |
 | `document_category`, PR 2 | `document_category_id` uuid PK, `name` citext UNIQUE, `description`, `audience` text CHECK (`everyone`, `roles`), `archived_at`, `created_by`, `created_at`, `updated_at` | MyCity's own list. Never seeded outside staging (A26) |
 | `document_category_role`, PR 2 | `document_category_id` FK CASCADE, `role_id` FK CASCADE; PK both | The roles of a `roles` audience. A check in the service: `roles` needs at least one |
-| `company_document`, PR 2 | `company_document_id` uuid PK, `number` UNIQUE (`DOC-0001`, the existing `document` scheme), `document_id` UNIQUE FK RESTRICT (the current version), `document_category_id` FK RESTRICT, `title`, `description`, `tags` text[] (GIN), `archived_at`, `archived_by`, `created_by`, `created_at`, `updated_at` | One company document through all its versions. The vault's row names it as its entity (`company_document`), as `partner_document` does. Expiry is the vault's `document.expires_on`, not a second column |
+| `company_document`, PR 2 | `company_document_id` uuid PK, `number` citext UNIQUE (`DOC-0001`, the existing `document` scheme), `document_id` UNIQUE FK RESTRICT (the current version), `document_category_id` FK RESTRICT, `title`, `description`, `tags` text[] (GIN), `archived_at` and `archived_by` (set together, a CHECK), `created_by` (the uploader the read rule names), `created_at`, `updated_at` | One company document through all its versions. The vault's row names it as its entity (`company_document`), as `partner_document` does. Expiry is the vault's `document.expires_on`, not a second column |
 | `document_text`, PR 2 | `document_id` PK FK CASCADE, `status` text CHECK (`done`, `empty`, `failed`), `text`, `pages`, `chars`, `extracted_at`, `created_at`, `updated_at` | The searchable text of one stored file. GIN trigram index on `search_fold(text)`, the pattern of `employee_search_idx` (0300). Only library types are read (§6.7) |
 
 Schema migration file(s): PR 1 `migrations/10500_document_centre.sql` (the two indexes); PR 2
@@ -169,10 +169,13 @@ A file's bytes stay on the vault's routes (`GET /documents/:id/content`, `/varia
 | `PATCH /library/documents/:id` | `CompanyDocumentUpdate` → `LibraryDocument` | `documents` edit · the uploader, or `documents.manage` | | Company documents only; another module's document answers `DOCUMENT_NOT_YOURS` |
 | `POST /library/documents/:id/versions` | `CompanyDocumentVersion` (`document_id` of the staged upload) → `LibraryDocument` | `documents` edit · as above | | `vault.supersede`; the old file is kept |
 | `POST /library/documents/:id/archive`, `/restore` | `EmptyBody` → `LibraryDocument` | `documents` delete · as above | | Reversible; nothing is deleted |
-| `GET /library/categories` | `CategoryListQuery` → `CategoryPage` | `documents` view | yes, 25 | Only the categories the reader sees; `archived` for `documents.manage` |
+| `GET /library/categories` | `CategoryListQuery` → `CategoryPage` | `documents` view | yes, 25 | Only the categories the reader sees; `archived` for `documents.manage` (nothing for anyone else) |
+| `GET /library/categories/:id` | `IdParams` → `DocumentCategory` | `documents` view | | One category the reader sees; 404 otherwise |
 | `POST /library/categories`, `PATCH /library/categories/:id`, `POST /library/categories/:id/archive`, `/restore` | `DocumentCategoryCreate`, `DocumentCategoryUpdate`, `EmptyBody` → `DocumentCategory` | `documents` edit, `documents.manage` | | |
 | `GET /library/tags` | `TagListQuery` → `TagPage` | `documents` view | yes, 25 | The tags in use on documents the reader sees, for the tag field's suggestions |
-| `POST /library/letterhead` | `LetterheadRequest` (`format`: `pdf`, `docx`) → `ExportRef` | `documents` view | | 202, then `GET /exports/:id` as every export (`docs/guides/foundation.md` §6.12) |
+| `POST /library/letterhead` | `LetterheadRequest` (`format`: `pdf`, `docx`) → `ExportFile` | `documents` view | | 202, then `GET /exports/:id` as every export (`docs/guides/foundation.md` §6.12) |
+
+`GET /library/documents` gains `category_id`, `tag` and `archived` (`true`: archived company documents, which only `documents.manage` reads; anyone else gets none). New Category's and Edit Category's role picker reads `GET /access/roles`, which the keepers' roles hold through `settings` view.
 
 Every list is paged at 25 through `shared/http/paged.js`. No route takes a page size.
 
@@ -213,6 +216,9 @@ module.exports = librarySource({
   },
   listed: "EXISTS (...)",                          // optional: only the files the record still holds (§6.1)
   expires: "(SELECT a.ends_on ...)",               // optional: when it ends, where the record says so (§6.6)
+  number: "(SELECT cd.number ...)",                // optional: the row's number where the record holds it (PR 2)
+  archived: "(SELECT cd.archived_at ...)",         // optional: when the record was archived (PR 2, a company document)
+  area_label: "Company",                           // optional: the Area filter's name where not the module's (PR 2)
   default: true,                                   // the vault's default rule, written as SQL by the registry
   // or, for an entity the module gave vault.defineAccess():
   reach: (client, user) => scopeFor(user, "partnerships", "view"),   // once per request
@@ -253,7 +259,7 @@ module.exports = librarySource({
 | Payroll | Leaving Certificate (`leaving_certificate`) | The employee (stored against their pay record, whose id is theirs) | default | 1 |
 | Knowledge Hub | Training Certificate (`training_certificate`) | The person it names, its certificate number | `training_enrolment`: the employee, or `training.manage` | 1 |
 | Knowledge Hub | SOP File (`sop_file`) | The SOP | `sop`: any `knowledge` view | 1 |
-| Company | Company Document (`company_document`) | Its category | `company_document`: §6.4 | 2 |
+| Company (area `documents`) | Company Document (`company_document`) | Its category (Open Record goes to Categories, for `documents.manage` only); its number DOC-0001 | `company_document`: §6.4 (`library.access.js`) | 2 |
 
 **Not in the library**, each named in `NOT_IN_LIBRARY`: payslips (D4); every export and transient
 type (kept a day or a request); chat files and link pictures; mail attachments, signature pictures
@@ -294,8 +300,10 @@ read all use it; nothing else decides.
 
 A company document is read by: the CEO; a holder of `documents.manage`; its uploader; and anyone
 with `documents` view when its category's audience is `everyone`, or `roles` and the reader holds
-one of them. This is `vault.defineAccess("company_document", ...)` and the same rule as SQL in
-`library.library.js`. Narrowing an audience hides its documents at once; nothing is cached.
+one of them, while it is not archived; an archived one is read by the CEO and `documents.manage` alone. This is
+`vault.defineAccess("company_document", ...)` and the same rule as SQL, both in `library.access.js` (the
+source, `library.library.js`, uses it). The uploader is `company_document.created_by`, so a version another
+person uploaded leaves the rule as it was. Narrowing an audience hides its documents at once; nothing is cached.
 
 - A category's name is unique without regard to case. A category in use is archived, never deleted:
   its documents stay, and it is no longer offered on Upload Document.
@@ -311,14 +319,19 @@ one of them. This is `vault.defineAccess("company_document", ...)` and the same 
   runs one transaction in `library.service`: allocate `DOC-` from `numbering.allocate("document")`,
   insert `company_document`, `vault.claim` the staged file as `company_document` with that row as its
   entity, set its title and expiry through the vault, `emit("company_document.uploaded")`.
-- The vault gains what the module needs rather than the module writing `document`: a title and
-  expiry setter beside `vault.setTitle`. No module updates `document` directly.
+- The vault gains what the module needs rather than the module writing `document`: `vault.setDetails`
+  (title and expiry) beside `vault.setTitle`. No module updates `document` directly.
 - **The same file twice** is refused: a current, unarchived company document with the same
   `content_hash` answers 422 on the file field (`Already in library`).
-- **Edit Details** changes title, category, tags, expiry and description.
-- **Upload New Version** is `vault.supersede` and re-points `company_document.document_id` in the
-  same transaction; the number, category, tags and expiry carry over unless changed. Versions are
-  listed from the vault's `GET /documents/:id/versions`.
+- **Edit Details** changes title, category, tags, expiry and description; an empty expiry or description
+  is cleared. Another module's document answers 409 `DOCUMENT_NOT_YOURS`; a company document that is
+  neither the reader's nor theirs to keep, 403.
+- **Upload New Version** takes a staged file like Upload Document: `vault.claim` binds it to the same
+  company document, `vault.follow` makes it the next version of the current file (the old one stays,
+  no longer current), and `company_document.document_id` is re-pointed, all in one transaction; the
+  number, category, tags, title and expiry carry over. (`vault.supersede` takes bytes in the request,
+  where the library takes a staged upload, so it is not used.) Versions are listed from the vault's
+  `GET /documents/:id/versions`, and an old version's id opens the current one.
 - **Archive Document** sets `archived_at`; Restore Document clears it. Nothing is deleted, and a
   download of an archived document still works for those who may list it.
 - Documents of other modules are read only here. Their writes stay with their owners (one write
@@ -360,8 +373,11 @@ document (PR 2).
   pictures of text is not built (§13).
 - A nightly `document-text-sweep` reads documents that have no `document_text` row, in batches: the
   backfill of what was stored before PR 2, and the retry of a failed read.
-- ⌘K runs the same match inside its two second limit; the trigram index on `document_text` is what
-  keeps a search of the text inside it.
+- ⌘K runs the same match inside its two second limit (the file's text and the tags are two more
+  columns of its provider); an archived company document is not found there. The trigram index on
+  `document_text` is what keeps a search of the text inside it.
+- The job is `document-text` (`library.text.js`, `jobs/handlers/document-text.js`), one at a time; a
+  long PDF is read in its own process for up to two minutes and 512 MB.
 
 ### 6.8 The letterhead (D8)
 
@@ -371,7 +387,10 @@ pressed). The PDF is `templates/documents/letterhead.html` with an empty body, t
 letter wears. The Word file is `shared/documents/docx.js` given a header (the logo and the yellow
 rule) and a footer (the organisation line): the one Word writer gains header, footer and picture
 parts; no second writer is made. Both read Settings · Organisation and the brand files at the press.
-The type is `letterhead_export` (`export: true`), kept a day like every export.
+The type is `letterhead_export` (`export: true`), kept a day like every export and read by whoever asked.
+The PDF's doc type declares `blank: true` (`shared/documents/generate.js`), so the letterhead prints no date
+and no title over the empty page; the Word file is `library.letterhead.js`, built in the worker on
+`letterhead.requested`.
 
 ### 6.9 Expiry (D10)
 
@@ -389,7 +408,8 @@ All under `defineEvents("documents", ...)` in `library.events.js`.
 
 | Event / job | When | Does | PR |
 |---|---|---|---|
-| `company_document.uploaded`, `.updated`, `.version_added`, `.archived`, `.restored` | After the write commits | Audit; the text job for a new file | 2 |
+| `company_document.uploaded`, `.updated`, `.version_added`, `.archived`, `.restored` | After the write commits | Audit (the text job follows the vault's own `document.claimed`) | 2 |
+| `letterhead.requested` | Download Letterhead, Word | The Word file, in the worker (`library.letterhead.js`) | 2 |
 | `document_category.created`, `.updated`, `.archived`, `.restored` | After the write commits | Audit | 2 |
 | `company_document.expiring` | 60, 30, 7 days ahead and on the day | Notification Document Expiring to the uploader and `documents.manage` (Settings · Notifications can change it); opens the Library on the document | 2 |
 | Outbox handler on `document.stored`, `document.claimed`, `document.generated` | A library type's file exists | Queues `document-text` | 2 |
@@ -432,8 +452,9 @@ the `edit` grant on its own module, the subject, the uploader or the CEO.
   a library_item`) and a provider for `document_category` (group Document Categories, for
   `documents.manage`).
 - **Screens and actions**: Library (words: library, document centre, files, vault, agreement,
-  contract, letterhead, CAC) and, in PR 2, Categories; the actions Upload Document (`documents`
-  create), Download Letterhead (`documents` view) and New Category (`documents.manage`). The word
+  contract, letterhead, CAC) and, in PR 2, Categories; the actions Upload Company Document
+  (`documents` create; the screen's button reads Upload Document, a name other modules' buttons also
+  use), Download Letterhead (`documents` view) and New Document Category (`documents.manage`). The word
   `documents` alone keeps finding ESS · My Documents too.
 - **AI reads** (`library.ai.js`, PR 2): `documents.find` (params `LibraryListQuery`, permission
   `documents` view, run `library.service.list`, cite `library_item`), paged at 25, and its summary
@@ -442,9 +463,12 @@ the `edit` grant on its own module, the subject, the uploader or the CEO.
 - **AI routes**: "open the document centre", "find a document" go to `documents.library`, with `q`
   prefilled where the question names one.
 - **AI actions**: gate 23 asks that every Create and Update schema of `library.js` is an action a
-  person confirms or is named in `not_offered` with an allowed reason. `CompanyDocumentCreate` and
-  `CompanyDocumentVersion` are `file:`; the category forms and Edit Details are declared as actions
-  whose `run` is the module's own service function. No new model call is made, so no new AI job is
+  person confirms or is named in `not_offered` with an allowed reason. `CompanyDocumentCreate` is
+  `file:`; `documents.category_create` (New Category, `DocumentCategoryCreate`, a category seen by
+  everyone: named roles are set on the screen), `documents.category_edit` (Save Category,
+  `DocumentCategoryChange`) and `documents.edit_details` (Save Details, `CompanyDocumentChange`, one
+  the asker uploaded or keeps) are cards whose `run` is the module's own service function;
+  `DocumentCategoryUpdate` and `CompanyDocumentUpdate` are reached through them (`via`). No new model call is made, so no new AI job is
   named; if a build chat finds one is needed, it asks TB which job first (`ai-control.md` §6.2).
 
 ## 10 · On screen and mobile
@@ -453,8 +477,8 @@ the `edit` grant on its own module, the subject, the uploader or the CEO.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Document Centre · Library | The four KPI cards, each setting the list's filter; search; the filters Area, Type, Status, Added and, in PR 2, Category and Tag; the list: Document, Type, Belongs To, Added, Expires, status pill, and a Download icon at the row's end (desktop); the document's page: Back to Library, its title, the preview, Details (Type, Belongs To, Number, Added, Added By, Size, Expires, Version) with Download, View File, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Category, Tags, the words found in the file | A help term on Expiring Soon (the window) and on Signed (a signed document is never replaced); a Details row on the record for the file name and, where a file has no text, that it is found by name | That the library is a view of the vault, how a read rule is applied, why a document is missing for one reader: this guide §6, the User Guide |
-| Document Centre · Categories | The categories: Category, Seen By, Documents; the record: name, description, Seen By with its roles; New Category, Edit Category, Archive Category | A help term on Seen By (uploaders and document managers always see their documents) | How audiences are enforced: §6.4 |
+| Document Centre · Library | The four KPI cards, each setting the list's filter; search; the filters Area, Type, Status (Archived too, for `documents.manage`), Added and, in PR 2, Category and Tag; the list: Document, Type, Belongs To, Added, Expires, status pill, and a Download icon at the row's end (desktop); the document's page: Back to Library, its title, the preview, Details (Type, Belongs To, Number, Added, Added By, Size, Expires, Version) with Download, View File, Open Record; PR 2: Upload Document, Download Letterhead, Edit Details, Upload New Version, Archive Document, Category, Tags, the words found in the file | A help term on Expiring Soon (the window) and on Signed (a signed document is never replaced); a Details row on the record for the file name and, where a file has no text, that it is found by name | That the library is a view of the vault, how a read rule is applied, why a document is missing for one reader: this guide §6, the User Guide |
+| Document Centre · Categories | The categories: Category, Seen By, Documents; the category's page: Back to Categories, its name, Details (description, Seen By with its roles); New Category, Edit Category, Archive Category | A help term on Seen By (uploaders and document managers always see their documents) | How audiences are enforced: §6.4 |
 
 Word limits are FRONTEND_GUIDE §5's: the page title is Library, card titles are the four of D7, every
 button is Verb Noun. A file's preview is content (`data-copy="content"`).
@@ -464,7 +488,12 @@ button is Verb Noun. A file's preview is content (`data-copy="content"`).
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Document Centre · Library | The four KPI cards two to a row, Filter Documents (the four filters in a sheet with Show Documents and Clear Filters; the button counts the filters set), the search, then document cards: the title with its status pill, Type, Belongs To, Added | The subtitle; the Expires column and the row's Download icon (Expires is on the document's page with Added By, Size and Version) | Download, full width at the foot of Details on the document's page; Upload Document from the screen's New action | Documents in the More tiles; the two tabs scroll sideways; a tapped card opens the document's page in place of the list, Details first and the preview under them, and Back returns to the list (F31 amended 17/11/2026) |
-| Document Centre · Categories | Category cards: name, Seen By, the count | The description (in the sheet) | New Category | The second tab |
+| Document Centre · Categories | Category cards: name, Seen By, the count | The description (on the category's page) | New Category | The second tab; a tapped card opens the category's page in place of the list |
+
+Download Letterhead is a menu in the page header (PDF File, Word File) on both shells; Upload Document is
+the header's primary on desktop and the New action on a phone. A company document's Edit Details, Upload
+New Version and Archive Document (or Restore Document) are in the Document Actions menu at the top of
+the document's Details, shown only to those who may use them.
 
 Desktop is the list across the page's width (a table with a sticky filter row), each row ending in
 a Download icon (`IconButton`, named Download and the document's title) that saves the file without
@@ -473,7 +502,8 @@ MyCity found the document beside the list too much to take in): Back to Library,
 page's heading and in the trail, then the preview on two thirds of the width (`DocumentPreview` over
 `useFileBlob`, `lg`) and Details on the third beside it (`Grid` `2/1`), Download, View File and Open
 Record at its top and the facts under them. A file with no preview (Word, Excel, a video) shows No
-Preview in its place. View File opens the full screen viewer (`useFileViewer`). Model the list on `app/src/features/partnerships/Contracts.tsx`
+Preview in its place. View File opens the full screen viewer (`useFileViewer`). Categories follows the
+same rule: the list across the page, a category on its own page with Back to Categories. Model the list on `app/src/features/partnerships/Contracts.tsx`
 and `recruitment/TalentPool.tsx`, the record and the upload on `people/EmployeeDocuments.tsx`; do
 not copy `ess/Documents.tsx`, which opens its record in a modal (the older pattern). Selects from a
 server list load as they scroll (`useInfinite` with `paging`, F32). Tags use `ComboListField`; no tag
@@ -492,8 +522,9 @@ input exists and none is added. No folder icon exists; the module's icon is `doc
 - **Open Record without the grant** (an employee's own offer letter, in Recruitment): the button is
   not drawn. A document about the reader links to its Self-Service screen where the route map has one.
 - **A record with no name** (a draft with no title): Belongs To shows the record's number.
-- **No documents at all**: the empty state No Documents Yet, with Upload Document for those who may.
-  **A search with no result**: No Documents Found, with Clear Filters.
+- **No documents at all**: the empty state No Documents Yet (Upload Document is in the header and the
+  New action; the shared list's empty state carries no button). **A search with no result**: No
+  Documents Found; Clear Filters is in the phone's filter sheet, and All Documents clears them anywhere.
 - **A category archived while a person fills Upload Document**: 422 on Category (`Pick another category`).
 - **An audience narrowed while a document is open**: the next read is a 404; nothing was cached.
 - **A role deleted**: its `document_category_role` rows go with it (CASCADE); a `roles` category
@@ -536,7 +567,8 @@ None blocks the build. Each is TB's to decide unless it names another owner.
 
 ## 14 · Change log
 
-- 17/11/2026 · TB · The Library made lighter to read: the list takes the page's width and a document opens as a page of its own (`?id=`, Back to Library), the preview on two thirds of the width and Details with Download, View File and Open Record beside it; on a phone the same page replaces the list, Details first. Each desktop row ends in a Download icon. The list's filters are kept for Back. F31 amended for the Library. §2, §3, §10, §11 follow.
+- 17/11/2026 · TB · The Library made lighter to read: the list takes the page's width and a document opens as a page of its own (`?id=`, Back to Library), the preview on two thirds of the width and Details beside it with Download, View File and Open Record (and PR 2's Document Actions menu) at their top; on a phone the same page replaces the list, Details first. Each desktop row ends in a Download icon. Categories opens a category as its own page too (Back to Categories). The lists' filters are kept for Back. F31 amended for the Document Centre. §2, §3, §10, §11 follow.
+- 17/11/2026 · TB · PR 2 built: company documents, categories with an audience, tags, Upload Document, Edit Details, Upload New Version, Archive and Restore; Document Centre · Categories (#114); the files' text and search inside them; the letterhead as PDF and Word; expiry reminders and Home's alert; Praxis AI's read, summary and three cards; staging's seed. Brought in line with what was built: §2 and the header (row #114), §4 (`company_document`'s CHECK and its uploader), §5 (`GET /categories/:id`, the letterhead's `ExportFile`, `archived` and the roles picker), §6.2 (a source's `number`, `archived`, `area_label`), §6.4 (the rule in `library.access.js`; archived for keepers alone), §6.5 (a new version is claimed and followed, not superseded; `vault.setDetails`; Edit Details' refusals), §6.7 (the job, ⌘K's columns), §6.8 (`blank: true`), §7, §9 (the cards' keys), §10 (where the actions sit) and §11 (empty states).
 
 - 16/11/2026 · TB · PR 1 built: the `documents` key and its grants (`10590`), the two indexes (`10500`), the registry `shared/documents/library.js` with its 15 sources in 13 modules over 17 document types, the `library` module (list, figures, one document, filters, ⌘K) and Document Centre · Library (#113) on both shells. Brought in line with what was built: §5 (the list's filters are `area`, `doc_type`, `status`, `added`; the filters offer only types the reader holds), §6.1 (a row is a file that can be opened: scanned and drawn), §6.2 (the source's shape: `types` with their names, `entity`, `kind`, `listed`, `expires`; a source's rule must be the vault's kind), §6.3 (how the proof compares), §6.6 (Expiring shows before Signed; an agreement's term counts), §6.7 (every word of a search is held to the row), §9, §10 and §11.
 - 16/11/2026 · TB · Written and agreed: the Document Centre, a new module with the `documents` key, planned from the study of the vault and TB's nine answers (§1.1), with the two-PR build plan of Appendix A.

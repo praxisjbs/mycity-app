@@ -1,13 +1,16 @@
 ---
 title: Document Centre
 module: documents
-summary: Every document you may open, found, previewed and downloaded in one place.
+summary: Every document you may open, found, previewed and downloaded in one place, and the company's own papers.
 icon: doc
 ---
 
 The Document Centre is one place to find a document without first finding the record that holds it.
 An agreement, an offer letter, a query letter, an invoice or a certificate is listed here, whichever
 part of the hub made it. You see only the documents you could already open from their own screens.
+
+It is also where the company's own papers are kept: the CAC certificate, the status report, licences
+and permits. Each sits in a category, and each category is seen by everyone or by named roles.
 
 ## Library {#document-centre-library screen=documents/library}
 
@@ -36,6 +39,10 @@ Pressing a figure shows the documents behind its number.
 > **Tip:** To find a partner's service agreement, type the partner's name and the word agreement.
 > You do not need to open the partner first.
 
+Words inside PDF and Word files are searched too. When a word was found inside the file, the words
+around it show under the document's title. A scanned page has no words to search: find it by its
+name.
+
 When nothing matches, the list reads **No Documents Found**. Shorten what you typed, or clear a
 filter.
 
@@ -48,7 +55,8 @@ filter.
 4. Pick a **Type** to see one kind of document, such as an agreement or an invoice.
 5. Pick a **Status** to see only documents that are expiring or signed.
 6. Pick when it was **Added**.
-7. On a phone, press **Show Documents**.
+7. Pick a **Category** or a **Tag** to see only the company's documents filed under it.
+8. On a phone, press **Show Documents**.
 
 To see everything again, press the **All Documents** figure. On a phone you can also press
 **Clear Filters** in the filter sheet.
@@ -77,6 +85,63 @@ To see everything again, press the **All Documents** figure. On a phone you can 
    as it is.
    ![The download icon at the end of a row](shot:document-centre-download)
 
+### Upload a company document {#document-centre-upload needs="documents create"}
+
+1. Open [Document Centre · Library](/documents?tab=library).
+2. Press **Upload Document**. On a phone, press the round button at the bottom right, then **Upload Company Document**.
+   ![Upload Document](shot:document-centre-upload)
+3. Choose the **File**: a PDF, a Word or Excel file, or a photo, up to 25 MB.
+4. Check the **Title**. It starts as the file's name.
+5. Pick its **Category**. Only the categories you see are offered.
+6. Add **Tags** if you like: a word each, up to eight. Words already in use are suggested.
+7. If the document runs out, enter when it **Expires**. You and the document managers are reminded
+   60, 30 and 7 days before, and on the day.
+8. Add a **Description** if you like.
+9. Press **Upload Document**.
+
+| Field | What to Enter | Needed |
+|---|---|---|
+| **File** | The document itself | Yes |
+| **Title** | What it is, such as CAC Certificate | Yes |
+| **Category** | Where it is kept | Yes |
+| **Tags** | Words to find it by | No |
+| **Expires** | The day it runs out | No |
+| **Description** | A line about it | No |
+
+> **Important:** The same file cannot be uploaded twice. If it is already in the library, the file
+> field reads Already in library.
+
+### Change a company document {#document-centre-change needs="documents edit"}
+
+You may change the company documents you uploaded. Document managers may change any of them.
+
+1. Open the document in [Document Centre · Library](/documents?tab=library).
+2. Press **Document Actions**, at the top of its **Details**.
+3. To change its title, category, tags, expiry or description, press **Edit Details**, make the
+   change and press **Save Details**. Leave **Expires** empty to take its expiry away.
+4. To replace the file, press **Upload New Version**, choose the new **File** and press
+   **Upload Version**. The old file is kept in its versions.
+
+A document another part of the hub made, such as an agreement or an offer letter, is changed where it
+was made.
+
+### Archive a company document {#document-centre-archive needs="documents delete"}
+
+1. Open the document in [Document Centre · Library](/documents?tab=library).
+2. Press **Document Actions**, then **Archive Document**, and confirm with **Archive Document**.
+3. It leaves the list and the figures. Nothing is deleted.
+4. {needs="cap documents.manage"} To find it again, pick **Archived** under **Status**. Open it and press
+   **Document Actions**, then **Restore Document**.
+
+### Download the letterhead {#document-centre-letterhead needs="documents view"}
+
+1. Open [Document Centre · Library](/documents?tab=library).
+2. Press **Download Letterhead**.
+3. Press **PDF File** or **Word File**. The file is saved on your device.
+
+The letterhead carries the company's logo, name and address as Settings · Organisation holds them on
+the day you download it.
+
 ### Find a document from anywhere {#document-centre-search}
 
 1. Press Ctrl and K on a computer, or the search icon at the top of a phone.
@@ -95,6 +160,73 @@ If you open a link to a document that is not yours, the screen reads **Document 
 Payslips are not listed here. Find yours on
 [Employee Self-Service · My Payslips](/ess?tab=my-payslips).
 
+## Categories {#document-centre-categories screen=documents/categories}
+
+The categories the company's documents are kept in, who sees each, and how many documents each one
+holds. This tab is for the document managers.
+
+![Categories: who sees each and how many documents it holds](shot:document-centre-categories)
+
+| Column | What It Shows |
+|---|---|
+| **Category** | Its name |
+| **Seen By** | **Everyone**, or the roles named on it. Its uploaders and the document managers always see its documents |
+| **Documents** | How many current documents it holds |
+
+### Add a category {#document-centre-new-category needs="documents edit, cap documents.manage"}
+
+1. Open [Document Centre · Categories](/documents?tab=categories).
+2. Press **New Category**. On a phone, press the round button at the bottom right, then
+   **New Document Category**.
+   ![New Category](shot:document-centre-new-category)
+3. Enter its **Name**. A name is used once.
+4. Add a **Description** if you like.
+5. Under **Seen By**, pick **Everyone**, or **Named Roles** and pick the **Roles** that see it.
+6. Press **Create Category**.
+
+### Change or archive a category {#document-centre-change-category needs="cap documents.manage"}
+
+1. Open [Document Centre · Categories](/documents?tab=categories) and press the category. It opens
+   on a page of its own. Press **Back to Categories** to return to the list.
+2. Press **Edit Category**, make the change and press **Save Category**. Narrowing who sees it hides
+   its documents from the others at once.
+3. To stop offering it on Upload Document, press **Archive Category** and confirm with
+   **Archive Category**. Its documents stay where they are.
+4. To bring one back, pick **Archived** under **Show**, press it and press **Restore Category**.
+
+```shot document-centre-upload
+open: /documents?tab=library
+as: operations
+device: desktop
+do:
+  - click: button "Upload Document"
+  - wait: label "Title"
+crop: modal
+marks:
+  1: text "File" | The document itself
+  2: label "Category" | Where it is kept
+```
+
+```shot document-centre-categories
+open: /documents?tab=categories
+as: operations
+marks:
+  1: text "Finance Records" | Press a category to open it
+```
+
+```shot document-centre-new-category
+open: /documents?tab=categories
+as: operations
+device: desktop
+do:
+  - click: button "New Category"
+  - wait: label "Name"
+crop: modal
+marks:
+  1: label "Name" | Used once
+  2: text "Named Roles" | Pick the roles that see it
+```
+
 ```shot document-centre-library
 open: /documents?tab=library
 as: operations
@@ -102,17 +234,6 @@ marks:
   1: text "Expiring Soon" | Press a figure to see its documents
   2: searchbox | Find a document by any words
   3: row 1 | Press a document to open it
-```
-
-```shot document-centre-download
-open: /documents?tab=library
-as: operations
-device: desktop
-do:
-  - fill: searchbox = chowdeck agreement
-  - wait: button "Download Chowdeck Service Agreement"
-marks:
-  1: button "Download Chowdeck Service Agreement" | Save a copy without opening
 ```
 
 ```shot document-centre-filters
@@ -138,4 +259,15 @@ marks:
   1: button "Download" | Save a copy on this device
   2: button "Open Record" | Go to what it belongs to
   3: button "Back to Library" | Return to the list
+```
+
+```shot document-centre-download
+open: /documents?tab=library
+as: operations
+device: desktop
+do:
+  - fill: searchbox = chowdeck agreement
+  - wait: button "Download Chowdeck Service Agreement"
+marks:
+  1: button "Download Chowdeck Service Agreement" | Save a copy without opening
 ```

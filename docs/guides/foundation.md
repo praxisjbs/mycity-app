@@ -1205,6 +1205,8 @@ screen.
 
 ## 14 · Change log
 
+- 17/11/2026 · TB · For the Document Centre's PR 2 (`document-centre.md` §6.5, §6.7, §6.8): the vault gains `setDetails` (a file's title and expiry, beside `setTitle`); the Word writer (`shared/documents/docx.js`) gains a header with a picture and a rule, and a footer, and may leave its title out; `documents.generate` takes `blank: true` (the letterhead prints no date); `services/media/pdf-text.js` takes its page and character limits, its time and memory, and answers done, empty or failed with `detail`, the CV's limits unchanged.
+
 - 16/11/2026 · TB · §9: the Document Centre's Library lists what is filed on an employee's record (a document, an identification, a certificate: `documents.library.js`; rent evidence: `organisation.library.js`; `document-centre.md` §6.2), each for the readers `vault.canRead` already lets open it. `vault.hasAccess()` says whether an entity type has a read rule of its own, and `shared/documents/library.js` is the library's registry. The `documents` module's empty `documents.search.js` is deleted: ⌘K finds documents through the library (`library.search.js`). Nothing on a People or Self-Service screen changed.
 - 14/11/2026 · JP · §9: `imports.summary`, Import History in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8). Nothing on screen changes.
 - 14/11/2026 · JP · §6.12: Praxis AI's Download PDF joins the list (`praxis-ai.md` §6.19 item 8): a PDF reserved with `exports.reserve` and drawn in the worker, since its figures are the asker's at the build, not at the press.

@@ -159,4 +159,47 @@ describe("Document Centre · Library", () => {
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
   }, 60000);
+
+  it("a company document shows its category and tags, and its keeper may edit, replace and archive it", async () => {
+    const cac = LIBRARY_ROWS.find((d) => d.title === "Certificate of Incorporation")!;
+    await openAs("cynthia@mycityapp.io", `${HERE}&id=${cac.document_id}`);
+    const heading = await screen.findByRole("heading", { name: "Certificate of Incorporation", level: 1 });
+    let pane: HTMLElement = heading;
+    while (pane.parentElement && !within(pane).queryByText("Category")) pane = pane.parentElement;
+    expect(within(pane).getByText("Registration & Statutory")).toBeTruthy();
+    expect(within(pane).getByText("cac, incorporation")).toBeTruthy();
+    fireEvent.pointerDown(within(pane).getByRole("button", { name: "Document Actions" }), { button: 0, pointerType: "mouse" });
+    for (const name of ["Edit Details", "Upload New Version", "Archive Document"]) expect((await screen.findAllByText(name)).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByText("Edit Details").at(-1)!);
+    const form = await screen.findByRole("dialog", { name: "Edit Details" });
+    for (const label of ["Title", "Category", "Tags", "Expires", "Description"]) expect(within(form).getByText(label)).toBeTruthy();
+    expect(within(form).getByRole("button", { name: "Save Details" })).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+    expect(await axe(document.body)).toHaveNoViolations();
+  }, 60000);
+
+  it("Upload Document asks for the file and its details; staff cannot upload, and never see a category kept from them", async () => {
+    await openAs("cynthia@mycityapp.io", HERE);
+    fireEvent.click(screen.getAllByRole("button", { name: "Upload Document" })[0]!);
+    const form = await screen.findByRole("dialog", { name: "Upload Document" });
+    for (const label of ["File", "Title", "Category", "Tags", "Expires", "Description"]) expect(within(form).getByText(label)).toBeTruthy();
+    // Pressing it with nothing filled marks the fields, and sends nothing.
+    fireEvent.click(within(form).getByRole("button", { name: "Upload Document" }));
+    await settled();
+    expect(screen.getByRole("dialog", { name: "Upload Document" })).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+    cleanup();
+
+    await openAs("emeka@mycityapp.io", HERE);
+    expect(screen.queryByRole("button", { name: "Upload Document" })).toBeNull();
+    expect(screen.queryByText("Annual Status Report")).toBeNull();
+    expect(screen.getAllByText("Certificate of Incorporation").length).toBeGreaterThan(0);
+  }, 60000);
+
+  it("Download Letterhead offers PDF and Word", async () => {
+    await openAs("emeka@mycityapp.io", HERE);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Download Letterhead" }), { button: 0, pointerType: "mouse" });
+    expect((await screen.findAllByText("PDF File")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Word File").length).toBeGreaterThan(0);
+  }, 60000);
 });

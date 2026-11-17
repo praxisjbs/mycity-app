@@ -12,7 +12,7 @@ the date, and add a line to §3.
 | Owner | TB (Tom-Blake Asaah) |
 | Type | Full stack (CLAUDE.md step 1) |
 | Branches | PR 1 `m10/document-centre-library`, PR 2 `m10/document-centre-company` (a cloud session uses the branch it was given) |
-| Pull requests | PR 0 (the plan) praxisjbs/mycity-app#163; PR 1 praxisjbs/mycity-app#164; PR 2 adds its number here |
+| Pull requests | PR 0 (the plan) praxisjbs/mycity-app#163; PR 1 praxisjbs/mycity-app#164; PR 2 praxisjbs/mycity-app#167 |
 
 ---
 
@@ -69,24 +69,26 @@ Praxis AI's read.
 - [x] 16/11/2026 · Document Centre · Library on both shells, on the contract; the mock
 - [x] 16/11/2026 · PROGRESS section and row #113, the counts; MILESTONES §18's table; the guides of the modules touched
 - [x] 16/11/2026 · The User Guide chapter and its pictures
-- [ ] `npm run ci` green; PR opened, ready, green on GitHub, merged
+- [x] 16/11/2026 · `npm run ci` green; PR opened, ready, green on GitHub, merged (praxisjbs/mycity-app#164)
 
 ### PR 2 · Company documents and the extras
 
-- [ ] Contract: company documents, categories, tags, the letterhead; the list's new filters
-- [ ] `10510`, `10520`, `10591`; `documents.manage`
-- [ ] Company documents: upload, edit, versions, archive, the audience rule and its proof
-- [ ] Document Centre · Categories (row #114)
-- [ ] The files' text: the job, the sweep, search inside files
-- [ ] The letterhead as PDF and Word
-- [ ] Expiry: the reminder, the notice, Home's alert subject
-- [ ] Praxis AI: read, summary, routes, actions; the catalogue snapshot
-- [ ] Staging's seed; the mock's writes
-- [ ] PROGRESS, MILESTONES, the guides, the User Guide chapter and its pictures
+- [x] 17/11/2026 · Contract: company documents, categories, tags, the letterhead; the list's new filters
+- [x] 17/11/2026 · `10510`, `10520`, `10591`; `documents.manage`
+- [x] 17/11/2026 · Company documents: upload, edit, versions, archive, the audience rule and its proof
+- [x] 17/11/2026 · Document Centre · Categories (row #114)
+- [x] 17/11/2026 · The files' text: the job, the sweep, search inside files
+- [x] 17/11/2026 · The letterhead as PDF and Word
+- [x] 17/11/2026 · Expiry: the reminder, the notice, Home's alert subject
+- [x] 17/11/2026 · Praxis AI: read, summary, routes, actions; the catalogue snapshot
+- [x] 17/11/2026 · Staging's seed; the mock's writes
+- [x] 17/11/2026 · PROGRESS, MILESTONES, the guides, the User Guide chapter and its pictures
 - [ ] `npm run ci` green; PR opened, ready, green on GitHub, merged
 
 ## 3 · Log
 
-- 17/11/2026 · TB · Between PR 1 and PR 2, the Library made lighter to read (TB's three answers of 17/11/2026): a document opens as a page of its own, the preview on two thirds of the width and Details beside it; the KPI cards and filters stay; a Download icon ends each desktop row. F31 amended. What PR 2 should know: the record is `DocumentRecord` in `Library.tsx`, so Edit Details, Upload New Version and Archive Document join its Details card; the filters are held by `useKept("library.filters")`, and the Category and Tag filters join that state. Left: PR 2.
+- 17/11/2026 · TB · After PR 2, the Library and Categories made lighter to read (TB's answers of 17/11/2026, merged after PR 2 as TB chose): a document opens as a page of its own, its preview on two thirds of the width and Details beside it with PR 2's Document Actions menu; a category opens on its own page too; the KPI cards and filters stay; a Download icon ends each desktop row. F31 amended. Left: nothing.
+- 17/11/2026 · TB · PR 2 built in a fresh chat from its start prompt: company documents in categories with an audience (`10510`, `documents.manage` in `10591`), Upload Document from a staged file, Edit Details, Upload New Version, Archive and Restore; Document Centre · Categories (#114); the files' text (`10520`, the `document-text` job and its nightly sweep) and search inside files in the Library and ⌘K; the letterhead as PDF and Word; the expiry reminder and Home's alert opening the Library; Praxis AI's read, summary and three cards; staging's seed and the mock's writes. What the build settled beyond the plan, now in the guide: a new version is claimed and followed (`vault.follow`), not superseded, since the library takes a staged file; the read rule lives in `library.access.js`, an archived company document is for keepers alone, and the uploader is `company_document.created_by`; a source may name a row's `number`, `archived` and `area_label` (Company); `GET /categories/:id`; ⌘K's action is Upload Company Document, since Upload Document names other modules' buttons too; the generator's `blank: true`. The proof (`library-access.test.js`) now holds the audience rule for every role. Left: §13's open questions, TB's.
+
 - 16/11/2026 · TB · PR 1 built, in the planning chat as TB asked (the same model and effort): the `documents` key, the registry and its 15 sources, the `library` module, Document Centre · Library (#113) on both shells, ⌘K's Documents group, the chapter and its pictures. What the build settled beyond the plan, now in the guide: a row is a file that can be opened (scanned and drawn, §6.1); a source names its entity types and may give a finer `kind`, a `listed` narrowing and an `expires` date (§6.2); Expiring shows before Signed and an agreement's term counts (§6.6); a search holds every word to the row (§6.7); the filters offer only the types a reader holds (§5). What PR 2 should know: `library.readable()` already takes `{ listed: false }` for the access test; `vault.hasAccess()` exists; `NOT_IN_LIBRARY` must lose nothing when `company_document` joins; the mock's ⌘K does not list documents (the real API does). Left: PR 2.
 - 16/11/2026 · TB · Planned in one chat from a study of the vault (63 document types, 25 read rules) and TB's nine answers: the guide with its Appendix A, MILESTONES §18 ratified, this tracker. No code. Left: PR 1, then PR 2.

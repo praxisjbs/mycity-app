@@ -52,3 +52,13 @@ describe("Knowledge Hub · Training", () => {
     expect(tabVisible({ module: "ess", tab: "my-training" }, reader({ ess: ["view"] }))).toBe(true);
   });
 });
+
+describe("Document Centre · Categories", () => {
+  const categories = { module: "documents", tab: "categories" };
+  test("follows documents.manage, as every category write asks; everyone finds documents on Library", () => {
+    expect(tabVisible(categories, reader({ documents: ["view"] }, { capabilities: ["documents.manage"] }))).toBe(true);
+    expect(tabVisible(categories, reader({ documents: ["view", "create", "edit", "delete"] }))).toBe(false);
+    expect(tabVisible(categories, reader({ documents: ["view"] }, { is_ceo: true }))).toBe(true);
+    expect(tabVisible({ module: "documents", tab: "library" }, reader({ documents: ["view"] }))).toBe(true);
+  });
+});

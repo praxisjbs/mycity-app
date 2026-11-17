@@ -422,6 +422,32 @@ async function setTitle(client, documentId, title) {
 }
 
 /**
+ * Set what a person says about a file they keep in a library of their own (a Document Centre company
+ * document, docs/guides/document-centre.md §6.5): its title and when it expires. Only what is given
+ * changes; `expires_on: null` clears the expiry. A locked document keeps both.
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {string} documentId
+ * @param {{title?: string, expires_on?: string|null}} details
+ * @returns {Promise<boolean>} whether anything changed
+ */
+async function setDetails(client, documentId, details = {}) {
+  if (!inTransaction(client))
+    throw new Error("vault.setDetails must run inside atomically()");
+  const hasTitle = details.title !== undefined;
+  const hasExpiry = details.expires_on !== undefined;
+  if (!hasTitle && !hasExpiry) return false;
+  const { rowCount } = await client.query(
+    `UPDATE document
+        SET title = CASE WHEN $2::boolean THEN $3::text ELSE title END,
+            expires_on = CASE WHEN $4::boolean THEN $5::date ELSE expires_on END
+      WHERE document_id = $1 AND locked_at IS NULL
+        AND (($2::boolean AND title IS DISTINCT FROM $3::text) OR ($4::boolean AND expires_on IS DISTINCT FROM $5::date))`,
+    [documentId, hasTitle, hasTitle ? String(details.title).trim().slice(0, 200) : null, hasExpiry, hasExpiry ? details.expires_on : null],
+  );
+  return rowCount > 0;
+}
+
+/**
  * Make a file already stored the next version of another: a stranger's replacement for a file of
  * theirs that was refused (a hire's second passport photograph after the first was rejected on the
  * onboarding case). The older one stays, in the newer one's versions, and leaves the lists that show
@@ -925,6 +951,7 @@ module.exports = {
   STAGED_DOC_TYPE,
   lock,
   setTitle,
+  setDetails,
   follow,
   remove,
   removeFiles,

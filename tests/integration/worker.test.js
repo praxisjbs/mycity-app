@@ -600,6 +600,7 @@ describe("schedules and heartbeat", () => {
       "budget-threshold",
       "celebrations",
       "community-membership",
+      "document-text-sweep",
       "exchange-rates",
       "export-cleanup",
       "home-alert-sweeps",

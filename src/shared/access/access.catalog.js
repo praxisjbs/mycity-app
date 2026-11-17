@@ -252,6 +252,13 @@ const CAPABILITY_CATALOG = [
     label: "Manage Training",
     description: "Build, publish, assign and archive courses, and see everyone's progress and certificates.",
   },
+  // M10 Document Centre (docs/guides/document-centre.md §8), seeded in 10591.
+  {
+    code: "documents.manage",
+    module: "documents",
+    label: "Manage Documents",
+    description: "Keep the Document Centre's categories and who sees each, and edit, replace and archive every company document.",
+  },
   {
     code: "mailbox.signature",
     module: "mailbox",

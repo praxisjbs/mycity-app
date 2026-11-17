@@ -16,6 +16,9 @@
  *     },
  *     listed: "EXISTS (...)",                         // optional: only the files the record still holds
  *     expires: "(SELECT a.ends_on ...)",              // optional: when it ends, where the record says so
+ *     number: "(SELECT cd.number ...)",               // optional: the row's number, where the record holds it
+ *     archived: "(SELECT cd.archived_at ...)",        // optional: when the record was archived (a company document)
+ *     area_label: "Company",                          // optional: the Area filter's name, where not the module's
  *     default: true,                                  // the vault's default read rule, as SQL from here
  *     // or, for an entity the module gave vault.defineAccess():
  *     reach: (client, user) => scopeFor(user, "partnerships", "view"),   // once per request
@@ -124,6 +127,9 @@ function librarySource(spec) {
     record: record ? Object.freeze({ type: record.type, id: record.id, label: record.label, ref: record.ref || "NULL" }) : null,
     listed: typeof spec.listed === "string" && spec.listed.trim() ? spec.listed : null,
     expires: typeof spec.expires === "string" && spec.expires.trim() ? spec.expires : null,
+    number: typeof spec.number === "string" && spec.number.trim() ? spec.number : null,
+    archived: typeof spec.archived === "string" && spec.archived.trim() ? spec.archived : null,
+    area_label: typeof spec.area_label === "string" && spec.area_label.trim() ? spec.area_label.trim() : null,
     default: spec.default === true,
     reach: spec.default === true ? null : spec.reach,
     readable: spec.default === true ? null : spec.readable,
@@ -338,7 +344,9 @@ function perType(pick) {
   return branches.length ? `(CASE d.doc_type ${branches.join(" ")} ELSE NULL END)` : "NULL::text";
 }
 
-const areaLabel = (area) => (catalog.MODULE_META[area] ? catalog.MODULE_META[area].label : area);
+const moduleLabel = (area) => (catalog.MODULE_META[area] ? catalog.MODULE_META[area].label : area);
+/** The Area filter's name for a source: its own, else its module's. */
+const areaLabel = (s) => s.area_label || moduleLabel(s.area);
 
 /**
  * The SQL of what a row shows, each an expression over `d`: the type's name (a source's finer
@@ -349,13 +357,17 @@ function columns() {
   return {
     type_label: `COALESCE(${perSource((s) => s.kind)}, ${fixed})`,
     area: perType((s) => s.area),
-    area_label: perType((s) => areaLabel(s.area)),
+    area_label: perType((s) => areaLabel(s)),
     record_type: perSource((s) => s.record && s.record.type),
     record_id: perSource((s) => s.record && s.record.id),
     record_label: perSource((s) => s.record && s.record.label),
     record_ref: perSource((s) => s.record && s.record.ref),
     // When it ends: the record's own date where its source gives one (an agreement's term), else the file's.
     expires_on: `COALESCE(${perSource((s) => s.expires)}::date, d.expires_on)`,
+    // The row's number: the record's own where its source gives one (a company document's DOC-0001), else the file's.
+    number: `COALESCE(${perSource((s) => s.number)}, d.number)`,
+    // When the record was archived, where its source can be (a company document); NULL for every other row.
+    archived_at: `(${perSource((s) => s.archived)})::timestamptz`,
   };
 }
 
@@ -364,7 +376,7 @@ function options(from = sources()) {
   const areas = [];
   const types = [];
   for (const s of from) {
-    if (!areas.some((a) => a.area === s.area)) areas.push({ area: s.area, label: areaLabel(s.area) });
+    if (!areas.some((a) => a.area === s.area)) areas.push({ area: s.area, label: areaLabel(s) });
     for (const t of s.doc_types) types.push({ doc_type: t, label: s.types[t], area: s.area });
   }
   const order = catalog.MODULES;
