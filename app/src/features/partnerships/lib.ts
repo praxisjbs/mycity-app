@@ -92,17 +92,25 @@ export function useCategoryOptions() {
 /** The meanings a signed deal may still move to: another signed one, On Hold or Closed Lost (§6.5). */
 const AFTER_SIGNING = new Set(["signed", "active", "on_hold", "closed_lost"]);
 
+/** The meanings of a deal still being pursued (§6.5). */
+const PURSUING = new Set(["prospect", "contacted", "meeting", "proposal", "negotiation"]);
+
 /**
- * A stage's place in the list; a move to an earlier one, On Hold or Closed Lost needs a reason, and a
- * signed deal goes back before signing never (§6.5): `refused` says so before anything is asked.
+ * A stage's place in the list, as the API rules it (§6.5): a move to an earlier one, past a pursuing
+ * stage (QA F64), to On Hold or to Closed Lost needs a reason; a signed deal goes back before signing
+ * never (`refused` says so before anything is asked); signing needs the signed copy and, when the deal
+ * has no projected value, the deal marked as signed with no money value (`value`, QA F53).
  */
-export function moveNeeds(stages: ListValue[], deal: Pick<DealDetail, "stage" | "signed_at">, code: string) {
+export function moveNeeds(stages: ListValue[], deal: Pick<DealDetail, "stage" | "signed_at" | "estimated_value" | "non_monetary">, code: string) {
   const from = stages.find((s) => s.code === deal.stage);
   const to = stages.find((s) => s.code === code);
   const back = !!from && !!to && from.meaning !== "on_hold" && to.position < from.position;
+  const pursuing = (s: ListValue | undefined): s is ListValue => !!s && s.active && PURSUING.has(s.meaning ?? "");
+  const skips = !back && pursuing(from) && pursuing(to) && stages.some((s) => pursuing(s) && s.position > from.position && s.position < to.position);
   const signs = !!to && (to.meaning === "signed" || to.meaning === "active") && !deal.signed_at;
   const refused = !!to && !!deal.signed_at && !AFTER_SIGNING.has(to.meaning ?? "") ? "Already signed" : null;
-  return { to, reason: back || to?.meaning === "on_hold" || to?.meaning === "closed_lost", copy: signs, refused };
+  const unvalued = !deal.estimated_value || /^0+(\.0+)?$/.test(deal.estimated_value);
+  return { to, reason: back || skips || to?.meaning === "on_hold" || to?.meaning === "closed_lost", copy: signs, value: signs && unvalued && !deal.non_monetary, refused };
 }
 
 /** The stage after the current one, for the phone's Next Stage at the foot of a record. */
@@ -117,8 +125,17 @@ export const HEALTH: Record<DealRow["health"], { label: string; tone: Tone }> = 
   on_track: { label: "On Track", tone: "ok" },
   follow_up_required: { label: "Follow-Up Required", tone: "warn" },
   stalled: { label: "Stalled", tone: "err" },
+  overdue: { label: "Overdue", tone: "err" },
 };
-export const healthPill = (h: DealRow["health"] | null | undefined) => (h ? { tone: HEALTH[h].tone, text: HEALTH[h].label } : null);
+/**
+ * A deal's health as a pill. A deal that is finished shows how it ended instead, never the health it
+ * had (QA F64: a lost deal read On Track): `lost` reads Lost and `completed` Completed.
+ */
+export const healthPill = (h: DealRow["health"] | null | undefined, status?: string | null) => {
+  if (status === "lost") return { tone: "neutral" as Tone, text: "Lost" };
+  if (status === "completed") return { tone: "neutral" as Tone, text: "Completed" };
+  return h ? { tone: HEALTH[h].tone, text: HEALTH[h].label } : null;
+};
 
 const LEAD_STATUS: Record<LeadRow["status"], { label: string; tone: Tone }> = {
   new: { label: "New", tone: "info" },

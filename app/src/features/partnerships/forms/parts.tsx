@@ -23,6 +23,8 @@ import {
   SelectField,
   TextAreaField,
   TextField,
+  toMoneyString,
+  type ContractSchema,
   type FieldState,
   type PlaceValue,
 } from "@mycity/ui";
@@ -34,6 +36,34 @@ import { SCOPES, useCategoryOptions, useListSuggestions } from "../lib";
  * `useContractForm` with the contract's own schema (LeadFields or PartnerFields, ContactInput,
  * DealFields), so a field is checked as it is filled by the rules the API keeps.
  */
+
+/**
+ * What a person typed, as the contract takes it. A MoneyField holds "750,000" or "750000.5" as typed;
+ * the wire wants "750000.00" (gate 20). A NumberField holds "5"; the wire wants 5. The forms check
+ * the contract against these, never against the text, so a plain amount is never "Check the format"
+ * and a count is never "Required" (QA F51, F61).
+ */
+export const moneyOnWire = (typed: unknown): unknown => (typeof typed === "string" && typed.trim() ? toMoneyString(typed) : typed);
+/** A whole number as typed ("1,200"), as a number; nothing typed is nothing. */
+export const countOnWire = (typed: unknown): unknown => {
+  if (typeof typed !== "string") return typed;
+  const s = typed.replace(/,/g, "").trim();
+  return s === "" ? undefined : Number(s);
+};
+/** A contract schema checked against what the typed values become on the wire. */
+export const checkedOnWire = <T,>(schema: ContractSchema, toWire: (v: T) => unknown): ContractSchema => ({
+  safeParse: (v: unknown) => schema.safeParse(toWire(v as T)),
+});
+
+/** The money keys of a deal's option. */
+const OPTION_MONEY = ["original_price", "deal_price", "commission_amount", "merchant_take"] as const;
+/** A deal form's values as DealFields reads them: its projected value and its options' prices on the wire. */
+export function dealOnWire(v: Record<string, unknown>): Record<string, unknown> {
+  const options = Array.isArray(v.options)
+    ? (v.options as Array<Record<string, unknown>>).map((o) => ({ ...o, ...Object.fromEntries(OPTION_MONEY.map((k) => [k, moneyOnWire(o[k])])) }))
+    : v.options;
+  return { ...v, estimated_value: moneyOnWire(v.estimated_value), options };
+}
 
 /** What every part's form gives it: the binding and the setter (useContractForm's). */
 export interface Bound {
@@ -62,7 +92,8 @@ export function useMeAsPerson(): PersonRef | null {
 /** The region: a scope, and for Cities the cities picked (F27). */
 function RegionField({ f }: { f: Bound }) {
   const x = b(f);
-  const region = (x.values.region ?? { scope: "national" }) as { scope: string; cities?: PlaceValue[] };
+  // No scope is chosen for the person (QA F46: every record read National, the form's default).
+  const region = (x.values.region ?? { scope: "" }) as { scope: string; cities?: PlaceValue[] };
   return (
     <>
       <Field label="Region" {...x.status("region")}>
@@ -107,6 +138,9 @@ export function OrganisationPart({ f, kind, owner, custom }: { f: Bound; kind: "
         <SelectField {...txt(f, "partner_category_id")} options={categories.options} more={categories.more} onMore={categories.onMore} placeholder="Choose One" />
       </Field>
       <RegionField f={f} />
+      {kind === "lead" && (
+        <Field label="Source" {...x.status("source")}><ComboField {...txt(f, "source")} list={sources} option={(s) => s.label} placeholder="Referral" /></Field>
+      )}
       <Field label="Industry" optional {...x.status("industry")}><TextField {...txt(f, "industry")} placeholder="Events" /></Field>
       <OwnerField f={f} label={kind === "lead" ? "Lead Owner" : "Owner"} initial={owner} />
       <MoreFields label="Advanced">
@@ -116,9 +150,6 @@ export function OrganisationPart({ f, kind, owner, custom }: { f: Bound; kind: "
           <Field label="Headquarters" optional {...x.status("headquarters")}><AddressField {...plc(f, "headquarters")} places={places} level="area" /></Field>
         )}
         {kind === "partner" && <Field label="Partner Since" optional {...x.status("since")}><DateField {...txt(f, "since")} /></Field>}
-        {kind === "lead" && (
-          <Field label="Source" optional {...x.status("source")}><ComboField {...txt(f, "source")} list={sources} option={(s) => s.label} placeholder="Referral" /></Field>
-        )}
         {kind === "lead" && <ImpactFields f={f} />}
         {kind === "lead" && <Field label="Comments" optional {...x.status("comments")}><TextAreaField {...txt(f, "comments")} /></Field>}
         {custom && <CustomFieldsPart defs={custom} f={f} />}
@@ -217,6 +248,7 @@ export function dealStart(stage: string, ownerId: string) {
     objective: "",
     stage,
     estimated_value: "",
+    non_monetary: false,
     expected_close_on: "",
     event_starts_on: "",
     event_ends_on: "",
@@ -255,7 +287,7 @@ export function dealBody(v: Record<string, unknown>, deal?: { money: boolean; cu
   for (const [k, value] of Object.entries(v)) {
     if (k.endsWith("_person") || UI_KEYS.has(k)) continue;
     if (isBlank(value)) continue;
-    out[k] = k === "expected_attendance" ? Number(value) : value;
+    out[k] = k === "expected_attendance" ? countOnWire(value) : k === "estimated_value" ? moneyOnWire(value) : value;
   }
   if (deal) {
     const validity = validityOnWire(v);
@@ -466,8 +498,9 @@ export const optionsStart = (d: Pick<DealDetail, "options"> | null): OptionDraft
 export function optionsOnWire(rows: OptionDraft[], money: boolean) {
   return rows.map((o, i) => {
     const out: Record<string, string | number> = { position: i + 1, label: o.label.trim() };
-    for (const k of ["original_price", "discount_pct", "deal_price", "price_note"] as const) if (o[k].trim()) out[k] = o[k].trim();
-    if (money) for (const k of ["commission_amount", "merchant_take"] as const) if (o[k].trim()) out[k] = o[k].trim();
+    for (const k of ["discount_pct", "price_note"] as const) if (o[k].trim()) out[k] = o[k].trim();
+    for (const k of ["original_price", "deal_price"] as const) if (o[k].trim()) out[k] = toMoneyString(o[k]);
+    if (money) for (const k of ["commission_amount", "merchant_take"] as const) if (o[k].trim()) out[k] = toMoneyString(o[k]);
     return out;
   });
 }

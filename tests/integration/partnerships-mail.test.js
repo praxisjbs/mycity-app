@@ -183,9 +183,10 @@ describeDb("partnerships: mail linked to a lead or partner (§6.15)", () => {
         name: "Harbour Lights Festival",
         partner_category_id: category,
         region: { scope: "national" },
+        source: "Referral",
         owner_id: emp("bola"),
         contact: { first_name: "Ada", last_name: "Obi", email: "ada@harbour.example.test", signatory: true },
-        deal: { title: "Harbour Lights 2026", owner_id: emp("bola") },
+        deal: { title: "Harbour Lights 2026", owner_id: emp("bola"), estimated_value: "1200000.00" },
       }),
       201,
     );

@@ -97,7 +97,7 @@ function LeadList() {
           { key: "n", label: "Lead", render: (l) => <Who name={l.name} sub={l.category ?? undefined} /> },
           { key: "st", label: "Status", render: (l) => (l.on_hold ? <Pill tone="warn">On Hold</Pill> : <StatusPill status={leadPill(l.status)} />) },
           { key: "s", label: "Stage", render: (l) => l.stage_label ?? "None", desktop: true },
-          { key: "h", label: "Health", render: (l) => <StatusPill status={healthPill(l.health)} />, desktop: true },
+          { key: "h", label: "Health", render: (l) => <StatusPill status={healthPill(l.health, l.status === "lost" ? "lost" : null)} />, desktop: true },
           { key: "r", label: "Region", render: (l) => l.region ?? "None", desktop: true },
           { key: "o", label: "Owner", render: (l) => l.owner?.display_name ?? "No Owner", desktop: true },
           { key: "c", label: "Last Contact", render: (l) => (l.last_contact_at ? formatWhen(l.last_contact_at) : "Never"), desktop: true },

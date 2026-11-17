@@ -53,7 +53,7 @@ export function Pipeline({ id }: { id: string | null }) {
             ]}
           />
           <PhoneOnly className="mt-3">
-            <Chips label="Health" value={filter.health} onChange={(v) => setFilter({ ...filter, health: v })} options={[["", "All"], ["stalled", "Stalled"], ["follow_up_required", "Follow-Up"], ["on_track", "On Track"]]} />
+            <Chips label="Health" value={filter.health} onChange={(v) => setFilter({ ...filter, health: v })} options={[["", "All"], ["stalled", "Stalled"], ["overdue", "Overdue"], ["follow_up_required", "Follow-Up"], ["on_track", "On Track"]]} />
             <PagedTable<DealRow>
               title="Open Deals"
               list={deals}
@@ -64,7 +64,7 @@ export function Pipeline({ id }: { id: string | null }) {
               columns={[
                 { key: "r", label: "Record", render: (x) => <Who name={x.record.name} sub={x.title} /> },
                 { key: "s", label: "Stage", render: (x) => x.stage_label },
-                { key: "h", label: "Health", render: (x) => <StatusPill status={healthPill(x.health)} /> },
+                { key: "h", label: "Health", render: (x) => <StatusPill status={healthPill(x.health, x.status)} /> },
                 { key: "d", label: "Days at Stage", align: "n", render: (x) => x.days_at_stage },
               ]}
             />

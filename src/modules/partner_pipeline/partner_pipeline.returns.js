@@ -6,7 +6,9 @@
  * (Enter Returns) and the Partnership Returns import (partner_pipeline.returns.import.js) write here.
  */
 const { pool } = require("../../config/db");
+const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const { compare, money, toWire } = require("../../shared/money/money");
 const { EVENTS } = require("./partner_pipeline.events");
 const repo = require("./partner_pipeline.repo");
 const service = require("./partner_pipeline.service");
@@ -61,12 +63,30 @@ async function removeIn(client, actor, deal, day) {
   });
 }
 
+/**
+ * A month a person enters must add up: MyCity's commission within gross sales, and what was paid to
+ * the partner within what the commission leaves (QA F61). 422 on the field that breaks it. The
+ * Partnership Returns import keeps the tracker's figures as they were written, so it is not asked.
+ */
+function assertFits(body) {
+  if (!body.gross_sales) return;
+  const commission = body.mycity_commission || "0.00";
+  if (body.mycity_commission && compare(body.mycity_commission, body.gross_sales) > 0) {
+    throw new AppError("VALIDATION_FAILED", "More than gross sales", 422, { mycity_commission: ["More than gross sales"] });
+  }
+  const left = toWire(money(body.gross_sales).minus(money(commission)));
+  if (body.paid_to_partner && compare(body.paid_to_partner, left) > 0) {
+    throw new AppError("VALIDATION_FAILED", "More than sales left", 422, { paid_to_partner: ["More than sales left"] });
+  }
+}
+
 /** Enter Returns (PUT /deals/:id/returns/:month): a month at a time, replacing what it held. */
 async function save(actor, scope, id, month, body) {
+  assertFits(body);
   return service.tx(async (client) => {
     await service.assertSeen(client, id, scope);
     return saveIn(client, actor, await repo.lock(client, id), month, body);
   });
 }
 
-module.exports = { page, save, saveIn, removeIn };
+module.exports = { page, save, saveIn, removeIn, assertFits };

@@ -98,6 +98,10 @@ route(router, "post", "/proposals/:id/draft",
   { ...params, body: c.common.EmptyBody, response: pr.ProposalDetail, summary: "Write Draft" },
   edit, controller.draft);
 
+route(router, "post", "/proposals/:id/own-words",
+  { ...params, body: c.common.EmptyBody, response: pr.ProposalDetail, summary: "Write It Myself: the kit filled from the record, nothing asked of Claude" },
+  edit, controller.ownWords);
+
 route(router, "patch", "/proposals/:id/content",
   { ...params, body: pr.ProposalContentEdit, response: pr.ProposalDetail, summary: "Edit a page of the proposal" },
   edit, controller.edit);

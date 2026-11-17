@@ -140,6 +140,7 @@ describeDb("partnerships: agreements, approval, signing and verification", () =>
         name,
         partner_category_id: category,
         region: { scope: "national" },
+        source: "Referral",
         owner_id: emp("staff"),
         contact: { first_name: "Ngozi", last_name: "Adebayo", job_title: "Founder", email: `${name.toLowerCase().replace(/\W+/g, ".")}@example.test`, signatory: true },
         deal: {

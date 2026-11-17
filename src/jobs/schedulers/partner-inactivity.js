@@ -9,6 +9,6 @@ const { defineSchedule } = require("../registry");
 module.exports = defineSchedule({
   name: "partner-inactivity",
   pattern: "30 6 * * *",
-  summary: "Quiet partners and leads followed up: deals Follow-Up Required, a task for the owner",
-  run: () => require("../../modules/partner_pipeline/partner_pipeline.inactivity").sweep(),
+  summary: "Deals past their expected close marked Overdue; quiet partners and leads followed up: deals Follow-Up Required, a task for the owner",
+  run: () => require("../../modules/partner_pipeline/partner_pipeline.inactivity").morning(),
 });

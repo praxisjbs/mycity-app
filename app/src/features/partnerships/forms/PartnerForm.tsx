@@ -6,7 +6,7 @@ import { invalidate, useMutation } from "@/api/hooks";
 import { CheckboxField, Field, toast, UploadField, useContractForm, Wizard, type PlaceValue } from "@mycity/ui";
 import { failed, useCategoryDefaults, useFieldDefs, useHoldsMoney, useStages } from "../lib";
 import { DuplicateNotice } from "./LeadForm";
-import { ContactPart, contactStart, customForCreate, DealPart, dealBody, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
+import { checkedOnWire, ContactPart, contactStart, customForCreate, DealPart, dealBody, dealOnWire, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
 
 /**
  * New Partner (docs/guides/partnerships.md §6.6, §10.1): an organisation whose relationship is already
@@ -28,7 +28,7 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
       name: "",
       legal_name: "",
       partner_category_id: "",
-      region: { scope: "national" } as { scope: string; cities?: PlaceValue[] },
+      region: { scope: "" } as { scope: string; cities?: PlaceValue[] },
       industry: "",
       owner_id: me?.employee_id ?? "",
       website: "",
@@ -43,7 +43,7 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
   const dealDefs = useFieldDefs("deal", category);
   const defaults = useCategoryDefaults(category);
   const contact = useContractForm(contactStart(), partners.ContactInput);
-  const deal = useContractForm(dealStart(signed[0]?.code ?? "", me?.employee_id ?? ""), pipeline.DealFields);
+  const deal = useContractForm(dealStart(signed[0]?.code ?? "", me?.employee_id ?? ""), checkedOnWire(pipeline.DealFields, dealOnWire));
   useEffect(() => {
     if (!deal.values.stage && signed[0]) deal.set("stage", signed[0].code);
   }, [signed, deal]);
@@ -51,6 +51,11 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
   const submit = async () => {
     if (!evidence.copy && !evidence.before) {
       setProblem("Attach the signed copy");
+      return;
+    }
+    // A deal signed as it is made says what it is worth, or that it is worth no money (QA F53).
+    if (!deal.values.estimated_value && deal.values.non_monetary !== true) {
+      setProblem("Add the deal's value, or tick No Money Value.");
       return;
     }
     const v = org.values;
@@ -127,6 +132,9 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
                 }}
                 label="Signed Before the Hub"
               />
+              {!deal.values.estimated_value && (
+                <CheckboxField value={deal.values.non_monetary === true} onChange={(on) => deal.set("non_monetary", on)} label="No Money Value" />
+              )}
             </>
           ),
         },

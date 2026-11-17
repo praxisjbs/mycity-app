@@ -3,16 +3,17 @@ import pipeline from "@mycity/contract/schemas/partner_pipeline.js";
 import { useState } from "react";
 import { invalidate, useMutation } from "@/api/hooks";
 import { upload } from "@/api/upload";
-import { Button, Field, FormError, FormFooter, TextAreaField, toast, UploadField, useContractForm } from "@mycity/ui";
+import { Button, CheckboxField, Field, FormError, FormFooter, TextAreaField, toast, UploadField, useContractForm } from "@mycity/ui";
 import { failed } from "../lib";
 
 /**
  * After a press on the stage switcher, what the move needs (docs/guides/partnerships.md §6.5): Why,
- * for a move back, On Hold or Closed Lost; the signed copy, for a signed stage of a deal not yet
- * signed. Checked by StageMove; the API decides.
+ * for a move back, past a stage, On Hold or Closed Lost; the signed copy, for a signed stage of a deal
+ * not yet signed; and for one with no projected value, No Money Value ticked (QA F53), else Edit Deal
+ * first. Checked by StageMove; the API decides.
  */
-export function MoveStage({ deal, to, reason, copy, close }: { deal: Pick<DealDetail, "deal_id">; to: ListValue; reason: boolean; copy: boolean; close: () => void }) {
-  const f = useContractForm({ stage: to.code, reason: "", signed_copy_document_id: "" }, pipeline.StageMove);
+export function MoveStage({ deal, to, reason, copy, value = false, close }: { deal: Pick<DealDetail, "deal_id">; to: ListValue; reason: boolean; copy: boolean; value?: boolean; close: () => void }) {
+  const f = useContractForm({ stage: to.code, reason: "", signed_copy_document_id: "", non_monetary: false }, pipeline.StageMove);
   const [problem, setProblem] = useState<string | null>(null);
   const move = useMutation("POST /api/v1/partnerships/deals/:id/stage");
   const go = async () => {
@@ -25,8 +26,12 @@ export function MoveStage({ deal, to, reason, copy, close }: { deal: Pick<DealDe
       setProblem("Attach the signed copy");
       return;
     }
+    if (value && !f.values.non_monetary) {
+      setProblem("Add the deal's value on Edit Deal, or tick No Money Value.");
+      return;
+    }
     try {
-      await move.run({ params: { id: deal.deal_id }, body: { stage: to.code, ...(f.values.reason.trim() && { reason: f.values.reason.trim() }), ...(f.values.signed_copy_document_id && { signed_copy_document_id: f.values.signed_copy_document_id }) } });
+      await move.run({ params: { id: deal.deal_id }, body: { stage: to.code, ...(f.values.reason.trim() && { reason: f.values.reason.trim() }), ...(f.values.signed_copy_document_id && { signed_copy_document_id: f.values.signed_copy_document_id }), ...(value && f.values.non_monetary && { non_monetary: true }) } });
       invalidate("/api/v1/partnerships");
       close();
       toast(`Moved to ${to.label}`);
@@ -40,6 +45,11 @@ export function MoveStage({ deal, to, reason, copy, close }: { deal: Pick<DealDe
       {copy && (
         <Field label="Signed Copy" {...f.status("signed_copy_document_id")}>
           <UploadField purpose="attachment" upload={upload} multiple={false} accept=".pdf,.jpg,.jpeg,.png" kinds="PDF or a photo" compact onUploaded={(docs) => (setProblem(null), f.set("signed_copy_document_id", docs[0]?.document_id ?? ""))} />
+        </Field>
+      )}
+      {value && (
+        <Field label="Projected Value" help="This deal has no value. Tick it if it is signed with no money changing hands, such as a media swap.">
+          <CheckboxField label="No Money Value" value={f.values.non_monetary} onChange={(on) => (setProblem(null), f.set("non_monetary", on))} />
         </Field>
       )}
       {problem && <FormError>{problem}</FormError>}

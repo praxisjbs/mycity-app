@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { Banner, Button, toast, useContractForm, Wizard, type PlaceValue } from "@mycity/ui";
 import { failed, useCategoryDefaults, useFieldDefs, useHoldsMoney, useStages } from "../lib";
-import { ContactPart, contactStart, customForCreate, DealPart, dealBody, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
+import { checkedOnWire, ContactPart, contactStart, customForCreate, DealPart, dealBody, dealOnWire, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
 
 /** A likely duplicate of what is being entered (§6.2): advisory, never blocking. */
 export function DuplicateNotice({ name, email, onNewDeal }: { name: string; email?: string; onNewDeal?: (partnerId: string) => void }) {
@@ -41,7 +41,7 @@ export function LeadForm({ close, onCreated, onNewDeal }: { close: () => void; o
     {
       name: "",
       partner_category_id: "",
-      region: { scope: "national" } as { scope: string; cities?: PlaceValue[] },
+      region: { scope: "" } as { scope: string; cities?: PlaceValue[] },
       industry: "",
       owner_id: me?.employee_id ?? "",
       website: "",
@@ -59,7 +59,7 @@ export function LeadForm({ close, onCreated, onNewDeal }: { close: () => void; o
   const dealDefs = useFieldDefs("deal", category);
   const defaults = useCategoryDefaults(category);
   const contact = useContractForm(contactStart(), partners.ContactInput);
-  const deal = useContractForm(dealStart(open[0]?.code ?? "", me?.employee_id ?? ""), pipeline.DealFields);
+  const deal = useContractForm(dealStart(open[0]?.code ?? "", me?.employee_id ?? ""), checkedOnWire(pipeline.DealFields, dealOnWire));
   useEffect(() => {
     if (!deal.values.stage && open[0]) deal.set("stage", open[0].code);
   }, [open, deal]);

@@ -51,8 +51,9 @@ export function Partner360({ id }: { id: string }) {
   const primary = x.contacts.find((c) => c.primary_contact);
   const tabs = TABS.filter((t) => t !== "returns" || money);
   const open = (title: string, body: (close: () => void) => JSX.Element, wide = false) => modal.open({ title, wide, body });
+  const logInteraction = () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={unfinished[0]?.deal_id} close={close} />);
   const menu = [
-    { label: "Log Interaction", icon: "plus" as const, onSelect: () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={unfinished[0]?.deal_id} close={close} />) },
+    { label: "Log Interaction", icon: "plus" as const, onSelect: logInteraction },
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
     { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${partner.partner_id}&record=partner`) },
@@ -121,7 +122,7 @@ export function Partner360({ id }: { id: string }) {
             columns={[
               { key: "t", label: "Deal", render: (d) => d.title },
               { key: "s", label: "Stage", render: (d) => d.stage_label },
-              { key: "h", label: "Health", render: (d) => <StatusPill status={healthPill(d.health)} />, desktop: true },
+              { key: "h", label: "Health", render: (d) => <StatusPill status={healthPill(d.health, d.status)} />, desktop: true },
               { key: "st", label: "Status", render: (d) => <StatusPill status={dealPill(d.status)} /> },
               { key: "v", label: "Projected Value", align: "n", render: (d) => (d.estimated_value ? formatMoney(d.estimated_value) : "None"), desktop: true },
             ]}
@@ -130,7 +131,7 @@ export function Partner360({ id }: { id: string }) {
         {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} signedOutside={partner.signed_outside} />}
         {tab === "returns" && <ReturnsTab deals={x.deals} readOnly={readOnly} />}
         {tab === "work" && <WorkTab record={record} dealId={unfinished.length === 1 ? unfinished[0]!.deal_id : null} readOnly={readOnly} />}
-        {tab === "activity" && <ActivityTab record={record} history={x.history} />}
+        {tab === "activity" && <ActivityTab record={record} history={x.history} onLog={readOnly ? undefined : logInteraction} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}
         {tab === "details" && (
           <DetailsTab

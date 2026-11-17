@@ -91,6 +91,7 @@ describeDb("partnerships: analytics (§6.18)", () => {
         name,
         partner_category_id: category,
         region: { scope: "national" },
+        source: "Referral",
         owner_id: emp(who),
         identified_on: identified,
         contact: { first_name: "Ife", last_name: "Okon", email: `${name.toLowerCase().replace(/\W+/g, ".")}@example.test` },

@@ -6,12 +6,13 @@ import { failed } from "../lib";
 
 /** Set Health (docs/guides/partnerships.md §6.5): On Track, Follow-Up Required or Stalled; Stalled needs its blockers. */
 export function SetHealth({ deal, close }: { deal: Pick<DealDetail, "deal_id" | "health" | "blockers">; close: () => void }) {
-  const f = useContractForm({ health: deal.health, blockers: deal.blockers ?? "" }, pipeline.HealthSet);
+  // Overdue is the morning job's to set and clear: a person picks a health of their own.
+  const f = useContractForm({ health: deal.health === "overdue" ? "" : deal.health, blockers: deal.blockers ?? "" }, pipeline.HealthSet);
   const set = useMutation("POST /api/v1/partnerships/deals/:id/health");
   const save = async () => {
     if (!f.check()) return;
     try {
-      await set.run({ params: { id: deal.deal_id }, body: { health: f.values.health, ...(f.values.blockers.trim() && { blockers: f.values.blockers.trim() }) } });
+      await set.run({ params: { id: deal.deal_id }, body: { health: f.values.health as Exclude<DealDetail["health"], "overdue">, ...(f.values.blockers.trim() && { blockers: f.values.blockers.trim() }) } });
       invalidate("/api/v1/partnerships");
       close();
       toast("Health set");

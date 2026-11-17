@@ -5,6 +5,10 @@
  * tracker's shapes, owned by MyCity's real staff (seeds/staging/lib/staff.js). Production starts empty
  * (A5): MyCity imports its own tracker there.
  *
+ * Owners are the people of the departments that work Partnerships, Partnership & Growth first, then
+ * Branding & Marketing (seeds/staff/nomenclature.json's PG and BM), each with a login; never Operations
+ * & People, whose work this is not (QA F06; JBS Praxis, 17/11/2026). With neither on the register, the CEO.
+ *
  *   partners     signed before the hub, each with a live deal, its options, months of returns and the
  *                latest contact; one quiet for 45 days, so Home raises Partner Inactivity and the
  *                follow-up job its task
@@ -26,6 +30,18 @@ const { realStaff } = require("./lib/staff");
 const { removeHomeStagingRows } = require("./lib/home-staging-rows");
 
 const src = (p) => require(path.join(__dirname, "..", "..", "src", p));
+
+/** The departments that own partnership records, by their codes in nomenclature.json, in this order. */
+const OWNING_CODES = ["PG", "BM"];
+/** Each owner slot of the records below, as a place in the owners' list. */
+const SLOT = { head: 0, "head_team:1": 1, "head_team:2": 2, "head_team:3": 3, manager: 4 };
+
+/** The people who may own the seed's records: the owning departments' staff with a login, in order. */
+function ownersOf(staff) {
+  const departments = require(path.join(__dirname, "..", "staff", "nomenclature.json")).departments;
+  const names = OWNING_CODES.map((code) => (departments.find((d) => d.code === code) || {}).name).filter(Boolean);
+  return names.flatMap((name) => staff.everyone.filter((p) => p.user_id && p.department === name));
+}
 
 /** Home's tables in M7, children first (home-staging-rows.js DELETE_ORDER). */
 const PARTNERSHIP_TABLES = [
@@ -284,8 +300,11 @@ async function seed({ pool, actor: seedActor, log = () => {} }) {
     );
   const all = { scope: "all", scope_ids: null, employee_id: ops.employee_id };
   const actor = { ...ops, source: (seedActor && seedActor.source) || "seed" };
-  const ownerOf = (slot) =>
-    (personOf(staff, slot) || staff.operations || staff.ceo).employee_id;
+  const owners = ownersOf(staff);
+  const ownerOf = (slot) => {
+    if (owners.length) return owners[(SLOT[slot] ?? 0) % owners.length].employee_id;
+    return (staff.ceo || personOf(staff, slot) || ops).employee_id;
+  };
 
   const { rows: cats } = await pool.query(
     "SELECT partner_category_id, name FROM partner_category WHERE active",
@@ -416,6 +435,7 @@ async function seed({ pool, actor: seedActor, log = () => {} }) {
         partner_category_id: category(l.category),
         region: { scope: "national" },
         industry: l.industry,
+        source: l.source || "Referral",
         owner_id: owner,
         identified_on: lagos.addDays(today, -(20 + n * 6)),
         contact: contactOf(
@@ -436,8 +456,9 @@ async function seed({ pool, actor: seedActor, log = () => {} }) {
       const leadId = r.lead.lead_id;
       const dealId = r.deal.deal_id;
       const code = await stage(l.stage);
+      // Straight to its stage, past the ones before it, says why, as a person's move would (§6.5).
       if (code && code !== r.deal.stage)
-        await stages.move(actor, all, dealId, { stage: code });
+        await stages.move(actor, all, dealId, { stage: code, reason: `Reached ${l.stage} before the hub` });
       if (l.meeting)
         await interactions.create({ ...actor, employee_id: owner }, all, {
           lead_id: leadId,
@@ -461,6 +482,34 @@ async function seed({ pool, actor: seedActor, log = () => {} }) {
       log(
         `partnerships: ${l.name} stopped (${err.code || err.name}: ${err.message})`,
       );
+    }
+  }
+
+  // 5. Records this seed made before their owners were the owning departments' people (QA F06: the
+  // book sat with Operations & People): each, and its open and live deals, moved to its slot's owner,
+  // through the services. A record already with its owner is left alone, so a second run changes nothing.
+  const pipelineService = src("modules/partner_pipeline/partner_pipeline.service");
+  for (const r of [...PARTNERS, ...LEADS]) {
+    const want = ownerOf(r.owner);
+    try {
+      const { rows: found } = await pool.query(
+        `SELECT 'partner' AS kind, partner_id AS id, owner_id, status FROM partner WHERE name = $1
+         UNION ALL SELECT 'lead', lead_id, owner_id, status FROM lead WHERE name = $1 AND status <> 'converted'`,
+        [r.name],
+      );
+      for (const row of found) {
+        if (row.owner_id !== want && row.status !== "closed") {
+          await (row.kind === "partner" ? partners : leads).update(actor, all, row.id, { owner_id: want });
+        }
+        const { rows: deals } = await pool.query(
+          `SELECT partnership_opportunity_id AS id FROM partnership_opportunity
+            WHERE ${row.kind}_id = $1 AND status IN ('open', 'live') AND owner_id IS DISTINCT FROM $2`,
+          [row.id, want],
+        );
+        for (const d of deals) await pipelineService.update(actor, all, d.id, { owner_id: want });
+      }
+    } catch (err) {
+      log(`partnerships: ${r.name}'s owner not moved (${err.code || err.name}: ${err.message})`);
     }
   }
 

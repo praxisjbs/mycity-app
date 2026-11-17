@@ -32,8 +32,11 @@ const LeadFields = z
     industry: optionalText(80),
     website: optionalText(200),
     objective: optionalText(2000),
-    /** A lead source by its name or its code; a name the list does not hold joins it (§6.3). */
-    source: blank(listWords),
+    /**
+     * A lead source by its name or its code; a name the list does not hold joins it (§6.3). Required
+     * (QA F22: every lead read No Source, so Leads by Source said nothing).
+     */
+    source: listWords,
     owner_id: uuid,
     identified_on: blank(isoDate),
     /** Impacts by name or code; a name the list does not hold joins it. */
@@ -75,7 +78,8 @@ const LeadUpdate = z
 const LeadLose = z.object({ reason: z.string().trim().min(10, "At least 10 characters").max(1000) }).strict();
 
 /** Convert to Partner, for a deal signed outside the hub: it asks for the signed copy. Idempotent. */
-const LeadConvert = z.object({ signed_copy_document_id: blank(uuid) }).strict();
+/** Convert to Partner: the signed copy, and for a deal with no projected value, signed with no money value. */
+const LeadConvert = z.object({ signed_copy_document_id: blank(uuid), non_monetary: z.boolean().optional() }).strict();
 
 const LeadConverted = z.object({ partner_id: uuid }).strict();
 
@@ -97,7 +101,7 @@ const LeadAdd = z
     /** With `cities`: the city, picked as every address is. */
     city: PlaceToken.optional(),
     industry: optionalText(80),
-    source: listCode.optional(),
+    source: listCode,
     owner_id: uuid,
     contact_first_name: text(80),
     contact_last_name: text(80),

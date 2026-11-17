@@ -4,6 +4,7 @@ import { useState } from "react";
 import { invalidate, useMutation } from "@/api/hooks";
 import { Button, Field, formatMonth, FormFooter, MoneyField, NumberField, SelectField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { failed } from "../lib";
+import { checkedOnWire, countOnWire, moneyOnWire } from "./parts";
 
 /** The last eighteen months, newest first, as `YYYY-MM`: the months a return is entered for. */
 export function recentMonths(today = todayIso()): string[] {
@@ -15,7 +16,17 @@ export function recentMonths(today = todayIso()): string[] {
 }
 
 const str = (v: number | string | null | undefined) => (v === null || v === undefined ? "" : String(v));
-const int = (v: string) => (v.trim() === "" ? undefined : Number(v));
+
+type Typed = { units_sold: string; gross_sales: string; mycity_commission: string; paid_to_partner: string; downloads: string; note: string };
+const MONEY = ["gross_sales", "mycity_commission", "paid_to_partner"] as const;
+
+/** The month as ReturnSave takes it: counts as numbers, amounts to two places, empty figures left out. */
+export function returnsOnWire(v: Typed): Record<string, unknown> {
+  const out: Record<string, unknown> = { units_sold: countOnWire(v.units_sold), downloads: countOnWire(v.downloads) };
+  for (const k of MONEY) if (v[k].trim()) out[k] = moneyOnWire(v[k]);
+  if (v.note.trim()) out.note = v.note.trim();
+  return out;
+}
 
 /**
  * Enter Returns (docs/guides/partnerships.md §6.14), with `partnerships.money`: a deal's month at a
@@ -34,22 +45,14 @@ export function ReturnsForm({ dealId, held, close }: { dealId: string; held?: De
       downloads: str(held?.downloads),
       note: held?.note ?? "",
     },
-    pipeline.ReturnSave,
+    checkedOnWire(pipeline.ReturnSave, returnsOnWire),
   );
   const save = useMutation("PUT /api/v1/partnerships/deals/:id/returns/:month");
   const submit = async () => {
     if (!f.check()) return;
-    const v = f.values;
-    const body = {
-      units_sold: int(v.units_sold),
-      downloads: int(v.downloads),
-      ...(v.gross_sales ? { gross_sales: v.gross_sales } : {}),
-      ...(v.mycity_commission ? { mycity_commission: v.mycity_commission } : {}),
-      ...(v.paid_to_partner ? { paid_to_partner: v.paid_to_partner } : {}),
-      ...(v.note.trim() ? { note: v.note.trim() } : {}),
-    };
+    const body = returnsOnWire(f.values);
     try {
-      await save.run({ params: { id: dealId, month }, body });
+      await save.run({ params: { id: dealId, month }, body: body as never });
       invalidate("/api/v1/partnerships");
       close();
       toast("Returns saved");

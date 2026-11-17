@@ -96,6 +96,7 @@ describeDb("Partnerships summaries against the real migrations", () => {
           name,
           partner_category_id: category,
           region: { scope: "national" },
+          source: "Referral",
           owner_id: emp(who),
           contact: { first_name: "Ife", last_name: "Okon", email: `${name.toLowerCase().replace(/\W+/g, ".")}@example.test` },
           deal: { title: `${name} Deal`, owner_id: emp(who), estimated_value: "1000000.00" },
@@ -192,7 +193,7 @@ describeDb("Partnerships summaries against the real migrations", () => {
     expect(o.chart.series.map((s) => s.label)).toEqual(["New", "Contacted", "Lost"]);
     const byCategory = await summaryOf("ceo", "leads.summary", { by: "category" });
     expect(Object.fromEntries(groupOf(byCategory, "category").rows.map((r) => [r.label, r.value]))).toEqual({ Event: 3, Vendor: 2 });
-    expect(groupOf(await summaryOf("ceo", "leads.summary", { by: "source" }), "source").rows).toEqual([expect.objectContaining({ label: "No Source", value: 5 })]);
+    expect(groupOf(await summaryOf("ceo", "leads.summary", { by: "source" }), "source").rows).toEqual([expect.objectContaining({ label: "Referral", value: 5 })]);
     expect(groupOf(await summaryOf("ceo", "leads.summary", { by: "region" }), "region").rows).toEqual([expect.objectContaining({ label: "National", value: 5 })]);
     expect(groupOf(await summaryOf("ceo", "leads.summary", { by: "owner" }), "owner").rows.map((r) => [r.label, r.value])).toEqual([["Musa Danjuma", 3], ["Kemi Alade", 1], ["Zainab Lawal", 1]]);
     expect(all.series.map((s) => s.key)).toEqual(["identified", "converted"]);
