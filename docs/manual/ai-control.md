@@ -331,10 +331,10 @@ open: /ai-control?tab=spend
 as: admin
 do:
   - click: button "Switch Off AI"
-  - wait: role alertdialog "Switch Off AI"
+  - wait: text "Every AI button is hidden until AI is switched on."
 crop: modal
 marks:
-  1: role alertdialog "Switch Off AI" | Confirm to switch every AI feature off
+  1: text "Every AI button is hidden until AI is switched on." | Confirm to switch every AI feature off
 ```
 
 ```shot ai-control-action-sheet
