@@ -307,6 +307,7 @@ describeDb("Praxis AI summaries, the read timeout and Download Excel against the
       "calendar.summary",
       "commitments.summary",
       "disbursements.summary",
+      "documents.summary",
       "expenses.summary",
       "goals.summary",
       "interactions.summary",
