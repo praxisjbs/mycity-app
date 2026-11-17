@@ -119,3 +119,32 @@ describe("the routes", () => {
     expect(keys).not.toEqual(expect.arrayContaining(["limit"]));
   });
 });
+
+describe("relief and handover (docs/guides/ess.md §6)", () => {
+  const annual = { handover_every_request: true, handover_over_days: 7 };
+  const sick = { handover_every_request: false, handover_over_days: 7 };
+  const never = { handover_every_request: false, handover_over_days: null };
+
+  test("every request, or more than the type's working days; null never asks by length", () => {
+    expect(rules.needsCover(annual, 1)).toBe(true);
+    expect(rules.needsCover(sick, 7)).toBe(false);
+    expect(rules.needsCover(sick, 8)).toBe(true);
+    expect(rules.needsCover(never, 200)).toBe(false);
+    expect(rules.needsCover(null, 30)).toBe(false);
+  });
+
+  test("a request that needs cover lacks neither field; both are marked at once", () => {
+    expect(() => rules.assertCover(annual, 1, {})).toThrow(
+      expect.objectContaining({
+        code: "LEAVE_COVER_NEEDED",
+        status: 422,
+        fields: { relief_employee_id: ["Required"], handover_document_id: ["Required"] },
+      }),
+    );
+    expect(() => rules.assertCover(annual, 1, { relief_employee_id: "x" })).toThrow(
+      expect.objectContaining({ fields: { handover_document_id: ["Required"] } }),
+    );
+    expect(() => rules.assertCover(annual, 1, { relief_employee_id: "x", handover_document_id: "y" })).not.toThrow();
+    expect(() => rules.assertCover(sick, 3, {})).not.toThrow();
+  });
+});

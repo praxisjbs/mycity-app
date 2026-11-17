@@ -20,6 +20,7 @@ jest.mock("../../src/jobs/queues", () => ({
 }));
 
 const { rebuild } = require("./helpers/schema");
+const { annualWithoutCover } = require("./helpers/leave");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
@@ -57,6 +58,8 @@ describeDb("Praxis AI's My Approvals card against the real migrations", () => {
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
+    // Short Annual requests are only the way to what this suite tests (helpers/leave.js).
+    await annualWithoutCover(pool);
     workingWeek.invalidateCalendar();
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));

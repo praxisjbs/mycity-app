@@ -184,7 +184,10 @@ capabilities `home.team`, `home.reports` and `alerts.manage` with their role gra
 leave module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list
 indexes) · `1170` `employee.photo_document_id`, the photo an employee uses (a vault document;
 cleared if it is deleted) · `1128` one waiting send per draft (`mail_send_queue_one_per_draft_uq`; doubles and the sends of discarded drafts cancelled) · `1180` `employee.birth_day` and `birth_month`, a birthday known only as a day and month (both or neither, a real day of that month), read by the celebrations when `date_of_birth` is empty · `1190` `document.waveform`, a voice note's loudness in at most 64 bars of 0 to 100, measured by the worker · `1195` `community_message.pinned_until`, `pinned_at`, `pinned_by`, a message pinned for everyone until a time (at most 3 a conversation, kept by the service) · `1480` `community_wish`, a wish under a birthday or anniversary card (1 to 280 characters, its author, `deleted_at`; listed newest first per card), kept out of the channel's stream (`docs/guides/community.md` §3 step 3) · `1290` the leave status code list (Cancelled added, Draft switched off) and the four
-leave types · `1300` attendance as the clock writes it: the policy's `geofence_mode`,
+leave types · `1210` a leave request's relief officer (`relief_employee_id`, an employee) and handover
+note (`handover_document_id`, a vault document), both `ON DELETE SET NULL` and indexed, and each leave
+type's rule for them (`handover_every_request`; `handover_over_days`, 7 by default, 0 to 366 or null;
+`docs/guides/ess.md` §6) · `1295` Annual needs both on every request (TB, 17/11/2026; §4) · `1300` attendance as the clock writes it: the policy's `geofence_mode`,
 `device_mode` and `max_accuracy_m`; `attendance_device` (a person's clock-in devices on
 `known_device`, observed, registered or removed); the event's `work_date`, `device_at`, device,
 policy, `idempotency_key` and correction fields, one active clock-in and one active clock-out a day
@@ -769,6 +772,7 @@ No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `resto
 | Tables for M11 | Handover is scripts and documents, not records | MILESTONES §16 |
 | Demonstration and business data in production | Reference seeds hold only what the code cannot run without; categories, stages, policies and thresholds are entered by MyCity | A5, A26 |
 | (Exception) The four default leave types in production | Seeded in `1290` (Annual 20, Compassionate 5, Sick 12, Unpaid) with DO NOTHING; People change, retire or add types on People · Leave | The team lead, 17/10/2026 |
+| (Exception) When a leave request needs a relief officer and a handover note | `1210` gives every type, and a new one, more than 7 working days (a company rule with no legal source); `1295` sets Annual to every request, only while it still holds `1210`'s default. People change either per type on People · Leave | TB, 17/11/2026 |
 
 Anything else in MILESTONES that has no table yet is **owed**, not excluded, and is listed under
 its milestone in §3.

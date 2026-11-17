@@ -80,24 +80,30 @@ module.exports = defineManifest({
     {
       key: "my_leave.request",
       label: "Request Leave",
-      description: "Ask for leave for myself: the leave type, the first and last day, and a note for my line manager",
+      description: "Ask for leave for myself: the type, first and last day, my relief officer and a note. Leave needing a handover note is sent from Request Leave's form, which takes the file",
       input: c.leave.LeaveRequestCreate,
       permission: ["ess", "create"],
       risk: "standard",
-      // The request is the person's own: the card names no other record.
-      check: async (_client, _values, actor) => {
+      // The request is the person's own: the card names no other record. A request that needs a
+      // handover note is refused here, before anything is written, and the card opens the form (ess.md §9).
+      check: async (_client, values, actor) => {
         if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee asks for leave", 403);
+        await leave.assertCardCover(values);
       },
       // The same function Request Leave's Send calls (ess.leave.request); the type, the days and the year's allowance are its checks.
       run: (values, actor) => leave.request(actor, actor.employee_id, values),
       readback: (r) => [{ type: "leave_request", id: r.leave_request_id, label: `${r.leave_type_name}, ${r.days} ${r.days === 1 ? "day" : "days"}`, status: "sent", link: (routeMap.linkFor("leave_request", r.leave_request_id, { self: true }) || {}).path || null }],
-      labels: { leave_type_id: "Leave Type", starts_on: "First Day", ends_on: "Last Day", reason: "Note" },
-      // Request Leave's form, field for field; the type named, picked with the form's own list, and asked for first (decision 32).
-      fields: ["leave_type_id", "starts_on", "ends_on", "reason"],
-      picks: { leave_type_id: "leave_type" },
-      names: async (values, actor) => {
+      labels: { leave_type_id: "Leave Type", starts_on: "First Day", ends_on: "Last Day", relief_employee_id: "Relief Officer", reason: "Note" },
+      // Request Leave's form, field for field, all but the handover note (a file stays on the form); the type
+      // named, picked with the form's own list, and asked for first (decision 32); the relief officer with its own.
+      fields: ["leave_type_id", "starts_on", "ends_on", "relief_employee_id", "reason"],
+      picks: { leave_type_id: "leave_type", relief_employee_id: "relief_officer" },
+      names: async (values, actor, db) => {
         const type = (await typesFor(actor)).find((t) => t.leave_type_id === values.leave_type_id);
-        return type ? [{ type: "leave_type", id: type.leave_type_id, label: type.name }] : [];
+        return [
+          ...(type ? [{ type: "leave_type", id: type.leave_type_id, label: type.name }] : []),
+          ...(await leave.reliefNames(db, values.relief_employee_id)),
+        ];
       },
       asks: [
         { field: "leave_type_id", question: "Which leave type?", options: async ({ actor }) => (await typesFor(actor)).filter((t) => t.remaining === null || t.remaining === undefined || t.remaining > 0).map(choiceOf) },
@@ -105,7 +111,10 @@ module.exports = defineManifest({
         { field: "starts_on", question: "What is your first day off?", choices: ["Tomorrow", "Next Monday"] },
         { field: "ends_on", question: "What is your last day off?", choices: ["The Same Day"] },
       ],
-      resolve: { leave_type_id: (value, actor) => typeIdOf(actor, value) },
+      resolve: {
+        leave_type_id: (value, actor) => typeIdOf(actor, value),
+        relief_employee_id: (value, actor, db) => leave.reliefIdOf(db, actor, value),
+      },
     },
     {
       key: "my_queries.respond",

@@ -22,7 +22,7 @@ export default function Ess({ tab, id }: ModuleScreenProps) {
     case "policy-updates": return <PolicyUpdatesPage />;
     case "my-performance": return <MyPerformancePage />;
     case "my-payslips": return <MyPayslipsPage id={id} />;
-    case "my-leave": return <MyLeavePage />;
+    case "my-leave": return <MyLeavePage id={id} />;
     case "my-requests": return <MyRequestsPage />;
     case "my-queries": return <MyQueriesPage />;
     case "my-documents": return <MyDocumentsPage />;

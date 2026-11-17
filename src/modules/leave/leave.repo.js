@@ -47,6 +47,13 @@ const APPROVER_NAME = `CASE WHEN wi.state = 'pending' AND jsonb_array_length(wi.
             OR (a ->> 'type' = 'ceo' AND au.is_ceo)))
 ) END`;
 
+/** The handover note as an upload answers it (DocumentRef), or null. */
+const HANDOVER = `CASE WHEN hd.document_id IS NULL THEN NULL ELSE json_build_object(
+  'document_id', hd.document_id,
+  'file_name', COALESCE(hd.original_name, hd.title, 'Handover note'),
+  'size_bytes', COALESCE(hd.bytes, 0)::bigint,
+  'mime_type', hd.mime) END`;
+
 /** Every request with what a screen needs, and the columns the filters and scope read. */
 const ROWS = `
   SELECT lr.leave_request_id,
@@ -57,6 +64,8 @@ const ROWS = `
          ${STATUS} AS status,
          lr.workflow_instance_id, ${WAITING_ON} AS waiting_on, ${APPROVER_NAME} AS approver_name,
          (lr.recorded_by IS NOT NULL) AS recorded,
+         ${personJson("re", "rd")} AS relief_employee, lr.relief_employee_id,
+         ${HANDOVER} AS handover,
          lr.submitted_at,
          COALESCE(lr.decided_at, CASE WHEN wi.state <> 'pending' THEN wi.completed_at END) AS decided_at,
          lr.created_at,
@@ -65,12 +74,15 @@ const ROWS = `
     JOIN employee e ON e.employee_id = lr.employee_id
     LEFT JOIN department d ON d.department_id = e.department_id
     JOIN leave_type t ON t.leave_type_id = lr.leave_type_id
-    LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = lr.workflow_instance_id`;
+    LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = lr.workflow_instance_id
+    LEFT JOIN employee re ON re.employee_id = lr.relief_employee_id
+    LEFT JOIN department rd ON rd.department_id = re.department_id
+    LEFT JOIN document hd ON hd.document_id = lr.handover_document_id`;
 
 /** The keys of LeaveRequest, and nothing the filters only needed. */
 const OUT = `v.leave_request_id, v.employee, v.leave_type_id, v.leave_type_name, v.starts_on,
   v.ends_on, v.days, v.reason, v.status, v.workflow_instance_id, v.waiting_on, v.approver_name, v.recorded,
-  v.submitted_at, v.decided_at, v.created_at`;
+  v.relief_employee, v.handover, v.submitted_at, v.decided_at, v.created_at`;
 
 const SORTS = {
   starts_on: "v.starts_on",
@@ -120,10 +132,15 @@ function list(db, query, scope) {
   );
 }
 
-/** One request, or null. `employee_id` comes along for the ownership and scope checks. */
+/**
+ * One request, or null. `employee_id`, `relief_employee_id` and `handover_document_id` come along
+ * for the ownership, scope and cover checks.
+ */
 async function get(db, id) {
   const { rows } = await db.query(
-    `SELECT ${OUT}, v.employee_id, v.department_id FROM (${ROWS}) v WHERE v.leave_request_id = $1`,
+    `SELECT ${OUT}, v.employee_id, v.department_id, v.relief_employee_id,
+            (v.handover ->> 'document_id')::uuid AS handover_document_id
+       FROM (${ROWS}) v WHERE v.leave_request_id = $1`,
     [id],
   );
   return rows[0] || null;
@@ -132,8 +149,45 @@ async function get(db, id) {
 /** The public shape of a row get() returned. */
 function publicRow(row) {
   if (!row) return row;
-  const { employee_id: _e, department_id: _d, ...out } = row;
+  const { employee_id: _e, department_id: _d, relief_employee_id: _r, handover_document_id: _h, ...out } = row;
   return out;
+}
+
+/** The request a handover note belongs to, for the vault's read rule; null when none holds it. */
+async function byHandover(db, documentId) {
+  const { rows } = await db.query(
+    `SELECT leave_request_id, employee_id, relief_employee_id, workflow_instance_id
+       FROM leave_request WHERE handover_document_id = $1
+      ORDER BY created_at DESC, leave_request_id LIMIT 1`,
+    [documentId],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Who may cover for `employeeId` (Request Leave's Relief Officer, docs/guides/ess.md §6): active
+ * employees other than them, by name; with both days, nobody on waiting or approved leave on any
+ * of them (the same overlap overlapping() holds a request to).
+ */
+function reliefOfficers(db, employeeId, query) {
+  const params = [employeeId, query.q || null, query.starts_on || null, query.ends_on || null];
+  return pageQuery(
+    db,
+    `SELECT ${personJson("e", "d")} AS person, btrim(e.first_name || ' ' || e.last_name) AS display_name, e.employee_id,
+            ${TOTAL_COL}
+       FROM employee e
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE e.status = 'active' AND e.employee_id <> $1
+        AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name || ' ' || COALESCE(e.preferred_name, ''))
+             LIKE '%' || search_fold($2) || '%')
+        AND ($3::date IS NULL OR $4::date IS NULL OR NOT EXISTS (
+              SELECT 1 FROM (${ROWS}) v
+               WHERE v.employee_id = e.employee_id AND v.starts_on <= $4::date AND v.ends_on >= $3::date
+                 AND ${LIVE}))
+      ORDER BY ${orderBy(query, { display_name: "btrim(e.first_name || ' ' || e.last_name)" }, "e.employee_id")}`,
+    params,
+    query,
+  ).then((page) => ({ ...page, data: page.data.map((r) => r.person) }));
 }
 
 /**
@@ -367,9 +421,10 @@ async function insertRequest(client, r) {
   const { rows } = await client.query(
     `INSERT INTO leave_request
        (employee_id, leave_type_id, starts_on, ends_on, amount, reason, status,
-        submitted_at, decided_at, recorded_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $8, $9)
-     RETURNING leave_request_id, employee_id, leave_type_id, starts_on, ends_on, amount, reason, status, recorded_by`,
+        submitted_at, decided_at, recorded_by, relief_employee_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $8, $9, $10)
+     RETURNING leave_request_id, employee_id, leave_type_id, starts_on, ends_on, amount, reason, status, recorded_by,
+               relief_employee_id, handover_document_id`,
     [
       r.employee_id,
       r.leave_type_id,
@@ -380,9 +435,25 @@ async function insertRequest(client, r) {
       r.status,
       r.status === "approved" ? new Date() : null,
       r.recorded_by || null,
+      r.relief_employee_id || null,
     ],
   );
   return rows[0];
+}
+
+/** The active logins of one employee (the relief officer a notice goes to); none when they have none. */
+async function loginsOf(db, employeeId) {
+  if (!employeeId) return [];
+  const { rows } = await db.query(
+    "SELECT user_id FROM app_user WHERE employee_id = $1 AND status = 'active' ORDER BY user_id",
+    [employeeId],
+  );
+  return rows.map((r) => r.user_id);
+}
+
+/** The handover note a request holds, once the vault has given it to the request (vault.claim). */
+async function setHandover(client, id, documentId) {
+  await client.query("UPDATE leave_request SET handover_document_id = $2 WHERE leave_request_id = $1", [id, documentId]);
 }
 
 async function setWorkflow(client, id, instanceId) {
@@ -402,7 +473,7 @@ async function settle(client, id, status) {
         SET status = $2, decided_at = now(),
             cancelled_at = CASE WHEN $2 = 'cancelled' THEN now() ELSE cancelled_at END
       WHERE leave_request_id = $1 AND status = 'submitted'
-      RETURNING leave_request_id, employee_id, status`,
+      RETURNING leave_request_id, employee_id, status, relief_employee_id`,
     [id, status],
   );
   return rows[0] || null;
@@ -423,7 +494,7 @@ async function cancel(client, id) {
 
 const TYPE_COLS = `t.leave_type_id, t.code::text AS code, t.name,
   CASE WHEN jsonb_typeof(t.policy -> 'days_per_year') = 'number' THEN (t.policy ->> 'days_per_year')::int END AS days_per_year,
-  t.active`;
+  t.active, t.handover_every_request, t.handover_over_days`;
 
 function listTypes(db, query) {
   const params = [query.active === undefined ? null : query.active, query.q || null];
@@ -475,23 +546,26 @@ async function countActiveTypes(db) {
   return rows[0].n;
 }
 
-async function insertType(client, { code, name, days_per_year: days }) {
+async function insertType(client, { code, name, days_per_year: days, handover_every_request: every, handover_over_days: over }) {
   const { rows } = await client.query(
-    `INSERT INTO leave_type (code, name, unit, policy)
-     VALUES ($1, $2, 'days', jsonb_build_object('days_per_year', $3::int))
+    `INSERT INTO leave_type (code, name, unit, policy, handover_every_request, handover_over_days)
+     VALUES ($1, $2, 'days', jsonb_build_object('days_per_year', $3::int), $4, $5)
      RETURNING leave_type_id`,
-    [code, name, days],
+    [code, name, days, every === true, over === undefined ? null : over],
   );
   return getType(client, rows[0].leave_type_id);
 }
 
 async function updateType(client, id, patch) {
   const hasDays = Object.prototype.hasOwnProperty.call(patch, "days_per_year");
+  const hasOver = Object.prototype.hasOwnProperty.call(patch, "handover_over_days");
   await client.query(
     `UPDATE leave_type
         SET name = COALESCE($2, name),
             active = COALESCE($3, active),
-            policy = CASE WHEN $4::boolean THEN policy || jsonb_build_object('days_per_year', $5::int) ELSE policy END
+            policy = CASE WHEN $4::boolean THEN policy || jsonb_build_object('days_per_year', $5::int) ELSE policy END,
+            handover_every_request = COALESCE($6, handover_every_request),
+            handover_over_days = CASE WHEN $7::boolean THEN $8::int ELSE handover_over_days END
       WHERE leave_type_id = $1`,
     [
       id,
@@ -499,6 +573,9 @@ async function updateType(client, id, patch) {
       patch.active === undefined ? null : patch.active,
       hasDays,
       hasDays ? patch.days_per_year : null,
+      patch.handover_every_request === undefined ? null : patch.handover_every_request,
+      hasOver,
+      hasOver ? patch.handover_over_days : null,
     ],
   );
   return getType(client, id);
@@ -561,6 +638,10 @@ module.exports = {
   setAllowance,
   employeeOf,
   insertRequest,
+  setHandover,
+  byHandover,
+  loginsOf,
+  reliefOfficers,
   setWorkflow,
   settle,
   cancel,

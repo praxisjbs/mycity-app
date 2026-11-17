@@ -17,6 +17,11 @@
  *
  * Lengths are working days (shared/time/working-week.js: the configured week, public
  * holidays left out), whole numbers on the wire.
+ *
+ * Relief and handover (docs/guides/ess.md §6, TB 17/11/2026): a request may name a relief
+ * officer, the colleague who covers while the person is away, and carry a handover note, a
+ * file staged through POST /documents. Each leave type says when both are required: on every
+ * request, or when a request is more than a number of working days.
  */
 const { z } = require("zod");
 const {
@@ -30,8 +35,10 @@ const {
   recordId,
   changesBeside,
   nothingOn,
+  blank,
 } = require("./common");
 const { PersonRef } = require("./organisation");
+const { DocumentRef } = require("./documents");
 
 const LeaveStatus = z.enum(["submitted", "approved", "rejected", "cancelled"]);
 
@@ -51,6 +58,14 @@ const leaveCode = z
 /** Working days a year; null when the type has no allowance (unpaid leave). */
 const daysPerYear = z.number().int().min(0).max(366).nullable();
 
+/**
+ * A request of the type needs a relief officer and a handover note when it is more than this many
+ * working days; null when its length never asks for them. A new type takes 7, a company rule with
+ * no legal source (TB, 17/11/2026; docs/guides/ess.md §6), which People change per type.
+ */
+const HANDOVER_OVER_DAYS = 7;
+const handoverOverDays = z.number().int().min(0, "0 to 366 days").max(366, "0 to 366 days").nullable();
+
 /** One leave type as a picker or People's list shows it. */
 const LeaveType = z
   .object({
@@ -59,6 +74,10 @@ const LeaveType = z
     name: z.string(),
     days_per_year: daysPerYear,
     active: z.boolean(),
+    /** Every request of the type needs a relief officer and a handover note. */
+    handover_every_request: z.boolean(),
+    /** Or a request more than this many working days does; null when length never asks. */
+    handover_over_days: handoverOverDays,
   })
   .strict();
 
@@ -72,6 +91,8 @@ const LeaveTypeCreate = z
     code: leaveCode,
     name: text(80),
     days_per_year: daysPerYear.default(null),
+    handover_every_request: z.boolean().default(false),
+    handover_over_days: handoverOverDays.default(HANDOVER_OVER_DAYS),
   })
   .strict();
 
@@ -81,6 +102,8 @@ const LeaveTypeUpdateFields = z
     name: text(80).optional(),
     days_per_year: daysPerYear.optional(),
     active: z.boolean().optional(),
+    handover_every_request: z.boolean().optional(),
+    handover_over_days: handoverOverDays.optional(),
   })
   .strict();
 const LeaveTypeUpdate = LeaveTypeUpdateFields.refine((v) => Object.keys(v).length > 0, "Change at least one field");
@@ -94,6 +117,8 @@ const LeaveTypeAdd = z
   .object({
     name: text(80),
     days_per_year: daysPerYear.default(null),
+    handover_every_request: z.boolean().default(false),
+    handover_over_days: handoverOverDays.default(HANDOVER_OVER_DAYS),
   })
   .strict();
 
@@ -124,6 +149,10 @@ const LeaveRequest = z
     /** The one person the waiting stage names (a line manager, a login it was given to, the CEO); null when a role decides it. */
     approver_name: z.string().nullable(),
     recorded: z.boolean(),
+    /** The colleague who covers while the person is away, or null. */
+    relief_employee: PersonRef.nullable(),
+    /** The handover note the person uploaded, or null; opened through GET /documents/:id/content. */
+    handover: DocumentRef.nullable(),
     submitted_at: isoDateTime.nullable(),
     decided_at: isoDateTime.nullable(),
     created_at: isoDateTime,
@@ -146,9 +175,19 @@ const oneYear = (v) =>
   !v.starts_on || !v.ends_on || v.ends_on < v.starts_on || v.ends_on.slice(0, 4) === v.starts_on.slice(0, 4);
 const OTHER_YEAR = { message: "Ends in another year", path: ["ends_on"] };
 
+/**
+ * The relief officer and the handover note a request may carry (docs/guides/ess.md §6): each
+ * optional here, both required by the service when the type and the days ask for them. An empty
+ * pick is left out.
+ */
+const cover = {
+  relief_employee_id: blank(uuid),
+  handover_document_id: blank(uuid),
+};
+
 /** POST /ess/leave: the employee asks for leave. */
 const LeaveRequestCreate = z
-  .object(span)
+  .object({ ...span, ...cover })
   .strict()
   .refine(endsAfterStart, ENDS_BEFORE)
   .refine(oneYear, OTHER_YEAR);
@@ -162,9 +201,40 @@ const LeaveRequestPrefill = z
     leave_type_id: uuid.optional(),
     starts_on: isoDate.optional(),
     ends_on: isoDate.optional(),
+    relief_employee_id: uuid.optional(),
     reason: optionalText(500),
   })
   .strict();
+
+/**
+ * GET /ess/leave/check: what Request Leave asks before Send, once the type and both days are
+ * picked: the working days the span holds, and whether the type asks for a relief officer and a
+ * handover note for it. `days` is null when the span is not one Send would take (it ends before it
+ * starts, or crosses New Year).
+ */
+const LeaveRequestCheckQuery = z
+  .object({ leave_type_id: uuid, starts_on: isoDate, ends_on: isoDate })
+  .strict();
+const LeaveRequestCheck = z
+  .object({
+    days: z.number().int().min(0).nullable(),
+    handover_needed: z.boolean(),
+  })
+  .strict();
+
+/**
+ * GET /ess/leave/relief-officers: who may cover for the caller (Request Leave's Relief Officer,
+ * and Praxis AI's card): active colleagues, never the caller, by name; with both days, those on
+ * waiting or approved leave on any of them are left out.
+ */
+const LeaveReliefQuery = listQuery(
+  {
+    starts_on: isoDate.optional(),
+    ends_on: isoDate.optional(),
+  },
+  ["display_name"],
+);
+const LeaveReliefPage = Paged(PersonRef);
 
 /** POST /leave/requests: People record leave on someone's behalf. It is approved at once. */
 const LeaveRecordCreate = z
@@ -327,6 +397,8 @@ const TABLES = {
   LeaveRequest: {
     table: "leave_request",
     virtual: {
+      relief_employee: "the employee behind leave_request.relief_employee_id, with their photo_url",
+      handover: "the document behind leave_request.handover_document_id",
       employee: "the person, from employee and department, with their photo_url",
       leave_type_name: "leave_type.name",
       days: "leave_request.amount, in working days",
@@ -338,6 +410,10 @@ const TABLES = {
   LeavePage: { table: null, reason: "a page of leave requests" },
   LeaveRequestCreate: { table: "leave_request" },
   LeaveRequestPrefill: { table: "leave_request" },
+  LeaveRequestCheckQuery: { table: null, reason: "the type and the days Request Leave asks about before Send" },
+  LeaveRequestCheck: { table: null, reason: "the working days a span holds and whether its type asks for cover, worked out, never kept" },
+  LeaveReliefQuery: { table: null, reason: "the search and the days of the relief officer list" },
+  LeaveReliefPage: { table: null, reason: "a page of people who may cover" },
   LeaveRecordCreate: { table: "leave_request" },
   LeaveCancel: {
     table: null,
@@ -387,6 +463,11 @@ module.exports = {
   LeavePage,
   LeaveRequestCreate,
   LeaveRequestPrefill,
+  LeaveRequestCheckQuery,
+  LeaveRequestCheck,
+  LeaveReliefQuery,
+  LeaveReliefPage,
+  HANDOVER_OVER_DAYS,
   LeaveRecordCreate,
   LeaveCancel,
   LeaveApprove,

@@ -16,6 +16,7 @@ import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
 import { assignSite, siteOf, WORKSITES } from "./worksites";
 import { loginOfEmployee } from "./settings";
+import { UPLOADS } from "../uploads";
 import organisation from "@mycity/contract/schemas/organisation.js";
 
 /**
@@ -823,7 +824,18 @@ const LEAVE_TYPES: LeaveType[] = (
     ["sick", "Sick", 12],
     ["unpaid", "Unpaid", null],
   ] as Array<[LeaveTypeCode, string, number | null]>
-).map(([code, name, days]) => ({ leave_type_id: sid(`leave_type:${code}`), code, name, days_per_year: days, active: true }));
+).map(([code, name, days]) => ({
+  leave_type_id: sid(`leave_type:${code}`),
+  code,
+  name,
+  days_per_year: days,
+  active: true,
+  // Annual on every request; every other type over 7 working days (1210, 1295; docs/guides/ess.md §6).
+  handover_every_request: code === "annual",
+  handover_over_days: 7,
+}));
+/** Whether a request of the type and length needs a relief officer and a handover note (leave.balance.needsCover). */
+const needsCover = (t: LeaveType, days: number) => t.handover_every_request || (t.handover_over_days !== null && days > t.handover_over_days);
 const typeOf = (code: string) => LEAVE_TYPES.find((t) => t.code === code)!;
 const personRef = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null as string | null });
 
@@ -837,6 +849,19 @@ function lineManagerName(key: string): string | null {
   const p = byKey(key);
   return (p && managerOf(p)?.display_name) ?? null;
 }
+/** A sample request's relief officer: the next colleague in the same department, else anyone else. */
+const reliefFor = (key: string) => {
+  const p = byKey(key)!;
+  return PEOPLE.find((x) => x.user_key !== key && x.department === p.department) ?? PEOPLE.find((x) => x.user_key !== key)!;
+};
+/** A sample request's cover: its relief officer and handover note when its type and days ask for them. */
+const coverOf = (l: L, i: number) =>
+  needsCover(typeOf(l.type), l.days)
+    ? {
+        relief_employee: personRef(reliefFor(l.key)),
+        handover: { document_id: sid(`leave-handover:${i}`), file_name: "Handover-Note.pdf", size_bytes: 48_213, mime_type: "application/pdf" },
+      }
+    : { relief_employee: null, handover: null };
 const LEAVE: MockLeave[] = L_ROWS.map((l, i) => ({
   leave_request_id: sid(`leave:${i}`),
   employee: personRef(byKey(l.key)!),
@@ -852,6 +877,7 @@ const LEAVE: MockLeave[] = L_ROWS.map((l, i) => ({
   waiting_on: l.status === "submitted" ? (l.days > 5 ? "Operations & People" : "Line Manager") : null,
   approver_name: l.status === "submitted" && l.days <= 5 ? lineManagerName(l.key) : null,
   recorded: false,
+  ...coverOf(l, i),
   submitted_at: at(5 + i, "10:00"),
   decided_at: l.status === "submitted" ? null : at(4 + i, "12:00"),
   created_at: at(5 + i, "10:00"),
@@ -888,9 +914,17 @@ route("GET /api/v1/leave/types", (req) =>
 );
 route("POST /api/v1/leave/types", (req) => {
   if (!full(req.user!)) return fail(403, "PERMISSION_DENIED", "You need people create to add leave types.");
-  const b = req.body as { code: string; name: string; days_per_year?: number | null };
+  const b = req.body as { code: string; name: string; days_per_year?: number | null; handover_every_request?: boolean; handover_over_days?: number | null };
   if (LEAVE_TYPES.some((t) => t.code === b.code)) return fail(409, "LEAVE_TYPE_EXISTS", "A leave type already has this code", { code: ["Already in use"] });
-  const t = { leave_type_id: uuid(), code: b.code, name: b.name, days_per_year: b.days_per_year ?? null, active: true };
+  const t = {
+    leave_type_id: uuid(),
+    code: b.code,
+    name: b.name,
+    days_per_year: b.days_per_year ?? null,
+    active: true,
+    handover_every_request: b.handover_every_request ?? false,
+    handover_over_days: b.handover_over_days === undefined ? 7 : b.handover_over_days,
+  };
   LEAVE_TYPES.push(t);
   return created(t);
 });
@@ -997,6 +1031,7 @@ route("POST /api/v1/leave/requests", (req) => {
   const l: MockLeave = {
     leave_request_id: uuid(), employee: personRef(who), key: who.user_key, leave_type_id: t.leave_type_id, leave_type_name: t.name, starts_on: b.starts_on, ends_on: b.ends_on,
     days: workingDays(b.starts_on, b.ends_on), reason: b.reason ?? null, status: "approved", workflow_instance_id: null, waiting_on: null, approver_name: null, recorded: true,
+    relief_employee: null, handover: null,
     submitted_at: new Date().toISOString(), decided_at: new Date().toISOString(), created_at: new Date().toISOString(),
   };
   LEAVE.unshift(l);
@@ -1140,12 +1175,38 @@ route("GET /api/v1/ess/leave/calendar", (req) => {
   return asPage(paged(rows, { ...req, query }, { sort: { starts_on: LIST_SORT.starts_on } }));
 });
 route("GET /api/v1/ess/leave/balances", (req) => ok(yearOf(req.user!, Number(req.query.year || isoDaysAgo(0).slice(0, 4)))));
+/** Before Send: the working days, and whether the type asks for a relief officer and a handover note. */
+route("GET /api/v1/ess/leave/check", (req) => {
+  const t = LEAVE_TYPES.find((x) => x.leave_type_id === req.query.leave_type_id);
+  const from = String(req.query.starts_on || "");
+  const to = String(req.query.ends_on || "");
+  if (!t) return ok({ days: null, handover_needed: false });
+  if (!from || !to || to < from || to.slice(0, 4) !== from.slice(0, 4)) return ok({ days: null, handover_needed: needsCover(t, 0) });
+  const days = workingDays(from, to);
+  return ok({ days, handover_needed: needsCover(t, days) });
+});
+/** Who may cover: active colleagues, never the reader; with both days, nobody away on them. */
+route("GET /api/v1/ess/leave/relief-officers", (req) => {
+  const from = req.query.starts_on ? String(req.query.starts_on) : null;
+  const to = req.query.ends_on ? String(req.query.ends_on) : null;
+  const away = (key: string) =>
+    Boolean(from && to) && LEAVE.some((l) => l.key === key && (l.status === "submitted" || l.status === "approved") && l.starts_on <= to! && l.ends_on >= from!);
+  const rows = PEOPLE.filter((p) => p.user_key !== req.user && !away(p.user_key))
+    .map(personRef)
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  const { starts_on: _s, ends_on: _e, ...query } = req.query;
+  return paged(rows, { ...req, query }, { search: (p) => [p.display_name], sort: { display_name: (a, b) => a.display_name.localeCompare(b.display_name) } });
+});
 route("GET /api/v1/ess/leave/:id", (req) => {
+  const me = byKey(req.user!);
   const l = myLeave(req.user!).find((x) => x.leave_request_id === req.params.id);
-  return l ? ok(out(l)) : notFound();
+  if (l) return ok(out(l));
+  // One the reader covers as relief officer: theirs to read, its note to the approver left out.
+  const covered = LEAVE.find((x) => x.leave_request_id === req.params.id && me && x.relief_employee?.employee_id === me.employee_id);
+  return covered ? ok({ ...out(covered), reason: null }) : notFound();
 });
 route("POST /api/v1/ess/leave", (req) => {
-  const b = req.body as { leave_type_id: string; starts_on: string; ends_on: string; reason?: string };
+  const b = req.body as { leave_type_id: string; starts_on: string; ends_on: string; reason?: string; relief_employee_id?: string; handover_document_id?: string };
   const t = LEAVE_TYPES.find((x) => x.leave_type_id === b.leave_type_id);
   const f: Record<string, string[]> = {};
   if (!t) f.leave_type_id = ["Pick a type"];
@@ -1159,9 +1220,22 @@ route("POST /api/v1/ess/leave", (req) => {
   const tooMany = overAllowance(me.user_key, t!, b.starts_on, b.ends_on);
   if (tooMany) return tooMany;
   const days = workingDays(b.starts_on, b.ends_on);
+  // Relief and handover, as leave.balance.assertCover and leave.clash.reliefClash refuse them.
+  const cover: Record<string, string[]> = {};
+  if (needsCover(t!, days) && !b.relief_employee_id) cover.relief_employee_id = ["Required"];
+  if (needsCover(t!, days) && !b.handover_document_id) cover.handover_document_id = ["Required"];
+  if (Object.keys(cover).length) return fail(422, "LEAVE_COVER_NEEDED", "This leave needs a relief officer and a handover note", cover);
+  const relief = b.relief_employee_id ? byId(b.relief_employee_id) : null;
+  if (b.relief_employee_id && (!relief || relief.user_key === me.user_key))
+    return fail(422, "LEAVE_RELIEF_UNAVAILABLE", "Pick another relief officer", { relief_employee_id: [relief ? "Pick someone else" : "Not on the staff"] });
+  if (relief && LEAVE.some((x) => x.key === relief.user_key && ["submitted", "approved"].includes(x.status) && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
+    return fail(422, "LEAVE_RELIEF_UNAVAILABLE", "Pick another relief officer", { relief_employee_id: ["Away on those days"] });
+  const note = b.handover_document_id ? (UPLOADS.get(b.handover_document_id) ?? { document_id: b.handover_document_id, file_name: "Handover-Note.pdf", size_bytes: 0, mime_type: "application/pdf" }) : null;
   const l: MockLeave = {
     leave_request_id: uuid(), employee: personRef(me), key: me.user_key, leave_type_id: t!.leave_type_id, leave_type_name: t!.name, starts_on: b.starts_on, ends_on: b.ends_on,
     days, reason: b.reason ?? null, status: "submitted", workflow_instance_id: uuid(), waiting_on: "Line Manager", approver_name: lineManagerName(me.user_key), recorded: false,
+    relief_employee: relief ? personRef(relief) : null,
+    handover: note ? { document_id: note.document_id, file_name: note.file_name, size_bytes: note.size_bytes, mime_type: note.mime_type } : null,
     submitted_at: new Date().toISOString(), decided_at: null, created_at: new Date().toISOString(),
   };
   LEAVE.unshift(l);

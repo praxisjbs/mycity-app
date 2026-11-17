@@ -5,7 +5,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { Button, CheckboxField, DataView, Field, FormFooter, Grow, NumberField, Pager, Pill, rules, SegmentedControl, TapList, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { Button, CheckboxField, ChoiceField, DataView, Field, FormFooter, Grow, NumberField, Pager, Pill, rules, SegmentedControl, TapList, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 
 /**
  * People · Leave settings (docs/guides/ess.md §6, §10): the leave types People offer
@@ -25,6 +25,15 @@ export const codeOf = (name: string) => {
 };
 
 const daysText = (n: number | null) => (n === null ? "No set allowance" : `${n} ${n === 1 ? "day" : "days"} a year`);
+
+/** When a request of the type needs a relief officer and a handover note (docs/guides/ess.md §6). */
+type Handover = "every" | "longer" | "never";
+const handoverOf = (t: Pick<LeaveType, "handover_every_request" | "handover_over_days"> | null): Handover =>
+  !t ? "longer" : t.handover_every_request ? "every" : t.handover_over_days === null ? "never" : "longer";
+const handoverText = (t: LeaveType) =>
+  t.handover_every_request ? "Every Request" : t.handover_over_days === null ? "Never" : `Over ${t.handover_over_days} ${t.handover_over_days === 1 ? "Day" : "Days"}`;
+/** A new type asks over 7 working days unless People say otherwise (TB, 17/11/2026). */
+const HANDOVER_OVER_DAYS = 7;
 
 /** The leave types, with Add Type and each type's form. */
 export function LeaveTypes() {
@@ -53,6 +62,7 @@ export function LeaveTypes() {
         columns={[
           { key: "n", label: "Type", render: (t) => t.name },
           { key: "d", label: "Allowance", render: (t) => daysText(t.days_per_year) },
+          { key: "h", label: "Handover", render: handoverText },
           { key: "s", label: "Status", render: (t) => <Pill tone={t.active ? "ok" : "neutral"}>{t.active ? "Offered" : "Retired"}</Pill> },
         ]}
         footer={<Pager page={list.page} onPage={list.setPage} noun="type" />}
@@ -65,16 +75,28 @@ function TypeForm({ type, close }: { type: LeaveType | null; close: () => void }
   const me = useMe();
   const confirm = useConfirm();
   const f = useContractForm(
-    { name: type?.name ?? "", days: type?.days_per_year === null || type?.days_per_year === undefined ? "" : String(type.days_per_year), active: type?.active ?? true },
+    {
+      name: type?.name ?? "",
+      days: type?.days_per_year === null || type?.days_per_year === undefined ? "" : String(type.days_per_year),
+      active: type?.active ?? true,
+      handover: handoverOf(type) as string,
+      over: String(type?.handover_over_days ?? HANDOVER_OVER_DAYS),
+    },
     {
       name: (v) => rules.required("Name the type")(v) ?? (String(v).trim().length > 80 ? "At most 80 characters" : null),
       days: (v) => (v === "" || (Number(v) >= 0 && Number(v) <= 366) ? null : "0 to 366 days"),
+      over: (v, all) => (all.handover !== "longer" || (v !== "" && Number(v) >= 0 && Number(v) <= 366) ? null : "0 to 366 days"),
     },
   );
   const add = useMutation("POST /api/v1/leave/types");
   const change = useMutation("PATCH /api/v1/leave/types/:id");
   const remove = useMutation("DELETE /api/v1/leave/types/:id");
   const days = f.values.days === "" ? null : Number(f.values.days);
+  // Every Request keeps the number for a later switch back; Never asks by length no more.
+  const handover = {
+    handover_every_request: f.values.handover === "every",
+    handover_over_days: f.values.handover === "never" ? null : Number(f.values.over || HANDOVER_OVER_DAYS),
+  };
   const done = (text: string) => {
     invalidate("/api/v1/leave/types");
     invalidate("/api/v1/ess/leave");
@@ -85,15 +107,16 @@ function TypeForm({ type, close }: { type: LeaveType | null; close: () => void }
     if (!f.check()) return;
     try {
       if (type) {
-        await change.run({ params: { id: type.leave_type_id }, body: { name: f.values.name.trim(), days_per_year: days, active: f.values.active } });
+        await change.run({ params: { id: type.leave_type_id }, body: { name: f.values.name.trim(), days_per_year: days, active: f.values.active, ...handover } });
         done(`${f.values.name.trim()} saved`);
       } else {
-        await add.run({ body: { code: codeOf(f.values.name), name: f.values.name.trim(), days_per_year: days } });
+        await add.run({ body: { code: codeOf(f.values.name), name: f.values.name.trim(), days_per_year: days, ...handover } });
         done(`${f.values.name.trim()} added`);
       }
     } catch (e) {
       // The code is made from the name, so its marks go on Name; only a duplicate reads Already a Type.
       if (e instanceof ApiError && e.fields.code) f.setServerErrors({ name: [e.code === "LEAVE_TYPE_EXISTS" ? "Already a type" : (e.fields.code[0] ?? "Check the name")] });
+      else if (e instanceof ApiError && e.fields.handover_over_days) f.setServerErrors({ over: e.fields.handover_over_days });
       else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
     }
@@ -115,6 +138,22 @@ function TypeForm({ type, close }: { type: LeaveType | null; close: () => void }
       <Field label="Days a Year" optional info="Working days each person gets a year. Leave empty for a type with no limit, such as unpaid leave." {...f.field("days")}>
         <NumberField {...f.field("days")} placeholder="20" />
       </Field>
+      <Field label="Handover Needed" info="When a request of this type must name a relief officer and carry a handover note." {...f.field("handover")}>
+        <ChoiceField
+          value={f.values.handover as Handover}
+          onChange={(v) => f.set("handover", v)}
+          options={[
+            ["every", "Every Request"],
+            ["longer", "Longer Leave"],
+            ["never", "Never"],
+          ]}
+        />
+      </Field>
+      {f.values.handover === "longer" && (
+        <Field label="Longer Than (Days)" {...f.field("over")}>
+          <NumberField {...f.field("over")} placeholder="7" />
+        </Field>
+      )}
       {type && (
         <Field label="Offered" {...f.field("active")}>
           <CheckboxField {...f.field("active")} label="Offered on new requests" />

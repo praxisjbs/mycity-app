@@ -603,7 +603,8 @@ Your leave this year: what you are entitled to, what you have taken and booked, 
    *3 taken, 2 booked, 1 pending, 14 left*. Pending days are still waiting for a decision.
    **No set allowance** means the type has no yearly limit.
 5. Press a request to open it. It shows its **Type**, **From**, **To**, **Days**, **Approver**,
-   **Status** and your **Note**.
+   **Status**, your **Relief Officer** and **Handover Note** when you gave them, and your **Note**.
+   Press **Open Note** to download your handover note.
 6. Press **Leave Calendar** to see a month of approved and waiting leave. Yours is marked **You**.
    Leave still waiting for approval is marked **Waiting**.
 7. {needs="manager"} The leave of the people who report to you shows there too, by first name.
@@ -626,8 +627,20 @@ opens your next booked leave. Below them, tap **My Requests** or **Entitlement**
 3. Choose the **First Day** and the **Last Day**. The hub counts MyCity's working days between
    them, both included. Days off in the working week, such as Sunday, and public holidays are left
    out. Saturday counts when it is a working day.
-4. Add a **Note** for your manager if it helps, such as `Family event`.
-5. Press **Send Request**. A message names who it went to, such as *Sent to Tolu Adeyemi*.
+4. Pick your **Relief Officer**, the colleague who covers your work while you are away. The list
+   offers everyone who works here now, a page at a time as you scroll, and leaves out anyone away on
+   the days you picked.
+5. Under **Handover Note**, press the box and choose your note: your open work and where to find it,
+   as a PDF, Word, Excel file or a photo, up to 15 MB. Its name shows once it arrives; press
+   **Replace** to choose another.
+6. Add a **Note** for your manager if it helps, such as `Family event`.
+7. Press **Send Request**. A message names who it went to, such as *Sent to Tolu Adeyemi*.
+
+**Relief Officer** and **Handover Note** read **Optional** unless the leave type asks for them.
+Annual leave always does, and other leave usually does when it is more than 7 working days. Once you
+have picked the type and both days, their **Optional** tags go when they are needed. Your relief
+officer is told when your leave is approved, and again if approved leave is cancelled. They do not
+need to accept.
 
 Your request reads **Pending** until it is decided. **Approver** names who it waits on: your line
 manager by name, then **Operations & People** for long leave. You are told when they decide.
@@ -653,6 +666,11 @@ Leave People recorded for you reads **People** under **Approver**.
 | **Overlaps other leave** | You already asked for leave on some of those days | Change the days, or cancel the other request |
 | *32 working days, 19 left* | The working days you asked for, then the days you have left this year | Ask for fewer days, or another type |
 | **Not offered** | People stopped offering that type while you filled the form | Pick another **Leave Type** |
+| **Required** on **Relief Officer** or **Handover Note** | This leave needs both | Pick a colleague and add your note |
+| **Pick someone else** | You picked yourself as relief officer | Pick a colleague |
+| **Away on those days** | Your relief officer has leave on some of the same days | Pick another colleague |
+| **Not active** or **Not on the staff** | They no longer work here | Pick another colleague |
+| **Upload it again** | The note did not reach the hub as yours | Press **Replace** and choose the file again |
 | *At most 500 characters* | The note is over 500 characters | Shorten the **Note** |
 
 ### Cancel a request {#ess-leave-cancel}
@@ -664,6 +682,19 @@ You can cancel a request while it waits, or approved leave before it starts.
 
 If it says **This leave can no longer be cancelled**, the leave has started. Ask People and
 Operations.
+
+### Cover for a colleague {#ess-leave-cover}
+
+When a colleague names you as their relief officer, you are told once their leave is approved.
+
+1. Open the notice, such as *Relief cover: Ada Okafor*. It opens their request on
+   [My Leave](/ess?tab=my-leave).
+2. The request shows the **Employee**, **Type**, **From**, **To**, **Days**, **Status** and your name
+   under **Relief Officer**.
+3. Press **Open Note** to download their handover note.
+
+If their approved leave is cancelled, you are told with *Relief cover cancelled*. The request is
+theirs: you cannot cancel it, and it is not listed under **My Requests**.
 
 > **Tip:** Asking for company money is the **My Requests** tab, after **My Leave**. It has its own
 > chapter: [My Requests](#expenses-my-requests).
@@ -1164,7 +1195,9 @@ crop: modal
 marks:
   1: label "Leave Type" | The kind of leave
   2: label "First Day" | Your first day away
-  3: button "Send Request" | Send it to your manager
+  3: label "Relief Officer" | Who covers for you
+  4: label "Handover Note" | Your open work
+  5: button "Send Request" | Send it to your manager
 ```
 
 ```shot ess-documents

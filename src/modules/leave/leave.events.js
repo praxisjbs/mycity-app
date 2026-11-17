@@ -11,9 +11,18 @@
  * After commit the outcome of an approval is copied onto the request (`settle`), at
  * least once and idempotently: the copy changes only a request still `submitted`. A
  * request withdrawn from My Approvals rather than My Leave is settled the same way.
+ *
+ * Relief and handover (docs/guides/ess.md §6, §8): the relief officer a request names is
+ * told when it is approved and again when approved leave is cancelled, with no step of
+ * their own. The handover note is a `leave_handover` document on the request, opened by
+ * the person, the relief officer, whoever may read the request's approval, and People
+ * within their scope.
  */
 const { defineEvents, WORKFLOW } = require("../../shared/events/catalogue");
 const { defineNotification } = require("../../shared/notifications/fanout");
+const { defineDocumentType } = require("../../shared/documents/types");
+const vault = require("../../shared/documents/vault");
+const { formatDate } = require("../../shared/time/day-first");
 const outbox = require("../../shared/events/outbox");
 const workflow = require("../../shared/workflow/engine");
 
@@ -27,7 +36,13 @@ const EVENTS = defineEvents("people", {
   "leave_type.created": { summary: "A leave type was added" },
   "leave_type.updated": { summary: "A leave type was changed" },
   "leave_type.deleted": { summary: "A leave type nobody had used was deleted" },
+  "leave_request.relief_covering": { summary: "A relief officer was told they cover approved leave" },
+  "leave_request.relief_released": { summary: "A relief officer was told leave they covered was cancelled" },
 });
+
+/** The handover note a request carries (vault.claim in leave.service.request). */
+const HANDOVER_DOC_TYPE = "leave_handover";
+defineDocumentType(HANDOVER_DOC_TYPE, { label: "Handover Note", module: "people", sensitivity: "personal" });
 
 /** The approval flow every request opens. */
 const DEFINITION_KEY = "leave.approval";
@@ -42,6 +57,48 @@ defineNotification(EVENTS.LEAVE_REQUEST_CANCELLED, {
   to: [{ subject: true }],
   title: "Leave cancelled",
   body: (e) => `${e.payload.leave_type_name} leave was cancelled.`,
+});
+
+/** The relief officer's login, from the event (leave.repo.loginsOf). */
+const relief = (e, client) => require("./leave.repo").loginsOf(client, e.payload.relief_employee_id);
+/** "Annual leave, 03/12/2026 to 10/12/2026." */
+const span = (e) => `${e.payload.leave_type_name} leave, ${formatDate(e.payload.starts_on)} to ${formatDate(e.payload.ends_on)}.`;
+
+defineNotification(EVENTS.LEAVE_REQUEST_RELIEF_COVERING, {
+  to: [{ users: relief }],
+  title: (e) => `Relief cover: ${e.payload.employee_name}`,
+  body: span,
+  who: "The relief officer",
+  copy: true,
+});
+
+defineNotification(EVENTS.LEAVE_REQUEST_RELIEF_RELEASED, {
+  to: [{ users: relief }],
+  title: "Relief cover cancelled",
+  body: (e) => `${e.payload.employee_name}, ${span(e)}`,
+  who: "The relief officer",
+  copy: true,
+});
+
+/**
+ * Who opens a handover note (docs/guides/ess.md §8): the CEO, the person, the relief officer,
+ * whoever may read the request's approval (its approvers on any stage, those who decided it, and
+ * `people` view within scope), and for a request with no approval `people` view within scope.
+ * A note no request holds yet stays its uploader's.
+ */
+vault.defineAccess("leave_request", async (client, user, doc) => {
+  if (!user) return false;
+  if (user.is_ceo === true) return true;
+  const row = await require("./leave.repo").byHandover(client, doc.document_id);
+  if (!row) return Boolean(doc.uploaded_by && doc.uploaded_by === user.user_id);
+  if (user.employee_id && (row.employee_id === user.employee_id || row.relief_employee_id === user.employee_id)) return true;
+  if (row.workflow_instance_id) {
+    const instance = await workflow.getInstance(client, row.workflow_instance_id);
+    if (instance && (await require("../workflow/workflow.service").mayRead(client, instance, user))) return true;
+  }
+  const scope = await require("../../middleware/rbac").scopeFor(user, "people", "view");
+  if (!scope) return false;
+  return scope.scope === "all" || (scope.scope_ids || []).includes(row.employee_id);
 });
 
 defineNotification(EVENTS.LEAVE_BALANCE_SET, {
@@ -77,4 +134,4 @@ outbox.register(WORKFLOW.WORKFLOW_CANCELLED, "leave.apply_withdrawal", async (ev
   await settle(event.entity.id, "cancelled");
 });
 
-module.exports = { EVENTS, DEFINITION_KEY, OUTCOME };
+module.exports = { EVENTS, DEFINITION_KEY, OUTCOME, HANDOVER_DOC_TYPE };

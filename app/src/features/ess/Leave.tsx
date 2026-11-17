@@ -2,17 +2,18 @@ import type { LeaveBalance, LeaveRequest } from "@mycity/contract/contract.gen.t
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Calendar, Card, CardHeader, DataView, DesktopOnly, formatDate, Grid, KeyValue, KpiCard, Meter, PageHeader, Pager, TapList, toast, todayIso, useConfirm, useModal } from "@mycity/ui";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { PhoneCards } from "@/features/shared/PhoneCards";
-import { dayCount, LeaveForm, statusPill, waitingOnOf } from "@/features/people/Leave";
+import { coverRows, dayCount, LeaveForm, statusPill, waitingOnOf } from "@/features/people/Leave";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 
 /**
  * ESS · My Leave (#12, `my-leave`): the caller's own requests and what is left of
  * their year (docs/guides/ess.md §10). Everything here is the caller's own; asking
- * for leave sends it to the approval flow.
+ * for leave sends it to the approval flow. A link naming a request (`?id=`, a notice) opens
+ * it; one that names the reader as its relief officer opens read only, with its handover note.
  */
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--input)"];
@@ -24,7 +25,8 @@ const headline = (balances: LeaveBalance[]) =>
 /** Who a request waits on, or who settled it. */
 const approverOf = (r: LeaveRequest) => waitingOnOf(r) ?? (r.recorded ? "People" : r.status === "cancelled" ? "Withdrawn" : "Decided");
 
-export function MyLeavePage() {
+export function MyLeavePage({ id = null }: { id?: string | null }) {
+  const me = useMe();
   const modal = useModal();
   const confirm = useConfirm();
   const bal = useApi("GET /api/v1/ess/leave/balances");
@@ -41,12 +43,23 @@ export function MyLeavePage() {
   useScreenAction({ label: "Request Leave", onSelect: request });
   // The assistant's Request Leave button: ?new=1 and the form's values (docs/guides/praxis-ai.md §6.4).
   useNewLink(request);
+  // A link names a request (a notice, ⌘K, the assistant): it opens once, found as the reader's own or one they cover.
+  const linked = useApi("GET /api/v1/ess/leave/:id", { params: { id: id ?? "" }, enabled: Boolean(id) });
+  const handled = useRef<string | null>(null);
+  const openLinked = useRef<(r: LeaveRequest) => void>(() => undefined);
+  useEffect(() => {
+    if (!id || handled.current === id || !linked.data) return;
+    handled.current = id;
+    openLinked.current(linked.data);
+  }, [id, linked.data]);
 
   const open = (r: LeaveRequest) =>
     modal.open({
       title: `${r.leave_type_name} Leave, ${formatDate(r.starts_on)}`,
       body: (close) => {
-        const canCancel = r.status === "submitted" || (r.status === "approved" && r.starts_on > today);
+        // Someone else's request reaches here only when the reader covers it as relief officer.
+        const covering = r.employee.employee_id !== me.employee_id;
+        const canCancel = !covering && (r.status === "submitted" || (r.status === "approved" && r.starts_on > today));
         const stop = async () => {
           const booked = r.status === "approved";
           if (!(await confirm({ title: "Cancel Request", body: booked ? "The days go back to your balance." : "It no longer waits for a decision.", confirmLabel: "Cancel Request", cancelLabel: "Keep It", destructive: true }))) return;
@@ -66,12 +79,14 @@ export function MyLeavePage() {
               <CardHeader title="Request" />
               <KeyValue
                 items={[
+                  ...(covering ? ([["Employee", r.employee.display_name]] as Array<[string, string]>) : []),
                   ["Type", r.leave_type_name],
                   ["From", formatDate(r.starts_on)],
                   ["To", formatDate(r.ends_on)],
                   ["Days", dayCount(r.days)],
-                  ["Approver", approverOf(r)],
+                  ...(covering ? [] : ([["Approver", approverOf(r)]] as Array<[string, string]>)),
                   ["Status", statusPill(r)],
+                  ...coverRows(r),
                   ...(r.reason ? ([["Note", r.reason]] as Array<[string, string]>) : []),
                 ]}
               />
@@ -87,6 +102,8 @@ export function MyLeavePage() {
         );
       },
     });
+
+  openLinked.current = open;
 
   const ent = (
     <Card>

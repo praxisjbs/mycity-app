@@ -55,6 +55,11 @@ module.exports = {
 
   getLeave: async (req, res) => ok(res, await service.leave.get(req.user, id(req))),
 
+  leaveCheck: async (req, res) => ok(res, await service.leave.check(req.user, req.validated.query)),
+
+  reliefOfficers: async (req, res) =>
+    sendPaged(res, await service.leave.reliefOfficers(req.user, req.validated.query)),
+
   requestLeave: async (req, res) =>
     created(res, await service.leave.request(withActor(req), req.validated.body)),
 

@@ -81,9 +81,19 @@ route(router, "get", "/leave/balances",
     summary: "What is left of my year, per leave type" },
   controller.leaveBalances);
 
+route(router, "get", "/leave/check",
+  { query: c.leave.LeaveRequestCheckQuery, response: c.leave.LeaveRequestCheck, self: true,
+    summary: "The working days a request holds, and whether it needs a relief officer and a handover note" },
+  controller.leaveCheck);
+
+route(router, "get", "/leave/relief-officers",
+  { query: c.leave.LeaveReliefQuery, response: c.leave.LeaveReliefPage, self: true,
+    summary: "Who may cover for me while I am away" },
+  controller.reliefOfficers);
+
 route(router, "get", "/leave/:id",
   { params: c.common.IdParams, response: c.leave.LeaveRequest, self: true,
-    summary: "One of my leave requests" },
+    summary: "One of my leave requests, or one I cover as relief officer" },
   controller.getLeave);
 
 route(router, "post", "/leave",
