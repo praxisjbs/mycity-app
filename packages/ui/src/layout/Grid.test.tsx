@@ -31,6 +31,10 @@ describe("Grid", () => {
     expect(cls).toContain("xl:*:odd:col-span-7");
     expect(cls).not.toContain("[");
     expect(cls).not.toContain("mb-3");
+    const third = render(<Grid cols="2/1">{cells(2)}</Grid>).container.firstElementChild?.className ?? "";
+    expect(third).toContain("xl:*:odd:col-span-8");
+    expect(third).toContain("xl:*:even:col-span-4");
+    expect(third).toContain("xl:*:max-h-card-pane");
   });
 
   it("lets two columns side by side scroll on their own on desktop, only once they sit side by side", () => {

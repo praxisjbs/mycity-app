@@ -360,6 +360,8 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   `docs/guides/payroll.md` §10.3). Partnerships' Partners, Leads, Proposals, Contracts & MOUs and
   Categories fill the page with their list and open a record as a page of its own (`?id=`, a Back
   button above it), on desktop and phone (F31 amended 16/11/2026, TB; `docs/guides/partnerships.md` §10).
+  So does Document Centre · Library: a document opens as its own page, its preview beside its details
+  (F31 amended 17/11/2026, TB; `docs/guides/document-centre.md` §10).
 - **The main action within thumb reach**: at the bottom of the screen or the sheet, full width.
 - **Tap targets at least 44 × 44 px.** Inline help terms inside a sentence or heading are the only
   exception.
@@ -711,7 +713,8 @@ app/
                               layout-context
     features/shared/          wiring, never components (§9.4): sections (PagedTable, ExportAction),
                               pickers (EmployeePicker), wire (the API's shapes to the components'),
-                              files (useFileViewer: MediaViewer on this app's session), KpiTiles, Letter
+                              files (useFileViewer: MediaViewer on this app's session), KpiTiles, Letter,
+                              kept (useKept: a list's filters kept while a record has its own page)
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,

@@ -55,17 +55,27 @@ To see everything again, press the **All Documents** figure. On a phone you can 
 
 ### Open, preview and download a document {#document-centre-open}
 
-1. Press a document in the list. On a computer it opens beside the list. On a phone it opens in a
-   sheet.
-   ![A document open beside the list](shot:document-centre-document)
+1. Press a document in the list. It opens on a page of its own. On a computer the file is on the
+   left and its **Details** are on the right. On a phone the details come first and the file under
+   them.
+   ![A document on its own page](shot:document-centre-document)
 2. Read its details: its **Type**, what it **Belongs To**, when it was **Added** and when it
    **Expires**.
 3. Press **View File** to read it full screen. This shows for PDFs, pictures and videos.
 4. Press **Download** to save a copy on your device.
 5. Press **Open Record** to go to the partner, the person or the request it belongs to. This shows
    only when you may open that screen.
+6. Press **Back to Library** to return to the list. Your filters are as you left them.
 
 > **Important:** A Word or Excel file has no preview. Press **Download** and open it on your device.
+
+### Download without opening {#document-centre-download}
+
+1. Open [Document Centre · Library](/documents?tab=library) on a computer.
+2. Find the document in the list.
+3. Press the download icon at the end of its row. A copy is saved on your device and the list stays
+   as it is.
+   ![The download icon at the end of a row](shot:document-centre-download)
 
 ### Find a document from anywhere {#document-centre-search}
 
@@ -94,6 +104,17 @@ marks:
   3: row 1 | Press a document to open it
 ```
 
+```shot document-centre-download
+open: /documents?tab=library
+as: operations
+device: desktop
+do:
+  - fill: searchbox = chowdeck agreement
+  - wait: button "Download Chowdeck Service Agreement"
+marks:
+  1: button "Download Chowdeck Service Agreement" | Save a copy without opening
+```
+
 ```shot document-centre-filters
 open: /documents?tab=library
 as: operations
@@ -116,4 +137,5 @@ do:
 marks:
   1: button "Download" | Save a copy on this device
   2: button "Open Record" | Go to what it belongs to
+  3: button "Back to Library" | Return to the list
 ```
