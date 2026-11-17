@@ -4,7 +4,7 @@ import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { placeValue } from "@/features/shared/places";
 import { Button, FormFooter, toast, useContractForm, Wizard } from "@mycity/ui";
 import { failed, useCategoryDefaults, useFieldDefs, useHoldsMoney, useStages } from "../lib";
-import { customForEdit, DealPart, dealBody, dealStart, optionsOnWire, optionsStart, useMeAsPerson, validityOnWire, validityStart, type Bound, type CustomDraft, type OptionDraft } from "./parts";
+import { checkedOnWire, countOnWire, customForEdit, DealPart, dealBody, dealOnWire, dealStart, moneyOnWire, optionsOnWire, optionsStart, useMeAsPerson, validityOnWire, validityStart, type Bound, type CustomDraft, type OptionDraft } from "./parts";
 
 const orNull = (v: unknown) => (v === "" || v === undefined ? null : v);
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -55,7 +55,7 @@ export function DealForm({ close, partnerId, deal, categoryId }: { close: () => 
         custom: { ...deal.custom } as CustomDraft,
       }
     : dealStart(open[0]?.code ?? "", me?.employee_id ?? "");
-  const f = useContractForm(start, pipeline.DealFields);
+  const f = useContractForm(start, checkedOnWire(pipeline.DealFields, dealOnWire));
   const create = useMutation("POST /api/v1/partnerships/deals");
   const edit = useMutation("PATCH /api/v1/partnerships/deals/:id");
   const submit = async () => {
@@ -65,7 +65,8 @@ export function DealForm({ close, partnerId, deal, categoryId }: { close: () => 
         // Edit Deal: a field emptied is cleared (null); the terms are sent only when they changed; the stage moves on the switcher.
         const changes: Record<string, unknown> = {};
         for (const k of ["title", "objective", "estimated_value", "expected_close_on", "event_starts_on", "event_ends_on", "event_title", "next_action", "next_action_on", "comments", "owner_id", "impact_rating", "impact_note"]) changes[k] = orNull(v[k]);
-        changes.expected_attendance = v.expected_attendance === "" ? null : Number(v.expected_attendance);
+        changes.estimated_value = orNull(moneyOnWire(v.estimated_value));
+        changes.expected_attendance = countOnWire(v.expected_attendance) ?? null;
         changes.venue = v.venue ?? null;
         if (!changes.owner_id) delete changes.owner_id;
         if (!same(v.impact, start.impact)) changes.impact = v.impact;

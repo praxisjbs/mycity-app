@@ -139,6 +139,7 @@ describeDb("contracts and MoUs in the chat against the real migrations", () => {
           name: "Lagoon Youth Fest",
           partner_category_id: category,
           region: { scope: "national" },
+          source: "Referral",
           owner_id: emp("staff"),
           contact: { first_name: "Ngozi", last_name: "Adebayo", job_title: "Founder", email: "ngozi@lagoon.example.test", signatory: true },
           deal: { title: "Lagoon Youth Fest Partnership", owner_id: emp("staff"), estimated_value: "2500000.00" },

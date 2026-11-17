@@ -715,7 +715,8 @@ kit), `templates/email/` (`proposal-sent`, `agreement-sign`; the sealed copy and
 signatures service's). PR 8: `partnership_analytics` (`.queries`, `.service`, `.ai` with the
 summaries), `leads.views.js` and `agreements.views.js`, `proposals.ai.js` and `.search.js`,
 `mailbox/binding/` (Link to Partner, `app/src/features/mailbox/PartnerContext.tsx`), migration `7120`,
-the synthetic staging seed `seeds/staging/70_partnerships.js`.
+the synthetic staging seed `seeds/staging/70_partnerships.js`. After the QA audit (17/11/2026): migration
+`7130` (Overdue health, a deal's `non_monetary`) and reference seed `7191` (the `overdue` code).
 
 ### 5.11 M8 · Expenses & Budget Control · AJ · 7 to 11 Dec
 

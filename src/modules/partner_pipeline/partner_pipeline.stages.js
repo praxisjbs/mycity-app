@@ -5,14 +5,20 @@
  *
  *   refused       the stage it is at; a retired stage; a signed deal sent back before signing
  *                 (it is closed as lost instead)
- *   needs Why     On Hold, Closed Lost, and any move to an earlier position (10 characters or more);
- *                 leaving On Hold resumes the deal and needs none
+ *   needs Why     On Hold, Closed Lost, any move to an earlier position, and a move forward past an
+ *                 open stage (QA F64: Prospect Identified straight to Proposal Sent), 10 characters
+ *                 or more; leaving On Hold resumes the deal and needs none
  *   needs a copy  a move into a signed meaning (`signed`, `active`) of a deal not yet signed, unless
  *                 it has a signed agreement: the signed copy, through the upload engine
+ *   needs a value a person's move into a signed meaning of a deal with no projected value, unless
+ *                 it is marked signed with no money value (`non_monetary`, QA F53)
  *
  * What each move does, in the same transaction:
  *   the deal       its stage; `lost` with its reason at Closed Lost; `live` and signed (its validity
- *                  dated) on entering a signed meaning; `open` again when a lost deal reopens
+ *                  dated, Overdue cleared) on entering a signed meaning; `open` again when a lost
+ *                  deal reopens
+ *   its agreement  a deal signed by an uploaded copy, with no agreement on file, gets one recorded in
+ *                  Contracts & MOUs as signed outside the hub (agreements.generate.recordedIn, QA F07)
  *   its history    a stage line, with the reason and where it came from (a person, a conversion)
  *   a lead's       its status read from the new stage (§6.4); a signed deal converts it into a
  *                  partner (partners.convert.js), with its signed copy
@@ -21,6 +27,7 @@
  */
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
+const money = require("../../shared/money/money");
 const lagos = require("../../shared/time/lagos");
 const { EVENTS } = require("./partner_pipeline.events");
 const repo = require("./partner_pipeline.repo");
@@ -31,10 +38,13 @@ const invalid = (field, message, code = "VALIDATION_FAILED") => new AppError(cod
 
 /** The meanings a signed deal may still move to: another signed one, On Hold, or Closed Lost. */
 const AFTER_SIGNING = new Set(["signed", "active", "on_hold", "closed_lost"]);
+/** The meanings of a deal still being pursued, in the order a deal moves through them. */
+const PURSUING = new Set(["prospect", "contacted", "meeting", "proposal", "negotiation"]);
 
 /**
  * What a move needs and refuses, from the stages' meanings and order (no writes).
- * @returns {{from: object|null, to: object, back: boolean, needsReason: boolean, signs: boolean}}
+ * `skips`: forward from one pursuing stage to another past an active pursuing stage between them.
+ * @returns {{from: object|null, to: object, back: boolean, skips: boolean, needsReason: boolean, signs: boolean}}
  */
 function ruleOf(stages, deal, code) {
   const to = lists.stageOf(stages, code);
@@ -46,8 +56,11 @@ function ruleOf(stages, deal, code) {
   const back = Boolean(from) && from.meaning !== "on_hold" && order(to) < order(from);
   if (deal.signed_at && !AFTER_SIGNING.has(to.meaning)) throw invalid("stage", "Already signed");
   const signs = lists.isSigned(to.meaning) && !deal.signed_at;
-  const needsReason = back || to.meaning === "on_hold" || to.meaning === "closed_lost";
-  return { from, to, back, needsReason, signs };
+  const pursuing = (s) => Boolean(s) && s.active && PURSUING.has(s.meaning);
+  const skips =
+    !back && pursuing(from) && pursuing(to) && stages.some((s) => pursuing(s) && order(s) > order(from) && order(s) < order(to));
+  const needsReason = back || skips || to.meaning === "on_hold" || to.meaning === "closed_lost";
+  return { from, to, back, skips, needsReason, signs };
 }
 
 /**
@@ -65,11 +78,21 @@ async function moveIn(client, actor, deal, body, { source = "person" } = {}) {
   const reason = body.reason ? body.reason.trim() : null;
   // Convert to Partner moves the deal to its signed stage from wherever it was: the signed copy is the reason.
   if (rule.needsReason && !reason && source !== "conversion") throw invalid("reason", "Say why");
-  if (rule.signs && !body.signed_copy_document_id && !(await repo.hasSignedAgreement(client, deal.deal_id))) {
+  const agreed = rule.signs ? await repo.hasSignedAgreement(client, deal.deal_id) : false;
+  if (rule.signs && !body.signed_copy_document_id && !agreed) {
     throw invalid("signed_copy_document_id", "Attach the signed copy", "SIGNED_COPY_REQUIRED");
+  }
+  // A person signing a deal, on the switcher or by Convert to Partner, says what it is worth, or that it
+  // is worth no money on purpose. A signing through the hub's own agreement and the tracker import keep
+  // the deal as it is.
+  const noValue = deal.estimated_value === null || deal.estimated_value === undefined || money.isZero(deal.estimated_value);
+  if (rule.signs && (source === "person" || source === "conversion") && noValue && !body.non_monetary && !deal.non_monetary) {
+    throw invalid("non_monetary", "Add the deal's value", "DEAL_VALUE_REQUIRED");
   }
 
   const changes = { stage: rule.to.code };
+  if (rule.signs && body.non_monetary && noValue) changes.non_monetary = true;
+  if (rule.signs && deal.health === "overdue") changes.health = "on_track";
   if (rule.to.meaning === "closed_lost") Object.assign(changes, { status: "lost", closed_at: new Date(), close_reason: reason });
   else if (rule.signs) {
     const { rows } = await client.query("SELECT validity_days, valid_until FROM partnership_opportunity WHERE partnership_opportunity_id = $1", [deal.deal_id]);
@@ -105,6 +128,10 @@ async function moveIn(client, actor, deal, body, { source = "person" } = {}) {
       });
     }
     await require("../partners/partners.service").syncStatus(client, actor, deal.partner_id);
+  }
+  // Signed by an uploaded copy and nothing on file in Contracts & MOUs: the copy is recorded as its agreement.
+  if (rule.signs && body.signed_copy_document_id && !agreed) {
+    await require("../agreements/agreements.generate").recordedIn(client, actor, deal.deal_id, body.signed_copy_document_id);
   }
   if (rule.signs) {
     await emit(client, {

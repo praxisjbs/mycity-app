@@ -79,6 +79,7 @@ module.exports = defineManifest({
         { field: "contact_first_name", question: "Who is the contact there?" },
         { field: "contact_last_name", question: "What is their last name?" },
         { field: "deal_title", question: "What was signed?" },
+        { field: "estimated_value", question: "What is the signed deal worth?" },
       ],
       run: (values, actor) => service.create(actor, actor.scope, partnerCreate(values)),
       readback: partnerLine("added"),

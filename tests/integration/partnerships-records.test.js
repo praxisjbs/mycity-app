@@ -95,6 +95,7 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
     partner_category_id: cat.event,
     region: { scope: "national" },
     industry: "Events",
+    source: "Referral",
     owner_id: emp(who),
     contact: { first_name: "Ngozi", last_name: "Adebayo", job_title: "Founder", email: `${name.toLowerCase().replace(/\W+/g, ".")}@example.test`, phones: ["08031234500"] },
     deal: { title: `${name} Festival 2026`, owner_id: emp(who), estimated_value: "2500000.00", options: [{ position: 1, label: "Regular", deal_price: "10000.00" }] },
@@ -289,12 +290,14 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
     });
     const move = (body) => as("staff").post(`/partnerships/deals/${dealId}/stage`, body);
 
-    test("forward needs no reason; the same stage is refused; the lead's status follows", async () => {
+    test("the next stage needs no reason; skipping one needs why; the same stage is refused; the lead's status follows", async () => {
       expect((await move({ stage: "prospect_identified" })).body.error.fields.stage).toEqual(["Already at this stage"]);
-      const res = await move({ stage: "proposal_sent" });
+      // Past the stages between, a move forward says why (QA F64: Prospect Identified straight to Proposal Sent).
+      expect((await move({ stage: "proposal_sent" })).body.error.fields.reason).toEqual(["Say why"]);
+      const res = await move({ stage: "proposal_sent", reason: "Met them at the expo and sent it there" });
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ stage: "proposal_sent", meaning: "proposal" });
-      expect(res.body.history[0]).toMatchObject({ kind: "stage", from_label: "Prospect Identified", to_label: "Proposal Sent", by: expect.objectContaining({ employee_id: emp("staff") }) });
+      expect(res.body.history[0]).toMatchObject({ kind: "stage", from_label: "Prospect Identified", to_label: "Proposal Sent", reason: "Met them at the expo and sent it there", by: expect.objectContaining({ employee_id: emp("staff") }) });
       expect((await one("SELECT status FROM lead WHERE lead_id = $1", [lead.lead_id])).status).toBe("qualified");
     });
 
@@ -490,8 +493,8 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
   });
 
   describe("partners (§6.6)", () => {
-    test("New Partner records one signed before the hub; Close Partner loses its deals", async () => {
-      const res = await as("staff").post("/partnerships/partners", {
+    test("New Partner records one signed before the hub; Close Partner ends its signed deal and loses the rest", async () => {
+      const body = {
         name: "Eko Hotels Group",
         partner_category_id: cat.hospitality,
         region: { scope: "national" },
@@ -499,7 +502,12 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
         contact: { first_name: "Femi", last_name: "Bello", email: "femi@eko.example.test" },
         deal: { title: "Weekend Listing", owner_id: emp("staff") },
         signed_before_hub: true,
-      });
+      };
+      // A deal signed as it is made says what it is worth, or that it is worth no money (QA F53).
+      const unvalued = await as("staff").post("/partnerships/partners", body);
+      expect(unvalued.status).toBe(422);
+      expect(unvalued.body.error.fields).toEqual({ "deal.estimated_value": ["Add the deal's value"] });
+      const res = await as("staff").post("/partnerships/partners", { ...body, deal: { ...body.deal, non_monetary: true } });
       expect(res.status).toBe(201);
       expect(res.body.partner).toMatchObject({ number: "PAR-0003", status: "active", signed_outside: true, stage_label: "Partnership Signed" });
       const id = res.body.partner.partner_id;
@@ -514,7 +522,8 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       const closed = await as("staff").post(`/partnerships/partners/${id}/close`, { reason: "They left MyCityApp for good" });
       expect(closed.status).toBe(200);
       expect(closed.body.partner).toMatchObject({ status: "closed", close_reason: "They left MyCityApp for good" });
-      expect(closed.body.deals.map((d) => d.status)).toEqual(["lost", "lost"]);
+      // The signed deal ends as Completed with the reason, never rewritten as lost (QA F63); the open one is lost.
+      expect(closed.body.deals.map((d) => d.status).sort()).toEqual(["completed", "lost"]);
     });
 
     test("New Partner needs a signed or active stage and its evidence", async () => {
@@ -558,7 +567,7 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
         region: { scope: "national" },
         owner_id: emp("staff"),
         contact: { first_name: "Chidi", last_name: "Eze", email: "chidi@ikoyi.example.test" },
-        deal: { title: "Lights 2026", owner_id: emp("staff") },
+        deal: { title: "Lights 2026", owner_id: emp("staff"), estimated_value: "1500000.00" },
         signed_before_hub: true,
       });
       expect(made.status).toBe(201);
@@ -658,6 +667,80 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
     });
   });
 
+  describe("the QA audit's controls (§6.1, §6.5, §6.14; 17/11/2026)", () => {
+    const daysFrom = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    let signedDeal;
+    let leadId;
+
+    test("signing needs a value or No Money Value (F53), and a signed copy is recorded as its agreement (F07)", async () => {
+      const made = await newLead("staff", "Calabar Carnival Nights", { deal: { title: "Carnival 2026", owner_id: emp("staff") } });
+      leadId = made.lead.lead_id;
+      signedDeal = made.deal.deal_id;
+      const copy = (await as("staff").upload("carnival-signed.pdf")).body.document_id;
+      const unvalued = await as("staff").post(`/partnerships/deals/${signedDeal}/stage`, { stage: "partnership_signed", signed_copy_document_id: copy });
+      expect([unvalued.status, unvalued.body.error.code, unvalued.body.error.fields]).toEqual([422, "DEAL_VALUE_REQUIRED", { non_monetary: ["Add the deal's value"] }]);
+      const res = await as("staff").post(`/partnerships/deals/${signedDeal}/stage`, { stage: "partnership_signed", signed_copy_document_id: copy, non_monetary: true });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ status: "live", non_monetary: true });
+      const agreement = await one(
+        "SELECT status, signed_outside, signed_document_id, partner_id IS NOT NULL AS on_partner FROM partnership_agreement WHERE partnership_opportunity_id = $1",
+        [signedDeal],
+      );
+      expect(agreement).toEqual({ status: "signed", signed_outside: true, signed_document_id: copy, on_partner: true });
+    });
+
+    test("a converted lead's last contact is its partner's (F23)", async () => {
+      const partnerId = (await one("SELECT converted_partner_id FROM lead WHERE lead_id = $1", [leadId])).converted_partner_id;
+      const logged = await as("staff").post("/partnerships/interactions", {
+        partner_id: partnerId,
+        interaction_type: "call",
+        occurred_at: new Date(Date.now() - 600000).toISOString(),
+        subject: "Kick-off call",
+        summary: "Agreed the launch week with the organisers.",
+      });
+      expect(logged.status).toBe(201);
+      const row = (await as("staff").get("/partnerships/leads?q=Calabar&status=converted")).body.data[0];
+      expect(row.last_contact_at).not.toBeNull();
+    });
+
+    test("a month of returns must add up (F61)", async () => {
+      const save = (body) => as("ops").put(`/partnerships/deals/${signedDeal}/returns/2026-10`, body);
+      const over = await save({ gross_sales: "100000.00", mycity_commission: "150000.00" });
+      expect([over.status, over.body.error.fields]).toEqual([422, { mycity_commission: ["More than gross sales"] }]);
+      const paid = await save({ gross_sales: "100000.00", mycity_commission: "8000.00", paid_to_partner: "95000.00" });
+      expect([paid.status, paid.body.error.fields]).toEqual([422, { paid_to_partner: ["More than sales left"] }]);
+      expect((await save({ units_sold: 5, gross_sales: "100000.00", mycity_commission: "8000.00", paid_to_partner: "92000.00", downloads: 10 })).status).toBe(200);
+    });
+
+    test("a past close date is refused while the deal is to win; the morning marks it Overdue and a new date clears it (F52)", async () => {
+      const refused = await as("staff").post("/partnerships/leads", leadBody("staff", "Past Close Ltd", { deal: { title: "Old Deal", owner_id: emp("staff"), expected_close_on: "2020-01-01" } }));
+      expect([refused.status, refused.body.error.fields]).toEqual([422, { "deal.expected_close_on": ["Pick today or later"] }]);
+      const made = await newLead("staff", "Overdue Gala", { deal: { title: "Gala 2026", owner_id: emp("staff"), estimated_value: "500000.00", expected_close_on: daysFrom(5) } });
+      const dealId = made.deal.deal_id;
+      // Time passes: the close date is three days gone.
+      await q("UPDATE partnership_opportunity SET expected_close_on = $2::date WHERE partnership_opportunity_id = $1", [dealId, daysFrom(-3)]);
+      const inactivity = require("../../src/modules/partner_pipeline/partner_pipeline.inactivity");
+      expect(await inactivity.markOverdue()).toBeGreaterThanOrEqual(1);
+      expect((await as("staff").get(`/partnerships/deals/${dealId}`)).body.health).toBe("overdue");
+      expect(await one("SELECT source, to_stage FROM partnership_stage_history WHERE partnership_opportunity_id = $1 AND kind = 'health' ORDER BY changed_at DESC LIMIT 1", [dealId])).toEqual({ source: "system", to_stage: "overdue" });
+      // A person never sets Overdue; a past date stays refused; a new date clears it.
+      expect((await as("staff").post(`/partnerships/deals/${dealId}/health`, { health: "overdue" })).status).toBe(422);
+      expect((await as("staff").patch(`/partnerships/deals/${dealId}`, { expected_close_on: daysFrom(-1) })).body.error.fields).toEqual({ expected_close_on: ["Pick today or later"] });
+      const moved = await as("staff").patch(`/partnerships/deals/${dealId}`, { expected_close_on: daysFrom(14) });
+      expect([moved.status, moved.body.health]).toEqual([200, "on_track"]);
+    });
+
+    test("an owner is someone who works in Partnerships, never someone who has left (F06)", async () => {
+      await q("UPDATE app_user SET status = 'left' WHERE employee_id = $1", [emp("peer")]);
+      try {
+        const res = await as("ops").post("/partnerships/leads", leadBody("peer", "Left Behind Ltd"));
+        expect([res.status, res.body.error.fields]).toEqual([422, { owner_id: ["Not in Partnerships"] }]);
+      } finally {
+        await q("UPDATE app_user SET status = 'active' WHERE employee_id = $1", [emp("peer")]);
+      }
+    });
+  });
+
   describe("Praxis AI's cards run the screens' own functions (§9)", () => {
     const roles = async (who) => (await one("SELECT COALESCE(array_agg(role_id), '{}') AS ids FROM user_role WHERE user_id = $1", [user(who)])).ids;
     const actorOf = async (who, key) => {
@@ -679,6 +762,7 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
         name: "Jos Wildlife Park",
         partner_category_id: cat.event,
         region_scope: "national",
+        source: "referral",
         owner_id: emp("staff"),
         contact_first_name: "Yusuf",
         contact_last_name: "Garba",
@@ -700,6 +784,7 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
         contact_first_name: "Efe",
         contact_last_name: "Okon",
         deal_title: "Holiday Listing",
+        estimated_value: "900000.00",
       });
       expect(made.partner).toMatchObject({ status: "active", signed_outside: true });
       const saved = await run("staff", "partners.update", { partner_id: made.partner.partner_id, website: "https://obudu.example.test" });
@@ -715,7 +800,7 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       const deal = await run("staff", "deals.create", { partner_id: partner.partner_id, title: "Easter Packages", owner_id: emp("staff") });
       expect(deal).toMatchObject({ title: "Easter Packages", stage: "prospect_identified" });
       expect((await run("staff", "deals.update", { deal_id: deal.deal_id, next_action: "Send the rate card" })).next_action).toBe("Send the rate card");
-      expect((await run("staff", "deals.move_stage", { deal_id: deal.deal_id, stage: "Proposal Sent" })).stage).toBe("proposal_sent");
+      expect((await run("staff", "deals.move_stage", { deal_id: deal.deal_id, stage: "Proposal Sent", reason: "Sent the rate card at the first call" })).stage).toBe("proposal_sent");
       // A signed stage needs the copy, a file: the card is refused by its own check.
       const signed = await actorOf("staff", "deals.move_stage");
       await expect(registry.action("deals.move_stage").check(pool, { deal_id: deal.deal_id, stage: "partnership_signed" }, signed)).rejects.toMatchObject({ code: "SIGNED_COPY_REQUIRED" });

@@ -385,6 +385,7 @@ function dealRow(d: MockDeal): DealRow {
 function dealDetail(d: MockDeal, money: boolean): DealDetail {
   const out: DealDetail = {
     ...dealRow(d),
+    non_monetary: false,
     objective: d.objective,
     event_ends_on: d.event_ends_on,
     venue: d.venue,
@@ -1365,6 +1366,14 @@ route("POST /api/v1/partnerships/proposals/:id/draft", (req) => {
   setTimeout(() => {
     if (p.status === "writing") Object.assign(p, { status: "draft", content: contentFor({ number: p.number, title: `${p.deal_title}, Together`, partner: p.record.name }), title: `${p.deal_title}, Together`, progress: null });
   }, 9000);
+  return touch(p);
+});
+// Write It Myself: the kit's pages filled at once, nothing asked of the AI.
+route("POST /api/v1/partnerships/proposals/:id/own-words", (req) => {
+  const p = proposalOf(req.params.id);
+  if (!p) return notFound();
+  if (p.status !== "questions") return notNow("A draft is already written");
+  Object.assign(p, { status: "draft", content: contentFor({ number: p.number, title: `${p.deal_title}, Together`, partner: p.record.name }), title: `${p.deal_title}, Together`, progress: null });
   return touch(p);
 });
 route("PATCH /api/v1/partnerships/proposals/:id/content", (req) => {

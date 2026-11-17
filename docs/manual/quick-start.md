@@ -316,7 +316,7 @@ icon: spark
 ![The New Lead form](shot:qs-add-lead)
 
 1. Open [Partnerships · Leads](/partnerships?tab=leads) and press **New Lead**.
-2. On **Organisation**, type the **Name**, then pick the **Category** and the **Region**.
+2. On **Organisation**, type the **Name**, pick the **Category** and the **Region**, and type the **Source**.
 3. Press **Next**. Type the contact's **First Name** and **Last Name**, then press **Next**.
 4. Type the deal's **Title**, pick its **Stage**, then press **Add Lead**.
 5. Read [Add a lead](#partnerships-leads-add).
@@ -327,7 +327,7 @@ icon: spark
 
 1. Open [Partnerships · Leads](/partnerships?tab=leads) and press the lead. For a partner, open
    [Partnerships · Partners](/partnerships?tab=partners).
-2. Press **More**, then **Log Interaction**.
+2. Press **Activity**, then **Log Interaction**.
 3. Pick the **Kind**, the **Day** and the **Time**.
 4. Type the **Subject** and the **Summary**, then press **Log Interaction**.
 5. Read [Log an interaction](#partnerships-partners-log).

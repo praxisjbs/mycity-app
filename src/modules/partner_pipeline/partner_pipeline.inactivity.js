@@ -19,6 +19,11 @@
  *
  * Contact ends the spell; the next quiet spell has another day of last contact, so another key.
  * Safe to run again: a spell already followed up is skipped.
+ *
+ * Before the follow-up, the same morning (morning()): each open deal past its expected close date,
+ * On Track or Follow-Up Required, becomes Overdue, source `system`, with its health line (QA F52); a
+ * Stalled deal keeps its blockers. A new close date or signing clears it. This runs whether or not a
+ * Partner Inactivity rule is enabled.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -156,4 +161,49 @@ async function sweep({ now = new Date() } = {}) {
   return { followed_up: followed };
 }
 
-module.exports = { sweep, followUp, ruleDays };
+/** A batch of open deals past their expected close date and not yet marked, after `after` by id. */
+async function overdueBatch(db, { today, after }) {
+  const { rows } = await db.query(
+    `SELECT po.partnership_opportunity_id AS id FROM partnership_opportunity po
+      WHERE po.status = 'open' AND po.expected_close_on < $1::date AND po.health IN ('on_track', 'follow_up_required')
+        AND ($2::uuid IS NULL OR po.partnership_opportunity_id > $2::uuid)
+      ORDER BY po.partnership_opportunity_id
+      LIMIT $3 -- pagination:batch the deals one step of the morning's overdue pass reads`,
+    [today, after, BATCH],
+  );
+  return rows;
+}
+
+/**
+ * Mark each open deal past its expected close date Overdue (QA F52), one transaction a deal.
+ * @returns {Promise<number>} how many were marked
+ */
+async function markOverdue({ now = new Date() } = {}) {
+  const today = lagos.dateOf(now);
+  const health = require("./partner_pipeline.health");
+  let marked = 0;
+  let after = null;
+  for (;;) {
+    const batch = await overdueBatch(pool, { today, after });
+    for (const d of batch) {
+      const moved = await tx(async (client) => {
+        const deal = await repo.lock(client, d.id);
+        if (!deal || deal.status !== "open" || !["on_track", "follow_up_required"].includes(deal.health)) return false;
+        await health.setIn(client, null, deal, { health: "overdue" }, { source: "system" });
+        return true;
+      });
+      if (moved) marked += 1;
+    }
+    if (batch.length < BATCH) break;
+    after = batch[batch.length - 1].id;
+  }
+  return marked;
+}
+
+/** The morning's scheduler: overdue deals marked, then quiet records followed up. */
+async function morning({ now = new Date() } = {}) {
+  const overdue = await markOverdue({ now });
+  return { ...(await sweep({ now })), overdue };
+}
+
+module.exports = { sweep, followUp, ruleDays, markOverdue, morning };

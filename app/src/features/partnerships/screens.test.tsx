@@ -10,7 +10,9 @@ import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider, useRouter } from "@/lib/router";
 import { ScreenActionProvider } from "@/shell/screen-action";
 import Partnerships from "./index";
-import { forgetKept } from "./lib";
+import { forgetKept, healthPill, moveNeeds } from "./lib";
+import { dealOnWire } from "./forms/parts";
+import { returnsOnWire } from "./forms/ReturnsForm";
 
 /**
  * Pipeline, Partners and Leads with both 360s on the in-browser mock (docs/guides/partnerships.md §10):
@@ -343,4 +345,31 @@ describe("Partnerships on the contract", () => {
     expect((await screen.findAllByRole("button", { name: "Send for Signature" }, { timeout: 8000 })).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   }, 40000);
+});
+
+describe("the QA audit's rules on the screen (17/11/2026)", () => {
+  const stage = (code: string, meaning: string, position: number) => ({ code, label: code, meaning, position, active: true }) as never;
+  const STAGES = [stage("prospect", "prospect", 1), stage("contact", "contacted", 2), stage("meeting", "meeting", 3), stage("proposal", "proposal", 4), stage("signed", "signed", 5), stage("lost", "closed_lost", 6)];
+  const deal = (over: Record<string, unknown> = {}) => ({ stage: "prospect", signed_at: null, estimated_value: "500000.00", non_monetary: false, ...over }) as never;
+
+  it("typed amounts and counts go out as the contract takes them (F51, F61)", () => {
+    expect(dealOnWire({ estimated_value: "750,000", options: [{ deal_price: "15000", original_price: "" }] })).toMatchObject({ estimated_value: "750000.00", options: [{ deal_price: "15000.00", original_price: "" }] });
+    expect(returnsOnWire({ units_sold: "5", gross_sales: "100,000", mycity_commission: "", paid_to_partner: "92000.5", downloads: "10", note: " " })).toEqual({ units_sold: 5, downloads: 10, gross_sales: "100000.00", paid_to_partner: "92000.50" });
+    expect(returnsOnWire({ units_sold: "", gross_sales: "", mycity_commission: "", paid_to_partner: "", downloads: "", note: "" })).toEqual({ units_sold: undefined, downloads: undefined });
+  });
+
+  it("the next stage needs no reason, a skip does (F64); signing a deal with no value asks for No Money Value (F53)", () => {
+    expect(moveNeeds(STAGES, deal(), "contact").reason).toBe(false);
+    expect(moveNeeds(STAGES, deal(), "proposal").reason).toBe(true);
+    expect(moveNeeds(STAGES, deal(), "signed")).toMatchObject({ reason: false, copy: true, value: false });
+    expect(moveNeeds(STAGES, deal({ estimated_value: null }), "signed").value).toBe(true);
+    expect(moveNeeds(STAGES, deal({ estimated_value: "0.00" }), "signed").value).toBe(true);
+    expect(moveNeeds(STAGES, deal({ estimated_value: null, non_monetary: true }), "signed").value).toBe(false);
+  });
+
+  it("a finished deal shows how it ended, never the health it had", () => {
+    expect(healthPill("on_track", "lost")).toEqual({ tone: "neutral", text: "Lost" });
+    expect(healthPill("on_track", "completed")).toEqual({ tone: "neutral", text: "Completed" });
+    expect(healthPill("overdue", "open")).toEqual({ tone: "err", text: "Overdue" });
+  });
 });

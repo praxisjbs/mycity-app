@@ -139,6 +139,24 @@ describe("createApi", () => {
     expect(seen.at(-1)!.query).toEqual({ page: 2 });
   });
 
+  it("reads of one thing mounted together share one request, and a reload still asks again", async () => {
+    let n = 0;
+    const { transport, seen } = fake(() => ({ status: 200, body: { employee_id: `e${++n}` } }));
+    const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
+    const a = renderHook(() => core.useApi("GET /api/v1/employees/:id", { params: { id: "x" } }));
+    const b = renderHook(() => core.useApi("GET /api/v1/employees/:id", { params: { id: "x" } }));
+    await waitFor(() => expect(b.result.current.data).toEqual({ employee_id: "e1" }));
+    expect(a.result.current.data).toEqual({ employee_id: "e1" });
+    expect(seen).toHaveLength(1);
+    let reloading!: Promise<void>;
+    act(() => {
+      reloading = a.result.current.reload();
+    });
+    await act(async () => reloading);
+    expect(seen).toHaveLength(2);
+    await waitFor(() => expect(a.result.current.data).toEqual({ employee_id: "e2" }));
+  });
+
   it("invalidate refetches every mounted read under a path", async () => {
     const { transport, seen } = fake(() => ({ status: 200, body: page(1) }));
     const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });

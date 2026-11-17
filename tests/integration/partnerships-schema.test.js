@@ -254,7 +254,7 @@ describeDb("M7 partnerships schema and reference data against the real migration
     test("seeds the code lists the service switches on, and switches 7099's business choices off", async () => {
       const codes = async (domain, active) =>
         (await q("SELECT code::text AS code FROM reference_value WHERE domain = $1 AND active = $2 ORDER BY display_order", [domain, active])).rows.map((r) => r.code);
-      expect(await codes("deal_health", true)).toEqual(["on_track", "follow_up_required", "stalled"]);
+      expect(await codes("deal_health", true)).toEqual(["on_track", "follow_up_required", "stalled", "overdue"]); // 7191 adds Overdue (QA F52)
       expect(await codes("interaction_type", true)).toEqual(["call", "meeting", "email", "visit", "note"]);
       expect(await codes("partner_type", true)).toEqual([]);
       expect(await codes("partnership_stage", true)).toEqual([]);

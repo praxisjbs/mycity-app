@@ -21,7 +21,7 @@ export interface RecordFilterValue {
 
 export const NO_FILTERS: RecordFilterValue = { stage: "", partner_category_id: "", region_scope: "", owner_id: "", health: "", custom: {} };
 
-type Health = "on_track" | "follow_up_required" | "stalled";
+type Health = "on_track" | "follow_up_required" | "stalled" | "overdue";
 type Scope = "cities" | "national" | "africa" | "worldwide";
 
 /**
@@ -65,6 +65,7 @@ export function RecordFilters({ value, onChange, kind }: { value: RecordFilterVa
             ["on_track", "On Track"],
             ["follow_up_required", "Follow-Up Required"],
             ["stalled", "Stalled"],
+            ["overdue", "Overdue"],
           ]}
         />
         {filterable.map((d) => (

@@ -71,6 +71,7 @@ module.exports = defineManifest({
         { field: "partner_category_id", question: "Which category is it?", read: "categories.list" },
         { field: "region_scope", question: "Where does it work?", choices: SCOPES },
         { field: "city", question: "Which city?", when: { field: "region_scope", not: ["national", "africa", "worldwide"] } },
+        { field: "source", question: "Where did the lead come from?" },
         { field: "owner_id", question: "Who owns the lead?", read: "employees.list" },
         { field: "contact_first_name", question: "Who is the contact there?" },
         { field: "contact_last_name", question: "What is their last name?" },

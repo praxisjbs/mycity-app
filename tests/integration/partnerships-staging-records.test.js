@@ -91,6 +91,35 @@ describeDb("Partnerships' records staging seed against the real migrations", () 
     expect(logs.some((m) => /removed Home's 1 demonstration rows/.test(m))).toBe(true);
   });
 
+  test("its records belong to Partnership & Growth and Branding & Marketing, never Operations & People (QA F06)", async () => {
+    const { rows } = await q(
+      `SELECT DISTINCT d.name AS department
+         FROM (SELECT owner_id FROM lead UNION SELECT owner_id FROM partner UNION SELECT owner_id FROM partnership_opportunity) o
+         JOIN employee e ON e.employee_id = o.owner_id
+         LEFT JOIN department d ON d.department_id = e.department_id`,
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(["Partnership & Growth", "Branding & Marketing"]).toContain(r.department);
+  });
+
+  test("a run again moves a record it made that was left with Operations & People", async () => {
+    const ops = await one(
+      `SELECT e.employee_id FROM employee e JOIN app_user u ON u.employee_id = e.employee_id
+         JOIN user_role ur ON ur.user_id = u.user_id JOIN role r ON r.role_id = ur.role_id
+        WHERE r.code = 'operations_people' LIMIT 1`,
+    );
+    const kora = await one("SELECT partner_id, owner_id FROM partner WHERE name = 'Kora Street Kitchens'");
+    await q("UPDATE partner SET owner_id = $2 WHERE partner_id = $1", [kora.partner_id, ops.employee_id]);
+    await q("UPDATE partnership_opportunity SET owner_id = $2 WHERE partner_id = $1", [kora.partner_id, ops.employee_id]);
+    const again = [];
+    await runFile(seed, again);
+    await settle();
+    expect(again.filter((m) => /not moved|stopped/.test(m))).toEqual([]);
+    expect(await one("SELECT owner_id FROM partner WHERE partner_id = $1", [kora.partner_id])).toEqual({ owner_id: kora.owner_id });
+    const deals = (await q("SELECT DISTINCT owner_id FROM partnership_opportunity WHERE partner_id = $1 AND status IN ('open', 'live')", [kora.partner_id])).rows;
+    expect(deals).toEqual([{ owner_id: kora.owner_id }]);
+  });
+
   test("partners signed before the hub, with their returns and latest contact; one quiet", async () => {
     const names = (await q("SELECT name FROM partner ORDER BY name")).rows.map((r) => r.name);
     for (const p of seed.PARTNERS) expect(names).toContain(p.name);

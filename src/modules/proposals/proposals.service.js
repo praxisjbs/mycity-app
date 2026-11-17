@@ -47,6 +47,20 @@ const tx = async (fn) => {
 const notFound = () => new AppError("NOT_FOUND", "That proposal does not exist, or you cannot see it", 404);
 const refuse = (message, fields) => new AppError("PROPOSAL_STATE", message, 409, fields);
 const now = () => new Date().toISOString();
+
+/**
+ * How long a job may say nothing before the proposal reads it as failed: past the AI call's own
+ * timeout on both providers, so a call still answering is never cut off (QA F62: the questions sat
+ * at Asking for ten minutes). The draft's steps each mark their time, so it has longer.
+ */
+const STALL_MS = { questions: 3 * 60_000, draft: 10 * 60_000 };
+/** A running job that has said nothing for too long, read as a failure Try Again may restart. */
+function progressOf(progress, at = Date.now()) {
+  if (!progress || progress.failed) return progress || null;
+  const since = Date.parse(progress.at || "");
+  const limit = STALL_MS[progress.job] || STALL_MS.draft;
+  return Number.isFinite(since) && at - since > limit ? { ...progress, failed: true, reason: "error" } : progress;
+}
 const aadOf = (id) => `partnership_proposal:${id}:link`;
 
 /** The private link of a proposal while its token works. */
@@ -151,7 +165,7 @@ async function detailOf(db, r, actor) {
     supersedes_id: r.supersedes_id,
     link_url: out || r.status === "accepted" ? linkOf(r) : null,
     ai,
-    progress: r.progress,
+    progress: progressOf(r.progress),
     versions,
     can: {
       edit: r.status === "draft",
@@ -275,10 +289,11 @@ async function start(actor, body, scope, { byHand = false } = {}) {
 /** Try Again: the questions or the draft asked of Claude once more, the brief and answers kept. */
 async function retry(actor, id, scope) {
   const r = await seen(pool, id, scope);
-  if (!r.progress || !r.progress.failed) throw refuse("Nothing to try again");
+  const progress = progressOf(r.progress);
+  if (!progress || !progress.failed) throw refuse("Nothing to try again");
   const ai = await aiState(pool);
   if (ai !== "on") throw refuse(ai === "capped" ? "AI Limit Reached" : "AI Is Off");
-  const job = r.progress.job;
+  const job = progress.job;
   await tx(async (client) => {
     await repo.lockProposal(client, id);
     if (job === "questions") await repo.clearQuestions(client, id);
@@ -386,13 +401,18 @@ async function reshuffle(actor, id, qid, scope) {
  * Write Draft
  * ------------------------------------------------------------------ */
 
-async function requestDraft(actor, id, scope, { byHand = false } = {}) {
+/**
+ * Write Draft. `byHand` fills the kit from the record without asking Claude: the staging seed's, and
+ * Write It Myself (`ownWords`), which a person may press while the cards are still being asked or after
+ * they failed, so a proposal never waits on the AI (QA F62); the cards, if any arrive, are left unread.
+ */
+async function requestDraft(actor, id, scope, { byHand = false, ownWords = false } = {}) {
   const r = await seen(pool, id, scope);
   if (r.status !== "questions") throw refuse("A draft is already written");
   const cards = await repo.questionsOf(pool, id);
   const open = cards.filter((q) => q.required && q.state === "open");
-  if (open.length) throw refuse("Answer the required cards", { questions: ["Answer the required cards"] });
-  const ai = byHand ? "off" : await aiState(pool);
+  if (open.length && !ownWords) throw refuse("Answer the required cards", { questions: ["Answer the required cards"] });
+  const ai = byHand || ownWords ? "off" : await aiState(pool);
   await tx(async (client) => {
     await repo.lockProposal(client, id);
     if (ai === "on") {
@@ -416,7 +436,7 @@ async function requestDraft(actor, id, scope, { byHand = false } = {}) {
       logoAssetId: (assets.find((a) => a.role === "logo") || {}).proposal_asset_id,
     });
     await repo.updateProposal(client, id, { status: "draft", content: built, progress: null });
-    await emit(client, { key: EVENTS.PROPOSAL_DRAFTED, entity: { type: "partnership_proposal", id }, actor, payload: { number: r.number, by_hand: true } });
+    await emit(client, { key: EVENTS.PROPOSAL_DRAFTED, entity: { type: "partnership_proposal", id }, actor, payload: { number: r.number, by_hand: true, ...(ownWords ? { own_words: true } : {}) } });
   });
   return reread(id, actor);
 }
@@ -655,6 +675,7 @@ async function aiSummary(client, params, scope, at = new Date()) {
 }
 
 module.exports = {
+  progressOf,
   list,
   aiSummary,
   summary,

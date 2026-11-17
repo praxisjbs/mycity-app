@@ -88,9 +88,10 @@ describeDb("partnerships: work connected to a partner", () => {
         name,
         partner_category_id: cat.event,
         region: { scope: "national" },
+        source: "Referral",
         owner_id: emp(who),
         contact: { first_name: "Ngozi", last_name: "Adebayo", email: `${name.toLowerCase().replace(/\W+/g, ".")}@example.test` },
-        deal: { title: `${name} 2026`, owner_id: emp(who), ...deal },
+        deal: { title: `${name} 2026`, owner_id: emp(who), estimated_value: "600000.00", ...deal },
       }),
       201,
     );
@@ -102,7 +103,7 @@ describeDb("partnerships: work connected to a partner", () => {
         region: { scope: "national" },
         owner_id: emp(who),
         contact: { first_name: "Femi", last_name: "Bello", email: `${name.toLowerCase().replace(/\W+/g, ".")}@example.test` },
-        deal: { title: `${name} Edition`, owner_id: emp(who), ...deal },
+        deal: { title: `${name} Edition`, owner_id: emp(who), estimated_value: "750000.00", ...deal },
         ...extra,
       }),
       201,
@@ -249,6 +250,22 @@ describeDb("partnerships: work connected to a partner", () => {
       // The 360's Overview names the next events the reader may see.
       expect((await as("staff").get(`/partnerships/leads/${lead}`)).body.overview.events.map((e) => e.title)).toEqual(["Tasting with the organisers"]);
       expect((await as("other").get(`/partnerships/leads/${lead}`)).body.overview.events).toEqual([]);
+    });
+
+    test("the Work tab opens every kind for a reader of every scope (all, team, own)", async () => {
+      // A reader with `all` was once refused every kind: the task filter named the reader's id
+      // only for a narrower scope, and PostgreSQL rejects a parameter the query never uses.
+      for (const who of ["ops", "manager", "staff"]) {
+        for (const kind of ["task", "project", "event"]) {
+          const page = ok(await as(who).get(`/partnerships/work?lead_id=${lead}&kind=${kind}`));
+          expect(Array.isArray(page.data)).toBe(true);
+        }
+      }
+      const everyTask = ok(await as("ops").get(`/partnerships/work?lead_id=${lead}&kind=task`));
+      expect(everyTask.hidden).toEqual({ projects: 0, tasks: 0, events: expect.any(Number) });
+      expect(everyTask.data.length).toBeGreaterThanOrEqual(3);
+      const byDeal = ok(await as("ops").get(`/partnerships/work?lead_id=${lead}&deal_id=${leadDeal}&kind=task`));
+      expect(byDeal.data.every((t) => t.deal_id === leadDeal)).toBe(true);
     });
 
     test("the pickers offer the records and open deals the person sees", async () => {

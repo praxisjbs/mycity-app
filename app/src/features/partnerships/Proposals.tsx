@@ -202,7 +202,7 @@ function ProposalList() {
   }, [preset]);
   return (
     <>
-      <PageHeader title="Proposals" sub="Written with Claude, sent by you" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newProposal}>New Proposal</Button> : undefined} />
+      <PageHeader title="Proposals" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newProposal}>New Proposal</Button> : undefined} />
       {s.data && (
         <KpiTiles
           mobileCols={2}

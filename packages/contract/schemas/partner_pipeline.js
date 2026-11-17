@@ -26,8 +26,13 @@ const { PlaceInput, PlaceView } = require("./maps");
 
 /** What a stage counts as, fixed, so MyCity may rename its stages without breaking a count (§6.3). */
 const StageMeaning = z.enum(["prospect", "contacted", "meeting", "proposal", "negotiation", "signed", "active", "closed_lost", "on_hold"]);
-/** How a deal is going beside its stage (deal_health). Stalled needs blockers. */
-const DealHealth = z.enum(["on_track", "follow_up_required", "stalled"]);
+/**
+ * How a deal is going beside its stage (deal_health). Stalled needs blockers; `overdue` is an open deal
+ * past its expected close, set each morning, never by a person.
+ */
+const DealHealth = z.enum(["on_track", "follow_up_required", "stalled", "overdue"]);
+/** The health a person sets (Set Health, its card): never Overdue, which the morning job decides. */
+const SettableHealth = z.enum(["on_track", "follow_up_required", "stalled"]);
 /** open: being pursued; live: signed and running; completed: past its validity and event; lost. */
 const DealStatus = z.enum(["open", "live", "completed", "lost"]);
 /** A record's region: the cities picked, or one of the wider scopes. */
@@ -595,6 +600,8 @@ const DealFields = z
     stage: blank(listCode),
     /** Projected value: the owner's estimate. */
     estimated_value: blank(money),
+    /** New Partner's signed deal with no value: signed with no money value on purpose (§6.5). */
+    non_monetary: z.boolean().optional(),
     commission_pct: blank(percent),
     validity: Validity.optional(),
     expected_close_on: blank(isoDate),
@@ -659,13 +666,15 @@ const StageMove = z
     stage: listCode,
     reason: blank(z.string().trim().min(10, "At least 10 characters").max(1000)),
     signed_copy_document_id: blank(uuid),
+    /** Into a signed stage with no projected value: signed with no money value on purpose. */
+    non_monetary: z.boolean().optional(),
   })
   .strict();
 
 /** Set Health. Stalled needs its blockers. */
 const HealthSet = z
   .object({
-    health: DealHealth,
+    health: SettableHealth,
     blockers: blank(z.string().trim().min(10, "At least 10 characters").max(1000)),
   })
   .strict()
@@ -732,7 +741,7 @@ const DealStageChange = z
 const DealHealthChange = z
   .object({
     deal_id: recordId("deal"),
-    health: DealHealth,
+    health: SettableHealth,
     blockers: blank(z.string().trim().min(10, "At least 10 characters").max(1000)),
   })
   .strict()
@@ -820,6 +829,8 @@ const DealDetail = DealRow.extend({
   close_reason: z.string().nullable(),
   /** Its agreement's value when it has one, else its projected value. */
   signed_value: money.nullable(),
+  /** Signed with no money value on purpose (§6.5). */
+  non_monetary: z.boolean(),
   impact: z.array(z.string()),
   /** Its impacts by name, in the list's order: what Edit Deal's Impact holds. */
   impact_labels: z.array(z.string()),
@@ -1137,6 +1148,7 @@ module.exports = {
   TABLES,
   StageMeaning,
   DealHealth,
+  SettableHealth,
   DealStatus,
   RegionScope,
   ImpactRating,
