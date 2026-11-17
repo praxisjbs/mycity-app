@@ -399,6 +399,41 @@
       "capability": "expenses.finance"
     },
     {
+      "key": "documents.category_create",
+      "kind": "action",
+      "module_key": "documents",
+      "permission": "documents.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "library.DocumentCategoryCreate",
+      "schema_sha": "7705b0ffa3c30bbc",
+      "screen": null,
+      "capability": "documents.manage"
+    },
+    {
+      "key": "documents.category_edit",
+      "kind": "action",
+      "module_key": "documents",
+      "permission": "documents.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "library.DocumentCategoryChange",
+      "schema_sha": "507a02ba629691fc",
+      "screen": null,
+      "capability": "documents.manage"
+    },
+    {
+      "key": "documents.edit_details",
+      "kind": "action",
+      "module_key": "documents",
+      "permission": "documents.edit",
+      "risk": "standard",
+      "bulk": 1,
+      "schema": "library.CompanyDocumentChange",
+      "schema_sha": "0faea9396e7f136f",
+      "screen": null
+    },
+    {
       "key": "employees.add",
       "kind": "action",
       "module_key": "people",
@@ -1903,6 +1938,18 @@
       "summary": "disbursements.summary"
     },
     {
+      "key": "documents.find",
+      "kind": "read",
+      "module_key": "documents",
+      "permission": "documents.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "library.LibraryListQuery",
+      "schema_sha": "3b37f33c2e2968f4",
+      "screen": null,
+      "summary": "documents.summary"
+    },
+    {
       "key": "employees.list",
       "kind": "read",
       "module_key": "people",
@@ -2678,6 +2725,50 @@
       "schema": null,
       "schema_sha": null,
       "screen": "community.channels"
+    },
+    {
+      "key": "documents.route.download_the_letterhead",
+      "kind": "route",
+      "module_key": "documents",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "documents.library"
+    },
+    {
+      "key": "documents.route.manage_document_categories_and_who_sees_them",
+      "kind": "route",
+      "module_key": "documents",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "documents.categories"
+    },
+    {
+      "key": "documents.route.open_the_document_centre_or_find_a_document",
+      "kind": "route",
+      "module_key": "documents",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": "3b37f33c2e2968f4",
+      "screen": "documents.library"
+    },
+    {
+      "key": "documents.route.upload_a_company_document",
+      "kind": "route",
+      "module_key": "documents",
+      "permission": null,
+      "risk": null,
+      "bulk": null,
+      "schema": null,
+      "schema_sha": null,
+      "screen": "documents.library"
     },
     {
       "key": "ess.route.change_my_phone_address_next_of_kin_or_bank_details",
@@ -4272,6 +4363,17 @@
       "bulk": null,
       "schema": "disbursements.DisbursementSummaryQuery",
       "schema_sha": "5db509dd85943153",
+      "screen": null
+    },
+    {
+      "key": "documents.summary",
+      "kind": "summary",
+      "module_key": "documents",
+      "permission": "documents.view",
+      "risk": null,
+      "bulk": null,
+      "schema": "library.LibrarySummaryQuery",
+      "schema_sha": "32062bdb9024160d",
       "screen": null
     },
     {

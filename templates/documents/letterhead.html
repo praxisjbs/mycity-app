@@ -70,7 +70,7 @@
   <div class="lh-meta">
     {{#if doc.sealing.qr}}<img class="lh-meta-qr" src="{{ doc.sealing.qr }}" alt="Verification code">{{/if}}
     {{#if number}}<div><strong>{{ number }}</strong></div>{{/if}}
-    {{#if doc.letter}}{{else}}<div>{{ longdate today }}</div>{{/if}}
+    {{#if doc.letter}}{{else}}{{#if doc.blank}}{{else}}<div>{{ longdate today }}</div>{{/if}}{{/if}}
   </div>
 </header>
 </td></tr></thead>

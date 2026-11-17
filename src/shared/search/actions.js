@@ -215,6 +215,25 @@ const ACTIONS = Object.freeze([
     capability: "training.manage",
     words: ["course", "build a course", "create a course", "new lesson"],
   }),
+  a("upload_document", "Upload Document", {
+    screen: "documents.library",
+    params: { action: "new" },
+    need: ["documents", "create"],
+    words: ["upload a document", "add a document", "company document", "cac certificate", "licence", "status report"],
+  }),
+  a("download_letterhead", "Download Letterhead", {
+    screen: "documents.library",
+    params: { action: "letterhead" },
+    need: ["documents", "view"],
+    words: ["letterhead", "blank letterhead", "company letterhead", "headed paper"],
+  }),
+  a("new_document_category", "New Document Category", {
+    screen: "documents.categories",
+    params: { action: "new" },
+    need: ["documents", "edit"],
+    capability: "documents.manage",
+    words: ["document category", "new category", "who sees documents"],
+  }),
   a("raise_query", "Raise a Query", {
     screen: "queries.queries",
     params: { action: "new" },

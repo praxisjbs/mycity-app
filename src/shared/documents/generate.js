@@ -47,6 +47,10 @@
  *   defineDocType("sanction_letter", { template: "warning-letter", templateChoice: true, ... });
  *   await documents.generate(client, { doc_type: "sanction_letter", template: step.letter_template, ... });
  *
+ * A doc type that is the letterhead itself with nothing on it (the Document Centre's Download
+ * Letterhead, docs/guides/document-centre.md §6.8) declares `blank: true` with `heading: false`:
+ * the letterhead then prints no date, so the page is left for a letter not yet written.
+ *
  * A doc type whose documents someone signs off declares `signedBy: (data) => data.signer`. The
  * letterhead then closes the body with that person's block, `{ name, role, signature }` (a PNG
  * data URL drawn on a SignatureField, or null), whatever the template, so a letter written on a
@@ -136,6 +140,8 @@ function defineDocType(docType, spec) {
     throw new Error(`defineDocType(${docType}): appendix is (data) => [{ title, markdown }]`);
   if (spec.sealing !== undefined && typeof spec.sealing !== "function")
     throw new Error(`defineDocType(${docType}): sealing is (data) => { signers, certificate, qr, verify_url, reference } or null`);
+  if (spec.blank !== undefined && typeof spec.blank !== "boolean")
+    throw new Error(`defineDocType(${docType}): blank is true or false`);
   if (spec.ownWording === true && spec.templateChoice !== true)
     throw new Error(`defineDocType(${docType}): ownWording needs templateChoice, to name the template the wording came from`);
   if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec)
@@ -274,6 +280,7 @@ function docOf(spec, data, title) {
   const letter = spec.letter ? spec.letter(data) || null : null;
   return {
     title: spec.heading === false ? null : title,
+    blank: spec.blank === true,
     signer: spec.signedBy ? spec.signedBy(data) || null : null,
     letter: letter ? { date: letter.date, to: (letter.to || []).filter(Boolean).map((line) => ({ line })) } : null,
     appendix: spec.appendix ? (spec.appendix(data) || []).filter((x) => x && x.markdown) : [],
