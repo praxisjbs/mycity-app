@@ -979,6 +979,7 @@ do:
   - fill: label "Name" = Kora Street Kitchens
   - click: label "Category"
   - click: role option "Hospitality"
+  - click: role radio "National"
   - click: button "Next"
   - wait: label "First Name"
 crop: modal
@@ -994,6 +995,7 @@ do:
   - fill: label "Name" = Kora Street Kitchens
   - click: label "Category"
   - click: role option "Hospitality"
+  - click: role radio "National"
   - click: button "Next"
   - fill: label "First Name" = Ife
   - fill: label "Last Name" = Bello
@@ -1152,6 +1154,9 @@ do:
   - fill: label "Name" = Kora Street Kitchens
   - click: label "Category"
   - click: role option "Hospitality"
+  - click: role radio "National"
+  - fill: label "Source" = Referral
+  - press: Tab
   - click: button "Next"
   - wait: label "First Name"
 crop: modal
@@ -1167,6 +1172,9 @@ do:
   - fill: label "Name" = Kora Street Kitchens
   - click: label "Category"
   - click: role option "Hospitality"
+  - click: role radio "National"
+  - fill: label "Source" = Referral
+  - press: Tab
   - click: button "Next"
   - fill: label "First Name" = Ife
   - fill: label "Last Name" = Bello
