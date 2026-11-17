@@ -149,7 +149,7 @@ function CategoryPanel({ id, onGone }: { id: string; onGone: () => void }) {
   if (read.error) {
     return (
       <Card>
-        <EmptyState bare title="Category Not Found" text="It was removed, or is not yours to open." icon="doc" action={<Button onClick={onGone}>Back to Categories</Button>} />
+        <EmptyState bare title="Category Not Found" text="It was removed, or is not yours." icon="doc" action={<Button onClick={onGone}>Back to Categories</Button>} />
       </Card>
     );
   }
