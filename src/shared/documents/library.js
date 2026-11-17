@@ -65,6 +65,7 @@ const NOT_IN_LIBRARY = Object.freeze({
   mail_attachment: "a mail's attachment, for the mailbox it arrived in",
   mail_signature_image: "a picture inside an email signature",
   employee_photo: "a profile photo",
+  leave_handover: "a leave request's handover note, for its person, relief officer and approvers (ess.md §8)",
   brand_image: "a brand file of Settings · Organisation",
   signature_image: "a drawn signature, part of the document it signed",
   query_signature: "a drawn signature, part of the letter it signed",

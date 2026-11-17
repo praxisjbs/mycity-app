@@ -13,6 +13,7 @@ const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
 const { rebuild } = require("./helpers/schema");
+const { annualWithoutCover } = require("./helpers/leave");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
@@ -67,6 +68,8 @@ describeDb("My Profile against the real migrations", () => {
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
+    // A short Annual request is only the way to the photo on the leave list (helpers/leave.js).
+    await annualWithoutCover(pool);
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));
     const make = (key, first, last, role, job) =>
