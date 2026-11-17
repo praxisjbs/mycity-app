@@ -5,12 +5,14 @@
  *   const g = await governance.check(db, { module: "recruitment" });
  *   // → { settings, vendor: "gemini" | "stub", model, spent_ngn, cap_ngn }
  *   //   or throws AppError AI_DISABLED / AI_MODULE_DISABLED / AI_CAP_REACHED
+ *   await governance.available(db)   // → false while switched off or at the cap on all AI
  *
  * Every AI entry point (llm.service.complete, transcription) asks here first, so a
  * new feature cannot forget the switch or the cap.
  *
  * The settings (ai_setting, one row) hold:
- *   enabled                 the whole of AI on or off
+ *   enabled                 the whole of AI on or off: Switch Off AI and Switch On AI on AI
+ *                           Control · Spend, with switched_by and switched_at (ai_governance)
  *   vendor                  "stub" sends every call to the stub; otherwise the chains decide
  *                           (services/ai/jobs.js, AI Control). `model` is no longer read
  *   disabled_modules        per-module switch: module keys whose AI features are off
@@ -221,9 +223,31 @@ async function atCap(db, now = new Date()) {
   return value;
 }
 
-/** A cap set or a test: ask again at once. */
+/** Ten seconds of the answer to "may AI answer now", per process, as for the caps. */
+let availableMemo = { at: 0, month: null, value: null };
+
+/** A cap set, the switch pressed or a test: ask again at once. */
 function forgetCaps() {
   capMemo = { at: 0, month: null, value: null };
+  availableMemo = { at: 0, month: null, value: null };
+}
+
+/**
+ * May any AI call happen now: switched on and the month's cap on all AI not reached. The hub hides
+ * its AI buttons when it may not (/auth/me `ai_available`, ⌘K; docs/guides/ai-control.md §6.7).
+ * A provider set up or not is not asked: with none, the stub answers.
+ * @param {{query: Function}} db
+ * @returns {Promise<boolean>}
+ */
+async function available(db, now = new Date()) {
+  const month = lagos.today(now).slice(0, 7);
+  if (availableMemo.value !== null && availableMemo.month === month && Date.now() - availableMemo.at < CAP_TTL_MS)
+    return availableMemo.value;
+  const s = await settings(db);
+  let value = s.enabled;
+  if (value && s.monthly_cap_ngn !== null) value = money.compare(await spentThisMonth(db, now), s.monthly_cap_ngn) < 0;
+  availableMemo = { at: Date.now(), month, value };
+  return value;
 }
 
 /**
@@ -296,6 +320,7 @@ module.exports = {
   caps,
   atCap,
   forgetCaps,
+  available,
   check,
   health,
 };

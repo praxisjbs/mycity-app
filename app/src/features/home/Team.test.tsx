@@ -334,6 +334,7 @@ describe("a person's sheet", () => {
         manages_people: true,
         appearance: { dark: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact" },
         hidden_fields: [],
+        ai_available: true,
       }) as Me;
     const open = () => true;
     const labels = (me: Me, opens: (tab: string) => boolean = open) => personLinks(me, "00000000-0000-4000-a000-000000000003", opens).map((l) => l.label);

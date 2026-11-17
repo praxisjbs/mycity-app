@@ -4,6 +4,7 @@ import { capabilitiesOf } from "../data/access";
 import { appearanceApplied } from "../data/appearance";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
 import { searchResult } from "../data/search";
+import { aiAvailable } from "./ai_control";
 import { searchableDays } from "./attendance";
 import { leaveRequests } from "./organisation";
 import { codeGiven, codeOk, markFresh, needsCode, passkeyOwner, waysOf } from "./security";
@@ -61,6 +62,7 @@ export function me(key: string): Me {
     manages_people: teamOf(key).length > 0,
     appearance: appearanceApplied(),
     hidden_fields: isCeo || SEES_ALL.includes(role.code) ? [] : HIDDEN,
+    ai_available: aiAvailable(),
   };
 }
 

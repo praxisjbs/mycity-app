@@ -9,6 +9,7 @@ import assessmentSchemas from "@mycity/contract/schemas/assessments.js";
 import type { AssessmentDetail } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useApi, useMutation } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { Button, Card, CardHeader, ChoiceField, Field, FormError, FormFooter, Grid, HelpTerm, NumberField, TextAreaField, TextField, toast } from "@mycity/ui";
 import { say } from "./shared";
 
@@ -43,6 +44,7 @@ export function AssessmentQuestions({ assessment, close, onSaved }: { assessment
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [problem, setProblem] = useState<string | null>(null);
   const ai = useApi("GET /api/v1/recruitment/vacancies/assist");
+  const aiOn = useAiAvailable();
   const suggest = useMutation("POST /api/v1/recruitment/assessments/assist");
   const save = useMutation("PUT /api/v1/recruitment/assessments/:id/questions");
   const place = (issues: Issue[]) => {
@@ -99,7 +101,7 @@ export function AssessmentQuestions({ assessment, close, onSaved }: { assessment
   const mark = (key: string) => (errors[key] ? { state: "bad" as const, message: errors[key] } : {});
   return (
     <>
-      {ai.data?.available && (
+      {(aiOn && ai.data?.available) && (
         <div className="mb-3 flex justify-end">
           <Button size="sm" icon="spark" onClick={suggestAi}>Suggest With AI</Button>
         </div>

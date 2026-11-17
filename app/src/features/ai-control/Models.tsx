@@ -2,6 +2,7 @@ import aiControl from "@mycity/contract/schemas/ai_control.js";
 import type { AiControlModel, AiPriceProposal, AiPricesSave, AiProvider } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { invalidate, refresh, useApi, usePaged } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { useAuth } from "@/auth/AuthProvider";
 import { doesOf } from "@/features/settings/integrations/words";
 import { useRouter } from "@/lib/router";
@@ -186,6 +187,7 @@ function ModelSheet({ m, close }: { m: AiControlModel; close: () => void }) {
 
 /** The New Prices sheet (decision 31): the run as it goes, its proposals, Accept All, Find More. */
 function NewPrices() {
+  const aiOn = useAiAvailable();
   const { can } = useAuth();
   const edit = can("ai_control", "edit");
   const summary = useApi("GET /api/v1/ai-control/models/summary");
@@ -315,9 +317,9 @@ function NewPrices() {
           ]}
         />
       )}
-      {edit && !running && (waiting > 0 || (s?.to_price ?? 0) > 0) && (
+      {edit && !running && (waiting > 0 || (aiOn && (s?.to_price ?? 0) > 0)) && (
         <FormFooter>
-          {(s?.to_price ?? 0) > 0 && <Button onClick={findMore}>Find More</Button>}
+          {aiOn && (s?.to_price ?? 0) > 0 && <Button onClick={findMore}>Find More</Button>}
           {waiting > 0 && (
             <Button variant="primary" icon="check" onClick={acceptAll}>
               Accept All
@@ -334,6 +336,8 @@ type Show = (typeof SHOW)[number][0];
 
 /** AI Control · Models (docs/guides/ai-control.md §2, §10). */
 export function Models() {
+  // Find Prices asks a model; Edit Price is how a price is set while AI is off (ai-control.md §6.7).
+  const aiOn = useAiAvailable();
   const { can } = useAuth();
   const modal = useModal();
   const [provider, setProvider] = useState<AiProvider | "">("");
@@ -384,7 +388,7 @@ export function Models() {
         <Button variant="primary" icon="check" onClick={review}>
           Review Prices
         </Button>
-      ) : can("ai_control", "edit") ? (
+      ) : aiOn && can("ai_control", "edit") ? (
         <Button variant="primary" icon="srch" onClick={find}>
           Find Prices
         </Button>

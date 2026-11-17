@@ -4,6 +4,7 @@ import type { ProposalDetail, ProposalPreview } from "@mycity/contract/contract.
 import { api } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { saveExport } from "@/api/exports";
+import { useAiAvailable } from "@/auth/ai";
 import { Banner, Button, Field, FormFooter, TextAreaField, TextField, toast, useContractForm } from "@mycity/ui";
 import { fail, failed } from "../lib";
 
@@ -32,6 +33,7 @@ export function SendProposal({ p, preview, close, done }: { p: ProposalDetail; p
   const [off, setOff] = useState<string | null>(null);
   const send = useMutation("POST /api/v1/partnerships/proposals/:id/send");
   const draft = useMutation("POST /api/v1/partnerships/proposals/:id/message");
+  const aiOn = useAiAvailable();
   const toText = to ?? primary;
 
   const write = async () => {
@@ -90,7 +92,7 @@ export function SendProposal({ p, preview, close, done }: { p: ProposalDetail; p
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button icon="spark" onClick={write}>Write With AI</Button>
+        {aiOn && <Button icon="spark" onClick={write}>Write With AI</Button>}
         <Button variant="primary" icon="send" onClick={confirm}>Confirm and Send</Button>
       </FormFooter>
     </>

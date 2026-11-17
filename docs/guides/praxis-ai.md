@@ -2027,7 +2027,10 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **No AI provider set up** (a laptop, CI, a staging server without a key): the stub answers,
   marked as a placeholder, with no reads; the ledger records it (`vendor: stub`).
 - **AI switched off, Praxis AI's module switch off, or the month's cap reached**: no model is
-  asked; the answer line says so in a few words and nothing is spent.
+  asked; the answer line says so in a few words and nothing is spent. Switched off or at the cap,
+  the hub leaves Praxis AI out altogether (`Me.ai_available`, `ai-control.md` §6.7): the menu, the
+  top bar's button, the floating button's and ⌘K's; a link to it lands on the first screen the
+  person may open. Praxis AI's own switch alone still shows it and refuses the question.
 - **Every model in the chain passed by or failing**: `AI_UNAVAILABLE`, Try Again.
 - **The model names a read the person may not run, or one that does not exist**: it was never
   offered; the call is refused as not available and the loop carries on.
@@ -2650,6 +2653,7 @@ area and guides from B.4:
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Praxis AI itself: the menu, the top bar's button, the floating button's, ⌘K's screens, New Conversation and conversations; a link to it lands on the first screen the person may open; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 17/11/2026 · TB · The Document Centre joins the assistant (`document-centre.md` §9, its PR 2): the read `documents.find` (the library by the asker's own rights, the words found inside a file never returned), the summary `documents.summary` (the Library's four figures), the cards `documents.edit_details`, `documents.category_create` and `documents.category_edit`, and four routes to Document Centre · Library and Categories. No file's contents reach a model (D12); no new model call, so no new AI job.
 
 - 14/11/2026 · JP · Charts in the Overview, PR 8 built (Appendix B; §6.13 Workspace, Knowledge Hub, Community, Home and Settings, §6.19 items 3 and 9): ten summaries, `projects.summary`, `calendar.summary`, `training.summary`, `policies.summary`, `sops.summary`, `announcements.summary`, `activity.summary`, `alerts.summary`, `runs.summary` and `imports.summary`, each one SQL with its list's own reach, stacked where a grouping has parts; their twelve reads name them, so every read names its summary or why it needs none, `scripts/check/ai-summary-gaps.json` is deleted and gate 23 rule 9 runs with no list. Try Asking gains a chart question for each area, by its summary, two of the six shown (§6.8, rule 5 holding each to a summary that exists); the User Guide's See figures as a chart an example for each area. The build taught §6.13 six things, written there: these lists show every record, so a period narrows only when asked, but Calendar is a month and Activity a day; a summary over a list that answers only a capability's holders answers only them, except Training (anyone else's own places, as My Training) and Announcements (anyone else's own received, the read rates being the tab's, decision 58); a project's Open and Overdue are apart, so its parts sum; an SOP is Published, a Draft never published or Archived, a published one being changed a figure of its own; Activity Today's six events from two modules group by kind; Calendar's kinds are five, to keep within a stacked bar's six parts. `calendar.summary` and `activity.summary` carry their reads' probes, each making its record today (§6.17); the calendar's month and its summary read one list of items (`calendar.repo` `ITEMS`).

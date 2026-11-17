@@ -19,6 +19,7 @@
  *   GET    /spend/actions                 view   this month by action, 25 a page
  *   PUT    /caps/:provider                edit   a paid provider's monthly cap
  *   PUT    /cap                           edit   the cap on all AI
+ *   PUT    /switch                        edit   Switch Off AI or Switch On AI
  *
  * The `ai_control` key (seed 10290): the Implementation Team and the System Administrator edit,
  * Operations & People view, nobody else holds it.
@@ -101,5 +102,9 @@ route(router, "put", "/caps/:provider",
 route(router, "put", "/cap",
   { body: a.AiCapSave, response: a.AiSpend, summary: "Set the monthly cap on all AI" },
   edit, controller.setOverallCap);
+
+route(router, "put", "/switch",
+  { body: a.AiSwitchSave, response: a.AiSpend, summary: "Switch all AI off or on" },
+  edit, controller.setSwitch);
 
 module.exports = { basePath: "/ai-control", surface: "staff", router };

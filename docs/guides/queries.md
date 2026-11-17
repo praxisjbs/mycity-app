@@ -612,6 +612,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Write With AI on Raise a Query and the letter editor (its AI Is Off label stays for a module switched off alone); the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 16/11/2026 · TB · §9: the Document Centre's Library lists the letter a query holds and each letter a sanction issued (`queries.library.js`; `document-centre.md` §6.2), by the vault's default rule: the employee it is about and Queries & Sanctions within scope. Nothing on a Queries & Sanctions screen changed.
 - 13/11/2026 · JP · §9: `queries.summary` and `sanctions.summary` for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7), within §6.1's rule, fines in naira only for a reader who sees pay. Nothing on screen changes.
 - 11/11/2026 · JP · Fault #9 of the 11/11 staging brief (`QUERY_SELF: employee_id` at `POST /queries`): Raise a Query's Employee picker offered the raiser and anyone archived or suspended, and only the server refused them. It now asks for active people with the new `exclude_self` filter on `GET /employees` (`foundation.md` §5), so neither is offered (§6.2).

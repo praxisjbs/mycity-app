@@ -36,4 +36,5 @@ module.exports = {
   spendActions: async (req, res) => sendPaged(res, await service.spendActions(req.validated.query)),
   setCap: async (req, res) => ok(res, await service.setCap(params(req).provider, req.validated.body, withActor(req))),
   setOverallCap: async (req, res) => ok(res, await service.setOverallCap(req.validated.body, withActor(req))),
+  setSwitch: async (req, res) => ok(res, await service.setSwitch(req.validated.body, withActor(req))),
 };

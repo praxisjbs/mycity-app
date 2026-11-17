@@ -821,6 +821,7 @@ and sent to the AI only through `redact.shield` and never to DeepSeek. Capabilit
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Write With AI on a vacancy, Suggest With AI, Screen With AI (and the phone's screen action), Score With AI and an interview card's Tidy With AI; the interview's two follow-up questions; Provisional's help no longer names Score With AI; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 13/11/2026 · JP · Praxis AI's recruitment summaries (`praxis-ai.md` Appendix B PR 5, §9): vacancies, candidates, interviews, assessments and the talent pool in figures for the Overview's charts, within the screens' own scope. No screen of Recruitment changed.
 
 - 12/11/2026 · AJ · `onboarding-document-rejected`, a tenth Candidate Email (§6.8,

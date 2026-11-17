@@ -614,6 +614,7 @@ Each PR is full stack where it says so, contract first, and leaves `npm run ci` 
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Draft With AI on an SOP and Draft Lesson; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 16/11/2026 · TB · §9: the Document Centre's Library lists a training certificate for the person it was awarded to and the holders of `training.manage`, and an SOP's files for everyone who opens the Knowledge Hub (`training.library.js`, `knowledge.library.js`; `document-centre.md` §6.2), the vault's own rules for them written once more for a list. Nothing on a Knowledge Hub screen changed.
 - 14/11/2026 · JP · §9: `sops.summary` and `training.summary`, the SOPs and the places on courses in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8): the SOPs as each reader may read them; every place for `training.manage`, otherwise the reader's own. Nothing on screen changes.
 - 13/11/2026 · TB · My Notes on desktop (§6.13): Minimise Notes, Open Notes, Close Notes and Try Again did nothing on desktop. A press anywhere on the bar took the pointer for dragging, so the button's click went to the bar. `NoteTaker` now starts a drag only from the bar itself or Move Notes; a test presses each button with the pointer. The phone was not affected.

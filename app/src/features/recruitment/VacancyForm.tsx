@@ -17,6 +17,7 @@ import type { SeatSuggestion, VacancyDetail } from "@mycity/contract/contract.ge
 import type { PersonRef } from "@/api/types/common";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { HiringManagerPicker } from "@/features/shared/pickers";
 import { places, placeValue } from "@/features/shared/places";
 import { paging } from "@/features/shared/wire";
@@ -354,7 +355,8 @@ function WriteWithAi({ values, onDraft }: { values: Values; onDraft: (d: Pick<Va
   const draft = useMutation("POST /api/v1/recruitment/vacancies/assist");
   const [line, setLine] = useState("");
   const confirm = useConfirm();
-  if (!status.data?.available) return null;
+  const aiOn = useAiAvailable();
+  if (!aiOn || !status.data?.available) return null;
   const write = async () => {
     if (line.trim().length < 10 || values.title.trim().length < 3) return toast.error("Name the role and say what it does");
     // Words already typed are not replaced without asking: the draft has no undo (GE, 05/11/2026).

@@ -12,7 +12,8 @@ import type {
   ChainLink,
   ModelCapability,
 } from "@mycity/contract/contract.gen.ts";
-import { fail, invalid, noContent, ok, paged, route, sid } from "../core";
+import { fail, invalid, mockSession, noContent, ok, paged, route, sid } from "../core";
+import { byKey } from "../data/people";
 
 /**
  * AI Control on the mock (packages/contract/schemas/ai_control.js): the seven jobs and the four
@@ -465,6 +466,16 @@ route("POST /api/v1/ai-control/prices/:id/dismiss", (req) => {
 
 /* ───────────── Spend and caps ───────────── */
 
+/** The whole of AI on or off (ai_setting.enabled), and who last pressed the switch. */
+const SWITCH: AiSpend["switch"] = { enabled: true, switched_by: null, switched_at: null };
+
+const overallTotal = () => Object.values(SPENT).reduce((a, s) => a + Number(s.spent), 0);
+
+/** /me's `ai_available` on the mock: switched on and under the cap on all AI (ai-control.md §6.7). */
+export function aiAvailable(): boolean {
+  return SWITCH.enabled && (overallCap === null || overallTotal() < Number(overallCap));
+}
+
 function spend(): AiSpend {
   const today = new Date();
   const first = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -473,7 +484,7 @@ function spend(): AiSpend {
     const n = d.getDate();
     days.push({ day: d.toISOString().slice(0, 10), spent_ngn: (600 + ((n * 137) % 900) + (n % 7 === 0 ? 0 : 140)).toFixed(2) });
   }
-  const total = Object.values(SPENT).reduce((a, s) => a + Number(s.spent), 0).toFixed(2);
+  const total = overallTotal().toFixed(2);
   return {
     month: `${TODAY.slice(0, 7)}-01`,
     rate: RATE,
@@ -504,6 +515,7 @@ function spend(): AiSpend {
         finished_at: `${TODAY}T01:04:12.000Z`,
       },
     },
+    switch: { ...SWITCH },
   };
 }
 
@@ -529,5 +541,16 @@ route("PUT /api/v1/ai-control/caps/:provider", (req) => {
 
 route("PUT /api/v1/ai-control/cap", (req) => {
   overallCap = capOf(req.body);
+  return ok(spend());
+});
+
+route("PUT /api/v1/ai-control/switch", (req) => {
+  const enabled = req.body.enabled === true;
+  if (enabled !== SWITCH.enabled) {
+    SWITCH.enabled = enabled;
+    const who = byKey(mockSession.get());
+    SWITCH.switched_by = who ? { user_id: who.employee_id.replace(/^.{4}/, "u5e7"), display_name: who.display_name } : null;
+    SWITCH.switched_at = new Date().toISOString();
+  }
   return ok(spend());
 });

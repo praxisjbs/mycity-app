@@ -687,6 +687,7 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Tidy With AI on Support Needed; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 14/11/2026 · JP · §9: `projects.summary` and `calendar.summary`, Projects and the person's month in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8); Calendar's month and its summary read one list of items (`calendar.repo` `ITEMS`). Nothing on screen changes.
 - 11/11/2026 · TB · M10 PR 3 (`knowledge.md` §6.7): a task may name a `training_enrolment` (migration `10420`, `TaskEntityType`); the training module sets "Complete <course>" for each assigned person through `create`, and the new `completeForRecord` moves a record's open tasks to Done when its course completes, as `cancelForRecord` cancels them. Nothing on My Workspace's screens changes: such a task opens My Training.
 - 08/11/2026 · JP · M7 PR 8 (`partnerships.md` §6.15): `PartnerLinkFields` takes `open`, showing Partner and Deal at once with no Disconnect, for a form whose whole purpose is the link: Mailbox's Link to Partner reuses Workspace's pickers rather than a copy. Nothing on My Workspace's screens changes.
