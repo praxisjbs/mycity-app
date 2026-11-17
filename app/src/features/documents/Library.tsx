@@ -151,7 +151,7 @@ export function Library({ id }: { id: string | null }) {
         </FormFooter>
       ),
     });
-  useScreenAction(mayUpload ? { label: "Upload Document", onSelect: add } : null);
+  useScreenAction(mayUpload ? { label: "Upload Company Document", onSelect: add } : null);
   useUrlAction("new", mayUpload ? add : null);
   useUrlAction("letterhead", askLetterhead);
   return (

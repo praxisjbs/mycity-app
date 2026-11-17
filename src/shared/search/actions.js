@@ -215,7 +215,7 @@ const ACTIONS = Object.freeze([
     capability: "training.manage",
     words: ["course", "build a course", "create a course", "new lesson"],
   }),
-  a("upload_document", "Upload Document", {
+  a("upload_document", "Upload Company Document", {
     screen: "documents.library",
     params: { action: "new" },
     need: ["documents", "create"],

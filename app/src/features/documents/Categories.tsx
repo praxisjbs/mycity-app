@@ -19,6 +19,7 @@ import {
   CardHeader,
   ChoiceField,
   DataView,
+  DesktopOnly,
   EmptyState,
   Field,
   FilterSelect,
@@ -82,9 +83,11 @@ export function Categories({ id }: { id: string | null }) {
         title="Categories"
         sub="Where company documents are kept"
         actions={
-          <Button variant="primary" icon="plus" onClick={add}>
-            New Category
-          </Button>
+          <DesktopOnly>
+            <Button variant="primary" icon="plus" onClick={add}>
+              New Category
+            </Button>
+          </DesktopOnly>
         }
       />
       <ListDetail
@@ -98,6 +101,7 @@ export function Categories({ id }: { id: string | null }) {
             search="Search categories"
             rowKey={(c) => c.document_category_id}
             noun="category"
+            nounPlural="categories"
             onRowClick={(c) => openOne(c.document_category_id)}
             selectedKey={beside ? shown : null}
             actions={

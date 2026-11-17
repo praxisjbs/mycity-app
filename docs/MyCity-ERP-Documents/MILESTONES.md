@@ -1691,7 +1691,7 @@ inventory was approved, and its key is new: `documents`, with the capability `do
 categories. It takes `docs/PROGRESS.md` from 107 screens to 109 (the staff app from 97 to 99). It is
 applied step by step: the Document Centre's PR 1 (16/11/2026) applied Library to the table below,
 `docs/PROGRESS.md` (row #113), `scripts/check/progress.js`, `src/shared/route-map.js`,
-`src/shared/search/screens.js` and the app's catalogue; its PR 2 applies Categories (#114 while free). Its engineering shape and build plan are
+`src/shared/search/screens.js` and the app's catalogue; its PR 2 (17/11/2026) applied Categories the same way (row #114). Its engineering shape and build plan are
 in `docs/guides/document-centre.md`.
 
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
@@ -1706,7 +1706,7 @@ staff never navigates to it to do their job.
 | (ungrouped) | **Employee Self-Service** | 13 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · My Training · Org Chart · My Security | M1, M10 (My Training, 11/11/2026) |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
-| Work | **Document Centre** | 1 | Library | M10 (ratified 16/11/2026; Categories joins with its PR 2) |
+| Work | **Document Centre** | 2 | Library · Categories | M10 (ratified 16/11/2026) |
 | People | **People** | 7 | Employees · Organogram · Departments · Attendance · Leave · Devices · Worksites | M1, M2 (Departments) |
 | People | **Performance** | 5 | Goals · Scorecards · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
