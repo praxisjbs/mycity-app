@@ -1196,7 +1196,7 @@ marks:
   1: label "Leave Type" | The kind of leave
   2: label "First Day" | Your first day away
   3: label "Relief Officer" | Who covers for you
-  4: label "Handover Note" | Your open work
+  4: text "Handover Note" | Your open work
   5: button "Send Request" | Send it to your manager
 ```
 
