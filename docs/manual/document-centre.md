@@ -63,17 +63,27 @@ To see everything again, press the **All Documents** figure. On a phone you can 
 
 ### Open, preview and download a document {#document-centre-open}
 
-1. Press a document in the list. On a computer it opens beside the list. On a phone it opens in a
-   sheet.
-   ![A document open beside the list](shot:document-centre-document)
+1. Press a document in the list. It opens on a page of its own. On a computer the file is on the
+   left and its **Details** are on the right. On a phone the details come first and the file under
+   them.
+   ![A document on its own page](shot:document-centre-document)
 2. Read its details: its **Type**, what it **Belongs To**, when it was **Added** and when it
    **Expires**.
 3. Press **View File** to read it full screen. This shows for PDFs, pictures and videos.
 4. Press **Download** to save a copy on your device.
 5. Press **Open Record** to go to the partner, the person or the request it belongs to. This shows
    only when you may open that screen.
+6. Press **Back to Library** to return to the list. Your filters are as you left them.
 
 > **Important:** A Word or Excel file has no preview. Press **Download** and open it on your device.
+
+### Download without opening {#document-centre-download}
+
+1. Open [Document Centre · Library](/documents?tab=library) on a computer.
+2. Find the document in the list.
+3. Press the download icon at the end of its row. A copy is saved on your device and the list stays
+   as it is.
+   ![The download icon at the end of a row](shot:document-centre-download)
 
 ### Upload a company document {#document-centre-upload needs="documents create"}
 
@@ -106,7 +116,7 @@ To see everything again, press the **All Documents** figure. On a phone you can 
 You may change the company documents you uploaded. Document managers may change any of them.
 
 1. Open the document in [Document Centre · Library](/documents?tab=library).
-2. Press **Document Actions**, beside its title.
+2. Press **Document Actions**, at the top of its **Details**.
 3. To change its title, category, tags, expiry or description, press **Edit Details**, make the
    change and press **Save Details**. Leave **Expires** empty to take its expiry away.
 4. To replace the file, press **Upload New Version**, choose the new **File** and press
@@ -176,7 +186,8 @@ holds. This tab is for the document managers.
 
 ### Change or archive a category {#document-centre-change-category needs="cap documents.manage"}
 
-1. Open [Document Centre · Categories](/documents?tab=categories) and press the category.
+1. Open [Document Centre · Categories](/documents?tab=categories) and press the category. It opens
+   on a page of its own. Press **Back to Categories** to return to the list.
 2. Press **Edit Category**, make the change and press **Save Category**. Narrowing who sees it hides
    its documents from the others at once.
 3. To stop offering it on Upload Document, press **Archive Category** and confirm with
@@ -247,4 +258,16 @@ do:
 marks:
   1: button "Download" | Save a copy on this device
   2: button "Open Record" | Go to what it belongs to
+  3: button "Back to Library" | Return to the list
+```
+
+```shot document-centre-download
+open: /documents?tab=library
+as: operations
+device: desktop
+do:
+  - fill: searchbox = chowdeck agreement
+  - wait: button "Download Chowdeck Service Agreement"
+marks:
+  1: button "Download Chowdeck Service Agreement" | Save a copy without opening
 ```

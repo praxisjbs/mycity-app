@@ -33,5 +33,6 @@ export default {
     ),
     "Wide and Narrow": () => <Grid cols="1.4/1">{["Requests", "Request Detail"].map(tile)}</Grid>,
     "Narrow and Wide": () => <Grid cols="1/1.5">{["Departments", "Team Roster"].map(tile)}</Grid>,
+    "Two Thirds and One": () => <Grid cols="2/1">{["File Preview", "Details"].map(tile)}</Grid>,
   },
 } satisfies GalleryEntry;

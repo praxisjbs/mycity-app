@@ -9,17 +9,19 @@
  * @status stable
  * @example <Grid cols={4} phoneCols={2}>{kpis}</Grid>
  * @example <Grid cols="1.4/1"><Card /><Card /></Grid>
+ * @example <Grid cols="2/1"><DocumentPreview /><Card /></Grid>
  */
 import { useEffect, useRef, type HTMLAttributes } from "react";
 import { cn } from "../lib/cn";
 
-/** Equal columns (1 to 4), or an uneven pair: "1.4/1" wide then narrow, "1/1.5" narrow then wide. "4m2" is the merged name for 4 with two on a phone. */
-export type GridCols = 1 | 2 | 3 | 4 | "4m2" | "1.4/1" | "1/1.5";
+/** Equal columns (1 to 4), or an uneven pair: "1.4/1" wide then narrow, "1/1.5" narrow then wide, "2/1" two thirds then one (a file beside its details). "4m2" is the merged name for 4 with two on a phone. */
+export type GridCols = 1 | 2 | 3 | 4 | "4m2" | "1.4/1" | "1/1.5" | "2/1";
 
 /*
  * The uneven pairs sit on a 12-column track: 7 + 5 for wide then narrow,
- * 5 + 7 for narrow then wide (odd children take the first width, even the
- * second), so no arbitrary column template is written.
+ * 5 + 7 for narrow then wide, 8 + 4 for two thirds then one (odd children
+ * take the first width, even the second), so no arbitrary column template is
+ * written.
  */
 const COLS: Record<Exclude<GridCols, "4m2">, string> = {
   1: "grid-cols-1",
@@ -28,6 +30,7 @@ const COLS: Record<Exclude<GridCols, "4m2">, string> = {
   4: "grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
   "1.4/1": "grid-cols-1 xl:grid-cols-12 xl:*:odd:col-span-7 xl:*:even:col-span-5",
   "1/1.5": "grid-cols-1 xl:grid-cols-12 xl:*:odd:col-span-5 xl:*:even:col-span-7",
+  "2/1": "grid-cols-1 xl:grid-cols-12 xl:*:odd:col-span-8 xl:*:even:col-span-4",
 };
 
 /*
@@ -39,6 +42,7 @@ const PANES: Partial<Record<Exclude<GridCols, "4m2">, string>> = {
   2: "lg:*:max-h-card-pane lg:*:overflow-y-auto",
   "1.4/1": "xl:*:max-h-card-pane xl:*:overflow-y-auto",
   "1/1.5": "xl:*:max-h-card-pane xl:*:overflow-y-auto",
+  "2/1": "xl:*:max-h-card-pane xl:*:overflow-y-auto",
 };
 
 const FOCUSABLE = 'a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';

@@ -2,12 +2,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { forgetKept } from "@/features/shared/kept";
 import { copyProblems, openAs, settled } from "./testKit";
 
 /**
  * Document Centre · Categories on the in-browser mock (docs/guides/document-centre.md §6.4, §10):
- * the categories beside the picked one on a wide desktop and in a sheet on a phone (F31), who sees
- * each, New Category with its audience, and the tab kept to documents.manage.
+ * the categories across the page and a category on a page of its own (F31 amended 17/11/2026), who
+ * sees each, New Category with its audience, and the tab kept to documents.manage.
  */
 
 vi.mock("@/api/mock/core", async (importOriginal) => {
@@ -27,20 +28,37 @@ if (!("ResizeObserver" in window)) {
 
 afterEach(() => {
   cleanup();
+  forgetKept();
   setViewport(1440);
 });
 
 const HERE = "/documents?tab=categories";
 
 describe("Document Centre · Categories", () => {
-  it("lists the categories with who sees each and how many documents, the first beside the list", async () => {
+  it("lists the categories with who sees each and how many documents; nothing opens unasked", async () => {
     await openAs("cynthia@mycityapp.io", HERE);
     expect(screen.getByRole("heading", { name: "Categories", level: 1 })).toBeTruthy();
     for (const name of ["Registration & Statutory", "Licences & Permits", "Finance Records"]) expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Management, Operations & People").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Edit Category" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Edit Category" })).toBeNull();
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
+  }, 60000);
+
+  it("opens a category as a page of its own, with Back to Categories", async () => {
+    await openAs("cynthia@mycityapp.io", HERE);
+    fireEvent.click(screen.getAllByText("Licences & Permits")[0]!);
+    await settled();
+    expect(window.location.search).toContain("id=");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Licences & Permits", level: 1 })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit Category" })).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+    expect(await axe(document.body)).toHaveNoViolations();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Categories" }));
+    await settled();
+    expect(screen.getByRole("heading", { name: "Categories", level: 1 })).toBeTruthy();
   }, 60000);
 
   it("New Category takes a name and who sees it; Named Roles asks for the roles", async () => {
@@ -58,15 +76,16 @@ describe("Document Centre · Categories", () => {
     expect(screen.getAllByText("Board Papers").length).toBeGreaterThan(0);
   }, 60000);
 
-  it("on a phone the categories are cards and a tapped card opens its sheet", async () => {
+  it("on a phone the categories are cards and a tapped card opens its page", async () => {
     setViewport(390);
     await openAs("cynthia@mycityapp.io", HERE);
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click((await screen.findAllByText("Licences & Permits"))[0]!);
     await settled();
-    const sheet = screen.getAllByRole("dialog").at(-1)!;
-    expect(within(sheet).getByRole("button", { name: "Edit Category" })).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit Category" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to Categories" })).toBeTruthy();
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
   }, 60000);

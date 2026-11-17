@@ -1,30 +1,37 @@
 {
   "document-centre-categories": {
     "spec": "34ef0f4f4807f019",
-    "source": "1fb92244d8babe40",
+    "source": "19761dd05ccb4970",
     "devices": [
       "desktop",
       "phone"
     ]
   },
   "document-centre-document": {
-    "spec": "db126740919472ea",
-    "source": "1fb92244d8babe40",
+    "spec": "7631d49d931a86cb",
+    "source": "19761dd05ccb4970",
     "devices": [
       "desktop",
       "phone"
     ]
   },
+  "document-centre-download": {
+    "spec": "ff380052bf80d7f4",
+    "source": "19761dd05ccb4970",
+    "devices": [
+      "desktop"
+    ]
+  },
   "document-centre-filters": {
     "spec": "595baeeb9666fd9b",
-    "source": "1fb92244d8babe40",
+    "source": "19761dd05ccb4970",
     "devices": [
       "phone"
     ]
   },
   "document-centre-library": {
     "spec": "b8930b54ae403452",
-    "source": "1fb92244d8babe40",
+    "source": "19761dd05ccb4970",
     "devices": [
       "desktop",
       "phone"
@@ -32,14 +39,14 @@
   },
   "document-centre-new-category": {
     "spec": "89318fd98ebe4cdc",
-    "source": "1fb92244d8babe40",
+    "source": "19761dd05ccb4970",
     "devices": [
       "desktop"
     ]
   },
   "document-centre-upload": {
     "spec": "cbb2f9952b4ad737",
-    "source": "1fb92244d8babe40",
+    "source": "19761dd05ccb4970",
     "devices": [
       "desktop"
     ]
