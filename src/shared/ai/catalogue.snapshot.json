@@ -406,7 +406,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "library.DocumentCategoryCreate",
-      "schema_sha": "7705b0ffa3c30bbc",
+      "schema_sha": "c7d6d84a64b228c1",
       "screen": null,
       "capability": "documents.manage"
     },
@@ -418,7 +418,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "library.DocumentCategoryChange",
-      "schema_sha": "507a02ba629691fc",
+      "schema_sha": "53ef0348d2b39597",
       "screen": null,
       "capability": "documents.manage"
     },
@@ -430,7 +430,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "library.CompanyDocumentChange",
-      "schema_sha": "0faea9396e7f136f",
+      "schema_sha": "684e736e7209f4ef",
       "screen": null
     },
     {

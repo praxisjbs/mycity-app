@@ -53,6 +53,17 @@ const DocumentTitle = text(200);
 /** What a company document is, for its uploader: optional. */
 const DocumentDescription = z.string().trim().max(2000, "At most 2000 characters");
 
+/**
+ * A value a form may leave empty: "" and null read as none (on Edit Details, clear it), and a value
+ * left out changes nothing.
+ * @param {z.ZodTypeAny} schema
+ */
+const clearable = (schema) =>
+  schema
+    .or(z.literal(""))
+    .nullish()
+    .transform((v) => (v === "" ? null : v));
+
 /** When a document was added, as the Added filter offers it. */
 const LibraryAdded = z.enum(["this_month", "last_90_days", "this_year"]);
 
@@ -178,8 +189,8 @@ const CompanyDocumentCreate = z
     title: DocumentTitle,
     document_category_id: z.string().uuid("Pick a category"),
     tags: DocumentTags.default([]),
-    expires_on: isoDate.nullish(),
-    description: DocumentDescription.nullish(),
+    expires_on: clearable(isoDate),
+    description: clearable(DocumentDescription),
   })
   .strict();
 
@@ -188,8 +199,8 @@ const CompanyDocumentFields = {
   title: DocumentTitle.optional(),
   document_category_id: z.string().uuid("Pick a category").optional(),
   tags: DocumentTags.optional(),
-  expires_on: isoDate.nullish(),
-  description: DocumentDescription.nullish(),
+  expires_on: clearable(isoDate),
+  description: clearable(DocumentDescription),
 };
 
 /** PATCH /library/documents/:id: Edit Details. Something must change. */
@@ -242,7 +253,7 @@ const pickRole = { message: "Pick a role", path: ["role_ids"] };
 const DocumentCategoryCreate = z
   .object({
     name: CategoryName,
-    description: DocumentDescription.max(500, "At most 500 characters").nullish(),
+    description: clearable(DocumentDescription.max(500, "At most 500 characters")),
     audience: CategoryAudience.default("everyone"),
     role_ids: CategoryRoleIds.default([]),
   })
@@ -251,7 +262,7 @@ const DocumentCategoryCreate = z
 
 const CategoryFields = {
   name: CategoryName.optional(),
-  description: DocumentDescription.max(500, "At most 500 characters").nullish(),
+  description: clearable(DocumentDescription.max(500, "At most 500 characters")),
   audience: CategoryAudience.optional(),
   role_ids: CategoryRoleIds.optional(),
 };

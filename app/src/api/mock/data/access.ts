@@ -8,6 +8,7 @@ export const CAPABILITIES = [
   { code: "alerts.clear", name: "Clear Alerts", description: "Clear or dismiss an alert on Home." },
   { code: "alerts.manage", name: "Manage Alert Rules", description: "Create, change and switch off the rules that raise alerts on Home." },
   { code: "announcements.post", name: "Post Announcements", description: "Post to the announcements channel and track who has read a post." },
+  { code: "documents.manage", name: "Manage Documents", description: "Keep the Document Centre's categories and who sees each, and edit, replace and archive every company document." },
   { code: "expenses.finance", name: "Run Expenses", description: "Group approved requests into requisitions, record disbursements, set budgets and manage the expense categories." },
   { code: "goals.company", name: "Set Company OKRs", description: "Set the company objectives and key results, and send the company plan." },
   { code: "goals.confirm", name: "Confirm Scores", description: "Confirm the month's key result scores the heads propose." },
@@ -35,11 +36,11 @@ const MANAGES = ["alerts.clear", "home.reports", "home.team"];
 /** Role code → the capabilities it holds by default. */
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
   implementation: EVERY,
-  operations_people: [...HOME, "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "partnerships.configure", "partnerships.money", "payroll.configure", "performance.manage", "policies.manage", "queries.configure", "sops.manage", "training.manage", "workspace.late_reasons"],
+  operations_people: [...HOME, "documents.manage", "expenses.finance", "goals.company", "goals.function", "goals.organisation", "goals.view_all", "partnerships.configure", "partnerships.money", "payroll.configure", "performance.manage", "policies.manage", "queries.configure", "sops.manage", "training.manage", "workspace.late_reasons"],
   management: [...HOME, "goals.company", "goals.function", "goals.view_all", "partnerships.money", "workspace.late_reasons"],
   head_of_department: [...MANAGES, "goals.function"],
   manager: MANAGES,
-  administrator: ["mailbox.signature"],
+  administrator: ["documents.manage", "mailbox.signature"],
   employee: [],
 };
 

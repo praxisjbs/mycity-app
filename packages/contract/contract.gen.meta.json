@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "2b303cd710861af6d953d8571c17671984e273e54e7e596c7a542f078d123ba7",
+  "source_hash": "e848c8cf5a5d7ea149ede19ac045c320943305f9db6f8722c8dbf0e278d7baaf",
   "schemas": 2315,
   "endpoints": 1041,
   "inputs": {
@@ -39,7 +39,7 @@
     "packages/contract/schemas/kpis.js": "b445c4cd7b6eb931b84c30ac96d19d161a6628f9798168c93191962a814de399",
     "packages/contract/schemas/leads.js": "cc46fad3191664d1c4b2e98d3307267de39313e6025467e7b8eca820bc21f9cd",
     "packages/contract/schemas/leave.js": "c83b24e18b4670160529c0eb5f54aaa2e22dbde50746360e6a849e203ef8dbd7",
-    "packages/contract/schemas/library.js": "0175920bda794627167004b85fc1c866222bf07b6eb9353db71f79568a32b22d",
+    "packages/contract/schemas/library.js": "ba1a4a16a8bf21bfeb929748ede1366e1a943df36ba27be1e922cda21fff4372",
     "packages/contract/schemas/mailbox.js": "e67e5676fb7985852c18dd9a1aa370a41aff21487eead2eed3cacf36d315fa45",
     "packages/contract/schemas/maps.js": "aca5dc368c5c2da84d1612c7141991c9b86397b96395aea607c427987b43985c",
     "packages/contract/schemas/notifications.js": "742af8dbdf50b9ecc2be93e4f26e81e220bb8ff2ae4b7eb5432c22f081142960",

@@ -95,6 +95,7 @@ export const COMING: Record<string, string[]> = {
 
   /* Document Centre */
   "documents/library": ["Every document you may open, in one place", "Search by name, type or who it belongs to", "Preview and download without leaving the list"],
+  "documents/categories": ["The categories company documents are kept in", "Who sees each: everyone, or named roles", "How many documents each one holds"],
 
   /* Expenses */
   "expenses/approvals": ["Requests waiting on you, oldest first", "Approve, send back or reject with a reason", "The budget each request draws on"],
