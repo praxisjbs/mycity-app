@@ -60,7 +60,7 @@ const SCREENS = Object.freeze({
   ],
   community: ["channels", "direct-messages", "announcements"],
   mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash", "signature"],
-  documents: ["library"],
+  documents: ["library", "categories"],
   people: ["employees", "attendance", "leave", "devices", "worksites", "organogram", "departments"],
   performance: ["goals", "targets", "kpis", "reviews", "analytics"],
   queries: ["queries", "rules", "sanctions", "letter-templates"],
@@ -162,6 +162,8 @@ const ENTITY_ROUTES = Object.freeze({
 
   // Document Centre: a document of the library, by its file's id (docs/guides/document-centre.md §9).
   library_item: screen("documents", "library"),
+  company_document: screen("documents", "library"), // search:none found as a library_item, by its file
+  document_category: screen("documents", "categories"),
 
   // People
   employee: {

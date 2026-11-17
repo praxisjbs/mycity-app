@@ -221,6 +221,13 @@ const CASES = Object.freeze([
   { id: "expenses.to-pay", as: "operations_people", question: "Which expense requests are waiting to be paid?", reads: ["expenses.list", "disbursements.list"] },
   { id: "expenses.no-reference", as: "operations_people", question: "Which payments are missing a bank reference?", reads: ["disbursements.list"] },
   { id: "expenses.categories", as: "operations_people", question: "Which expense categories do we offer?", reads: ["expense_categories.list"] },
+  // The Document Centre (docs/guides/document-centre.md §9): its read and summary by the asker's own rights, and its three cards.
+  { id: "documents.find", as: "employee", question: "Find the certificate of incorporation in the Document Centre.", reads: ["documents.find"] },
+  { id: "documents.expiring", as: "operations_people", question: "How many documents are expiring soon?", reads: ["documents.summary"] },
+  { id: "card.document-category", as: "operations_people", question: "Add a document category called Board Papers.", shows: ["cards"], action: "documents.category_create" },
+  { id: "card.document-category-edit", as: "operations_people", question: "Rename the Templates document category to Forms and Templates.", shows: ["cards"], action: "documents.category_edit" },
+  { id: "card.document-details", as: "operations_people", question: "Change the title of the Business Premises Permit (Sample) to Premises Permit, Lagos Office.", shows: ["cards"], action: "documents.edit_details" },
+  { id: "card.document-category-not-mine", as: "employee", question: "Add a document category called Snacks.", shows: ["cards"], no_action: ["documents.category_create"] },
   { id: "expenses.requisitions", as: "ceo", question: "Which requisitions are waiting for me?", reads: ["requisitions.list", "expenses.approvals"] },
   { id: "expenses.budgets", as: "management", question: "How much of each department's budget is left this year?", reads: ["budgets.list"] },
   { id: "expenses.projects", as: "management", question: "Which projects are over their budget?", reads: ["budgets.projects"] },

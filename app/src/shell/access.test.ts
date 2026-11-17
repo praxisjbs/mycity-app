@@ -68,6 +68,14 @@ describe("shell access", () => {
     expect(visibleTabs(person([], { grants: { knowledge: ["view"] } }), knowledge).map((t) => t.slug)).toContain("user-guide");
   });
 
+  it("Document Centre · Categories follows documents.manage; everyone finds documents on Library", () => {
+    const documents = MODULES.find((m) => m.key === "documents")!;
+    const tabs = (me: Me) => visibleTabs(me, documents).map((t) => t.slug);
+    expect(tabs(person([], { grants: { documents: ["view", "create", "edit", "delete"] } }))).toEqual(["library"]);
+    expect(tabs(person(["documents.manage"], { grants: { documents: ["view"] } }))).toEqual(["library", "categories"]);
+    expect(tabs(person([], { grants: { documents: ["view"] }, is_ceo: true }))).toEqual(["library", "categories"]);
+  });
+
   it("a capability never opens a module the person cannot view", () => {
     const me = person(["home.team"], { grants: { people: ["view"] } });
     expect(visibleModules(me).map((m) => m.key)).toEqual(["people"]);

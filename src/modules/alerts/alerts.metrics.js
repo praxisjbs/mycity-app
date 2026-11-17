@@ -21,7 +21,8 @@
  *               and `since` is the breach's latest evidence; a deadline's also has `due_on`, its date.
  *
  *   approval_ageing     workflow_instance: whole days a pending request has waited at its stage
- *   document_expiry     document: days left before a current document expires
+ *   document_expiry     document: days left before a current document expires (a company document's
+ *                       subject is library_item, so its alert opens the Document Centre's Library)
  *   confirmation_due    employee: days left before an active employee's confirmation is due
  *   contract_ending     employee: days left before an active employee's contract ends
  *   partner_inactivity  the partners source adapter: whole days since an active partner's last contact
@@ -157,12 +158,16 @@ const dated = (today, date, coming, passed) => `${date < today ? passed : coming
  */
 async function documentExpiry(client, rule, { today, after = null }) {
   const { rows } = await client.query(
-    `SELECT d.document_id, d.title, d.expires_on, d.subject_employee_id, e.first_name, e.last_name
+    `SELECT d.document_id, d.title, d.expires_on, d.subject_employee_id, e.first_name, e.last_name,
+            (d.entity_type = 'company_document') AS company
        FROM document d
        LEFT JOIN employee e ON e.employee_id = d.subject_employee_id
       WHERE d.is_current AND d.scan_status <> 'infected' AND d.expires_on IS NOT NULL
         AND d.expires_on <= $1::date
         AND (d.subject_employee_id IS NULL OR e.status = 'active')
+        -- An archived company document raises nothing (docs/guides/document-centre.md §6.9).
+        AND NOT EXISTS (SELECT 1 FROM company_document cd
+                         WHERE d.entity_type = 'company_document' AND cd.document_id = d.document_id AND cd.archived_at IS NOT NULL)
         AND ($2::uuid IS NULL OR d.document_id > $2::uuid)
       ORDER BY d.document_id
       LIMIT $3 -- pagination:batch the documents one step of a sweep raises expiry alerts for`,
@@ -174,7 +179,9 @@ async function documentExpiry(client, rule, { today, after = null }) {
     (r) => {
       const who = nameOf(r.first_name, r.last_name);
       return {
-        subject: { type: "document", id: r.document_id },
+        // A company document opens the Document Centre's Library on it; every other document opens
+        // where it does today (docs/guides/document-centre.md §6.9).
+        subject: { type: r.company ? "library_item" : "document", id: r.document_id },
         subject_employee_id: r.subject_employee_id,
         ...deadline(rule, today, r.expires_on),
         title: who ? `${who}: ${r.title}` : r.title,

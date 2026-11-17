@@ -236,6 +236,40 @@ describeDb("document centre: the library lists what the vault lets a reader open
       await doc({ doc_type: "training_certificate", entity_type: "training_enrolment", subject_employee_id: emp(subject), sensitivity: "personal" });
     await doc({ doc_type: "sop_file", entity_type: "sop", uploaded_by: user("ops") });
 
+    // Company documents (§6.4): a category seen by everyone, one by Management alone, and one by roles
+    // that are all gone; in each a document Head of Department uploaded, one archived in the first,
+    // and a version replaced. Their rule is the category's audience, the uploader, or documents.manage.
+    const category = async (name, audience, roleCodes = []) => {
+      const c = await one("INSERT INTO document_category (name, audience) VALUES ($1, $2) RETURNING document_category_id", [name, audience]);
+      for (const code of roleCodes)
+        await q("INSERT INTO document_category_role (document_category_id, role_id) SELECT $1, role_id FROM role WHERE code = $2", [c.document_category_id, code]);
+      return c.document_category_id;
+    };
+    let companyNo = 0;
+    const companyDoc = async (categoryId, { by = "hod", archived = false, current = true } = {}) => {
+      companyNo += 1;
+      const d = await doc({ doc_type: "company_document", entity_type: "company_document", uploaded_by: user(by), title: `Company Paper ${companyNo}`, is_current: current });
+      const cd = await one(
+        `INSERT INTO company_document (number, document_id, document_category_id, title, created_by, archived_at, archived_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING company_document_id`,
+        [`DOC-9${companyNo}`, d.document_id, categoryId, `Company Paper ${companyNo}`, user(by), archived ? new Date() : null, archived ? user("ops") : null],
+      );
+      await q("UPDATE document SET entity_id = $2 WHERE document_id = $1", [d.document_id, cd.company_document_id]);
+      d.entity_id = cd.company_document_id;
+      return d;
+    };
+    const open = await category("Registration", "everyone");
+    const managers = await category("Finance Records", "roles", ["management"]);
+    const nobody = await category("Board Papers", "roles");
+    people.company = {
+      open: await companyDoc(open),
+      managers: await companyDoc(managers),
+      nobody: await companyDoc(nobody),
+      staffOwn: await companyDoc(nobody, { by: "staff" }),
+      archived: await companyDoc(open, { archived: true }),
+      replaced: await companyDoc(open, { current: false }),
+    };
+
     // What is never a library row, whoever asks: not a library type, or a file that cannot be opened.
     await doc({ doc_type: "payslip", entity_type: "payslip", subject_employee_id: emp("staff"), sensitivity: "restricted" });
     await doc({ doc_type: "community_media", entity_type: "community_channel", uploaded_by: user("staff") });
@@ -272,7 +306,7 @@ describeDb("document centre: the library lists what the vault lets a reader open
   test("every registered document type is given to the library by a source, or named as left out", () => {
     expect(library.unaccounted()).toEqual([]);
     expect(library.sources().flatMap((s) => s.doc_types).sort()).toEqual([
-      "disbursement_receipt", "employee_certificate", "employee_document", "employee_identification", "employment_contract",
+      "company_document", "disbursement_receipt", "employee_certificate", "employee_document", "employee_identification", "employment_contract",
       "expense_invoice", "leaving_certificate", "offer_letter", "partner_document", "partnership_agreement", "proposal",
       "query_letter", "rent_evidence", "sanction_letter", "sop_file", "statutory_source", "training_certificate",
     ]);
@@ -301,6 +335,30 @@ describeDb("document centre: the library lists what the vault lets a reader open
     expect(await count("staff")).toBeLessThan(all);
     expect(await count("staff")).toBeGreaterThan(0);
     expect(await count("viewer")).toBeLessThan(await count("ops"));
+  });
+
+  test("a company document follows its category's audience, its uploader and documents.manage; an archived one is the keepers' alone", async () => {
+    const c = people.company;
+    const sees = async (who) => new Set(await readableIds(who));
+    const has = (set, d) => set.has(d.document_id);
+    for (const who of ["ceo", "ops", "admin", "impl"]) {
+      const s = await sees(who);
+      expect([who, has(s, c.open), has(s, c.managers), has(s, c.nobody), has(s, c.archived)]).toEqual([who, true, true, true, true]);
+    }
+    const mgmt = await sees("mgmt");
+    expect([has(mgmt, c.open), has(mgmt, c.managers), has(mgmt, c.nobody), has(mgmt, c.archived)]).toEqual([true, true, false, false]);
+    const hod = await sees("hod");
+    // Head of Department uploaded all three: their own, but never once archived.
+    expect([has(hod, c.open), has(hod, c.managers), has(hod, c.nobody), has(hod, c.archived)]).toEqual([true, true, true, false]);
+    const staff = await sees("staff");
+    expect([has(staff, c.open), has(staff, c.managers), has(staff, c.nobody), has(staff, c.staffOwn)]).toEqual([true, false, false, true]);
+    // A replaced version is never a row, whoever asks.
+    expect(has(await sees("ceo"), c.replaced)).toBe(false);
+    // The list hides an archived one unless its keeper asks for the Archived filter; nobody else ever gets it.
+    expect(await listed("ops")).not.toContain(c.archived.document_id);
+    expect(await listed("ops", "&archived=true")).toEqual([c.archived.document_id]);
+    expect(await listed("mgmt", "&archived=true")).toEqual([]);
+    expect((await as("staff").get(`/library/documents/${c.managers.document_id}`)).status).toBe(404);
   });
 
   test("Partnerships follows the record: an owner, a deal's member, and nobody else", async () => {

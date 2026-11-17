@@ -54,6 +54,7 @@ const SCREENS = Object.freeze([
   s("mailbox", "signature", "Signature", ["signature", "email signature", "sign-off", "whatsapp", "social links"]),
 
   s("documents", "library", "Library", ["library", "document centre", "document center", "files", "vault", "agreement", "contract", "mou", "letterhead", "cac"]),
+  s("documents", "categories", "Categories", ["document categories", "document category", "who sees documents", "document audience"]),
 
   s("people", "employees", "Employees", ["staff", "staff list", "register", "directory", "hr", "people"]),
   s("people", "attendance", "Attendance", ["team attendance", "clock ins", "lateness", "absence"]),
@@ -180,6 +181,8 @@ function tabVisible(screen, reader) {
   if (module === "home" && tab === "alerts")
     return hasCapability(reader, "alerts.clear") || hasCapability(reader, "alerts.manage");
   if (module === "home" && tab === "reports") return hasCapability(reader, "home.reports");
+  // Document Centre · Categories is for those who keep the library (docs/guides/document-centre.md §8).
+  if (module === "documents" && tab === "categories") return hasCapability(reader, "documents.manage");
   // Knowledge Hub · Policies is for those who write policies; everyone reads theirs on Policy Updates.
   if (module === "knowledge" && tab === "policies") return hasCapability(reader, "policies.manage");
   // Knowledge Hub · Training is for those who build and assign courses; everyone takes theirs on My Training.

@@ -745,6 +745,19 @@ keeps what it asked for in the answer's `metadata.ask`, and an answer its Overvi
 - `10590` seed: the `documents` grants (every system role views the Library; create and edit for the
   heads and those who run the company; delete for those who keep it), `ON CONFLICT DO NOTHING`.
 
+**Built 17/11/2026, Document Centre PR 2** (`docs/guides/document-centre.md` §4, §6.4, §6.7):
+- `10510` `document_category` (name citext unique, `audience` everyone or roles, `archived_at`; MyCity's
+  own, never seeded outside staging), `document_category_role` (a roles audience's roles, both keys
+  CASCADE) and `company_document` (`number` DOC-0001 from the `document` scheme, `document_id` unique, the
+  current version, RESTRICT; category RESTRICT; `title`, `description`, `tags` text[] with a GIN index;
+  `archived_at` and `archived_by` set together; `created_by`, the uploader the read rule names). Its
+  expiry is the vault's `document.expires_on`. `updated_at` triggers on the first and the last.
+- `10520` `document_text`: one stored file's text (`done`, `empty` or `failed`), its pages and length,
+  cascading with its document; a trigram index on `search_fold(COALESCE(text, ''))`, the pattern of
+  `employee_search_idx`, so a word inside a file is found inside ⌘K's two seconds.
+- `10591` seed: the `documents.manage` capability, given to Implementation, System Administrator and
+  Operations & People, `ON CONFLICT DO NOTHING`.
+
 ### M11 Handover · 11000 to 11999 · TB
 
 No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `restore-drill.js`).

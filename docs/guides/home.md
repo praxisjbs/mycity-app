@@ -444,7 +444,8 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
 - **The metric registry** (`src/modules/alerts/alerts.metrics.js`, keys equal to the contract's
   `HomeAlertMetric`, in this order): `approval_ageing` (approval, whole days a pending request has waited at its stage; the alert is
   about the record waiting and the person it is for), `document_expiry` (document, deadline: a
-  current document's expiry), `confirmation_due` and `contract_ending` (people, deadline: an active
+  current document's expiry; a Document Centre company document's subject is `library_item`, so its
+  alert opens the Library on it, and an archived one raises none, `document-centre.md` §6.9), `confirmation_due` and `contract_ending` (people, deadline: an active
   employee's dates, as the staff register counts them), `partner_inactivity` (partnership, whole
   days since an active partner's last contact), `budget_threshold` (budget, percent of a running
   Naira budget spent), `recruitment_sla` (recruitment, whole days an application has been at its
@@ -878,6 +879,8 @@ rows, and nothing in the code says where anything came from.
   other currencies out. Owner to decide whether such sums group by currency when M7 and M8 land.
 
 ## 14 · Change log
+
+- 17/11/2026 · TB · §6 Alerts: `document_expiry` raises a Document Centre company document under the subject `library_item`, so its alert opens Document Centre · Library on it; an archived company document raises none (`document-centre.md` §6.9, its PR 2). Every other document opens where it did.
 
 - 16/11/2026 · JP · §3 step 2, §6 Overview: the Staff day strip's Shift Today reads today as the clock does (`reconcile.judgedOn`). A schedule People changed after the person's clock-in showed the new hours on Home while the clock and the register kept the judged ones (a day is judged once, attendance.md §6.4). Found filming the Milestones 0 and 1 videos; `home-overview.test.js`.
 - 14/11/2026 · JP · §11: the attendance seed punches only people with a login. On staging it had punched the payroll seed's invented employees, whom the register never expects, and Home read "22 of 17 clocked in" (found filming the Milestones 0 and 1 videos).
