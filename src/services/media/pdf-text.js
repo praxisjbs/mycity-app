@@ -44,7 +44,7 @@ async function textOf(input, { pages: maxPages = MAX_PAGES, chars: maxChars = MA
   try {
     const parts = [];
     let length = 0;
-    let read = 0;
+    let pagesRead = 0;
     for (let n = 1; n <= Math.min(doc.numPages, maxPages) && length < maxChars; n += 1) {
       const page = await doc.getPage(n);
       const content = await page.getTextContent();
@@ -56,10 +56,10 @@ async function textOf(input, { pages: maxPages = MAX_PAGES, chars: maxChars = MA
         .trim();
       parts.push(line);
       length += line.length;
-      read = n;
+      pagesRead = n;
     }
     const text = parts.join("\n\n").slice(0, maxChars).trim();
-    return { text: text.length >= 20 ? text : null, pages: read };
+    return { text: text.length >= 20 ? text : null, pages: pagesRead };
   } finally {
     await doc.destroy();
   }
