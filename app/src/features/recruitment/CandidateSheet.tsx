@@ -11,6 +11,7 @@ import poolSchemas from "@mycity/contract/schemas/talent_pool.js";
 import type { ApplicationStage, CandidateDetail } from "@mycity/contract/contract.gen.ts";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import { saveFile } from "@/api/download";
+import { useAiAvailable } from "@/auth/ai";
 import { useAuth } from "@/auth/AuthProvider";
 import { useScreenState } from "@/lib/plan";
 import { useRouter } from "@/lib/router";
@@ -65,6 +66,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
   // Reopen needs the role still open (the API refuses a closed one); the sheet's own record does not say.
   const role = useApi("GET /api/v1/recruitment/vacancies/:id", { params: { id: read.data?.vacancy.vacancy_id ?? "" }, enabled: Boolean(read.data && read.data.status === "not_progressed") });
   const ai = useApi("GET /api/v1/recruitment/vacancies/assist");
+  const aiOn = useAiAvailable();
   const score = useMutation("POST /api/v1/recruitment/candidates/:id/score");
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
   const reopen = useMutation("POST /api/v1/recruitment/candidates/:id/reopen");
@@ -90,7 +92,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
   const live = c.status === "active";
   // A form opened from here sits over the candidate's dialog, which is still open when the form closes.
   const back = () => modal.close();
-  const mayScore = c.can_edit && ai.data?.available && c.cv_state === "clean" && c.screening_score === null;
+  const mayScore = c.can_edit && (aiOn && ai.data?.available) && c.cv_state === "clean" && c.screening_score === null;
   type Act = { label: string; icon?: IconName; danger?: boolean; onSelect: () => unknown };
   const editing = c.can_edit && live;
   const ahead = editing ? nextAhead(c) : undefined;
@@ -162,7 +164,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
                 ) : (
                   <span key="s" className="inline-flex items-center gap-1.5">
                     <b>{Math.round(c.score)}</b>
-                    {c.score_provisional && provisionalTerm}
+                    {c.score_provisional && provisionalTerm(aiOn)}
                   </span>
                 ),
               ],

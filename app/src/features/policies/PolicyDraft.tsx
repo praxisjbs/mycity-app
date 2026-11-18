@@ -4,6 +4,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import type { PersonRef } from "@/api/types/common";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { useAuth } from "@/auth/AuthProvider";
 import { EmployeePicker } from "@/features/shared/pickers";
 import {
@@ -164,6 +165,7 @@ export function DraftEditor({ p, onDirty }: { p: Policy; onDirty?: (dirty: boole
   const save = useMutation("PUT /api/v1/policies/:id/draft");
   const discard = useMutation("POST /api/v1/policies/:id/draft/discard");
   const tidy = useMutation("POST /api/v1/policies/tidy");
+  const aiOn = useAiAvailable();
   const departments = useDepartments();
   const f = useContractForm<Values>(valuesOf(p), draftSchema(p));
   const v = f.values;
@@ -431,9 +433,9 @@ export function DraftEditor({ p, onDirty }: { p: Policy; onDirty?: (dirty: boole
         <Card>
           <CardHeader
             title="Policy Text"
-            help="Paste or type it as it is. Tidy With AI suggests headings and lists without changing a word."
+            help={aiOn ? "Paste or type it as it is. Tidy With AI suggests headings and lists without changing a word." : "Paste or type it as it is."}
             right={
-              editable && (
+              editable && aiOn && (
                 <Button size="sm" icon="spark" onClick={tidyText}>
                   Tidy With AI
                 </Button>

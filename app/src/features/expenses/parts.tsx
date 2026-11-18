@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
 import { saveFile } from "@/api/download";
+import { useAiAvailable } from "@/auth/ai";
 import { useMe } from "@/auth/AuthProvider";
 import { hasCapability } from "@/shell/access";
 import { paging } from "@/features/shared/wire";
@@ -136,6 +137,8 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
   const depts = useInfinite("GET /api/v1/departments", { filters: { active: "true" } });
   const [invoice, setInvoice] = useState(existing?.invoice ?? null);
   const [category, setCategory] = useState<string | null>(existing?.category ?? null);
+  // Read Invoice and Suggest Category only while AI may answer; the fields are filled by hand otherwise (ai-control.md §6.7).
+  const aiOn = useAiAvailable();
   const f = useContractForm(
     {
       purpose: existing?.purpose ?? "",
@@ -262,7 +265,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
           <span className="flex flex-wrap items-center gap-2 text-xs">
             <Sub>{invoice.file_name}</Sub>
             <ActionGroup>
-              <Button size="sm" icon="spark" onClick={readInvoice}>Read Invoice</Button>
+              {aiOn && <Button size="sm" icon="spark" onClick={readInvoice}>Read Invoice</Button>}
               <Button size="sm" onClick={async () => setInvoice(null)}>Replace</Button>
             </ActionGroup>
           </span>
@@ -272,7 +275,7 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button icon="spark" onClick={suggestCategory}>Suggest Category</Button>
+        {aiOn && <Button icon="spark" onClick={suggestCategory}>Suggest Category</Button>}
         <Button onClick={save(false)}>Save Draft</Button>
         <Button variant="primary" onClick={save(true)}>{existing?.status === "sent_back" ? "Send Again" : "Send Request"}</Button>
       </FormFooter>
@@ -313,6 +316,7 @@ function clampWords(text: string | null | undefined): string | null {
 export function RequestCard({ id, actions }: { id: string; actions?: (r: ExpenseRequest) => ReactNode }) {
   const d = useApi("GET /api/v1/expenses/:id", { params: { id } });
   const dup = useMutation("POST /api/v1/expenses/:id/duplicate-check");
+  const aiOn = useAiAvailable();
   const [verdict, setVerdict] = useState<{ line: string; why: string | null } | null>(null);
   if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
   const r = d.data;
@@ -374,7 +378,7 @@ export function RequestCard({ id, actions }: { id: string; actions?: (r: Expense
       </div>
       {r.possible_duplicates.length + r.possible_duplicates_hidden > 0 && (
         <div className="mt-3">
-          <CardHeader title="Possible Duplicates" right={r.possible_duplicates.length > 0 && <Button size="sm" icon="spark" onClick={check}>Check Duplicate</Button>} />
+          <CardHeader title="Possible Duplicates" right={aiOn && r.possible_duplicates.length > 0 && <Button size="sm" icon="spark" onClick={check}>Check Duplicate</Button>} />
           {r.possible_duplicates.map((o) => (
             <Sub key={o.expense_request_id}>{o.number}, {o.purpose}, <Money value={o.amount} /></Sub>
           ))}

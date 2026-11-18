@@ -50,6 +50,7 @@ const deliveryPlan = require("../delivery-plan");
 const registry = require("./registry");
 const { SCREENS, tabVisible } = require("./screens");
 const { ACTIONS, linkOf } = require("./actions");
+const governance = require("../../services/ai/governance");
 
 const MIN_TERM = 2;
 const MAX_TERM = 80;
@@ -114,6 +115,8 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
     const s = await scopeFor(user, module, "view");
     if (s) scopes.set(module, s);
   }
+  // Praxis AI's conversations open Praxis AI, which the shell leaves out while AI may not answer.
+  if (scopes.has("praxis_ai") && !(await governance.available(db))) scopes.delete("praxis_ai");
   // A provider behind a capability runs only for its holders (the CEO holds every one).
   const caps =
     candidates.some((p) => p.capability) && !(user && user.is_ceo === true)
@@ -289,6 +292,9 @@ async function readerOf(db, user) {
     );
     managesPeople = Boolean(rows[0] && rows[0].manages);
   }
+  // While AI may not answer, Praxis AI is out of the shell, so ⌘K leaves its screens and New
+  // Conversation out too (docs/guides/ai-control.md §6.7).
+  if (!(await governance.available(db))) delete grants.praxis_ai;
   return {
     grants,
     scopes,

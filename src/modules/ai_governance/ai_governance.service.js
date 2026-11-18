@@ -15,6 +15,7 @@
  *   acceptProposal(id, b, by), dismissProposal(id, by)
  *   spend(), spendActions(query)   this Lagos month against the caps
  *   setCap(provider, b, by), setOverallCap(b, by)
+ *   setSwitch(b, by)                     Switch Off AI or Switch On AI (§6.7)
  *
  * Every write runs in one transaction with emit(), and bumps the settings' version after the
  * commit, so every process walks the new chain or cap within a second. Nothing here tells
@@ -579,7 +580,7 @@ async function spend() {
   const { from, to } = governance.monthWindow(now);
   const today = lagos.today(now);
   const month = `${today.slice(0, 7)}-01`;
-  const [total, byProvider, limits, s, days, rate, plan, cat, refusals, nightly] = await Promise.all([
+  const [total, byProvider, limits, s, days, rate, plan, cat, refusals, nightly, sw] = await Promise.all([
     governance.spentThisMonth(pool, now),
     governance.spentByProvider(pool, now),
     governance.caps(pool),
@@ -590,6 +591,7 @@ async function spend() {
     aiJobs.catalogue(pool),
     repo.praxisRefusals(pool, from, to),
     repo.latestAttackRun(pool),
+    repo.switchOf(pool),
   ]);
   const byDay = new Map(days.map((d) => [d.day, money.toWire(d.spent)]));
   const series = [];
@@ -617,7 +619,41 @@ async function spend() {
     }),
     days: series,
     praxis_ai: { reads_refused: refusals.reads_refused, presses_refused: refusals.presses_refused, nightly: nightly ? attackRunView(nightly) : null },
+    switch: switchView(sw),
   };
+}
+
+/** The switch as the wire carries it (AiSwitch). */
+function switchView(row) {
+  return {
+    enabled: row.enabled !== false,
+    switched_by: row.switched_by ? { user_id: row.switched_by, display_name: row.switched_by_name || "" } : null,
+    switched_at: row.switched_at ? iso(row.switched_at) : null,
+  };
+}
+
+/**
+ * PUT /ai-control/switch: Switch Off AI or Switch On AI (docs/guides/ai-control.md decision 36,
+ * §6.7). Pressed to what it already is, nothing is written or audited.
+ */
+async function setSwitch(body, actor) {
+  const enabled = body.enabled === true;
+  await tx(async (client) => {
+    const before = await repo.switchOf(client);
+    if ((before.enabled !== false) === enabled && before.ai_setting_id) return;
+    await repo.setSwitch(client, enabled, userOf(actor));
+    const after = await repo.switchOf(client);
+    await emit(client, {
+      key: EVENTS.AI_CONTROL_SWITCHED,
+      entity: { type: "ai_setting", id: after.ai_setting_id },
+      actor,
+      before: { enabled: before.enabled !== false },
+      after: { enabled },
+      payload: { enabled },
+    });
+  });
+  await changed();
+  return spend();
 }
 
 /** One run of the attack suite as the wire carries it (AiAttackRun). */
@@ -732,6 +768,7 @@ module.exports = {
   attackRunView,
   setCap,
   setOverallCap,
+  setSwitch,
   SITES,
   sourceFor,
 };

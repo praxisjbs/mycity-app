@@ -6,6 +6,7 @@ import type { ProposalContent, ProposalContentEdit, ProposalDetail, ProposalPrev
 type Section = ProposalContent["sections"][number];
 import { invalidate, useMutation } from "@/api/hooks";
 import { upload } from "@/api/upload";
+import { useAiAvailable } from "@/auth/ai";
 import { ActionGroup, Banner, Button, DocumentFrame, Field, FormFooter, Pill, SelectField, TextAreaField, TextField, toast, UploadField, useContractForm, useIsPhone, useModal } from "@mycity/ui";
 import { fail, failed } from "../lib";
 
@@ -127,6 +128,7 @@ function Rewrite({ p, s, close }: { p: ProposalDetail; s: Section; close: () => 
  * a phone edits the words and the pictures.
  */
 export function Edit({ p, preview, done }: { p: ProposalDetail; preview: ProposalPreview; done: (next: ProposalDetail) => void }) {
+  const aiOn = useAiAvailable();
   const phone = useIsPhone();
   const modal = useModal();
   const visible = preview.sections.filter((s) => !s.hidden);
@@ -161,7 +163,7 @@ export function Edit({ p, preview, done }: { p: ProposalDetail; preview: Proposa
       <ActionGroup>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" icon="edit" onClick={() => open("Edit Words", (close) => <EditWords p={p} s={section} close={close} />)}>Edit Words</Button>
-          {p.ai === "on" && <Button size="sm" icon="spark" onClick={() => open("Rewrite Section", (close) => <Rewrite p={p} s={section} close={close} />)}>Rewrite Section</Button>}
+          {p.ai === "on" && aiOn && <Button size="sm" icon="spark" onClick={() => open("Rewrite Section", (close) => <Rewrite p={p} s={section} close={close} />)}>Rewrite Section</Button>}
           {!phone && <Button size="sm" variant="ghost" icon="up" onClick={() => change({ op: "move", key: s.key, direction: "up" })} disabled={at <= 0}>Move Up</Button>}
           {!phone && <Button size="sm" variant="ghost" icon="down" onClick={() => change({ op: "move", key: s.key, direction: "down" })} disabled={at >= preview.sections.length - 1}>Move Down</Button>}
           <Button size="sm" variant="ghost" icon={s.hidden ? "eye" : "hide"} onClick={() => change({ op: "hide", key: s.key, hidden: !s.hidden })}>{s.hidden ? "Show Page" : "Hide Page"}</Button>

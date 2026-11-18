@@ -79,6 +79,12 @@ interface AuthValue {
   can: (module: string, action?: string) => boolean;
   /** Read the signed-in person again: after My Profile changes their photo, so the shell shows it. */
   refreshMe: () => Promise<void>;
+  /**
+   * Read the signed-in person again quietly, keeping the one in hand when nothing changed: the
+   * shell's refresh and a move to another module, so AI switched off or on reaches every open hub
+   * without a poll (docs/guides/ai-control.md decision 37). A failure keeps what was there.
+   */
+  rereadMe: () => Promise<void>;
 }
 
 /** What follows a first step that did not sign in: the code, or setting two-step up. */
@@ -384,10 +390,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tell({ t: "signed-out" });
   }, [signedOut, tell]);
 
-  const can = useCallback((module: string, action = "view") => !!me?.grants[module]?.includes(action), [me]);
+  // Praxis AI is out of the hub while AI may not answer (docs/guides/ai-control.md §6.7).
+  const can = useCallback(
+    (module: string, action = "view") => !!me?.grants[module]?.includes(action) && (module !== "praxis_ai" || me.ai_available !== false),
+    [me],
+  );
 
   const refreshMe = useCallback(async () => {
     setMe(await api.call("GET /api/v1/auth/me"));
+  }, []);
+
+  const rereadMe = useCallback(async () => {
+    const cur = current.current;
+    if (cur.status !== "signed-in" || !cur.me) return;
+    try {
+      const next = await api.call("GET /api/v1/auth/me");
+      const was = current.current.me;
+      if (current.current.status === "signed-in" && was?.user_id === next.user_id && JSON.stringify(was) !== JSON.stringify(next)) setMe(next);
+    } catch {
+      /* the next call says what is wrong; the shell keeps what it had */
+    }
   }, []);
 
   const value = useMemo(
@@ -403,8 +425,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       can,
       refreshMe,
+      rereadMe,
     }),
-    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, finishSetup, signInWithPasskey, signOut, can, refreshMe],
+    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, finishSetup, signInWithPasskey, signOut, can, refreshMe, rereadMe],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

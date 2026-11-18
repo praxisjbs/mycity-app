@@ -21,6 +21,7 @@ const EVENTS = defineEvents("ai_control", {
   "ai_control.prices_proposed": { summary: "Find Prices proposed prices for IT to accept" },
   "ai_control.price_set": { summary: "A model's prices were accepted, edited, or saved with Accept All on AI Control" },
   "ai_control.cap_changed": { summary: "A provider's monthly cap, or the cap on all AI, was set" },
+  "ai_control.switched": { summary: "All AI was switched off or on from AI Control" },
   "ai_control.attack_run_recorded": { summary: "Praxis AI's attack suite ran against the real model and its result was recorded" },
   "ai_control.attack_leaked": { summary: "Praxis AI's attack suite found a leak: an answer gave someone what their own screens would not" },
 });

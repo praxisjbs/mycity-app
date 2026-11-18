@@ -679,4 +679,44 @@ describeDb("AI Control against the real migrations", () => {
       await q("DELETE FROM ai_model WHERE model = 'gemini-aa-mini'");
     });
   });
+  describe("Switch Off AI and Switch On AI (decisions 36 and 37, §6.7)", () => {
+    const search = async (who, term) => (await as(who).get(`/search?q=${encodeURIComponent(term)}`)).body;
+    const labels = (body) => body.groups.flatMap((g) => g.items.map((i) => i.title || i.label));
+
+    test("IT switches AI off, asked once, audited, who and when on Spend; every call is refused; /me and ⌘K follow", async () => {
+      await q("UPDATE ai_setting SET monthly_cap_ngn = NULL");
+      expect((await as("ops").put("/ai-control/switch").send({ enabled: false })).status).toBe(403);
+      expect((await as("staff").get("/auth/me")).body.ai_available).toBe(true);
+      expect(labels(await search("staff", "new conversation"))).toContain("New Conversation");
+
+      const off = await as("admin").put("/ai-control/switch").send({ enabled: false });
+      expect(off.status).toBe(200);
+      const userOf = async (email) => (await one("SELECT user_id FROM app_user WHERE email = $1", [email])).user_id;
+      expect(off.body.switch).toMatchObject({ enabled: false, switched_by: { user_id: await userOf("femi@mycity.test"), display_name: "Femi Bello" } });
+      expect(off.body.switch.switched_at).toEqual(expect.any(String));
+      const audit = await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'ai_control.switched'");
+      expect(audit.n).toBe(1);
+      // Pressed again: nothing more is written.
+      await as("admin").put("/ai-control/switch").send({ enabled: false });
+      expect((await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'ai_control.switched'")).n).toBe(1);
+
+      await expect(governance.check(pool, { module: "knowledge" })).rejects.toMatchObject({ code: "AI_DISABLED" });
+      expect((await as("staff").get("/auth/me")).body.ai_available).toBe(false);
+      expect(labels(await search("staff", "new conversation"))).not.toContain("New Conversation");
+      // AI Control stays open, so it can be switched back on.
+      expect((await as("ops").get("/ai-control/spend")).body.switch.enabled).toBe(false);
+
+      const on = await as("ceo").put("/ai-control/switch").send({ enabled: true });
+      expect(on.body.switch).toMatchObject({ enabled: true, switched_by: { user_id: await userOf("ceo@mycity.test") } });
+      expect((await as("staff").get("/auth/me")).body.ai_available).toBe(true);
+      expect((await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'ai_control.switched'")).n).toBe(2);
+    });
+
+    test("the month's cap on all AI reached reads as unavailable too; a cap changed asks again at once", async () => {
+      await as("admin").put("/ai-control/cap").send({ monthly_cap_ngn: "0.00" });
+      expect((await as("staff").get("/auth/me")).body.ai_available).toBe(false);
+      await as("admin").put("/ai-control/cap").send({ monthly_cap_ngn: "" });
+      expect((await as("staff").get("/auth/me")).body.ai_available).toBe(true);
+    });
+  });
 });

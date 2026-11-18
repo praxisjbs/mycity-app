@@ -192,6 +192,8 @@ async function me(db, userId) {
     // Required here, not at the top: settings.appearance reads security, which reads this file.
     appearance: await require("../settings/settings.appearance").applied(db),
     hidden_fields: await fieldMask.hiddenFieldsFor(db, { user_id: row.user_id, is_ceo: row.is_ceo === true }),
+    // Whether AI may answer now: the hub hides its AI buttons while it may not (ai-control.md §6.7).
+    ai_available: await require("../../services/ai/governance").available(db),
   };
 }
 

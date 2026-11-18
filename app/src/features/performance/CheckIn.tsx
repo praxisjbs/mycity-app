@@ -9,6 +9,7 @@ import type { Dictation, ReviewCheckIn, ReviewItem } from "@mycity/contract/cont
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { upload } from "@/api/upload";
+import { useAiAvailable } from "@/auth/ai";
 import {
   Banner,
   Button,
@@ -124,6 +125,8 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
   const saveDraft = useMutation("PUT /api/v1/ess/performance/check-in");
   const submitCheckIn = useMutation("POST /api/v1/ess/performance/check-in/submit");
   const tidy = useMutation("POST /api/v1/performance/tidy");
+  // Dictate and Tidy With AI need a model; the action is typed while AI is off (ai-control.md §6.7).
+  const aiOn = useAiAvailable();
   const set = (id: string, patch: Partial<Row>) => setRows((x) => ({ ...x, [id]: { ...x[id], ...patch } }));
   const after = () => {
     reload();
@@ -269,7 +272,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
             <Field label="Action" optional {...mark(id, "action_text", "Shorten the action")}>
               <TextAreaField value={r.action_text} onChange={(v) => set(id, { action_text: v, tidied: null })} rows={3} disabled={!open} />
             </Field>
-            {open && (
+            {open && aiOn && (
               <div className="flex flex-wrap items-center gap-2">
                 <VoiceField label="Action" action="Dictate" maxSeconds={DICTATION_SECONDS} transcribe={dictate(id)} onTranscript={(text) => set(id, { action_text: text })} />
                 {r.action_text.trim() && !r.tidied && <Button size="sm" icon="spark" onClick={() => tidyText(id)}>Tidy With AI</Button>}

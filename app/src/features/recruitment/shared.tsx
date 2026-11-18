@@ -81,7 +81,8 @@ export const INTERVIEW_TYPE: Record<InterviewType, string> = { in_person: "In Pe
 export const pill = ([tone, text]: [StatusTone, string]) => <StatusPill s={{ tone, text }} />;
 
 const PROVISIONAL_HELP = "Worked out from the form only. Press Score With AI to read the CV.";
-export const provisionalTerm = <HelpTerm help={PROVISIONAL_HELP}>Provisional</HelpTerm>;
+/** Provisional, with its help; Score With AI is named only while it is on the screen (ai-control.md §6.7). */
+export const provisionalTerm = (aiOn: boolean) => <HelpTerm help={aiOn ? PROVISIONAL_HELP : "Worked out from the form only."}>Provisional</HelpTerm>;
 
 /** A score as a list shows it: the figure, and Provisional while only the form was read. */
 export function ScoreText({ score, provisional }: { score: number | null; provisional: boolean }) {

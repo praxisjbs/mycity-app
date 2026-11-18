@@ -391,6 +391,33 @@ async function setOverallCap(db, cap, userId) {
   else await db.query("INSERT INTO ai_setting (monthly_cap_ngn, updated_by) VALUES ($1, $2)", [cap, userId]);
 }
 
+/**
+ * The switch on the ai_setting row in use: enabled, who last pressed it (named) and when. No row
+ * reads as on, never pressed (the environment's defaults).
+ */
+async function switchOf(db) {
+  const row = await one(
+    db,
+    `SELECT s.ai_setting_id, s.enabled, s.switched_by, s.switched_at,
+            trim(e.first_name || ' ' || e.last_name) AS switched_by_name
+       FROM ai_setting s
+       LEFT JOIN app_user u ON u.user_id = s.switched_by
+       LEFT JOIN employee e ON e.employee_id = u.employee_id
+      ORDER BY s.updated_at DESC LIMIT 1`,
+    [],
+  );
+  return row || { ai_setting_id: null, enabled: true, switched_by: null, switched_at: null, switched_by_name: null };
+}
+
+/** Switch all AI on or off on the row in use, or on a new row (the other settings at their defaults). */
+async function setSwitch(db, enabled, userId) {
+  const row = await one(db, "SELECT ai_setting_id FROM ai_setting ORDER BY updated_at DESC LIMIT 1 FOR UPDATE", []);
+  if (row)
+    await db.query("UPDATE ai_setting SET enabled = $2, switched_by = $3, switched_at = now(), updated_by = $3 WHERE ai_setting_id = $1", [row.ai_setting_id, enabled, userId]);
+  else
+    await db.query("INSERT INTO ai_setting (enabled, switched_by, switched_at, updated_by) VALUES ($1, $2, now(), $2)", [enabled, userId]);
+}
+
 /** The Knowledge Hub has indexed something: the embedding model is locked (§6.6). */
 async function embeddingsIndexed(db) {
   try {
@@ -433,5 +460,7 @@ module.exports = {
   setCap,
   overallCap,
   setOverallCap,
+  switchOf,
+  setSwitch,
   embeddingsIndexed,
 };

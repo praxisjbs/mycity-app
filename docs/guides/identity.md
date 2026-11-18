@@ -155,7 +155,7 @@ Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sig
 | `POST /api/v1/auth/forgot` | `ForgotBody` → `Accepted` | anonymous | | Same answer for every email; 5 per address in 15 minutes |
 | `POST /api/v1/auth/link` | `LinkCheckBody` → `LinkCheck` | anonymous | | 404 `LINK_INVALID` when expired or spent |
 | `POST /api/v1/auth/reset` | `ResetBody` → `ResetDone` | anonymous | | Sets the password, ends every session |
-| `GET /api/v1/auth/me` | → `Me` | own account | | `grants` per module, `scopes` (each module's widest record scope over the person's roles: `all`, `team` or `own`), and `capabilities`: the codes the person holds through a role or directly, A to Z (the CEO's are every code in `capability`), the same the routes check (README §5.2). Every session response carries the same `Me` |
+| `GET /api/v1/auth/me` | → `Me` | own account | | `grants` per module, `scopes` (each module's widest record scope over the person's roles: `all`, `team` or `own`), and `capabilities`: the codes the person holds through a role or directly, A to Z (the CEO's are every code in `capability`), the same the routes check (README §5.2); `ai_available`, false while AI is switched off on AI Control or the month's cap on all AI is reached (`ai-control.md` §6.7). Every session response carries the same `Me` |
 | `GET /api/v1/auth/security` | → `SecuritySummary` | own account | | |
 | `POST /api/v1/auth/password` | `PasswordChange` → `PasswordChanged` | own account | | 10 per person in 15 minutes |
 | `GET /api/v1/auth/sessions` | `SignInListQuery` → `SignInPage` | own account | yes, 25 | Filter `status` (active, ended); sort `issued_at` |
@@ -475,6 +475,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · `/auth/me` (and the sign-in answer's `user`) carries `ai_available` (`services/ai/governance.js` `available`): the hub hides Praxis AI and every AI button while it is false. The shell reads `/me` again at its refresh and on a move to another module (`rereadMe`, which keeps the person in hand when nothing changed), never on a timer; `can("praxis_ai")` answers false meanwhile (`ai-control.md` decisions 36 to 38, §6.7).
 - 14/11/2026 · JP · §10: Sign In clears a refused password unmarked: the refusal bar says why, and the field no longer also reads "Enter your password" (as the code and PIN steps already did). Reset and Welcome: an empty Confirm Password reads "Enter it again", a different one "Does not match"; "Enter it again" could not show before while New Password held anything. Found filming the Milestones 0 and 1 videos (`docs/runbooks/training-videos.md` §7); `Login.test.tsx`.
 - 11/11/2026 · AJ · `users.inviteIn(client, body, actor)`: Invite User's own step inside a caller's transaction, for M5's Complete Onboarding, which invites the hire's login on their company email with the role Staff all or nothing with the rest of that step (§3 step 1). The invitation, its link and its mail are unchanged.
 - 03/11/2026 · JP · `access.ai.js`: Save Role is `design` (`praxis-ai.md` decision 35): a role's grants are designed on Roles and Permissions with the whole matrix in view, so who may do what never changes from the chat. No screen changed.

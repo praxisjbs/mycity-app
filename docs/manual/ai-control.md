@@ -146,7 +146,8 @@ is saved until you accept it. Each search is billed by the provider.
 ![New Prices](shot:ai-control-new-prices)
 
 1. Press **Find Prices** at the top right. On a phone it is at the foot of the list. A message
-   says **Finding prices**, and **New Prices** opens.
+   says **Finding prices**, and **New Prices** opens. While AI is switched off there is no **Find
+   Prices**: set a price by hand instead.
 2. While it searches, a bar shows its progress: *Starting Search*, then *Batch 2 of 4*. Until
    prices arrive, the list says **Searching**.
 3. Prices appear as they arrive, each with the model, the price and the page it came from. On a
@@ -201,8 +202,10 @@ Spend shows what AI has cost this month, in naira, against each cap.
 
 1. Open [AI Control · Spend](/ai-control?tab=spend).
 2. **All AI** shows the month's spend against the cap on all AI, as a bar with the percent and, for
-   example, *₦19K of ₦100K cap*. It shows **At Cap** once reached. Below it, **Month Of**,
-   **One Dollar** (the day's rate) and **Rates Of** (the day the rate is from).
+   example, *₦19K of ₦100K cap*. It shows **At Cap** once reached, and **AI Off** while AI is
+   switched off. Below it, **Month Of**, **One Dollar** (the day's rate) and **Rates Of** (the day
+   the rate is from). Once anyone has switched AI off or on, **Switched Off** or **Switched On**
+   says who did and when.
 3. Each provider shows **Free** or **Paid**, what it spent and this month's calls. A paid one shows
    its cap, or *no cap*. **Not Set Up** means it has no key; **At Cap** means it reached its cap.
    The bar turns amber at 80% and red at 100%.
@@ -236,7 +239,32 @@ and opens Spend.
 | Cap | When it is reached |
 |---|---|
 | A provider's | That provider is skipped until the month ends, and the next model in each chain answers |
-| **All AI** | No AI feature answers until the month ends |
+| **All AI** | No AI feature answers until the month ends, and the hub hides its AI buttons as when AI is switched off |
+
+### Switch AI off or on {#ai-control-spend-switch needs="ai_control edit"}
+
+Switching AI off stops every AI feature at once, for everyone. Nothing is spent until it is
+switched on again. Every screen keeps its form, so the work is done by hand meanwhile.
+
+![Switch Off AI](shot:ai-control-switch-off)
+
+1. Open [AI Control · Spend](/ai-control?tab=spend).
+2. Press **Switch Off AI** on **All AI**.
+3. A box asks **Switch Off AI**. Press **Switch Off AI** to confirm, or **Cancel**.
+4. A message says **AI switched off**. **All AI** shows **AI Off**, and **Switched Off** with your
+   name and the time.
+5. To turn it back on, press **Switch On AI**. A message says **AI switched on**.
+
+While AI is off:
+
+- **Praxis AI** leaves the menu, the top bar and the round button on a phone, and search no
+  longer finds it.
+- Each screen's AI button is gone: **Read Invoice**, **Suggest Category**, **Write With AI**,
+  **Tidy With AI**, **Draft With AI**, **Summarise Thread**, **Find Prices** and the rest. Fill
+  the form by hand.
+- AI Control stays open, so you can switch AI back on.
+
+> Other people's screens follow when they next refresh or open another part of the hub.
 
 ```shot ai-control-actions
 open: /ai-control?tab=actions
@@ -296,6 +324,17 @@ as: admin
 marks:
   1: text "All AI" | All AI against its cap
   2: button "Set Cap" | Set the cap
+```
+
+```shot ai-control-switch-off
+open: /ai-control?tab=spend
+as: admin
+do:
+  - click: button "Switch Off AI"
+  - wait: text "Every AI button is hidden until AI is switched on."
+crop: modal
+marks:
+  1: text "Every AI button is hidden until AI is switched on." | Confirm to switch every AI feature off
 ```
 
 ```shot ai-control-action-sheet

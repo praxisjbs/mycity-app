@@ -17,6 +17,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import vacancySchemas from "@mycity/contract/schemas/vacancies.js";
 import type { FollowUpQuestion } from "@mycity/contract/contract.gen.ts";
 import { useApi, useInfinite, useMutation } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { HiringManagerPicker } from "@/features/shared/pickers";
 import { lineOf, places } from "@/features/shared/places";
 import { paging } from "@/features/shared/wire";
@@ -125,8 +126,9 @@ type Props = {
 
 export function VacancyInterview({ start, close, onDone }: Props) {
   const status = useApi("GET /api/v1/recruitment/vacancies/assist");
+  const aiOn = useAiAvailable();
   if (!status.data && !status.error) return <LoadingRows count={4} />;
-  return <Interview start={start} close={close} onDone={onDone} ai={status.data?.available === true} />;
+  return <Interview start={start} close={close} onDone={onDone} ai={aiOn && status.data?.available === true} />;
 }
 
 function Interview({ start, close, onDone, ai }: Props & { ai: boolean }) {

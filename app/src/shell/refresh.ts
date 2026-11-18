@@ -19,8 +19,23 @@ import { pendingUpdate, STAYED_MS } from "./pwa";
  */
 export const REFRESH_MS = 15000;
 
+/** What the shell reads outside the screen's own reads (/auth/me), asked again with them. */
+const alongside = new Set<() => Promise<void>>();
+
+/**
+ * Ask `read` again at every refresh of the screen; returns the way to stop. The shell's /me goes
+ * here, so AI switched off or on reaches an open hub at its next refresh (ai-control.md decision 37).
+ */
+export function refreshAlongside(read: () => Promise<void>): () => void {
+  alongside.add(read);
+  return () => {
+    alongside.delete(read);
+  };
+}
+
 export function refreshScreen(): Promise<void> {
-  return Promise.race([refresh("/api/"), new Promise<void>((done) => window.setTimeout(done, REFRESH_MS))]);
+  const reads = Promise.all([refresh("/api/"), ...[...alongside].map((read) => read().catch(() => undefined))]).then(() => undefined);
+  return Promise.race([reads, new Promise<void>((done) => window.setTimeout(done, REFRESH_MS))]);
 }
 
 export function useReloadApp(): () => Promise<void> {

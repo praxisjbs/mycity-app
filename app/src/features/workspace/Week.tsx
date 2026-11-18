@@ -9,6 +9,7 @@ import workspace from "@mycity/contract/schemas/workspace.js";
 import type { Task, TeamWeek, WeekView } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged, type PagedResult } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import {
   Button,
   Card,
@@ -133,6 +134,7 @@ function SupportNeededForm({ week, close }: { week: WeekView; close: () => void 
   const f = useContractForm({ week_starts_on: week.week_starts_on, support_needed: week.support_needed ?? "" }, workspace.WeekSave);
   const save = useMutation("PUT /api/v1/workspace/week");
   const tidy = useMutation("POST /api/v1/workspace/week/tidy");
+  const aiOn = useAiAvailable();
   const [summary, setSummary] = useState<{ text: string; run: string | null } | null>(null);
   const done = (message: string) => {
     invalidate("/api/v1/workspace");
@@ -194,7 +196,7 @@ function SupportNeededForm({ week, close }: { week: WeekView; close: () => void 
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button onClick={tidyIt}>Tidy With AI</Button>
+        {aiOn && <Button onClick={tidyIt}>Tidy With AI</Button>}
         <Button variant="primary" onClick={saveLine}>Save Line</Button>
       </FormFooter>
     </>

@@ -16,6 +16,7 @@ import {
   FormError,
   FormFooter,
   formatDate,
+  formatDateTime,
   Grid,
   HelpTerm,
   KeyValue,
@@ -29,6 +30,7 @@ import {
   Pill,
   toast,
   toMoneyString,
+  useConfirm,
   useContractForm,
   useModal,
 } from "@mycity/ui";
@@ -136,9 +138,31 @@ function ProviderCard({ p }: { p: AiProviderSpend }) {
 /** One day as a bar's label, day first without the year: "14/10". */
 const dayLabel = (iso: string) => formatDate(iso).slice(0, 5);
 
+/**
+ * Switch Off AI (asked first) and Switch On AI (docs/guides/ai-control.md decision 36, §6.7): the
+ * hub that pressed reads /me again at once, so its own AI buttons follow without a reload.
+ */
+function useSwitch(on: boolean) {
+  const { rereadMe } = useAuth();
+  const confirm = useConfirm();
+  return async () => {
+    if (on && !(await confirm({ title: "Switch Off AI", body: "Every AI button is hidden until AI is switched on.", destructive: true }))) return;
+    try {
+      await api.call("PUT /api/v1/ai-control/switch", { body: { enabled: !on } });
+      invalidate("/api/v1/ai-control");
+      await rereadMe?.();
+      toast(on ? "AI switched off" : "AI switched on");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not saved");
+    }
+  };
+}
+
 function Overall({ s }: { s: AiSpend }) {
   const { can } = useAuth();
   const modal = useModal();
+  const sw = s.switch;
+  const flip = useSwitch(sw.enabled);
   return (
     <Card>
       <CardHeader
@@ -146,13 +170,21 @@ function Overall({ s }: { s: AiSpend }) {
         help={HELP.overall}
         actions={
           can("ai_control", "edit") ? (
-            <Button size="sm" onClick={() => modal.open({ title: "Set Cap", body: (close) => <CapForm provider={null} cap={s.overall.cap_ngn} done={close} /> })}>
-              Set Cap
-            </Button>
+            <span className="flex flex-wrap gap-1.5">
+              <Button size="sm" variant={sw.enabled ? undefined : "primary"} onClick={flip}>
+                {sw.enabled ? "Switch Off AI" : "Switch On AI"}
+              </Button>
+              <Button size="sm" onClick={() => modal.open({ title: "Set Cap", body: (close) => <CapForm provider={null} cap={s.overall.cap_ngn} done={close} /> })}>
+                Set Cap
+              </Button>
+            </span>
           ) : undefined
         }
       >
-        {s.overall.at_cap && <Pill tone="err">At Cap</Pill>}
+        <span className="flex flex-wrap gap-1.5">
+          {!sw.enabled && <Pill tone="err">AI Off</Pill>}
+          {s.overall.at_cap && <Pill tone="err">At Cap</Pill>}
+        </span>
       </CardHeader>
       <div className="flex flex-col gap-2">
         <span className="text-2xl font-semibold">
@@ -164,6 +196,7 @@ function Overall({ s }: { s: AiSpend }) {
             ["Month Of", formatDate(s.month)],
             ["One Dollar", s.rate ? <Money value={Number(s.rate.usd_ngn).toFixed(2)} /> : null],
             ["Rates Of", s.rate ? formatDate(s.rate.day) : null],
+            [sw.enabled ? "Switched On" : "Switched Off", sw.switched_by && sw.switched_at ? `${sw.switched_by.display_name}, ${formatDateTime(sw.switched_at)}` : null],
           ]}
         />
       </div>

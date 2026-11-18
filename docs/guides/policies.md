@@ -407,6 +407,7 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Tidy With AI on a policy's text, and its mention in the Policy Text help; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 14/11/2026 · JP · §9: `policies.summary`, the policies and their acknowledgements in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8), for `policies.manage` alone. Nothing on screen changes.
 - 08/11/2026 · TB · `RichTextBlock` (`policies.js`) gains a `table` block (a header row and its rows), for an agreement's options table (M7 PR 6, `docs/guides/partnerships.md` §13.2); `markdownToBlocks` keeps tables. A policy's text never holds one, so its screens are unchanged.
 - 03/11/2026 · JP · Start Policy and Save Draft are Praxis AI cards for holders of `policies.manage`
