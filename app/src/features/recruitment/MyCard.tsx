@@ -12,6 +12,7 @@ import type { InterviewDecision, InterviewDetail } from "@mycity/contract/contra
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { saveFile } from "@/api/download";
+import { useAiAvailable } from "@/auth/ai";
 import { Button, ChoiceField, Field, FormError, FormFooter, HelpTerm, RatingField, TextAreaField, toast, useConfirm, useUnsavedChanges } from "@mycity/ui";
 import { DECISIONS, say } from "./shared";
 
@@ -40,6 +41,7 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
   const [marks, setMarks] = useState<Record<string, string>>({});
   // Read on `recruitment` view, as the card is: every panelist may tidy their own comments.
   const ai = useApi("GET /api/v1/recruitment/interviews/assist");
+  const aiOn = useAiAvailable();
   const save = useMutation("PUT /api/v1/recruitment/interviews/:id/feedback");
   const send = useMutation("POST /api/v1/recruitment/interviews/:id/feedback/submit");
   const tidy = useMutation("POST /api/v1/recruitment/interviews/assist");
@@ -218,7 +220,7 @@ export function MyCard({ interview, close, onChanged }: { interview: InterviewDe
       <Field label="Comments" optional {...mark("comments")}>
         <TextAreaField value={comments} onChange={setComments} rows={4} disabled={submitted} />
       </Field>
-      {!submitted && ai.data?.available && (
+      {!submitted && (aiOn && ai.data?.available) && (
         <Button size="sm" icon="spark" className="mb-3" onClick={tidyNotes}>Tidy With AI</Button>
       )}
       <Field label={<HelpTerm help={PRIVATE_HELP}>Private Notes</HelpTerm>} optional {...mark("private_notes")}>

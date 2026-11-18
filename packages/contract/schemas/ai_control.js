@@ -360,6 +360,21 @@ const AiPraxisSpend = z
   })
   .strict();
 
+/**
+ * Whether AI is switched on (ai_setting.enabled), and who last pressed Switch Off AI or Switch On AI
+ * and when (decision 36); both null until someone has.
+ */
+const AiSwitch = z
+  .object({
+    enabled: z.boolean(),
+    switched_by: z.object({ user_id: uuid, display_name: z.string() }).strict().nullable(),
+    switched_at: isoDateTime.nullable(),
+  })
+  .strict();
+
+/** PUT /switch: Switch Off AI (false) or Switch On AI (true). */
+const AiSwitchSave = z.object({ enabled: z.boolean() }).strict();
+
 /** GET /spend: this Lagos month. */
 const AiSpend = z
   .object({
@@ -378,6 +393,8 @@ const AiSpend = z
     days: z.array(AiSpendDay).max(31),
     /** Praxis AI's refusals this month and the nightly attack run (§10). */
     praxis_ai: AiPraxisSpend,
+    /** The whole of AI on or off (§6.7). */
+    switch: AiSwitch,
   })
   .strict();
 
@@ -462,6 +479,8 @@ const TABLES = {
   AiSpendActionPage: { table: null, reason: "a page of this month's spend by action" },
   AiCapParams: { table: null, reason: "the :provider path parameter" },
   AiCapSave: { table: "ai_provider_cap" },
+  AiSwitch: { table: null, reason: "ai_setting.enabled, switched_at, and switched_by named from app_user" },
+  AiSwitchSave: { table: "ai_setting" },
 };
 
 module.exports = {
@@ -504,4 +523,6 @@ module.exports = {
   AiSpendActionPage,
   AiCapParams,
   AiCapSave,
+  AiSwitch,
+  AiSwitchSave,
 };

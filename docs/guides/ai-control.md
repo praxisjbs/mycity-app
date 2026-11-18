@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | AI Control · Actions, Models and Spend (#98 to #100) |
 | Status | Built |
-| Last changed | 13/11/2026 |
+| Last changed | 17/11/2026 |
 
 Sources: TB's answers of 20/10/2026 on AI providers, transcription and AI Control (§1.1, with
 `integrations.md` §1.2), MILESTONES §15 (M10: governance, spend caps, model configuration, per-module
@@ -125,13 +125,38 @@ With Praxis AI's guide (21/10/2026, `praxis-ai.md` §1.1):
 35. **Voice Question** (`praxis-ai-voice`) is registered on Transcription, personal data: a question
     spoken on Praxis AI · Ask. Data Answers is now built.
 
+At the work progress review (MyCity with JBS Praxis, 16/11/2026), after AI spend on JBS Praxis's own
+keys reached about ₦26,000 to ₦27,000 while MyCity tests the system by hand:
+
+36. **Switch Off AI and Switch On AI on AI Control · Spend**, for whoever may set the cap
+    (`ai_control` edit). One press writes `ai_setting.enabled` through the `ai_governance` service,
+    in a transaction, with `emit("ai_control.switched")`, audited, and keeps who switched it and when
+    (`switched_by`, `switched_at`, migration 10230), which the All AI card shows. Switching off asks
+    first, in the shared confirm dialog; switching on does not. AI Control is configuration, not AI:
+    it stays open while AI is off, so AI can be switched back on. The ₦0 cap used as a stopgap
+    before this switch can be set back with Set Cap.
+37. **The hub learns it from `/auth/me`**, which the shell already loads at start: `Me.ai_available`
+    is false while AI is switched off or the month's cap on all AI is reached (either refuses every
+    call, §6.1 step 4). No second poll: the shell reads `/auth/me` again at its refresh (the pull on
+    a phone, the refresh button, ⌘K's Refresh Screen) and when the person moves to another module,
+    and AI Control's own switch reads it at once. ⌘K answers the same way (`search.service`).
+38. **While AI is unavailable, every way into AI that would only fail is hidden** (§6.7): Praxis AI
+    (its place in the menu, the top bar's button, the floating button's, ⌘K's screens, New
+    Conversation and conversations), and each feature's AI button. No gap and no explainer is left
+    where a button was (FRONTEND_GUIDE §5, gate 8); the form beside it is how the job is done. What
+    works without a model stays: a voice note's Transcribe hands back the browser's captions
+    (`integrations.md` §6.14).
+39. **The per-module switch stays open** (§13 question 1): `disabled_modules` still has no screen.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | AI Control · Actions (`actions`) | Staff app, System group, after Praxis AI | `ai_control` view | The seven jobs, each with its chain (first choice and up to three fallbacks) and the state of each model in it; the actions, 25 a page, each with its job, whether it carries personal data, its chain and today's calls | Edit Chain, Make First, give an action its own chain, Use Job Chain to put it back (edit) |
 | AI Control · Models (`models`) | Staff app | `ai_control` view | The models in a chain first, then the rest the key can use, 25 a page (Not on Key and Any behind the filter): what each does, its price in dollars and naira, the chains it is in; the New Prices sheet: Find Prices' progress, the prices it proposed with their pages, how many models are still to price or not listed | Find Prices, Accept All, Accept, Edit Price, Dismiss, Find More (edit); open the provider's connection |
-| AI Control · Spend (`spend`) | Staff app | `ai_control` view | This Lagos month: each provider's spend against its cap, all AI against the overall cap, the day's rate, Praxis AI's refusals this month and the nightly attack run's last result (`praxis-ai.md` §6.17), spend by day and, 25 a page, spend by action | Set Cap on a paid provider, Set Cap on all AI (edit) |
+| AI Control · Spend (`spend`) | Staff app | `ai_control` view | This Lagos month: whether AI is on, and who switched it last and when; each provider's spend against its cap, all AI against the overall cap, the day's rate, Praxis AI's refusals this month and the nightly attack run's last result (`praxis-ai.md` §6.17), spend by day and, 25 a page, spend by action | Switch Off AI (asks first) and Switch On AI, Set Cap on a paid provider, Set Cap on all AI (edit) |
+| AI Control · Models (`models`) while AI is off | Staff app | `ai_control` view | As above, without Find Prices and Find More (§6.7) | Edit Price, Accept, Accept All, Dismiss (edit) |
+| Every screen with an AI button (§6.7) | Staff app | As each screen | Without its AI button while `Me.ai_available` is false | The screen's own form |
 | Settings · Integrations (`integrations`) | Staff app | `integrations` view | Each AI connection's In Use reads AI Control's chains, and links to AI Control · Actions | As built (`integrations.md`) |
 | Praxis AI · Ask | Staff app | Everyone with Praxis AI | Data Answers on Default (decision 27) and Voice Question on Transcription (decision 35) | `praxis-ai.md` |
 
@@ -160,6 +185,11 @@ With Praxis AI's guide (21/10/2026, `praxis-ai.md` §1.1):
 6. AI Control · Spend sums the ledger per provider for the Lagos month against each provider's cap
    and the overall cap. **Set Cap** emits `ai_control.cap_changed`. A provider at its cap is skipped
    by every chain until the month ends; nobody is told (decision 21).
+7. **Switch Off AI** (decision 36) asks first, then sets `ai_setting.enabled` false and emits
+   `ai_control.switched`; every call is refused from then on (`AI_DISABLED`, §6.1 step 4). **Switch
+   On AI** sets it back. The screen that pressed reads `/auth/me` again at once; every other open hub
+   reads it at its next refresh or move to another module (decision 37) and hides or shows its AI
+   buttons (§6.7).
 
 ## 4 · Data
 
@@ -175,7 +205,7 @@ Migration `10200_ai_control.sql` (M10's block; M10 brought forward). `ai_model` 
 | `ai_model` (PR1) | adds `usd_per_thousand_searches` `numeric(12,4)`; `price_not_listed_at` (10210) | Google Search's price, for Find Prices; when the provider's page last did not price the model |
 | `ai_run_step` (M0) | adds `audio_seconds`, `ngn_per_audio_hour`, `searches`, `ngn_per_search`, `usd_ngn_rate`, `rate_day`; kind adds `search` | What the step was charged at, so a new price or rate never rewrites past spend |
 | `ai_run` (M0) | adds `original_purpose` (10220) | The key a run was recorded under when 10220 moved it onto its registered action (§6.5); null for every other run, and read by no code. 10220's DOWN puts the old key back from it |
-| `ai_setting` (M0) | `monthly_cap_ngn` is the overall cap, set on Spend | `vendor` and `model` are no longer read: the chains decide (§6.1) |
+| `ai_setting` (M0) | `monthly_cap_ngn` is the overall cap, set on Spend; `enabled`, set by Switch Off AI and Switch On AI; adds `switched_by` (FK `app_user`, ON DELETE SET NULL) and `switched_at` (10230) | `vendor` and `model` are no longer read: the chains decide (§6.1). `switched_by` and `switched_at` say who last pressed the switch and when; null until someone does. `updated_by` changes with a cap too, so it cannot say who switched |
 | `ai_attack_run` (10350) | `environment`, `run_by` (`nightly`, `hand`), `status` (`passed`, `leaked`, `cannot_run`, `failed`), `asked`, `passed`, `leaks` jsonb (a line per leak: the attack, who asked, what was wrong; never a record), `error_code`, `started_at`, `finished_at` | One per run of Praxis AI's attack suite against the real model (`scripts/ai/attack-assistant.js`, `praxis-ai.md` §6.17): Spend shows the newest. Written by `ai_governance.service.recordAttackRun` |
 
 The registry of actions is code, `src/services/ai/actions.js` (§6.5). Grants are reference data:
@@ -204,6 +234,10 @@ Under `/api/v1/ai-control`, schemas in `packages/contract/schemas/ai_control.js`
 | `GET /spend/actions` (`page`) | → `AiSpendActionPage`, this month by action, 25 a page | view |
 | `PUT /caps/:provider` | `AiCapSave` (`monthly_cap_ngn` or null) → `AiSpend` | edit |
 | `PUT /cap` | `AiCapSave` → `AiSpend`: the overall cap | edit |
+| `PUT /switch` | `AiSwitchSave` (`enabled`) → `AiSpend` (its `switch`: `enabled`, `switched_by` as `{ user_id, display_name }` or null, `switched_at`) | edit |
+
+`GET /auth/me` (`identity.js` `Me`) carries `ai_available`: false while AI is switched off or the
+month's cap on all AI is reached (`governance.available`, decision 37).
 
 Errors: 422 `NOT_AN_AI_PROVIDER`, `MODEL_NOT_LISTED`, `MODEL_CANNOT_DO_JOB`, `DEEPSEEK_PERSONAL_DATA`,
 `ANTHROPIC_SONNET_HAIKU`, `ONE_EMBEDDING_MODEL`, `NOT_PAID`; 404 `NO_SUCH_JOB`, `NO_SUCH_ACTION`;
@@ -356,6 +390,62 @@ changing it is a support step that rebuilds the index first (`docs/runbooks/`).
   only means the guide rebuilds its index on the next tick, searching by words meanwhile. The lock
   stays the Knowledge Hub articles' alone.
 
+### 6.7 AI switched off (decisions 36 to 38)
+
+- **The switch** is `ai_setting.enabled`. `PUT /ai-control/switch` writes it on the row in use (a
+  new row when there is none, the other settings at their defaults), with `switched_by` and
+  `switched_at`, in one transaction with `emit("ai_control.switched")` (before and after, so the
+  Audit Log shows it). Pressing it to what it already is changes nothing and emits nothing.
+- **Availability** is `governance.available(db)`: switched on and the month's overall cap not
+  reached, remembered ten seconds per process like a provider's cap (`atCap`); the switch and a cap
+  forget it. A provider set up or not is not part of it: with none, the stub answers (CI, laptops)
+  and each Write With AI already says so through `drafts.availability`.
+- **The hub** reads `Me.ai_available` (`useAiAvailable()`, `AuthProvider.tsx`). The shell drops
+  Praxis AI from the person's modules while it is false, so the menu, the rail, More, the top bar's
+  button, the floating button's and a link to Praxis AI all fall back as for a module the person
+  may not open; `can("praxis_ai")` answers false. ⌘K drops Praxis AI's screens, New Conversation
+  and the conversations (`search.service` `readerOf`).
+- **The AI buttons hidden** while it is false, each on its own screen, the form around it unchanged:
+
+  | Screen | Hidden | Done by hand instead |
+  |---|---|---|
+  | Praxis AI (Ask, History, Attach Document) | The whole module | The screens the cards would have opened |
+  | Expenses · New Request and Edit | Read Invoice, Suggest Category | The request's own fields, the invoice attached as it is |
+  | Expenses · a request's modal | Check Duplicate | Possible Duplicates still lists same payee and amount within 30 days |
+  | Mailbox · the composer | Write With AI (with its Tidy Email and Dictate) | The composer |
+  | Mailbox · a thread | Summarise Thread | Reading the thread |
+  | Queries · New Query, a letter | Write With AI | The query's and the letter's own fields |
+  | Recruitment · New Vacancy, Edit | Write With AI | Description, Requirements, Nice to Have |
+  | Recruitment · a vacancy's Apply Questions | Suggest With AI | Add Question |
+  | Recruitment · New Vacancy's interview | The two follow-up questions | The eight fixed questions; Draft Vacancy writes plainly from the answers (`recruitment.md` §9) |
+  | Recruitment · Assessments | Suggest With AI | Add Question |
+  | Recruitment · Candidates | Screen With AI (and the phone's screen action), Score With AI | Reading the CV; the form-only score stays |
+  | Recruitment · an interview card | Tidy With AI | The card's own comments |
+  | Partnerships · Proposals | Rewrite Section, Send Proposal's Write With AI; the questions are not asked | Build by Hand, or Write It Myself while the questions are asked (`partnerships.md` §6.10), fills the kit's pages from the record to edit; Send Proposal's own fields |
+  | Partnerships · Categories, an agreement template | Tidy With AI | The template's editor |
+  | Knowledge Hub · SOPs | Draft With AI | The SOP's own form |
+  | Knowledge Hub · Training, a lesson | Draft Lesson | The lesson's own text |
+  | Knowledge Hub · Policies, a draft | Tidy With AI | The policy's editor |
+  | ESS · My Performance, a check-in | Dictate, Tidy With AI | The check-in's own fields |
+  | My Workspace · Week | Tidy With AI | Support Needed as written |
+  | AI Control · Models | Find Prices, Find More | Edit Price |
+  | User Guide | Get Answer, the microphone | Search by words (already hidden by `GuideContents.answers` and `voice`) |
+
+  Kept: a voice note's Transcribe in Staff Community (the browser's captions, `integrations.md`
+  §6.14); Settings · Integrations' Test, which calls the model under test directly (§6.5) and is how
+  IT checks a key; the screens a refusal still reaches (a request already open when AI went off
+  says the server's refusal in its toast, as before).
+- **Background work while AI is off.** Nothing is lost and nothing fails loudly:
+  - CV screening on a new application and Screen With AI's queue end as `off` and keep no score
+    (`candidates.score.js`); Score With AI reads it once AI is back.
+  - The User Guide's index skips its sync (`skipped: AI_DISABLED`) and search goes by words; the
+    next tick after AI is back embeds what is missing (`user_guide.meaning.js`).
+  - Document Centre's and the Knowledge Hub's search inside files reads a file's text with no model
+    (`document-text`, `document-centre.md` §6.7): it keeps working and loses nothing.
+  - Find Prices ends its run `failed` with the switch's code; the nightly attack run reports Could
+    Not Run (`praxis-ai.md` §6.17).
+  - Expenses' duplicate check and every Write With AI answer `available: false` as before.
+
 ## 7 · Events, jobs and notifications
 
 | Event | When | Follow-on |
@@ -366,6 +456,7 @@ changing it is a support step that rebuilds the index first (`docs/runbooks/`).
 | `ai_control.prices_proposed` | A Find Prices request proposed prices | Audit only |
 | `ai_control.price_set` | Accept, or Edit Price saved | Audit only |
 | `ai_control.cap_changed` | Set Cap, a provider's or all AI | Audit only |
+| `ai_control.switched` | Switch Off AI or Switch On AI pressed (decision 36) | Audit only; no one is told (decision 21) |
 | `ai_control.attack_run_recorded` | Praxis AI's attack suite ran against the real model (nightly on staging, or by hand) and reported its result | Audit only; the row on `ai_attack_run` is what Spend shows |
 | `ai_control.attack_leaked` | A run found a leak: an answer gave someone what their own screens would not (`praxis-ai.md` §6.17) | **Notifies**: an urgent notice to whoever may change AI Control (`ai_control` edit: the Implementation Team and the System Administrator), pushed to every device, closed only on Acknowledge; its link opens Spend. The one exception to decision 21, decided with PR5 of the Praxis AI Engine (decision 26) |
 
@@ -376,7 +467,7 @@ changing it is a support step that rebuilds the index first (`docs/runbooks/`).
 | Role | Sees | Can do |
 |---|---|---|
 | Implementation Team | All three tabs | Everything (`ai_control` all) |
-| System Administrator | All three tabs | Change chains, find and accept prices, set caps (view, edit) |
+| System Administrator | All three tabs | Change chains, find and accept prices, set caps, switch AI off and on (view, edit) |
 | Operations & People | All three tabs | Nothing: view only, to know when to recharge (decision 12) |
 | Everyone else | Nothing: AI Control is not in their sidebar or ⌘K | |
 | CEO | Everything, by the standing rule | The same as the Implementation Team |
@@ -402,8 +493,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | AI Control · Actions (`actions`) | AI Control as the title; each job as a card (desktop) with its chain as First and Fallback 1 to 3, each model's name, provider and state pill (Ready, Not Set Up, Not on Key, Daily Limit, Skipped Until a time, At Cap, Personal Data, Cannot Search); Make First on each fallback; Edit Chain (First Choice, Fallback 1 to 3, each a model picker searching the models that can do the job; Embeddings First Choice only; Save Chain); Locked on Embeddings once indexed; the actions with job, first choice, Personal Data, Own Chain and Not Built Yet pills, Calls Today; an action's sheet with Make First, Edit Chain and Use Job Chain (Restore Chain on Data Answers, "Back on its chosen chain"); toasts "Moved to first", "Chain saved", "Back on its job's chain" | Help terms on each job's name (what it is for, from §6.2), on Personal Data (DeepSeek is passed by) and on Own Chain | How the chain is walked and when a provider is skipped: §6.1 |
-| AI Control · Models (`models`) | Models as the title; Find Prices; the New Prices sheet, opened by Find Prices and by Review Prices while proposals wait: the run's progress ("Batch 2 of 4"), each proposed price (model, provider, price, page) with Accept and Dismiss, Accept All, and Find More once the run ends with models still to price; Still to Price and Not Listed counts; a failed run's reason as a pill ("No Search Model"), in the sheet and beside Find Prices once it is closed; the models: name, provider and what it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour"), In Naira, In Chains; Provider and Show (On Key, Not on Key, Any) filters; a model's sheet with its prices, Per 1,000 Searches, In Chains, Edit Price (Input per Million, Output per Million, Audio per Million, Per Audio Hour, Per 1,000 Searches, each Optional) and Open Connection; toasts "Finding prices", "12 prices saved", "Nothing left to accept", "Prices saved", "Proposal dismissed" | Help terms on In Naira (the day's rate it used) and Not Listed (models the provider's page does not price; asked again after 7 days) | How Find Prices searches and why IT confirms: §1.1 decision 20, §6.4 |
-| AI Control · Spend (`spend`) | Spend as the title; All AI: spent, against its cap (a meter, the percent and "₦19K of ₦100K cap"), Month Of, One Dollar, Rates Of; each provider: Free or Paid, Not Set Up, At Cap, spent, against its cap or "no cap", calls this month; Set Cap on All AI and each paid provider (Monthly Cap, Optional; blank removes it); three figures for Praxis AI: Reads Refused and Presses Refused (each "Praxis AI, this month"), Nightly Attacks ("11 of 11" with Passed and the day, in red Leaked; Could Not Run or Failed; before the first run Not Run, "No run yet"); Spend by Day (desktop): a bar a day, each labelled 14/10, every few days on a narrow screen; By Action: action, job, calls, spent; toasts "Cap set", "Cap removed" | Help terms on All AI and on Monthly Cap (what happens once reached), on Reads Refused (reads the asker's grants did not reach), Presses Refused (cards refused before anything ran) and Nightly Attacks (the questions asked of the real model as each role every night; a leak told at once) | How spend is summed: §6.3; what the attacks are and how a leak is graded: `praxis-ai.md` §6.17 |
+| AI Control · Models (`models`) | Models as the title; Find Prices (not while AI is off, §6.7); the New Prices sheet, opened by Find Prices and by Review Prices while proposals wait: the run's progress ("Batch 2 of 4"), each proposed price (model, provider, price, page) with Accept and Dismiss, Accept All, and Find More once the run ends with models still to price; Still to Price and Not Listed counts; a failed run's reason as a pill ("No Search Model"), in the sheet and beside Find Prices once it is closed; the models: name, provider and what it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour"), In Naira, In Chains; Provider and Show (On Key, Not on Key, Any) filters; a model's sheet with its prices, Per 1,000 Searches, In Chains, Edit Price (Input per Million, Output per Million, Audio per Million, Per Audio Hour, Per 1,000 Searches, each Optional) and Open Connection; toasts "Finding prices", "12 prices saved", "Nothing left to accept", "Prices saved", "Proposal dismissed" | Help terms on In Naira (the day's rate it used) and Not Listed (models the provider's page does not price; asked again after 7 days) | How Find Prices searches and why IT confirms: §1.1 decision 20, §6.4 |
+| AI Control · Spend (`spend`) | Spend as the title; All AI: AI Off as a red pill while AI is switched off, Switch Off AI (or Switch On AI) beside Set Cap for `ai_control` edit, Switched Off (or Switched On) with who and when ("Ada Obi, 16/11/2026 14:02") once anyone has pressed it, the confirm dialog Switch Off AI ("Every AI button is hidden until AI is switched on.", Switch Off AI), toasts "AI switched off", "AI switched on"; spent, against its cap (a meter, the percent and "₦19K of ₦100K cap"), Month Of, One Dollar, Rates Of; each provider: Free or Paid, Not Set Up, At Cap, spent, against its cap or "no cap", calls this month; Set Cap on All AI and each paid provider (Monthly Cap, Optional; blank removes it); three figures for Praxis AI: Reads Refused and Presses Refused (each "Praxis AI, this month"), Nightly Attacks ("11 of 11" with Passed and the day, in red Leaked; Could Not Run or Failed; before the first run Not Run, "No run yet"); Spend by Day (desktop): a bar a day, each labelled 14/10, every few days on a narrow screen; By Action: action, job, calls, spent; toasts "Cap set", "Cap removed" | Help terms on All AI and on Monthly Cap (what happens once reached), on Reads Refused (reads the asker's grants did not reach), Presses Refused (cards refused before anything ran) and Nightly Attacks (the questions asked of the real model as each role every night; a leak told at once) | How spend is summed: §6.3; what the attacks are and how a leak is graded: `praxis-ai.md` §6.17; what hides while AI is off and why: §6.7 |
 
 ### 10.2 Phone layout
 
@@ -411,7 +502,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 |---|---|---|---|---|
 | AI Control · Actions (`actions`) | Each job as a row with its first choice and its state, which opens the job's sheet | The fallbacks, in the job's sheet; the action rows below, each opening its own sheet | Make First and Edit Chain in the chain's sheet | More, then AI Control; tabs scroll sideways |
 | AI Control · Models (`models`) | Each model as a card: name, provider, Available, price | The chains it is in, the naira price | Find Prices, full width at the foot; New Prices as a sheet with Accept All at its foot | As above |
-| AI Control · Spend (`spend`) | All AI, then each provider's spend against its cap, as cards; the three Praxis AI figures two to a row | Spend by day | Set Cap on a paid provider's card, opening a sheet | As above |
+| AI Control · Spend (`spend`) | All AI with AI Off and Switched Off when off, then each provider's spend against its cap, as cards; the three Praxis AI figures two to a row | Spend by day | Switch Off AI (or Switch On AI) and Set Cap in the All AI card, the confirm as a bottom sheet; Set Cap on a paid provider's card, opening a sheet | As above |
 
 ## 11 · Edge cases
 
@@ -433,6 +524,16 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **A model the page never prices** (an old or regional model): Not Listed, asked again after 7
   days; Edit Price sets it by hand.
 - **A proposal for a model removed from the list**: it is dismissed with the model.
+- **AI switched off while a screen with an AI button is open**: the button stays until that hub's
+  next refresh or move to another module (decision 37); pressed meanwhile, the server refuses it
+  (`AI_DISABLED`) and the screen says so as before. Opening Praxis AI by a link lands on the first
+  screen the person may open.
+- **The month's cap on all AI reached**: the same as switched off for every screen (decision 37),
+  without the AI Off pill; Spend shows At Cap. A new month, or a higher cap, brings the buttons back.
+- **Switch Off AI pressed by two people at once**: the second finds it already off; nothing more is
+  written or audited.
+- **No `ai_setting` row** (a new database): AI reads as on (the environment's defaults, §6.1); the
+  first press writes the row.
 
 ## 12 · Donor code
 
@@ -444,12 +545,16 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 ## 13 · Open questions
 
 1. **The per-module switch** (`ai_setting.disabled_modules`, M0) has no screen yet; M10 decides
-   whether it goes on AI Control.
+   whether it goes on AI Control. The whole switch (decision 36) did not need it, and
+   `Me.ai_available` does not carry it: a module switched off by SQL still shows its AI buttons, and
+   a press is refused (`AI_MODULE_DISABLED`).
 2. **Actions registered later**: JD draft, CV screening, proposal draft, MOU draft and image
    reading are registered by the build that makes each one, asking the person which job
    (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5); Queries' two (`query-draft` on Default, `letter-draft` on Deep Reasoning, chosen by GE) on 26/10/2026 (`queries.md` §9). Expenses' three (`expense-invoice-read` on Image Reading, `expense-duplicate-check` and `expense-category-suggest` on Default, chosen by AJ) on 05/11/2026 (`expenses.md` §9). Praxis AI's `disbursement-receipt-read` (Image Reading, personal data, chosen by TB) on 13/11/2026, a payment receipt attached on Ask read for Record Disbursement's card; an attached invoice reuses `expense-invoice-read` (`praxis-ai.md` §6.18). `agreement-document-read` (Image Reading, personal data, chosen by TB, module Partnerships) the same day, a contract or MoU attached on Ask read, summarised and filed (`praxis-ai.md` §6.18, `partnerships.md` §9).
 
 ## 14 · Change log
+
+- 17/11/2026 · JP · Decisions 36 to 39 from the work progress review of 16/11/2026: Switch Off AI and Switch On AI on Spend (`PUT /switch`, `AiSwitchSave`, `AiSpend.switch`, `ai_control.switched`, migration 10230's `switched_by` and `switched_at`), `Me.ai_available` read at start, at the shell's refresh and on moving to another module, and every AI entry point in the hub hidden while it is false (§6.7, with the form route for each); background work checked (§6.7). §2, §3, §4, §5, §7, §8, §10, §11 and §13 follow.
 
 - 13/11/2026 · TB · §13: `agreement-document-read` registered on Image Reading, personal data, chosen by TB, module Partnerships (`praxis-ai.md` decisions 43 and 47, §6.18, Appendix A PR 2).
 - 13/11/2026 · TB · §13: `disbursement-receipt-read` registered on Image Reading, personal data, chosen by TB (`praxis-ai.md` decision 43, §6.18). `complete()`'s files take HEIC and HEIF too (a phone's photos, which Gemini reads).

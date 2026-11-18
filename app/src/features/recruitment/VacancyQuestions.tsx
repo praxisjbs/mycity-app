@@ -10,6 +10,7 @@ import vacancySchemas from "@mycity/contract/schemas/vacancies.js";
 import type { ScorecardWeight, VacancyDetail, VacancyQuestion } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useApi, useMutation } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { Button, Card, CardHeader, CheckboxField, ChoiceField, Field, FormError, FormFooter, HelpTerm, NumberField, TextField, toast } from "@mycity/ui";
 import { say } from "./shared";
 
@@ -40,6 +41,7 @@ export function QuestionsForm({ vacancy, close, onSaved }: { vacancy: VacancyDet
   const [problem, setProblem] = useState<string | null>(null);
   const settings = useApi("GET /api/v1/recruitment/vacancies/settings");
   const ai = useApi("GET /api/v1/recruitment/vacancies/assist");
+  const aiOn = useAiAvailable();
   const suggest = useMutation("POST /api/v1/recruitment/vacancies/:id/assist/questions");
   const save = useMutation("PUT /api/v1/recruitment/vacancies/:id/questions");
 
@@ -108,7 +110,7 @@ export function QuestionsForm({ vacancy, close, onSaved }: { vacancy: VacancyDet
   return (
     <>
       <Card>
-        <CardHeader title="Apply Questions" right={ai.data?.available ? <Button size="sm" icon="spark" onClick={suggestAi}>Suggest With AI</Button> : undefined} />
+        <CardHeader title="Apply Questions" right={(aiOn && ai.data?.available) ? <Button size="sm" icon="spark" onClick={suggestAi}>Suggest With AI</Button> : undefined} />
         {asks.map((a, i) => (
           <div key={a.id ?? `new-${i}`} className="mb-3 border-b border-border pb-3">
             <Field label={`Question ${i + 1}`} {...mark(`ask.${i}.prompt`)}>

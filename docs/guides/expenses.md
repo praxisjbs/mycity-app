@@ -538,6 +538,7 @@ None.
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Read Invoice, Suggest Category and Check Duplicate; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 16/11/2026 · TB · §9: the Document Centre's Library lists a request's invoice and a disbursement's receipt (`expenses.library.js`, `disbursements.library.js`; `document-centre.md` §6.2), each for the readers the vault already lets open it and nobody else. Nothing on an Expenses screen changed.
 - 14/11/2026 · JP · `budgets.summary` failed when an allocation carried kobo (₦1,050,000.50): the repo's JSON gave the amount as the number 1050000.5, which money() refuses, and Praxis AI's budget question drew no Overview. Every amount of the summary now leaves the database as text (`budgets.repo.js` `aiSummary`). Found building `praxis-ai.md` Appendix B PR 3; its test (`ai-overview-export.test.js`) holds a budget with kobo.
 - 13/11/2026 · JP · `expenses.summary`, `requisitions.summary` and `disbursements.summary` built (`praxis-ai.md` Appendix B PR 4, §9): Praxis AI charts requests by status, category, department, project or payee type (stacked Paid, Approved, Waiting), requisitions by status and payments by category or month, each within the reader's audience and scope as its list shows it.

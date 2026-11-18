@@ -3,6 +3,7 @@ import partner_pipeline from "@mycity/contract/schemas/partner_pipeline.js";
 import type { CategoryDetail, CategoryTemplate, RecordField, TemplateAsk } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { Button, CheckboxField, DocumentEditor, EmptyValue, Field, Form, FormError, FormFooter, FormRow, IconButton, SelectField, Skeleton, TextField, toast, useContractForm } from "@mycity/ui";
 import { editorFields, FIELD_TYPE_LABEL, KIND_LABEL, refusal } from "../lib";
 import { askKey } from "./template-html";
@@ -28,6 +29,7 @@ export function TemplateEditor({ category, template, tidy = false, close }: { ca
 }
 
 function Editor({ category, template, tidy, html, close }: { category: CategoryDetail; template?: CategoryTemplate; tidy: boolean; html: string; close: () => void }) {
+  const aiOn = useAiAvailable();
   const add = useMutation("POST /api/v1/partnerships/categories/:id/templates");
   const wording = useMutation("PUT /api/v1/partnerships/category-templates/:id/wording");
   const meta = useMutation("PATCH /api/v1/partnerships/category-templates/:id");
@@ -112,11 +114,13 @@ function Editor({ category, template, tidy, html, close }: { category: CategoryD
         <CheckboxField value={f.values.countersigned} onChange={(v) => f.set("countersigned", v)} label="MyCity Signs Too" />
         <CheckboxField value={f.values.is_default} onChange={(v) => f.set("is_default", v)} label="Default for Its Kind" />
       </div>
-      <div className="mb-2 flex justify-end">
-        <Button size="sm" variant="ghost" icon="spark" onClick={() => setStep("tidy")}>
-          Tidy With AI
-        </Button>
-      </div>
+      {aiOn && (
+        <div className="mb-2 flex justify-end">
+          <Button size="sm" variant="ghost" icon="spark" onClick={() => setStep("tidy")}>
+            Tidy With AI
+          </Button>
+        </div>
+      )}
       <Field label="Wording" {...f.status("body_html")}>
         <DocumentEditor label="Wording" fields={fields} {...f.field("body_html")} />
       </Field>

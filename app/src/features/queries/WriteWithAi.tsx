@@ -2,14 +2,16 @@ import queries from "@mycity/contract/schemas/queries.js";
 import type { AiAvailability } from "@mycity/contract/contract.gen.ts";
 import { useState, type ReactNode } from "react";
 import { Button, Field, FormFooter, Icon, TextAreaField, toast, useContractForm } from "@mycity/ui";
+import { useAiAvailable } from "@/auth/ai";
 
 /**
  * Write With AI on Raise a Query and the letter editor (docs/guides/queries.md §9), built like the
  * mailbox's: the AI step opens inside the form's own window, since modals never stack, and nothing
  * is kept. Use Draft hands the draft to the form, which the person still raises or saves.
  *
- * The button says so when AI cannot answer (AI Is Off, AI Limit Reached), and the form works as
- * before.
+ * The button says so when AI cannot answer for this module (AI Is Off, AI Limit Reached), and the
+ * form works as before. While AI is switched off for everyone, or the month's cap is reached, the
+ * button is not drawn at all (docs/guides/ai-control.md §6.7).
  */
 const label = (s: AiAvailability | undefined) => (!s || s.available ? "Write With AI" : s.reason === "limit" ? "AI Limit Reached" : "AI Is Off");
 
@@ -18,6 +20,8 @@ export const offToast = (reason: AiAvailability["reason"]) => toast(reason === "
 
 /** The button that opens the step, or says why it cannot. */
 export function WriteWithAiButton({ status, open }: { status: AiAvailability | undefined; open: () => void }) {
+  const aiOn = useAiAvailable();
+  if (!aiOn) return null;
   return (
     <div className="mb-2 flex justify-end">
       <Button size="sm" variant="ghost" icon="spark" onClick={() => (status && !status.available ? offToast(status.reason) : open())}>

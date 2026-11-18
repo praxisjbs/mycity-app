@@ -68,5 +68,13 @@
       "desktop",
       "phone"
     ]
+  },
+  "ai-control-switch-off": {
+    "spec": "5ae196ef6682a811",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
   }
 }

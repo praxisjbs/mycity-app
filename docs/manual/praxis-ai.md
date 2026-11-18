@@ -16,6 +16,9 @@ check and press. If something is missing, it asks first, one question at a time.
 until you press the card's button. A change it has no card for opens the screen where you do it,
 already filled in with what you said.
 
+> When AI is switched off on AI Control, or this month's AI budget is spent, Praxis AI is not in
+> the menu, the top bar or search. Do the work on its own screen until it is back.
+
 ## Ask {#praxis-ask screen=praxis_ai/ask icon=spark}
 
 Ask is a conversation: your questions on the right, Praxis AI's answers below them. On a computer

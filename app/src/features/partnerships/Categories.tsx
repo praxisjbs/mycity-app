@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { CategoryDetail, CategoryRow, CategoryTemplate, ChecklistItem, Field } from "@mycity/contract/contract.gen.ts";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { useTrailTitle } from "@/lib/trail";
@@ -309,6 +310,7 @@ function DefaultsCard({ d, edit }: { d: CategoryDetail; edit?: () => void }) {
 }
 
 function TemplatesCard({ d, configure }: { d: CategoryDetail; configure: boolean }) {
+  const aiOn = useAiAvailable();
   const modal = useModal();
   const change = useMutation("PATCH /api/v1/partnerships/category-templates/:id");
   const open = (template?: CategoryTemplate, tidy = false) =>
@@ -329,9 +331,11 @@ function TemplatesCard({ d, configure }: { d: CategoryDetail; configure: boolean
         actions={
           configure ? (
             <span className="flex gap-1.5">
-              <Button size="sm" icon="spark" onClick={() => open(undefined, true)}>
-                Tidy With AI
-              </Button>
+              {aiOn && (
+                <Button size="sm" icon="spark" onClick={() => open(undefined, true)}>
+                  Tidy With AI
+                </Button>
+              )}
               <Button size="sm" icon="plus" onClick={() => open()}>
                 Add Template
               </Button>

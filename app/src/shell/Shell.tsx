@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Avatar,
   BottomBar,
@@ -44,7 +44,7 @@ import { ShellNotices, useInstallApp } from "./Notices";
 import { OfflinePage, useOnline } from "./offline";
 import { PlannedScreen, ViewBar } from "./Planned";
 import { noteVisit, usePwa } from "./pwa";
-import { refreshScreen, useReloadApp } from "./refresh";
+import { refreshAlongside, refreshScreen, useReloadApp } from "./refresh";
 import { SCREENS } from "./screens";
 import { ScreenActionProvider } from "./screen-action";
 import { Search } from "./Search";
@@ -119,6 +119,21 @@ export function Shell() {
 
   useEffect(() => noteVisit(), []);
   useClockSync();
+
+  /*
+   * /me again at the shell's refresh and on a move to another module, never on a timer: AI switched
+   * off or on (Me.ai_available) shows or hides every AI button without a reload (ai-control.md §6.7).
+   */
+  const { rereadMe } = useAuth();
+  useEffect(() => refreshAlongside(rereadMe), [rereadMe]);
+  const firstModule = useRef(true);
+  useEffect(() => {
+    if (firstModule.current) {
+      firstModule.current = false;
+      return;
+    }
+    void rereadMe();
+  }, [key, rereadMe]);
 
   // This device's trail for this person: put back from the last session, or started afresh (F29).
   useLayoutEffect(() => {

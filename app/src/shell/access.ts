@@ -6,7 +6,12 @@ import { MODULES, type ModuleDef, type TabDef } from "./catalogue";
  * grant does not allow, so a hidden button is never the protection.
  */
 export function visibleModules(me: Me): ModuleDef[] {
-  return MODULES.filter((m) => me.grants[m.key]?.includes("view") || (m.key === "settings" && (healthView(me) || integrationsView(me))));
+  return MODULES.filter(
+    (m) =>
+      // Praxis AI only answers while AI may (docs/guides/ai-control.md §6.7); AI Control stays, to switch it back on.
+      (m.key !== "praxis_ai" || me.ai_available !== false) &&
+      (me.grants[m.key]?.includes("view") || (m.key === "settings" && (healthView(me) || integrationsView(me)))),
+  );
 }
 
 /**

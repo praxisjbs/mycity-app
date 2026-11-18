@@ -603,6 +603,7 @@ interface copy; the copy rules apply to the chrome around them.
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Write With AI (with Tidy Email and Dictate) in the composer and Summarise Thread; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 08/11/2026 · JP · M7 PR 8 (`docs/guides/partnerships.md` §6.15): Link to Partner. `mailbox/binding/`
   filled (`mail-context.service`, `intake.service`, `context-tabs`, `convert.service`); `GET`, `POST` and
   `DELETE /threads/:id/partner`; each message of a linked conversation logged once on its lead or partner

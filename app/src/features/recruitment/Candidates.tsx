@@ -13,6 +13,7 @@ import candidateSchemas from "@mycity/contract/schemas/candidates.js";
 import type { ApplicationStage, CandidatesCandidate, CandidatesCandidateListQuery } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
+import { useAiAvailable } from "@/auth/ai";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
@@ -77,6 +78,7 @@ export function Candidates() {
   const summary = useApi("GET /api/v1/recruitment/candidates/summary", { query: vacancy ? { vacancy_id: vacancy } : {} });
   const role = useApi("GET /api/v1/recruitment/vacancies/:id", { params: { id: vacancy }, enabled: Boolean(vacancy) });
   const ai = useApi("GET /api/v1/recruitment/vacancies/assist", { enabled: mayEdit });
+  const aiOn = useAiAvailable();
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
   // Offer is M5's column: it shows once M5's Offers screen opens here (F14), never before.
   const offers = useScreenState("recruitment", "offers").open;
@@ -104,9 +106,9 @@ export function Candidates() {
   const invite = () => modal.open({ title: "Invite to Apply", body: (close) => <InviteForm close={close} vacancyId={vacancy} /> });
   const screen = () => modal.open({ title: "Screen With AI", body: (close) => <ScreenForm close={close} vacancyId={vacancy} /> });
   useScreenAction(mayCreate ? { label: "Invite to Apply", onSelect: invite } : null);
-  useScreenAction(mayEdit ? { label: "Screen With AI", onSelect: screen } : null, { second: true });
+  useScreenAction(mayEdit && aiOn && ai.data?.available ? { label: "Screen With AI", onSelect: screen } : null, { second: true });
   useUrlAction("invite", mayCreate ? invite : null);
-  useUrlAction("screen", mayEdit ? screen : null);
+  useUrlAction("screen", mayEdit && aiOn ? screen : null);
 
   // A candidate found with ⌘K (`?id=`), or Invite to Apply asked for (`?invite=1`), opens once and leaves the address.
   const linked = params.get("id");
@@ -146,7 +148,7 @@ export function Candidates() {
         sub={role.data && vacancy ? role.data.title : undefined}
         actions={
           <>
-            {mayEdit && ai.data?.available && <Button icon="spark" onClick={screen}>Screen With AI</Button>}
+            {mayEdit && (aiOn && ai.data?.available) && <Button icon="spark" onClick={screen}>Screen With AI</Button>}
             {mayCreate && <Button variant="primary" icon="send" onClick={invite}>Invite to Apply</Button>}
           </>
         }

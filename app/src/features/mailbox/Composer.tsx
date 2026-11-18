@@ -5,6 +5,7 @@ import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
 import { addDaysIso, Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, formatDateTime, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, shortMessage, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
+import { useAiAvailable } from "@/auth/ai";
 import { partsOf, WriteWithAi } from "./Assist";
 
 export interface ComposeInit {
@@ -112,6 +113,7 @@ function quickTimes() {
  * progress, send now or schedule, discard inline. Saves the draft as it is typed.
  */
 export function Composer({ from, init, close }: { from: string; init: ComposeInit; close: () => void }) {
+  const aiOn = useAiAvailable();
   const draftId = useMemo(() => init.draft_id ?? crypto.randomUUID(), [init.draft_id]);
   const sendKey = useMemo(() => crypto.randomUUID(), []);
   const [to, setTo] = useState(init.to ?? []);
@@ -255,7 +257,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           trigger={(open) => (
             <span className="flex items-center gap-1">
               <Tooltip label="Attach File"><button type="button" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground phone:size-tap"><Icon name="clip" /></button></Tooltip>
-              <Button ref={aiButton} size="sm" variant="ghost" icon="spark" onClick={() => setAi({ mounted: true, open: true })}>Write With AI</Button>
+              {aiOn && <Button ref={aiButton} size="sm" variant="ghost" icon="spark" onClick={() => setAi({ mounted: true, open: true })}>Write With AI</Button>}
             </span>
           )}
         />

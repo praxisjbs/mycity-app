@@ -6,6 +6,7 @@ import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { usePhotos } from "@/api/download";
 import { upload } from "@/api/upload";
+import { useAiAvailable } from "@/auth/ai";
 import { useAuth } from "@/auth/AuthProvider";
 import { DepartmentPicker, EmployeePicker } from "@/features/shared/pickers";
 import { withSignature } from "@/features/shared/signature";
@@ -431,6 +432,7 @@ const itemBody = (kind: ItemKind, v: ItemValues) => {
 const itemSchema = (kind: ItemKind): ContractSchema => ({ safeParse: (v: unknown) => training.ItemCreate.safeParse(itemBody(kind, v as ItemValues)) });
 
 function ItemForm({ c, kind, it, close }: { c: Course; kind: ItemKind; it: TrainingItem | null; close: () => void }) {
+  const aiOn = useAiAvailable();
   const add = useMutation("POST /api/v1/training/courses/:id/items");
   const save = useMutation("PATCH /api/v1/training/items/:id");
   const [file, setFile] = useState<string | null>(it?.document_name ?? null);
@@ -537,7 +539,7 @@ function ItemForm({ c, kind, it, close }: { c: Course; kind: ItemKind; it: Train
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        {kind === "lesson" && (
+        {kind === "lesson" && aiOn && (
           <Button icon="spark" onClick={() => setStep("source")}>
             Draft Lesson
           </Button>

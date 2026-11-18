@@ -109,6 +109,11 @@ const Me = z
      * Empty for the CEO.
      */
     hidden_fields: z.array(z.string()),
+    /**
+     * Whether AI may answer now: false while AI is switched off on AI Control or the month's cap on
+     * all AI is reached. The hub hides its AI buttons while it is false (ai-control.md §6.7).
+     */
+    ai_available: z.boolean(),
   })
   .strict();
 

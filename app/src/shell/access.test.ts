@@ -26,6 +26,7 @@ function person(capabilities: string[], over: Partial<Me> = {}): Me {
     manages_people: false,
     appearance: { dark: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact" },
     hidden_fields: [],
+    ai_available: true,
     ...over,
   };
 }

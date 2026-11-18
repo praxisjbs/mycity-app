@@ -12,6 +12,8 @@ const m = vi.hoisted(() => ({
   rows: {} as Record<string, unknown[]>,
   can: ((_module: string, _action?: string) => true) as (module: string, action?: string) => boolean,
   navigate: vi.fn(),
+  reread: vi.fn(async () => undefined),
+  aiAvailable: true,
 }));
 vi.mock("@/api/hooks", () => ({
   invalidate: m.invalidate,
@@ -23,7 +25,7 @@ vi.mock("@/api/hooks", () => ({
   },
 }));
 vi.mock("@/api/client", async () => ({ api: { call: m.call }, ApiError: (await import("@mycity/ui")).ApiError }));
-vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: m.can }) }));
+vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: m.can, rereadMe: m.reread, me: { ai_available: m.aiAvailable } }) }));
 vi.mock("@/lib/router", () => ({ useRouter: () => ({ navigate: m.navigate }) }));
 
 import AiControl from "./index";
@@ -157,6 +159,7 @@ const SPEND: AiSpend = {
     presses_refused: 2,
     nightly: { ai_attack_run_id: "00000000-0000-4000-8000-0000000000e1", environment: "staging", run_by: "nightly", status: "passed", asked: 11, passed: 11, leaks: [], error_code: null, started_at: "2026-10-20T01:00:00.000Z", finished_at: "2026-10-20T01:04:12.000Z" },
   },
+  switch: { enabled: true, switched_by: null, switched_at: null },
 };
 
 const page = (tab: string) =>
@@ -322,6 +325,43 @@ describe("AI Control", () => {
     await waitFor(() =>
       expect(m.call).toHaveBeenCalledWith("PUT /api/v1/ai-control/caps/:provider", { params: { provider: "gemini" }, body: { monthly_cap_ngn: "60000.00" } }),
     );
+  });
+
+  it("Spend: Switch Off AI asks first, then switches and reads /me again; off, AI Off with who and when, and Switch On AI", async () => {
+    m.data = { "GET /api/v1/ai-control/spend": SPEND };
+    m.rows = { "GET /api/v1/ai-control/spend/actions": [] };
+    m.call.mockResolvedValueOnce({ ...SPEND, switch: { enabled: false, switched_by: { user_id: "u1", display_name: "Femi Bello" }, switched_at: "2026-11-16T13:02:00.000Z" } });
+    const { unmount } = page("spend");
+    expect(screen.queryByText("AI Off")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Switch Off AI" }));
+    const ask = within(await screen.findByRole("alertdialog"));
+    await userEvent.click(ask.getByRole("button", { name: "Switch Off AI" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("PUT /api/v1/ai-control/switch", { body: { enabled: false } }));
+    await waitFor(() => expect(m.reread).toHaveBeenCalled());
+    unmount();
+
+    m.data = { "GET /api/v1/ai-control/spend": { ...SPEND, switch: { enabled: false, switched_by: { user_id: "u1", display_name: "Femi Bello" }, switched_at: "2026-11-16T13:02:00.000Z" } } };
+    m.call.mockClear();
+    m.call.mockResolvedValueOnce(SPEND);
+    page("spend");
+    expect(screen.getByText("AI Off")).toBeTruthy();
+    expect(screen.getByText("Switched Off")).toBeTruthy();
+    expect(screen.getByText("Femi Bello, 16/11/2026 14:02")).toBeTruthy();
+    // Switching on asks nothing.
+    await userEvent.click(screen.getByRole("button", { name: "Switch On AI" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("PUT /api/v1/ai-control/switch", { body: { enabled: true } }));
+  });
+
+  it("Models: no Find Prices while AI is off; Edit Price stays", () => {
+    m.aiAvailable = false;
+    m.data = { [SUMMARY]: { finding: false, run: null, last_found_at: null, proposals: 0, to_price: 4, not_listed: 0, rate: RATE } };
+    m.rows = { "GET /api/v1/ai-control/models": [MODEL] };
+    try {
+      page("models");
+      expect(screen.queryByRole("button", { name: "Find Prices" })).toBeNull();
+    } finally {
+      m.aiAvailable = true;
+    }
   });
 
   it("Spend: Praxis AI's refusals this month and the nightly attack run, as figures; before the first run, Not Run; a leak in red", () => {

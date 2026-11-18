@@ -7,6 +7,7 @@ import { saveFile, useFileUrls } from "@/api/download";
 import { useFileViewer, viewableFile } from "@/features/shared/files";
 import { ForwardTo } from "@/features/community/Forward";
 import { useRealtime } from "@/api/realtime";
+import { useAiAvailable } from "@/auth/ai";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
@@ -192,6 +193,7 @@ function quote(m: MailMessage) {
 }
 
 function ThreadReader({ row, mailbox, writes, onBack, compose, onMoved }: { row: ThreadRow; mailbox: string; writes: boolean; onBack: () => void; compose: (init: ComposeInit, title?: string) => void; onMoved: () => void }) {
+  const aiOn = useAiAvailable();
   const { can } = useAuth();
   const t = useApi("GET /api/v1/mailbox/threads/:id", { params: { id: row.mail_thread_id } });
   const [images, setImages] = useState(false);
@@ -288,7 +290,7 @@ function ThreadReader({ row, mailbox, writes, onBack, compose, onMoved }: { row:
           {!spam && writes && <Button icon="send" onClick={() => reply(false)}>Reply</Button>}
           {!spam && writes && lastMsg.to.length + lastMsg.cc.length > 1 && <Button onClick={() => reply(true)}>Reply All</Button>}
           {!spam && writes && <Button onClick={forward}>Forward</Button>}
-          {!spam && (mobile ? <IconButton icon="spark" label="Summarise Thread" onClick={summarise} /> : <Button icon="spark" onClick={summarise}>Summarise Thread</Button>)}
+          {!spam && aiOn && (mobile ? <IconButton icon="spark" label="Summarise Thread" onClick={summarise} /> : <Button icon="spark" onClick={summarise}>Summarise Thread</Button>)}
           <Menu trigger={(p) => <IconButton {...p} icon="dots" label="Move this message" />} items={moves} />
         </span>
       </div>

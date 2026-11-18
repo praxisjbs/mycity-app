@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
+import { useAiAvailable } from "@/auth/ai";
 import { useFileViewer } from "@/features/shared/files";
 import { paging } from "@/features/shared/wire";
 import { hrefFor, moduleKeyOf, useRouter, useSearchParams } from "@/lib/router";
@@ -588,6 +589,7 @@ function SopEditor({ sop, close }: { sop: Sop; close: () => void }) {
   const f = useContractForm<Values>(initial, draftSchema);
   const [mode, setMode] = useState<"form" | "ai" | "compare">("form");
   const [suggestion, setSuggestion] = useState<SopDraftSuggestion | null>(null);
+  const aiOn = useAiAvailable();
   const v = f.values;
 
   const setOrder = (order: string[]) => f.set("order", order);
@@ -656,11 +658,13 @@ function SopEditor({ sop, close }: { sop: Sop; close: () => void }) {
 
   return (
     <>
-      <div className="mb-3 flex justify-end">
-        <Button icon="spark" onClick={() => setMode("ai")}>
-          Draft With AI
-        </Button>
-      </div>
+      {aiOn && (
+        <div className="mb-3 flex justify-end">
+          <Button icon="spark" onClick={() => setMode("ai")}>
+            Draft With AI
+          </Button>
+        </div>
+      )}
       <Field label="Title" {...f.status("title")}>
         <TextField {...f.field("title")} />
       </Field>
