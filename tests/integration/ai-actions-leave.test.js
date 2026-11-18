@@ -21,6 +21,7 @@ jest.mock("../../src/jobs/queues", () => ({
 }));
 
 const { rebuild } = require("./helpers/schema");
+const { annualWithoutCover } = require("./helpers/leave");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
@@ -67,6 +68,8 @@ describeDb("Praxis AI's leave cards against the real migrations", () => {
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
+    // Short Annual requests are only the way to what this suite tests (helpers/leave.js).
+    await annualWithoutCover(pool);
     workingWeek.invalidateCalendar();
     calendar = await workingWeek.loadCalendar(pool);
     outbox.markReady();
@@ -109,7 +112,9 @@ describeDb("Praxis AI's leave cards against the real migrations", () => {
     expect(asked.status).toBe(200);
     expect(c.assistant.AiAnswer.safeParse(asked.body).success).toBe(true);
     expect(asked.body.card).toMatchObject({ action_key: "my_leave.request", label: "Request Leave", schema: "leave.LeaveRequestCreate", risk: "standard", confirm: "press", records: [], values: { leave_type_id: annual, starts_on: mon, ends_on: tue, reason: "A family wedding" }, problems: {} });
-    expect(asked.body.card.fields.map((f) => [f.name, f.label])).toEqual([["leave_type_id", "Leave Type"], ["starts_on", "First Day"], ["ends_on", "Last Day"], ["reason", "Note"]]);
+    // Request Leave's fields but the handover note, a file that stays on the form (ess.md §9).
+    expect(asked.body.card.fields.map((f) => [f.name, f.label])).toEqual([["leave_type_id", "Leave Type"], ["starts_on", "First Day"], ["ends_on", "Last Day"], ["relief_employee_id", "Relief Officer"], ["reason", "Note"]]);
+    expect(asked.body.card.fields.find((f) => f.name === "relief_employee_id")).toMatchObject({ kind: "id", picks: "relief_officer", required: false });
     const pressed = await h.press("one", asked.body.card.ai_action_draft_id);
     expect(pressed.status).toBe(200);
     expect(pressed.body.lines).toEqual([{ type: "leave_request", id: expect.any(String), label: "Annual, 2 days", ok: true, message: "sent", link: expect.stringMatching(/^\/ess\?tab=my-leave&id=/) }]);
@@ -117,6 +122,29 @@ describeDb("Praxis AI's leave cards against the real migrations", () => {
     expect(mine.status).toBe(200);
     expect(mine.body).toMatchObject({ status: "submitted", days: 2, reason: "A family wedding", waiting_on: "Line Manager" });
     requests.wedding = mine.body;
+  });
+
+  test("my_leave.request for leave that needs a handover note: the relief officer matched by name, the press refused for the form, nothing written (ess.md §9)", async () => {
+    // Annual on every request, as seeded (1295): this suite took the rule off for its other cards.
+    await q("UPDATE leave_type SET handover_every_request = true WHERE code = 'annual'");
+    try {
+      const [, , , , fri] = week(5);
+      const before = (await q("SELECT count(*)::int AS n FROM leave_request")).rows[0].n;
+      script(say({ text: "Here is the request.", action: { key: "my_leave.request", values: { leave_type_id: "Annual", starts_on: fri, ends_on: fri, relief_employee_id: "Zainab Lawal", reason: "A family visit" }, suggested: false } }));
+      const asked = await h.ask("one", { question: "Request annual leave on Friday; Zainab covers for me.", shows: ["cards"] });
+      expect(asked.status).toBe(200);
+      expect(asked.body.card).toMatchObject({ values: { leave_type_id: annual, relief_employee_id: h.people.two.employee_id }, problems: {} });
+      expect(asked.body.card.names).toEqual(expect.arrayContaining([expect.objectContaining({ type: "employee", id: h.people.two.employee_id, label: "Zainab Lawal" })]));
+      const pressed = await h.press("one", asked.body.card.ai_action_draft_id);
+      expect([pressed.status, pressed.body.error.code]).toEqual([409, "HANDOVER_NOTE_NEEDED"]);
+      expect((await q("SELECT count(*)::int AS n FROM leave_request")).rows[0].n).toBe(before);
+      // The person themself is never their own relief officer: a name that is theirs matches nobody, so the field reads Pick one.
+      script(say({ text: "Here is the request.", action: { key: "my_leave.request", values: { leave_type_id: annual, starts_on: fri, ends_on: fri, relief_employee_id: "Musa Danjuma" }, suggested: false } }));
+      const self = await h.ask("one", { question: "Request annual leave on Friday, cover by me.", shows: ["cards"] });
+      expect(self.body.card.problems.relief_employee_id).toEqual(["Pick one"]);
+    } finally {
+      await q("UPDATE leave_type SET handover_every_request = false WHERE code = 'annual'");
+    }
   });
 
   test("my_leave.request names its leave type, matches one written by name, and marks an id nothing names Pick one, never sending it (decision 32)", async () => {

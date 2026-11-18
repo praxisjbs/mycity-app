@@ -29,6 +29,8 @@ const q = (sql, params) => pool.query(sql, params);
 const PASSWORD = "Leave-Days9Test";
 const Y = Number(lagos.today().slice(0, 4)) + 1;
 const d = (mmdd) => `${Y}-${mmdd}`;
+/** A file the upload engine takes as a PDF: the handover note a request carries. */
+const pdf = () => Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -62,8 +64,32 @@ describeDb("leave against the real migrations", () => {
       request(app).patch(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
   });
 
-  const ask = (who, leaveType, from, to, reason) =>
-    as(who).post("/ess/leave", { leave_type_id: types[leaveType], starts_on: from, ends_on: to, reason });
+  /** A handover note staged by `who` (POST /documents), as Request Leave's upload box stages it. */
+  const stage = async (who) => {
+    const res = await request(app)
+      .post("/api/v1/documents")
+      .set("Authorization", `Bearer ${tokens[who]}`)
+      .field("purpose", "document")
+      .attach("file", pdf(), { filename: "handover.pdf", contentType: "application/pdf" });
+    expect(res.status).toBe(201);
+    return res.body.document_id;
+  };
+
+  /**
+   * Ask for leave. Annual needs a relief officer and a handover note on every request (TB,
+   * 17/11/2026), so an Annual request names a colleague and carries a staged note unless `cover`
+   * says otherwise: false for none, or the fields to send.
+   */
+  const ask = async (who, leaveType, from, to, reason, cover) => {
+    const body = { leave_type_id: types[leaveType], starts_on: from, ends_on: to, reason };
+    if (cover && typeof cover === "object") Object.assign(body, cover);
+    else if (cover !== false && leaveType === "annual")
+      Object.assign(body, {
+        relief_employee_id: people[who === "other" ? "staff" : "other"].employee.employee_id,
+        handover_document_id: await stage(who),
+      });
+    return as(who).post("/ess/leave", body);
+  };
 
   const statusInDb = async (id) =>
     (await q("SELECT status FROM leave_request WHERE leave_request_id = $1", [id])).rows[0].status;
@@ -136,11 +162,21 @@ describeDb("leave against the real migrations", () => {
       ["sick", 12],
       ["unpaid", null],
     ]);
+    // Annual needs a relief officer and a handover note on every request; the rest over 7 working days (1210, 1295).
+    expect(seeded.body.data.map((t) => [t.code, t.handover_every_request, t.handover_over_days])).toEqual([
+      ["annual", true, 7],
+      ["compassionate", false, 7],
+      ["sick", false, 7],
+      ["unpaid", false, 7],
+    ]);
     for (const t of seeded.body.data) types[t.code] = t.leave_type_id;
 
     const study = await as("ops").post("/leave/types", { code: "Study", name: "Study", days_per_year: 3 });
     expect(study.status).toBe(201);
-    expect(study.body).toMatchObject({ code: "study", name: "Study", days_per_year: 3, active: true });
+    expect(study.body).toMatchObject({ code: "study", name: "Study", days_per_year: 3, active: true, handover_every_request: false, handover_over_days: 7 });
+    const rule = await as("ops").patch(`/leave/types/${study.body.leave_type_id}`, { handover_every_request: true, handover_over_days: null });
+    expect(rule.body).toMatchObject({ handover_every_request: true, handover_over_days: null, days_per_year: 3 });
+    expect((await as("ops").patch(`/leave/types/${study.body.leave_type_id}`, { handover_over_days: 400 })).status).toBe(422);
     expect((await as("ops").post("/leave/types", { code: "annual", name: "Again" })).status).toBe(409);
     expect((await as("staff").post("/leave/types", { code: "exam", name: "Exam" })).status).toBe(403);
 
@@ -226,8 +262,11 @@ describeDb("leave against the real migrations", () => {
     const after = await as("staff").get(`/ess/leave/balances?year=${Y}`);
     expect(after.body.balances.find((b) => b.code === "annual")).toMatchObject({ pending: 3, remaining: 17 });
     expect((await as("staff").get(`/ess/leave?year=${Y}`)).body.page.total).toBe(1);
-    // A type with no allowance has no ceiling.
-    const unpaid = await ask("staff", "unpaid", d("03-01"), d("03-27"));
+    // A type with no allowance has no ceiling. Over 7 working days, it needs cover (TB, 17/11/2026).
+    const unpaid = await ask("staff", "unpaid", d("03-01"), d("03-27"), undefined, {
+      relief_employee_id: people.manager.employee.employee_id,
+      handover_document_id: await stage("staff"),
+    });
     expect(unpaid.status).toBe(201);
     expect(unpaid.body.days).toBe(24 - off[0].n);
     expect((await as("staff").post(`/ess/leave/${unpaid.body.leave_request_id}/cancel`, {})).body.status).toBe("cancelled");
@@ -309,10 +348,122 @@ describeDb("leave against the real migrations", () => {
 
   test("my leave is mine: another employee's request is a 404", async () => {
     const mine = (await as("staff").get(`/ess/leave?year=${Y}`)).body.data[0];
-    expect((await as("other").get(`/ess/leave/${mine.leave_request_id}`)).status).toBe(404);
+    expect((await as("outsider").get(`/ess/leave/${mine.leave_request_id}`)).status).toBe(404);
+    expect((await as("outsider").post(`/ess/leave/${mine.leave_request_id}/cancel`, {})).status).toBe(404);
+    // The relief officer it names reads it, but it is never theirs to cancel or list.
+    expect((await as("other").get(`/ess/leave/${mine.leave_request_id}`)).status).toBe(200);
     expect((await as("other").post(`/ess/leave/${mine.leave_request_id}/cancel`, {})).status).toBe(404);
     expect((await as("other").get(`/ess/leave?year=${Y}`)).body.page.total).toBe(0);
     expect((await as("staff").get("/leave/requests")).status).toBe(403);
+  });
+
+  test("relief and handover: required by the type, checked, and read before Send", async () => {
+    const staffId = people.staff.employee.employee_id;
+    const otherId = people.other.employee.employee_id;
+    // Annual asks on every request: both fields marked at once, nothing written.
+    const bare = await ask("staff", "annual", d("09-06"), d("09-06"), undefined, false);
+    expect([bare.status, bare.body.error.code, bare.body.error.fields]).toEqual([
+      422,
+      "LEAVE_COVER_NEEDED",
+      { relief_employee_id: ["Required"], handover_document_id: ["Required"] },
+    ]);
+    // Not themselves, not someone away, not a file somebody else staged.
+    const self = await ask("staff", "annual", d("09-06"), d("09-06"), undefined, { relief_employee_id: staffId, handover_document_id: await stage("staff") });
+    expect(self.body.error.fields).toEqual({ relief_employee_id: ["Pick someone else"] });
+    const away = await ask("other", "sick", d("09-06"), d("09-06"));
+    expect(away.status).toBe(201);
+    const busy = await ask("staff", "annual", d("09-06"), d("09-06"), undefined, { relief_employee_id: otherId, handover_document_id: await stage("staff") });
+    expect(busy.body.error.fields).toEqual({ relief_employee_id: ["Away on those days"] });
+    const theirs = await ask("staff", "annual", d("09-07"), d("09-07"), undefined, { relief_employee_id: otherId, handover_document_id: await stage("other") });
+    expect(theirs.body.error.fields).toEqual({ handover_document_id: ["Upload it again"] });
+
+    // Who may cover: never the person, and with the dates, nobody away on them.
+    const list = await as("staff").get("/ess/leave/relief-officers");
+    expect(list.status).toBe(200);
+    expect(list.body.page.size).toBe(25);
+    const ids = list.body.data.map((p) => p.employee_id);
+    expect(ids).toContain(otherId);
+    expect(ids).not.toContain(staffId);
+    const onDay = await as("staff").get(`/ess/leave/relief-officers?starts_on=${d("09-06")}&ends_on=${d("09-06")}`);
+    expect(onDay.body.data.map((p) => p.employee_id)).not.toContain(otherId);
+    expect((await as("staff").get("/ess/leave/relief-officers?q=zainab")).body.data.map((p) => p.display_name)).toEqual(["Zainab Lawal"]);
+    expect((await as("other").post(`/ess/leave/${away.body.leave_request_id}/cancel`, {})).status).toBe(200);
+
+    // Other types ask only over 7 working days; the form reads which before Send.
+    const short = await as("staff").get(`/ess/leave/check?leave_type_id=${types.sick}&starts_on=${d("09-13")}&ends_on=${d("09-14")}`);
+    expect(short.body).toEqual({ days: 2, handover_needed: false });
+    const long = await as("staff").get(`/ess/leave/check?leave_type_id=${types.sick}&starts_on=${d("09-13")}&ends_on=${d("09-24")}`);
+    expect(long.body.days).toBeGreaterThan(7);
+    expect(long.body.handover_needed).toBe(true);
+    const oneAnnual = await as("staff").get(`/ess/leave/check?leave_type_id=${types.annual}&starts_on=${d("09-13")}&ends_on=${d("09-13")}`);
+    expect(oneAnnual.body).toEqual({ days: 1, handover_needed: true });
+    const backwards = await as("staff").get(`/ess/leave/check?leave_type_id=${types.sick}&starts_on=${d("09-14")}&ends_on=${d("09-13")}`);
+    expect(backwards.body).toEqual({ days: null, handover_needed: false });
+    const shortSick = await ask("staff", "sick", d("09-13"), d("09-14"));
+    expect(shortSick.status).toBe(201);
+    expect(shortSick.body).toMatchObject({ relief_employee: null, handover: null });
+    expect((await ask("staff", "sick", d("09-20"), d("09-29"))).body.error.code).toBe("LEAVE_COVER_NEEDED");
+    expect((await as("staff").post(`/ess/leave/${shortSick.body.leave_request_id}/cancel`, {})).status).toBe(200);
+  });
+
+  test("relief and handover: who opens the note, and the relief officer told on approval and on cancellation", async () => {
+    const res = await ask("staff", "annual", d("10-04"), d("10-05"), "Wedding");
+    expect(res.status).toBe(201);
+    expect(res.body.relief_employee).toMatchObject({ display_name: "Zainab Lawal" });
+    expect(res.body.handover).toMatchObject({ file_name: "handover.pdf", mime_type: "application/pdf" });
+    const note = res.body.handover.document_id;
+    const doc = await q("SELECT doc_type, entity_type, entity_id, subject_employee_id FROM document WHERE document_id = $1", [note]);
+    expect(doc.rows[0]).toMatchObject({ doc_type: "leave_handover", entity_type: "leave_request", entity_id: res.body.leave_request_id });
+
+    // The person, the relief officer, the approver and People open it; anyone else meets a 404.
+    for (const who of ["staff", "other", "manager", "ops"]) expect([who, (await as(who).get(`/documents/${note}`)).status]).toEqual([who, 200]);
+    expect((await as("outsider").get(`/documents/${note}`)).status).toBe(404);
+    // People and the approver read both on the request where they decide.
+    const seen = await as("manager").get(`/leave/requests/${res.body.leave_request_id}`);
+    expect(seen.body.relief_employee.display_name).toBe("Zainab Lawal");
+    expect(seen.body.handover.document_id).toBe(note);
+    // Nobody is told while it waits.
+    await drain();
+    const titles = async () =>
+      (await q("SELECT title, body FROM notification WHERE user_id = $1 AND entity_id = $2 ORDER BY created_at", [people.other.user.user_id, res.body.leave_request_id])).rows;
+    expect(await titles()).toEqual([]);
+
+    await as("manager").post(`/workflow/instances/${res.body.workflow_instance_id}/approve`, {});
+    await drain();
+    expect((await titles()).map((n) => n.title)).toEqual(["Relief cover: Musa Danjuma"]);
+    // The relief officer reads the request they cover on My Leave, without its note, and cannot cancel it.
+    const covered = await as("other").get(`/ess/leave/${res.body.leave_request_id}`);
+    expect(covered.status).toBe(200);
+    expect(covered.body).toMatchObject({ status: "approved", reason: null, employee: { display_name: "Musa Danjuma" } });
+    expect((await as("other").post(`/ess/leave/${res.body.leave_request_id}/cancel`, {})).status).toBe(404);
+    expect((await as("outsider").get(`/ess/leave/${res.body.leave_request_id}`)).status).toBe(404);
+
+    expect((await as("staff").post(`/ess/leave/${res.body.leave_request_id}/cancel`, {})).status).toBe(200);
+    await drain();
+    const told = await titles();
+    expect(told.map((n) => n.title)).toEqual(["Relief cover: Musa Danjuma", "Relief cover cancelled"]);
+    expect(told[1].body).toMatch(/^Musa Danjuma, Annual leave, \d{2}\/10\/\d{4} to \d{2}\/10\/\d{4}\.$/);
+  });
+
+  test("the staging sample's Annual request names a relief officer and carries a handover note (seeds/lib/leave-sample.js)", async () => {
+    const { applyLeaveSample, loginsOf } = require("../../seeds/lib/leave-sample");
+    const id = people.outsider.employee.employee_id;
+    const logins = await loginsOf(pool, [id]);
+    const logged = [];
+    const r = await applyLeaveSample({
+      pool,
+      log: (line) => logged.push(line),
+      rows: [{ key: "bisi", type: "annual", from: 30, to: 31, days: 2, status: "submitted", reason: "A sample request" }],
+      people: new Map([["bisi", { employee_id: id, user: logins.get(id), manager: null }]]),
+      recorder: null,
+      today: lagos.today(),
+    });
+    expect([r, logged]).toEqual([{ added: 1, skipped: 0, already: 0 }, []]);
+    const sample = (await as("outsider").get("/ess/leave")).body.data[0];
+    expect(sample.relief_employee).toBeTruthy();
+    expect(sample.relief_employee.employee_id).not.toBe(id);
+    expect(sample.handover).toMatchObject({ file_name: "Handover-Note.pdf", mime_type: "application/pdf" });
+    expect((await as("outsider").post(`/ess/leave/${sample.leave_request_id}/cancel`, {})).status).toBe(200);
   });
 
   test("People record leave, approved at once, and the person is told", async () => {

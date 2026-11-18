@@ -32,7 +32,7 @@ const SCREENS = Object.freeze([
   s("ess", "my-attendance", "My Attendance", ["attendance", "clock", "timesheet", "lateness", "punch"]),
   s("ess", "my-performance", "My Performance", ["performance", "my goals", "my kpis", "appraisal"]),
   s("ess", "my-payslips", "My Payslips", ["payslip", "pay slip", "salary slip", "salary", "pay"]),
-  s("ess", "my-leave", "My Leave", ["leave", "holiday", "vacation", "time off", "annual leave", "days off"]),
+  s("ess", "my-leave", "My Leave", ["leave", "holiday", "vacation", "time off", "annual leave", "days off", "relief officer", "handover note"]),
   s("ess", "my-queries", "My Queries", ["query", "queries against me", "disciplinary"]),
   s("ess", "my-documents", "My Documents", ["documents", "my files", "contract", "certificates", "vault"]),
   s("ess", "work-location-requests", "Work Location Requests", ["remote work", "work from home", "wfh", "location change"]),
@@ -58,7 +58,7 @@ const SCREENS = Object.freeze([
 
   s("people", "employees", "Employees", ["staff", "staff list", "register", "directory", "hr", "people"]),
   s("people", "attendance", "Attendance", ["team attendance", "clock ins", "lateness", "absence"]),
-  s("people", "leave", "Leave", ["leave requests", "holiday", "time off", "leave calendar"]),
+  s("people", "leave", "Leave", ["leave requests", "holiday", "time off", "leave calendar", "leave types", "relief cover"]),
   s("people", "devices", "Devices", ["equipment", "laptops", "assets"]),
   s("people", "worksites", "Worksites", ["sites", "offices", "locations", "geofence"]),
   s("people", "organogram", "Organogram", ["org chart", "structure", "reporting lines", "seats", "hierarchy"]),

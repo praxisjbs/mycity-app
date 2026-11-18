@@ -707,7 +707,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "leave.LeaveTypeAdd",
-      "schema_sha": "38fe4cc3735c03c5",
+      "schema_sha": "c33451448c581a0c",
       "screen": null
     },
     {
@@ -718,7 +718,7 @@
       "risk": "approval",
       "bulk": 1,
       "schema": "leave.LeaveTypeChange",
-      "schema_sha": "e8034eb6465f65bc",
+      "schema_sha": "5da47e4caa517a9f",
       "screen": null
     },
     {
@@ -852,7 +852,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "leave.LeaveRequestCreate",
-      "schema_sha": "73c8bbf479a2db68",
+      "schema_sha": "f3811574f02e2dd2",
       "screen": null
     },
     {
@@ -2789,7 +2789,7 @@
       "risk": null,
       "bulk": null,
       "schema": null,
-      "schema_sha": "6d0190d937f298a5",
+      "schema_sha": "a5283adfc9973bfc",
       "screen": "ess.my-leave"
     },
     {

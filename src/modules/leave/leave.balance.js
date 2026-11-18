@@ -11,6 +11,8 @@
  *    working day in it is refused.
  *  - A type with an allowance is refused when the request would take the year past it,
  *    counting what is already granted and what is still waiting.
+ *  - A request needs a relief officer and a handover note when its type says every request,
+ *    or when its working days are more than the type's number (docs/guides/ess.md §6).
  */
 const { AppError } = require("../../shared/errors");
 const workingWeek = require("../../shared/time/working-week");
@@ -53,4 +55,30 @@ function assertWithinAllowance(balance, days) {
   }
 }
 
-module.exports = { daysOf, assertWithinAllowance };
+/**
+ * Whether a request of `type` that takes `days` working days needs a relief officer and a
+ * handover note: the type asks on every request, or the request is longer than its number.
+ * @param {{handover_every_request?: boolean, handover_over_days?: number|null}} type
+ * @param {number} days
+ */
+function needsCover(type, days) {
+  if (!type) return false;
+  if (type.handover_every_request === true) return true;
+  const over = type.handover_over_days;
+  return over !== null && over !== undefined && days > Number(over);
+}
+
+/**
+ * Refuse a request that needs cover and lacks it, each missing field marked on itself, both at
+ * once so the person fills them together. A request that needs none passes whatever it carries.
+ */
+function assertCover(type, days, body) {
+  if (!needsCover(type, days)) return;
+  const fields = {};
+  if (!body.relief_employee_id) fields.relief_employee_id = ["Required"];
+  if (!body.handover_document_id) fields.handover_document_id = ["Required"];
+  if (Object.keys(fields).length)
+    throw new AppError("LEAVE_COVER_NEEDED", "This leave needs a relief officer and a handover note", 422, fields);
+}
+
+module.exports = { daysOf, assertWithinAllowance, needsCover, assertCover };

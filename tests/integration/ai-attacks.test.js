@@ -26,6 +26,7 @@ jest.mock("../../src/jobs/queues", () => ({
 }));
 
 const { rebuild } = require("./helpers/schema");
+const { annualWithoutCover } = require("./helpers/leave");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
@@ -76,6 +77,8 @@ describeDb("the attack suite against the real migrations, the model scripted", (
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
     jest.spyOn(realtime, "toChannel").mockReturnValue(true);
     await rebuild(pool, config.DB_NAME);
+    // Short Annual requests are only the way to what this suite tests (helpers/leave.js).
+    await annualWithoutCover(pool);
     workingWeek.invalidateCalendar();
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));

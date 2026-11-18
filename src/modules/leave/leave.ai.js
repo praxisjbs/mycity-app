@@ -75,7 +75,12 @@ const recordProbe = {
 };
 
 const typeLine = (status) => (t) => [{ type: "leave_type", id: t.leave_type_id, label: t.name, status, link: routeMap.screenPath("people", "leave") }];
-const TYPE_LABELS = { name: "Name", days_per_year: "Days a Year" };
+const TYPE_LABELS = {
+  name: "Name",
+  days_per_year: "Days a Year",
+  handover_every_request: "Handover Every Request",
+  handover_over_days: "Longer Than (Days)",
+};
 
 module.exports = defineManifest({
   module: "people",
@@ -111,11 +116,11 @@ module.exports = defineManifest({
     {
       key: "leave_types.add",
       label: "Add Type",
-      description: "Add a leave type staff may ask for: its name and the working days a year it allows (none for no set allowance)",
+      description: "Add a leave type: its name, working days a year (none for no limit), and whether a relief officer and handover note are needed on every request or over some days (7 unless said)",
       input: c.leave.LeaveTypeAdd,
       permission: ["people", "create"],
       risk: "standard",
-      form: "none: New Leave Type's sheet makes the code from the name as it sends; the card takes the name and the allowance (LeaveTypeAdd)",
+      form: "none: New Leave Type's sheet makes the code from the name as it sends; the card takes the name, the allowance and the handover rule (LeaveTypeAdd)",
       asks: [{ field: "name", question: "What is the leave type called?" }],
       // The same function Add Type calls, the code made from the name as the sheet makes it.
       run: (values, actor) => service.addType(actor, values),
@@ -125,13 +130,13 @@ module.exports = defineManifest({
     {
       key: "leave_types.edit",
       label: "Save Type",
-      description: "Change a leave type: rename it, change the working days a year it allows, or retire it (active false) or offer it again (true); only what changes",
+      description: "Change a leave type: rename it, its days a year, retire or offer it again, or when a relief officer and handover note are needed (every request, or over some days); only what changes",
       input: c.leave.LeaveTypeChange,
       permission: ["people", "edit"],
       // A changed allowance moves everyone's year: Confirm It's You first (JBS Praxis, 03/11/2026).
       risk: "approval",
       form: "none: Edit Leave Type's sheet changes the type open on People, Leave and never names it; the card does",
-      fields: ["leave_type_id", "name", "days_per_year", "active"],
+      fields: ["leave_type_id", "name", "days_per_year", "handover_every_request", "handover_over_days", "active"],
       asks: [{ field: "leave_type_id", question: "Which leave type?", options: ({ db }) => service.typeNames(db) }],
       resolve: { leave_type_id: (value, _actor, db) => service.typeIdOf(db, value) },
       records: (values, _actor, db) => service.cardType(db, values.leave_type_id),

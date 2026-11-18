@@ -11,7 +11,7 @@ import { chooseOption, installMatchMedia, optionLabels } from "@mycity/ui/testin
  * (fault #1, 21/10/2026: LEAVE_SPANS_YEARS came back from the server). The clock is 21/10/2026.
  */
 
-const m = vi.hoisted(() => ({ run: vi.fn(async (): Promise<unknown> => ({})), years: [] as Array<number | undefined>, pickerFilters: [] as unknown[] }));
+const m = vi.hoisted(() => ({ run: vi.fn(async (): Promise<unknown> => ({})), years: [] as Array<number | undefined>, pickerFilters: [] as unknown[], needed: false }));
 vi.mock("@/api/hooks", () => {
   const annual = "11111111-1111-4111-8111-111111111111";
   const unpaid = "22222222-2222-4222-8222-222222222222";
@@ -26,8 +26,10 @@ vi.mock("@/api/hooks", () => {
   };
   return {
     invalidate: vi.fn(),
-    useApi: (_key: string, opts: { query?: { year?: number }; enabled?: boolean } = {}) => {
+    useApi: (key: string, opts: { query?: { year?: number }; enabled?: boolean } = {}) => {
       if (opts.enabled === false) return { data: undefined, error: null, loading: false, reload: () => undefined };
+      // Whether the type and the days ask for a relief officer and a handover note (ess.md §6).
+      if (key === "GET /api/v1/ess/leave/check") return { data: { days: 2, handover_needed: m.needed }, error: null, loading: false, reload: () => undefined };
       m.years.push(opts.query?.year);
       const balances = [
         { leave_type_id: annual, code: "annual", name: "Annual", entitled: 20, taken: 3, booked: 0, pending: 5, remaining: 12 },
@@ -37,8 +39,18 @@ vi.mock("@/api/hooks", () => {
     },
     useMutation: () => ({ run: m.run, pending: false }),
     usePaged: () => ({ ...types, q: "", setQ: () => undefined, setPage: () => undefined }),
-    // Leave Type's options, 25 at a time as its menu nears its end.
-    useInfinite: () => ({ ...types, more: () => undefined, reload: () => undefined }),
+    // Leave Type's and Relief Officer's options, 25 at a time as each menu nears its end.
+    useInfinite: (key: string) =>
+      key === "GET /api/v1/ess/leave/relief-officers"
+        ? {
+            rows: [{ employee_id: "44444444-4444-4444-8444-444444444444", display_name: "Zainab Lawal", job_title: "Field Officer", department: "Programmes", photo_url: null }],
+            page: { number: 1, size: 25, total: 1, pages: 1, has_next: false },
+            loading: false,
+            error: null,
+            more: () => undefined,
+            reload: () => undefined,
+          }
+        : { ...types, more: () => undefined, reload: () => undefined },
   };
 });
 vi.mock("@/api/download", () => ({ usePhotos: () => ({}) }));
@@ -71,6 +83,7 @@ afterEach(() => {
   vi.clearAllMocks();
   m.years.length = 0;
   m.pickerFilters.length = 0;
+  m.needed = false;
 });
 
 describe("Request Leave", () => {
@@ -159,6 +172,50 @@ describe("Request Leave", () => {
     await user.click(screen.getByRole("button", { name: "Send Request" }));
     expect(await screen.findByText(message)).toBeTruthy();
     expect(screen.queryByText("Sent to your line manager")).toBeNull();
+  });
+});
+
+describe("Request Leave's relief officer and handover note (ess.md §6, §10)", () => {
+  const optionalOf = (label: string) => screen.getByText(label).closest("label, div")?.textContent ?? "";
+
+  it("offers both, Optional while the type and days do not ask for them", async () => {
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
+    expect(await optionLabels(screen.getByRole("combobox", { name: "Relief Officer" }))).toEqual(["Zainab Lawal · Programmes"]);
+    expect(optionalOf("Relief Officer")).toContain("Optional");
+    expect(optionalOf("Handover Note")).toContain("Optional");
+  });
+
+  it("drops the Optional tags when the type asks, and marks both on Send without sending", async () => {
+    const user = userEvent.setup();
+    m.needed = true;
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
+    await chooseOption(screen.getByRole("combobox", { name: "Leave Type" }), "Annual · 12 days left");
+    await user.type(screen.getByLabelText("First Day"), "02/11/2026");
+    await user.type(screen.getByLabelText("Last Day"), "03/11/2026");
+    expect(optionalOf("Relief Officer")).not.toContain("Optional");
+    expect(optionalOf("Handover Note")).not.toContain("Optional");
+    await user.click(screen.getByRole("button", { name: "Send Request" }));
+    expect(await screen.findAllByText("Required")).toHaveLength(2);
+    expect(m.run).not.toHaveBeenCalled();
+  });
+
+  it("sends the relief officer picked, and leaves out what was not given", async () => {
+    const user = userEvent.setup();
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
+    await chooseOption(screen.getByRole("combobox", { name: "Leave Type" }), "Unpaid");
+    await user.type(screen.getByLabelText("First Day"), "02/11/2026");
+    await user.type(screen.getByLabelText("Last Day"), "03/11/2026");
+    await chooseOption(screen.getByRole("combobox", { name: "Relief Officer" }), "Zainab Lawal · Programmes");
+    await user.click(screen.getByRole("button", { name: "Send Request" }));
+    expect(m.run).toHaveBeenCalledWith({
+      body: { leave_type_id: "22222222-2222-4222-8222-222222222222", starts_on: "2026-11-02", ends_on: "2026-11-03", relief_employee_id: "44444444-4444-4444-8444-444444444444" },
+    });
+  });
+
+  it("is never on Record Leave, which People fill for someone else", () => {
+    render(<LeaveForm close={() => undefined} onBehalf />, { wrapper: RouterProvider });
+    expect(screen.queryByText("Relief Officer")).toBeNull();
+    expect(screen.queryByText("Handover Note")).toBeNull();
   });
 });
 

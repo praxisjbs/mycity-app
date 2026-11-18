@@ -747,6 +747,7 @@ module.exports = {
   assertCardInstances,
   stageOf,
   mayAct,
+  mayRead,
   pendingStage,
   withdraw,
   reassign,

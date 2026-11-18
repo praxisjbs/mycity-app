@@ -92,6 +92,8 @@ describe("KPI cards", () => {
           waiting_on: null,
           approver_name: null,
           recorded: false,
+          relief_employee: null,
+          handover: null,
           submitted_at: "2026-10-16T09:30:00.000Z",
           decided_at: "2026-10-16T12:00:00.000Z",
           created_at: "2026-10-16T09:30:00.000Z",

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import leave from "@mycity/contract/schemas/leave.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import type { LeaveRequest, LeaveStatus } from "@mycity/contract/contract.gen.ts";
+import type { DocumentRef, LeaveRequest, LeaveStatus } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { usePhotos } from "@/api/download";
+import { saveFile, usePhotos } from "@/api/download";
+import { upload } from "@/api/upload";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
@@ -35,11 +36,13 @@ import {
   Pill,
   SearchInput,
   SelectField,
+  Sub,
   TapList,
   TextAreaField,
   toast,
   todayIso,
   Toolbar,
+  UploadField,
   useConfirm,
   useContractForm,
   useModal,
@@ -80,6 +83,20 @@ const sentTo = (r: LeaveRequest) => {
 };
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
+
+/** The handover note's button, wherever a request shows: it saves the file the vault lets the reader open. */
+export const noteButton = (r: LeaveRequest) =>
+  r.handover ? (
+    <Button key="note" size="sm" icon="doc" onClick={() => saveFile(`/api/v1/documents/${r.handover!.document_id}/content`, r.handover!.file_name)}>
+      Open Note
+    </Button>
+  ) : null;
+
+/** A request's relief officer and handover note, as its details list them (docs/guides/ess.md §10). */
+export const coverRows = (r: LeaveRequest): Array<[string, ReactNode]> => [
+  ...(r.relief_employee ? ([["Relief Officer", r.relief_employee.display_name]] as Array<[string, ReactNode]>) : []),
+  ...(r.handover ? ([["Handover Note", noteButton(r)]] as Array<[string, ReactNode]>) : []),
+];
 
 export function PeopleLeave() {
   const me = useMe();
@@ -244,6 +261,7 @@ function RequestCard({ leave: r, onDone }: { leave: LeaveRequest; onDone: () => 
           ["Status", statusPill(r)],
           ...(waitingOnOf(r) ? ([["Waiting On", waitingOnOf(r)]] as Array<[string, string]>) : []),
           ...(r.recorded ? ([["Recorded By", "People"]] as Array<[string, string]>) : []),
+          ...coverRows(r),
           ...(r.reason ? ([["Reason", r.reason]] as Array<[string, string]>) : []),
         ]}
       />
@@ -359,13 +377,42 @@ export function LeaveTypeSelect({ year, own = true, ...field }: { year: number; 
   return <SelectField placeholder={types.loading ? "Loading" : "Pick a type"} options={types.rows.map((t) => [t.leave_type_id, typeLabel(t)])} {...paging(types)} {...field} />;
 }
 
+/**
+ * Request Leave's Relief Officer: the colleagues who may cover, never the reader, 25 at a time as
+ * the menu nears its end (F32); with both days, those away on them are left out (GET
+ * /ess/leave/relief-officers). Praxis AI's Request Leave card picks with it too.
+ */
+export function ReliefOfficerSelect({ startsOn, endsOn, valueLabel, ...field }: { startsOn?: string; endsOn?: string; valueLabel?: string } & Omit<SelectFieldProps, "options">) {
+  const dates = startsOn && endsOn && endsOn >= startsOn ? { starts_on: startsOn, ends_on: endsOn } : {};
+  const people = useInfinite("GET /api/v1/ess/leave/relief-officers", { filters: dates, sort: "display_name" });
+  const picked = people.rows.find((p) => p.employee_id === field.value);
+  return (
+    <SelectField
+      placeholder={people.loading ? "Loading" : "Pick someone"}
+      options={people.rows.map((p) => [p.employee_id, p.department ? `${p.display_name} · ${p.department}` : p.display_name])}
+      valueLabel={picked ? undefined : valueLabel}
+      {...paging(people)}
+      {...field}
+    />
+  );
+}
+
 /** Ask for leave (My Leave), or record it for someone (People). */
 export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: boolean }) {
   const [who, setWho] = useState<PersonRef[]>([]);
   const [whoError, setWhoError] = useState<string | null>(null);
   // My Leave opened by Praxis AI's Request Leave button carries the type, the days and the note.
   const filled = useAddressPrefill(leave.LeaveRequestPrefill, !onBehalf);
-  const f = useContractForm({ leave_type_id: "", starts_on: "", ends_on: "", reason: "", ...filled }, leave.LeaveRequestCreate);
+  const f = useContractForm({ leave_type_id: "", starts_on: "", ends_on: "", relief_employee_id: "", handover_document_id: "", reason: "", ...filled }, leave.LeaveRequestCreate);
+  const [note, setNote] = useState<DocumentRef | null>(null);
+  // Whether the type and the days ask for a relief officer and a handover note: their Optional tags go (ess.md §6).
+  const v = f.values;
+  const spanSet = Boolean(v.leave_type_id && v.starts_on && v.ends_on && v.ends_on >= v.starts_on);
+  const check = useApi("GET /api/v1/ess/leave/check", {
+    query: { leave_type_id: v.leave_type_id, starts_on: v.starts_on, ends_on: v.ends_on },
+    enabled: !onBehalf && spanSet,
+  });
+  const needed = !onBehalf && spanSet && Boolean(check.data?.handover_needed);
   // The year the First Day falls in: what is left of it shows beside each type on My Leave.
   const year = Number((f.values.starts_on || todayIso()).slice(0, 4));
   const ask = useMutation("POST /api/v1/ess/leave");
@@ -376,18 +423,27 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
     const missing = onBehalf && !who.length;
     setWhoError(missing ? "Pick someone" : null);
     if (!f.check() || missing) return;
+    // Needed and not given: marked on the fields as Send would, before it is sent.
+    const gaps = needed
+      ? Object.fromEntries((["relief_employee_id", "handover_document_id"] as const).filter((k) => !f.values[k]).map((k) => [k, ["Required"]]))
+      : {};
+    if (Object.keys(gaps).length) return f.setServerErrors(gaps);
     const body = {
       leave_type_id: f.values.leave_type_id,
       starts_on: f.values.starts_on,
       ends_on: f.values.ends_on,
       ...(f.values.reason.trim() ? { reason: f.values.reason.trim() } : {}),
     };
+    const cover = {
+      ...(f.values.relief_employee_id ? { relief_employee_id: f.values.relief_employee_id } : {}),
+      ...(f.values.handover_document_id ? { handover_document_id: f.values.handover_document_id } : {}),
+    };
     try {
       if (onBehalf) {
         const r = await recordIt.run({ body: { ...body, employee_id: who[0].employee_id } });
         toast(`Leave recorded for ${r.employee.display_name}`);
       } else {
-        toast(sentTo(await ask.run({ body })));
+        toast(sentTo(await ask.run({ body: { ...body, ...cover } })));
       }
       invalidate("/api/v1/leave");
       invalidate("/api/v1/ess/leave");
@@ -425,6 +481,40 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
       <Field label="Last Day" {...f.field("ends_on")}>
         <DateField {...f.field("ends_on")} min={f.values.starts_on || undefined} />
       </Field>
+      {!onBehalf && (
+        <>
+          <Field label="Relief Officer" optional={!needed} info="The colleague who covers your work while you are away. They are told once your leave is approved." {...f.field("relief_employee_id")}>
+            <ReliefOfficerSelect startsOn={v.starts_on} endsOn={v.ends_on} {...f.field("relief_employee_id")} />
+          </Field>
+          <Field label="Handover Note" optional={!needed} info="Your open work and where to find it, for your relief officer and your approvers." {...f.status("handover_document_id")}>
+            {note ? (
+              <span className="flex flex-wrap items-center gap-2 text-xs">
+                <Sub>{note.file_name}</Sub>
+                <Button size="sm" onClick={() => (setNote(null), f.set("handover_document_id", ""))}>
+                  Replace
+                </Button>
+              </span>
+            ) : (
+              <UploadField
+                upload={upload}
+                purpose="document"
+                // What the vault keeps for a document, and its limit (mime-policy.js, body-limits.js).
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.docx,.xlsx"
+                maxBytes={15 * 1024 * 1024}
+                multiple={false}
+                compact
+                kinds="PDF, Word, Excel or a photo"
+                onUploaded={(docs) => {
+                  const doc = docs[0];
+                  if (!doc) return;
+                  setNote(doc);
+                  f.set("handover_document_id", doc.document_id);
+                }}
+              />
+            )}
+          </Field>
+        </>
+      )}
       <Field label="Note" optional {...f.field("reason")}>
         <TextAreaField {...f.field("reason")} placeholder="Family event" />
       </Field>

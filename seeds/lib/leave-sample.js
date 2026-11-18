@@ -12,6 +12,11 @@
  *   rejected   asked by the person, then rejected in the flow by their line manager
  *   cancelled  asked by the person, then cancelled by them
  *
+ * A request whose type and days need a relief officer and a handover note (docs/guides/ess.md
+ * §6: Annual always, any type over its number of working days) names the first colleague the
+ * form's own list offers on those days, one of the sample's people when it can, and carries a
+ * one-page handover note staged as the person, as Request Leave's upload box stages it.
+ *
  * Dates move forward off days that are not worked (the configured week and the public
  * holidays), and a request is kept inside the year it starts in. A row that still does not fit
  * is logged and skipped; the rest load. Nothing is added while any of these people has leave,
@@ -26,6 +31,32 @@ const addDays = (iso, n) => {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
+
+/**
+ * A one-page PDF reading `lines`, built by hand so a laptop without Chromium can seed it too: the
+ * handover note a sample request carries.
+ */
+function notePdf(lines) {
+  const esc = (t) => String(t).replace(/[\\()]/g, (c) => `\\${c}`);
+  const text = lines.map((l, i) => `BT /F1 12 Tf 72 ${720 - i * 20} Td (${esc(l)}) Tj ET`).join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${Buffer.byteLength(text)} >>\nstream\n${text}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let out = "%PDF-1.4\n";
+  const offsets = objects.map((body, i) => {
+    const at = Buffer.byteLength(out);
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+    return at;
+  });
+  const xref = Buffer.byteLength(out);
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, "latin1");
+}
 
 /** The dates a row asks for, from today: off days moved forward, kept inside one year. */
 function datesOf(row, today, cal, workingWeek) {
@@ -52,8 +83,25 @@ async function applyLeaveSample({ pool, log, rows, people, recorder, today }) {
   const engine = require(path.join(ROOT, "src/shared/workflow/engine"));
   const workingWeek = require(path.join(ROOT, "src/shared/time/working-week"));
   const { atomically } = require(path.join(ROOT, "src/shared/db/tx"));
+  const uploads = require(path.join(ROOT, "src/modules/documents/documents.service"));
 
   const ids = [...people.values()].map((p) => p.employee_id);
+
+  /** The relief officer and the note a request needs, or nothing when its type and days need none. */
+  async function coverFor(person, body) {
+    if (!(await leave.checkSpan(body)).handover_needed) return {};
+    const free = (await leave.reliefOfficers(person.employee_id, { page: 1, starts_on: body.starts_on, ends_on: body.ends_on })).data;
+    const relief = free.find((p) => ids.includes(p.employee_id)) || free[0];
+    if (!relief) throw new Error("nobody free to cover those days");
+    const buffer = notePdf([
+      "Handover note",
+      `${body.starts_on} to ${body.ends_on}`,
+      `Covering: ${relief.display_name}`,
+      "Open work, contacts and where the files are. SAMPLE for staging.",
+    ]);
+    const staged = await uploads.stage({ buffer, originalname: "Handover-Note.pdf", size: buffer.length, mimetype: "application/pdf" }, { purpose: "document" }, person.user);
+    return { relief_employee_id: relief.employee_id, handover_document_id: staged.document_id };
+  }
   const { rows: existing } = await pool.query(
     "SELECT count(*)::int AS n FROM leave_request WHERE employee_id = ANY($1::uuid[])",
     [ids],
@@ -78,7 +126,7 @@ async function applyLeaveSample({ pool, log, rows, people, recorder, today }) {
         if (!recorder) throw new Error("Operations & People has no login to record it");
         await leave.record(recorder, everyone, { employee_id: person.employee_id, ...body });
       } else {
-        const asked = await leave.request(person.user, person.employee_id, body);
+        const asked = await leave.request(person.user, person.employee_id, { ...body, ...(await coverFor(person, body)) });
         if (row.status === "cancelled") {
           await leave.cancelOwn(person.user, person.employee_id, asked.leave_request_id, {});
         } else if (row.status === "rejected") {

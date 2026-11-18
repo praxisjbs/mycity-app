@@ -21,22 +21,30 @@
  * An employee cancels their own request while it waits (the approval is withdrawn with
  * it) or once granted until it starts. People cancel granted leave until it ends; a
  * waiting request is theirs to decide in My Approvals instead.
+ *
+ * Relief and handover (docs/guides/ess.md §6): the person's own request may name a relief
+ * officer (leave.clash.reliefClash) and carry a handover note staged through POST /documents,
+ * claimed here into the vault. Both are required together when the type asks for them
+ * (leave.balance.needsCover). The relief officer is told when the request is approved, and
+ * again when approved leave is cancelled; they read the request on My Leave.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
+const vault = require("../../shared/documents/vault");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { scopeFor } = require("../../middleware/rbac");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const { assertInScope } = require("../../shared/rbac/scope");
 const { oneNamed } = require("../../shared/ai/named");
+const { HANDOVER_OVER_DAYS } = require("@mycity/contract").leave;
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const engine = require("../../shared/workflow/engine");
 const repo = require("./leave.repo");
 const rules = require("./leave.balance");
-const { clashesOf } = require("./leave.clash");
-const { EVENTS, DEFINITION_KEY } = require("./leave.events");
+const { clashesOf, reliefClash } = require("./leave.clash");
+const { EVENTS, DEFINITION_KEY, HANDOVER_DOC_TYPE } = require("./leave.events");
 
 /** Leave types a year can show at once (LeaveBalances holds at most 25). */
 const MAX_ACTIVE_TYPES = 25;
@@ -164,12 +172,38 @@ async function calendarFor(user, employeeId, query) {
   );
 }
 
-/** One of the caller's own requests, or a 404 when it is someone else's. */
+/**
+ * One of the caller's own requests, or one that names them as its relief officer (read only, its
+ * note to the approver left out); a 404 when it is anyone else's.
+ */
 async function getOwn(employeeId, id) {
   const row = await repo.get(pool, id);
-  if (!row || row.employee_id !== employeeId) throw notFound();
-  return repo.publicRow(row);
+  if (!row || !employeeId) throw notFound();
+  if (row.employee_id === employeeId) return repo.publicRow(row);
+  if (row.relief_employee_id === employeeId) return { ...repo.publicRow(row), reason: null };
+  throw notFound();
 }
+
+/**
+ * What Request Leave asks before Send (GET /ess/leave/check): the working days the span holds and
+ * whether its type asks for a relief officer and a handover note. A span Send would refuse for its
+ * dates holds no days and needs nothing yet; its own refusal comes at Send.
+ */
+async function checkSpan(query) {
+  const type = await repo.getType(pool, query.leave_type_id);
+  if (!type) return { days: null, handover_needed: false };
+  let days;
+  try {
+    days = rules.daysOf(query.starts_on, query.ends_on, await workingWeek.loadCalendar(pool));
+  } catch (err) {
+    if (err instanceof AppError && err.status === 422) return { days: null, handover_needed: rules.needsCover(type, 0) };
+    throw err;
+  }
+  return { days, handover_needed: rules.needsCover(type, days) };
+}
+
+/** Who may cover for the person (GET /ess/leave/relief-officers): 25 at a time, the person never among them. */
+const reliefOfficers = (employeeId, query) => repo.reliefOfficers(pool, employeeId, query);
 
 /** One person's year, every active type. */
 async function balancesFor(employeeId, year) {
@@ -246,6 +280,10 @@ async function checked(client, employeeId, body, type, own = true) {
     (b) => b.leave_type_id === type.leave_type_id,
   );
   rules.assertWithinAllowance(balance, days);
+  if (own) {
+    rules.assertCover(type, days, body);
+    await reliefClash(client, employeeId, body);
+  }
   return days;
 }
 
@@ -267,7 +305,21 @@ async function request(user, employeeId, body) {
       amount: days,
       reason: body.reason,
       status: "submitted",
+      relief_employee_id: body.relief_employee_id || null,
     });
+    if (body.handover_document_id) {
+      // The note was staged by the person (POST /documents); from now on the request's rule reads it.
+      await vault.claim(client, {
+        document_id: body.handover_document_id,
+        doc_type: HANDOVER_DOC_TYPE,
+        entity: { type: "leave_request", id: row.leave_request_id },
+        subject_employee_id: employeeId,
+        actor: user,
+        field: "handover_document_id",
+      });
+      await repo.setHandover(client, row.leave_request_id, body.handover_document_id);
+      row.handover_document_id = body.handover_document_id;
+    }
     await emit(client, {
       key: EVENTS.LEAVE_REQUEST_SUBMITTED,
       entity: { type: "leave_request", id: row.leave_request_id },
@@ -336,6 +388,26 @@ async function cancelRow(client, row, actor, reason) {
     before: { status: row.status },
     after: { status: "cancelled" },
     payload: { ...payloadOf(row), reason: reason || null },
+  });
+  if (row.status === "approved") await tellRelief(client, row, EVENTS.LEAVE_REQUEST_RELIEF_RELEASED, actor);
+}
+
+/**
+ * Tell the relief officer a request names (docs/guides/ess.md §7): covering, once it is approved;
+ * released, once approved leave is cancelled. Nothing when it names none.
+ * @param {object} row   the request as repo.get reads it
+ */
+async function tellRelief(client, row, key, actor) {
+  if (!row || !row.relief_employee_id) return;
+  await emit(client, {
+    key,
+    entity: { type: "leave_request", id: row.leave_request_id },
+    actor,
+    payload: {
+      ...payloadOf(row),
+      relief_employee_id: row.relief_employee_id,
+      employee_name: row.employee && row.employee.display_name ? row.employee.display_name : "A colleague",
+    },
   });
 }
 
@@ -477,6 +549,7 @@ async function settle(id, status) {
       after: { status },
       payload: { leave_request_id: id, employee_id: row.employee_id, subject_employee_id: row.employee_id },
     });
+    if (status === "approved" && row.relief_employee_id) await tellRelief(client, await repo.get(client, id), EVENTS.LEAVE_REQUEST_RELIEF_COVERING, null);
   });
 }
 
@@ -570,7 +643,14 @@ function codeOf(name) {
 }
 
 /** Add Type: the sheet's name and allowance, the code made from the name as the sheet makes it. */
-const addType = (actor, values) => createType(actor, { code: codeOf(values.name), name: values.name, days_per_year: values.days_per_year === undefined ? null : values.days_per_year });
+const addType = (actor, values) =>
+  createType(actor, {
+    code: codeOf(values.name),
+    name: values.name,
+    days_per_year: values.days_per_year === undefined ? null : values.days_per_year,
+    handover_every_request: values.handover_every_request === true,
+    handover_over_days: values.handover_over_days === undefined ? HANDOVER_OVER_DAYS : values.handover_over_days,
+  });
 
 /**
  * A type a card names by its words (shared/ai/named.js): its name or code, with or without the
@@ -607,6 +687,44 @@ async function assertCardRecord(db, { employee_id: employeeId }, actor) {
   const inScope = actor.scope.scope === "all" || (actor.scope.scope_ids || []).includes(employeeId);
   if (!person || !inScope) throw new AppError("NOT_FOUND", "That employee does not exist", 404, { employee_id: ["No such person"] });
   if (person.status !== "active") throw new AppError("EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", 422, { employee_id: ["Not active"] });
+}
+
+/*
+ * Request Leave's card (praxis-ai.md §6.11; docs/guides/ess.md §9): it may name a relief officer,
+ * picked with the form's own list, but never carries a file. A request that needs a handover note
+ * is refused at the press before anything is written, and the card sends the person to the form.
+ */
+
+/** The relief officer a card names, by name; nothing for an id that names nobody. */
+async function reliefNames(db, id) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ""))) return [];
+  const person = await repo.employeeOf(db, id);
+  return person ? [{ type: "employee", id, label: person.display_name }] : [];
+}
+
+/**
+ * A relief officer the model writes by name, matched among the people Request Leave's list offers
+ * the person (shared/ai/named.js), the days left aside; null when none or several match.
+ */
+async function reliefIdOf(db, actor, words) {
+  if (!actor || !actor.employee_id) return null;
+  for (const q of [words, null]) {
+    const page = await repo.reliefOfficers(db, actor.employee_id, { page: 1, ...(q ? { q } : {}) });
+    const found = oneNamed(page.data || [], words, (p) => [p.display_name]);
+    if (found) return found.employee_id;
+  }
+  return null;
+}
+
+/**
+ * The card's check: a request its type and days ask a handover note for is not sent from the
+ * chat. The refusal's code gives the card its Add Handover Note, which opens Request Leave filled.
+ */
+async function assertCardCover(values) {
+  if (!values || !values.leave_type_id || !values.starts_on || !values.ends_on || values.handover_document_id) return;
+  const { handover_needed: needed } = await checkSpan(values);
+  if (needed)
+    throw new AppError("HANDOVER_NOTE_NEEDED", "This leave needs a handover note. Add it on Request Leave.", 409);
 }
 
 /**
@@ -661,6 +779,11 @@ module.exports = {
   calendarFor,
   calendarScope,
   getOwn,
+  checkSpan,
+  reliefOfficers,
+  reliefNames,
+  reliefIdOf,
+  assertCardCover,
   balancesFor,
   balancesOf,
   setAllowance,

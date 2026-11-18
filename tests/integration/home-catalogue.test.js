@@ -18,6 +18,7 @@
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { rebuild, sql } = require("./helpers/schema");
+const { annualWithoutCover } = require("./helpers/leave");
 const lagos = require("../../src/shared/time/lagos");
 const workingWeek = require("../../src/shared/time/working-week");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
@@ -103,6 +104,8 @@ describeDb("the KPI catalogue against the real migrations", () => {
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
+    // Short Annual requests are only the way to what this suite tests (helpers/leave.js).
+    await annualWithoutCover(pool);
     workingWeek.invalidateCalendar();
     ({ worksite_id: headOffice } = await one(
       `INSERT INTO worksite (code, name, latitude, longitude, radius_m)

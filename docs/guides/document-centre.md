@@ -263,7 +263,8 @@ module.exports = librarySource({
 
 **Not in the library**, each named in `NOT_IN_LIBRARY`: payslips (D4); every export and transient
 type (kept a day or a request); chat files and link pictures; mail attachments, signature pictures
-and dictations; profile photos; brand files; signature drawings (`signature_image`, `query_signature`,
+and dictations; profile photos; leave handover notes (`leave_handover`, for the request's person,
+relief officer and approvers, `docs/guides/ess.md` §8); brand files; signature drawings (`signature_image`, `query_signature`,
 `policy_signature`, `training_signature`); proposal images, transcripts and proof point pictures;
 imported spreadsheets; staged uploads; and, until TB decides otherwise (§13), CVs, assessment answers,
 interview forms, review files, scheduled reports, training material and training proof.
@@ -567,6 +568,7 @@ None blocks the build. Each is TB's to decide unless it names another owner.
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · §6.2: a leave request's handover note (`leave_handover`, `docs/guides/ess.md` §6) is named in `NOT_IN_LIBRARY`: it opens for the request's person, relief officer and approvers, not on the Library. No screen of the Document Centre changed.
 - 17/11/2026 · TB · The Library made lighter to read: the list takes the page's width and a document opens as a page of its own (`?id=`, Back to Library), the preview on two thirds of the width and Details beside it with Download, View File and Open Record (and PR 2's Document Actions menu) at their top; on a phone the same page replaces the list, Details first. Each desktop row ends in a Download icon. Categories opens a category as its own page too (Back to Categories). The lists' filters are kept for Back. F31 amended for the Document Centre. §2, §3, §10, §11 follow.
 - 17/11/2026 · TB · PR 2 built: company documents, categories with an audience, tags, Upload Document, Edit Details, Upload New Version, Archive and Restore; Document Centre · Categories (#114); the files' text and search inside them; the letterhead as PDF and Word; expiry reminders and Home's alert; Praxis AI's read, summary and three cards; staging's seed. Brought in line with what was built: §2 and the header (row #114), §4 (`company_document`'s CHECK and its uploader), §5 (`GET /categories/:id`, the letterhead's `ExportFile`, `archived` and the roles picker), §6.2 (a source's `number`, `archived`, `area_label`), §6.4 (the rule in `library.access.js`; archived for keepers alone), §6.5 (a new version is claimed and followed, not superseded; `vault.setDetails`; Edit Details' refusals), §6.7 (the job, ⌘K's columns), §6.8 (`blank: true`), §7, §9 (the cards' keys), §10 (where the actions sit) and §11 (empty states).
 

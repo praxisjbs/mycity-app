@@ -32,6 +32,7 @@ jest.mock("../../src/jobs/queues", () => ({
 }));
 
 const { rebuild } = require("./helpers/schema");
+const { annualWithoutCover } = require("./helpers/leave");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
@@ -143,6 +144,8 @@ describeDb("Praxis AI action cards against the real migrations", () => {
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
+    // Short Annual requests are only the way to what this suite tests (helpers/leave.js).
+    await annualWithoutCover(pool);
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));
     const sample = (first, last, email, job) => ({

@@ -66,8 +66,10 @@ icon: spark
 
 1. Open [My Leave](/ess?tab=my-leave) and press **Request Leave**.
 2. Pick the **Leave Type**, then the **First Day** and the **Last Day**.
-3. Add a **Note** for your manager if it helps.
-4. Press **Send Request**. Your line manager is told. Read [Request leave](#ess-leave-request).
+3. Pick your **Relief Officer** and add your **Handover Note** when the type asks for them, as
+   annual leave does.
+4. Add a **Note** for your manager if it helps.
+5. Press **Send Request**. Your line manager is told. Read [Request leave](#ess-leave-request).
 
 ## Read Your Mail {#qs-mail role="Everyone" icon=mail screen=mailbox/inbox}
 
@@ -95,7 +97,8 @@ icon: spark
 
 1. Open [People · Leave](/people?tab=leave) and press **Pending**. A request in **Need You** on
    [Home · Overview](/home?tab=overview) brings you here too.
-2. Press the request. Check **Also Away** for who else is off.
+2. Press the request. Check **Also Away** for who else is off. Where it has a **Handover Note**,
+   press **Open Note** to read it.
 3. Press **Approve**, or **Reject**, type the **Reason** and press **Reject Leave**. The person is
    told. Read [Approve or reject leave](#people-leave-decide).
 

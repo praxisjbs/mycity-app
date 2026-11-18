@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #56 My Requests (M8), #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
-| Last changed | 13/11/2026 |
+| Last changed | 17/11/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -43,7 +43,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · Policy Updates (`policy-updates`) | Staff app | Every employee | Owned by TB (policies.md): every policy that applies to them, those to acknowledge first, as clean text or sentences with what changed; approvers, the versions waiting on them | Acknowledge, Later, Download PDF; an approver approves and signs |
 | ESS · My Performance (`my-performance`) | Staff app | Every employee | Score to date, rating, this month's check-in, commitments on time, agreement; My Scorecard, This Month's Check-In, My Commitments (Performance PR 4), Rolls Up To, My Reviews, My PIP when open (Performance PR 3; `docs/guides/performance.md` §10) | Agree Scorecard, Disagree With Reason; Start Check-In, Save Draft, Submit Check-In, Dictate, Tidy With AI, Add Evidence, Change Score; open a review and download a closed one's PDF; a link to their own scorecard opens My Scorecard |
 | ESS · My Payslips (`my-payslips`) | Staff app | Every employee | Payslips by year, gross, net, deductions, next payday, a month's payslip in a modal | Change year, open a month, download a PDF, email a copy, Download All of the year, open the deductions breakdown |
-| ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, cancel a request while it waits or before it starts, open a request or a figure's list, open the leave calendar |
+| ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests; a request they are the relief officer on, opened from its notice | Request leave with a relief officer and a handover note, cancel a request while it waits or before it starts, open a request or a figure's list, open the leave calendar, open a handover note |
 | ESS · My Requests (`my-requests`) | Staff app | Every employee | Their own expense requests: KPI cards, the list, a request in the modal. Built by M8 (`docs/guides/expenses.md` §2, §10), listed here because it is an ESS tab | New Request, Edit, Send Again, Cancel Request |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | One tab, a Queries and Sanctions switch: their queries (open first) and their sanctions | Respond to an open query; open a letter. Sanctions are read only |
 | ESS · My Documents (`my-documents`) | Staff app | Every employee | Their vault: contracts, certificates, ID; signed, verified, expiring, missing | Upload a requested document, preview, download |
@@ -52,7 +52,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | Shell avatar (rail, phone top bar, More) | Staff app | Every employee | The photo from My Profile, or initials | |
 | People · Employees (employee record) | Staff app | People; Download Their Data the CEO only | The same employee record | Where People edit the fields an employee cannot; the CEO asks for a copy of one person's data (Download Their Data) |
 | People · Employees · Work Schedule tab | Staff app | People | Owned by LA: Work Setup and the person's work schedule | Where the work schedule shown in My Profile is set |
-| People · Leave (`leave`) | Staff app | `people` view: Operations & People everyone, a line manager their team | Everyone's requests within that scope, the figures above them, who else in the department is away, the calendar of approved and waiting leave a month at a time | Approve or reject a request that waits on them, record leave for someone (`people` create), cancel granted leave before it ends (`people` edit) |
+| People · Leave (`leave`) | Staff app | `people` view: Operations & People everyone, a line manager their team | Everyone's requests within that scope, the figures above them, each request's relief officer and handover note, who else in the department is away, the calendar of approved and waiting leave a month at a time | Approve or reject a request that waits on them (after reading its handover note), record leave for someone (`people` create), cancel granted leave before it ends (`people` edit), say on each leave type when a request needs a relief officer and a handover note (`people` edit) |
 | Payroll · Payslips (M6) | Staff app | Payroll | The payslips ESS shows | Approving a run is what makes a payslip visible in ESS |
 | Queries & Sanctions (M3) | Staff app | Managers, People, CEO | The queries and sanctions ESS shows | Raising and deciding them |
 | Settings · Security (#78) | Staff app | `settings` view, edit | Session length, idle lock and password minimum within the server's floor; two-step by role; everyone's sessions; failed sign-ins | The rules My Security follows; a role that requires two-step makes its people set it up at their next sign-in (`docs/guides/foundation.md` §6.4) |
@@ -88,9 +88,16 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    every month, the 30th unless MyCity sets another, a short month paying on its last day,
    `docs/guides/payroll.md` §6.11). From approval until the pay is transferred the month shows "In the run";
    before approval it has no row.
-5. **Leave.** A request from My Leave goes to the line manager, then to Operations & People when it
-   is over 5 days (the leave flow, `docs/guides/foundation.md` §6.5) → approved leave counts down the
-   entitlement and is never counted as absence by attendance.
+5. **Leave.** A request from My Leave names a relief officer (the colleague who covers while the
+   person is away) and carries a handover note (a file, staged through the upload engine and claimed
+   by the request into the vault) when its leave type asks for them (§6, Relief and handover) → it goes to
+   the line manager, then to Operations & People when it is over 5 days (the leave flow,
+   `docs/guides/foundation.md` §6.5, as configured on Settings · Approvals; no stage is added for the
+   relief officer) → the approvers read the relief officer and open the handover note on People ·
+   Leave, where they decide → approved, the relief officer is told (a notice that opens the request
+   on their My Leave, with the handover note); approved leave withdrawn or cancelled later tells them
+   again → approved leave counts down the entitlement and is never counted as absence by
+   attendance.
 6. **Documents.** People request a document (passport photograph, a certificate) → it shows as
    Missing in My Documents → the employee uploads it → People see it on the employee record. A
    missing document blocks onboarding for a new hire, nothing for a confirmed employee.
@@ -119,13 +126,13 @@ services, always for the caller's own `employee_id`.
 | `employee` (organisation) | `employee_id`, `phone`, `address`, `next_of_kin`, `bank`, `photo_document_id` | The editable fields are written through the organisation service |
 | attendance tables (LA) | see the attendance guide | Read for the work schedule |
 | `payslip` (M6, payroll) | `payslip_id`, `payroll_run_id` (its `period`), `employee_id`, `status`, `earnings_total`, `deductions_total`, `net_pay`, `published_at` | Only `published` payslips are returned: those of a run the CEO approved (`docs/guides/payroll.md` §4.2) |
-| `leave_type` (leave) | `code`, `name`, `policy.days_per_year`, `active` | The types People offer and each one's yearly allowance. Four are seeded (`1290`: Annual 20, Compassionate 5, Sick 12, Unpaid), by the team lead's decision of 17/10/2026; People add, change, retire and delete the rest on People · Leave |
-| `leave_request`, `leave_balance` (leave) | `employee_id`, `leave_type_id`, `starts_on`, `ends_on`, `amount` (working days), `status`, `workflow_instance_id`, `recorded_by` | `leave_balance` holds People's figure for one person and year; without one the type's allowance applies. `1200` checks the status and indexes the lists |
+| `leave_type` (leave) | `code`, `name`, `policy.days_per_year`, `active`, `handover_every_request`, `handover_over_days` | The types People offer and each one's yearly allowance. Four are seeded (`1290`: Annual 20, Compassionate 5, Sick 12, Unpaid), by the team lead's decision of 17/10/2026; People add, change, retire and delete the rest on People · Leave. When a request of the type needs a relief officer and a handover note (`1210`, `1295`; §6): on every request, or when it is more than `handover_over_days` working days (null: never by length) |
+| `leave_request`, `leave_balance` (leave) | `employee_id`, `leave_type_id`, `starts_on`, `ends_on`, `amount` (working days), `status`, `workflow_instance_id`, `recorded_by`, `relief_employee_id`, `handover_document_id` | `leave_balance` holds People's figure for one person and year; without one the type's allowance applies. `1200` checks the status and indexes the lists; `1210` adds the relief officer (an employee, `ON DELETE SET NULL`) and the handover note (a vault `document`, `ON DELETE SET NULL`), each indexed |
 | `query`, `sanction` (M3) | `employee_id`, `status`, `outcome`, `deduction` | |
 | `document` (vault) | `document_id`, `entity_type`, `entity_id`, `sensitivity` | `restricted` documents are readable by the subject in ESS (BACKEND_STRUCTURE §5) |
 | identity and security tables | password, two-step, passkeys, PIN, sessions | Owned by `identity` and `security` |
 
-Migration file(s): none for ESS. Leave: `migrations/1200_leave_requests.sql`, `seeds/reference/1290_seed_leave.sql` (the status list and the four types).
+Migration file(s): none for ESS. Leave: `migrations/1200_leave_requests.sql`, `seeds/reference/1290_seed_leave.sql` (the status list and the four types), `migrations/1210_leave_relief_handover.sql` (the relief officer, the handover note and each type's rule for them, every type more than 7 days by default), `seeds/reference/1295_seed_leave_handover.sql` (Annual on every request, TB 17/11/2026, an exception to A26 as `1290` is).
 
 ## 5 · API
 
@@ -151,8 +158,10 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `GET /leave` | `EssLeaveListQuery` (`status`, `year`) → `LeavePage` | `ess` · own | yes | Built 17/10/2026. The caller's own requests |
 | `GET /leave/calendar` | `EssLeaveCalendarQuery` (`month`) → `LeavePage` | `ess` · own, wider by rule | yes | Built 18/10/2026. Approved and waiting leave touching the month: the caller's own and everyone under them in the reporting tree; everyone for the CEO and People with scope all (Operations & People) (the team lead, 18/10/2026) |
 | `GET /leave/balances` | `EssLeaveBalanceQuery` (`year`) → `LeaveBalances` | `ess` · own | | Built 17/10/2026. Every active type: entitled, taken, booked, pending, remaining |
-| `GET /leave/:id` | → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Someone else's is a 404 |
-| `POST /leave` | `LeaveRequestCreate` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Opens the `leave.approval` flow in the same transaction |
+| `GET /leave/check` | `LeaveRequestCheckQuery` (`leave_type_id`, `starts_on`, `ends_on`) → `LeaveRequestCheck` | `ess` · own | | Built 17/11/2026. The working days the span holds and whether its type asks for a relief officer and a handover note (§6), so Request Leave drops their Optional tags before Send |
+| `GET /leave/relief-officers` | `LeaveReliefQuery` (`q`; `starts_on` and `ends_on` together) → `LeaveReliefPage` | `ess` · own | yes | Built 17/11/2026. Who may cover: active employees other than the caller, by name; with the dates, those away on any of them (waiting or approved leave) are left out. Request Leave's Relief Officer reads it 25 at a time (F32), and Praxis AI's card picks with it |
+| `GET /leave/:id` | → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Someone else's is a 404, unless it names the caller as its relief officer (17/11/2026): then it is theirs to read, its note left out |
+| `POST /leave` | `LeaveRequestCreate` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Opens the `leave.approval` flow in the same transaction. From 17/11/2026 it takes `relief_employee_id` and `handover_document_id` (a file staged with `POST /documents`, purpose `document`), both required when the type asks for them (§6) |
 | `POST /leave/:id/cancel` | `LeaveCancel` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. While it waits (the approval is withdrawn too) or once granted until it starts |
 | `GET /queries` | `EssQueryListQuery` (`status`: open, archived) → `MyQueryPage` | `ess` · own | yes | Contract in `schemas/queries.js` (queries guide §5) |
 | `POST /queries/:id/response` | `QueryResponseCreate` → `MyQuery` | `ess` · own | | Through the queries service |
@@ -167,7 +176,7 @@ Download Their Data is the organisation module's route, built by ESS (`ess.expor
 view then `requireCeo()`: anyone else is a 403, an unknown person a 404. The same workbook,
 downloaded by the CEO, counted in the person's one a day.
 
-People · Leave calls the `leave` module under `/api/v1/leave` (`schemas/leave.js`): `GET /requests` (`LeaveListQuery`: status, type, employee, `from` and `to` overlap, `live` for waiting and approved only (the Leave Calendar), search, sort), `GET /summary`, `GET /requests/:id`, `GET /requests/:id/clashes`, all `people` view within scope; `POST /requests` (`LeaveRecordCreate`, `people` create, approved at once); `POST /requests/:id/cancel` (`people` edit); `GET /types` (`ess` view, so every form can list them), `POST /types` and `PATCH /types/:id` (`people` create, edit), `DELETE /types/:id` (`people` delete; refused with `LEAVE_TYPE_IN_USE` once a request or allowance names it, so it is retired instead); `GET /balances` (`LeaveBalanceQuery`: one person's year, `people` view within scope) and `PUT /balances` (`LeaveAllowanceSet`: one person's allowance of a type for a year, `null` back to the type's, `people` edit; the person is told). A waiting request is decided with the approval's own routes (`POST /workflow/instances/:id/approve`, `reject`), never a leave route.
+People · Leave calls the `leave` module under `/api/v1/leave` (`schemas/leave.js`): `GET /requests` (`LeaveListQuery`: status, type, employee, `from` and `to` overlap, `live` for waiting and approved only (the Leave Calendar), search, sort), `GET /summary`, `GET /requests/:id`, `GET /requests/:id/clashes`, all `people` view within scope; `POST /requests` (`LeaveRecordCreate`, `people` create, approved at once); `POST /requests/:id/cancel` (`people` edit); `GET /types` (`ess` view, so every form can list them), `POST /types` and `PATCH /types/:id` (`people` create, edit; each type's `handover_every_request` and `handover_over_days` among their fields), `DELETE /types/:id` (`people` delete; refused with `LEAVE_TYPE_IN_USE` once a request or allowance names it, so it is retired instead); `GET /balances` (`LeaveBalanceQuery`: one person's year, `people` view within scope) and `PUT /balances` (`LeaveAllowanceSet`: one person's allowance of a type for a year, `null` back to the type's, `people` edit; the person is told). A waiting request is decided with the approval's own routes (`POST /workflow/instances/:id/approve`, `reject`), never a leave route. Every `LeaveRequest` carries `relief_employee` (a `PersonRef`, or null) and `handover` (the note's `DocumentRef`, or null); the note itself is opened with `GET /documents/:id/content`, the vault deciding who may (§8).
 
 My Security calls the `identity` module's own-account routes (`/auth/security`, `/auth/password`,
 `/auth/sessions`) and the `security` module's (`/security`, `/security/two-step*`,
@@ -239,6 +248,40 @@ check ownership, not the `settings` grant (README §5.2).
   granted until it starts. People cancel granted leave until it ends; a waiting request is theirs
   to decide in My Approvals. Leave People record is approved at once, with no flow, and the person
   is told.
+- **Relief and handover** (Edidiong at the work progress review of 16/11/2026; TB's details of
+  17/11/2026, not reopened). A request may name a **relief officer**, the colleague who covers for
+  the person while they are away so open work is handed over, and carry a **handover note**, a file
+  the person uploads. Both are required together when the request's type says so, else both are
+  optional:
+  - each leave type holds the rule, set by People on Leave Types without code: **every request**
+    (`handover_every_request`), or a request **more than N working days** (`handover_over_days`,
+    against `leave_request.amount`; null for never by length). A request needs both when its type
+    says every request, or when its working days are more than the type's number;
+  - Annual (`annual`) is every request; every other type, and a new type unless People say
+    otherwise, is more than 7 working days (`1210`, `1295`). **The 7 is a company rule with no legal
+    source** (TB, 17/11/2026: "for annual leave only, or any leave above 7 days"); People change it
+    per type;
+  - the relief officer is an active employee other than the person asking, and is refused when
+    they are on leave waiting or approved on any of the same days (the clash check,
+    `leave.clash.js` `reliefClash`, over the same overlap the person's own request is held to). The
+    form picks them from a server list 25 at a time (F32), which leaves out whoever is away on the
+    dates once both are chosen;
+  - the note goes through the upload engine (`POST /documents`, purpose `document`: PDF, Word,
+    Excel or a photo, up to 15 MB) and the vault; the request claims it in its own transaction
+    (`vault.claim`, doc type `leave_handover`) and stores its `document_id`;
+  - the relief officer is **notified only**, with no acceptance step (TB): told when the request is
+    approved (by its flow; leave People record carries neither field), and again if approved leave
+    is then withdrawn or cancelled. A request withdrawn while it waits tells them nothing, since they
+    were never told;
+  - the approval is the leave flow configured on Settings · Approvals, unchanged (TB: "it must go
+    through the approval workflow from settings"). No stage is added; the approvers read the relief
+    officer and open the note where they decide, on the request's record on People · Leave;
+  - Record Leave (People recording leave already agreed) takes neither: it is not the person's own
+    request, and a type's rule never holds it.
+  The checks run in the request's transaction after the person's lock, beside the others above, and
+  their refusals land on the fields: Relief Officer "Required", "Pick someone else", "Not on the
+  staff", "Not active", "Away on those days"; Handover Note "Required" or, for a file that was not staged by the person,
+  "Upload it again".
 - Signed documents carry two hashes (content and artifact) and a public verification link on
   `go.mycityapp.io/verify/<ref>`.
 - Changing the password ends the employee's other sessions. The password, two-step, passkey, PIN
@@ -272,6 +315,8 @@ check ownership, not the `settings` grant (README §5.2).
 | Event / job | When | Does |
 |---|---|---|
 | `employee.updated` (organisation) | After an own-profile change commits | Audit row with before and after |
+| `leave_request.relief_covering` (`leave.events.js`) | A request naming a relief officer is approved (`settle`, after its approval completes) | "Relief cover: Ada Okafor", "Annual leave, 03/12/2026 to 10/12/2026." to the relief officer's login, opening the request on their My Leave (People · Leave for a reader with `people` view over it); People may copy it (`notifications.md` §6) |
+| `leave_request.relief_released` (`leave.events.js`) | Approved leave naming a relief officer is cancelled, by the person before it starts or by People before it ends | "Relief cover cancelled", "Ada Okafor, Annual leave, 03/12/2026 to 10/12/2026." to the relief officer, opening the request as above |
 | `employee.bank_details_changed` (`ess.events.js`) | After a bank change commits | "Bank details changed" to `people` edit holders within scope; never the account |
 | `employee.photo_updated` | After a photo is set or removed (organisation, 19/10/2026) | Shell and Community pick up the new avatar |
 | `employee.data_export_requested` (`ess.events.js`) | Download My Data or Download Their Data, at once | On the person's record with who asked (audit), with the restricted `data_export` file it reserved; after commit `ess.data_export` builds the workbook into that file, which the screen that asked downloads; nothing is emailed |
@@ -293,6 +338,14 @@ every query (Operations & People, Management, Implementation) and the CEO.
 
 Restricted documents (payslips, bank letters, ID) are readable by the subject in ESS and otherwise
 only with the owning module's grant.
+
+A leave request's handover note (`leave_handover`, personal) opens for the person who asked, the
+relief officer it names, whoever may read its approval (the approvers named on any of its stages
+and those who decided it, `workflow.service.mayRead`, which also reads the `people` view grant
+within its scope), and, for a request with no approval, holders of `people` view within their scope;
+the CEO as always. Anyone else is a 404 (`vault.defineAccess("leave_request")`, `leave.events.js`). A
+relief officer reads the request they cover on My Leave (`GET /ess/leave/:id`), without its note to
+the approver, and cannot cancel it.
 
 Download My Data is the person's own; Download Their Data is the CEO's alone (`requireCeo`), not
 People's or a manager's. The workbook opens for the person it is about and the CEO, nobody else.
@@ -323,7 +376,12 @@ People's or a manager's. The workbook opens for the person it is about and the C
   late reasons share: the whole name, then the one name it begins, then the one name holding the
   word, "pay" for Leave Without Pay; never one of several), and asked for leave without a type it asks
   "Which leave type?" with the person's types and the days left of each, `praxis-ai.md` decision 32;
-  then the first and last day off when they were not said, decision 34). For People: `leave.approve` and `leave.reject` (`leave.ai.js`; `people` approve, risk
+  then the first and last day off when they were not said, decision 34; from 17/11/2026 the card
+  may name a relief officer, picked with Request Leave's own list (`relief_officer`) or matched by
+  name among the people that list offers, but never carries a file: when the type and days need a
+  handover note, its check refuses the press with `HANDOVER_NOTE_NEEDED` before anything is written,
+  and the card's Add Handover Note opens Request Leave filled with the card's values, the relief
+  officer among them (`LeaveRequestPrefill`), to add the note and send it there). For People: `leave.approve` and `leave.reject` (`leave.ai.js`; `people` approve, risk
   approval, so Confirm It's You within five minutes; up to 25 requests a press; inputs
   `LeaveApprove` and `LeaveReject`, a reason required to reject; the requests named who, type and
   days through `leave.service.cardRecords`; at the press every request must be in the person's
@@ -334,18 +392,25 @@ People's or a manager's. The workbook opens for the person it is about and the C
   create, risk approval, since it is approved at once and spends the person's year: the person in the
   reader's scope, the type matched by name, the days; `leave.service.record`), **Add Type**
   (`leave_types.add`: the name and the days a year, the code made from the name as New Leave Type
-  makes it, `leave.service.codeOf`) and **Save Type** (`leave_types.edit`, risk approval, since a
-  changed allowance moves everyone's year: the type by its name, renamed, re-allowanced, retired or
-  offered again; `updateType`). And the person's own **Send Response** (`my_queries.respond`,
+  makes it, `leave.service.codeOf`; from 17/11/2026 also when the type asks for a relief officer and
+  a handover note, every request or more than a number of working days, 7 unless said) and **Save
+  Type** (`leave_types.edit`, risk approval, since a
+  changed allowance moves everyone's year: the type by its name, renamed, re-allowanced, retired,
+  offered again, or its relief and handover rule changed; `updateType`). Every leave read
+  (`leave.requests`, `my_leave.list`) returns each request's relief officer and handover note by
+  name, never the file. And the person's own **Send Response** (`my_queries.respond`,
   `ess.ai.js`, `ess` create): the response to one of their own open queries, named by its number,
   in their own words, sent once through My Queries' own `ess.queries.respond`
   (`docs/guides/queries.md` §3 step 3).
 - **AI routes**: "my payslip" → My Payslips; "request leave" → My Leave with `new=1`, Request
-  Leave open and filled with the type, the days and the note the person gave
+  Leave open and filled with the type, the days, the relief officer and the note the person gave
   (`leave.LeaveRequestPrefill`, `docs/guides/praxis-ai.md` §6.4); "change my password" → My
   Security; "upload my photo" → My Profile.
-- **Search** (`ess.search.js`, ⌘K): the tabs by name and the words people use: payslip, salary
-  slip, leave, holiday, query, sanction, documents, contract, password, two-step.
+- **Search** (⌘K, the tabs' words in `src/shared/search/screens.js`): the tabs by name and the words people use: payslip, salary
+  slip, leave, holiday, relief officer, handover, query, sanction, documents, contract, password,
+  two-step. Leave requests are found on People · Leave by the person, the type or their relief
+  officer's name (`leave.search.js`); a handover note is found from its request (route map
+  `leave_request`), never on its own.
 
 ## 10 · On screen and mobile
 
@@ -366,7 +431,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | ESS · Policy Updates (`policy-updates`) | Owned by TB: policies.md §10.1 | policies.md | policies.md §6 |
 | ESS · My Performance (`my-performance`) | As `docs/guides/performance.md` §10.1 lists: the quarter and reviewer (desktop subtitle); Score to Date, Rating, This Month, Commitments On Time, Agreement; a banner when something waits (Agree Scorecard, or Start Check-In with its due date); My Scorecard, This Month's Check-In, My Commitments (this month's, each with its state and original date, Send Commitments while some are not sent), Rolls Up To, My Reviews, My PIP when open | Help terms on Score to Date, Change Score and Evidence (performance §10.1) | How scoring and the review chain work: performance §6.9, §6.12 |
 | ESS · My Payslips (`my-payslips`) | The year (‹ year ›, from the start year to this one), Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; 2026 Payslips (Month, Net, Status: Paid, Paid with a deduction, In the run); a month opens its payslip in the modal (its PDF, Preparing while it renders) with Download PDF and Email a Copy. Deductions opens Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries). A link to a payslip opens it; a link to a deduction opens Salary Deductions | Help term on **In the run**: approved, and the pay is not yet transferred | "This is the document the engine produces": §6. A deduction only from an upheld query, waived means nothing deducted: §3 step 3, §6. No PAYE or pension line: §6. Visible once the CEO approves, the pay day the 30th unless set: §3 step 4. The Salary Deductions subtitle and "Click a month to preview it" are removed |
-| ESS · My Leave (`my-leave`) | "2026 entitlement" (desktop subtitle); Leave Calendar (a month of approved and waiting leave, the reader's own marked You and in yellow, waiting ones marked Waiting; this year and next) and Request Leave; Entitlement, Taken, Approved Upcoming, Remaining, each opening its list or request (Taken: Leave Taken, the year's approved leave that has begun; Approved Upcoming: the next booked leave, read on its own, and nothing when none is booked); My Requests (Type, From, To, Days, Approver: the person it waits on by name, else the stage, as §6 says; Status), a row opens the request with Cancel Request while it waits or before it starts, which asks first (Keep It, Cancel Request); Entitlement by type (allowance, bar, taken, booked, pending, left; No set allowance for a type without one). Request Leave: Leave Type (the types People offer, each with what is left of the year the First Day falls in: "Annual · 12 days left"; a type with no allowance by its name alone), First Day and Last Day (DD/MM/YYYY; a typed day the calendar greys out reads "Pick 21/10/2026 or later" at once, a Last Day in another year "Ends in another year", one past the allowance "32 working days, 19 left" after Send), Note (Optional); Cancel, Send Request, whose message names who it went to ("Sent to Kemi Alade") | None | "Leave is approved by your line manager in one step" and "The calendar shows clashes before you submit": §3 step 5, §6 |
+| ESS · My Leave (`my-leave`) | "2026 entitlement" (desktop subtitle); Leave Calendar (a month of approved and waiting leave, the reader's own marked You and in yellow, waiting ones marked Waiting; this year and next) and Request Leave; Entitlement, Taken, Approved Upcoming, Remaining, each opening its list or request (Taken: Leave Taken, the year's approved leave that has begun; Approved Upcoming: the next booked leave, read on its own, and nothing when none is booked); My Requests (Type, From, To, Days, Approver: the person it waits on by name, else the stage, as §6 says; Status), a row opens the request (Type, From, To, Days, Approver, Status, Relief Officer, Handover Note with Open Note, Note) with Cancel Request while it waits or before it starts, which asks first (Keep It, Cancel Request); a link naming a request (`?id=`, a notice) opens it the same way, and one the reader is the relief officer on opens read only (Employee, Type, From, To, Days, Status, Relief Officer, Handover Note with Open Note; no Note, no Cancel Request); Entitlement by type (allowance, bar, taken, booked, pending, left; No set allowance for a type without one). Request Leave: Leave Type (the types People offer, each with what is left of the year the First Day falls in: "Annual · 12 days left"; a type with no allowance by its name alone), First Day and Last Day (DD/MM/YYYY; a typed day the calendar greys out reads "Pick 21/10/2026 or later" at once, a Last Day in another year "Ends in another year", one past the allowance "32 working days, 19 left" after Send), Relief Officer (active colleagues, never the reader, 25 at a time as the menu scrolls; once both days are picked, those away on any of them are left out; a refusal's mark shows on it), Handover Note (the upload box "PDF, Word, Excel or a photo, up to 15 MB", the file's name with Replace once it arrived), each Optional unless the type and days ask for them, when the Optional tag goes (read from `GET /ess/leave/check` once the type and both days are picked); Note (Optional); Cancel, Send Request, whose message names who it went to ("Sent to Kemi Alade") | Help terms: Relief Officer, "The colleague who covers your work while you are away. They are told once your leave is approved."; Handover Note, "Your open work and where to find it, for your relief officer and your approvers." | "Leave is approved by your line manager in one step" and "The calendar shows clashes before you submit": §3 step 5, §6. Which types need a relief officer and a handover note, and the 7 days: §6, Relief and handover; the screen only drops the Optional tags. That the relief officer is told and need not accept: §6 |
 | ESS · My Queries (`my-queries`) | The Queries and Sanctions switch, each with its count; Queries (Number, Subject, Raised, Status), open ones first, the picked query beside the list with View Letter and Respond; Sanctions (Sanction, Query, Reason, Date, Fine), each opening its letter. Owned by the queries guide §10 | Help on Respond By | The 24 hours to respond: §3 step 3 (an open query shows its own due time). "Most queries close with no action", the response kept beside the decision, disagreement read before the decision: §6. Who can see a query: §8. A deduction only after an upheld sanction: §3 step 3. The flowchart and the page subtitle are removed |
 | ESS · My Documents (`my-documents`) | Upload Document (What Is It, then the drop box "PDF, Word, Excel or a photo, up to 15 MB", the vault's document limit and types; the upload starts as soon as the file is chosen; a larger file is refused before it is sent, "Larger than 15 MB"); Documents, Signed, Verified, Expiring, Missing; Vault (Document, Uploaded, Status, Expires); a row opens the document (Uploaded, Status, Expires, Reference; View File on a PDF or a photo, which opens it full screen in the file viewer with Download and, on a phone, Share; Download, or Upload Document on a missing one); the chosen document's preview, a PDF's pages drawn in the app | None | "Signed documents carry two hashes and a public verification link": §6. What each status means: `docs/guides/foundation.md` §6.9. A missing document blocks onboarding only for a new hire: §3 step 6, §11. The "Your vault" subtitle and "Click any row to preview it" are removed |
 | ESS · My Security (`my-security`) | Password (when it was changed, or Not changed yet; Change Password); Two-Step Sign-In (On or Off; Ask for a Code: Every Sign-In, Once a Day, Once a Month; the recovery codes left; Set Up Two-Step, New Codes, Change App, Turn Off); PIN (On or Off, Changed or Not set; Set PIN, Change PIN, Remove PIN); Passkeys (Name with This Device, Added, Last Used; Add Passkey; a passkey opens Name, Save Name, Remove Passkey); Clock-In Devices (each registered or new device with its platform, status, last clock-in and This Device; Manage My Devices); Signed In (Device with its address, Signed In, This Device or Sign Out; Sign Out Others when there are others); Recent Sign-Ins (When, Device, Method, Address, Status). Change Password, Set PIN (New PIN, Confirm PIN), Set Up Two-Step (the QR code, the key, Code From App, Turn On; then the ten codes and Copy Codes) and Confirm It's You (Confirm With; Password or PIN; Confirm or Use Passkey) are forms. Sign Out, Turn Off, New Codes, Remove PIN and Remove Passkey ask first | Help terms on the card titles: Two-Step Sign-In, "A code from an authenticator app on your phone after your password or PIN, on a device that has not given one lately. A passkey needs no code."; PIN, "Four digits that unlock the app, and sign you in on a device you have signed in on before." | The page subtitle "Your password and where you are signed in" is removed. Where devices are managed and the flag on others: §3 step 7. The password, two-step, passkey and PIN rules, the window, the other sessions ending on a change, and the session limits: `docs/guides/identity.md` §6 |
@@ -374,7 +439,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Every list and card that names a person | Their photo, or their initials | None | The sizes and how photos are fetched: §3 step 1, §6 |
 | People · Employees (employee record) | Owned by People: that module's guide | That module's guide | That module's guide |
 | People · Employees · Attendance setup | Owned by LA: the attendance guide §3 | The attendance guide | The attendance guide §3 |
-| People · Leave (`leave`) | The month (desktop subtitle); Leave Calendar, Record Leave (`people` create); On Leave Today, Pending Approval, Starting Soon (Next 14 days), Approved This Year; search and the status chips (All, Pending, Approved, Rejected, Cancelled); Requests (Employee, Type, From, To, Days, Status); a request opens beside the list on desktop (the first waiting one shows unasked, or the one `?id=` names from Need You, ⌘K or a notification) and in a sheet on a phone (FRONTEND_FOUNDATION F31; `?id=` opens it there too): Employee, Type, From, To, Days, Status, Waiting On (the person by name, else the stage), Recorded By, Reason, Also Away (who else in the department, with their dates and status), Approve and Reject (Reject asks for a Reason) when it waits on the reader now (the approval's `can_decide`, read from `GET /workflow/instances/:id`), Cancel Leave when granted and not ended. Leave Calendar: a month picker, this year and next, approved and waiting leave (a waiting name marked Waiting). Record Leave: Employee (active staff only; a refusal's mark shows on it), Leave Type, First Day, Last Day, Note (Optional); Cancel, Record Leave. Leave Types: Add Type (`people` create); Type, Allowance, Status (Offered, Retired); a type opens Name (at most 80 characters; its code is made from it, `type_` before a name too short), Days a Year (Optional), Offered, with Delete Type (`people` delete), Cancel, Save Type. Allowances: Employee, Year, each type's entitled, taken, booked and left; Set opens Days (Optional), Cancel, Save Allowance | Help terms: Days a Year, "Working days each person gets a year. Leave empty for a type with no limit, such as unpaid leave."; Days, "Leave empty to use the type's usual allowance." | Who approves at which length: §6 and Settings · Approvals. The checks a request must pass: §6 |
+| People · Leave (`leave`) | The month (desktop subtitle); Leave Calendar, Record Leave (`people` create); On Leave Today, Pending Approval, Starting Soon (Next 14 days), Approved This Year; search and the status chips (All, Pending, Approved, Rejected, Cancelled); Requests (Employee, Type, From, To, Days, Status); a request opens beside the list on desktop (the first waiting one shows unasked, or the one `?id=` names from Need You, ⌘K or a notification) and in a sheet on a phone (FRONTEND_FOUNDATION F31; `?id=` opens it there too): Employee, Type, From, To, Days, Status, Waiting On (the person by name, else the stage), Recorded By, Relief Officer, Handover Note (Open Note), Reason, Also Away (who else in the department, with their dates and status), Approve and Reject (Reject asks for a Reason) when it waits on the reader now (the approval's `can_decide`, read from `GET /workflow/instances/:id`), Cancel Leave when granted and not ended. Leave Calendar: a month picker, this year and next, approved and waiting leave (a waiting name marked Waiting). Record Leave: Employee (active staff only; a refusal's mark shows on it), Leave Type, First Day, Last Day, Note (Optional); Cancel, Record Leave. Leave Types: Add Type (`people` create); Type, Allowance, Handover (Every Request, Over 7 Days, Never), Status; a type opens Name (at most 80 characters; its code is made from it, `type_` before a name too short), Days a Year (Optional), Handover Needed (Every Request, Longer Leave, Never; Add Type starts at Longer Leave), Longer Than (Days) while Longer Leave is chosen (7 on a new type), Offered, with Delete Type (`people` delete), Cancel, Save Type. Allowances: Employee, Year, each type's entitled, taken, booked and left; Set opens Days (Optional), Cancel, Save Allowance | Help terms: Days a Year, "Working days each person gets a year. Leave empty for a type with no limit, such as unpaid leave."; Days, "Leave empty to use the type's usual allowance."; Handover Needed, "When a request of this type must name a relief officer and carry a handover note."; Relief Officer, "The colleague who covers while they are away. Told once the leave is approved." | Who approves at which length: §6 and Settings · Approvals. The checks a request must pass: §6 |
 | Payroll · Payslips (M6) | Owned by Payroll (M6 guide) | The M6 guide | The M6 guide |
 | Queries & Sanctions (M3) | Owned by Queries & Sanctions (M3 guide) | The M3 guide | The M3 guide |
 | Settings · Security (M9) | Owned by Settings (M9 guide) | The M9 guide | The M9 guide |
@@ -397,14 +462,14 @@ Coming Soon from the module's delivery state.
 | ESS · Policy Updates (`policy-updates`) | As policies.md §10.2: To Acknowledge cards with Acknowledge full width, then policy cards | The subtitle | Acknowledge, as policies.md | As My Profile |
 | ESS · My Performance (`my-performance`) | The banner when something waits, the five figures two to a row, then icon cards: My Scorecard, This Month's Check-In, My Commitments (this month's count and how many on time), Rolls Up To, My Reviews, My PIP | The subtitle; the month columns of My Scorecard | Start Check-In, full width; the check-in is a full-screen sheet, one line per card, Submit Check-In in its footer | As My Profile |
 | ESS · My Payslips (`my-payslips`) | The year switcher (44 px targets) and Download All; the stats two to a row (Gross left off); then the months as a list with a status pill | The subtitle, the Gross figure; a month opens its payslip in a modal on desktop at every width and as a full sheet on a phone (F31 as amended for payslips, `docs/guides/payroll.md` §10.3) | Download PDF, at the foot of the month's sheet or modal, Email a Copy beside it | As My Profile |
-| ESS · My Leave (`my-leave`) | Request Leave; the four KPI cards two to a row, each opening its list as a sheet; icon cards My Requests and Entitlement | The subtitle; the requests table (a list in the My Requests sheet); the entitlement card (its sheet) | Request Leave opens the form as a full sheet, Send Request full width | As My Profile |
+| ESS · My Leave (`my-leave`) | Request Leave; the four KPI cards two to a row, each opening its list as a sheet; icon cards My Requests and Entitlement | The subtitle; the requests table (a list in the My Requests sheet); the entitlement card (its sheet) | Request Leave opens the form as a full sheet (Relief Officer's list a sheet of 44 px rows, Handover Note's box a full-width tap target), Send Request full width; a request, its own or one they cover, opens in a bottom sheet with Open Note and Cancel Request full width | As My Profile |
 | ESS · My Queries (`my-queries`) | The switch as a segmented control at the top, then the chosen list as cards | The Number and Query columns | A tapped query opens in a sheet with Respond at its foot; a sanction opens its letter | As My Profile |
 | ESS · My Documents (`my-documents`) | Upload Document; the five stats; the documents as a list with a status pill | The Expires column, and the preview beside the list: a document opens its details as a sheet, with View File (the file viewer, full screen, swiped and pinched) and Download | Upload Document; on a missing document, Upload Document in its sheet | As My Profile |
 | ESS · My Security (`my-security`) | Icon cards two to a row: Password, Two-Step Sign-In, Passkeys, PIN, Signed In, Recent Sign-Ins, Clock-In Devices, each with its state (Changed date, On or Off, how many passkeys or devices) | Every card's detail, each in a sheet (the sign-in and passkey lists as cards) | Change Password, Save PIN and Turn On open their forms as sheets, the primary full width; Add Passkey makes the phone's own passkey (the fingerprint or face) | As My Profile |
 | Shell avatar (rail, phone top bar, More) | The avatar at the right of the phone top bar; it opens More, whose top row is the person with Theme, Density and Settings | The rail itself | None | The phone top bar |
 | People · Employees (employee record) | Owned by People | That module's guide | That module's guide | That module's guide |
 | People · Employees · Attendance setup | Owned by LA | The attendance guide | The attendance guide | The attendance guide |
-| People · Leave (`leave`) | The four figures two to a row, the search and chips, then the requests as cards | The subtitle; the request beside the list: nothing opens until a request is tapped | Tap a request: it opens in a sheet over the list, Approve full width at its foot with Reject above it (Cancel Leave the same) (F31); Record Leave opens the form as a full sheet | People from the menu; the tabs along the top scroll sideways |
+| People · Leave (`leave`) | The four figures two to a row, the search and chips, then the requests as cards | The subtitle; the request beside the list: nothing opens until a request is tapped | Tap a request: it opens in a sheet over the list, with Relief Officer and Open Note in its details, Approve full width at its foot with Reject above it (Cancel Leave the same) (F31); Record Leave opens the form as a full sheet; Leave Types' form in its sheet, Handover Needed as a segmented control | People from the menu; the tabs along the top scroll sideways |
 | Payroll · Payslips (M6) | Owned by Payroll | The M6 guide | The M6 guide | The M6 guide |
 | Queries & Sanctions (M3) | Owned by Queries & Sanctions | The M3 guide | The M3 guide | The M3 guide |
 | Settings · Security (M9) | Owned by Settings | The M9 guide | The M9 guide | The M9 guide |
@@ -427,6 +492,17 @@ Deductions figure and every form open the shared modal.
 - **A document already given**: uploading against the same request again is refused, saying it arrived.
 - **Fourth device**: refused; the employee removes one first (My Devices).
 - **Bank details changed by mistake**: People are notified and can revert; the audit keeps both.
+- **A relief officer who goes on leave later**: a request already approved keeps them; nothing
+  re-checks it. A new request naming them on those days is refused ("Away on those days").
+- **A relief officer suspended or leaving**: kept on the request as it was; never told, as nobody
+  suspended is (`notifications.md` §6).
+- **A leave type's rule changed while someone fills the form**: Send is held to the rule in force
+  at the press; a newly required field reads "Required".
+- **A handover note uploaded and the form then cancelled**: the staged file stays the uploader's
+  own, unclaimed, and nothing reads it.
+- **Praxis AI asked for leave that needs a handover note**: the card names the relief officer but
+  cannot carry a file, so its press is refused with Add Handover Note, which opens Request Leave
+  filled; nothing is written until the person sends the form.
 
 ## 12 · Donor code
 
@@ -453,6 +529,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · Relief officer and handover note on a leave request (Edidiong, work progress review 16/11/2026; TB's details 17/11/2026): §2, §3 step 5, §4, §5 (`GET /ess/leave/check`, `GET /ess/leave/relief-officers`, the request's new fields, a relief officer reading the request they cover), §6 (Relief and handover: each type's rule, Annual every request, every other type more than 7 working days, a company rule with no legal source; the relief officer active, not the person, not away; notified only; the leave flow unchanged), §7 (`leave_request.relief_covering`, `leave_request.relief_released`), §8 (who opens the note), §9 (the card names a relief officer and sends the person to the form for the note), §10, §11. Leave has no Edit or Send Again (a request is cancelled and asked again), so there is nothing for them to carry; the assistant's Request Leave button carries the relief officer.
 - 13/11/2026 · JP · §9: `my_leave.summary`, the person's own leave in figures by type for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7). No screen of ESS changed.
 - 13/11/2026 · JP · M6 PR 8: the stale payroll lines brought to what M6 built (the `payslip` row's columns and `published` rule, the `payslip.published` event in place of `payroll.run_approved`, the Coming Soon examples as past); Download My Data keeps no payslips, which My Payslips' Download All hands over (`docs/guides/payroll.md` §13.2 item 45).
 - 13/11/2026 · TB · ESS · My Training (#110): Download Word under My Notes saves the note and downloads it as a Word file, the person's alone (`knowledge.md` §6.13, §5).

@@ -6,7 +6,7 @@ import { useMe } from "@/auth/AuthProvider";
 import { useFreshSignIn, type ConfirmedWay } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
 import { schemas, type AiActionCard, type AiActionResult, type Department } from "@mycity/contract/contract.gen.ts";
-import { LeaveTypeSelect } from "@/features/people/Leave";
+import { LeaveTypeSelect, ReliefOfficerSelect } from "@/features/people/Leave";
 import { ColleaguePicker, DepartmentPicker, EmployeePicker, HiringManagerPicker, PartnerDealPicker, PartnerRecordPicker, PolicyPicker, ProjectPicker, TaskPeoplePicker, TaskPicker, WorksitePicker, type PartnerDealChoice, type PartnerRecordChoice, type PolicyChoice, type ProjectChoice, type TaskChoice, type WorksiteChoice } from "@/features/shared/pickers";
 import { places } from "@/features/shared/places";
 import { hrefFor } from "@/lib/routes";
@@ -26,8 +26,19 @@ import { ActionCard, AddressField, toast, todayIso, type CardField, type ActionC
 /** The key under which this device remembers that Set Passkey was offered. */
 export const PASSKEY_OFFERED = "praxis-ai:passkey-offered";
 
-/** Refusals a screen answers: the press names the screen that makes it possible. */
-const SCREEN_FOR: Record<string, { label: string; href: string }> = {
+/** The card's values that name a screen's form fields, as text for its address. */
+const textOf = (values: Record<string, unknown>, keys: string[]) =>
+  Object.fromEntries(keys.map((k) => [k, typeof values[k] === "string" && values[k] ? (values[k] as string) : undefined]));
+
+/**
+ * Refusals a screen answers: the press names the screen that makes it possible, with the card's own
+ * values when its form takes them (a handover note is uploaded on Request Leave, docs/guides/ess.md §9).
+ */
+const SCREEN_FOR: Record<string, { label: string; href: string | ((values: Record<string, unknown>) => string) }> = {
+  HANDOVER_NOTE_NEEDED: {
+    label: "Add Handover Note",
+    href: (values) => hrefFor("ess", "my-leave", { new: "1", ...textOf(values, ["leave_type_id", "starts_on", "ends_on", "relief_employee_id", "reason"]) }),
+  },
   NO_MAILBOX: { label: "Open Mailbox", href: hrefFor("mailbox", "inbox") },
   MAIL_AUTH_FAILED: { label: "Open Mailbox", href: hrefFor("mailbox", "inbox") },
   // A query's letter is signed with the signature the person draws by hand: Letter Templates opens Edit Signature.
@@ -126,6 +137,8 @@ function CardPick({ field, value, onChange, names }: { field: CardField; value: 
       return <ProjectPicker value={projects} onChange={(p) => (setProjects(p), set(p.map((x) => x.project_id)))} />;
     case "leave_type":
       return <LeaveTypeSelect year={Number(todayIso().slice(0, 4))} value={ids[0] ?? ""} onChange={(v) => set(v ? [v] : [])} />;
+    case "relief_officer":
+      return <ReliefOfficerSelect value={ids[0] ?? ""} valueLabel={ids[0] ? nameOf(ids[0]) : undefined} onChange={(v) => set(v ? [v] : [])} />;
     case "task":
       return <TaskPicker value={tasks} onChange={(t) => (setTasks(t), set(t.map((x) => x.task_id)))} />;
     case "employee":
@@ -227,7 +240,7 @@ export function AnswerCard({ card: drawn, onRedraw, onAsk }: { card: AiActionCar
       onOpen={navigate}
       onAsk={onAsk}
       problem={problem?.message ?? null}
-      problemAction={screen ? { label: screen.label, onPress: () => navigate(screen.href) } : null}
+      problemAction={screen ? { label: screen.label, onPress: () => navigate(typeof screen.href === "function" ? screen.href(card.values) : screen.href) } : null}
     />
   );
 }

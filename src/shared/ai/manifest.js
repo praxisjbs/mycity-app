@@ -140,7 +140,7 @@ const FILE_KEYS = new Set(["kind", "label", "permission", "capability", "questio
 const FILE_KINDS = new Set(["invoice", "payment_receipt", "contract"]);
 const ROUTE_KEYS = new Set(["intent", "screen", "params", "prefill"]);
 /** What an id field of a card is picked with on Edit (packages/contract AiCardPicks; praxis-ai.md decisions 31 and 32). */
-const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task", "employee", "worksite", "policy", "place", "site_member", "partner", "lead", "partner_deal", "hiring_manager"]);
+const PICKS = new Set(["colleague", "task_assignee", "task_member", "department", "project", "leave_type", "task", "employee", "worksite", "policy", "place", "site_member", "partner", "lead", "partner_deal", "hiring_manager", "relief_officer"]);
 const ASK_KEYS = new Set(["field", "question", "choices", "options", "none", "when", "read", "params", "type", "also"]);
 /** The answers to tap under a question, at most (AiAnswer.choices). */
 const CHOICES_MAX = 6;

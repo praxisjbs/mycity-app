@@ -773,7 +773,9 @@ them.
 4. The first request waiting is shown beside the list, or the one a link named, from **Need You**,
    search or a notification. Press another to show it instead. Its card
    shows **Employee**, **Type**, **From**, **To**, **Days**, **Status**, **Waiting On**,
-   **Recorded By** (**People** when People recorded it), the person's **Reason**, and **Also Away**:
+   **Recorded By** (**People** when People recorded it), the **Relief Officer** who covers while they
+   are away and their **Handover Note** with **Open Note** when they gave them, the person's
+   **Reason**, and **Also Away**:
    who else in the department is off then. **Nobody else in the department** means nobody else is
    off.
 5. **Leave Calendar** shows approved and waiting leave a month at a time, each day with the first
@@ -782,8 +784,8 @@ them.
 6. **Leave Types** and **Allowances** list the types and each person's days. Only People change
    them.
 
-On a phone, the figures sit two to a row and the request's card is under the list. Tap a request,
-then scroll down to it, or drag it down to close it.
+On a phone, the figures sit two to a row and the requests are cards. Tap a request to open it in a
+sheet over the list, with **Open Note** among its details; drag it down to close it.
 
 ### Approve or reject leave {#people-leave-decide needs="people approve"}
 
@@ -793,10 +795,11 @@ People. **Waiting On** says who decides it now.
 1. A request in **Need You** on your [Home · Overview](/home?tab=overview) opens here with that
    request shown. Or press **Pending** and press the request waiting on you.
    ![A request waiting on you](shot:people-leave-request)
-2. Check **Also Away** for who else is off. **Approve** and **Reject** show only when the request
-   waits on you now.
+2. Check **Also Away** for who else is off, and who covers under **Relief Officer**. Press
+   **Open Note** to read their **Handover Note**. **Approve** and **Reject** show only when the
+   request waits on you now.
 3. Press **Approve**. The message says it is approved and the person has been told, such as
-   *Approved. Ada has been told.*
+   *Approved. Ada has been told.* Their relief officer is told too.
 4. Or press **Reject**, type the **Reason**, and press **Reject Leave**. The person reads your
    reason.
 
@@ -818,7 +821,8 @@ For leave already agreed, such as sick leave told by phone.
 3. Press **Record Leave**. The message names them, such as *Leave recorded for Ada Okafor*. It is
    approved at once, and the person is told.
 
-Leave cannot be recorded for someone suspended or who has left.
+Leave cannot be recorded for someone suspended or who has left. **Record Leave** asks for no relief
+officer or handover note: those are the person's own, on their request.
 
 | The field says | What it means | What to do |
 |---|---|---|
@@ -836,19 +840,22 @@ Leave cannot be recorded for someone suspended or who has left.
 
 1. Press the approved request. **Cancel Leave** shows until its last day.
 2. Press **Cancel Leave**, then **Cancel Leave** again, or **Keep It**. A message says
-   **Leave cancelled**, and the person is told.
+   **Leave cancelled**, and the person is told, and so is their relief officer.
 
 If it says **This leave can no longer be cancelled**, the leave has ended or was already cancelled.
 
 ### Set leave types and allowances {#people-leave-types needs="people edit"}
 
-1. Press **Leave Types** to see each type with its **Allowance** and **Status**: **Offered** or
-   **Retired**.
+1. Press **Leave Types** to see each type with its **Allowance**, its **Handover** (when a request
+   needs a relief officer and a handover note: *Every Request*, *Over 7 Days* or *Never*) and
+   **Status**: **Offered** or **Retired**.
 2. {needs="people create"} Press **Add Type**. **Add Leave Type** opens. Type its **Name** and its
    **Days a Year** (leave it empty for a type with no limit, such as unpaid leave), and press
    **Add Type**. The message names it, such as *Study added*.
 3. Press a type to change its **Name** or **Days a Year**, and press **Save Type**. The message
-   names it, such as *Study saved*. Untick **Offered on new requests** to retire it: it reads
+   names it, such as *Study saved*. Under **Handover Needed**, choose **Every Request**,
+   **Longer Leave** (then type the days in **Longer Than (Days)**: a request longer than that needs
+   them) or **Never**. A new type starts at **Longer Leave**, more than 7 working days. Untick **Offered on new requests** to retire it: it reads
    **Retired**, and leave already taken keeps it. Tick it again to offer it again.
    ![A leave type](shot:people-leave-type)
 4. Press **Allowances**. Pick the **Employee** and choose the **Year**, this year or next. Each type
@@ -865,7 +872,7 @@ If it says **This leave can no longer be cancelled**, the leave has ended or was
 |---|---|---|
 | **Name the type** | **Name** is empty | Type a name |
 | **At most 80 characters** | **Name** is too long | Shorten it |
-| **0 to 366 days** | **Days a Year** or **Days** is out of range | Type 0 to 366, or leave it empty |
+| **0 to 366 days** | **Days a Year**, **Longer Than (Days)** or **Days** is out of range | Type 0 to 366, or leave it empty |
 | **Already a type** | Another type has a name that close | Choose another name |
 | *Retire a type first: 25 is the most offered at once* | 25 types are offered already | Retire one, then add or offer this one |
 | **That leave type does not exist** | Someone deleted it meanwhile | Close the form |
@@ -1329,7 +1336,8 @@ do:
 crop: modal
 marks:
   1: label "Days a Year" | The yearly allowance
-  2: button "Save Type" | Save it
+  2: label "Handover Needed" | When cover is needed
+  3: button "Save Type" | Save it
 ```
 
 ```shot people-worksites-site
