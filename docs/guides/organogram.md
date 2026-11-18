@@ -510,6 +510,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · People · Leave and Leave Types gained the relief officer and handover note (`docs/guides/ess.md` §6, §10), in the People folder this guide shares. No Organogram or Departments screen changed.
 - 16/11/2026 · TB · Nothing on the Organogram or Org Chart changed. Beside them in `src/modules/organisation/`, `organisation.library.js` gives the Document Centre's Library a person's rent evidence (`document-centre.md` §6.2).
 - 14/11/2026 · JP · §10: on a computer, a person's card on the tree (Organogram and Org Chart) has the person's name as its button, described by their job, so the keyboard and a screen reader open them by it; a press anywhere on the card still opens them, and the fold button stays its own control. The card was a focusable box with no role or name. Found filming the Milestones 0 and 1 videos (`docs/runbooks/training-videos.md` §7); `OrgTree.test.tsx`.
 - 13/11/2026 · JP · §9: `seats.summary`, the structure's roles in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7). Nothing on screen changes.
