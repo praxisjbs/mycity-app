@@ -197,7 +197,8 @@ const PartnerAdd = z
     deal_title: text(150),
     /** A signed or active stage; the first signed one when left out. */
     deal_stage: listCode.optional(),
-    estimated_value: blank(money),
+    /** What the signed deal is worth (QA F53); a deal signed with no money value is entered on the screen. */
+    estimated_value: money,
   })
   .strict()
   .refine((v) => v.region_scope !== "cities" || Boolean(v.city), { message: "Pick a city", path: ["city"] });

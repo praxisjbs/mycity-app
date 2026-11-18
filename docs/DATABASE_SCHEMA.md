@@ -568,7 +568,10 @@ the shared signatures service's Record Signed Copy · `7101` (M7 PR 6) `partners
 the Proposal Studio's progress, encrypted link and sent message · `7120` (M7 PR 8) `partner_interaction`
 `mail_from`, `mail_to` and `mail_thread_id` (a linked mail's sender, recipients and conversation, kept with
 the interaction), and `mail_message_id` set null when its message goes, so emptying Trash keeps the
-record's history. The Workspace link
+record's history · `7130` (after the QA audit, 17/11/2026) `partnership_opportunity.health` widened by
+`overdue` (an open deal past its expected close, set by the morning job) and
+`partnership_opportunity.non_monetary` (a deal signed with no money value on purpose); reference seed
+`7191` the `deal_health` code `overdue`. The Workspace link
 columns of `7040` are written by the Workspace services since PR 5. `docs/guides/partnerships.md` §4 is
 the field-by-field account.
 

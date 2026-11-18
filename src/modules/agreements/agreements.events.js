@@ -51,6 +51,7 @@ const EVENTS = defineEvents("partnerships", {
   "agreement.viewed": { summary: "An agreement's signing page was opened" },
   "agreement.partner_signed": { summary: "A partner signed an agreement; MyCity's signature waits" },
   "agreement.signed": { summary: "An agreement was signed" },
+  "agreement.recorded": { summary: "A deal signed by an uploaded copy was recorded as an agreement signed outside the hub" },
   "agreement.sealed": { summary: "A signed agreement was sealed and filed with the partner's documents" },
   "agreement.signature_ended": { summary: "An agreement's signing was declined or lapsed" },
   "agreement.activated": { summary: "A signed agreement's term began" },

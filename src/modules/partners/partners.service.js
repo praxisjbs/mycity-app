@@ -267,6 +267,8 @@ async function createIn(client, actor, body, { held, source = "person" }) {
 async function create(actor, scope, body) {
   leads().assertOwner(scope, body.owner_id);
   leads().assertOwner(scope, body.deal.owner_id, "deal.owner_id");
+  await pipeline.assertMayOwn(body.owner_id);
+  await pipeline.assertMayOwn(body.deal.owner_id, "deal.owner_id");
   const held = await pipeline.holdsMoney(actor);
   const made = await pipeline.tx((client) => createIn(client, actor, body, { held }));
   return get360(made.partner_id, scope, actor);
@@ -281,6 +283,7 @@ async function lockSeen(client, id, scope) {
 /** Edit Partner (PATCH /partners/:id). */
 async function update(actor, scope, id, body) {
   if (body.owner_id) leads().assertOwner(scope, body.owner_id);
+  await pipeline.assertMayOwn(body.owner_id);
   await pipeline.tx(async (client) => {
     const p = await lockSeen(client, id, scope);
     const changes = {};
@@ -314,14 +317,24 @@ async function close(actor, scope, id, body) {
   await pipeline.tx(async (client) => {
     const p = await lockSeen(client, id, scope);
     if (p.status === "closed") throw invalid("reason", "Already closed");
+    // Its signed deals end as Completed with the reason, never rewritten as lost (QA F63); a deal it
+    // never won goes to Closed Lost.
     const unfinished = await dealRepo.unfinishedOf(client, { kind: "partner", id });
+    let lostCount = 0;
+    let ended = 0;
     if (unfinished.length) {
-      const lost = lists.firstOf(await lists.stagesOf(client), "closed_lost");
-      if (!lost) throw invalid("reason", "Set up a Closed Lost stage");
       const stages = require("../partner_pipeline/partner_pipeline.stages");
+      let lost = null;
       for (const dealId of unfinished) {
         const deal = await dealRepo.lock(client, dealId);
+        if (deal.signed_at) {
+          if (await pipeline.endIn(client, actor, deal, body.reason)) ended += 1;
+          continue;
+        }
+        lost = lost || lists.firstOf(await lists.stagesOf(client), "closed_lost");
+        if (!lost) throw invalid("reason", "Set up a Closed Lost stage");
         if (String(deal.stage) !== lost.code) await stages.moveIn(client, actor, deal, { stage: lost.code, reason: body.reason });
+        lostCount += 1;
       }
     }
     await repo.update(client, id, { status: "closed", closed_at: new Date(), close_reason: body.reason });
@@ -331,7 +344,7 @@ async function close(actor, scope, id, body) {
       actor,
       before: { status: p.status },
       after: { status: "closed" },
-      payload: { partner_id: id, number: p.number, deals_lost: unfinished.length },
+      payload: { partner_id: id, number: p.number, deals_lost: lostCount, deals_ended: ended },
     });
   });
   return get360(id, scope, actor);

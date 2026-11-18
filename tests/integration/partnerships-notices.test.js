@@ -79,9 +79,10 @@ describeDb("partnerships: who is told (§7)", () => {
         name,
         partner_category_id: category,
         region: { scope: "national" },
+        source: "Referral",
         owner_id: emp("staff"),
         contact: { first_name: "Uche", last_name: "Nwosu", email: `${name.toLowerCase().replace(/\W+/g, ".")}@example.test` },
-        deal: { title: `${name} Partnership`, owner_id: emp("staff") },
+        deal: { title: `${name} Partnership`, owner_id: emp("staff"), estimated_value: "800000.00" },
       }),
       201,
     );

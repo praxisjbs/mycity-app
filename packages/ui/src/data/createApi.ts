@@ -297,10 +297,26 @@ export function createApi<E>(config: ApiConfig) {
    * the next person nor shown: a read still on its way at Sign Out never fills the next session.
    */
   let generation = 0;
+  /**
+   * One GET on its way per key: reads of the same thing mounted together (a 360's ten parts each
+   * reading the stage list) share the answer instead of asking ten times. A reload, a refresh and an
+   * invalidation always ask afresh, so a write is never answered by a read that left before it.
+   */
+  const inflight = new Map<string, { gen: number; answer: Promise<unknown> }>();
+  function shared(ck: string, fresh: boolean, ask: () => Promise<unknown>): Promise<unknown> {
+    const have = inflight.get(ck);
+    if (!fresh && have && have.gen === generation) return have.answer;
+    const answer = ask().finally(() => {
+      if (inflight.get(ck)?.answer === answer) inflight.delete(ck);
+    });
+    inflight.set(ck, { gen: generation, answer });
+    return answer;
+  }
   /** Forget every kept answer: someone signed out, or someone else signed in. */
   function clear() {
     generation += 1;
     cache.clear();
+    inflight.clear();
   }
   const cacheKey = (key: string, params: unknown, query: unknown) => JSON.stringify([key, params ?? null, query ?? null]);
   const pathOf = (key: string, params: unknown) => {
@@ -319,6 +335,10 @@ export function createApi<E>(config: ApiConfig) {
   /** Asks every mounted read under the prefixes again and drops their cached answers; settles when the last has landed. */
   function reloadUnder(prefixes: string[], quiet: boolean): Promise<void> {
     const landed: Promise<void>[] = [];
+    for (const k of [...inflight.keys()]) {
+      const path = JSON.parse(k)[0] as string;
+      if (prefixes.some((p) => path.slice(path.indexOf(" ") + 1).startsWith(p))) inflight.delete(k);
+    }
     for (const [path, set] of listeners) {
       if (!prefixes.some((p) => path.startsWith(p))) continue;
       set.forEach((fn) => {
@@ -397,7 +417,8 @@ export function createApi<E>(config: ApiConfig) {
         }
         return true;
       };
-      call(k, { params: p ?? undefined, query: q ?? undefined } as Opts<K>)
+      // A first read shares one already on its way; a reload (tick moved on) asks afresh.
+      (shared(ck, tick > 0, () => call(k, { params: p ?? undefined, query: q ?? undefined } as Opts<K>)) as Promise<ResponseOf<E, K>>)
         .then((data) => {
           if (stale()) return;
           if (config.cache) cache.set(ck, data);

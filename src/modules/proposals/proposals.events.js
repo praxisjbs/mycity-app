@@ -66,7 +66,12 @@ const queues = () => require("../../jobs/queues");
 outbox.register(EVENTS.PROPOSAL_STARTED, "proposals.ask", async (event) => {
   if (event.payload.queue === false) return;
   const id = event.entity.id;
-  await queues().enqueue("proposal-questions", "ask", { partnership_proposal_id: id }, { jobId: `proposal-questions-${id}-${event.payload.attempt || 1}` });
+  await queues().enqueue("proposal-questions", "ask", { partnership_proposal_id: id }, {
+    jobId: `proposal-questions-${id}-${event.payload.attempt || 1}`,
+    // Asked once: a failure shows on the proposal at once with Try Again (QA F62), never after
+    // five silent attempts of up to two providers each.
+    attempts: 1,
+  });
 });
 
 /* After Write Draft: Claude writes the proposal in the worker. */

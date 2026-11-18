@@ -674,7 +674,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "leads.LeadAdd",
-      "schema_sha": "e4f6f0a5c45c1519",
+      "schema_sha": "de290877b563de75",
       "screen": null
     },
     {
@@ -1026,7 +1026,7 @@
       "risk": "standard",
       "bulk": 1,
       "schema": "partners.PartnerAdd",
-      "schema_sha": "4271c6c0101ddcff",
+      "schema_sha": "f9791395e1561964",
       "screen": null
     },
     {
@@ -1861,7 +1861,7 @@
       "risk": null,
       "bulk": null,
       "schema": "partner_pipeline.DealListQuery",
-      "schema_sha": "38ed60dff143fdf3",
+      "schema_sha": "1212a05ea5e04df7",
       "screen": null,
       "summary": "partnerships.summary"
     },
@@ -2137,7 +2137,7 @@
       "risk": null,
       "bulk": null,
       "schema": "leads.LeadListQuery",
-      "schema_sha": "85294e8f5f7ee9ca",
+      "schema_sha": "0783835917f2e7f9",
       "screen": null,
       "summary": "leads.summary"
     },
@@ -2269,7 +2269,7 @@
       "risk": null,
       "bulk": null,
       "schema": "partners.PartnerListQuery",
-      "schema_sha": "ffe2bf894a6f1134",
+      "schema_sha": "acbd4e40fd0ca02d",
       "screen": null,
       "summary": "partners.summary"
     },
@@ -4472,7 +4472,7 @@
       "risk": null,
       "bulk": null,
       "schema": "leads.LeadSummaryQuery",
-      "schema_sha": "06793369473d63b2",
+      "schema_sha": "a8eb0fc008b97e1b",
       "screen": null
     },
     {
@@ -4549,7 +4549,7 @@
       "risk": null,
       "bulk": null,
       "schema": "partners.PartnerSummaryQuery",
-      "schema_sha": "8b7ce5dda7226f6f",
+      "schema_sha": "668997ff983eefcc",
       "screen": null
     },
     {

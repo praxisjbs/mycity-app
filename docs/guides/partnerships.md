@@ -478,6 +478,13 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `POST /par
   are the deals the reader sees.
 - A record or a deal is given only to an owner in the reader's scope (`all`: anyone), so nothing a person
   makes or edits vanishes from them.
+- **An owner works in Partnerships** (QA F06, JBS Praxis 17/11/2026): a person with an active login whose
+  roles give them Partnerships edit, or the CEO (`partner_pipeline.service.assertMayOwn`, on New and
+  Edit Lead, Partner and Deal; "Not in Partnerships"). Who that is lies with Settings · Roles &
+  Permissions, not with the code: the module belongs to the departments that work it, Partnership &
+  Growth and Branding & Marketing, and a person whose work it is not (Operations & People) is given no
+  Partnerships grant there. A person who has left is never a new owner; their records are reassigned on
+  screen.
 - Proposals and agreements follow their deal; documents follow their record and keep their sensitivity.
 - **Money is gated:** anyone who may see a record sees its projected and signed values. Commission rates
   and amounts, the merchant's take, returns and payouts need `partnerships.money` (held by Operations &
@@ -580,7 +587,8 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `POST /par
   workspace services); sets the lead Converted with `converted_partner_id`; raises the deliverables
   (§6.7); makes the calendar event (§6.16); emits `lead.converted` and `deal.signed`.
 - **Convert to Partner** on the Lead 360 is the same transition for a deal signed outside the hub; it
-  asks for the signed copy. A converted lead is read only and links to its partner.
+  asks for the signed copy, and for a deal with no projected value, **No Money Value** (§6.5). A
+  converted lead is read only and links to its partner.
 - Conversion is idempotent on the deal: a second press, a second tab or a repeated signature event
   converts once.
 
@@ -588,12 +596,29 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `POST /par
 
 - **The stage switcher:** the stages in order, the current one marked; one press on another stage moves
   there. Refused to the same stage. A reason (at least 10 characters) is required for `on_hold`,
-  `closed_lost` and any move to an earlier position. A move into `signed` without a signed agreement
-  asks for the signed copy or offers Generate Agreement. Each move writes a history line, emits
-  `deal.stage_changed` and, for a lead, sets its status, in one transaction.
-- **Health:** On Track, Follow-up Required, Stalled, on open and live deals. Stalled requires
-  **Blockers** (at least 10 characters), shown on the 360's Overview and in Pipeline's Stalled list.
-  Health changes write a health history line.
+  `closed_lost`, any move to an earlier position, and a move forward past an active stage still being
+  pursued (`prospect` to `negotiation` meanings; QA F64: Prospect Identified straight to Proposal Sent),
+  kept on the history line. A move into `signed` without a signed agreement asks for the signed copy or
+  offers Generate Agreement. Each move writes a history line, emits `deal.stage_changed` and, for a
+  lead, sets its status, in one transaction.
+- **Signing needs a value** (QA F53): a person's move into a signed meaning, on the switcher or by Convert
+  to Partner, of a deal with no projected value is refused ("Add the deal's value") unless it is ticked
+  **No Money Value** (`non_monetary`, a deal signed with no money changing hands, such as a media swap).
+  New Partner's signed first deal asks the same. A signing through the hub's own agreement and the
+  tracker import keep the deal as it is.
+- **A signed copy is its agreement** (QA F07): a deal signed with an uploaded copy (the switcher, Convert
+  to Partner) and no agreement on file gets one recorded in Contracts & MOUs, signed outside the hub, the
+  copy its file (`agreements.generate.recordedIn`, `agreement.recorded`); nothing is generated, approved,
+  sent or sealed, and the daily job makes it Active. A deal with an agreement not closed keeps that one.
+- **Health:** On Track, Follow-up Required, Stalled, on open and live deals, and **Overdue**. Stalled
+  requires **Blockers** (at least 10 characters), shown on the 360's Overview and in Pipeline's Stalled
+  list. Health changes write a health history line. Overdue (QA F52) is the morning job's (§6.12): an
+  open deal past its expected close, On Track or Follow-up Required, becomes Overdue (source `system`);
+  a new close date or signing puts it back On Track. Set Health never offers it. A finished deal shows how
+  it ended, Lost or Completed, never the health it had (QA F64).
+- **Expected close** is today or later while a deal is still to win, on New Deal, New Lead and Edit Deal
+  ("Pick today or later", QA F52); New Partner's signed deal and the tracker import may carry an
+  earlier one.
 - **A deal carries:** title; its event (title, start and end, venue picked from the address search,
   expected attendance) when it is one; objective; impact; projected value; expected close; next action
   and its date; its team; up to five **options**; its commission rate; its validity; its custom fields.
@@ -614,7 +639,8 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `POST /par
   none) and either a signed copy or "signed before the hub", which shows on its Documents tab and on
   verification.
 - **Status:** `active` while any deal is live; `dormant` when none is; `closed` by Close Partner with a
-  reason (its open deals are lost with it, each with that reason). Home reads `active`.
+  reason: its signed deals end as Completed with that reason, never rewritten as lost (QA F63), and its
+  open deals are lost with it, each with that reason. Home reads `active`.
 - **Options** follow MyCity's Deal Merchant Agreement: up to five, each with a label, Original Price,
   Discount %, Deal Price (or a price note: App Download, Free Entry), MyCity's Commission per sale and the
   Merchant's Take per sale. The commission amount defaults to the deal price times the deal's rate, the
@@ -757,7 +783,12 @@ studio (`StepBar`: Brief, Questions, Draft, Edit, Send):
    Reach, Money, Timing, Proof) with progress ("6 of 9"). The person answers, presses **Use Suggestion**,
    **Skip** or **Reshuffle** (a different question in its place, from the same group; the replaced card
    kept as `replaced`; at most three reshuffles a card). Between 5 and 12 cards; **Write Draft** waits
-   while a required card is open. Questions take seconds; a failure offers Try Again.
+   while a required card is open. Questions take seconds; a failure offers Try Again. The job asks once
+   (QA F62: five silent attempts of two providers kept a proposal at Asking for ten minutes), so a
+   failure shows at once; a job that says nothing for three minutes (the draft, ten) reads as failed and
+   Try Again starts it. **Write It Myself** (`POST /proposals/:id/own-words`), while the cards are asked
+   or once they failed, fills the kit from the record as AI Is Off does, so a proposal never waits on
+   the AI.
 3. **Draft.** Claude writes the proposal as **structured content** (`ProposalContent`): an ordered list
    of sections, each naming a layout of the design kit (§6.11) and filling that layout's fields. The
    server validates it against the contract, checks its figures (below), renders it, and stores version
@@ -871,6 +902,10 @@ studio's preview, the public page and, through Chromium, the PDF.
   creates one Workspace task for the owner, "Follow up with <partner>", due three working days later
   (`shared/time/working-week`), dedup key `partner-inactivity:<partner_id>:<date of last contact>`.
   One task per quiet spell. Leads' open deals follow the same rule.
+- **Overdue** (QA F52), the same morning and first, whether or not a Partner Inactivity rule is enabled:
+  each open deal past its expected close date, On Track or Follow-up Required, becomes Overdue, source
+  `system`, with its health line (`partner_pipeline.inactivity.markOverdue`; the scheduler runs
+  `morning()`).
 
 ### 6.13 The tracker importer and Start From Tracker
 
@@ -919,6 +954,11 @@ Performance** (headers on row 3, four staff names, no figures).
   title), both with `partnerships.money`.
 - A month imported again replaces that month's figures for the deal, audited. Downloads show to anyone
   who may see the record; money only with `partnerships.money`.
+- **A month entered must add up** (QA F61): MyCity's commission within gross sales ("More than gross
+  sales"), and paid to the partner within what the commission leaves ("More than sales left"). The
+  import keeps the tracker's figures as written. The form sends what was typed as the contract takes it:
+  amounts to two places, units and downloads as numbers (QA F51, F61: `750000` read "Check the format",
+  a filled count "Required").
 - The Returns tab: the months as a table, a chart of commission by month, the year's totals.
 
 ### 6.15 Mail threads
@@ -1039,12 +1079,13 @@ holds a `PlaceInput` key to its owner's name, and the contract's region key is `
 | `agreement.generated`, `agreement.submitted` | Generate, Submit | Opens `partnership.agreement`; approvers told through My Approvals |
 | `agreement.approved`, `agreement.rejected` | The flow | The owner told |
 | `agreement.sent`, `agreement.viewed`, `agreement.signed` | The signature service | Status; the sealed copy to every signer and the owner; `deal.signed` |
+| `agreement.recorded` | A deal signed by an uploaded copy with no agreement on file (§6.5) | Audit; the agreement listed in Contracts & MOUs |
 | `agreement.activated`, `agreement.expiring`, `agreement.renewed`, `agreement.closed` | Daily job, Renew, Close | The reminder `agreement_renewal` (`defineReminder`) at the notice date and nearer |
 | `deal_return.saved` | Enter Returns, the import | Audit |
 | `partner_document.attached`, `partner_document.removed` | Upload Document, a signed copy, Add Partner Document; Remove Document | Audit (Settings · Audit Log); the vault's `document.removed` beside a removal |
 | `mailbox.thread_bound`, `mailbox.thread_unbound` | Link to Partner, Unlink | Audit (mailbox's own events) |
 | job `proposal-questions`, `proposal-draft` | The studio | The AI action, validation, render; Try Again on failure |
-| job `partner-inactivity` (scheduler `partner-inactivity`) | Each morning after `home-alert-sweeps` | §6.12 |
+| job `partner-inactivity` (scheduler `partner-inactivity`) | Each morning after `home-alert-sweeps` | Overdue deals, then the follow-up (§6.12) |
 | job `agreement-renewal` (scheduler `agreement-renewals`) | Daily, Lagos morning | Active, Expiring, deals Completed, proposals Expired, partner status |
 | M0 jobs `import-validate`, `import-commit`, `pdf-render`, `email-send` | The engines | Unchanged |
 
@@ -1197,8 +1238,9 @@ of the seven steps a stage counts as (Prospect, Contacted, Meeting, Proposal, Ne
 done, current and ahead, with MyCity's exact stage named beside it ("Contract Review"). **Next Stage**
 moves it to the next stage in MyCity's order in one press, the next stage named beside it; **Change
 Stage** lists every stage, On Hold and Closed Lost among them, for the rarer moves. A deal On Hold or
-Closed Lost shows the bar with no step current and that stage named. Moving back, to On Hold or to Closed Lost
-still asks why, and a first signed stage still asks for the signed copy (§6.5).
+Closed Lost shows the bar with no step current and that stage named. Moving back, past a stage, to On Hold
+or to Closed Lost still asks why, a first signed stage still asks for the signed copy, and one with no
+projected value asks for No Money Value (§6.5).
 
 ### 10.1 Content tiers
 
@@ -1206,14 +1248,14 @@ still asks why, and a first signed stage still asks for the signed copy (§6.5).
 |---|---|---|---|
 | Pipeline | KPI strip (Open Deals, Signed This Year, Signed Value, Stalled); filters (Stage, Category, Region, Owner, Health); Stages bars; Longest at a Stage (record, deal, stage, days, owner); Stalled (record, deal, blockers, owner); New Lead | Help on Stalled; help on Signed Value | Stage meanings and counting: §6.3, §6.6 |
 | Categories | Category list (name, partners, leads, default commission); the picked category: Defaults (Default Commission, Default Validity, Counts as Vendor), Templates (name, kind, default, version; Add Template, Tidy With AI, Edit), Delivery Checklist (item, due; Add Item, Move Up, Move Down, Retire), Custom Fields (label, type, applies to, filterable; Add Field); Pipeline Settings (stages with what each counts as; impact; sources; document kinds); Proof Points; New Category; Start From Tracker | Help on Counts As; help on Counts as Vendor | Why lists are data (A26): §6.3 |
-| Partner 360 | Header (logo, name, category, region, owner, status); KPI cards (§6.2); tabs; on Overview each deal's stage switcher, Health, Blockers, Next Action, Expected Close; New Deal, Log Interaction, New Proposal, Generate Agreement, Upload Document, Enter Returns, New Project, New Task, New Event, Add Contact; on Documents (the Lead 360's too) a row opens its file in the viewer (a file it cannot show downloads), Download on each row, Remove Document on an upload | Help on Days Since Last Contact; help on Dormant | How the 360 is assembled: §6.2 |
+| Partner 360 | Header (logo, name, category, region, owner, status); KPI cards (§6.2); tabs; on Overview each deal's stage switcher, Health, Blockers, Next Action, Expected Close; New Deal, Log Interaction, New Proposal, Generate Agreement, Upload Document, Enter Returns, New Project, New Task, New Event, Add Contact; on Documents (the Lead 360's too) a row opens its file in the viewer (a file it cannot show downloads), Download on each row, Remove Document on an upload; on Activity (the Lead 360's too) Log Interaction above the interactions | Help on Days Since Last Contact; help on Dormant | How the 360 is assembled: §6.2 |
 | Lead 360 | Header with the status from the deal; KPI cards (Projected Value, Days at Stage, Health, Days Since Last Contact); tabs; the stage switcher; Log Interaction, New Proposal, Close as Lost, Convert to Partner | Help on Status: read from the deal's stage | The conversion transaction: §6.4 |
-| Stage switcher, Set Health | The seven-step bar with the current stage named; Next Stage with the next stage named; Change Stage (every stage, On Hold, Closed Lost); Why (required back, On Hold, Closed Lost); Health; Blockers (required for Stalled); Attach Signed Copy when moving to a signed stage | None: the bar shows the step a stage counts as | History mechanics: §6.5 |
+| Stage switcher, Set Health | The seven-step bar with the current stage named; Next Stage with the next stage named; Change Stage (every stage, On Hold, Closed Lost); Why (required back, past a stage, On Hold, Closed Lost); Health (On Track, Follow-Up Required, Stalled; Overdue shown, never offered; a finished deal reads Lost or Completed); Blockers (required for Stalled); Attach Signed Copy when moving to a signed stage, with No Money Value when the deal has no projected value | Help on No Money Value | History mechanics, Overdue: §6.5, §6.12 |
 | Partners and Leads lists | List across the page (name, category, region, stage, health, owner, last contact; leads: status); search; filters in one row incl. filterable custom fields; Export; New Partner or New Lead; Lost chip on Leads | None | Dedup scoring: §6.2 |
-| New Lead, New Partner, New Deal | Organisation (Name, Category, Region, Industry); Contact (Name, Position, Email, Phone); Deal (Title, Objective, Stage, Projected Value, Expected Close, Event Dates, Venue); Advanced (Legal Name, Website, Headquarters, Impact, Impact Rating, Impact Note, Expected Attendance, Source, Comments, custom fields); Deal Options on New Deal (up to five rows); a duplicate warning naming the match | Help on Projected Value; help on Commission when it differs from the category's | Dedup signals: §6.2 |
-| Proposals, Studio | List across the page (proposal, partner, value, status, viewed); a proposal's own page with the proposal as it will be seen; New Proposal; studio steps: Brief (Notes, Transcript, Images, Template), Questions (cards by group, progress, Use Suggestion, Skip, Reshuffle, Write Draft), Draft progress, Edit (Change Layout, Move Up, Move Down, Hide, Replace Image, Rewrite Section), Send (To, Cc, Subject, Message, the stand-ins and unconfirmed figures, Confirm and Send); Download PDF, Copy Link, Mark Accepted, Mark Declined, Withdraw, Revise, Save as Template | Help on a card's Why; help on a stand-in image | Prompts, figure checks, the job: §6.10, §6.11; no reassurance about AI on screen |
+| New Lead, New Partner, New Deal | Organisation (Name, Category, Region with none chosen, Source on a lead, required, Industry); Contact (Name, Position, Email, Phone); Deal (Title, Objective, Stage, Projected Value, Expected Close, Event Dates, Venue); New Partner's No Money Value when its deal has no projected value; Advanced (Legal Name, Website, Headquarters, Impact, Impact Rating, Impact Note, Expected Attendance, Comments, custom fields); Deal Options on New Deal (up to five rows); a duplicate warning naming the match; amounts typed plain or with commas | Help on Projected Value; help on Commission when it differs from the category's | Dedup signals: §6.2 |
+| Proposals, Studio | List across the page (proposal, partner, value, status, viewed); a proposal's own page with the proposal as it will be seen; New Proposal; studio steps: Brief (Notes, Transcript, Images, Template), Questions (cards by group, progress, Use Suggestion, Skip, Reshuffle, Write Draft), Draft progress with Write It Myself while the cards are asked and beside Try Again on a failure, Edit (Change Layout, Move Up, Move Down, Hide, Replace Image, Rewrite Section), Send (To, Cc, Subject, Message, the stand-ins and unconfirmed figures, Confirm and Send); Download PDF, Copy Link, Mark Accepted, Mark Declined, Withdraw, Revise, Save as Template | Help on a card's Why; help on a stand-in image | Prompts, figure checks, the job: §6.10, §6.11; no reassurance about AI on screen |
 | Contracts & MOUs | KPI strip (Active, In Approval, Awaiting Signature, Renewals 180 Days); lifecycle bar; list across the page (agreement, partner, kind, status, renewal); an agreement's own page: the document, approval (stage, waiting on), signers and their state, reference and QR, renewal; Generate Agreement, Submit for Approval, Approve and Reject (when the waiting stage names the reader; Reject asks its Reason), Send for Signature, Record Signed Copy, Send Again, Renew, Close Agreement | Help on Renewal: the notice period | Hashes and evidence: §6.9, the manual |
-| Analytics | Period; KPI strip (New Prospects, Meetings Held, Proposals Sent, Partnerships Signed); per lead owner table (the eight measures); Signed per Month; Returns per Month (money); By Category; By Region; Stage Conversion; Export | Help on each measure | Definitions: §6.18 |
+| Analytics | Period; KPI strip (New Prospects, Meetings Held, Proposals Sent, Partnerships Signed); per lead owner table (the eight measures); Signed per Month (each bar in deals); Returns per Month (money, each bar in naira, the caption in app downloads); By Category; By Region; Stage Conversion; Export | Help on each measure | Definitions: §6.18 |
 | My Workspace forms | Connect to Partner; then Partner and Deal; on edit, Disconnect | None | Visibility: §6.16, workspace.md |
 | Public · Proposal | The proposal as designed; Download PDF; the owner's contact | None | Tracking: §6.10 |
 | Public · Sign | The agreement in full; Send Code, Your Code, Resend Code; Full Name, Title; Draw or Type; I Agree to Sign Electronically; Sign Agreement; Download Signed Copy | Help on the code: sent to the address the link was sent to | Evidence and hashes: the manual |
@@ -1254,8 +1296,9 @@ tables and field chips, with Insert Field) is the template editor, beside `RichT
 
 - **A record made a minute ago** shows zeros and empty sections (§6.2).
 - **No owner** (an unmatched tracker owner): seen with scope `all`, flagged No Owner, assignable.
-- **The owner leaves MyCity**: their records keep them as a former employee; Operations & People reassign;
-  open proposals keep the sender until reassigned.
+- **The owner leaves MyCity**: their records keep them as a former employee until reassigned on screen
+  (Edit Lead, Edit Partner, Edit Deal); a person who has left is never given a record (§6.1). Open
+  proposals keep the sender until reassigned.
 - **A duplicate**: warned, never blocked; a lead whose organisation is a partner is offered New Deal.
 - **Conversion twice**: converts once (§6.4).
 - **Signed outside the hub**: Record Signed Copy or a stage move with the copy; verification says so.
@@ -1668,6 +1711,22 @@ Nothing ported says where it came from (`scripts/check/provenance.js`).
   bar's is full width there). TB chose all five screens, the one-row filters and the bar over a stage
   pill alone or a step a press.
 
+- **17/11/2026 (JBS Praxis): after the QA audit** (the audit's F05 to F64 on Partnerships). The module
+  belongs to the departments that work it, Partnership & Growth and Branding & Marketing; who may see
+  and edit it is Settings · Roles & Permissions' (option C as seeded: Employee own, Head of Department
+  team, Management everything), and Operations & People's Partnerships grant is MyCity's to untick there.
+  An owner is someone with Partnerships edit (§6.1). Agreements go to the Head of Department of the
+  owner's department, the Program Manager covering the Head, Strategy, Partnerships & Growth seat while
+  it is vacant (People · Departments, Set Head), then the CEO. Every control the audit asked for on a
+  deal: a value or No Money Value to sign, a signed copy recorded as its agreement, no past close date
+  and Overdue, a reason to skip a stage, Lost and Completed shown for a finished deal, Close Partner
+  ending signed deals as Completed, Source required on New Lead's first step and no Region chosen for
+  the person (§6.5, §6.6, §10). Write It Myself on the Proposal Studio; the subtitle naming the model
+  taken off Proposals, since a person reviews and sends every proposal. The staging seed's records belong
+  to Partnership & Growth and Branding & Marketing staff, and a second run moves its own records there
+  (`seeds/staging/70_partnerships.js`). The audit's customer, ticket and campaign records (F08) are not
+  scoped: Partnerships is a partner CRM.
+
 ### 13.3 Still open
 
 - **AI jobs:** settled. `template-tidy` is Default (JP, 06/11/2026) and `proposal-message` is Default (TB,
@@ -1984,6 +2043,7 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 17/11/2026 · JP · After the QA audit (§13.2): the Work tab answers every reader (F05: a reader with `all` was refused every kind, a parameter the task query never used); §6.1 an owner works in Partnerships; §6.5 signing needs a value or No Money Value, a signed copy is recorded as its agreement, no past close date, Overdue set by the morning job (migration `7130`, seed `7191`), a reason to skip a stage, a finished deal shows Lost or Completed; §6.6 Close Partner ends signed deals as Completed; §6.10 Write It Myself and a job asked once; §6.12 the morning's Overdue pass; §6.14 a month of returns adds up and the forms send typed amounts and counts as the contract takes them; §7 `agreement.recorded`; §10 Log Interaction on Activity, Source on New Lead's first step and required, no Region chosen, Analytics' units, Proposals' subtitle taken off; §11 the owner who leaves. A lead's last contact counts its partner's once converted (F23). One request for reads of the same thing mounted together (`createApi`, F25).
 - 17/11/2026 · TB · `useKept` (a list's chips and filters kept while a record has its own page) moved to `app/src/features/shared/kept.ts`, where Document Centre · Library uses it too; `lib.ts` re-exports it, so the screens import it as before. Nothing on screen changed; the chapter's pictures retaken because their code's fingerprint moved.
 - 16/11/2026 · TB · §9: the Document Centre's Library lists an agreement's PDF (the sealed copy once signed, named by its kind), a lead's or a partner's documents and a proposal as sent (`agreements.library.js`, `partners.library.js`, `proposals.library.js`; `document-centre.md` §6.2). An agreement and a record's documents follow §6.1 as their own screens do (`dealSeen`, `recordSeen`); a proposal's PDF follows the vault's default rule, so a reader whose scope is not `all` does not find it there (`document-centre.md` §13, question 5). Nothing on a Partnerships screen changed.
 - 16/11/2026 · TB · A list fills the page and a record opens on its own page (§2, §10, §13.2; F31 amended): Partners, Leads, Proposals, Contracts & MOUs and Categories, desktop and phone; the filters in one row; `StageSwitcher` reworked into the seven-step bar with Next Stage and Change Stage. The chapter's steps and pictures follow.

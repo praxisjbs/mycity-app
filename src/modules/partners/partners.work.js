@@ -235,6 +235,8 @@ function dealsOf(query, scope, db = pool) {
 function visibleOf(kind, wscope, params) {
   if (!wscope) return "false";
   if (kind === "project") return "true";
+  // `all` sees every task: no parameter is pushed, since PostgreSQL refuses one the query never names.
+  if (kind === "task" && wscope.scope === "all") return "true";
   params.push(wscope.employee_id || null);
   const me = `$${params.length}::uuid`;
   if (kind === "event") {

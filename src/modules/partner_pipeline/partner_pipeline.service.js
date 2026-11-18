@@ -60,6 +60,27 @@ function assertOwner(scope, ownerId, field = "owner_id") {
   if (!(scope.scope_ids || []).includes(ownerId)) throw invalid(field, "Outside your team");
 }
 
+/**
+ * Who may own a lead, a partner or a deal (§6.1; QA F06): a person with an active login whose roles give
+ * them Partnerships edit, or the CEO. Settings · Roles & Permissions decides who that is, so a person
+ * whose work is not partnerships, or who has left, is never given a book they cannot work.
+ * @param {string|null|undefined} ownerId  an employee id
+ */
+async function assertMayOwn(ownerId, field = "owner_id", db = pool) {
+  if (!ownerId) return;
+  const { rows } = await db.query(
+    `SELECT 1 AS x FROM app_user u
+      WHERE u.employee_id = $1 AND u.status = 'active'
+        AND (u.is_ceo OR EXISTS (
+              SELECT 1 FROM user_role ur JOIN permission pm ON pm.role_id = ur.role_id
+               WHERE ur.user_id = u.user_id AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)
+                 AND pm.module_key = 'partnerships' AND pm.can_edit))
+      LIMIT 1`,
+    [ownerId],
+  );
+  if (!rows.length) throw invalid(field, "Not in Partnerships");
+}
+
 /** Whether the person sees and enters commission and returns (§6.1): `partnerships.money`, or the CEO. */
 async function holdsMoney(actor) {
   if (!actor) return false;
@@ -133,6 +154,7 @@ async function detailOf(db, r, held) {
     completed_at: r.completed_at,
     close_reason: r.close_reason,
     signed_value: r.signed_value,
+    non_monetary: r.non_monetary === true,
     impact: r.impact || [],
     impact_labels: r.impact_labels || [],
     impact_rating: r.impact_rating,
@@ -246,6 +268,12 @@ async function createIn(client, actor, record, body, { held, field = null, allow
   if (signed && !allowSigned) throw invalid(at("stage"), "Pick an open stage");
   if (!signed && allowSigned) throw invalid(at("stage"), "Pick a signed stage");
   if (stage.meaning === "closed_lost") throw invalid(at("stage"), "Pick an open stage");
+  if (source === "person") {
+    // A deal still to win closes today or later (QA F52); New Partner's deal is signed already.
+    if (!signed && body.expected_close_on && body.expected_close_on < lagos.today()) throw invalid(at("expected_close_on"), "Pick today or later");
+    // A deal signed as it is made says what it is worth, or that it is worth no money (QA F53).
+    if (signed && !body.estimated_value && body.non_monetary !== true) throw invalid(at("estimated_value"), "Add the deal's value");
+  }
   const category = await categoryOf(client, record.categoryId);
   const rate = body.commission_pct ?? (category ? category.default_commission_pct : null);
   const custom = await fields.checkCustom(client, { appliesTo: "deal", categoryId: record.categoryId, values: body.custom });
@@ -272,6 +300,7 @@ async function createIn(client, actor, record, body, { held, field = null, allow
     expected_attendance: body.expected_attendance ?? null,
     objective: body.objective ?? null,
     estimated_value: body.estimated_value ?? null,
+    non_monetary: signed && !body.estimated_value && body.non_monetary === true,
     commission_pct: rate,
     commission_deviates: options.deviates(rate, category && category.default_commission_pct),
     ...validity,
@@ -330,6 +359,7 @@ async function recordFor(client, body, scope) {
 /** New Deal (POST /deals): on a partner, or on a lead without one, at the first stage unless an open one is given. */
 async function create(actor, scope, body) {
   assertOwner(scope, body.owner_id);
+  await assertMayOwn(body.owner_id);
   const held = await holdsMoney(actor);
   const id = await tx(async (client) => {
     const record = await recordFor(client, body, scope);
@@ -341,12 +371,18 @@ async function create(actor, scope, body) {
 /** Edit Deal (PATCH /deals/:id): its terms, options, team and custom values. The stage and health move on their own routes. */
 async function update(actor, scope, id, body) {
   if (body.owner_id) assertOwner(scope, body.owner_id);
+  await assertMayOwn(body.owner_id);
   const held = await holdsMoney(actor);
   refuseMoney(body, held);
   await tx(async (client) => {
     const seen = await repo.get(client, id, scope);
     if (!seen) throw notFound();
     const deal = await repo.lock(client, id);
+    // A new close date is today or later while the deal is still to win (QA F52); one that is clears Overdue.
+    const closeMoved = body.expected_close_on !== undefined && body.expected_close_on !== deal.expected_close_on;
+    if (closeMoved && !deal.signed_at && body.expected_close_on && body.expected_close_on < lagos.today()) {
+      throw invalid("expected_close_on", "Pick today or later");
+    }
     const starts = body.event_starts_on !== undefined ? body.event_starts_on : deal.event_starts_on;
     const ends = body.event_ends_on !== undefined ? body.event_ends_on : deal.event_ends_on;
     if (starts && ends && ends < starts) throw invalid("event_ends_on", "Ends before it starts");
@@ -369,6 +405,9 @@ async function update(actor, scope, id, body) {
     }
     if (body.custom !== undefined) changes.custom = await fields.checkCustom(client, { appliesTo: "deal", categoryId: seen.partner_category_id, values: body.custom, had: deal.custom });
     await repo.update(client, id, changes);
+    if (closeMoved && deal.health === "overdue") {
+      await require("./partner_pipeline.health").setIn(client, actor, { ...deal, ...changes }, { health: "on_track" }, { source: "system" });
+    }
     if (body.venue !== undefined) {
       if (body.venue) await places.save(client, "deal.venue", id, body.venue, { field: "venue" });
       else await places.remove(client, "deal.venue", id);
@@ -424,6 +463,28 @@ async function completeLapsed() {
   return { completed };
 }
 
+/**
+ * End a locked signed deal early, in the caller's transaction: Completed with its reason, as a deal past
+ * its validity is, never Closed Lost (QA F63: closing a partner rewrote its won deal as a loss).
+ * @param {{deal_id: string, number: string, partner_id: string|null, owner_id: string|null, status: string}} deal
+ */
+async function endIn(client, actor, deal, reason) {
+  if (deal.status !== "live") return false;
+  await client.query(
+    "UPDATE partnership_opportunity SET status = 'completed', completed_at = now(), close_reason = $2 WHERE partnership_opportunity_id = $1 AND status = 'live'",
+    [deal.deal_id, reason || null],
+  );
+  await emit(client, {
+    key: EVENTS.DEAL_COMPLETED,
+    entity: { type: "partner_deal", id: deal.deal_id },
+    actor,
+    before: { status: "live" },
+    after: { status: "completed" },
+    payload: { deal_id: deal.deal_id, number: deal.number, partner_id: deal.partner_id, owner_id: deal.owner_id, reason: reason || null },
+  });
+  return true;
+}
+
 /** The deal behind a card or a 360, seen by the reader, or a 404. */
 async function assertSeen(db, id, scope) {
   const r = await repo.get(db, id, scope);
@@ -450,10 +511,12 @@ async function cardNames(db, ids) {
 }
 
 module.exports = {
+  endIn,
   MONEY,
   completeLapsed,
   cardNames,
   assertOwner,
+  assertMayOwn,
   holdsMoney,
   rowOf,
   detailFor,

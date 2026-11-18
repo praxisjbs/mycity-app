@@ -11,6 +11,12 @@ const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
 const deals = require("../partner_pipeline/partner_pipeline.repo");
 
+/**
+ * A lead's last contact: its own interactions, and once converted its partner's, since conversion moves
+ * them to the partner (QA F23: a converted lead read Never while its partner showed the call).
+ */
+const LAST_CONTACT = `GREATEST(${deals.lastContact("lead", "l.lead_id")}, CASE WHEN l.converted_partner_id IS NOT NULL THEN ${deals.lastContact("partner", "l.converted_partner_id")} END)`;
+
 /** The lead's one deal (a lead has the one it was captured with, §6.4), its stage's label and meaning. */
 const FROM = `FROM lead l
   LEFT JOIN partnership_opportunity dl ON dl.lead_id = l.lead_id
@@ -22,7 +28,7 @@ const FROM = `FROM lead l
 const ROW = `l.lead_id, l.number::text AS number, l.name, l.partner_category_id, pc.name::text AS category,
   ${deals.regionLabel("l.region_scope", "lead.cities", "l.lead_id")} AS region, l.status,
   COALESCE(rv.metadata->>'meaning' = 'on_hold', false) AS on_hold, COALESCE(rv.label, dl.stage) AS stage_label, dl.health,
-  ${personJson("e", "d")} AS owner, ${deals.lastContact("lead", "l.lead_id")} AS last_contact_at, l.identified_on, l.created_at`;
+  ${personJson("e", "d")} AS owner, ${LAST_CONTACT} AS last_contact_at, l.identified_on, l.created_at`;
 
 const DETAIL = `${ROW}, l.industry, l.website, l.objective, l.source, src.label AS source_label, l.region_scope,
   COALESCE(l.impact, '{}') AS impact, ${deals.impactLabels("l.impact")} AS impact_labels, l.impact_rating, l.impact_note, l.comments, l.custom, l.lost_reason,
