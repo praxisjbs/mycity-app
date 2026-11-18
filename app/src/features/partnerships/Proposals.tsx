@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import type { ProposalDetail, ProposalRow } from "@mycity/contract/contract.gen.ts";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { useAiAvailable } from "@/auth/ai";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
@@ -181,7 +180,6 @@ export function Proposals({ id }: { id: string | null }) {
 }
 
 function ProposalList() {
-  const aiOn = useAiAvailable();
   const modal = useModal();
   const phone = useIsPhone();
   const { location, navigate } = useRouter();
@@ -204,7 +202,7 @@ function ProposalList() {
   }, [preset]);
   return (
     <>
-      <PageHeader title="Proposals" sub={aiOn ? "Written with Claude, sent by you" : undefined} actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newProposal}>New Proposal</Button> : undefined} />
+      <PageHeader title="Proposals" actions={mayCreate ? <Button variant="primary" icon="plus" onClick={newProposal}>New Proposal</Button> : undefined} />
       {s.data && (
         <KpiTiles
           mobileCols={2}

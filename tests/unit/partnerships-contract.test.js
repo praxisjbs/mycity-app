@@ -163,8 +163,10 @@ describe("the rules a request is held to", () => {
   });
 
   test("a lead comes with its contact and its first deal", () => {
-    const lead = { name: "Kano Fair", partner_category_id: ID, region: { scope: "national" }, owner_id: ID, contact: { first_name: "Musa", last_name: "Bello" }, deal };
+    const lead = { name: "Kano Fair", partner_category_id: ID, region: { scope: "national" }, source: "Referral", owner_id: ID, contact: { first_name: "Musa", last_name: "Bello" }, deal };
     ok(c.leads.LeadCreate, lead);
+    // Where a lead came from is required (QA F22).
+    no(c.leads.LeadCreate, { ...lead, source: undefined }, "source");
     no(c.leads.LeadCreate, { ...lead, deal: undefined }, "deal");
     no(c.leads.LeadCreate, { ...lead, deal: { ...deal, lead_id: ID } });
     no(c.leads.LeadLose, { reason: "No" }, "reason");

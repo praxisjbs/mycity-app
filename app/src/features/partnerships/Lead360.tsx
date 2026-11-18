@@ -39,8 +39,9 @@ export function Lead360({ id }: { id: string }) {
   const done = lead.status === "converted" || lead.status === "lost";
   const readOnly = lead.status === "converted" || !mayEdit;
   const open = (title: string, body: (close: () => void) => JSX.Element, wide = false) => modal.open({ title, wide, body });
+  const logInteraction = () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={x.deal?.deal_id} close={close} />);
   const menu = [
-    { label: "Log Interaction", icon: "plus" as const, onSelect: () => open("Log Interaction", (close) => <LogInteraction record={record} dealId={x.deal?.deal_id} close={close} />) },
+    { label: "Log Interaction", icon: "plus" as const, onSelect: logInteraction },
     { label: "Upload Document", icon: "clip" as const, onSelect: () => open("Upload Document", (close) => <UploadDocument record={record} close={close} />) },
     { label: "Add Contact", icon: "plus" as const, onSelect: () => open("Add Contact", (close) => <ContactForm record={record} close={close} />) },
     { label: "New Proposal", icon: "forward" as const, onSelect: () => navigate(`/partnerships?tab=proposals&new=${lead.lead_id}&record=lead`) },
@@ -75,7 +76,7 @@ export function Lead360({ id }: { id: string }) {
           readOnly ? undefined : (
             <>
               <Menu label="Lead Actions" trigger={<Button icon="dots">More</Button>} items={menu} />
-              {!done && <Button variant="primary" onClick={() => open("Convert to Partner", (close) => <ConvertLead id={lead.lead_id} close={close} onConverted={(pid) => navigate(`/partnerships?tab=partners&id=${pid}`)} />)}>Convert to Partner</Button>}
+              {!done && <Button variant="primary" onClick={() => open("Convert to Partner", (close) => <ConvertLead id={lead.lead_id} unvalued={!x.deal?.estimated_value && !x.deal?.non_monetary} close={close} onConverted={(pid) => navigate(`/partnerships?tab=partners&id=${pid}`)} />)}>Convert to Partner</Button>}
             </>
           )
         }
@@ -85,7 +86,7 @@ export function Lead360({ id }: { id: string }) {
         items={[
           { label: "Projected Value", value: formatMoneyShort(x.kpis.projected_value) },
           { label: "Days at Stage", value: String(x.kpis.days_at_stage) },
-          { label: "Health", value: x.kpis.health ? HEALTH[x.kpis.health].label : "None", tone: x.kpis.health === "stalled" ? "err" : x.kpis.health === "follow_up_required" ? "warn" : undefined },
+          { label: "Health", value: x.kpis.health ? HEALTH[x.kpis.health].label : "None", tone: x.kpis.health === "stalled" || x.kpis.health === "overdue" ? "err" : x.kpis.health === "follow_up_required" ? "warn" : undefined },
           { label: "Days Since Last Contact", value: daysWord(x.kpis.days_since_contact), help: SINCE_CONTACT_HELP },
         ]}
       />
@@ -101,7 +102,7 @@ export function Lead360({ id }: { id: string }) {
         {tab === "deal" && (x.deal ? <DealPanel deal={x.deal} readOnly={readOnly} money={money} categoryId={lead.partner_category_id} /> : <EmptyState title="No Deal Yet" />)}
         {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} />}
         {tab === "work" && <WorkTab record={record} dealId={x.deal && (x.deal.status === "open" || x.deal.status === "live") ? x.deal.deal_id : null} readOnly={readOnly || done} />}
-        {tab === "activity" && <ActivityTab record={record} history={x.deal?.history} />}
+        {tab === "activity" && <ActivityTab record={record} history={x.deal?.history} onLog={readOnly ? undefined : logInteraction} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}
         {tab === "details" && (
           <DetailsTab

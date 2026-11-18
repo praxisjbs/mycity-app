@@ -123,6 +123,8 @@ async function createIn(client, actor, body, { held, source = "person" }) {
 async function create(actor, scope, body) {
   assertOwner(scope, body.owner_id);
   assertOwner(scope, body.deal.owner_id, "deal.owner_id");
+  await pipeline.assertMayOwn(body.owner_id);
+  await pipeline.assertMayOwn(body.deal.owner_id, "deal.owner_id");
   const held = await pipeline.holdsMoney(actor);
   const made = await pipeline.tx((client) => createIn(client, actor, body, { held }));
   return get360(made.lead_id, scope, actor);
@@ -139,6 +141,7 @@ async function lockSeen(client, id, scope) {
 /** Edit Lead (PATCH /leads/:id). */
 async function update(actor, scope, id, body) {
   if (body.owner_id) assertOwner(scope, body.owner_id);
+  await pipeline.assertMayOwn(body.owner_id);
   await pipeline.tx(async (client) => {
     const lead = await lockSeen(client, id, scope);
     const changes = {};
@@ -227,7 +230,7 @@ async function convert(actor, scope, id, body) {
       client,
       actor,
       locked,
-      { stage: signed.code, reason: null, signed_copy_document_id: body.signed_copy_document_id || null },
+      { stage: signed.code, reason: null, signed_copy_document_id: body.signed_copy_document_id || null, non_monetary: body.non_monetary === true },
       { source: "conversion" },
     );
     return { partner_id: moved.converted_partner_id };

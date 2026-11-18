@@ -48,7 +48,7 @@ export function useMover(deal: DealDetail | null) {
     if (needs.refused) return toast(needs.refused);
     if (needs.reason || needs.copy) {
       const to = needs.to;
-      modal.open({ title: needs.copy ? "Attach Signed Copy" : `Move to ${to.label}`, body: (close) => <MoveStage deal={deal} to={to} reason={needs.reason} copy={needs.copy} close={close} /> });
+      modal.open({ title: needs.copy ? "Attach Signed Copy" : `Move to ${to.label}`, body: (close) => <MoveStage deal={deal} to={to} reason={needs.reason} copy={needs.copy} value={needs.value} close={close} /> });
       return;
     }
     return move
@@ -102,7 +102,7 @@ export function DealPanel({ deal, readOnly, money, categoryId }: { deal: DealDet
       <KeyValue
         items={[
           ["Number", deal.number],
-          ["Health", <StatusPill key="h" status={healthPill(deal.health)} />],
+          ["Health", <StatusPill key="h" status={healthPill(deal.health, deal.status)} />],
           ...(deal.blockers ? ([["Blockers", deal.blockers]] as Array<[ReactNode, ReactNode]>) : []),
           ["Next Action", deal.next_action ? `${deal.next_action}${deal.next_action_on ? `, ${formatDate(deal.next_action_on)}` : ""}` : "None"],
           ["Expected Close", deal.expected_close_on ? formatDate(deal.expected_close_on) : "None"],
@@ -186,8 +186,11 @@ function InteractionDetail({ i }: { i: Interaction }) {
   );
 }
 
-/** Activity: every interaction, newest first, and the stage and health history (a lead's deal's; a partner's deals'). */
-export function ActivityTab({ record, history }: { record: RecordKey; history?: Array<StageHistoryLine | RecordHistoryLine> }) {
+/**
+ * Activity: every interaction, newest first, and the stage and health history (a lead's deal's; a
+ * partner's deals'). `onLog` puts Log Interaction on the tab itself, beside the list it adds to (QA F59).
+ */
+export function ActivityTab({ record, history, onLog }: { record: RecordKey; history?: Array<StageHistoryLine | RecordHistoryLine>; onLog?: () => unknown }) {
   const modal = useModal();
   const list = usePaged("GET /api/v1/partnerships/interactions", { filters: record.type === "partner" ? { partner_id: record.id } : { lead_id: record.id }, sort: "-occurred_at" });
   const open = (i: Interaction) => modal.open({ title: i.subject.slice(0, 80), body: () => <InteractionDetail i={i} /> });
@@ -195,6 +198,7 @@ export function ActivityTab({ record, history }: { record: RecordKey; history?: 
     <>
       <PagedTable<Interaction>
         title="Interactions"
+        right={onLog && <Button size="sm" icon="plus" onClick={onLog}>Log Interaction</Button>}
         list={list}
         rowKey={(i) => i.partner_interaction_id}
         noun="interaction"

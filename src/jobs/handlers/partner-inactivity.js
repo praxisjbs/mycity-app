@@ -9,6 +9,6 @@ const { withCronLock } = require("../cron-lock");
 const inactivity = require("../../modules/partner_pipeline/partner_pipeline.inactivity");
 
 module.exports = async function partnerInactivity() {
-  const out = await withCronLock("partner-inactivity", () => inactivity.sweep());
+  const out = await withCronLock("partner-inactivity", () => inactivity.morning());
   return out === undefined ? { skipped: "locked" } : out;
 };

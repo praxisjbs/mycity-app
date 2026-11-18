@@ -421,7 +421,7 @@ changing it is a support step that rebuilds the index first (`docs/runbooks/`).
   | Recruitment · Assessments | Suggest With AI | Add Question |
   | Recruitment · Candidates | Screen With AI (and the phone's screen action), Score With AI | Reading the CV; the form-only score stays |
   | Recruitment · an interview card | Tidy With AI | The card's own comments |
-  | Partnerships · Proposals | Rewrite Section, Send Proposal's Write With AI; the questions are not asked | Build by Hand fills the kit's pages from the record to edit; Send Proposal's own fields |
+  | Partnerships · Proposals | Rewrite Section, Send Proposal's Write With AI; the questions are not asked | Build by Hand, or Write It Myself while the questions are asked (`partnerships.md` §6.10), fills the kit's pages from the record to edit; Send Proposal's own fields |
   | Partnerships · Categories, an agreement template | Tidy With AI | The template's editor |
   | Knowledge Hub · SOPs | Draft With AI | The SOP's own form |
   | Knowledge Hub · Training, a lesson | Draft Lesson | The lesson's own text |

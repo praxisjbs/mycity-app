@@ -59,8 +59,11 @@ describe("the stage switcher's rules (§6.5)", () => {
     expect(fields(() => ruleOf(STAGES, deal("initial_contact"), "old_stage"))).toEqual({ stage: ["Pick a stage"] });
   });
 
-  test("forward needs no reason; back, On Hold and Closed Lost need one; leaving On Hold does not", () => {
-    expect(ruleOf(STAGES, deal("initial_contact"), "negotiation").needsReason).toBe(false);
+  test("the next stage needs no reason; a skip, back, On Hold and Closed Lost need one; leaving On Hold does not", () => {
+    expect(ruleOf(STAGES, deal("initial_contact"), "proposal_sent").needsReason).toBe(false);
+    // Past a stage still being pursued (QA F64); signing needs its copy, not a reason.
+    expect(ruleOf(STAGES, deal("initial_contact"), "negotiation")).toMatchObject({ skips: true, needsReason: true });
+    expect(ruleOf(STAGES, deal("initial_contact"), "partnership_signed")).toMatchObject({ skips: false, needsReason: false, signs: true });
     expect(ruleOf(STAGES, deal("negotiation"), "initial_contact")).toMatchObject({ back: true, needsReason: true });
     expect(ruleOf(STAGES, deal("negotiation"), "on_hold").needsReason).toBe(true);
     expect(ruleOf(STAGES, deal("negotiation"), "closed_lost").needsReason).toBe(true);

@@ -312,6 +312,7 @@ function Figures({ a, phone }: { a: PartnershipAnalytics; phone: boolean }) {
             label: monthLabel(m.month),
             value: m.signed,
           }))}
+          format={(n) => `${count(n)} ${n === 1 ? "deal" : "deals"}`}
           caption={`${formatMoneyShort(a.signed_per_month.reduce((n, m) => n + Number(m.value), 0).toFixed(2))} signed`}
         />
         {a.returns_per_month && !phone && (
@@ -322,7 +323,8 @@ function Figures({ a, phone }: { a: PartnershipAnalytics; phone: boolean }) {
               label: monthLabel(m.month),
               value: Number(m.mycity_commission),
             }))}
-            caption={`${count(a.returns_per_month.reduce((n, m) => n + m.downloads, 0))} downloads`}
+            format={(n) => formatMoneyShort(n.toFixed(2))}
+            caption={`${count(a.returns_per_month.reduce((n, m) => n + m.downloads, 0))} app downloads`}
           />
         )}
       </Grid>

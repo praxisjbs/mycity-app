@@ -36,6 +36,7 @@ module.exports = {
   skip: async (req, res) => ok(res, await service.skip(actor(req), id(req), req.validated.params.qid, scopeOf(req))),
   reshuffle: async (req, res) => ok(res, await service.reshuffle(actor(req), id(req), req.validated.params.qid, scopeOf(req))),
   draft: async (req, res) => ok(res, await service.requestDraft(actor(req), id(req), scopeOf(req))),
+  ownWords: async (req, res) => ok(res, await service.requestDraft(actor(req), id(req), scopeOf(req), { ownWords: true })),
   edit: async (req, res) => ok(res, await service.edit(actor(req), id(req), req.validated.body, scopeOf(req))),
   rewrite: async (req, res) => {
     const p = await service.seen(require("../../config/db").pool, id(req), scopeOf(req));

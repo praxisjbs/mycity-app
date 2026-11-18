@@ -147,6 +147,7 @@ describeDb("partnerships: the Proposal Studio", () => {
       name: "Lakeside Jazz Ltd",
       partner_category_id: cat.partner_category_id,
       region: { scope: "national" },
+      source: "Referral",
       owner_id: emp("staff"),
       contact: { first_name: "Ife", last_name: "Okon", email: "ife@lakeside.example", phones: ["08031230000"] },
       deal: { title: "Lakeside Jazz Weekend 2026", owner_id: emp("staff"), estimated_value: "4500000.00", event_starts_on: "2026-12-18", event_ends_on: "2026-12-20", options: [{ position: 1, label: "Regular", deal_price: "15000.00" }] },
@@ -369,6 +370,26 @@ describeDb("partnerships: the Proposal Studio", () => {
     const draft = await as("staff").post(api(`/proposals/${res.body.partnership_proposal_id}/draft`));
     expect(draft.body.status).toBe("draft");
     expect(draft.body.content.sections.map((s) => s.layout)).toEqual(["cover", "why_mycity", "packages", "timeline", "next_steps", "closing"]);
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  test("Write It Myself fills the kit while the cards are asked; a job silent too long reads failed, and Try Again starts it (QA F62)", async () => {
+    on();
+    const complete = jest.spyOn(ai, "complete");
+    const res = await as("staff").post(api("/proposals"), { deal_id: deal.deal_id, notes: "Do it by hand." });
+    expect(res.body).toMatchObject({ status: "questions", progress: { job: "questions", failed: false } });
+    const id = res.body.partnership_proposal_id;
+    // Asked an hour ago and never answered: the proposal says so, with Try Again.
+    await q("UPDATE partnership_proposal SET progress = jsonb_set(progress, '{at}', to_jsonb($2::text)) WHERE partnership_proposal_id = $1", [id, new Date(Date.now() - 3600000).toISOString()]);
+    const stalled = (await as("staff").get(api(`/proposals/${id}`))).body;
+    expect(stalled.progress).toMatchObject({ job: "questions", failed: true, reason: "error" });
+    const again = await as("staff").post(api(`/proposals/${id}/retry`));
+    expect([again.status, again.body.progress.failed]).toEqual([200, false]);
+    // Write It Myself, while the cards are still being asked: the kit from the record, nothing asked of Claude.
+    const mine = await as("staff").post(api(`/proposals/${id}/own-words`));
+    expect([mine.status, mine.body.status, mine.body.progress]).toEqual([200, "draft", null]);
+    expect(mine.body.content.sections.map((s) => s.layout)).toEqual(["cover", "why_mycity", "packages", "timeline", "next_steps", "closing"]);
+    expect((await as("staff").post(api(`/proposals/${id}/own-words`))).status).toBe(409);
     expect(complete).not.toHaveBeenCalled();
   });
 

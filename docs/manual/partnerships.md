@@ -247,20 +247,24 @@ A lead becomes a partner when its deal is signed. Use this task for a partner th
 5. Press **Next**. On **Contact**, fill in the **First Name** and **Last Name**. Add the **Position**,
    **Email** and **Phone** if you have them.
    ![The Contact step](shot:partnerships-partner-new-2)
-6. Press **Next**. On **Signed Deal**, type the deal's **Title** and pick its **Stage**.
+6. Press **Next**. On **Signed Deal**, type the deal's **Title**, pick its **Stage** and fill in its
+   **Projected Value**.
    ![The Signed Deal step](shot:partnerships-partner-new-3)
 7. Under **Signed Copy**, upload the signed agreement. If it was signed before MyCity used this system,
    tick **Signed Before the Hub** instead.
-8. Press **Add Partner**. The message reads *Partner added*.
+8. If no money changes hands, such as a media swap, leave the value empty and tick **No Money Value**.
+9. Press **Add Partner**. The message reads *Partner added*.
 
 If you press **Add Partner** with neither a copy nor the tick, the form says *Attach the signed copy*.
+With neither a value nor **No Money Value**, it asks you to add the deal's value.
 
 ### Open a deal {#partnerships-partners-deal needs="partnerships create"}
 
 1. Open the partner and press **New Deal**.
    ![New Deal](shot:partnerships-deal-new)
 2. Type the **Title**. Add the **Objective** if it helps.
-3. Pick the **Stage**, and fill in the **Projected Value** and **Expected Close**.
+3. Pick the **Stage**, and fill in the **Projected Value** and **Expected Close**. Type amounts plainly,
+   such as 750000 or 750,000. The close date is today or later.
 4. For an event, pick the **Event Dates** and the **Venue** from the address search.
 5. To price the deal in lines, press **Add Option**. Name the option, then fill in its
    **Original Price**, **Discount %** and **Deal Price**. Add up to five options.
@@ -282,10 +286,13 @@ no board. You move a deal with one press.
    *Moved to* and the stage's name.
 3. To move anywhere else, press **Change Stage** and pick the stage. **On Hold** and **Closed Lost** are
    at the end of its list.
-4. Moving back, to **On Hold** or to **Closed Lost** asks you to explain. Type the **Why**, at least
-   ten characters, then press **Move Stage**.
+4. Moving back, skipping a stage, or moving to **On Hold** or **Closed Lost** asks you to explain. Type
+   the **Why**, at least ten characters, then press **Move Stage**.
    ![Why a deal moves back](shot:partnerships-stage-why)
 5. The first move to a signed stage asks for the **Signed Copy**. Upload it and press **Move Stage**.
+   The copy is kept in [Contracts & MOUs](/partnerships?tab=contracts-and-mous) as its agreement.
+6. A deal with no **Projected Value** cannot be signed until you add one with **Edit Deal**. If no money
+   changes hands, tick **No Money Value** instead.
 
 When someone else moves a deal, its owner is told. Moves are listed under **Stage History** on
 **Activity**.
@@ -298,6 +305,10 @@ When someone else moves a deal, its owner is told. Moves are listed under **Stag
 3. For **Stalled**, type the **Blockers**. They are required, so the team can see what is in the way.
 4. Press **Set Health**. The message reads *Health set*.
 
+A deal still open after its **Expected Close** reads **Overdue** the next morning. Give it a new
+**Expected Close** with **Edit Deal** and it is back on track. A finished deal shows **Lost** or
+**Completed** instead of its health.
+
 ### Edit a deal {#partnerships-partners-edit needs="partnerships edit"}
 
 1. Press **Edit Deal** on the deal.
@@ -308,7 +319,8 @@ When someone else moves a deal, its owner is told. Moves are listed under **Stag
 
 Log every call, meeting, email, visit or note so the whole team sees the history.
 
-1. Open the partner or the lead and press **More**, then **Log Interaction**.
+1. Open the partner or the lead and press **Activity**, then **Log Interaction** above the list. It is
+   under **More** too.
    ![Log Interaction](shot:partnerships-interaction)
 2. Pick the **Kind**: **Call**, **Meeting**, **Email**, **Visit** or **Note**.
 3. Pick the **Day** and **Time**. The day cannot be in the future.
@@ -362,8 +374,11 @@ Returns are what a partner's deal earned in a month.
    ![Enter Returns](shot:partnerships-returns-enter)
 4. Pick the **Month**.
 5. Fill in the **Units Sold**, **Gross Sales**, **MyCity Commission**, **Paid to Partner** and
-   **Downloads**. Add a **Note** if it helps.
+   **Downloads**. Add a **Note** if it helps. Type amounts plainly, such as 100000 or 100,000.
 6. Press **Save Returns**. The message reads *Returns saved*.
+
+The figures must add up. **More than gross sales** means the commission is above the gross sales.
+**More than sales left** means the payout is above what the commission leaves.
 
 The cards **Commission**, **Gross Sales**, **Units Sold** and **Downloads** add up the year. **Months**
 lists each month and marks it **Entered** or **Imported**. Press a month to change it. The monthly report
@@ -389,7 +404,8 @@ open. Connecting work never widens who can see it.
    ![Close Partner](shot:partnerships-partner-close)
 3. Type the **Why** and press **Close Partner**. The message reads *Partner closed*.
 
-A closed partner is read only. Its history stays.
+A closed partner is read only. Its history stays. Its signed deals end as **Completed**; deals not yet
+signed are lost.
 
 ### Export the partners {#partnerships-partners-export needs="partnerships export"}
 
@@ -420,23 +436,26 @@ that deal's stage, so you never type it.
 ### Add a lead {#partnerships-leads-add needs="partnerships create"}
 
 1. Press **New Lead** at the top right of [Partnerships · Leads](/partnerships?tab=leads).
-2. On **Organisation**, type the **Name**, pick the **Category** and the **Region**.
+2. On **Organisation**, type the **Name**, pick the **Category** and the **Region**. No region is picked
+   for you.
    ![The first step of New Lead](shot:partnerships-lead-new-1)
 3. For **Cities**, pick each city from the search.
-4. Pick the **Lead Owner**. It starts as you.
-5. Read any warning that starts *Already here*. It names a partner or lead that looks the same. It
+4. Type the **Source**, or pick one it suggests. It is required, so you can see where leads come from.
+5. Pick the **Lead Owner**. It starts as you. The owner must work in Partnerships, or the form says
+   *Not in Partnerships*.
+6. Read any warning that starts *Already here*. It names a partner or lead that looks the same. It
    never stops you.
-6. Press **Advanced** for the **Website**, **Source**, **Impact**, **Impact Rating**, **Impact Note** and
-   **Comments**. Type a **Source** or an **Impact**, or pick one it suggests. For each **Impact**, press
-   Enter or pick it; press the cross on one to take it off. A new one is added to its list.
-7. Press **Next**. On **Contact**, fill in the **First Name** and **Last Name**. Add the **Position**,
+7. Press **Advanced** for the **Website**, **Impact**, **Impact Rating**, **Impact Note** and
+   **Comments**. Type an **Impact**, or pick one it suggests. Press Enter or pick it; press the cross on
+   one to take it off. A new one is added to its list.
+8. Press **Next**. On **Contact**, fill in the **First Name** and **Last Name**. Add the **Position**,
    **Email** and **Phone** if you have them.
    ![The Contact step](shot:partnerships-lead-new-2)
-8. Press **Next**. On **Deal**, type the **Title**, and the **Objective** if it helps.
+9. Press **Next**. On **Deal**, type the **Title**, and the **Objective** if it helps.
    ![The Deal step](shot:partnerships-lead-new-3)
-9. Pick the **Stage**, and fill in the **Projected Value** and **Expected Close**. For an event, pick the
-   **Event Dates** and the **Venue**.
-10. Press **Add Lead**. The message reads *Lead added*, and the lead opens.
+10. Pick the **Stage**, and fill in the **Projected Value** and **Expected Close**. For an event, pick
+   the **Event Dates** and the **Venue**.
+11. Press **Add Lead**. The message reads *Lead added*, and the lead opens.
 
 Move the lead on as in [Move a deal's stage](#partnerships-partners-stage). Log calls as in
 [Log an interaction](#partnerships-partners-log).
@@ -455,7 +474,8 @@ A lead also converts by itself when its agreement is signed. Use this when it si
 1. Open the lead and press **Convert to Partner**.
    ![Convert to Partner](shot:partnerships-lead-convert)
 2. Upload the **Signed Copy**.
-3. Press **Convert to Partner**. The message reads *Now a partner*, and the partner opens.
+3. If the deal has no **Projected Value** and no money changes hands, tick **No Money Value**.
+4. Press **Convert to Partner**. The message reads *Now a partner*, and the partner opens.
 
 Its deal, contacts, documents, history and work move with it. The lead shows **Now a partner.** with
 **Open Partner**.
@@ -534,7 +554,10 @@ The studio reads your notes and asks about what is missing. Each question is a c
 | **AI Is Off** | AI is not switched on for Partnerships | Press **Build by Hand** and fill the proposal in yourself |
 | **AI Limit Reached** | This month's AI budget is spent | Press **Build by Hand**, or ask an administrator |
 | **The draft did not finish** | The writing stopped | Press **Try Again** |
-| **The questions did not arrive** | The questions could not be made | Press **Try Again** |
+| **The questions did not arrive** | The questions could not be made, or took too long | Press **Try Again**, or **Write It Myself** |
+
+> **Tip:** You never have to wait for the questions. Press **Write It Myself** while they are being asked,
+> and the proposal is filled from the deal for you to finish by hand.
 
 ### Edit the proposal {#partnerships-proposals-edit needs="partnerships edit"}
 
@@ -956,6 +979,7 @@ do:
   - fill: label "Name" = Kora Street Kitchens
   - click: label "Category"
   - click: role option "Hospitality"
+  - click: role radio "National"
   - click: button "Next"
   - wait: label "First Name"
 crop: modal
@@ -971,6 +995,7 @@ do:
   - fill: label "Name" = Kora Street Kitchens
   - click: label "Category"
   - click: role option "Hospitality"
+  - click: role radio "National"
   - click: button "Next"
   - fill: label "First Name" = Ife
   - fill: label "Last Name" = Bello
@@ -1129,6 +1154,9 @@ do:
   - fill: label "Name" = Kora Street Kitchens
   - click: label "Category"
   - click: role option "Hospitality"
+  - click: role radio "National"
+  - fill: label "Source" = Referral
+  - press: Tab
   - click: button "Next"
   - wait: label "First Name"
 crop: modal
@@ -1144,6 +1172,9 @@ do:
   - fill: label "Name" = Kora Street Kitchens
   - click: label "Category"
   - click: role option "Hospitality"
+  - click: role radio "National"
+  - fill: label "Source" = Referral
+  - press: Tab
   - click: button "Next"
   - fill: label "First Name" = Ife
   - fill: label "Last Name" = Bello

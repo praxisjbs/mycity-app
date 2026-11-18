@@ -223,6 +223,51 @@ async function draftIn(client, actor, facts, opts = {}) {
 }
 
 /**
+ * A deal signed by an uploaded copy (a stage move with its signed copy, New Partner's signed copy),
+ * recorded in Contracts & MOUs as an agreement signed outside the hub, so every deal signed with a
+ * copy has its agreement on file (QA F07). The copy is the agreement: nothing is generated, approved,
+ * sent or sealed, and the daily `agreement-renewals` job makes it Active from today. Left alone when
+ * the deal already has an agreement that is not closed (one drafted, sent or signed in the hub).
+ * In the caller's transaction, after the deal is on its partner (a lead converts first).
+ * @returns {Promise<string|null>} the agreement's id, or null when one was already on file
+ */
+async function recordedIn(client, actor, dealId, documentId) {
+  const { rows } = await client.query(
+    "SELECT 1 AS x FROM partnership_agreement WHERE partnership_opportunity_id = $1 AND status <> 'closed' LIMIT 1",
+    [dealId],
+  );
+  if (rows.length) return null;
+  const facts = await repo.dealFacts(client, dealId);
+  const day = lagos.today();
+  const { number } = await numbering.allocate(client, "agreement", { date: day });
+  const id = await repo.insert(client, {
+    partner_id: facts.partner_id || null,
+    lead_id: facts.partner_id ? null : facts.lead_id,
+    partnership_opportunity_id: dealId,
+    number,
+    title: facts.title,
+    status: "signed",
+    starts_on: day,
+    ends_on: facts.valid_until || null,
+    value: facts.estimated_value === null || facts.estimated_value === undefined ? null : money.toWire(facts.estimated_value),
+    currency: facts.currency || money.CURRENCY,
+    owner_id: facts.owner_id,
+    document_id: documentId,
+    signed_document_id: documentId,
+    signed_at: new Date(),
+    signed_outside: true,
+  });
+  await emit(client, {
+    key: EVENTS.AGREEMENT_RECORDED,
+    entity: { type: ENTITY, id },
+    actor,
+    after: { number, status: "signed", signed_outside: true },
+    payload: { partnership_agreement_id: id, number, deal_id: dealId, document_id: documentId },
+  });
+  return id;
+}
+
+/**
  * The record's values again, for a Draft's chips still empty after the record or the asks changed:
  * the values kept, the new ones over them, then the chips filled.
  */
@@ -238,4 +283,4 @@ async function refillIn(client, a, given) {
   return { fields, body: fill(a.body || "", data) };
 }
 
-module.exports = { templateFor, wordingOf, valuesFor, optionsGrid, validityLabel, nest, fill, titleOf, draftIn, refillIn };
+module.exports = { templateFor, wordingOf, valuesFor, optionsGrid, validityLabel, nest, fill, titleOf, draftIn, refillIn, recordedIn };

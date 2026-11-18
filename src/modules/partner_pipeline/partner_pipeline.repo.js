@@ -528,7 +528,7 @@ const impactLabels = (column) =>
 
 const DETAIL = `${ROW}, po.objective, po.event_ends_on, po.expected_attendance, po.blockers, po.next_action, po.next_action_on,
   po.commission_pct, po.commission_deviates, po.validity_days, po.valid_until, po.identified_on, po.signed_at,
-  po.completed_at, po.close_reason, ${signedValue("po")} AS signed_value, COALESCE(po.impact, '{}') AS impact,
+  po.completed_at, po.close_reason, ${signedValue("po")} AS signed_value, po.non_monetary, COALESCE(po.impact, '{}') AS impact,
   ${impactLabels("po.impact")} AS impact_labels, po.impact_rating, po.impact_note, po.comments, po.custom, po.owner_id,
   COALESCE(p.partner_category_id, l.partner_category_id) AS partner_category_id`;
 
@@ -842,7 +842,8 @@ async function update(client, id, changes) {
 async function lock(client, id) {
   const { rows } = await client.query(
     `SELECT po.partnership_opportunity_id AS deal_id, po.number, po.title, po.partner_id, po.lead_id, po.stage, po.status, po.health,
-            po.blockers, po.owner_id, po.signed_at, po.estimated_value, po.commission_pct, po.custom, po.event_starts_on, po.event_ends_on
+            po.blockers, po.owner_id, po.signed_at, po.estimated_value, po.commission_pct, po.custom, po.event_starts_on, po.event_ends_on,
+            po.expected_close_on, po.non_monetary
        FROM partnership_opportunity po WHERE po.partnership_opportunity_id = $1 FOR UPDATE`,
     [id],
   );
