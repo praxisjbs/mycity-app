@@ -176,3 +176,256 @@ Fix: None (see F11a and F11b for the bank rule).
 Effort: S
 For MyCity: A record can be saved before every detail is known; the run reports anyone without bank details, and blocks them once Bank Details Required is on.
 
+
+ID: F10a
+Title: Two-step sign-in not yet required for any role
+Verdict: CLIENT_ACTION
+Severity: Medium
+Module: Settings
+Evidence: Enforcement by role is built: Settings · Security, Two-Step by Role (app/src/features/settings/SecurityRules.tsx:129-150) sets role.two_step_required; a person holding such a role is sent to the set-up step at the next sign-in and cannot turn two-step off (src/modules/security/security.service.js:154-155, TWO_STEP_REQUIRED). Ran tests/integration/settings.test.js -t "two-step" (2 passed), including "a role that requires two-step makes its people set it up at their next sign-in". No role requires it out of the box, so 0 of 22 is the starting state, not a fault. The auditor's Management role holds Settings view only (seeds/reference/0290_seed_roles_and_grants.sql:75), so it could not switch it on.
+Scope ref: MILESTONES §14 (M9) "MFA (TOTP) enrolment and enforcement by role", amended 16/10/2026; identity guide §6 rule 15.
+Fix: None in code. Before go-live, Operations & People (Settings edit) open Settings · Security, Two-Step by Role, and switch on Implementation Team, Operations & People, Management and System Administrator; each holder sets it up at their next sign-in.
+Effort: S
+For MyCity: Requiring two-step sign-in by role is already built. Operations & People switch it on for the senior roles in Settings, Security before go-live, and those staff set it up the next time they sign in.
+
+ID: F10b
+Title: Some staff logins use personal Gmail addresses
+Verdict: CLIENT_ACTION
+Severity: Low
+Module: Settings
+Evidence: The addresses come from MyCity's own staff list: seeds/staff/staff-list.xlsx, Email column, rows 12 to 18 (seven Growth, Marketing and Graphics staff) are @gmail.com, read with src/shared/spreadsheet/parse.js. A login signs in with its employee's work email; when People correct Work Email, an unused login follows it and a login in use moves with Use Work Email on Settings · Users (ran tests/integration/logins.test.js: all pass, including "a login in use stays until Use Work Email"). No rule restricts logins to one email domain; none is in scope.
+Scope ref: foundation guide §6.1 (the roster as MyCity gave it); identity guide §6 (Use Work Email).
+Fix: None in code. MyCity issues @mycityapp.io addresses to these seven staff; People update Work Email on each record and press Use Work Email on Settings · Users for any login already in use, or send us a corrected staff list.
+Effort: S
+For MyCity: Seven people in the staff list MyCity gave us have personal Gmail addresses. Once they have work addresses, People change them on each record and the login moves with one button.
+
+ID: F13a
+Title: Requests from staff under a vacant seat go above it
+Verdict: NOT_REPRODUCED
+Severity: Low
+Module: People
+Evidence: Throwaway test zz-audit-b-controls (deleted): a person moved to report to a vacant seat whose line manager is Kemi; their leave request's first stage named Kemi (type employee), and Kemi approved it. The rule is the view employee_effective_manager (migrations/1160_employee_effective_manager.sql: the first person above a chain of vacant seats, else the CEO), read by src/shared/workflow/approvers.js:53-60. So staff under "Head, Strategy, Partnerships & Growth" wait on the Program Manager, whom the sheet puts above that seat (seeds/staff/staff-list.xlsx row 20). Settings · Approvals' Needs Fixing counts flows with invalid stages, not vacant approvers, so 0 is correct.
+Scope ref: organogram guide §4 and §6 (TB, 19/10/2026); MILESTONES §5 (A11, amended 14/10/2026).
+Fix: None.
+Effort: S
+For MyCity: We tested it: when a manager's seat is empty, the request goes to the next person up, so nothing waits on an empty seat.
+
+ID: F13b
+Title: Nobody but the CEO can approve their own request
+Verdict: NOT_REPRODUCED
+Severity: Low
+Module: Approvals
+Evidence: Throwaway test zz-audit-b-controls (deleted): an Operations & People holder's 7-day leave reached the Operations & People stage; the requester got can_decide false and 403 on Approve, it was not in their My Approvals, and the other holder of the role approved it. Rule: src/shared/workflow/approvers.js:117 (canAct refuses opened_by) and :141-160 (waitingOnClause). Reassigning to the requester is refused (ran tests/integration/workflow.test.js, 20/20 pass, including the reassign test at line 430). A person cannot become their own approver through the tree either: reporting to oneself gave 422 REPORTS_TO_SELF and a loop through a vacant seat 422 REPORTING_LOOP, both orders. We could not open the staging request the auditor saw ("JBS Praxis Team" waiting on itself) from the repository.
+Scope ref: MILESTONES §5 amended 14/10/2026 ("nobody approves their own request (the CEO excepted)"); foundation guide §6.5.
+Fix: None in code. We open that staging request's route (People · Leave, the request, its approval) and report how it was named; if it shows a fault, it becomes a bug of its own.
+Effort: S
+For MyCity: The system refuses anyone approving their own request, and we tested it. We will look at the one staging request the audit named and report back.
+
+ID: F13c
+Title: CEO decides own review and both offer stages
+Verdict: BY_DESIGN
+Severity: Low
+Module: Approvals
+Evidence: The CEO may act on any stage of any approval, and a CEO's own request with nobody above them waits on the CEO (src/shared/workflow/approvers.js:116 and :82-86). Throwaway test: the CEO's own leave routed to the CEO with can_decide true; tests/integration/workflow.test.js (20/20 pass) "the CEO approves anywhere, even a stage that names someone else". So OFF-0001, where Ifeoma Mbonu approved both the Head of Department and CEO stages, and the CEO's own review naming the CEO, follow the rule. A rule that each stage needs a different person is F78b.
+Scope ref: MILESTONES §5 amended 14/10/2026 ("the CEO excepted"); foundation guide §6.5 ("the CEO excepted, who may decide any stage") and its events table (the CEO decides their own request, 02/11/2026).
+Fix: None.
+Effort: S
+For MyCity: This was agreed: the CEO can approve at any step and approves their own requests, since nobody sits above the CEO. If MyCity wants a second person on CEO requests, see F78b.
+
+ID: F75a
+Title: A leaver's login is closed, though the role still lists them
+Verdict: NOT_REPRODUCED
+Severity: Low
+Module: Settings
+Evidence: Ran tests/integration/logins.test.js (all pass): archiving a record closes the login at once ("This account is closed", 403), the follow-on job ends every session and spends every open link, and Restore alone does not reopen it. Throwaway test zz-audit-b-controls (deleted): an Operations & People holder archived as Left kept their user_role row, but sign-in answered 403, their old token 401, and a new Operations & People stage notified only the active holder (0 notices to the leaver). The role row stays so Reactivate (after Restore) gives the same access back (src/modules/identity/identity.service.js:1093-1122; identity guide §6.1). So Cynthia Osakunih's listing grants nothing while she is Left. Her record is Active in our roster (seeds/staff/staff-list.xlsx row 7), so it was archived on staging on screen. The "JBS test" Gmail login is not in our seeds or scripts; it is a test login made on staging.
+Scope ref: identity guide §6.1 ("no login works for someone who is not on the active staff list"); MILESTONES §14 (M9).
+Fix: None in code. If Cynthia still works at MyCity, People press Restore on her record and Reactivate on Settings · Users. We suspend the JBS test login on staging; production has only the build account, suspended at handover (docs/runbooks/first-accounts.md §5).
+Effort: S
+For MyCity: We tested it: once someone leaves, their login is closed at once and every session ends, so the role they held gives them nothing. We will remove our test login from staging.
+
+ID: F75b
+Title: Role's people count leaves out closed logins its list shows
+Verdict: IMPROVEMENT
+Severity: Low
+Module: Settings
+Evidence: Throwaway test: role detail users = 1 while GET /users?role=operations_people listed "Tunde Bakare: active, Cyn Leaver: left". The count counts active logins only (src/modules/access/access.repo.js:16-19, HOLDERS); the People tab lists every login holding the role, whatever its status (app/src/features/settings/Roles.tsx:771-783). Both are right on their own terms, but side by side they read as a mismatch.
+Scope ref: MILESTONES §14 (M9, Roles & Permissions); identity guide §10 (Settings · Users).
+Fix: Have the People tab list active logins by default (filter status=active, with closed ones behind the status filter), or label the count "2 active" (Roles.tsx PeoplePanel).
+Effort: S
+For MyCity: The count shows people who can use the role; the list also showed someone who has left, marked Left. We will make the two read the same way.
+
+ID: F76a
+Title: No approval or effective date for a pay change
+Verdict: OUT_OF_SCOPE
+Severity: Medium
+Module: People
+Evidence: Throwaway test zz-audit-b-controls (deleted): a Management user changed gross_monthly 5,000.00 to 350,000.00 through PATCH /employees/:id, 200, and no approval opened. That is the specified behaviour: pay is a People · Employees field set by Add and Edit with People edit (payroll guide §2 screens table, People · Employees row), and payroll reads gross_monthly as it stands when Compute runs (payroll guide §6.3 rule 1). The money control is the run: every run is approved by the CEO before it is paid (MILESTONES §11 amended 08/11/2026). No milestone asks for a pay-change request, approval or effective date.
+Scope ref: MILESTONES §11 (M6) and its amendments of 08/11, 11/11 and 12/11/2026; payroll guide §13.1.
+Fix: None now. A Change Report would cover a pay-change request (new figure, reason, effective month) through a Settings · Approvals flow, payroll reading the figure in force for the run's month, and the record showing pending changes.
+Effort: M
+For MyCity: Pay changes were scoped as an edit on the employee record, checked when the CEO approves each payroll run. An approval step with an effective date for each change would be new work we can scope in a Change Report.
+
+ID: F76b
+Title: Management can edit pay while Payroll is view only
+Verdict: CLIENT_ACTION
+Severity: Low
+Module: People
+Evidence: Management holds People view, create and edit over everyone and sees Salary and pay (seeds/reference/0290_seed_roles_and_grants.sql:66, 0449_seed_field_visibility_capabilities.sql:15), so it may set pay on the record; Payroll view only governs runs. A role that masks Salary and pay cannot read or write it (src/shared/rbac/field-mask.js:211 assertWritable, 403 FIELD_RESTRICTED). Both are role settings MyCity controls on Settings · Roles & Permissions.
+Scope ref: MILESTONES §14 (M9: custom roles, module rights and masked fields); payroll guide §2 (People · Employees row: "`people` edit, a field masked from a role is left out of its form").
+Fix: None in code. If only Operations & People should change pay, Operations & People remove People edit from Management on Settings · Roles & Permissions, or mask Salary and pay for it (which also hides pay from Management).
+Effort: S
+For MyCity: Management may edit employee records today, pay included, because the role was set up that way. Operations & People can narrow it on Roles & Permissions.
+
+ID: F76c
+Title: Record History names changed fields; Audit Log keeps values
+Verdict: BY_DESIGN
+Severity: Low
+Module: People
+Evidence: Throwaway test: the History entry read "Record changed: Gross Monthly" (src/modules/organisation/employee-360.service.js:109-121), while GET /audit for the same change returned before.gross_monthly 5000.00 and after 350000.00, and Settings · Audit Log shows each field before and after (app/src/features/settings/AuditLog.tsx:174-215; Salary and pay masked for a role that hides it). History naming fields in words, not values, was decided 25/10/2026 (organogram guide change log: "History names the fields a change touched in words").
+Scope ref: MILESTONES §14 (M9 definition of done: the audit log shows who did what, when and to which record); foundation guide §6.16.
+Fix: None. Optional: a link from a History line to its Audit Log entry.
+Effort: S
+For MyCity: The old and new pay are recorded; they show on Settings, Audit Log for people allowed to see pay. The record's History only names what changed, by design, so salaries do not show to everyone who can read the record.
+
+ID: F76d
+Title: History shows the UTC date, not the Lagos date
+Verdict: BUG
+Severity: Low
+Module: People
+Evidence: app/src/features/people/Employee360.tsx:465 renders formatDate(r.occurred_at.slice(0, 10)), the UTC date of the timestamp, so a change at 00:45 Lagos on 17/11 (23:45 UTC on 16/11) reads 16/11/2026. formatDate on the full timestamp would use Africa/Lagos (packages/ui/src/lib/format.ts:8-21). ESS · My Profile's history has the same slice (app/src/features/ess/Profile.tsx:98). Code reading; the server sends a UTC ISO timestamp (employee-360.service.js:24).
+Scope ref: CLAUDE.md rule "Dates ISO on the wire, day-first for people"; FRONTEND_GUIDE §6 (format helpers, Lagos time).
+Fix: Pass the whole timestamp to formatDateTime (or formatDate) in Employee360.tsx History and ess/Profile.tsx, so the date and time read in Lagos time. A sweep of the other `_at.slice(0, 10)` uses (13 in app/src) is worth doing at the same time.
+Effort: S
+For MyCity: Changes made just after midnight showed the previous day. We will fix it so History shows Lagos date and time.
+
+ID: F30a
+Title: My Profile says On Probation where People say Active
+Verdict: BUG
+Severity: Low
+Module: ESS
+Evidence: Two rules for one status. People · Employees shows On Probation only when a confirmation due date is set and no confirmation date (app/src/features/people/status.ts:21), else Active. ESS · My Profile shows On Probation whenever confirmed_on is empty (app/src/features/ess/Profile.tsx:77 and :122, from src/modules/ess/ess.profile.js:57). MyCity's staff list carries no probation dates, so roster staff read Active on the register and On Probation on their own profile. Code reading; ran app/src/features/people/status.test.ts (6 pass), which holds the register's rule. Not seed data.
+Scope ref: foundation guide §10.1 (employment status drawn from the record's status and two probation dates); ESS guide §10 (My Profile).
+Fix: Send confirmation_due_on and status in the ESS profile and draw the pill with the same employmentStatus rule the register uses (ess.profile.js, ess/Profile.tsx, people/status.ts shared).
+Effort: S
+For MyCity: A person's own profile used a stricter rule than the employee list, so the two disagreed. We will make both read the same status.
+
+ID: F30b
+Title: Cancelled leave shows Withdrawn under Approver
+Verdict: IMPROVEMENT
+Severity: Low
+Module: ESS
+Evidence: ESS · My Leave's Approver column reads the person it waits on, else People for a recorded request, else Withdrawn for a cancelled one, else Decided (app/src/features/ess/Leave.tsx:26), while Status reads Cancelled. It is consistent on new records (as the auditor found), so not a data fault; the guide's My Requests row describes Approver as "the person it waits on by name, else the stage" and does not mention Withdrawn (ESS guide §10).
+Scope ref: ESS guide §10 (ESS · My Leave row), §6 (cancel while it waits).
+Fix: Show a dash under Approver for a cancelled request, so its state reads once, in Status (ess/Leave.tsx approverOf; the ESS chapter of the User Guide with it).
+Effort: S
+For MyCity: A cancelled request said Withdrawn in one column and Cancelled in the next. We will show it once.
+
+ID: F35
+Title: Staff logins wait for People to send the invitations
+Verdict: CLIENT_ACTION
+Severity: Medium
+Module: Settings
+Evidence: The roster gives every person a login in the invited state and sends no email, on purpose: "No email is sent: Send Invite (one or all) does that, later" (foundation guide §6.1; scripts/db/load-staff.js:31-33). Settings · Users has Invite All Pending (app/src/features/settings/index.tsx:119) and each record has Send Invite; the User Guide says the same (docs/manual/settings.md:280). So 13 of 23 Not Sent and Last Seen Never is the state before People invite. Announcement acknowledgement follows from staff signing in.
+Scope ref: foundation guide §6.1 (TB, 16/10/2026); identity guide §6; MILESTONES §16 (M11 handover and training).
+Fix: None in code. Operations & People press Invite All Pending on Settings · Users when MyCity is ready (in waves by department if preferred, with Send Invite on each record), then follow up on anyone still Invited; we can cover this in the M11 handover.
+Effort: S
+For MyCity: Nobody is emailed until Operations & People choose to invite them, so most staff have not signed in yet. Pressing Invite All Pending on Settings, Users sends every invitation at once.
+
+ID: F37a
+Title: Extra vacant CEO seat entered on staging
+Verdict: CLIENT_ACTION
+Severity: Low
+Module: People
+Evidence: No seed, loader or script creates a seat called CEO: the staff list's VACANT rows are the ten open posts in seeds/staff/staff-list.xlsx rows 20 to 29, and "CEO" in its Line Manager column resolves to the Chief Executive Officer post (src/modules/organisation/manager-text.js:29), never to a seat. Ran tests/integration/staff-nomenclature.test.js (all pass), which loads the real sheet and finds its open seats where the sheet puts them. So the seat was added on staging with Add Role. The warning "2 people and roles sit at the top" is the Organogram doing its job (app/src/features/organogram/OrgTree.tsx:402).
+Scope ref: organogram guide §6 and §10 (People · Organogram); A5 (production is never seeded).
+Fix: None in code. On staging, whoever added it closes the seat (today through Praxis AI's Save Role with status closed, see F37b) or gives it a line with Edit Role.
+Effort: S
+For MyCity: The extra CEO seat is not in the structure we loaded; it was added by hand on staging and will not exist on production. It can be removed there.
+
+ID: F37b
+Title: No Close Role button for an open role on screen
+Verdict: IMPROVEMENT
+Severity: Low
+Module: People
+Evidence: The API closes a vacant seat (OrgSeatUpdate status closed, packages/contract/schemas/organisation.js:776-790, PATCH /org-seats/:id) and Praxis AI's Save Role card can do it (organogram guide §9, "closed with status"), but the Organogram's Edit Role only changes title, department and reports-to; grep of app/src for a close action on a seat finds none. So a seat added by mistake cannot be removed with a button.
+Scope ref: organogram guide §10 (People · Organogram: Create Vacancy and Edit Role on a vacant seat); MILESTONES §6 (M1 organogram).
+Fix: Add Close Role to a vacant seat's Edit Role (asks first, refused while people report to it), using the existing route; the People chapter of the User Guide with it.
+Effort: S
+For MyCity: An open role added by mistake can only be removed through the assistant today. We will add a Close Role button.
+
+ID: F38a
+Title: Duplicate Marketing department and missing head entered on staging
+Verdict: CLIENT_ACTION
+Severity: Low
+Module: People
+Evidence: Our files define five departments, each with a short code and a head: General Management GM, Technology & Back-office Ops TBO, Branding & Marketing BM (head: the Head, PR, Marketing & Brand Strategy post), Partnership & Growth PG, People & Culture PC (seeds/staff/nomenclature.json:3-20). No seed or script makes a "Marketing" department (grep of seeds/ and scripts/). Ran tests/integration/staff-nomenclature.test.js (all pass): Branding & Marketing gets code BM and Chinyere Elechi as head, and a head cleared on screen stays cleared after the next deploy ("an edit made on screen stays"). A department added on screen without a code takes one from its name (src/modules/organisation/organisation.service.js:59-71), hence MARKETING. A department's avatar is its name's initials, first and last word, the same rule as people (packages/ui/src/lib/format.ts:181-186), hence TO beside the code TBO.
+Scope ref: organogram guide §6.1 (departments are settings, edited on screen); foundation guide §6.1 (nomenclature, TB 22/10/2026).
+Fix: None in code. Operations & People merge Marketing into Branding & Marketing (More Actions, Merge Department; docs/manual/people.md:535), set Branding & Marketing's head again, and edit any code they want shorter.
+Effort: S
+For MyCity: The extra Marketing department and the empty head were changed on staging, not loaded by us; our structure has five departments with heads. Operations & People can merge it in one step.
+
+ID: F38b
+Title: Build account's department code reads IMPLEMENTATION
+Verdict: SEED_DATA
+Severity: Low
+Module: People
+Evidence: Our build account is created in a department named Implementation (scripts/db/create-admin.js:233), made at lines 406-415 without a code, so it takes IMPLEMENTATION from its name (organisation.service.js:59-71), unlike the short codes of MyCity's departments. The build account is also created on production and suspended at handover (docs/runbooks/first-accounts.md §2, §5), so the department would remain.
+Scope ref: foundation guide §6.1; docs/runbooks/first-accounts.md.
+Fix: Give the build account's department a short code (IMP) when create-admin makes it, and retire the Implementation department at handover with the account (create-admin.js, the first-accounts runbook §5).
+Effort: S
+For MyCity: The Implementation department is ours, holding only our build account. We will give it a short code and remove it at handover.
+
+ID: F39
+Title: Avatar initials take the first and last word
+Verdict: BY_DESIGN
+Severity: Low
+Module: Platform
+Evidence: One rule for every name: the first letter of the first and last words (packages/ui/src/lib/format.ts:181-186; "Cynthia Osakunih" gives CO, held by packages/ui/src/lib/format.test.ts:78; ran it, 14 pass). It suits staff with middle names ("Tobiloba Iyanuoluwa Dada" gives TD). "JBS Praxis Team" is our build account (first name "JBS Praxis", last name "Team", scripts/db/create-admin.js:227-229), so JT follows the rule; no MyCity person or organisation is affected, and the account is suspended at handover.
+Scope ref: FRONTEND_FOUNDATION (shared components and format helpers, packages/ui); docs/runbooks/first-accounts.md §5.
+Fix: None.
+Effort: S
+For MyCity: Initials take the first and last name for everyone. JT belongs to our own build account, which is switched off at handover.
+
+ID: F44
+Title: Typos in job titles, a category and a goal entered on staging
+Verdict: CLIENT_ACTION
+Severity: Low
+Module: People
+Evidence: None of the three is in our files: grep of seeds/, migrations/ and scripts/, and of the parsed workbooks seeds/staff/staff-list.xlsx and seeds/staging/performance/*.xlsx, finds no "Markerting", "Infrastructuaral" or "#2bn". Expense categories are MyCity's to enter (A26; expenses guide §4, expense_category "Entered by MyCity"), and our plan seed writes "₦2 billion" (seeds/staging/45_performance_plan.js:46). So they were typed on staging. Production is never seeded with demonstration data (A5).
+Scope ref: MILESTONES §1 A5 and A26.
+Fix: None in code. Whoever entered them corrects the three job titles on People · Employees, the category name on Expenses · Categories and the goal title on Performance, and uses the corrected spellings in the production import.
+Effort: S
+For MyCity: These spellings were typed on staging and are not in anything we load. Please correct them there and in the data prepared for go-live.
+
+ID: F69
+Title: Some Audit Log entries name the record by a short ID
+Verdict: BUG
+Severity: Low
+Module: Settings
+Evidence: The record's name is looked up by id only for logins, roles and employees; anything else is named from the number, name, title or label its own entry recorded, else the screen shows the id's first eight characters (src/modules/audit/audit.repo.js:16-34; app/src/features/settings/AuditLog.tsx:44). Several Partnerships events record only the changed field, for example a deal's health: before {health}, after {health} (src/modules/partner_pipeline/partner_pipeline.health.js:30-36), so they read "Partner deal · aeb9ac4f". The same fault was fixed for accounts on 14/11/2026 (foundation guide change log, "named a record by an id's first eight characters"); Partnerships entries were not covered. Not changed since (git log on src/modules/audit). Code reading.
+Scope ref: MILESTONES §14 (M9 definition of done: "who did what, when and to which record"); foundation guide §10 (Settings · Audit Log).
+Fix: In RECORD_NAME, look up partner and partner_deal (and any other entity type whose events carry no number) by id, as for employees and roles (audit.repo.js), with a test per type.
+Effort: S
+For MyCity: Some Partnerships entries in the Audit Log showed an internal code instead of the record's number or name. We will make every entry name its record.
+
+ID: F78a
+Title: Payroll and expense chains are the agreed ones
+Verdict: BY_DESIGN
+Severity: Low
+Module: Approvals
+Evidence: Payroll: Operations & People compute and submit, and the run is approved by the CEO alone, as MyCity answered on 08/11/2026 (MILESTONES §11; payroll guide §3, the payroll.run flow naming the CEO). Expenses: the auditor read the Expense Request flow on its own; every approved request then goes into a requisition the CEO approves, so the CEO sees every expense before it is paid (Requester, Line manager, Operations, Requisition, CEO, Disbursed; MILESTONES §13 "Thresholds and the requisition, reconciled"). There is no amount threshold by decision (expenses guide §6.3, decision 1). Any flow can take extra stages on Settings · Approvals with Edit Stages, without a deploy (docs/manual/settings.md, Change who approves; MILESTONES §14 definition of done).
+Scope ref: MILESTONES §11 (amended 08/11/2026), §13, §14; expenses guide decision 1; payroll guide §13.1.
+Fix: None. If MyCity wants another checker before the CEO on payroll, Operations & People add a stage on Settings · Approvals.
+Effort: S
+For MyCity: The chains are the ones MyCity agreed: the CEO approves every payroll run and every requisition of expenses. Extra steps can be added in Settings, Approvals without any code change.
+
+ID: F78b
+Title: Rule that each approval stage needs a different person
+Verdict: OUT_OF_SCOPE
+Severity: Low
+Module: Approvals
+Evidence: The engine's fixed rules are: nobody approves their own request, the CEO excepted; the requester can withdraw; rejecting or sending back needs a reason; approvers are resolved when a stage starts (MILESTONES §5, amended 14/10/2026). The CEO may decide any stage (foundation guide §6.5), which is how one person filled two levels of OFF-0001 (F13c). No milestone asks for distinct approvers across stages.
+Scope ref: MILESTONES §5 (A11, "Port it as it is; do not extend it in M0", amended 14/10/2026); foundation guide §6.5.
+Fix: None now. A Change Report would cover a per-flow "different person at each stage" setting, whether the CEO exception still applies to it, and what happens when only one eligible person remains (skip, reassign or wait).
+Effort: M
+For MyCity: The agreed engine stops people approving their own requests but lets the CEO approve at any step. Requiring a different person at each step would be new work for a Change Report.
