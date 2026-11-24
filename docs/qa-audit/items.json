@@ -1828,7 +1828,7 @@
    "title": "Statutory payroll items are not configured",
    "auditor_sev": "Critical",
    "verdict": "Split: MyCity action, By design, Out of scope",
-   "went": "Change Report: CR-06; also MA-01, MA-02",
+   "went": "MyCity Actions: MA-01, MA-02; also CR-06",
    "reason": "F01a: Statutory figures not yet entered on Configurations (MyCity action). F01b: Run not blocked while statutory items read Not Set (By design). F01c: Per-employee pension or PAYE exemption (Out of scope). F01d: Test PAYE band of 0 to 200 naira on staging (MyCity action)."
   },
   {
@@ -1845,7 +1845,7 @@
    "auditor_sev": "Critical",
    "verdict": "Out of scope",
    "went": "Change Report: CR-01",
-   "reason": "No finance core (invoicing, receivables, payables, ledger)."
+   "reason": "No finance core (invoicing, receivables, payables, ledger). A finance core is not in any of the eleven milestones. We recommend integrating an accounting system rather than building one, and list it for discussion."
   },
   {
    "audit": "F04",
@@ -1853,7 +1853,7 @@
    "auditor_sev": "Critical",
    "verdict": "Out of scope",
    "went": "Change Report: CR-02",
-   "reason": "No products, inventory, orders or revenue capture."
+   "reason": "No products, inventory, orders or revenue capture. Sales and inventory are not in any milestone. We recommend feeding revenue from the MyCity apps' own data into Performance goals, and list it for discussion."
   },
   {
    "audit": "F05",
@@ -1868,7 +1868,7 @@
    "title": "Departed Operations & People lead still owns the partnership book",
    "auditor_sev": "High",
    "verdict": "Split: Fixed since audit, Out of scope, Seed data, MyCity action, Improvement",
-   "went": "Bugs & Gaps: BG-004, BG-033; also BG-065, CR-05, MA-04",
+   "went": "Bugs & Gaps: BG-004, BG-033; also BG-065, MA-04, CR-05",
    "reason": "F06a: Departed Operations & People lead owned the partnership book (Fixed since audit). F06b: No forced reassignment of owned records when someone leaves (Out of scope). F06c: Our staff seed still loads the departed Operations & People lead (Seed data). F06d: Staging records still held by the departed lead (MyCity action). F06e: Owner filter cannot find records held by a leaver (Improvement)."
   },
   {
@@ -2044,7 +2044,7 @@
    "title": "Task discipline isn't enforced",
    "auditor_sev": "Medium",
    "verdict": "Split: Seed data, By design, MyCity action",
-   "went": "Bugs & Gaps: BG-026; also CR-16, MA-11",
+   "went": "Bugs & Gaps: BG-026; also MA-11, CR-16",
    "reason": "F28a: Staging demo tasks go overdue with no reason and normal priority (Seed data). F28b: A reason is not forced the moment a task goes overdue (By design). F28c: Overdue Tasks query rule left in Draft on staging (MyCity action)."
   },
   {
@@ -2164,7 +2164,7 @@
    "title": "Duplicate and incomplete projects",
    "auditor_sev": "Medium",
    "verdict": "Split: MyCity action, Improvement, By design",
-   "went": "Bugs & Gaps: BG-027; also CR-14, MA-24",
+   "went": "Bugs & Gaps: BG-027; also MA-24, CR-14",
    "reason": "F43a: Duplicate projects on staging were typed there, not seeded (MyCity action). F43b: No warning when a new project repeats an existing name (Improvement). F43c: Due date and budget are not required on a project (By design)."
   },
   {
@@ -2197,7 +2197,7 @@
    "auditor_sev": "Low",
    "verdict": "Out of scope",
    "went": "Change Report: CR-03",
-   "reason": "Mailbox makes failing calls before an account is connected."
+   "reason": "Mailbox makes failing calls before an account is connected. Mailbox was a change request MyCity declined, so it is outside the go-live scope. The fault is noted in case Mailbox is taken up later."
   },
   {
    "audit": "F48",
@@ -2348,7 +2348,7 @@
    "title": "Attendance punches create noise and skip key checks",
    "auditor_sev": "Medium",
    "verdict": "Split: Improvement, By design, MyCity action",
-   "went": "Bugs & Gaps: BG-006; also CR-21, MA-09",
+   "went": "Bugs & Gaps: BG-006; also MA-09, CR-21",
    "reason": "F66a: One exception per punch from an unregistered device (Improvement). F66b: Clock-in after the shift's end is accepted and marked late (By design). F66c: Remote clock-ins read Not Checked while Home Location is off (MyCity action)."
   },
   {
@@ -2428,7 +2428,7 @@
    "title": "Salary changes need no approval and leave no before-and-after record",
    "auditor_sev": "High",
    "verdict": "Split: Out of scope, MyCity action, By design, Bug",
-   "went": "Bugs & Gaps: BG-046; also CR-08, MA-19",
+   "went": "Bugs & Gaps: BG-046; also MA-19, CR-08",
    "reason": "F76a: No approval or effective date for a pay change (Out of scope). F76b: Management can edit pay while Payroll is view only (MyCity action). F76c: Record History names changed fields; Audit Log keeps values (By design). F76d: History shows the UTC date, not the Lagos date (Bug)."
   },
   {
@@ -2489,7 +2489,7 @@
   }
  ],
  "meta": {
-  "subtitle": "JBS Praxis response to MyCity's QA audit of staging (16 and 17/11/2026, findings F01 to F83). Every finding was tested or read against the code on main (697f1db) between 24 and 25/11/2026.",
+  "subtitle": "JBS Praxis response to MyCity's QA audit of staging (16 and 17/11/2026, findings F01 to F83). Every finding was tested or read against the code on main (697f1db) on 24/11/2026.",
   "howto": [
    "Bugs & Gaps is the fix tracker: only verified bugs, gaps, improvements and seed-data fixes. JBS Praxis ticks Fixed ✓ with the PR and date as each fix merges; MyCity records its retest.",
    "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them.",
@@ -2530,12 +2530,12 @@
     "Fixed since audit*"
    ],
    [
-    "Change Report",
-    "Change Report*"
-   ],
-   [
     "MyCity Actions",
     "MyCity Actions*"
+   ],
+   [
+    "Change Report",
+    "Change Report*"
    ],
    [
     "Closed: works as agreed",

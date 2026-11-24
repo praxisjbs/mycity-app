@@ -28,29 +28,24 @@ each list's row reads.
       have no amount threshold by decision; duplicate-claim detection IS in M8's scope).
 - [x] Partnerships fixes merged after the audit noted (#170, 4978ae8): F05 retested, 13 of 13
       in `tests/integration/partnerships-work.test.js` pass.
-- [~] Five verifiers, one per group (`groups/`), each following `BRIEF.md`. Their verdicts are
-      saved in `verdicts/a.md` to `e.md` (a Partnerships, b Payroll/People/Settings,
-      c Expenses/Workspace, d Recruitment/Performance/Queries, e Home/platform/ESS).
-      A file may be partial if the session stopped mid-run.
-- [ ] Compile the verdicts into `items.json` (one row per item, the reconciliation for all 83).
-- [ ] Build the workbook, recalculate it (zero formula errors), check every F-number is
-      accounted for, deliver it.
+- [x] Every finding F01 to F83 verified (174 parts), saved in `verdicts/a.md` to `e.md`
+      (a Partnerships, b Payroll/People/Settings, c Expenses/Workspace,
+      d Recruitment/Performance/Queries, e Home/platform/ESS). Finished 24/11/2026.
+- [x] Compiled into `items.json` by `compile.py`, which holds the routing tables (module
+      milestone and owner, Change Report rows, MyCity Actions rows).
+- [x] Workbook built: `MyCity-QA-Audit-Response.xlsx` (zero formula errors, 83 of 83 findings
+      reconciled once each).
+- [ ] Before PR #173 is ready: give `docs/qa-audit/` its lines in `README.MD` (README §11), or
+      move the folder out of the repository.
+- [ ] Fix the open items, ticking Fixed ✓ with the PR and date.
 
-## To resume in a new session
+## To rebuild the workbook
 
-1. Read this file, then `BRIEF.md`.
-2. For each group, compare `groups/<g>.txt` (the finding numbers) with `verdicts/<g>.md`. Any
-   finding with no block there still needs verifying: give a fresh agent `BRIEF.md` and only the
-   missing findings, with its own `*_test` database (the integration tests need one per agent).
-3. Compile everything into `items.json` and run `python3 build.py items.json <out>.xlsx`, then
-   the xlsx skill's recalc.
+```
+python3 docs/qa-audit/compile.py docs/qa-audit/items.json
+python3 docs/qa-audit/build.py docs/qa-audit/items.json docs/qa-audit/MyCity-QA-Audit-Response.xlsx
+```
 
-## Paused 24/11/2026 (usage limit): findings with no verdict yet
-
-- a_partnerships: 
-- b_payroll_people_settings: F10 F13 F30 F35 F37 F38 F39 F44 F69 F75 F76 F78 
-- c_expenses_workspace: 
-- d_recruitment_performance_queries: F29 F33 F40 F77 F80 F82 
-- e_home_platform_ess: F34 F36 F41 F48 F50 F55 F68 F83 
-
-The verifiers were stopped mid-run; their throwaway tests were deleted. Resume step 2 above with only these findings.
+Then recalculate it (the xlsx skill's `recalc.py`). Rebuilding replaces the ticks typed into the
+workbook, so once fixing starts, tick in the workbook itself, or add `done`, `pr` and `fixed_on`
+to the verdict's tracker row in `compile.py` first.

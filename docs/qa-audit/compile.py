@@ -53,14 +53,20 @@ for g in "abcde":
 
 # The lead's out-of-scope rulings (TB, 24/11/2026) have no verifier block.
 RULED = {
-    "F03": ("No finance core (invoicing, receivables, payables, ledger)", "Finance"),
-    "F04": ("No products, inventory, orders or revenue capture", "Sales and inventory"),
-    "F47": ("Mailbox makes failing calls before an account is connected", "Mailbox"),
+    "F03": ("No finance core (invoicing, receivables, payables, ledger)", "Finance",
+            "A finance core is not in any of the eleven milestones. We recommend integrating an "
+            "accounting system rather than building one, and list it for discussion."),
+    "F04": ("No products, inventory, orders or revenue capture", "Sales and inventory",
+            "Sales and inventory are not in any milestone. We recommend feeding revenue from the "
+            "MyCity apps' own data into Performance goals, and list it for discussion."),
+    "F47": ("Mailbox makes failing calls before an account is connected", "Mailbox",
+            "Mailbox was a change request MyCity declined, so it is outside the go-live scope. The "
+            "fault is noted in case Mailbox is taken up later."),
 }
-for fid, (title, mod) in RULED.items():
+for fid, (title, mod, note) in RULED.items():
     blocks.setdefault(fid, {"ID": fid, "Title": title, "Verdict": "OUT_OF_SCOPE", "Severity": "Low",
                             "Module": mod, "Evidence": "Lead's ruling, 24/11/2026.", "Scope ref": "",
-                            "Fix": "None under contract.", "Effort": "L", "For MyCity": ""})
+                            "Fix": "None under contract.", "Effort": "L", "For MyCity": note})
 
 for b in blocks.values():
     missing = [k for k in FIELDS if not b.get(k)]
@@ -561,7 +567,7 @@ for pid, b in blocks.items():
         else:
             sys.exit(f"{pid} ({b['Verdict']}) went nowhere")
 
-BUCKETS = ["Bugs & Gaps", "Fixed since audit", "Change Report", "MyCity Actions",
+BUCKETS = ["Bugs & Gaps", "Fixed since audit", "MyCity Actions", "Change Report",
            "Closed: works as agreed", "Closed: not reproduced"]
 parts_of = defaultdict(list)
 for pid in blocks:
@@ -595,8 +601,7 @@ for fid, fx in sorted(FINDINGS.items(), key=lambda kv: int(kv[0][1:])):
 
 meta = dict(
     subtitle="JBS Praxis response to MyCity's QA audit of staging (16 and 17/11/2026, findings F01 to F83). "
-             "Every finding was tested or read against the code on main (697f1db) between 24 and "
-             "25/11/2026.",
+             "Every finding was tested or read against the code on main (697f1db) on 24/11/2026.",
     howto=[
         "Bugs & Gaps is the fix tracker: only verified bugs, gaps, improvements and seed-data fixes. "
         "JBS Praxis ticks Fixed ✓ with the PR and date as each fix merges; MyCity records its retest.",

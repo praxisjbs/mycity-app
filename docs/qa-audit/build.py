@@ -196,7 +196,7 @@ K = data["client"]
 wk = wb.create_sheet("MyCity Actions")
 KH = ["Ref", "Audit ref", "Area", "Action for MyCity", "Where in the hub", "Why it matters",
       "Before go-live?", "Done ✓", "Notes"]
-KW = [8, 10, 16, 52, 30, 44, 10, 8, 30]
+KW = [8, 10, 16, 52, 30, 44, 17, 8, 30]
 INPUTS_K = (8, 9)
 title_block(wk, "MyCity Actions · setup, data and decisions",
             "The hub already supports these. They need MyCity's own settings, data or a policy decision, "
@@ -239,7 +239,7 @@ wr.sheet_view.zoomScale = 90
 
 # ------------------------------------------------------------------ Summary (first sheet)
 s = wb.create_sheet("Summary", 0)
-SW = [30, 13, 13, 13, 13, 4, 30, 13, 13]
+SW = [40, 13, 13, 13, 13, 4, 30, 13, 13]
 widths(s, SW)
 title_block(s, "MyCity Hub · QA audit response",
             data["meta"]["subtitle"], 9)
@@ -389,6 +389,7 @@ s.cell(row=row, column=1, value="Sheets").font = f(12, True, BRAND)
 row += 1
 for name, desc in data["meta"]["sheets"]:
     s.cell(row=row, column=1, value=name).font = f(10, True)
+    s.cell(row=row, column=1).alignment = Alignment(wrap_text=True, vertical="top")
     c = s.cell(row=row, column=2, value=desc)
     c.font = f(10)
     c.alignment = Alignment(wrap_text=True, vertical="top")
