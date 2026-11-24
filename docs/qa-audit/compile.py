@@ -161,7 +161,9 @@ def how_verified(e):
 
 TYPE = {"BUG": "Bug", "GAP": "Gap", "IMPROVEMENT": "Improvement", "SEED_DATA": "Seed data",
         "FIXED_SINCE_AUDIT": "Bug"}
-TYPE_OVERRIDE = {}  # ID: type, where a fixed item was a gap rather than a bug
+TYPE_OVERRIDE = {"F06a": "Seed data"}  # ID: type, where the verdict alone does not say
+HOW_OVERRIDE = {"F06a": "Seed file read", "F79c": "Code reading", "F81d": "Code reading",
+                "F24": "Code reading", "F02f": "Code reading"}
 
 # ---------------------------------------------------------------- Change Report rows
 # BY_DESIGN parts that ask MyCity's way to change an agreed decision; and every OUT_OF_SCOPE part.
@@ -441,7 +443,7 @@ for n, b in enumerate(track, start=1):
     mod, ms, owner = module_of(b)
     row = dict(ref=ref, audit=b["ID"], module=mod, type=TYPE_OVERRIDE.get(b["ID"], TYPE[b["Verdict"]]),
                severity=b["Severity"], title=clean(b["Title"]), found=clean(b["Evidence"]),
-               how=how_verified(b["Evidence"]), fix=clean(b["Fix"]), scope=clean(b["Scope ref"]),
+               how=HOW_OVERRIDE.get(b["ID"]) or how_verified(b["Evidence"]), fix=clean(b["Fix"]), scope=clean(b["Scope ref"]),
                milestone=ms, effort=b["Effort"], owner=owner, mycity=clean(b["For MyCity"]))
     if b["Verdict"] == "FIXED_SINCE_AUDIT":
         pr, day = fixed_in(b)

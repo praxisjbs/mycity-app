@@ -8,6 +8,7 @@ items.json holds four lists:
 """
 import json
 import sys
+from datetime import date
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.formatting.rule import FormulaRule, CellIsRule
@@ -129,7 +130,8 @@ rows = []
 for i, it in enumerate(T, start=1):
     rows.append([it["ref"], it["audit"], it["module"], it["type"], it["severity"], it["title"],
                  it["found"], it["how"], it["fix"], it["scope"], it["milestone"], it["effort"],
-                 it.get("owner", ""), it.get("done", ""), it.get("pr", ""), it.get("fixed_on", ""),
+                 it.get("owner", ""), it.get("done", ""), it.get("pr", ""),
+                 date.fromisoformat(it["fixed_on"]) if it.get("fixed_on") else "",
                  "", it["mycity"]])
 body(ws, HR + 1, rows, center_cols=(1, 2, 4, 5, 8, 11, 12, 13, 14, 15, 16, 17), input_cols=INPUTS_T)
 last_t = HR + len(rows)
