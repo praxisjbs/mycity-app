@@ -7,11 +7,24 @@ import { Banner, Button, toast, useContractForm, Wizard, type PlaceValue } from 
 import { failed, useCategoryDefaults, useFieldDefs, useHoldsMoney, useStages } from "../lib";
 import { checkedOnWire, ContactPart, contactStart, customForCreate, DealPart, dealBody, dealOnWire, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
 
+/**
+ * What the duplicate check asks with: a name once it has three characters and an email, each only as
+ * DuplicateQuery takes it, so a name past 150 characters (the field marks it) is never sent to be
+ * refused (fault #6 of the 23/11 staging brief). Null when there is nothing to ask.
+ */
+export function duplicateQuery(name: string, email?: string): { name?: string; email?: string } | null {
+  const n = name.trim();
+  const query = {
+    ...(n.length >= 3 && partners.DuplicateQuery.safeParse({ name: n }).success && { name: n }),
+    ...(email && partners.DuplicateQuery.safeParse({ email }).success && { email }),
+  };
+  return Object.keys(query).length ? query : null;
+}
+
 /** A likely duplicate of what is being entered (§6.2): advisory, never blocking. */
 export function DuplicateNotice({ name, email, onNewDeal }: { name: string; email?: string; onNewDeal?: (partnerId: string) => void }) {
-  const asked = name.trim().length >= 3 || Boolean(email && email.includes("@"));
-  const query = { ...(name.trim().length >= 3 && { name: name.trim() }), ...(email && email.includes("@") && { email }) };
-  const dup = useApi("GET /api/v1/partnerships/duplicates", { query, enabled: asked });
+  const query = duplicateQuery(name, email);
+  const dup = useApi("GET /api/v1/partnerships/duplicates", { query: query ?? {}, enabled: query !== null });
   const top = dup.data?.candidates[0];
   if (!top) return null;
   return (
