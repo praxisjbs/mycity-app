@@ -174,9 +174,10 @@ describeDb("performance importers on MyCity's workbooks", () => {
     // People the staff list does not hold, and codes the change map lacks, are errors to skip.
     for (const p of run.problems) expect(p.problems[0].message).toMatch(/is not on the staff list|is not a key result or KPI/);
     expect(run.committed.create).toBeGreaterThan(100);
-    // Abubakar Mohammed and Emmanuel Aneke are not on the staff list; Bode's TECH-K lines name KPIs
-    // the change map lacks. "Precious Iyersehen" is Precious Iyeserhen, two letters out.
-    expect(missing.sort()).toEqual(["Abubakar Mohammed", "Bode Oluwasanmi", "Emmanuel Aneke"]);
+    // Abubakar Mohammed and Emmanuel Aneke are not on the staff list, nor is Cynthia Osakunih since she
+    // left and Obianuju Nwoye took her post (24/11/2026); Bode's TECH-K lines name KPIs the change map
+    // lacks. "Precious Iyersehen" is Precious Iyeserhen, two letters out.
+    expect(missing.sort()).toEqual(["Abubakar Mohammed", "Bode Oluwasanmi", "Cynthia Osakunih", "Emmanuel Aneke"]);
 
     const card = await one(
       `SELECT s.*, r.first_name AS reviewer FROM scorecard s
