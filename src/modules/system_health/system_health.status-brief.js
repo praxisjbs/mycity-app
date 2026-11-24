@@ -26,6 +26,8 @@ const { fence, oneLine, when } = shared;
 
 const SHORT = { production: "prod", staging: "stg" };
 const STATE = { up: "Up", degraded: "Degraded", down: "Down" };
+/** A Performance target's verdict (`performance.judge`), in words. */
+const TARGET = { met: "met", missed: "missed", none: "no verdict" };
 const SERVICE = { ready: "Ready", degraded: "Degraded", unavailable: "Unavailable" };
 const JOB = { on_time: "On time", failing: "Failing", late: "Late", waiting: "Not due yet" };
 const SEVERITY = { fatal: "Crash", error: "Error", warning: "Warning", notice: "Form refused" };
@@ -312,8 +314,9 @@ function glanceSection(input, problems) {
   }
   if (input.faults) out.push(`- **Open faults:** ${input.faults.total}.`);
   if (input.last24) {
+    const d = input.last24;
     out.push(
-      `- **Last 24 hours:** every check up ${input.last24.uptime_pct}% of the time; ${input.last24.gap_minutes} minutes without a snapshot.${input.last24.recording ? "" : " **Nothing is recording now:** the five-minute job is not running."}`,
+      `- **Last 24 hours:** ${d.availability.value === null ? "availability not recorded" : `the API answered ${d.availability.value}% of the minutes`}; ${d.gap_minutes} minutes not recorded.${d.recording ? "" : " **Nothing is recording now:** the one-minute `system-health-sample` job is not running."}`,
     );
   }
   return out;
@@ -360,6 +363,25 @@ function problemSection(c, n, input, server) {
       out.push("", "**Their last errors:**", "");
       for (const j of errors) out.push(`- \`${j.name}\` at ${at(j.last_failure_at)}:`, "", fence(j.last_error), "");
     }
+  }
+  if (c.key === "outbox" && input.failed_events && input.failed_events.rows.length) {
+    const f = input.failed_events;
+    out.push(
+      "",
+      "**The events that failed for good** (newest first; a retry runs only the handlers not yet done):",
+      "",
+      "| Event | Record | Tries | Handlers done | First raised | Failed | Outbox id |",
+      "|---|---|---|---|---|---|---|",
+    );
+    for (const e of f.rows) {
+      out.push(`| \`${e.event_key}\` | ${cell(e.record)} | ${e.attempts} of ${e.max_attempts} | ${e.done.length ? e.done.map(code).join(", ") : "none"} | ${at(e.created_at)} | ${at(e.failed_at)} | \`${e.outbox_id}\` |`);
+    }
+    const errors = f.rows.filter((e) => e.error);
+    if (errors.length) {
+      out.push("", "**Their last errors:**", "");
+      for (const e of errors) out.push(`- \`${e.event_key}\` (\`${e.outbox_id}\`):`, "", fence(e.error), "");
+    }
+    if (f.total > f.rows.length) out.push("", `${f.total - f.rows.length} more failed events are not in this file: the second query under First look lists them all.`);
   }
   if (c.key === "worker" && input.queues && input.queues.queues.length) {
     const busy = input.queues.queues.filter((q) => q.waiting || q.active || q.delayed || q.last_failure);
@@ -427,20 +449,22 @@ function changesSection(changes) {
   return out;
 }
 
+/** The last day as Settings · Performance draws it (`performance.series`, range `day`), against its targets. */
 function last24Section(p) {
   const out = ["## The last 24 hours", ""];
   if (!p) return [...out, "_Could not be read._"];
-  out.push(`- Every check up ${p.uptime_pct}% of the time; ${p.gap_minutes} minutes without a snapshot.`);
-  out.push(`- Newest snapshot: ${at(p.last_snapshot_at)}.${p.recording ? "" : " **Nothing is recording**: the five-minute `system-health` job is not running."}`);
-  const latest = [...(p.points || [])].reverse().find((x) => x.requests !== null || x.disk_free_pct !== null);
+  const against = (m, unit = "") => (m.value === null ? "no traffic to judge" : `${m.value}${unit} against ${m.target}${unit} (${TARGET[m.state] || m.state})`);
+  out.push(`- **Availability:** ${against(p.availability, "%")}; ${p.down_minutes} minutes down, ${p.gap_minutes} minutes not recorded.`);
+  out.push(`- **Requests:** ${p.requests}, p95 ${against(p.response_p95, " ms")}, mean ${p.response_mean_ms === null ? "none" : `${p.response_mean_ms} ms`}; failed ${against(p.failed, "%")}.`);
+  out.push(`- **Newest sample:** ${p.last_sample_at ? at(p.last_sample_at) : "none"}.${p.recording ? "" : " **Nothing is recording**: the one-minute `system-health-sample` job is not running."}`);
+  const latest = [...(p.points || [])].reverse().find((x) => x.requests !== null || x.cpu_busy_pct !== null);
   if (latest) {
     const bits = [];
-    if (latest.requests !== null) bits.push(`${latest.requests} requests, mean ${latest.mean_ms} ms, ${latest.error_pct || "0"}% failed`);
-    if (latest.disk_free_pct !== null) bits.push(`disk ${latest.disk_free_pct}% free`);
-    if (latest.memory_used_pct !== null) bits.push(`memory ${latest.memory_used_pct}% used`);
-    if (latest.cpu_load !== null) bits.push(`load ${latest.cpu_load} per core`);
-    if (latest.database_mb !== null) bits.push(`database ${latest.database_mb} MB`);
-    out.push(`- The newest hour (${at(latest.at)}): ${bits.join(", ")}.`);
+    if (latest.requests !== null) bits.push(`${latest.requests} requests, mean ${latest.mean_ms ?? 0} ms, ${latest.error_pct || "0"}% failed`);
+    if (latest.cpu_busy_pct !== null) bits.push(`processor ${latest.cpu_busy_pct}% busy`);
+    if (latest.memory_in_use_pct !== null) bits.push(`memory ${latest.memory_in_use_pct}% in use`);
+    if (latest.disk_used_pct !== null) bits.push(`disk ${latest.disk_used_pct}% used`);
+    out.push(`- **The newest quarter hour** (${at(latest.at)}): ${bits.join(", ")}.`);
   }
   return out;
 }

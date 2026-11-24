@@ -36,6 +36,7 @@ const CHECKS = [
   { key: "migrations", label: "Migrations", look: "The migration ledger is missing or empty. The database is not at this build." },
   { key: "numbering", label: "Numbering", look: "A document type has no numbering scheme, so nothing of that type can be created." },
   { key: "outbox", label: "Events", look: "Events are piling up: the worker is behind or down." },
+  // `lookAt` says this instead when nothing is piling up and an event failed for good.
   { key: "storage", label: "File Storage", look: "The media folder is missing or cannot be written to. Uploads will fail." },
   { key: "chromium", label: "PDFs", look: "Chromium is missing, so no PDF can be drawn." },
   { key: "ffmpeg", label: "Voice and Video", look: "Voice notes and video cannot be processed." },
@@ -65,8 +66,13 @@ const label = (key) => (BY_KEY.get(key) ? BY_KEY.get(key).label : key.replace(/_
 /** Mail paused on purpose (docs/guides/integrations.md §6.15): degraded, and where to undo it. */
 const pausedMail = (key, v) => key === "mail" && Boolean(v) && v.mode === "paused";
 
+/** Events degraded by events that used up their retries, not by a backlog the worker is behind on. */
+const failedEventsOnly = (key, v) => key === "outbox" && Boolean(v) && v.failed > 0 && !(v.backlog > 500);
+
 function lookAt(key, v) {
   if (pausedMail(key, v)) return "System mail is paused. Resume it on Settings, Integrations, System Sender.";
+  if (failedEventsOnly(key, v))
+    return "Follow-on work failed after every retry. Fix its cause, then retry it: the Status brief names each one.";
   return BY_KEY.get(key) ? BY_KEY.get(key).look : "Open the logs for this service.";
 }
 
@@ -97,7 +103,8 @@ function detailOf(key, v) {
   if (v.error) return String(v.error).slice(0, 200);
   const bits = [];
   if (key === "exchange_rates" && v.rate_day) bits.push(`rates of ${require("../../shared/time/day-first").formatDate(v.rate_day)}`);
-  if (key === "outbox" && v.backlog !== undefined) bits.push(`${v.backlog} waiting`);
+  if (key === "outbox" && v.failed > 0) bits.push(`${v.failed} failed`);
+  if (key === "outbox" && v.backlog !== undefined && (v.backlog > 0 || !(v.failed > 0))) bits.push(`${v.backlog} waiting`);
   if (key === "modules" && v.mounted !== undefined) bits.push(`${v.mounted} mounted`);
   if (key === "modules" && v.skipped && v.skipped.length) bits.push(`skipped: ${v.skipped.join(", ")}`);
   if (key === "migrations" && v.head) bits.push(`at ${v.head}`);
@@ -483,9 +490,11 @@ async function statusBriefInput({ checks, api = null }) {
     report.schedulers({ db: pool }),
     report.queues(),
     part("Changes over the last 7 days", () => repo.changesOfAll(pool, { page: 1 })),
-    part("The last 24 hours", () => performance({ range: "24h" })),
+    // The Performance tab's own day, so the brief and the screen never disagree.
+    part("The last 24 hours", () => require("./system_health.performance").series({ range: "day" })),
     part("Open faults", () => faults({ status: "active", page: 1 })),
   ]);
+  const failedEvents = checks && checks.outbox && checks.outbox.failed > 0 ? await part("Failed events", () => repo.failedEvents(pool, { page: 1 })) : null;
   if (jobs.db_error) unread.push(`Background job runs: ${jobs.db_error}`);
   if (jobs.queue_error) unread.push(`The schedule queue: ${jobs.queue_error}`);
   if (queues.error) unread.push(`Queues: ${queues.error}`);
@@ -520,6 +529,23 @@ async function statusBriefInput({ checks, api = null }) {
         }
       : null,
     last24,
+    failed_events: failedEvents
+      ? {
+          rows: failedEvents.data.map((r) => ({
+            event_key: r.event_key,
+            attempts: r.attempts,
+            max_attempts: r.max_attempts,
+            done: r.completed_handlers || [],
+            error: r.last_error ? scrub(String(r.last_error)).slice(0, 300) : null,
+            // Its type only: an event may be about a login, and the brief never carries a user id.
+            record: r.entity_type,
+            outbox_id: r.outbox_id,
+            created_at: new Date(r.created_at).toISOString(),
+            failed_at: new Date(r.updated_at).toISOString(),
+          })),
+          total: failedEvents.page.total,
+        }
+      : null,
     faults: open ? { rows: open.data, total: open.page.total } : null,
     host: null,
     unread,

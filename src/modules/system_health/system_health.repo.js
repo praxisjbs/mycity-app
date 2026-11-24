@@ -326,6 +326,25 @@ function changes(db, key, query) {
 }
 
 /** The same as changes(), for every check at once: the Status brief's table. */
+/**
+ * The outbox events that used up their retries, newest first: what degrades Events with nothing
+ * waiting, which no job prunes and only a retry clears (docs/runbooks/system-health.md §7.1).
+ * The record each was about comes from its event, so the brief can say what was not done.
+ */
+function failedEvents(db, query) {
+  return pageQuery(
+    db,
+    `SELECT o.outbox_id, o.event_key, o.attempts, o.max_attempts, o.completed_handlers, o.last_error,
+            o.created_at, o.updated_at, e.entity_type, ${TOTAL_COL}
+       FROM event_outbox o
+       JOIN event_log e ON e.event_id = o.event_id
+      WHERE o.status = 'failed'
+      ORDER BY o.updated_at DESC, o.outbox_id`,
+    [],
+    query,
+  );
+}
+
 function changesOfAll(db, query) {
   return pageQuery(
     db,
@@ -931,6 +950,7 @@ module.exports = {
   lastChanges,
   changes,
   changesOfAll,
+  failedEvents,
   snapshotsAround,
   trafficSince,
   WINDOWS,
