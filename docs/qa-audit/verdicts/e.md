@@ -264,3 +264,47 @@ Fix: None (F16a's label applies to the column badge too).
 Effort: S
 For MyCity: The 2 beside Done is the number of unread notifications about those tasks; the column's total (3) is shown at the right of the header.
 
+
+ID: F34a
+Title: History shows each person the tokens and cost of their own questions
+Verdict: BY_DESIGN
+Severity: Low
+Module: Praxis AI
+Evidence: app/src/features/assistant/index.tsx:296 to 302 (Your Spend card) and :327 to 328 (Tokens, desktop only, and Cost columns). This is the specified screen: docs/guides/praxis-ai.md §10.1 line 2014 lists "Question, Asked, Sources Read, Tokens, Cost" and Your Spend; §5 line 475 (`GET /history/questions`, "each with its sources, tokens and cost"). Decision 7 (line 61, amended 22/10/2026) keeps History to the person's own figures; everyone's spend is only on AI Control · Spend and, as counts and naira, for AI Control holders. On a phone Tokens is already hidden (§10.2 line 2023).
+Scope ref: praxis-ai.md §1.1 decision 7, §5, §10.1 (GE, 22/10/2026)
+Fix: None required. If MyCity prefer staff not to see cost, hide the Tokens and Cost columns and Your Spend for people without AI Control view in index.tsx and the guide's §10 (a decision change, cheap).
+Effort: S
+For MyCity: Staff see only what their own questions cost, as agreed when History was built; nobody sees anyone else's questions. If you would rather staff saw no cost at all, tell us and we will show it to AI Control holders only.
+
+ID: F34b
+Title: A simple how-to question reads the whole context every round
+Verdict: IMPROVEMENT
+Severity: Low
+Module: Praxis AI
+Evidence: Code reading (a live model run is not possible here). Every question sends one system turn carrying the person's screens, routes and one tool per read and summary they may run (src/services/ai/assistant/orchestrator.js:11 to 22, 172 to 200, 351), resent on each round of the loop (up to 8). A how-to question takes at least two rounds (the `guide.search` read, then the answer; praxis-ai.md line 757 to 760), so about 23,600 tokens (two rounds of about 11,800) and ₦24 is consistent with the design. The prefix is built to be cached (decision 24, line 112), but only the Anthropic adapter sets a cache mark (src/services/ai/vendors/anthropic.js:143), so the discount depends on which model AI Control assigns to Data Answers.
+Scope ref: praxis-ai.md §1.1 decisions 24 and 25, §6.1, §6.9 (guide.search)
+Fix: Measure tokens per round on staging, then trim the tools offered on the first round (for example route how-to questions to `guide.search` and the route list before the full read catalogue) in orchestrator.js; confirm the cache discount reaches the ledger for the vendor in use.
+Effort: M
+For MyCity: The figure is what the current design costs: each question carries everything the person is allowed to ask about. We will look at trimming it for simple how-to questions.
+
+ID: F36
+Title: Urgent announcements show a red bar on every screen until acknowledged
+Verdict: BY_DESIGN
+Severity: Low
+Module: Platform / Community
+Evidence: The row is the urgent bar ("1 of 3" means three urgent notices are open for this person), not a general announcement banner. packages/ui/src/feedback/UrgentBar.tsx:62 to 90: one line, the title truncated, the count, and Acknowledge; app/src/features/notifications/UrgentNotices.tsx:11 to 45 closes a notice only on Acknowledge. Its tests pass (`npx vitest run src/feedback/UrgentBar.test.tsx` in packages/ui: 4 passed). Decided: docs/guides/community.md §3 step 2 lines 66 to 72 (Urgent "puts the urgent bar on every screen of everyone in the audience ... until each person presses Acknowledge", TB, 19/10/2026) and docs/guides/notifications.md line 45 and §10.2 line 447 (on a phone "the title on one line and the count", tap the title to open it). "System Testing Queries" is not in our seeds (no match in seeds/ or src/), so it was posted as Urgent on staging by a MyCity user.
+Scope ref: community.md §3 step 2 Levels (TB, 19/10/2026); notifications.md §6, §10
+Fix: None. The bar goes as soon as the person presses Acknowledge on it or on the card in #announcements; posters should use Normal or Important for anything that is not an emergency.
+Effort: S
+For MyCity: The red bar is how an Urgent announcement was agreed to work: it stays on every screen until each person acknowledges it. Press Acknowledge on the bar to clear it, and post routine news as Normal or Important so it does not take the bar.
+
+ID: F41
+Title: Record History shows raw event keys for events it has no words for
+Verdict: BUG
+Severity: Low
+Module: Self-Service / People
+Evidence: Reproduced with a one-off node call: `summaryOf({action: "commitments.due"})` from src/modules/organisation/employee-360.service.js returns "commitments.due" (and "Record changed" for employee.updated). summaryOf (lines 106 to 120) words only six actions and otherwise prints the key with only an "employee." prefix stripped. The monthly commitments reminder is emitted on the employee record (src/modules/targets/targets.commitments.js:545, `entity: { type: "employee" }`), so its audit row lands in the person's history (organisation.repo.js:437 to 448, every audit row on the employee). About a dozen other modules emit on the employee entity too (leave, documents, payslips, reviews, attendance, workspace), so their keys can show the same way. People's History tab on the employee uses the same function. Every event already has a plain summary in its module's events file (targets.events.js:43, "A person has not sent their commitments for the month").
+Scope ref: ess.md §5 line 147 and §10.1 line 427 (Record History); FRONTEND_GUIDE §5 (no internal words on screen)
+Fix: In summaryOf, fall back to the event catalogue's own summary for the key (or a short label map) instead of the raw key, and decide whether reminders such as commitments.due belong in Record History at all (filter them in historyOf). Add a unit test over every key emitted on the employee entity.
+Effort: S
+For MyCity: Confirmed: some entries in Record History show a system name instead of words. We will word every entry and leave reminders out of the record's history.
