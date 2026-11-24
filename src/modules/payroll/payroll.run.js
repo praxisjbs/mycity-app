@@ -205,6 +205,10 @@ async function computeInto(client, run) {
   const runId = run.payroll_run_id;
   const { first, last } = lagos.monthBounds(run.period);
   const setting = await settings.settingOn(client, first);
+  // Bank Details Required is read as it stands today, when Compute or Submit runs, so a rule switched on mid-month holds
+  // the open run at once; the mode stays the month's own (§6.1 rule 4, §6.11 rules 2 and 3a).
+  const today = lagos.today();
+  const bankRule = await settings.settingOn(client, today);
 
   const people = await inputs.peopleFor(client, first, last);
   const ids = people.map((p) => p.employee_id);
@@ -276,7 +280,8 @@ async function computeInto(client, run) {
     config_snapshot: {
       payroll_setting_id: setting.payroll_setting_id,
       advanced,
-      require_bank_details: setting.require_bank_details === true,
+      require_bank_details: bankRule.require_bank_details === true,
+      bank_rule_on: today,
       pay_day: settings.payDayOf(setting),
       pay_day_is_default: !setting.pay_day,
       // The figures an advanced run was computed with and how PAYE was worked out, so a locked run is explained after

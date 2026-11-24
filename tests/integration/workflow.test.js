@@ -514,4 +514,97 @@ describeDb("approvals against the real migrations", () => {
     }
     expect(await listed()).toContain(id);
   });
+
+  describe("a line manager who has left (QA BG-005)", () => {
+    // Kemi (manager) <- Femi (archived) <- Bisi (left) <- Ada; and Uche (archived, at the top) <- Obi.
+    const staffer = (key, first, last, role, managerKey = null) =>
+      tx(async (client) => {
+        people[key] = await createAdmin(
+          client,
+          {
+            employee: {
+              first_name: first,
+              last_name: last,
+              work_email: `${key}@mycity.test`,
+              phone: "08031234567",
+              job_title: "Field Officer",
+              department_name: "Programmes",
+              start_date: "2026-01-05",
+              employment_type: "full_time",
+              work_pattern: "on_site",
+            },
+            role_code: role,
+          },
+          PASSWORD,
+          { allowAdditional: true },
+        );
+        if (managerKey)
+          await client.query("UPDATE employee SET line_manager_id = $1 WHERE employee_id = $2", [
+            people[managerKey].employee.employee_id,
+            people[key].employee.employee_id,
+          ]);
+      });
+    const leaves = (key, status) =>
+      q("UPDATE employee SET status = $2, archived_at = CASE WHEN $2 = 'archived' THEN now() END WHERE employee_id = $1", [
+        people[key].employee.employee_id,
+        status,
+      ]);
+    const firstStage = async (id) =>
+      (await q("SELECT stage_approvers FROM workflow_instance WHERE workflow_instance_id = $1", [id])).rows[0].stage_approvers;
+
+    beforeAll(async () => {
+      await staffer("femi", "Femi", "Adeyemi", "manager", "manager");
+      await staffer("bisi", "Bisi", "Okafor", "manager", "femi");
+      await staffer("ada", "Ada", "Eze", "employee", "bisi");
+      await staffer("uche", "Uche", "Nnamdi", "manager");
+      await staffer("obi", "Obi", "Ike", "employee", "uche");
+      await leaves("femi", "archived");
+      await leaves("bisi", "left");
+      await leaves("uche", "archived");
+    });
+
+    test("a leave request goes to the next active manager up, who decides it", async () => {
+      const { workflow_instance_id: id } = await openLeave("ada", 2);
+      expect(await firstStage(id)).toEqual([{ type: "employee", value: people.manager.employee.employee_id, via: "manager_of_subject" }]);
+      expect((await as("manager").get("/workflow/mine")).body.data.map((r) => r.workflow_instance_id)).toContain(id);
+      const approved = await as("manager").post(`/workflow/instances/${id}/approve`, {});
+      expect(approved.status).toBe(200);
+      expect(approved.body.state).toBe("approved");
+    });
+
+    test("an expense request goes to the next active manager up, then Operations & People", async () => {
+      const { workflow_instance_id: id } = await tx((client) =>
+        engine.openInstance(client, {
+          definition_key: "expenses.request",
+          entity: { type: "expense", id: crypto.randomUUID() },
+          subject_employee_id: people.ada.employee.employee_id,
+          context: { amount: "15000.00", requester_manages_people: false },
+          actor: people.ada.user,
+        }),
+      );
+      expect(await firstStage(id)).toEqual([{ type: "employee", value: people.manager.employee.employee_id, via: "manager_of_subject" }]);
+      // Operations & People may not decide the line manager's stage for them.
+      expect((await as("ops").post(`/workflow/instances/${id}/approve`, {})).status).toBe(403);
+      const first = await as("manager").post(`/workflow/instances/${id}/approve`, {});
+      expect(first.status).toBe(200);
+      expect(first.body).toMatchObject({ state: "pending", stage_name: "Operations & People" });
+      expect((await as("ops").post(`/workflow/instances/${id}/approve`, {})).body.state).toBe("approved");
+    });
+
+    test("with nobody active above the leaver, the request goes to the CEO", async () => {
+      const { workflow_instance_id: id } = await openLeave("obi", 1);
+      expect(await firstStage(id)).toEqual([{ type: "ceo", via: "no_line_manager" }]);
+      expect((await as("ceo").post(`/workflow/instances/${id}/approve`, {})).body.state).toBe("approved");
+    });
+
+    test("a manager who comes back answers for their team again", async () => {
+      await q("UPDATE employee SET status = 'active' WHERE employee_id = $1", [people.bisi.employee.employee_id]);
+      try {
+        const { rows } = await q("SELECT manager_id FROM employee_effective_manager WHERE employee_id = $1", [people.ada.employee.employee_id]);
+        expect(rows).toEqual([{ manager_id: people.bisi.employee.employee_id }]);
+      } finally {
+        await leaves("bisi", "left");
+      }
+    });
+  });
 });

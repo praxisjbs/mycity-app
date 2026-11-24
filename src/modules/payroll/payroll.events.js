@@ -14,6 +14,8 @@
  *   payslip.excluded, .included   a person was left out of a run, or put back
  *   payroll_adjustment.added, .removed   a one-off earning or deduction was added to a run, or taken off
  *   payroll_deduction.settled   a fine or an advance was deducted in full (its last instalment applied)
+ *   payroll_deduction.rescheduled   an approved run did not take an instalment (its person left out or with no pay),
+ *                            so it and the deduction's later ones moved on a month (§6.6 rule 10)
  *   payroll_setting.changed  the advanced option, the pay day or Bank Details Required, from a date
  *                            (security: the access watchers are told)
  *   payroll_setting.removed  Remove Change: a version of the setting still waiting for its day was taken back and the
@@ -50,6 +52,7 @@ const EVENTS = defineEvents("payroll", {
   "payroll_adjustment.added": { summary: "A one-off earning or deduction was added to a payroll run" },
   "payroll_adjustment.removed": { summary: "A one-off earning or deduction was taken off a payroll run" },
   "payroll_deduction.settled": { summary: "A fine or an advance was deducted in full" },
+  "payroll_deduction.rescheduled": { summary: "An instalment a payroll run did not take moved to a later month" },
   // Configurations: the advanced option, the pay day or Bank Details Required changed from a date.
   // Security: who may change how everyone is paid is watched as access changes are (§7).
   "payroll_setting.changed": { summary: "The payroll setting was changed from a date", security: true },

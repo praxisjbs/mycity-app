@@ -84,6 +84,8 @@ function view(r: ReviewDetail, user: string | null): ReviewDetail {
     score_month: parts.scores ? r.score_month : null,
     score_to_date: parts.scores ? r.score_to_date : null,
     rating: parts.scores ? r.rating : null,
+    weight_scored: parts.scores ? r.weight_scored : null,
+    weight_total: parts.scores ? r.weight_total : null,
     actions: parts.notes ? r.actions : [],
     context: team ? r.context : null,
     waiting_on_me: waitingOnMe(r, user),
@@ -122,6 +124,8 @@ const rowOf = (d: ReviewDetail) => ({
   score_month: d.score_month,
   score_to_date: d.score_to_date,
   rating: d.rating,
+  weight_scored: d.weight_scored,
+  weight_total: d.weight_total,
   due_on: d.due_on,
   waiting_on_me: d.waiting_on_me,
 });
@@ -183,11 +187,15 @@ function close(r: ReviewDetail) {
   r.score_month = s;
   r.score_to_date = s;
   r.rating = s === null ? null : ratingOf(s, r.conduct_breach);
+  // What the score rests on, as the server writes it at close (§6.9).
+  const covered = scoring.weightCoverage(lines);
+  r.weight_scored = covered ? scoring.formatWeight(covered.scored) : null;
+  r.weight_total = covered ? scoring.formatWeight(covered.total) : null;
   r.closed_at = now();
   r.document_id = sid(`rv:pdf:${r.performance_review_id}`);
   moved(r, "closed");
   const card = SCORECARDS.find((c) => c.scorecard_id === r.scorecard_id);
-  if (card) Object.assign(card, { score_to_date: s, rating: r.rating });
+  if (card) Object.assign(card, { score_to_date: s, rating: r.rating, weight_scored: r.weight_scored, weight_total: r.weight_total });
 }
 
 /* Rounds */
@@ -596,7 +604,7 @@ route("GET /api/v1/ess/performance", (req) => {
   const pip = PIPS.find((p) => p.employee.employee_id === me?.employee_id && (p.status === "open" || p.status === "extended"));
   const out: MyPerformance = {
     period: { performance_period_id: PERIOD.performance_period_id, name: PERIOD.name },
-    scorecard: card ? { scorecard_id: card.scorecard_id, status: card.status, score_to_date: card.score_to_date, rating: card.rating, employee_agreed_at: card.employee_agreed_at, reviewer_name: card.reviewer?.display_name ?? card.reviewer_role ?? null } : null,
+    scorecard: card ? { scorecard_id: card.scorecard_id, status: card.status, score_to_date: card.score_to_date, rating: card.rating, weight_scored: card.weight_scored, weight_total: card.weight_total, employee_agreed_at: card.employee_agreed_at, reviewer_name: card.reviewer?.display_name ?? card.reviewer_role ?? null } : null,
     check_in: open ? { performance_review_id: open.performance_review_id, month: open.month, due_on: open.status === "check_in" ? roundOf(open).check_in_due_on : open.due_on, status: open.status } : null,
     commitments: null,
     open_pip: pip ? { improvement_plan_id: pip.improvement_plan_id, review_on: pip.review_on } : null,

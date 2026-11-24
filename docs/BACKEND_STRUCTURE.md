@@ -1148,10 +1148,12 @@ calls the exported `createAdmin()` with the demonstration data.
 
 `--build-account` is the implementation team's login, on staging and production alike: the complete
 employee record is `BUILD_ACCOUNT` in the script (JBS Praxis Implementation Team, consultant,
-remote, a two-month contract, address, next of kin, pay, and a bank account of ten zeros that no
-payment can reach), role `implementation`. Every employee column is filled except the references
-(worksite, managers, seats) and `left_on`. Only the email and the password are typed, the email
-serving as work and personal email; neither is in the repository. It is suspended at handover (`docs/runbooks/first-accounts.md`).
+remote, a two-month contract, next of kin), role `implementation`. Every employee column is filled
+except the references (worksite, managers, seats), `left_on`, the home address and the pay and bank
+details: the account is the implementation partner's, never in MyCity's payroll (a run leaves out
+every holder of the role, `docs/guides/payroll.md` §6.1 rule 6). Only the email and the password are
+typed, the email serving as work and personal email; neither is in the repository. At handover its
+record is archived and its login closed (`docs/runbooks/first-accounts.md` §5).
 
 ### 17.4 What it needs from the M0 modules
 

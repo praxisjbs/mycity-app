@@ -593,15 +593,17 @@ describeDb("identity against the real migrations", () => {
       const made = await tx((c) => createAdmin(c, buildAccount("build@mycity.test"), "Implement#2026x"));
       expect(made.role.code).toBe("implementation");
       // Every column is filled except the references a first, remote account has nothing to
-      // point at, left_on, and the home address (picked on My Profile, F27).
+      // point at, left_on, the home address (picked on My Profile, F27) and the pay and bank details.
       const whole = await one(`SELECT to_jsonb(e) AS e FROM employee e WHERE employee_id = $1`, [
         made.employee.employee_id,
       ]);
       const empty = Object.keys(whole.e).filter((k) => whole.e[k] === null).sort();
       expect(empty).toEqual([
-        /* 0300 added archiving: a record that was never archived carries neither. */
+        /* The pay and bank details: the build account is never in MyCity's payroll (payroll guide §6.1 rule 6). */
+        "account_number",
         "archive_reason",
         "archived_at",
+        "bank_name",
         /* 1180: a birthday known only as a day and month, filled by the staff loader. */
         "birth_day",
         "birth_month",
@@ -609,6 +611,7 @@ describeDb("identity against the real migrations", () => {
         "bvn",
         "dotted_manager_id",
         "dotted_manager_seat_id",
+        "gross_monthly",
         /* F27: picked on My Profile after sign-in; a terminal cannot pick an address. */
         "home_address",
         "left_on",
@@ -657,9 +660,9 @@ describeDb("identity against the real migrations", () => {
         next_of_kin_name: "JBS Praxis Office",
         next_of_kin_phone: "+2348027492738",
         next_of_kin_relationship: "Employer",
-        bank_name: "Zenith Bank",
-        account_number: "0000000000",
-        gross_monthly: "1850000.00",
+        bank_name: null,
+        account_number: null,
+        gross_monthly: null,
         department: "Implementation",
       });
       const { res } = await signIn("build@mycity.test", "Implement#2026x");

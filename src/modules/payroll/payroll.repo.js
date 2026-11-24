@@ -527,6 +527,57 @@ async function settleFinished(client, runId) {
   return rows;
 }
 
+/**
+ * The instalments an approved run leaves behind (§6.6 rule 10): scheduled instalments of live deductions of the run's
+ * month that it did not take (its person left out or with no pay), and any of an earlier month whose run is approved or
+ * paid that was left the same way. Not a leaver's: their final run takes all they owe, and what it could not take stays
+ * where it is for Operations & People (§6.6 rule 9).
+ * @param {import("pg").PoolClient} client
+ * @param {string} period  the run's month, its first day
+ * @param {string} last    the run's last day
+ */
+async function missedInstalments(client, period, last) {
+  // pagination:complete the instalments one approved run did not take, each moved on
+  const { rows } = await completeQuery(
+    client,
+    `SELECT i.payroll_deduction_instalment_id, i.payroll_deduction_id, d.employee_id, i.period::text AS period
+       FROM payroll_deduction_instalment i
+       JOIN payroll_deduction d ON d.payroll_deduction_id = i.payroll_deduction_id
+       JOIN employee e ON e.employee_id = d.employee_id
+      WHERE d.status = 'active' AND i.status = 'scheduled'
+        AND (i.period = $1::date
+             OR (i.period < $1::date AND EXISTS (SELECT 1 FROM payroll_run x WHERE x.period = i.period AND x.status IN ('approved', 'paid'))))
+        AND (e.left_on IS NULL OR e.left_on > $2::date)
+      ORDER BY i.payroll_deduction_id, i.period`,
+    [period, last],
+    { label: "The instalments an approved run did not take", ceiling: MAX_PAYSLIPS * 12 },
+  );
+  return rows;
+}
+
+/** Every instalment of these deductions, whatever its state, locked for the rest of the transaction, in month order. */
+async function instalmentsOfDeductions(client, deductionIds) {
+  if (!deductionIds.length) return [];
+  // pagination:complete the at most twelve instalments of each deduction a run moves on
+  const { rows } = await completeQuery(
+    client,
+    `SELECT payroll_deduction_instalment_id, payroll_deduction_id, period::text AS period, status
+       FROM payroll_deduction_instalment WHERE payroll_deduction_id = ANY($1::uuid[])
+      ORDER BY payroll_deduction_id, period FOR UPDATE`,
+    [deductionIds],
+    { label: "The instalments of the deductions a run moves on", ceiling: MAX_PAYSLIPS * 12 },
+  );
+  return rows;
+}
+
+/** Move a scheduled instalment to another month. */
+function moveInstalment(client, id, period) {
+  return client.query(
+    `UPDATE payroll_deduction_instalment SET period = $2::date WHERE payroll_deduction_instalment_id = $1 AND status = 'scheduled'`,
+    [id, period],
+  );
+}
+
 /* ------------------------------------------------------------------ *
  * Problems (§6.15)
  * ------------------------------------------------------------------ */
@@ -573,6 +624,24 @@ const PROBLEMS = `
       FROM base b
       JOIN LATERAL (SELECT count(*) AS n FROM sanction_fine f JOIN sanction x ON x.sanction_id = f.sanction_id
                      WHERE x.employee_id = b.employee_id AND x.status = 'issued' AND f.settlement_status = 'pending') w ON w.n > 0
+    UNION ALL
+    -- An instalment due this month that the run does not take, because its person is left out or has no pay (§6.6 rule
+    -- 10): one row for each kind of deduction, counting its instalments. An excluded payslip counts here too.
+    SELECT CASE w.source WHEN 'salary_advance' THEN 'ADVANCE_NOT_TAKEN' ELSE 'FINE_NOT_TAKEN' END, 'warning', 4,
+           p.payroll_run_id, p.employee_id, p.payslip_id, w.n::int
+      FROM payslip p
+      JOIN payroll_run r ON r.payroll_run_id = p.payroll_run_id
+      JOIN employee e ON e.employee_id = p.employee_id
+      JOIN LATERAL (SELECT d.source, count(*) AS n
+                      FROM payroll_deduction_instalment i
+                      JOIN payroll_deduction d ON d.payroll_deduction_id = i.payroll_deduction_id
+                     WHERE d.employee_id = p.employee_id AND d.status = 'active' AND i.status = 'scheduled'
+                       AND (i.period = r.period
+                            OR (e.left_on IS NOT NULL AND e.left_on <= (date_trunc('month', r.period) + interval '1 month - 1 day')::date
+                                AND i.period > r.period))
+                     GROUP BY d.source) w ON true
+     WHERE p.payroll_run_id = ANY($1::uuid[]) AND r.status IN ('draft', 'computed')
+       AND (p.status = 'excluded' OR p.gross_monthly IS NULL OR e.start_date IS NULL)
     UNION ALL
     SELECT 'NO_PAY_SPLIT', 'warning', 7, b.payroll_run_id, b.employee_id, b.payslip_id, 1
       FROM base b
@@ -671,6 +740,9 @@ module.exports = {
   releaseInstalments,
   applyInstalments,
   settleFinished,
+  missedInstalments,
+  instalmentsOfDeductions,
+  moveInstalment,
   pageProblems,
   problemCounts,
   approverOf,

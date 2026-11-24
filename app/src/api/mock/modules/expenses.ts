@@ -293,6 +293,21 @@ route("GET /api/v1/expenses/mine/summary", (req) => {
     rejected: own.filter((r) => r.status === "rejected").length,
   });
 });
+/* New Request's budget figures before it is sent (expenses.budget-check preview): the department is the requester's own until another is picked. */
+route("GET /api/v1/expenses/mine/budget-check", (req) => {
+  const { expense_category_id: category, department_id: dept, amount } = req.query as { expense_category_id: string; department_id?: string; amount?: string };
+  const own = byKey(req.user!)?.department ?? "Operations & People";
+  const names = [...new Set([...REQS.map((x) => x.department), ...BUDS.map((x) => x.department), own])];
+  const department = dept ? names.find((d) => deptId(d) === dept) ?? null : own;
+  if (!department) return ok({ department_id: dept ?? null, budget_remaining: null, department_remaining: null, over_budget: true });
+  const left = remainingOf({ department, category_id: category, submitted_at: null, created_at: now() } as Req);
+  return ok({
+    department_id: deptId(department),
+    budget_remaining: left.line === null ? null : m(left.line),
+    department_remaining: left.dept === null ? null : m(left.dept),
+    over_budget: left.line === null || k(amount ?? "0.00") > left.line,
+  });
+});
 /* The Bank field's suggestions: the common banks (expenses.service COMMON_BANKS) and every bank a request names. */
 const COMMON_BANKS = [
   "Access Bank", "Citibank", "Ecobank", "Fidelity Bank", "First Bank", "FCMB", "Globus Bank", "GTBank", "Jaiz Bank",

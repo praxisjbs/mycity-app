@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { sid } from "@/api/mock/core";
 import { choose, copyProblems, dialog, openAs, openRow, press, settled } from "./testKit";
@@ -27,6 +28,11 @@ if (!("ResizeObserver" in window)) {
     disconnect() {}
   };
 }
+
+// The select's menu captures the pointer and scrolls its picked option into view; jsdom does neither.
+Element.prototype.scrollIntoView ??= () => undefined;
+Element.prototype.hasPointerCapture ??= () => false;
+Element.prototype.releasePointerCapture ??= () => undefined;
 
 beforeAll(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -110,6 +116,40 @@ describe("Recruitment · Offers", () => {
     expect(within(record("Tunde Bakare")).getByRole("button", { name: "Resend Offer" })).toBeTruthy();
   }, 60000);
 
+  it("Basic Salary starts empty with no range, is marked on its own line at ₦0, and an intern's ₦0 asks why (BG-001)", async () => {
+    // Seun's vacancy has no pay range: Basic Salary starts empty, never 0.00.
+    await openAs("cynthia@mycityapp.io", `/recruitment?tab=offers&new=1&application=${sid("app:18")}`);
+    let d = dialog();
+    await waitFor(() => expect((within(d).getByLabelText("Job Title") as HTMLInputElement).value).toBe("Graphics and Motion Designer"));
+    await press(d, "Next");
+    d = dialog();
+    const amount = () => within(dialog()).getAllByLabelText("Monthly Amount")[0] as HTMLInputElement;
+    expect(amount().value).toBe("");
+    await press(d, "Next");
+    expect(within(dialog()).getByText("Enter an amount")).toBeTruthy();
+    fireEvent.change(amount(), { target: { value: "0" } });
+    await settled();
+    await press(dialog(), "Next");
+    expect(within(dialog()).getByText("Enter an amount")).toBeTruthy();
+    expect(within(dialog()).queryByLabelText("Start Date")).toBeNull();
+    expect(within(dialog()).queryByLabelText("Why No Basic Salary")).toBeNull();
+    // An intern may be offered ₦0, with the reason the approvers read.
+    await press(dialog(), "Back");
+    const user = userEvent.setup();
+    await user.click(within(dialog()).getByRole("combobox", { name: "Employment Type" }));
+    await user.click(await screen.findByRole("option", { name: "Intern" }));
+    await settled();
+    await press(dialog(), "Next");
+    expect(within(dialog()).getByLabelText("Why No Basic Salary")).toBeTruthy();
+    await press(dialog(), "Next");
+    expect(within(dialog()).getByText("Say why")).toBeTruthy();
+    fireEvent.change(within(dialog()).getByLabelText("Why No Basic Salary"), { target: { value: "A placement the university pays a stipend for" } });
+    await settled();
+    await press(dialog(), "Next");
+    expect(within(dialog()).getByLabelText("Start Date")).toBeTruthy();
+    expect(copyProblems(dialog())).toEqual([]);
+  }, 60000);
+
   it("New Offer from a link starts from the candidate's vacancy and drafts the offer", async () => {
     // Seun Okonkwo declined an offer and is back at Shortlist: another may be made.
     await openAs("cynthia@mycityapp.io", `/recruitment?tab=offers&new=1&application=${sid("app:18")}`);
@@ -129,6 +169,20 @@ describe("Recruitment · Offers", () => {
     await waitFor(() => expect(screen.queryAllByRole("dialog").length).toBe(1));
     await waitFor(() => expect(within(record("Seun Okonkwo")).getAllByText("Draft").length).toBeGreaterThan(0));
     expect(within(record("Seun Okonkwo")).getByRole("button", { name: "Submit for Approval" })).toBeTruthy();
+  }, 60000);
+
+  it("Submit for Approval says on the line under the buttons that the start date has passed (BG-008)", async () => {
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=offers");
+    await pick("Kunle Afolabi");
+    // A month on, the draft's start date (three weeks after it was made) has gone by.
+    vi.setSystemTime(new Date("2026-12-10T08:30:00Z"));
+    try {
+      await press(record("Kunle Afolabi"), "Submit for Approval");
+      await waitFor(() => expect(within(record("Kunle Afolabi")).getByText("The start date has passed. Change it in Edit Offer.")).toBeTruthy());
+      expect(within(record("Kunle Afolabi")).getAllByText("Draft").length).toBeGreaterThan(0);
+    } finally {
+      vi.setSystemTime(new Date("2026-11-07T08:30:00Z"));
+    }
   }, 60000);
 
   it("the board's link opens a card's offer by its application", async () => {

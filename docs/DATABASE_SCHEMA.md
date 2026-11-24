@@ -341,6 +341,9 @@ Withdrawn (`withdrawn_at`, `withdrawn_reason`; the status `withdrawn`, `NOT VALI
 `rejected`, the instance, who asked, the decision and its reason; one pending request per plan) and the
 plan's two states `unbound` and `revising` on the `performance_plan` status check (`docs/guides/performance.md`
 §6.22, JBS Praxis, 27/10/2026) · `2321` seed: the flow `performance.plan_change`, the CEO alone ·
+`2330` a score to date's coverage on `performance_review` and `scorecard` (`weight_scored` of
+`weight_total`, `numeric(7,2)`, written at close; reviews closed before it filled from their lines)
+(BG-012, `docs/guides/performance.md` §6.9, JBS Praxis, 24/11/2026) ·
 `2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
 missed commitment's Recovery task (Performance PR 4) · `2500` projects get a screen: `project.created_by`,
 its status CHECK (`active`, `completed`) and indexes · `2510` Why Late's reasons (`task_late_reason`,

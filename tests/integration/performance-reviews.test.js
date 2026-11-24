@@ -377,11 +377,13 @@ describeDb("performance reviews against the real migrations", () => {
     review = (await as("ada").get(`/performance/reviews/${ids.reviewAda}`)).body;
     // (60 × 0.8 + 25 × 1 + 7.5 × 0) ÷ 92.5: the blank commitments line leaves the denominator.
     expect(review).toMatchObject({ status: "closed", score_month: "0.7892", score_to_date: "0.7892", rating: "meets" });
+    // What it rests on: 92.5 of the 100 (BG-012).
+    expect(review).toMatchObject({ weight_scored: "92.5", weight_total: "100" });
     expect(review.document_id).toBeTruthy();
     expect(review.items.map((i) => i.score)).toEqual(["0.8", "1", null, "0"]);
     expect(review.dotted_input).toBe("Strong on the Lagos launch");
     const card = (await as("ada").get(`/performance/scorecards/${ids.card_ada}`)).body;
-    expect(card).toMatchObject({ score_to_date: "0.7892", rating: "meets" });
+    expect(card).toMatchObject({ score_to_date: "0.7892", rating: "meets", weight_scored: "92.5", weight_total: "100" });
     expect(card.lines[0].months).toEqual([{ month: "2026-09-01", score: "0.8" }]);
     const doc = await one("SELECT doc_type, render_status, subject_employee_id FROM document WHERE document_id = $1", [review.document_id]);
     expect(doc).toMatchObject({ doc_type: "review_summary", subject_employee_id: emp("ada") });

@@ -8,7 +8,10 @@
  *   { type: "user", value: "<user id>" }       one named person
  *   { type: "manager_of_subject" }             the line manager of the person the request is about;
  *                                              for someone who reports to a vacant seat, the first
- *                                              person above the seat (employee_effective_manager)
+ *                                              person above the seat; for someone whose manager no
+ *                                              longer works here (archived, left, suspended), the
+ *                                              next active manager above them
+ *                                              (employee_effective_manager, migrations 1160, 1161)
  *   { type: "ceo" }                            the CEO (app_user.is_ceo)
  *   { type: "employee_in_context",             the employee the request names in that context field
  *     value: "<uuid field>" }                  (a review's second level); conditions.js skips the
@@ -23,8 +26,8 @@
  *   { type: "user", value: "<user id>" }
  *   { type: "employee", value: "<employee id>", via: "manager_of_subject" | "employee_in_context" }
  *   { type: "ceo" }      also what manager_of_subject becomes when the subject has no
- *                        line manager, nor anybody above their empty seat (the top of
- *                        the tree goes to the CEO)
+ *                        line manager, nor anybody active above their empty seat or their
+ *                        departed manager (the top of the tree goes to the CEO)
  *
  * Rules canAct() applies:
  *  - The CEO may act on any stage of any approval (by design; A11).
@@ -49,7 +52,11 @@ async function roleCodesOf(client, roleIds) {
   return rows.map((r) => r.code);
 }
 
-/** The person the subject answers to: their line manager, or whoever is above their empty seat. */
+/**
+ * The person the subject answers to: their line manager, or whoever is above their empty seat, and
+ * never someone who has left: past a manager who is not active it is the next active one above
+ * (the view does the climbing, so team scope and approvals agree). Null when nobody is: the CEO.
+ */
 async function lineManagerOf(client, employeeId) {
   if (!employeeId) return null;
   const { rows } = await client.query(

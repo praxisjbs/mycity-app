@@ -10,7 +10,7 @@
 | Capabilities | `expenses.finance` (group approved requests into requisitions, record disbursements, set budgets, manage categories) |
 | Screens (PROGRESS.md rows) | #56 (in ESS), #57, #58, #59, #60, #61, #106 Projects |
 | Status | Agreed |
-| Last changed | 16/11/2026 |
+| Last changed | 24/11/2026 |
 
 Agreed by AJ on 04/11/2026 from the Modules Review meeting of the same day (TB handed every M8
 decision to AJ). The decisions and the build plan are in `docs/handoff/m8-expenses.md`; where this
@@ -79,7 +79,8 @@ Projects).
    Request is on Expenses · Requisitions and Expenses · Approvals too (TB, 13/11/2026): the same form
    and service, the request the presser's own, found afterwards on their My Requests; not on the
    other tabs. A request larger than its department's remaining budget is flagged before the
-   line manager and Operations & People decide it, never after.
+   line manager and Operations & People decide it, never after; New Request shows the requester
+   the same figures and flag before Send Request (§6.6 rule 3).
 8. **History.** Every step is one event through `emit()`, so a request's history (raised, each
    decision with its reason, grouped, removed, authorised, paid, reference added) reads from the
    audit ledger, on the request's modal (`GET /expenses/:id/history`). A removal by the CEO is an
@@ -121,6 +122,7 @@ Implementation Team's own accounts.
 | `GET /api/v1/expenses/mine` | `ExpenseListQuery` → `ExpensePage` | self | yes, 25 | ESS · My Requests |
 | `GET /api/v1/expenses/mine/summary` | → `ExpenseMineSummary` | self | no | the four KPI cards |
 | `GET /api/v1/expenses/banks` | `ExpenseBankListQuery` → `ExpenseBankPage` | `expenses` create | yes, 25 | the Bank field's suggestions: the common banks, then every bank a request names, most used first; `q` narrows (§6.1 rule 7) |
+| `GET /api/v1/expenses/mine/budget-check` | `ExpenseBudgetCheckQuery` → `ExpenseBudgetCheck` | `expenses` create · the caller's own form | no | New Request's Budget Left, Department Left and Over Budget before it is sent (§6.6 rule 3): the category, the department (the caller's own when blank) and the total so far; a read, nothing kept, never a refusal |
 | `POST /api/v1/expenses/mine` | `ExpenseCreate` → `ExpenseRequest` | `expenses` create · own | | `submit: true` sends it at once |
 | `PATCH /api/v1/expenses/mine/:id` | `ExpenseUpdate` → `ExpenseRequest` | `expenses` edit · own | | draft or sent back only |
 | `POST /api/v1/expenses/mine/:id/submit` | `EmptyBody` → `ExpenseRequest` | `expenses` create · own | | Send Request, Send Again |
@@ -266,7 +268,12 @@ its amount, and the CEO decides the requisition as a whole.
    (and sent again), and worked out again for every request still `submitted` on a line whenever
    that line's figures move (a request on it approved, withdrawn or paid; the budget set or
    changed). A request already approved counts in its line's committed and keeps the flag it was
-   decided with. **The recount locks its lines first** (audit F6), in one order, in a statement of
+   decided with. **New Request shows it before Send Request** (QA audit BG-007, 24/11/2026): once a
+   category is picked, the form reads `GET /expenses/mine/budget-check` (`expenses.budget-check.js`
+   `preview`: the same line, day and count as sending) and shows Budget Left (the line's) and
+   Department Left, and the Over Budget pill once the lines' total is more than the line has left
+   (or there is no line). It stays a warning: Send Request is never refused for it. The figures are
+   the ones the requester's own request shows them once sent; nothing about anyone's request. **The recount locks its lines first** (audit F6), in one order, in a statement of
    its own, and only then counts the requests: two moves on one line at once (two approvals, a
    payment beside an approval, Edit Budget beside a settle) each read the other's, never drop it.
 4. **A budget set after requests were sent** counts them: saving a budget gives each request of
@@ -485,7 +492,7 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. Category opens a popover (Pick Category) with a Category Type filter (All, Operating, Capital) and a search over the categories, 25 a page; Bank suggests banks as typed and offers Add for one it does not know; Payee Name and Account Name show a person's name as their example, never the reader's own. Unit Price takes a minus for a line that takes money off (a discount, an amount already paid), shown red with (less). The modal's lines are two columns, Item (its quantity and the price of each under it) and Amount, so an invoice's long descriptions read in the modal. Read Invoice fills each price as a person types it ("-100,000") and names the category it picked. Edit Request shows a request's lines the same way ("1", "85,000"). A Send Back no longer tells its approvers "The requester withdrew this" (`engine.cancel` `sentBack`, expenses, agreements and payroll). The form: the lines (Item, Quantity, Unit Price, a minus taken for a discount, the Amount of each and the Total under them, Add Line), Read Invoice once an invoice is attached (the payee, the bank and the lines), Suggest Category in its footer, each filling the form for the person to check, Read Invoice's toast naming the amount the invoice asks for when the lines add up to another; nothing is saved until they press Edit Budget and Set Budget show their amounts as typed too; a budget opens in the wide dialog, so its five columns fit; a requisition's Remove column has no label, so a phone card reads Remove once. | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." | the approval routing and the budget recount: §3, §6 here, the manual |
+| ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. Category opens a popover (Pick Category) with a Category Type filter (All, Operating, Capital) and a search over the categories, 25 a page; Bank suggests banks as typed and offers Add for one it does not know; Payee Name and Account Name show a person's name as their example, never the reader's own. Unit Price takes a minus for a line that takes money off (a discount, an amount already paid), shown red with (less). The modal's lines are two columns, Item (its quantity and the price of each under it) and Amount, so an invoice's long descriptions read in the modal. Read Invoice fills each price as a person types it ("-100,000") and names the category it picked. Edit Request shows a request's lines the same way ("1", "85,000"). A Send Back no longer tells its approvers "The requester withdrew this" (`engine.cancel` `sentBack`, expenses, agreements and payroll). The form: the lines (Item, Quantity, Unit Price, a minus taken for a discount, the Amount of each and the Total under them, Add Line), Read Invoice once an invoice is attached (the payee, the bank and the lines), Suggest Category in its footer, each filling the form for the person to check, Read Invoice's toast naming the amount the invoice asks for when the lines add up to another; once a category is picked, Budget Left (the category line's, or No budget line) and Department Left under the lines, and the Over Budget pill once the total passes the line, a warning beside Send Request, never a block (§6.6 rule 3); nothing is saved until they press Edit Budget and Set Budget show their amounts as typed too; a budget opens in the wide dialog, so its five columns fit; a requisition's Remove column has no label, so a phone card reads Remove once. | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." Help on Budget Left: "What the department has left for this category this year." Help on Over Budget, as on Approvals | the approval routing and the budget recount: §3, §6 here, the manual |
 | Expenses · Requisitions | New Request (secondary beside Create Requisition; alone, primary, above Not Open to You for a reader without `expenses.finance`); Approved Requests (tick boxes, Create Requisition), each opening its request in the modal with Withdraw (a reason, after a confirm); Requisitions (Reference, Requests, Total, Submitted, Status). The modal: its requests, each opening, Remove, Approve, Reject (the CEO) | help on Requisitions: "Approved requests grouped for the CEO." | why requests are batched: MILESTONES §13, the manual |
 | Expenses · Approvals | New Request; KPI cards With You, Total Value, Oldest, Approved This Month (opens the requests the reader approved since the 1st, `approved_by_me_from`); the list; the modal with lines, invoice (opens as a PDF), budget remaining (the line's, and the department's beside it), an Over Budget pill, a Possible Duplicate pill with Check Duplicate; Approve, Send Back, Reject | help on Over Budget: "More than the department has left for this category this year." Help on Possible Duplicate: "Same payee and amount within 30 days." | the chain's configuration: Settings · Approvals, this guide |
 | Expenses · Disbursements | KPI cards Waiting to Pay and Reference Missing, each opening its list; Waiting to Pay, a request opening in the modal with Record Disbursement and Withdraw; Paid; Record Disbursement (Bank Reference, Receipt, Paid On), No on Save Without Reference? back on Bank Reference; a Reference Missing pill and Add Reference; a paid one's Receipt row with Open Receipt when one was uploaded (TB, 11/11/2026). No chart (decision 7) | help on Bank Reference: "The bank's transaction ID for this transfer." | audit-anchor reasoning: §6.5 here |
@@ -520,7 +527,8 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 - **Profile bank details missing** with Use My Company Account: refused on the bank fields, "Add
   your bank details to your profile first".
 - **Category deactivated** while a request uses it: the request keeps it.
-- **No budget for the year or the category**: the request is flagged Over Budget, never blocked.
+- **No budget for the year or the category**: the request is flagged Over Budget, never blocked;
+  New Request reads No budget line (No budget for the department) before it is sent.
 - **Year end**: a request counts in the year it was sent, even if paid in January.
 - **Empty states**: no requests yet, no budget for the year (New Budget), no categories (Add
   Suggested Categories).
@@ -542,6 +550,7 @@ None.
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · QA audit BG-007 (F56b): Over Budget was flagged to the approvers but the requester saw nothing before Send Request. New Request now shows Budget Left, Department Left and the Over Budget pill once a category is picked, from the new read `GET /expenses/mine/budget-check` (`ExpenseBudgetCheckQuery`, `ExpenseBudgetCheck`; `expenses.budget-check.js` `preview`, the same count as sending). Still a warning, never a block (§3 step 7, §5, §6.6 rule 3, §10.1, §11). `budgets.test.js`, `Expenses.test.tsx`.
 - 24/11/2026 · JP · From the 23/11 staging faults brief (fault #5, `PAYEE_INCOMPLETE` at `POST /expenses/mine/:id/submit`) and JBS Praxis's answer: Send Request on a draft with a blank payee was refused after the press, the form having already saved its edit. `expenses.payeeProblems` in the contract is the one rule; the form marks Payee Name, Bank, Account Name and Account Number before it saves, and the window's Send Request opens Edit Request with them marked (§6 rule 2). `Expenses.test.tsx`, `expenses.test.js`.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Read Invoice, Suggest Category and Check Duplicate; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 16/11/2026 · TB · §9: the Document Centre's Library lists a request's invoice and a disbursement's receipt (`expenses.library.js`, `disbursements.library.js`; `document-centre.md` §6.2), each for the readers the vault already lets open it and nobody else. Nothing on an Expenses screen changed.

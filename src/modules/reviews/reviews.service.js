@@ -99,6 +99,8 @@ function reviewView(r) {
     score_month: r.score_month,
     score_to_date: r.score_to_date,
     rating: r.rating,
+    weight_scored: r.weight_scored,
+    weight_total: r.weight_total,
     due_on: day(r.due_on),
     waiting_on_me: Boolean(r.waiting_on_me),
   };
@@ -850,7 +852,12 @@ async function markConduct(actor, scope, id, body) {
     if (r.status === "closed") {
       patch.rating = ratingOf(r.score_to_date, body.conduct_breach, r);
       if (r.scorecard_id && r.review_kind === "monthly")
-        await repo.setScorecardScore(client, r.scorecard_id, { score_to_date: r.score_to_date, rating: patch.rating });
+        await repo.setScorecardScore(client, r.scorecard_id, {
+          score_to_date: r.score_to_date,
+          rating: patch.rating,
+          weight_scored: r.weight_scored,
+          weight_total: r.weight_total,
+        });
     }
     await repo.update(client, id, patch);
     await emit(client, {
@@ -890,26 +897,27 @@ async function setProbationOutcome(actor, scope, id, body) {
  * Closing, and the approval's other outcomes (after commit, reviews.events.js)
  * ------------------------------------------------------------------ */
 
-/** The month's score and the score to date of a review being closed. */
+/**
+ * The month's score and the score to date of a review being closed, and the coverage of the score
+ * to date: the weight of the lines it rests on and of every line (§6.9; BG-012).
+ */
 async function scoresOf(client, r, items) {
   const weighted = items.map((i) => ({ weight: i.weight === null || i.weight === undefined ? 1 : i.weight, score: i.score }));
   const month = scoring.scoreToDate(weighted);
-  if (!(r.scorecard_id && r.review_kind === "monthly")) return { month, toDate: month };
+  if (!(r.scorecard_id && r.review_kind === "monthly")) return { month, toDate: month, coverage: scoring.weightCoverage(weighted) };
   const lines = await targetsRepo.lines(client, r.scorecard_id);
   const months = await repo.closedMonths(client, r.scorecard_id);
   const thisMonth = day(r.month);
-  const toDate = scoring.scoreToDate(
-    lines.map((l) => {
-      const scores = months
-        .filter((m) => m.employee_target_id === l.employee_target_id && day(m.month) !== thisMonth)
-        .map((m) => ({ month: day(m.month), score: m.score }));
-      const mine = items.find((i) => i.employee_target_id === l.employee_target_id);
-      if (mine) scores.push({ month: thisMonth, score: mine.score });
-      scores.sort((a, b) => a.month.localeCompare(b.month));
-      return { weight: l.weight, score: scoring.lineScore({ section: l.section, months: scores.map((s) => s.score) }) };
-    }),
-  );
-  return { month, toDate };
+  const scored = lines.map((l) => {
+    const scores = months
+      .filter((m) => m.employee_target_id === l.employee_target_id && day(m.month) !== thisMonth)
+      .map((m) => ({ month: day(m.month), score: m.score }));
+    const mine = items.find((i) => i.employee_target_id === l.employee_target_id);
+    if (mine) scores.push({ month: thisMonth, score: mine.score });
+    scores.sort((a, b) => a.month.localeCompare(b.month));
+    return { weight: l.weight, score: scoring.lineScore({ section: l.section, months: scores.map((s) => s.score) }) };
+  });
+  return { month, toDate: scoring.scoreToDate(scored), coverage: scoring.weightCoverage(scored) };
 }
 
 /** The chain as the PDF prints it. */
@@ -951,17 +959,22 @@ async function applyOutcome(client, r) {
  */
 async function closeReview(client, r, actor = null) {
   const items = await repo.items(client, r.performance_review_id);
-  const { month, toDate } = await scoresOf(client, r, items);
+  const { month, toDate, coverage } = await scoresOf(client, r, items);
   const rating = ratingOf(toDate, Boolean(r.conduct_breach), r);
+  const weights = {
+    weight_scored: coverage ? scoring.formatWeight(coverage.scored) : null,
+    weight_total: coverage ? scoring.formatWeight(coverage.total) : null,
+  };
   await repo.update(client, r.performance_review_id, {
     status: "closed",
     closed_at: new Date(),
     score_month: scoring.formatScore(month),
     score_to_date: scoring.formatScore(toDate),
     rating,
+    ...weights,
   });
   if (r.scorecard_id && r.review_kind === "monthly")
-    await repo.setScorecardScore(client, r.scorecard_id, { score_to_date: scoring.formatScore(toDate), rating });
+    await repo.setScorecardScore(client, r.scorecard_id, { score_to_date: scoring.formatScore(toDate), rating, ...weights });
   const closed = await repo.get(client, r.performance_review_id);
   const month0 = await tasksOf(client, closed);
   const titles = (b) => month0.tasks.filter((t) => t.bucket === b).map((t) => t.title);
@@ -979,7 +992,7 @@ async function closeReview(client, r, actor = null) {
     key: EVENTS.REVIEW_CLOSED,
     entity: { type: "performance_review", id: r.performance_review_id },
     actor,
-    after: { score_month: closed.score_month, score_to_date: closed.score_to_date, rating },
+    after: { score_month: closed.score_month, score_to_date: closed.score_to_date, rating, ...weights },
     payload: {
       performance_review_id: r.performance_review_id,
       employee_id: r.employee_id,
@@ -1278,6 +1291,8 @@ async function myPerformance(actor) {
           status: card.status,
           score_to_date: card.score_to_date,
           rating: card.rating,
+          weight_scored: card.weight_scored,
+          weight_total: card.weight_total,
           employee_agreed_at: iso(card.employee_agreed_at),
           reviewer_name: card.reviewer ? card.reviewer.display_name : card.reviewer_role || null,
         }

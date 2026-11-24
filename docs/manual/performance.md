@@ -534,8 +534,8 @@ of the people you manage.
 ![A scorecard](shot:performance-scorecard)
 
 1. The top shows the **Employee**, their **Designation**, **Department**, **Reviewer**, **Dotted
-   Line** and **Scope**, then the **Status**, **Score to Date**, **Rating**, **Weights** and who
-   has **Agreed**.
+   Line** and **Scope**, then the **Status**, **Score to Date**, **Rating**, **Coverage**,
+   **Weights** and who has **Agreed**.
 2. Each section lists its lines: the **Goal** or **KPI**, its **Target**, what it is **Linked
    To**, when it is **Due**, its **Weight**, each month's score and the **Score**. On a phone, a
    line shows its **Goal**, **Target**, **Weight** and **Score**; press it for the rest, its month
@@ -551,6 +551,7 @@ of the people you manage.
 | Row | What it reads |
 |---|---|
 | **Rating** | **Exceeds**, **Meets**, **Partly Meets**, **Below**, or **Not Rated** before the first review closes |
+| **Coverage** | How much of the scorecard's weight the score and rating rest on, such as *70 of 100 scored*; empty before the first review closes |
 | **Weights** | **100%** when every section's lines add up; **Check** when one does not |
 | **Agreed** | **Both**, **Employee**, **Reviewer** or **Not Yet** |
 | **Approval** | Who a late joiner's scorecard waits on |
@@ -859,8 +860,11 @@ A probation review belongs to no month: choose **Probation** in **Kind** to list
    **Tasks** listing each with **When** and **Due**; the attendance (**This Month**) and
    **Recognitions**. If you may see queries, **Queries This Month** lists the person's queries
    raised that month with their **Number**, **Subject**, **Raised** and **Outcome**.
-7. Once scored: **Score This Month**, **Score to Date** and **Rating**, and **Conduct** when a note
-   is marked. **Corrective Actions** lists each **Action**, its **Owner**, **Due** and **Task**.
+7. Once scored: **Score This Month**, **Score to Date**, **Rating** and **Coverage**, and **Conduct**
+   when a note is marked. **Coverage** is the weight of the lines that had a score, of the whole
+   scorecard, such as *32.5 of 100 scored*: lines left unscored or **Not Assessable** count neither
+   way, so a high rating on low coverage rests on a few lines. Point at the figure, or tap it on a
+   phone, to read what it means. **Corrective Actions** lists each **Action**, its **Owner**, **Due** and **Task**.
 8. Once closed, press **Download PDF** for the letterheaded copy.
 
 A reviewer cannot open a review until the person has checked in, or its due date has passed. Until
@@ -1071,7 +1075,8 @@ reviews. It is a tab of Employee Self-Service.
 2. A bar at the top says when something waits for you, such as *Your check-in is due 03/11/2026*,
    with its button.
 3. The tiles show your **Score to Date**, your **Rating**, your check-in for **This Month**, your
-   **Commitments On Time** and your **Agreement**.
+   **Commitments On Time** and your **Agreement**. Once a review has closed, the line under
+   **Rating** says how much of your scorecard's weight it rests on, such as *70 of 100 scored*.
 4. **My Scorecard** lists your lines in their three sections, with each month's score. Press a line
    for **Scorecard Line**: its **Target**, **Weight**, each month's score and the **Score**; on a
    phone that is where the month scores are. Without a scorecard this quarter it reads
@@ -1093,7 +1098,7 @@ reviews. It is a tab of Employee Self-Service.
 
 | Tile | What it reads |
 |---|---|
-| **Rating** | **Exceeds**, **Meets**, **Partly Meets**, **Below**, or **Not Rated** before your first review closes |
+| **Rating** | **Exceeds**, **Meets**, **Partly Meets**, **Below**, or **Not Rated** before your first review closes; under it, the weight scored |
 | **This Month** | *Due* and the date, **Open**, **None Open**, or your review's stage, such as **With Reviewer** |
 | **Commitments On Time** | Such as *3 of 4*: this month's commitments done on time, of those due |
 | **Agreement** | **Agreed**, **Not Yet**, or **Draft** while it is being written |

@@ -4,7 +4,10 @@ import { checkInText } from "@/features/ess/Performance";
 import { stepOfField } from "./Quarter";
 import { nextStep } from "./Reviews";
 import { ApiError } from "@/api/client";
-import { fieldMessage, monthChoices, monthScores, sayRefusal, startMonth } from "./shared";
+import { cleanup, render, screen } from "@testing-library/react";
+import { installMatchMedia } from "@mycity/ui/testing";
+import copy from "../../../../scripts/check/lib/copy.js";
+import { Coverage, COVERAGE_HELP, coverageText, fieldMessage, monthChoices, monthScores, sayRefusal, startMonth } from "./shared";
 
 /**
  * The small rules the Performance screens share (docs/guides/performance.md §10): a field's mark in
@@ -13,6 +16,7 @@ import { fieldMessage, monthChoices, monthScores, sayRefusal, startMonth } from 
  * state as the person reads it. The clock is 03/11/2026.
  */
 
+installMatchMedia();
 beforeAll(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-03T08:30:00Z"));
@@ -124,5 +128,28 @@ describe("My Performance's This Month", () => {
     expect(checkInText({ status: "check_in", due_on: "2026-11-05" })).toBe("Due 05/11/2026");
     expect(checkInText({ status: "returned", due_on: null })).toBe("With Reviewer");
     expect(checkInText({ status: "with_hr", due_on: null })).toBe("With HR");
+  });
+});
+
+describe("Coverage: the weight a score to date rests on (BG-012, §10.1)", () => {
+  it("reads as the weight scored of the whole, and nothing before a review closes", () => {
+    expect(coverageText({ weight_scored: "32.5", weight_total: "100" })).toBe("32.5 of 100 scored");
+    expect(coverageText({ weight_scored: null, weight_total: null })).toBeNull();
+    expect(coverageText(null)).toBeNull();
+  });
+
+  it("its meaning sits behind a help term, closed, within the help limits", () => {
+    render(<Coverage of={{ weight_scored: "32.5", weight_total: "100" }} />);
+    const term = screen.getByRole("button", { name: "32.5 of 100 scored" });
+    const help = document.getElementById(term.getAttribute("aria-describedby") ?? "");
+    expect(help?.textContent).toBe(COVERAGE_HELP);
+    expect(help?.hidden).toBe(true);
+    expect(copy.wordCount(COVERAGE_HELP)).toBeLessThanOrEqual(copy.LIMITS.help);
+    expect(copy.hasDash(COVERAGE_HELP)).toBe(false);
+    cleanup();
+    render(<Coverage of={{ weight_scored: null, weight_total: null }} />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByText("–")).toBeTruthy();
+    cleanup();
   });
 });

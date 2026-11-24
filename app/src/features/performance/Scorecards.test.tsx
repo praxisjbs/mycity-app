@@ -217,6 +217,22 @@ describe("Performance · a mid-quarter scorecard, a scorecard's link and a line'
     expect(asked.at(-1)?.query).not.toHaveProperty("department_id");
   }, 30000);
 
+  it("a scorecard shows Coverage beside Score to Date and Rating; My Performance puts it under Rating (BG-012)", async () => {
+    // Adedotun's milestone line (30) has no score yet: the rating rests on 70 of the 100.
+    await openAs("ngozi@mycityapp.io", "/performance?tab=targets");
+    fireEvent.click(screen.getByText("Adedotun Oyinloye"));
+    await settled();
+    const sheet = top();
+    expect(within(sheet).getByText("Coverage")).toBeTruthy();
+    const term = within(sheet).getByRole("button", { name: "70 of 100 scored" });
+    expect(document.getElementById(term.getAttribute("aria-describedby") ?? "")?.hidden).toBe(true);
+    expect(within(sheet).getByText("Meets")).toBeTruthy();
+    cleanup();
+    await openAs("adedotun@mycityapp.io", "/ess?tab=my-performance");
+    expect(screen.getByText("70 of 100 scored")).toBeTruthy();
+    expect(copyProblems()).toEqual([]);
+  }, 30000);
+
   it("on a phone: scorecards and lines are cards; a line opens its own sheet with Change Target at its foot", async () => {
     setViewport(390);
     await openAs("ngozi@mycityapp.io", "/performance?tab=targets");

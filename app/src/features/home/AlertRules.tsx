@@ -28,7 +28,6 @@ import {
   useConfirm,
   useContractForm,
   useModal,
-  useUnsavedChanges,
   type DataViewColumn,
 } from "@mycity/ui";
 import { clearerOptions, isMetric, METRIC_OPTIONS, ruleLine, SEVERITY } from "./labels";
@@ -256,7 +255,6 @@ function EditRule({ ruleId, close }: { ruleId: string; close: () => void }) {
 function RuleForm({ rule, close }: { rule?: HomeAlertRule; close: () => void }) {
   // Edit Rule is held to the same rule as New Rule, its metric included, as the server holds a change.
   const f = useContractForm<RuleValues>(rule ? ruleValues(rule) : newRuleValues(), alerts.HomeAlertRuleCreate);
-  useUnsavedChanges(f.isDirty);
   const create = useMutation("POST /api/v1/home/alert-rules");
   const update = useMutation("PATCH /api/v1/home/alert-rules/:id");
   const v = f.values;

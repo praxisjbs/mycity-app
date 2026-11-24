@@ -112,6 +112,25 @@ describe("scorecard line scoring (scorecard workbook, Guide)", () => {
     expect(s.scoreToDate(lines)).toBeCloseTo((11.25 + 45 + 12.5) / 85, 10);
     expect(s.scoreToDate([{ weight: 10, score: null }])).toBeNull();
   });
+
+  test("coverage: the weight a score to date rests on, over the same lines (BG-012)", () => {
+    // The audit's case: Results 60 Not Assessable, KPI 25 and the update 7.5 scored 1, commitments blank.
+    const lines = [
+      { weight: "60", score: null },
+      { weight: "25", score: "1" },
+      { weight: "7.5", score: null },
+      { weight: "7.5", score: "1" },
+    ];
+    expect(s.scoreToDate(lines)).toBe(1);
+    expect(s.rating(s.scoreToDate(lines))).toBe("exceeds");
+    expect(s.weightCoverage(lines)).toEqual({ scored: 32.5, total: 100 });
+    expect([s.formatWeight(32.5), s.formatWeight(100), s.formatWeight("12.50")]).toEqual(["32.5", "100", "12.5"]);
+    // A line weighted zero counts in neither; nothing scored is 0 of the whole; no weight at all is null.
+    expect(s.weightCoverage([{ weight: 0, score: "1" }, { weight: 40, score: null }])).toEqual({ scored: 0, total: 40 });
+    expect(s.weightCoverage([])).toBeNull();
+    expect(s.WeightSum.safeParse("32.5").success).toBe(true);
+    expect(s.WeightSum.safeParse("32.555").success).toBe(false);
+  });
 });
 
 describe("rating and the conduct cap (§6.15)", () => {

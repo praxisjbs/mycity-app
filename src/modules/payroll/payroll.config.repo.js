@@ -13,7 +13,8 @@
  *   nextPayDate(db, today, isPaid)  the next pay date on or after today whose run is not paid
  *
  * A run reads the setting on its period's first day, so the mode a month was computed in is the mode of
- * that month, whenever it is computed (§6.11 rule 2).
+ * that month, whenever it is computed (§6.11 rule 2). Bank Details Required is the exception: a run reads it as it
+ * stands on the day Compute or Submit runs, so a rule switched on mid-month holds the open run (§6.1 rule 4).
  */
 const effective = require("../../shared/db/effective-dated");
 const { AppError } = require("../../shared/errors");

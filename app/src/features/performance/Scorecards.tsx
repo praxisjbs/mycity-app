@@ -58,7 +58,7 @@ import {
   useModal,
 } from "@mycity/ui";
 import { Commitments } from "./Commitments";
-import { cardStatus, figureOf, fieldMessage, monthChoices, monthScores, monthShort, person, rating, score, SECTION_NAMES, startMonth, targetOf, useDepartmentFilter, useQuarter } from "./shared";
+import { cardStatus, Coverage, figureOf, fieldMessage, monthChoices, monthScores, monthShort, person, rating, score, SECTION_NAMES, startMonth, targetOf, useDepartmentFilter, useQuarter } from "./shared";
 
 const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
@@ -322,6 +322,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
           ["Status", cardStatus(c.status).text],
           ["Score to Date", score(c.score_to_date)],
           ["Rating", rating(c.rating).text],
+          ["Coverage", <Coverage of={c} />],
           ["Weights", c.weight_problems.length ? "Check" : "100%"],
           ["Agreed", agreedText],
           ...(c.amendment_instance_id ? ([["Approval", w?.stage_name ? `With ${w.stage_name}` : "Awaiting Approval"]] as Array<[string, string]>) : []),

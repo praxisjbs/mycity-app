@@ -15,7 +15,7 @@ const { z } = require("zod");
 const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { Link } = require("./tasks");
-const { ScoreValue, Quantity, Rating } = require("./scoring");
+const { ScoreValue, Quantity, Rating, WeightSum } = require("./scoring");
 const { MonthStart } = require("./kpis");
 const { Section, LineMeasure, LineSource, Weight } = require("./targets");
 const { UploadPurpose } = require("./documents");
@@ -102,6 +102,9 @@ const Review = z
     score_month: ScoreValue.nullable(),
     score_to_date: ScoreValue.nullable(),
     rating: Rating.nullable(),
+    /** What the score to date rests on, written at close (§6.9): the weight of the lines scored, of all lines. */
+    weight_scored: WeightSum.nullable(),
+    weight_total: WeightSum.nullable(),
     due_on: isoDate.nullable(),
     waiting_on_me: z.boolean(),
   })
@@ -646,6 +649,8 @@ const ReviewSummaryVars = z
     score_month: z.string(),
     score_to_date: z.string(),
     rating: z.string(),
+    /** "32.5 of 100 scored": the weight the score to date rests on. */
+    coverage: z.string(),
     conduct_note: z.string().nullable(),
     outcome: z.string().nullable(),
     no_check_in_reason: z.string().nullable(),

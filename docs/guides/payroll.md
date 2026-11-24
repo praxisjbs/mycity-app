@@ -10,7 +10,7 @@
 | Capabilities | `payroll.configure` (switch the advanced option on or off, set the pay day, enter statutory rates, bands, salary grades, pay components and a person's Prior Pay; the run itself needs only the `payroll` grant) |
 | Screens (PROGRESS.md rows) | #45 Payroll Runs, #46 Payslips, #48 Deductions, Configurations (new; PR 1 registers it in the next free row, #109 while free (#107 and #108 are the public site's), and marks #47 Salary Structure and #49 Statutory Dropped), #11 My Payslips; changes to Home (the Payroll In Progress card), Settings · Approvals (#72, the `payroll.run` flow), People · Attendance (#25, its Deductions and Overtime views gain a link to the run), Queries & Sanctions · Sanctions (a fine's Payroll state) and the Notification Settings (#74, the Payroll category) |
 | Status | Agreed |
-| Last changed | 16/11/2026 |
+| Last changed | 24/11/2026 |
 
 ---
 
@@ -440,7 +440,8 @@ key's versions and ends the open one the day before the next starts.
   `6020_payroll_advanced.sql` (grades, components, rates, and the employee columns); `6030_leave_unpaid.sql`
   (`leave_type.unpaid`); `6040_statutory_sources.sql` (each statutory version's legal source, PR 10);
   `6050_statutory_law.sql` (rent relief and the minimum wage, the PAYE Refund line, a payslip's taxable pay, the NHF choice
-  and the State on the employee, the rent declarations and Prior Pay; PR 11); the reference seed
+  and the State on the employee, the rent declarations and Prior Pay; PR 11); `6060_build_account_no_pay.sql` (no schema:
+  clears the pay and bank details on the build account's record, found by its role, §6.1 rule 6; QA BG-003); the reference seed
   `seeds/reference/6099_seed_payroll.sql`. Gaps are left between
   numbers so a fix can sit beside what it fixes.
 - **The seed holds only what the code cannot run without** (A26, MIGRATIONS §9): the `payroll.run` approval
@@ -596,10 +597,21 @@ business dates (`shared/time/lagos`).
 3. An excluded person has a payslip with status `excluded` and its reason, no lines and no number counted in
    the headcount; including them again and computing builds their lines.
 4. A person with no `bank_name` or `account_number` gets the warning No Bank Details (not blocking: they may
-   be paid another way) unless Bank Details Required is on, when it blocks Submit (§6.15). A person whose `contract_ends_on` is before the period's last day while still active
-   gets the warning Contract Ended.
+   be paid another way) unless Bank Details Required is on, when it blocks Submit (§6.15). The bank rule is read as it
+   stands on the day Compute or Submit runs, not on the month's first day, so a rule switched on mid-month holds the open
+   run at its next Compute, and Submit (which computes again) refuses it (QA BG-011, JBS Praxis, 24/11/2026; §13.1 item
+   49). The run keeps the rule it read in `config_snapshot` (`require_bank_details`, `bank_rule_on`). A person whose
+   `contract_ends_on` is before the period's last day while still active gets the warning Contract Ended.
 5. Compute never adds or removes a person from the group by itself once the run is Submitted; a joiner after
    Submit is paid in the next run (§11).
+6. **The build account is never in a run** (QA BG-003, JBS Praxis, 24/11/2026; §13.1 item 48). The account
+   `scripts/db/create-admin.js --build-account` makes is JBS Praxis's, the implementation partner's, never one of
+   MyCity's staff. `payroll.inputs.peopleFor` leaves out every person whose login holds the role that script gives it
+   (`implementation`, Implementation Team; `BUILD_TEAM_ROLE`), whatever pay the record is later given, so it gets no
+   payslip, cannot be excluded or given an adjustment (422 `NOT_IN_RUN`) and is in no count. The script gives the
+   record no salary and no bank details, and `6060_build_account_no_pay.sql` cleared both on the records already made
+   on staging and production, found the same way (by the role, never by name). At handover the record is archived, not
+   only its login suspended (`docs/runbooks/first-accounts.md` §5).
 
 ### 6.2 The month and the daily rate
 
@@ -697,6 +709,18 @@ suspension into absent days), so payroll does, from the owners' records:
    from final pay; a person whose `left_on` is in a later month keeps their schedule. Fines come before advances on the
    slip, then by month; if that would make the net
    negative, §6.7 rule 3 stands and Operations & People decide (settled 08/11/2026, §13.1 item 16).
+10. **An instalment a run cannot take rolls forward** (QA BG-002, JBS Praxis, 24/11/2026; §13.1 item 47). When a person
+   with an instalment due in the run's month (or, for a leaver, any they still owe) is excluded or has no pay (No Salary
+   Set, No Start Date), the run reports the warning Salary Advance Repayment Not Taken (`ADVANCE_NOT_TAKEN`) or Fine
+   Instalment Not Taken (`FINE_NOT_TAKEN`) on that person, with how many (§6.15). When the run is approved, the lock moves
+   each instalment of its month it did not take to the person's next paid month, and every later scheduled instalment of
+   that deduction a month on, so the schedule runs a month longer for each month missed and **nobody pays two
+   instalments of one deduction in a month** (`payroll.lock.carryPlan`, pure). A month is skipped if its run is already
+   Submitted, Approved or Paid or another instalment of the deduction is already taken in it. An instalment of an earlier
+   month whose run is approved or paid and left it behind (before this rule) moves the same way at the next approval; one
+   of an earlier month whose run is still open waits for that run. A leaver's are not moved: their final run takes all
+   they owe (rule 9), and what it could not take stays for Operations & People. Each deduction moved records
+   `payroll_deduction.rescheduled` (§7). Send Back, Reject and withdrawal move nothing.
 
 ### 6.7 Adjustments and the net
 
@@ -811,7 +835,8 @@ suspension into absent days), so payroll does, from the owners' records:
 2. **The advanced option** is a versioned setting (`payroll_setting`). It decides a run's mode by the run's
    **period**: a run is advanced when the setting in force on its first day has `advanced_enabled`. Switching on
    from 1 December makes the December run advanced; November, computed in December, stays simple. A locked run
-   never changes (it carries `advanced` and its snapshot).
+   never changes (it carries `advanced` and its snapshot). Bank Details Required is not read by period: a run reads it as
+   it stands when Compute or Submit runs (§6.1 rule 4).
 3. **Switching on** needs `payroll.configure`, a date that is today or later (Lagos, never earlier) and at least
    one statutory figure in force on that date (409 `NO_RATES`). Nothing else is asked since PR 11: the law settles
    the accountant's conventions, which the engine fixes (§6.12 rule 14).
@@ -819,7 +844,8 @@ suspension into absent days), so payroll does, from the owners' records:
    (a pay day, the switch or the bank rule waiting for its day) is taken back with Remove Change (§5), and the version
    before it runs on.
 3a. **The options MyCity configures** (§13.1 item 21), each saved as a new version of the setting from a date,
-   needing `payroll.configure`: **Pay Day**; **Bank Details Required** (a person with no bank details blocks Submit);
+   needing `payroll.configure`: **Pay Day**; **Bank Details Required** (a person with no bank details blocks Submit,
+   from the open run's next Compute, §6.1 rule 4);
    and, in advanced mode, the statutory figures and bands (each with its legal source, §6.12 rule 12), the pay components
    and each person's Prior Pay (PR 11; the conventions left the screen, the law settling them, §6.12 rule 14).
    Every figure and every convention is entered in the app by Operations & People, who run MyCity's payroll, when MyCity
@@ -1095,6 +1121,8 @@ is still 450,000.00 (s.120), and the net is 450,000.00 less 90,200.00, **₦359,
 | `CONTRACT_ENDED` | Warning | An active person's contract ended before the period's last day | Check the person, exclude if needed |
 | `NO_PAY_SPLIT` | Warning | Advanced mode and no pay components for a person | Set the split on Configurations |
 | `FINE_WAITING` | Warning | A pending fine exists (any month) | Accept, spread or waive it on Deductions |
+| `ADVANCE_NOT_TAKEN` | Warning | A person left out of the run or with no pay has an advance's instalment due this month (a leaver: any still owed); "Salary Advance Repayment not taken for …", with how many | Include them, or it moves to their next paid month (§6.6 rule 10) |
+| `FINE_NOT_TAKEN` | Warning | The same, for a fine's instalment; "Fine instalment not taken for …" | Include them, or it moves to their next paid month (§6.6 rule 10) |
 
 Submit refuses while any Blocking problem stands (422 `RUN_HAS_PROBLEMS`); warnings never block. A problem is about one person, and
 Overtime Waiting and Fine Waiting say how many; a run reports problems while it is a Draft or Computed one, and none once it is
@@ -1187,6 +1215,7 @@ the period, counts and statuses, never an amount (§6.13).
 | `payroll_adjustment.added`, `.removed` | An adjustment is saved or removed | Audit |
 | `payslip.excluded`, `.included` | A person is left out of a run, or put back | Audit |
 | `payroll_deduction.accepted`, `.released`, `.waived`, `.settled`, `.cancelled` | A fine or advance moves | Audit; notifies the employee for accepted, waived and a recorded advance; the fine events also reach `sanctions.fines`'s own (`sanction_fine.accepted` and so on). `.settled` is emitted by the lock (PR 2, entity `deduction`); the others are PR 3's (a fine's events name the fine as their entity, an advance's the deduction; an advance recorded is an `.accepted` with source `salary_advance`, and a cancelled advance tells no one) |
+| `payroll_deduction.rescheduled` | The lock moved on instalments the approved run did not take (§6.6 rule 10), one event a deduction (entity `deduction`) | Audit: the run, its month, how many moved and the first new month (`next_period`), never an amount; nobody is told |
 | `payroll_deduction.fine_pending` | After commit, from an outbox handler on `sanction.issued` whose payload has a `fine_amount` (`deductions.fine_waiting`); its `dedup_key` is the fine, so a retry tells once | Notifies `payroll` edit holders (scope `all`) "Fine Waiting for Payroll", the person and the query number, never the amount |
 | `payroll_setting.changed`, `statutory_rate.saved`, `salary_grade.saved`, `grade_placement.saved`, `pay_components.saved` | Configurations change | Audit; `payroll_setting.changed` is `security: true` so the access watchers are told. Each carries the item, code, person and day, never a rate's figure or an amount; nobody is told. `statutory_rate.saved` also says whether the version has a source or No Legal Source, and names its document |
 | `statutory_rate.removed`, `payroll_setting.removed` | Remove Change on a version not yet in force (PR 10) | Audit, with the version as it stood (`before`) and the version before it reopened; `payroll_setting.removed` is `security: true`, as `.changed` is. Carries the item and the day, never a figure; nobody is told |
@@ -1732,6 +1761,17 @@ relief's design):
     Guidelines para 25). State of Residence (the 36 states and the Federal Capital Territory) is on People · Employees' Tax
     and Pension step and in the staff import, masked as `employee.statutory`; PAYE and PAYE Refund print one group a
     State on the report, a person with none under Not Set.
+47. **An instalment a run cannot take rolls forward** (JBS Praxis, 24/11/2026; QA BG-002). The run warns, naming the
+    advance (or the fine), when a person with an instalment due is excluded or has no pay; on approval of a run that did
+    not recover it, the missed instalment moves to the next month the person is paid and the schedule runs a month
+    longer. Nobody pays two instalments in one month. §6.6 rule 10.
+48. **The build account is never in a payroll run** (JBS Praxis, 24/11/2026; QA BG-003). `create-admin --build-account`
+    gives it no salary and no bank details; `6060` clears both on the records already made, found by the account's role,
+    never by name; the run leaves it out by rule even if someone later gives it a salary; at handover its employee record
+    is closed, not only its login suspended. §6.1 rule 6, `docs/runbooks/first-accounts.md` §2 and §5.
+49. **Bank Details Required holds the open run from the day it is switched on** (JBS Praxis, 24/11/2026; QA BG-011).
+    Compute and Submit read the bank rule as it stands that day, not on the month's first day; the advanced option keeps
+    being read by the run's period (§6.11 rule 2). §6.1 rule 4.
 
 ### 13.2 Decided in writing this guide (change here if wrong)
 
@@ -2344,8 +2384,8 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
   `ess` (the routes, in `ess.earnings.js`, `ess.controller.js`, `ess.routes.js`), `dashboard/sources/payroll.source.js`, `settings.service.js`, `shared/access/access.catalog.js`,
   `shared/rbac/field-mask.js`, `shared/workflow/definitions.js`, `shared/route-map.js`, `shared/search/screens.js`.
 - **Schema:** `migrations/6000_payroll.sql`, `6010_payroll_deductions.sql`, `6020_payroll_advanced.sql`,
-  `6030_leave_unpaid.sql`, `6040_statutory_sources.sql`, `6050_statutory_law.sql`; `seeds/reference/6099_seed_payroll.sql`;
-  `seeds/staging/58_payroll.js` (PR 8, tested by `tests/integration/payroll-staging-seed.test.js`).
+  `6030_leave_unpaid.sql`, `6040_statutory_sources.sql`, `6050_statutory_law.sql`, `6060_build_account_no_pay.sql`;
+  `seeds/reference/6099_seed_payroll.sql`; `seeds/staging/58_payroll.js` (PR 8, tested by `tests/integration/payroll-staging-seed.test.js`).
 - **Templates:** `templates/documents/payslip.html`, `payslip-batch.html`, `statutory-report.html`;
   `templates/email/payslip-ready.html`.
 - **Frontend:** `app/src/features/payroll/` (the files of PR 7; `Deductions.tsx` came with PR 3 and `Configurations.tsx`
@@ -2361,6 +2401,17 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 24/11/2026 · LA · QA audit fixes, decided by JBS Praxis on 24/11/2026 (§13.1 items 47 to 49). BG-002: an instalment a
+  run cannot take (its person excluded or with no pay) is the new warning `ADVANCE_NOT_TAKEN` or `FINE_NOT_TAKEN` on the
+  run (contract `ProblemCode`, §6.15), and the lock moves it, with the deduction's later instalments, a month on when the
+  run is approved (`payroll.lock.carryMissed` and `carryPlan`, `payroll.repo.missedInstalments`; event
+  `payroll_deduction.rescheduled`, §7); §6.6 rule 10. BG-003: the build account is never in a run
+  (`payroll.inputs.peopleFor` leaves out the Implementation Team role's holders), `create-admin --build-account` gives
+  it no pay or bank details, and migration `6060_build_account_no_pay.sql` clears both on the records already made;
+  §6.1 rule 6, §4.3, Appendix D, `docs/runbooks/first-accounts.md` §2 and §5. BG-011: Compute and Submit read Bank
+  Details Required as it stands that day (`config_snapshot.bank_rule_on`); §6.1 rule 4, §6.11 rules 2 and 3a. Tests:
+  `tests/integration/payroll-run.test.js` (the last three), `src/modules/payroll/payroll.test.js` (`carryPlan`),
+  `tests/integration/identity.test.js` (the build account's empty pay columns).
 - 16/11/2026 · TB · §9: the Document Centre's Library lists a statutory rate's source and a joiner's leaving certificate (`statutory.library.js`; `document-centre.md` §6.2), by the vault's default rule: restricted, so Payroll's `edit`, the employee it is about or whoever filed it. Payslips are never listed there (its D4). Nothing on a Payroll screen changed.
 - 14/11/2026 · JP · Found filming the M6 videos: a person with no start date was left out of every run without a word
   (`payroll.inputs.peopleFor` read `start_date <= the month's last day`), and the roster loads Operations & People's

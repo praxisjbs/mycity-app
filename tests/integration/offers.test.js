@@ -625,4 +625,146 @@ describeDb("Recruitment · Offers against the real migrations", () => {
     ]);
     expect(signed.body.can_send).toBe(true);
   }, 90_000);
+
+  /** A vacancy with no pay range, typed as asked (QA audit BG-001: the draft once started at 0.00 there). */
+  async function rangelessApplicant(first, type = "internship") {
+    const dept = (await one("SELECT department_id FROM department WHERE name = 'Partnerships'")).department_id;
+    const v = await h.as("ops").post("/recruitment/vacancies").send({
+      title: `Content Intern (${first})`,
+      department_id: dept,
+      hiring_manager_id: h.people.hod.employee_id,
+      positions: 1,
+      employment_type: type,
+      work_pattern: "on_site",
+      location: { token: area("Yaba, Lagos") },
+      description: "Helps the content team research, write and check the listings that make the city guides worth opening.",
+      requirements: "A student or recent graduate who writes well.",
+      closes_on: lagos.addDays(lagos.today(), 30),
+      publish: true,
+    });
+    expect([v.status, v.body.error]).toEqual([201, undefined]);
+    n += 1;
+    const k = await one("INSERT INTO candidate (first_name, last_name, email) VALUES ($1, 'Adeyemi', $2) RETURNING candidate_id", [first, `${first.toLowerCase()}.adeyemi@example.test`]);
+    const a = await one(
+      "INSERT INTO application (number, vacancy_id, candidate_id, source, stage, status) VALUES ($1, $2, $3, 'careers', 'shortlist', 'active') RETURNING application_id",
+      [`APP-${String(900 + n).padStart(4, "0")}`, v.body.vacancy_id, k.candidate_id],
+    );
+    return a.application_id;
+  }
+
+  test("Basic Salary is above ₦0 at New Offer, Edit and Submit; no line below zero; an intern at ₦0 only with a reason the approvers read (BG-001)", async () => {
+    await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
+    const appId = await rangelessApplicant("Funmi");
+    // With no range on the vacancy the draft starts Basic Salary empty, not 0.00.
+    const start = await h.as("ops").get(`/recruitment/offers/draft?application_id=${appId}`);
+    expect(start.status).toBe(200);
+    expect(start.body).toMatchObject({ salary_min: null, salary_max: null, employment_type: "intern" });
+    expect(start.body.pay_lines).toEqual([{ name: "Basic Salary", monthly_amount: null }]);
+
+    const offer = (monthly, extra = {}) => ({ ...terms(appId, monthly), job_title: "Content Intern", work_pattern: "on_site", office_days: null, ...extra });
+    // Every line at ₦0, for a full-time offer: refused on the Basic Salary line.
+    const zero = await h.as("ops").post("/recruitment/offers").send(offer(["0.00", "0.00", "0.00"]));
+    expect(zero.status).toBe(422);
+    expect(zero.body.error).toMatchObject({ code: "NO_BASIC_SALARY", fields: { "pay_lines.0.monthly_amount": ["Enter an amount"] } });
+    // A line below zero is refused by the contract, before the database's own CHECK.
+    const negative = await h.as("ops").post("/recruitment/offers").send(offer(["150000.00", "-5000.00", "0.00"]));
+    expect(negative.status).toBe(422);
+    expect(negative.body.error.fields).toEqual({ "pay_lines.1.monthly_amount": ["Not below zero"] });
+    expect(schemas.offers.OfferPayLineInput.safeParse({ name: "Transportation Allowance", monthly_amount: "-1.00" }).success).toBe(false);
+    // The assistant's card takes a basic salary above ₦0 only.
+    expect(schemas.offers.OfferCard.safeParse({ application_id: appId, start_date: lagos.addDays(lagos.today(), 30), basic_salary: "0.00" }).success).toBe(false);
+
+    // An intern at ₦0: refused without a reason, kept with one, and shown on the offer the approvers open.
+    const intern = { employment_type: "intern" };
+    const noReason = await h.as("ops").post("/recruitment/offers").send(offer(["0.00", "20000.00", "0.00"], intern));
+    expect(noReason.status).toBe(422);
+    expect(noReason.body.error).toMatchObject({ code: "ZERO_BASIC_REASON", fields: { zero_basic_reason: ["Say why"] } });
+    const reason = "A university placement: the stipend is paid by the student's scholarship.";
+    const made = await h.as("ops").post("/recruitment/offers").send(offer(["0.00", "20000.00", "0.00"], { ...intern, zero_basic_reason: reason }));
+    expect(made.status).toBe(201);
+    expect(made.body).toMatchObject({ employment_type: "intern", monthly_total: "20000.00", zero_basic_reason: reason });
+
+    // Edit: the type changed away from intern with Basic Salary still ₦0 is refused; a salary drops the reason.
+    const toFullTime = await h.as("ops").patch(`/recruitment/offers/${made.body.offer_id}`).send({ employment_type: "full_time" });
+    expect(toFullTime.status).toBe(422);
+    expect(toFullTime.body.error.code).toBe("NO_BASIC_SALARY");
+    const paid = await h.as("ops").patch(`/recruitment/offers/${made.body.offer_id}`).send({ pay_lines: [{ name: "Stipend", monthly_amount: "50000.00" }] });
+    expect(paid.status).toBe(200);
+    expect(paid.body.zero_basic_reason).toBeNull();
+    const back = await h.as("ops").patch(`/recruitment/offers/${made.body.offer_id}`).send({ pay_lines: [{ name: "Stipend", monthly_amount: "0.00" }], zero_basic_reason: reason });
+    expect(back.status).toBe(200);
+    const approver = await h.as("hod").get(`/recruitment/offers/${made.body.offer_id}`);
+    expect(approver.body.zero_basic_reason).toBe(reason);
+    expect((await h.as("ops").post(`/recruitment/offers/${made.body.offer_id}/submit`).send({})).status).toBe(200);
+
+    // A draft at ₦0 written before the rule (as the audit found one) is refused at Submit for Approval.
+    const other = await rangelessApplicant("Gbenga", "full_time");
+    const old = (await h.as("ops").post("/recruitment/offers").send({ ...terms(other, ["150000.00", "0.00", "0.00"]), job_title: "Content Intern", work_pattern: "on_site", office_days: null })).body;
+    await pool.query("UPDATE offer_pay_line SET monthly_amount = 0 WHERE offer_id = $1", [old.offer_id]);
+    const submitted = await h.as("ops").post(`/recruitment/offers/${old.offer_id}/submit`).send({});
+    expect(submitted.status).toBe(422);
+    expect(submitted.body.error).toMatchObject({ code: "NO_BASIC_SALARY", fields: { "pay_lines.0.monthly_amount": ["Enter an amount"] } });
+    expect(await one("SELECT status FROM offer WHERE offer_id = $1", [old.offer_id])).toEqual({ status: "draft" });
+  }, 90_000);
+
+  test("a start date that has passed is refused at Submit for Approval and at Send Offer (BG-008)", async () => {
+    await h.as("ops").put("/recruitment/offers/settings/signatory").send({ signatory_employee_id: h.people.ops.employee_id });
+    const appId = await applicant("Kola");
+    const made = (await h.as("ops").post("/recruitment/offers").send({ ...terms(appId), start_date: lagos.addDays(lagos.today(), 3) })).body;
+    const yesterday = lagos.addDays(lagos.today(), -1);
+    // The draft waited until its start date had gone: Submit sends it back to Edit Offer.
+    await pool.query("UPDATE offer SET start_date = $2 WHERE offer_id = $1", [made.offer_id, yesterday]);
+    const sub = await h.as("ops").post(`/recruitment/offers/${made.offer_id}/submit`).send({});
+    expect(sub.status).toBe(422);
+    expect(sub.body.error).toMatchObject({ code: "START_PAST", message: "The start date has passed. Change it in Edit Offer.", fields: { start_date: ["Pick a later date"] } });
+    await pool.query("UPDATE offer SET start_date = $2 WHERE offer_id = $1", [made.offer_id, lagos.addDays(lagos.today(), 3)]);
+    await approved(made.offer_id);
+    await requirements();
+    expect((await h.as("ops").post(`/recruitment/offers/${made.offer_id}/sign`).send({ full_name: "Ada Obi", method: "type", typed: "Ada Obi", consent: true })).status).toBe(200);
+    // The approval took longer than the days left: Send refuses, and the offer stays approved and unsent.
+    await pool.query("UPDATE offer SET start_date = $2 WHERE offer_id = $1", [made.offer_id, yesterday]);
+    const before = mails("offer-sent").length;
+    const sent = await h.as("ops").post(`/recruitment/offers/${made.offer_id}/send`).send({});
+    expect(sent.status).toBe(422);
+    expect(sent.body.error).toMatchObject({ code: "START_PAST", message: "The start date has passed. Withdraw it and make a new offer." });
+    expect(await one("SELECT status, sent_at FROM offer WHERE offer_id = $1", [made.offer_id])).toEqual({ status: "approved", sent_at: null });
+    expect(mails("offer-sent").length).toBe(before);
+    // Today still counts: a hire may start the day the offer goes out.
+    await pool.query("UPDATE offer SET start_date = $2 WHERE offer_id = $1", [made.offer_id, lagos.today()]);
+    expect((await h.as("ops").post(`/recruitment/offers/${made.offer_id}/send`).send({})).status).toBe(200);
+  }, 90_000);
+
+  test("the letter words an employee, a contractor, a consultant and an intern apart; Offer Settings can branch on the type (BG-009)", async () => {
+    const letterFor = async (type, first) => {
+      const appId = await applicant(first);
+      const made = await h.as("ops").post("/recruitment/offers").send({ ...terms(appId), employment_type: type });
+      expect(made.status).toBe(201);
+      return made.body.letter.join("\n");
+    };
+    const employee = await letterFor("full_time", "Remi");
+    expect(employee).toContain("We are pleased to offer you employment with");
+    expect(employee).toContain("subject to applicable statutory deductions, including PAYE tax and pension contributions where applicable");
+    const contractor = await letterFor("contractor", "Segun");
+    expect(contractor).toContain("Offer of Engagement: Partnerships Manager");
+    expect(contractor).toContain("independent contractor");
+    expect(contractor).toContain("nothing in this letter creates an employment relationship");
+    expect(contractor).toContain("on receipt of your invoice");
+    expect(contractor).not.toContain("You are employed as");
+    expect(contractor).not.toContain("PAYE tax and pension contributions where applicable");
+    const consultant = await letterFor("consultant", "Obinna");
+    expect(consultant).toContain("independent consultant");
+    expect(consultant).not.toContain("independent contractor");
+    const intern = await letterFor("intern", "Halima");
+    expect(intern).toContain("Offer of Internship: Partnerships Manager");
+    expect(intern).toContain("Your monthly stipend is as follows");
+    expect(intern).toContain("who will set your learning objectives");
+    expect(intern).not.toContain("You are employed as");
+
+    // The flags are the wording's own variables: a saved wording may branch on them.
+    const letter = await h.as("ops").get("/recruitment/offers/settings/letter");
+    expect(letter.body.variables).toEqual(expect.arrayContaining(["is_employee", "is_contractor", "is_consultant", "is_intern"]));
+    const saved = await h.as("ops").put("/recruitment/offers/settings/letter").send({ body: `${letter.body.body}\n\n{{#if is_intern}}Your supervisor meets you weekly.{{/if}}` });
+    expect(saved.status).toBe(200);
+    expect((await h.as("ops").post("/recruitment/offers/settings/letter/restore").send({})).status).toBe(200);
+  }, 90_000);
 });

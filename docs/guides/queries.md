@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 16/11/2026 |
+| Last changed | 24/11/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -126,7 +126,7 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 |---|---|---|---|---|
 | `GET /api/v1/queries/summary` | → `QueriesSummary` | `queries` view · §6.1 | no | |
 | `GET /api/v1/queries` | `QueryListQuery` (`status`, `employee_id`, `raised`: `mine`, `rules`, `raised_from` and `raised_to` (Lagos days, both inclusive; a review's month), `ready` (`true`: open, no sanction waiting, answered or past its deadline, not about the reader; Issue Sanction's picker), `q`, `sort`) → `QueryPage` | `queries` view · §6.1 | yes, 25 | |
-| `GET /api/v1/queries/:id` | → `QueryDetail` | `queries` view · §6.1 | no | 404 outside visibility. `approval` names the stage a proposed sanction waits on, whether the reader may decide it and whether they sign |
+| `GET /api/v1/queries/:id` | → `QueryDetail` | `queries` view · §6.1 | no | 404 outside visibility. `approval` names the stage a proposed sanction waits on, whether the reader may decide it and whether they sign. `sanction.position` is its rung's place on the ladder (null for a rung since removed), read against the standing (§6.5) |
 | `POST /api/v1/queries` | `QueryCreate` → `QueryDetail` | `queries` create | | Idempotency-Key |
 | `POST /api/v1/queries/:id/remind` | `EmptyBody` → `QueryDetail` | `queries` create · §6.1 | | Once a day, while awaiting a response |
 | `POST /api/v1/queries/:id/decision` | `QueryDecision` → `QueryDetail` | `queries` edit · §6.1 | | §6.4 |
@@ -303,6 +303,12 @@ keeps the Operations & People signature (`definitions.decidedOnRecord`).
   on queries they raised, so it never hints at the others; Operations & People, who approve every
   sanction, see the whole standing. With none in force it is the first rung. This is what a second offence offers
   without code. People may choose a different rung; the choice and reason are recorded.
+- **The approver sees the standing** (QA audit BG-014, 24/11/2026; show and mark only). A manager's
+  Next can read Caution while a Warning someone else raised is in force, so the query's card shows a
+  reader with scope all (Operations & People, who approve every rung, and the CEO) the person's
+  sanctions in force and the next rung, from `GET /sanctions/standing`, while the query is open. A
+  proposal still waiting whose rung sits at or below a rung in force is marked **Below Next Step**.
+  Nothing more is asked of the proposer, and nothing is refused: the approver decides knowingly.
 - A retired rung keeps its sanctions; it is no longer offered. A rung with sanctions is never deleted.
 - Who decides is the `queries.consequence` approval, edited on Settings · Approvals: Operations &
   People for every rung (who sign it, §6.4), then the CEO for a rung that suspends without pay or
@@ -515,7 +521,7 @@ or tier 2.**
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature; Write With AI (What To Say, Write Draft, the draft, Try Again, Use Draft), reading AI Is Off or AI Limit Reached when it cannot answer | Help on Clause: the line of the policy the letter quotes | Where the signature is kept, the version cited: §6.2 |
-| Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised); Queries by Reason under it; a pressed row opens the query in a sheet (its status pill, subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, responded, sanction, and while a sanction waits: its step and who it waits on); Raise a Query (only with `queries` create; also from ⌘K), Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on; a refused proposal reads "Not Approved" | Help on Escalated (the KPI) and on Waiting On: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
+| Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised); Queries by Reason under it; a pressed row opens the query in a sheet (its status pill, subject, raised by (a person, the rule, or Attendance Policy), raised, response due, counted days, response, responded, sanction, and while a sanction waits: its step and who it waits on; for a reader with scope all while the query is open, In Force (each sanction in force, its number and until when, or None) and Next Step, and a Below Next Step pill on a waiting proposal at or below a rung in force, §6.5); Raise a Query (only with `queries` create; also from ⌘K), Send Reminder, View Letter (the PDF the employee received), Record Decision; Approve Sanction (Your Signature at the Operations & People stage) and Reject (Reason) for whoever it waits on; a refused proposal reads "Not Approved" | Help on Escalated (the KPI) and on Waiting On: a sanction is waiting for approval. Help on Response Due: the 24 hour window. Help on Next Step: the step after the highest one still in force. Help on Below Next Step: a step at or above it is already in force. Help on Your Signature when approving: it signs the letters | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
 | Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, Evidence (one item a line) for a step that requires it, fine, reason | Help on the next rung: why it is offered. Help on Evidence: the step needs the facts it rests on | The approval route and its thresholds: Settings · Approvals, §6.5 |
 | Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 14 days", the policy it enforces, status), a page at a time; Recent Firings; New Rule, Edit Rule, Activate, Pause, Delete Rule (only on a rule that never fired, after a confirm); the rule form's Name, What Sets It Off, How Many Times, Within, Days, Policy and Clause (both Optional); an empty state when there are no rules | Help on Policy and on Clause, as the form reads them. Help on What Sets It Off: late arrivals, absences and missing clock-outs are the Attendance Policy's. Help on a draft's trigger nothing counts yet (Missed Target), in place of Activate | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, date, status); a pressed row opens the sanction in a sheet (number, query, reason, decided by, waiting on, from, until, fine and its Payroll state, evidence; View Letter, Deduction Letter, Open Query); Issue Sanction (with `queries` edit: Query, a picker of those ready for a decision (`ready=true`), then Record Decision at Sanction), Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
@@ -612,6 +618,7 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · QA audit BG-014 (F33b), decided as show and mark only: the query's card shows a reader with scope all the person's sanctions in force and the Next Step (`GET /sanctions/standing`, already built), and marks a waiting proposal at or below a rung in force Below Next Step (§6.5, §10.1). `QuerySanctionRef` gains `position` (the rung's place, `consequence_step.position`) so the card can compare (§5). Nothing new is asked of the proposer. `Queries.test.tsx`, `queries.test.js`.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Write With AI on Raise a Query and the letter editor (its AI Is Off label stays for a module switched off alone); the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 16/11/2026 · TB · §9: the Document Centre's Library lists the letter a query holds and each letter a sanction issued (`queries.library.js`; `document-centre.md` §6.2), by the vault's default rule: the employee it is about and Queries & Sanctions within scope. Nothing on a Queries & Sanctions screen changed.
 - 13/11/2026 · JP · §9: `queries.summary` and `sanctions.summary` for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 7), within §6.1's rule, fines in naira only for a reader who sees pay. Nothing on screen changes.

@@ -12,7 +12,7 @@ import { CheckInSheet } from "@/features/performance/CheckIn";
 import { MyCommitments, useMyCommitmentsLine } from "@/features/performance/my/MyCommitments";
 import { MyReviewsList } from "@/features/performance/my/MyReviews";
 import { MyScorecard, RollsUpTo } from "@/features/performance/my/MyScorecard";
-import { rating, reviewStatus, score } from "@/features/performance/shared";
+import { coverageText, rating, reviewStatus, score } from "@/features/performance/shared";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { useSearchParams } from "@/lib/router";
@@ -26,6 +26,9 @@ import { Banner, Button, Card, CardHeader, DesktopOnly, EmptyState, ErrorState, 
  */
 export const checkInText = (c: Pick<NonNullable<MyPerformance["check_in"]>, "status" | "due_on"> | null) =>
   !c ? "None Open" : c.status === "check_in" ? (c.due_on ? `Due ${formatDate(c.due_on)}` : "Open") : c.status === "returned" ? reviewStatus("with_reviewer").text : reviewStatus(c.status).text;
+
+/** The Rating figure's help once a review has closed: its caption is the weight scored (§10.1; BG-012). */
+const RATING_HELP = "Counts only your scored lines. Unscored and Not Assessable lines are left out, so the line below shows how much was scored.";
 
 export function MyPerformancePage() {
   const modal = useModal();
@@ -97,7 +100,7 @@ export function MyPerformancePage() {
         mobileCols={2}
         items={[
           { label: "Score to Date", value: <HelpTerm help="Your scored lines, weighted. December's is your quarter's final.">{score(card?.score_to_date)}</HelpTerm> },
-          { label: "Rating", value: rating(card?.rating).text },
+          { label: "Rating", value: rating(card?.rating).text, sub: coverageText(card) ?? undefined, help: coverageText(card) ? RATING_HELP : undefined },
           { label: "This Month", value: checkInText(checkIn ?? null), tone: due ? "warn" : undefined },
           { label: "Commitments On Time", value: commitments },
           { label: "Agreement", value: agreement, tone: toAgree ? "warn" : undefined },

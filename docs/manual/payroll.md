@@ -61,7 +61,9 @@ problem stops **Submit for Approval** until it is fixed. A warning never stops i
 5. For no bank details, add them on the person's record. With **Bank Details Required** on, this
    is blocking.
 6. For fines waiting, accept, spread or waive them on [Payroll · Deductions](/payroll?tab=deductions).
-7. Press **Compute Run** again. The line goes once nothing is left.
+7. For a Salary Advance Repayment or fine instalment not taken, the person is left out or has no pay.
+   Press **Include** or set their pay. Otherwise, once the run is approved, it moves to their next paid month.
+8. Press **Compute Run** again. The line goes once nothing is left.
 
 ### Leave someone out, or put them back {#payroll-runs-exclude needs="payroll edit"}
 
@@ -234,6 +236,8 @@ from their next payslips.
 4. Pick the **Months** to recover it over and the **Start Month**.
 5. Write the **Reason**, then press **Record Advance**. The person is told.
 6. Each month's share shows on their payslip as Salary Advance Repayment.
+7. If the person is left out or has no pay, that month's share moves to their next paid month. The
+   advance then ends a month later. Nobody repays two shares in one month.
 
 ### Cancel an advance {#payroll-deductions-cancel needs="payroll edit"}
 
@@ -279,7 +283,8 @@ the month's last day is paid.
 ### Require bank details {#payroll-configurations-bank needs="cap payroll.configure"}
 
 1. Open [Payroll · Configurations](/payroll?tab=configurations).
-2. Turn **Bank Details Required** on. A person with no bank details then blocks **Submit for Approval**.
+2. Turn **Bank Details Required** on. A person with no bank details then blocks **Submit for Approval**,
+   in this month's run too, from its next **Compute Run**.
 3. Turn it off to let a run go without them. It is then only a warning.
 
 ### Remove a change still to come {#payroll-configurations-remove needs="cap payroll.configure"}

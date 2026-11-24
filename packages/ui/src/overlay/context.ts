@@ -4,12 +4,16 @@
  * layer ModalProvider keeps for a confirmation over an open modal, and the
  * opener focus returns to on close.
  */
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /** The overlay around a component: a modal, side panel or sheet. */
 export interface OverlayState {
-  /** Raise or lower the unsaved-changes flag; the overlay asks once before a dismissal discards them. */
-  setDirty: (dirty: boolean) => void;
+  /**
+   * Raise or lower one form's unsaved-changes flag; the overlay asks once before a dismissal
+   * discards them while any flag is up. `key` names the caller, so two forms in one overlay (a
+   * wizard's steps, or a form and its screen) never lower each other's flag.
+   */
+  setDirty: (key: object, dirty: boolean) => void;
   /** Close the way Esc does: asks to discard when there are unsaved changes. */
   dismiss: () => void;
 }
@@ -19,15 +23,18 @@ export const OverlayContext = createContext<OverlayState | null>(null);
 /**
  * Tells the modal, side panel or sheet around a form that it has unsaved
  * changes, so Esc, the close button, the scrim or a drag down asks once
- * whether to discard them. The form system calls it with its dirty state.
+ * whether to discard them. useContractForm calls it with its own dirty state, so
+ * a screen calls it only for changes held outside a form (a list being picked).
+ * Each call is its own flag: the overlay asks while any of them is up.
  */
 export function useUnsavedChanges(dirty: boolean): void {
   const overlay = useContext(OverlayContext);
+  const [key] = useState(() => ({}));
   useEffect(() => {
     if (!overlay) return;
-    overlay.setDirty(dirty);
-    return () => overlay.setDirty(false);
-  }, [overlay, dirty]);
+    overlay.setDirty(key, dirty);
+    return () => overlay.setDirty(key, false);
+  }, [overlay, key, dirty]);
 }
 
 /**

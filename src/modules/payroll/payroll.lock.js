@@ -10,7 +10,8 @@
  *                          so two people pressing at once queue and the second sees the first's lines),
  *                          runs its guard, then the work. Every write registers in `WRITES`, and a test
  *                          enumerates them and asserts each refuses a run it must not touch (§6.9 rule 4)
- *   applyApproval          the approval ended approved: the lock (§6.9 rule 3)
+ *   applyApproval          the approval ended approved: the lock (§6.9 rule 3), which also moves on the instalments
+ *                          the run did not take (§6.6 rule 10)
  *   returnToDraft          the approver sent it back or rejected it, or the opener withdrew it (§6.9 rule 2)
  *
  * The guards a write names:
@@ -171,6 +172,88 @@ async function assertVersionUnread(client, from, { advancedOnly = false } = {}) 
 }
 
 /* ------------------------------------------------------------------ *
+ * Instalments a run did not take (§6.6 rule 10)
+ * ------------------------------------------------------------------ */
+
+/** How many months ahead of an approved run an instalment may be moved into: a schedule of twelve, and two to spare. */
+const MONTHS_AHEAD = 14;
+
+/**
+ * Where a deduction's instalments go when an approved run did not take some of them. Pure. Every missed instalment and
+ * every scheduled one after the run's month move, in month order, each to the first month after the one before it
+ * (and never before its own) that has no run sent for approval, approved or paid and holds no other instalment of the
+ * deduction: so the schedule runs a month longer for each month missed, and nobody pays two instalments of one
+ * deduction in a month.
+ * @param {string} period  the approved run's month, its first day
+ * @param {Array<{payroll_deduction_instalment_id: string, period: string, status: string}>} rows  every instalment of the deduction
+ * @param {Set<string>} missed   the ids of the instalments the run did not take
+ * @param {Set<string>} closed   the months ahead whose run is sent for approval, approved or paid
+ * @returns {Array<{id: string, from: string, to: string}>} the moves, latest first, the order they are written in
+ */
+function carryPlan(period, rows, missed, closed) {
+  const moving = rows
+    .filter((r) => missed.has(r.payroll_deduction_instalment_id) || (r.status === "scheduled" && r.period > period))
+    .sort((a, b) => (a.period < b.period ? -1 : a.period > b.period ? 1 : 0));
+  const staying = new Set(rows.filter((r) => !moving.includes(r)).map((r) => r.period));
+  const out = [];
+  let previous = period;
+  for (const r of moving) {
+    const after = lagos.addMonths(previous, 1);
+    let to = r.period > after ? r.period : after;
+    while (closed.has(to) || staying.has(to)) to = lagos.addMonths(to, 1);
+    if (to !== r.period) out.push({ id: r.payroll_deduction_instalment_id, from: r.period, to });
+    previous = to;
+  }
+  return out.reverse();
+}
+
+/**
+ * Move on what the approved run did not take (§6.6 rule 10, JBS Praxis 24/11/2026): an instalment of the run's month whose
+ * person was left out or had no pay, or one of an earlier approved month left the same way, goes to the person's next
+ * paid month, and the deduction's later instalments each a month on. The runs of the months ahead are locked first, the
+ * order a deduction's own writes take them in, so a Compute or a Submit of such a month reads the moves after they commit.
+ * @returns {Promise<number>} how many instalments moved
+ */
+async function carryMissed(client, run, actor) {
+  const { last } = lagos.monthBounds(run.period);
+  const missed = await repo.missedInstalments(client, run.period, last);
+  if (!missed.length) return 0;
+  const ahead = Array.from({ length: MONTHS_AHEAD }, (_, k) => lagos.addMonths(run.period, k + 1));
+  const closed = new Set((await lockRunsOf(client, ahead)).filter((r) => CLOSED.includes(r.status)).map((r) => r.period));
+  const missedIds = new Set(missed.map((i) => i.payroll_deduction_instalment_id));
+  const owners = new Map(missed.map((i) => [i.payroll_deduction_id, i.employee_id]));
+  const rows = await repo.instalmentsOfDeductions(client, [...owners.keys()]);
+  let moved = 0;
+  for (const [deductionId, employeeId] of owners) {
+    const plan = carryPlan(
+      run.period,
+      rows.filter((r) => r.payroll_deduction_id === deductionId),
+      missedIds,
+      closed,
+    );
+    if (!plan.length) continue;
+    for (const step of plan) await repo.moveInstalment(client, step.id, step.to);
+    moved += plan.length;
+    await emit(client, {
+      key: EVENTS.PAYROLL_DEDUCTION_RESCHEDULED,
+      entity: { type: "deduction", id: deductionId },
+      actor,
+      after: { months: plan.map((step) => step.to).sort() },
+      payload: {
+        payroll_deduction_id: deductionId,
+        employee_id: employeeId,
+        subject_employee_id: employeeId,
+        payroll_run_id: run.payroll_run_id,
+        period: run.period,
+        moved: plan.length,
+        next_period: plan[plan.length - 1].to,
+      },
+    });
+  }
+  return moved;
+}
+
+/* ------------------------------------------------------------------ *
  * The two ends of a submitted run
  * ------------------------------------------------------------------ */
 
@@ -188,6 +271,8 @@ async function assertVersionUnread(client, from, { advancedOnly = false } = {}) 
 const applyApproval = defineWrite("applyApproval", "submitted", async (client, run, { approver_user_id: approver }) => {
   const runId = run.payroll_run_id;
   await repo.applyInstalments(client, runId);
+  // What the run did not take moves to the person's next paid month (§6.6 rule 10).
+  await carryMissed(client, run, approver);
   for (const d of await repo.settleFinished(client, runId)) {
     if (d.sanction_fine_id) {
       try {
@@ -276,6 +361,7 @@ module.exports = {
   lockRunsOf,
   lockMonths,
   assertVersionUnread,
+  carryPlan,
   applyApproval,
   returnToDraft,
 };

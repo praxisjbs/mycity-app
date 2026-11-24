@@ -59,6 +59,7 @@ describe("the routes", () => {
       ["GET", "/mine", "self", null],
       ["GET", "/mine/summary", "self", null],
       ["GET", "/banks", { key: "expenses", action: "create" }, null],
+      ["GET", "/mine/budget-check", { key: "expenses", action: "create" }, null],
       ["POST", "/mine", { key: "expenses", action: "create" }, null],
       ["POST", "/mine/invoice-reading", { key: "expenses", action: "create" }, null],
       ["POST", "/mine/category-suggestion", { key: "expenses", action: "create" }, null],

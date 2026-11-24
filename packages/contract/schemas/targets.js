@@ -19,7 +19,7 @@ const { z } = require("zod");
 const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged, recordId, changesBeside, nothingOn } = require("./common");
 const { PersonRef } = require("./organisation");
 const { Link, CommitmentState, CommitmentSetStatus, CommitmentRecoveryRef } = require("./tasks");
-const { ScoreValue, Quantity, Direction, Rating } = require("./scoring");
+const { ScoreValue, Quantity, Direction, Rating, WeightSum } = require("./scoring");
 const { MonthStart } = require("./kpis");
 
 const ScorecardStatus = z.enum(["draft", "binding", "agreed", "closed"]);
@@ -140,6 +140,9 @@ const Scorecard = z
     disagreed_at: isoDateTime.nullable(),
     score_to_date: ScoreValue.nullable(),
     rating: Rating.nullable(),
+    /** What the score to date rests on, written with it when a review closes (§6.9). */
+    weight_scored: WeightSum.nullable(),
+    weight_total: WeightSum.nullable(),
     line_count: z.number().int().min(0),
     created_at: isoDateTime,
     updated_at: isoDateTime,

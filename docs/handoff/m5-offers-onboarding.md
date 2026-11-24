@@ -189,6 +189,21 @@ earlier: M5's forms use help terms.
 
 ## 6 · Log
 
+- 24/11/2026 · JP · The QA audit's three Offers items, fixed on `claude/peaceful-clarke-fo8vc9` with JBS
+  Praxis's decisions of 24/11/2026 (guide §3, §6, §10, §13, §14; User Guide, Offers in `recruitment.md`).
+  - BG-001: Basic Salary (the first pay line, kept first on the form) above ₦0 at New Offer, Edit and
+    Submit for Approval (`NO_BASIC_SALARY`, *Enter an amount* on its line); no pay line below zero in the
+    contract; an intern's offer at ₦0 with `zero_basic_reason` (kept in `terms`, shown to the approvers
+    on Monthly Pay as No Basic Salary and Why No Basic Salary); the draft's Basic Salary `null`, not
+    0.00, on a vacancy with no range (`OfferDraftPayLine`); `OfferCard.basic_salary` above ₦0.
+  - BG-008: Submit and Send refuse a start date that has passed (`START_PAST`), said on the line under
+    the record's buttons; Send's message says to withdraw and make a new offer.
+  - BG-009: `is_employee`, `is_contractor`, `is_consultant`, `is_intern` in `OfferLetterVars`; the shipped
+    wording branches on them, employees' text unchanged (rendered byte for byte as before), contractor,
+    consultant and intern clauses drafted for MyCity's review (guide §13).
+  - Tests: three new cases in `tests/integration/offers.test.js` (19 green), the letter's branches in
+    `offers.test.js` (9 green), two cases in `Offers.test.tsx` (11 green); `onboarding.test.js` green.
+
 - 13/11/2026 · AJ · `m5/onboarding-fixes`, from the click-through of 12/11/2026 (guide §13): the signed
   offer on the hire's Documents tab and the contract there once; ended signing links read only on how
   they ended (the agreements' too, for TB); the signing page's heading by state; Document Rejected's

@@ -1,9 +1,10 @@
 "use strict";
 /**
  * The closed review as a letterheaded PDF (docs/guides/performance.md §6.12): the person, their
- * reviewer and month; each line with its target, actual, evidence, the proposed, self and final
- * score (Auto where the system worked it out, and the reason a score was changed); the month's
- * tasks; the corrective actions; the dotted manager's input; and the chain with names and dates.
+ * reviewer and month; the scores, the rating and the weight they rest on (§6.9); each line with
+ * its target, actual, evidence, the proposed, self and final score (Auto where the system worked
+ * it out, and the reason a score was changed); the month's tasks; the corrective actions; the
+ * dotted manager's input; and the chain with names and dates.
  * A review scored without its check-in (§11) prints the reviewer's reason, and no check-in for the
  * employee's own lines (their unsent drafts stay theirs).
  *
@@ -28,6 +29,11 @@ const EVIDENCE = { record: "Record", document: "File", link: "Link", note: "Note
 
 const score = (s) => (s === null || s === undefined ? "Not scored" : Number(s).toFixed(2));
 const text = (v) => (v === null || v === undefined || v === "" ? "Not given" : String(v));
+/** The weight the score to date rests on, as printed: "32.5 of 100 scored". */
+const coverage = (r) =>
+  r.weight_scored === null || r.weight_scored === undefined || r.weight_total === null || r.weight_total === undefined
+    ? "Not recorded"
+    : `${Number(r.weight_scored)} of ${Number(r.weight_total)} scored`;
 
 /** What a line aimed for, as printed. */
 const targetOf = (line) =>
@@ -69,6 +75,7 @@ function variables(review, items, tasks, chain) {
     score_month: score(review.score_month),
     score_to_date: score(review.score_to_date),
     rating: RATING[review.rating] || "Not rated",
+    coverage: coverage(review),
     conduct_note: review.conduct_breach ? text(review.conduct_note) : null,
     outcome: review.probation_outcome ? OUTCOME[review.probation_outcome] : null,
     no_check_in_reason: review.no_check_in_at ? text(review.no_check_in_reason) : null,
@@ -114,4 +121,4 @@ async function generate(client, review, items, tasks, chain) {
   return doc.document_id;
 }
 
-module.exports = { variables, generate, RATING, OUTCOME };
+module.exports = { coverage, variables, generate, RATING, OUTCOME };

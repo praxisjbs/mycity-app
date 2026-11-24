@@ -17,7 +17,9 @@ const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
 const { rebuild } = require("./helpers/schema");
-const { createAdmin } = require("../../scripts/db/create-admin");
+const fs = require("node:fs");
+const nodePath = require("node:path");
+const { createAdmin, buildAccount } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
@@ -29,6 +31,7 @@ const realtime = require("../../src/services/realtime/emitter");
 const attendancePay = require("../../src/modules/attendance/attendance.pay");
 const attendanceRepo = require("../../src/modules/attendance/attendance.repo");
 const fines = require("../../src/modules/sanctions/sanctions.fines");
+const inputs = require("../../src/modules/payroll/payroll.inputs");
 
 jest.mock("../../src/jobs/queues", () => ({
   enqueue: jest.fn(async () => ({ id: "1" })),
@@ -46,6 +49,10 @@ const p = c.payroll;
 const OCT = "2026-10-01";
 const SEP = "2026-09-01";
 const AUG = "2026-08-01";
+const NOV = "2026-11-01";
+const DEC = "2026-12-01";
+const JAN = "2027-01-01";
+const FEB = "2027-02-01";
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -75,6 +82,7 @@ describeDb("a month's payroll run against the real migrations", () => {
   const as = (who) => ({
     get: (path) => request(app).get(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`),
     post: (path, body = {}) => request(app).post(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
+    patch: (path, body = {}) => request(app).patch(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
     delete: (path) => request(app).delete(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`),
   });
   const employeeId = (who) => ids[who] || people[who].employee.employee_id;
@@ -936,5 +944,179 @@ describeDb("a month's payroll run against the real migrations", () => {
     const again = await snapshot(run.payroll_run_id);
     expect((await as("ops").post(`/payroll/runs/${run.payroll_run_id}/compute`)).status).toBe(200);
     expect(await snapshot(run.payroll_run_id)).toEqual(again);
+  }, 120_000);
+
+  /* ---------------------------------------------------------------- *
+   * QA 24/11/2026: the build account, the bank rule, an instalment a run cannot take
+   * ---------------------------------------------------------------- */
+
+  let novemberRun;
+
+  test("the build account has no pay, 6060 clears any it was given, and no run ever counts it (§6.1 rule 6)", async () => {
+    const made = await tx((client) => createAdmin(client, buildAccount("build@jbspraxis.test"), "Implement#2026x", { allowAdditional: true }));
+    const build = made.employee.employee_id;
+    const payOf = (id) => one("SELECT gross_monthly::text AS gross_monthly, bank_name, account_number FROM employee WHERE employee_id = $1", [id]);
+    expect(await payOf(build)).toEqual({ gross_monthly: null, bank_name: null, account_number: null });
+
+    // A record made before create-admin stopped giving it pay: the migration's UP clears it, and nobody else's.
+    await q("UPDATE employee SET gross_monthly = '1850000.00', bank_name = 'Zenith Bank', account_number = '0000000000' WHERE employee_id = $1", [build]);
+    const file = fs.readFileSync(nodePath.join(__dirname, "..", "..", "migrations", "6060_build_account_no_pay.sql"), "utf8");
+    await q(file.slice(file.indexOf("-- UP"), file.indexOf("-- DOWN")));
+    expect(await payOf(build)).toEqual({ gross_monthly: null, bank_name: null, account_number: null });
+    expect((await payOf(employeeId("ada"))).gross_monthly).toBe("450000.00");
+
+    // Given a salary again by hand, it is still never in a run, and cannot be left out of one or adjusted.
+    await q("UPDATE employee SET gross_monthly = '1850000.00', bank_name = 'Zenith Bank', account_number = '0000000000' WHERE employee_id = $1", [build]);
+    const opened = await as("ops").post("/payroll/runs", { period: NOV });
+    expect(opened.status).toBe(201);
+    novemberRun = p.PayrollRun.parse(opened.body).payroll_run_id;
+    expect((await as("ops").post(`/payroll/runs/${novemberRun}/compute`)).status).toBe(200);
+    expect((await q("SELECT 1 FROM payslip WHERE employee_id = $1", [build])).rows).toEqual([]);
+    expect(await slip(novemberRun, "ada")).toMatchObject({ status: "draft" });
+    const out = await as("ops").post(`/payroll/runs/${novemberRun}/exclude`, { employee_id: build, reason: "Trying to leave the build account out" });
+    expect([out.status, out.body.error.code]).toEqual([422, "NOT_IN_RUN"]);
+    await q("UPDATE employee SET gross_monthly = NULL, bank_name = NULL, account_number = NULL WHERE employee_id = $1", [build]);
+  }, 60_000);
+
+  test("Bank Details Required switched on today holds this month's open run at its next Compute and Submit (§6.1 rule 4)", async () => {
+    const before = p.PayrollProblemPage.parse((await as("ops").get(`/payroll/runs/${novemberRun}/problems`)).body);
+    expect(before.data.filter((x) => x.code === "NO_BANK").map((x) => [x.severity, x.employee.display_name])).toEqual([["warning", "Nobank Tester"]]);
+
+    // As Configurations sends it: from today, which is after the month's first day.
+    const today = lagos.today();
+    const changed = await as("ops").patch("/payroll/settings", { require_bank_details: true, effective_from: today });
+    expect(changed.status).toBe(200);
+    expect(p.PayrollSettings.parse(changed.body).require_bank_details).toBe(true);
+
+    const computed = p.PayrollRun.parse((await as("ops").post(`/payroll/runs/${novemberRun}/compute`)).body);
+    expect(computed.advanced).toBe(false);
+    const after = p.PayrollProblemPage.parse((await as("ops").get(`/payroll/runs/${novemberRun}/problems`)).body);
+    expect(after.data.filter((x) => x.code === "NO_BANK").map((x) => [x.severity, x.employee.display_name])).toEqual([["blocking", "Nobank Tester"]]);
+    const snap = (await one("SELECT config_snapshot FROM payroll_run WHERE payroll_run_id = $1", [novemberRun])).config_snapshot;
+    expect(snap).toMatchObject({ require_bank_details: true, bank_rule_on: today, advanced: false });
+
+    const refused = await as("ops").post(`/payroll/runs/${novemberRun}/submit`, { expected_net_total: computed.net_pay });
+    expect([refused.status, refused.body.error.code]).toEqual([422, "RUN_HAS_PROBLEMS"]);
+    expect((await one("SELECT status FROM payroll_run WHERE payroll_run_id = $1", [novemberRun])).status).toBe("computed");
+
+    // The bank details entered, the run computes clear of it.
+    await q("UPDATE employee SET bank_name = 'Test Bank', account_number = '0099887766' WHERE employee_id = $1", [employeeId("nobank")]);
+    expect((await as("ops").post(`/payroll/runs/${novemberRun}/compute`)).status).toBe(200);
+    const fixed = p.PayrollProblemPage.parse((await as("ops").get(`/payroll/runs/${novemberRun}/problems`)).body);
+    expect(fixed.data.filter((x) => x.code === "NO_BANK")).toEqual([]);
+  }, 60_000);
+
+  test("an instalment a run cannot take is named, and on approval moves to the person's next paid month, one a month (§6.6 rule 10)", async () => {
+    const periodsOf = async (deductionId) =>
+      (
+        await q(
+          "SELECT period::text AS period, status, amount::text AS amount FROM payroll_deduction_instalment WHERE payroll_deduction_id = $1 ORDER BY period",
+          [deductionId],
+        )
+      ).rows;
+    // The joiner is left out of November with an advance due; Nosalary has no pay and a fine due.
+    const advance = await deduct("joiner", { source: "salary_advance", total: "100000.00", months: 2, from: NOV });
+    const nosalaryFine = await fineFor("nosalary", "30000.00");
+    const fine = await deduct("nosalary", { source: "sanction_fine", total: "30000.00", months: 3, from: NOV, fineId: nosalaryFine.fine });
+    expect((await as("ops").post(`/payroll/runs/${novemberRun}/exclude`, { employee_id: employeeId("joiner"), reason: "Paid outside the system this month" })).status).toBe(200);
+    expect((await as("ops").post(`/payroll/runs/${novemberRun}/compute`)).status).toBe(200);
+
+    const named = async () =>
+      p.PayrollProblemPage.parse((await as("ops").get(`/payroll/runs/${novemberRun}/problems`)).body).data.filter((x) => /_NOT_TAKEN$/.test(x.code));
+    expect((await named()).map((x) => [x.code, x.severity, x.message, x.action])).toEqual([
+      ["ADVANCE_NOT_TAKEN", "warning", "Salary Advance Repayment not taken for Joiner Tester", "Include them, or it moves to their next paid month"],
+      ["FINE_NOT_TAKEN", "warning", "Fine instalment not taken for Nosalary Tester", "Include them, or it moves to their next paid month"],
+    ]);
+    // Left out for No Salary Set, the fine is still named; a person paid takes theirs and is not named.
+    expect((await as("ops").post(`/payroll/runs/${novemberRun}/exclude`, { employee_id: employeeId("nosalary"), reason: "Paid outside the system this month" })).status).toBe(200);
+    const computed = p.PayrollRun.parse((await as("ops").post(`/payroll/runs/${novemberRun}/compute`)).body);
+    expect((await named()).map((x) => [x.code, x.employee.display_name])).toEqual([
+      ["ADVANCE_NOT_TAKEN", "Joiner Tester"],
+      ["FINE_NOT_TAKEN", "Nosalary Tester"],
+    ]);
+    expect(computed.blocking_problems).toBe(0);
+    expect((await lines(novemberRun, "ada")).filter((l) => l.code === "fine" || l.code === "advance")).toHaveLength(2);
+
+    // Submitted and approved: nothing of theirs was taken, so each schedule runs a month longer.
+    const submit = await as("ops").post(`/payroll/runs/${novemberRun}/submit`, { expected_net_total: computed.net_pay });
+    expect(submit.status).toBe(200);
+    expect(await periodsOf(advance)).toEqual([
+      { period: NOV, status: "scheduled", amount: "50000.00" },
+      { period: DEC, status: "scheduled", amount: "50000.00" },
+    ]);
+    const approved = await as("ceo").post(`/workflow/instances/${p.PayrollRun.parse(submit.body).workflow_instance_id}/approve`, {});
+    expect(approved.status).toBe(200);
+    await drain();
+    expect((await one("SELECT status FROM payroll_run WHERE payroll_run_id = $1", [novemberRun])).status).toBe("approved");
+
+    expect(await periodsOf(advance)).toEqual([
+      { period: DEC, status: "scheduled", amount: "50000.00" },
+      { period: JAN, status: "scheduled", amount: "50000.00" },
+    ]);
+    expect(await periodsOf(fine)).toEqual([
+      { period: DEC, status: "scheduled", amount: "10000.00" },
+      { period: JAN, status: "scheduled", amount: "10000.00" },
+      { period: FEB, status: "scheduled", amount: "10000.00" },
+    ]);
+    expect((await q("SELECT status FROM payroll_deduction WHERE payroll_deduction_id = ANY($1::uuid[])", [[advance, fine]])).rows).toEqual([
+      { status: "active" },
+      { status: "active" },
+    ]);
+    // December takes one instalment of each, never two.
+    const december = await inputs.instalmentsFor(pool, [employeeId("joiner"), employeeId("nosalary")], DEC, "2026-12-31");
+    expect(december.map((i) => [i.payroll_deduction_id, i.amount, `${i.ordinal} of ${i.of}`]).sort()).toEqual(
+      [
+        [advance, "50000.00", "1 of 2"],
+        [fine, "10000.00", "1 of 3"],
+      ].sort(),
+    );
+
+    // Ada's November instalments were taken and applied; her December ones stay where they were.
+    const ada = (
+      await q(
+        `SELECT d.source, i.period::text AS period, i.status FROM payroll_deduction_instalment i
+           JOIN payroll_deduction d USING (payroll_deduction_id)
+          WHERE d.employee_id = $1 AND i.period >= $2::date ORDER BY d.source, i.period`,
+        [employeeId("ada"), NOV],
+      )
+    ).rows;
+    expect(ada).toEqual([
+      { source: "salary_advance", period: NOV, status: "applied" },
+      { source: "salary_advance", period: DEC, status: "scheduled" },
+      { source: "sanction_fine", period: NOV, status: "applied" },
+      { source: "sanction_fine", period: DEC, status: "scheduled" },
+    ]);
+
+    // An instalment an earlier approved run left behind (October's, for people added after it locked) moves on too;
+    // one whose month's run is still open waits for that run.
+    const left = (
+      await q(
+        `SELECT array_agg(i.period::text ORDER BY i.period) AS periods FROM payroll_deduction_instalment i
+           JOIN payroll_deduction d USING (payroll_deduction_id) JOIN employee e USING (employee_id)
+          WHERE e.staff_number = 'M0005'`,
+      )
+    ).rows[0].periods;
+    expect(left).toEqual([AUG, SEP, DEC]);
+
+    // Each move is recorded once per deduction, with months and counts and never an amount.
+    const moved = (
+      await q("SELECT entity_id, payload FROM event_log WHERE event_key = 'payroll_deduction.rescheduled' AND entity_id = ANY($1::text[]) ORDER BY entity_id", [
+        [advance, fine],
+      ])
+    ).rows;
+    expect(moved.map((e) => [e.entity_id, e.payload.moved, e.payload.next_period, e.payload.period]).sort()).toEqual(
+      [
+        [advance, 2, DEC, NOV],
+        [fine, 3, DEC, NOV],
+      ].sort(),
+    );
+    for (const e of moved) expect(Object.keys(e.payload).filter((k) => /amount|net|gross|total|pay$/.test(k))).toEqual([]);
+
+    // Approval applied twice moves nothing again.
+    expect(await require("../../src/modules/payroll/payroll.service").settle(novemberRun, "approved", p.PayrollRun.parse(submit.body).workflow_instance_id)).toBeNull();
+    expect(await periodsOf(advance)).toEqual([
+      { period: DEC, status: "scheduled", amount: "50000.00" },
+      { period: JAN, status: "scheduled", amount: "50000.00" },
+    ]);
   }, 120_000);
 });

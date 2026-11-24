@@ -63,6 +63,10 @@ const ProblemCode = z.enum([
   "NO_PAY_SPLIT",
   "FINE_WAITING",
   "EARLIER_RUN_OPEN",
+  // An instalment due this month that the run does not take, because its person is left out or has no pay (§6.6
+  // rule 10): it moves to their next paid month when the run is approved. One code for each kind of deduction.
+  "ADVANCE_NOT_TAKEN",
+  "FINE_NOT_TAKEN",
 ]);
 
 /** A reason a person types: 10 to 500 characters. */

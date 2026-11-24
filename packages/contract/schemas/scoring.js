@@ -37,6 +37,12 @@ const ScoreValue = z
 /** A target or actual quantity: numeric(18,4) as a decimal string ("64000", "0.95"). */
 const Quantity = z.string().regex(/^-?\d{1,14}(\.\d{1,4})?$/, "Like 64000 or 0.95");
 
+/**
+ * A sum of line weights, the coverage beside a score to date (§6.9): numeric(7,2) as a string
+ * ("100", "32.5"), as a line's own Weight travels.
+ */
+const WeightSum = z.string().regex(/^\d{1,5}(\.\d{1,2})?$/, "Like 100 or 32.5");
+
 const Direction = z.enum(["higher", "lower"]);
 const KrBand = z.enum(["good", "watch", "recovery"]);
 const Rating = z.enum(["exceeds", "meets", "partly_meets", "below"]);
@@ -296,6 +302,31 @@ function scoreToDate(lines) {
 }
 
 /**
+ * How much of the scorecard a score to date rests on (BG-012, §6.9): the weight of the lines that
+ * have a score and the weight of every line, over the lines scoreToDate reads (a line weighted
+ * zero or less counts in neither). Null when no line carries a weight.
+ * @param {Array<{weight: number|string, score: number|string|null}>} lines
+ * @returns {{scored: number, total: number}|null}
+ */
+function weightCoverage(lines) {
+  let scored = 0;
+  let total = 0;
+  for (const l of lines || []) {
+    const w = num(l.weight);
+    if (w === null || w <= 0) continue;
+    total += w;
+    if (num(l.score) !== null) scored += w;
+  }
+  return total > 0 ? { scored: round2(scored), total: round2(total) } : null;
+}
+
+/** A weight sum as it travels: two places at most, trailing zeros kept off ("32.5", "100"). */
+function formatWeight(n) {
+  const v = num(n);
+  return v === null ? null : String(round2(v));
+}
+
+/**
  * The rating band of a score to date; a confirmed conduct breach caps it at Partly Meets.
  * @param {number|string|null} score
  * @param {{conduct_breach?: boolean}} [opts]
@@ -348,6 +379,7 @@ const TABLES = {
 module.exports = {
   TABLES,
   ScoreValue,
+  WeightSum,
   Quantity,
   Direction,
   KrBand,
@@ -371,6 +403,8 @@ module.exports = {
   meanScore,
   lineScore,
   scoreToDate,
+  weightCoverage,
+  formatWeight,
   rating,
   sectionWeightProblems,
   daysBetween,

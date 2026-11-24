@@ -1,6 +1,6 @@
 import expenses from "@mycity/contract/schemas/expenses.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import type { ExpenseBank, ExpenseCategory, ExpenseRequest, ExpenseRow } from "@mycity/contract/contract.gen.ts";
+import type { ExpenseBank, ExpenseBudgetCheck, ExpenseCategory, ExpenseRequest, ExpenseRow } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
@@ -12,7 +12,7 @@ import { hasCapability } from "@/shell/access";
 import { paging } from "@/features/shared/wire";
 import type { Tone } from "@/api/types/common";
 import {
-  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, EMPTY_LINE, Field, formatDate, formatDateTime, formatMoney, FormFooter, Grid, HelpTerm, KeyValue, LinesField,
+  ActionGroup, Button, Card, CardHeader, Chain, CheckboxField, ChoiceField, ComboField, DataView, Details, ErrorState, EMPTY_LINE, Field, formatDate, formatDateTime, formatMoney, FormFooter, Grid, HelpTerm, KeyValue, LinesField, linesTotal,
   LoadingRows, Money, Pager, Pill, plural, Popover, RecordPicker, SelectField, Sub, TextAreaField, TextField, Timeline, toast, toMoneyString, useConfirm, useContractForm, useModal, UploadField, type ComboFieldProps, type LineValue,
 } from "@mycity/ui";
 
@@ -123,6 +123,52 @@ export const asTyped = (wire: string) => {
 /* ------------------------------------------------------------------ *
  * New Request and Edit
  * ------------------------------------------------------------------ */
+
+/** Over Budget's help, on the form and on the request's modal alike. */
+const OVER_BUDGET_HELP = "More than the department has left for this category this year.";
+
+/**
+ * What the request would count against if it were sent now (guide §6.6 rule 3): the category line's
+ * remaining, the department's for the year and Over Budget, as the approvers will see them. A
+ * warning, never a block. Read once a category is picked (the department is the requester's own
+ * until another is picked), and again once the total stops changing; Over Budget waits for a total.
+ */
+function BudgetCheck({ category, department, total }: { category: string; department: string; total: string }) {
+  const [amount, setAmount] = useState(total);
+  useEffect(() => {
+    const t = window.setTimeout(() => setAmount(total), 400);
+    return () => window.clearTimeout(t);
+  }, [total]);
+  const positive = Number(amount) > 0;
+  const c = useApi("GET /api/v1/expenses/mine/budget-check", {
+    query: { expense_category_id: category, ...(department ? { department_id: department } : {}), ...(positive ? { amount } : {}) },
+  });
+  // The last answer for this category and department stays while a new total is read, so the figures do not blink.
+  const key = `${category}:${department}`;
+  const [last, setLast] = useState<{ key: string; data: ExpenseBudgetCheck } | null>(null);
+  useEffect(() => {
+    if (c.data) setLast({ key, data: c.data });
+  }, [c.data, key]);
+  const r = c.data ?? (last?.key === key ? last.data : null);
+  if (!r) return null;
+  return (
+    <div className="mb-3.5">
+      <KeyValue
+        items={[
+          [
+            <HelpTerm key="l" help="What the department has left for this category this year.">Budget Left</HelpTerm>,
+            <span key="b" className="flex flex-wrap items-center gap-2">
+              {r.budget_remaining === null ? "No budget line" : <Money value={r.budget_remaining} />}
+              {positive && r.over_budget && <HelpTerm help={OVER_BUDGET_HELP}><Pill tone="err">Over Budget</Pill></HelpTerm>}
+            </span>,
+          ],
+          ["Department Left", r.department_remaining === null ? "No budget" : <Money key="d" value={r.department_remaining} />],
+        ]}
+      />
+    </div>
+  );
+}
+
 
 /** The lines as the contract takes them: a unit price as typed ("4,500", "-100,000") sent as a two-place string ("4500.00", "-100000.00"). */
 const linesOnWire = (lines: LineValue[]) => lines.map((l) => ({ ...l, unit_price: toMoneyString(l.unit_price) }));
@@ -255,6 +301,7 @@ export function RequestForm({ close, existing, project, sending }: { close: () =
       <Field label="Lines" {...f.status("lines")}>
         <LinesField name="lines" value={lines} onChange={setLines} />
       </Field>
+      {f.values.expense_category_id && <BudgetCheck category={f.values.expense_category_id} department={f.values.department_id} total={linesTotal(lines)} />}
       <Field label="Payee" {...f.status("payee_type")}>
         <SelectField options={PAYEES} value={f.values.payee_type} onChange={(v) => { f.set("payee_type", v as ExpenseRow["payee_type"]); if (v !== "staff") f.set("uses_profile_account", false); }} />
       </Field>
@@ -349,7 +396,7 @@ export function RequestCard({ id, actions }: { id: string; actions?: (r: Expense
     <Card>
       <CardHeader record title={`${r.number}, ${r.purpose}`} right={stagePill(r)} />
       <span className="mb-2 flex flex-wrap gap-2">
-        {r.over_budget && <HelpTerm help="More than the department has left for this category this year."><Pill tone="err">Over Budget</Pill></HelpTerm>}
+        {r.over_budget && <HelpTerm help={OVER_BUDGET_HELP}><Pill tone="err">Over Budget</Pill></HelpTerm>}
         {r.possible_duplicates.length + r.possible_duplicates_hidden > 0 && <HelpTerm help="Same payee and amount within 30 days."><Pill tone="warn">Possible Duplicate</Pill></HelpTerm>}
       </span>
       <DataView

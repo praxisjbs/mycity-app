@@ -25,10 +25,12 @@
  * Pay is monthly, line by line (Basic Salary, Internet & Recharge Allowance, Transportation
  * Allowance, ...); `annual_compensation` is twelve times the monthly total. A monthly total outside
  * the vacancy's monthly range is allowed with a reason the approvers see. Money is a two-place
- * string, NGN only.
+ * string, NGN only. No pay line is below zero; the first line is Basic Salary, which is above ₦0
+ * unless the offer is an internship, and then only with a reason the approvers see
+ * (`zero_basic_reason`; JBS Praxis, 24/11/2026).
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, isoDate, isoDateTime, money, blank, listQuery, Paged, summaryPeriod } = require("./common");
+const { uuid, text, optionalText, email, isoDate, isoDateTime, money, positiveMoney, blank, listQuery, Paged, summaryPeriod } = require("./common");
 const { DocumentRef } = require("./documents");
 const { InterviewDecision } = require("./interviews");
 const { EmploymentType, WorkPattern, PersonRef } = require("./organisation");
@@ -53,11 +55,26 @@ const OfferPayLine = z
   })
   .strict();
 
+/**
+ * A pay line's monthly amount as the form sends it: never below zero. An allowance may be 0.00; the
+ * first line, Basic Salary, is above ₦0 unless an internship gives a reason (the service decides, as
+ * it needs the offer's employment type).
+ */
+const payAmount = money.refine((v) => !v.startsWith("-"), "Not below zero");
+
 /** A pay line as the form sends it. */
 const OfferPayLineInput = z
   .object({
     name: text(80),
-    monthly_amount: money,
+    monthly_amount: payAmount,
+  })
+  .strict();
+
+/** A pay line New Offer starts with: Basic Salary at the vacancy's minimum, or empty when it has no range. */
+const OfferDraftPayLine = z
+  .object({
+    name: z.string(),
+    monthly_amount: money.nullable(),
   })
   .strict();
 
@@ -101,6 +118,8 @@ const OfferDetail = OfferRow.extend({
   salary_min: money.nullable(),
   salary_max: money.nullable(),
   range_reason: z.string().nullable(),
+  /** Why an internship's offer has no basic salary; the approvers read it. Null when Basic Salary is above ₦0. */
+  zero_basic_reason: z.string().nullable(),
   job_description: z.string().nullable(),
   additional_terms: z.string().nullable(),
   working_hours: z.string().nullable(),
@@ -184,6 +203,8 @@ const OfferFields = z
     pay_lines: z.array(OfferPayLineInput).min(1, "Add a pay line").max(12),
     /** Why the monthly total sits outside the vacancy's range; asked for only then. */
     range_reason: optionalText(500),
+    /** Why an intern's Basic Salary is ₦0; asked for only then, and refused for any other employment type. */
+    zero_basic_reason: optionalText(500),
     working_hours: optionalText(160),
     probation_months: blank(z.coerce.number().int().min(0).max(24)),
     /** The final job description for Schedule A, Markdown, copied from the vacancy's and edited. */
@@ -222,7 +243,8 @@ const OfferCard = z
   .object({
     application_id: uuid,
     start_date: isoDate,
-    basic_salary: money,
+    /** Above ₦0: an internship at ₦0 needs its reason, which only the form asks for. */
+    basic_salary: positiveMoney,
     job_title: optionalText(160),
     /** Why the basic salary sits outside the vacancy's range; refused without one when it does. */
     range_reason: optionalText(300),
@@ -245,7 +267,7 @@ const OfferDraft = z
     salary_min: money.nullable(),
     salary_max: money.nullable(),
     job_description: z.string().nullable(),
-    pay_lines: z.array(OfferPayLineInput),
+    pay_lines: z.array(OfferDraftPayLine),
     score: z.number().min(0).max(100).nullable(),
   })
   .strict();
@@ -328,6 +350,14 @@ const OfferLetterVars = z
     location: z.string().nullable(),
     start_date: isoDate,
     employment_type: z.string().nullable(),
+    /**
+     * The employment type as flags, so the standard wording can word each with {{#if}}: an employee
+     * (full time or part time), a contractor, a consultant, an intern. All false while a draft has no type.
+     */
+    is_employee: z.boolean(),
+    is_contractor: z.boolean(),
+    is_consultant: z.boolean(),
+    is_intern: z.boolean(),
     work_pattern: z.string().nullable(),
     office_days: z.number().int().nullable(),
     probation_months: z.number().int().nullable(),
@@ -361,6 +391,7 @@ const ROW = {
 const FIELDS = {
   valid_days: "kept in terms",
   benefits: "kept in terms",
+  zero_basic_reason: "kept in terms",
   pay_lines: "written to offer_pay_line; annual_compensation is twelve times their sum",
 };
 /**
@@ -382,6 +413,7 @@ const OfferSummaryQuery = z
 const TABLES = {
   OfferPayLine: { table: "offer_pay_line" },
   OfferPayLineInput: { table: "offer_pay_line" },
+  OfferDraftPayLine: { table: null, reason: "a pay line New Offer starts with, before it is written to offer_pay_line" },
   OfferRow: { table: "offer", virtual: ROW },
   OfferDetail: {
     table: "offer",
@@ -391,6 +423,7 @@ const TABLES = {
       department: "department.name",
       valid_days: "kept in terms",
       benefits: "kept in terms",
+      zero_basic_reason: "kept in terms",
       pay_lines: "offer_pay_line rows",
       monthly_total: "the sum of its pay lines",
       salary_min: "vacancy.salary_min",
@@ -437,6 +470,7 @@ module.exports = {
   OfferStatus,
   OfferPayLine,
   OfferPayLineInput,
+  OfferDraftPayLine,
   OfferRow,
   OfferDetail,
   OfferListQuery,

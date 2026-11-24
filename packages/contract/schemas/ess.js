@@ -22,7 +22,7 @@ const { LeaveStatus } = require("./leave");
 const { EmployeeStatus, EmploymentType, WorkPattern, ManagerRef } = require("./organisation");
 const { PlaceInput, PlaceView } = require("./maps");
 const { SchedulePlace } = require("./attendance");
-const { ScoreValue, Rating } = require("./scoring");
+const { ScoreValue, Rating, WeightSum } = require("./scoring");
 const { MonthStart } = require("./kpis");
 const { ScorecardStatus, CommitmentSetStatus } = require("./targets");
 const { ReviewStatus } = require("./reviews");
@@ -170,6 +170,8 @@ const MyPerformance = z
         status: ScorecardStatus,
         score_to_date: ScoreValue.nullable(),
         rating: Rating.nullable(),
+        weight_scored: WeightSum.nullable(),
+        weight_total: WeightSum.nullable(),
         employee_agreed_at: isoDateTime.nullable(),
         reviewer_name: z.string().nullable(),
       })

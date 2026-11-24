@@ -136,6 +136,8 @@ interface MockOffer {
   incentives: string | null;
   pay: Array<{ name: string; monthly_amount: string }>;
   range_reason: string | null;
+  /** Why an intern's Basic Salary is ₦0 (the API keeps it in `terms`). */
+  zero_basic_reason: string | null;
   job_description: string | null;
   additional_terms: string | null;
   working_hours: string | null;
@@ -190,6 +192,7 @@ function fromVacancy(a: D.MockApplication): Omit<MockOffer, "offer_id" | "number
     annual_leave_days: 20,
     incentives: null,
     range_reason: null,
+    zero_basic_reason: null,
     job_description: v.description,
     additional_terms: null,
     working_hours: v.working_days ? `${v.working_days}, 9:00 a.m. to 5:00 p.m.` : null,
@@ -459,6 +462,7 @@ function detailOf(o: MockOffer, req: Req): OfferDetail {
     salary_min: r.salary_min,
     salary_max: r.salary_max,
     range_reason: o.range_reason,
+    zero_basic_reason: o.zero_basic_reason,
     job_description: o.job_description,
     additional_terms: o.additional_terms,
     working_hours: o.working_hours,
@@ -560,7 +564,8 @@ R("GET /api/v1/recruitment/offers/draft", "create", (req) =>
       salary_min: v.salary_min,
       salary_max: v.salary_max,
       job_description: v.description,
-      pay_lines: [{ name: "Basic Salary", monthly_amount: v.salary_min ?? "0.00" }],
+      // Empty, never 0.00, when the vacancy has no range (as the API).
+      pay_lines: [{ name: "Basic Salary", monthly_amount: v.salary_min ?? null }],
       score: base.score_snapshot,
     };
     return ok(draft);
@@ -581,6 +586,7 @@ type Fields = Partial<{
   incentives: string | null;
   pay_lines: Array<{ name: string; monthly_amount: string }>;
   range_reason: string | null;
+  zero_basic_reason: string | null;
   working_hours: string | null;
   probation_months: number | null;
   job_description: string | null;
@@ -601,6 +607,11 @@ function apply(o: MockOffer, b: Fields): RawResponse | null {
   if (next.department_id) next.department = D.VACANCIES.find((v) => v.department_id === next.department_id)?.department ?? next.department;
   if (next.start_date && next.start_date < isoDaysAhead(0)) return invalid({ start_date: ["Pick a later date"] });
   if (!next.pay.length) return invalid({ pay_lines: ["Add a pay line"] });
+  // Basic Salary, the first line, is above ₦0; an intern's may be ₦0 with a reason (offers.service zeroBasicReasonOf).
+  const basicZero = kobo(next.pay[0]!.monthly_amount) <= 0;
+  if (basicZero && next.employment_type !== "intern") return fail(422, "NO_BASIC_SALARY", "Basic Salary must be above ₦0", { "pay_lines.0.monthly_amount": ["Enter an amount"] });
+  if (basicZero && !next.zero_basic_reason) return fail(422, "ZERO_BASIC_REASON", "Say why this internship has no basic salary", { zero_basic_reason: ["Say why"] });
+  if (!basicZero) next.zero_basic_reason = null;
   if (range(next).outside && !next.range_reason) return invalid({ range_reason: ["Say why"] });
   if (!range(next).outside) next.range_reason = null;
   Object.assign(o, next);
@@ -659,6 +670,7 @@ R("POST /api/v1/recruitment/offers/:id/submit", "edit", (req) => {
   if (!o) return offerNotFound();
   if (o.status !== "draft") return fail(409, "NOT_DRAFT", "Only a draft offer can be submitted");
   if (!o.start_date) return invalid({ start_date: ["Set the start date"] });
+  if (o.start_date < isoDaysAhead(0)) return fail(422, "START_PAST", "The start date has passed. Change it in Edit Offer.", { start_date: ["Pick a later date"] });
   if (!o.department_id) return invalid({ department_id: ["Set the department"] });
   if (!signatory()) return fail(409, "NO_SIGNATORY", "Name the Offer Signatory in Offers settings first");
   Object.assign(o, { status: "approval", submitted_at: nowIso(), workflow_instance_id: o.workflow_instance_id ?? sid(`wf:${o.offer_id}:${Date.now()}`), stage: "head_of_department", decisions: [], by: req.user! });
@@ -682,6 +694,7 @@ R("POST /api/v1/recruitment/offers/:id/send", "edit", (req) => {
   if (!o) return offerNotFound();
   if (o.status !== "approved") return fail(409, "NOT_APPROVED", "Only an approved offer can be sent");
   if (!o.company_signed_at) return fail(409, "NOT_SIGNED", "The offer is not signed for the company yet");
+  if (o.start_date && o.start_date < isoDaysAhead(0)) return fail(422, "START_PAST", "The start date has passed. Withdraw it and make a new offer.", { start_date: ["Pick a later date"] });
   Object.assign(o, { status: "sent", sent_at: nowIso(), expires_at: dayAhead(o.valid_days) });
   const a = appOf(o.application_id);
   if (a && a.stage === "shortlist") {
