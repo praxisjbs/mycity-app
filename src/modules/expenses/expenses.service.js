@@ -37,6 +37,7 @@ const routeMap = require("../../shared/route-map");
 const { holdsCapability } = require("../../middleware/rbac");
 const categories = require("../expense_categories/expense_categories.service");
 const repo = require("./expenses.repo");
+const { payeeProblems } = require("@mycity/contract").expenses;
 const budget = require("./expenses.budget-check");
 const { EVENTS, DEFINITION_KEY, INVOICE_DOC_TYPE } = require("./expenses.events");
 
@@ -422,8 +423,7 @@ function payeeAsSent(row, employee) {
       });
     return { payee_name: employee.display_name, bank_name: employee.bank_name, account_name: employee.display_name, account_number: employee.account_number };
   }
-  const missing = {};
-  for (const k of ["payee_name", "bank_name", "account_name", "account_number"]) if (!row[k]) missing[k] = ["Required"];
+  const missing = payeeProblems(row);
   if (Object.keys(missing).length) throw invalid("PAYEE_INCOMPLETE", "Add the payee's bank details", missing);
   return { payee_name: row.payee_name, bank_name: row.bank_name, account_name: row.account_name, account_number: row.account_number };
 }

@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import type { ReactNode } from "react";
 import { ModalProvider, Toaster } from "@mycity/ui";
 import { installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
@@ -165,6 +166,27 @@ describe("My Requests", () => {
     expect(within(form).queryByRole("checkbox", { name: "Use My Company Account" })).toBeNull();
     await pick("Staff");
     expect(tick().getAttribute("aria-checked") ?? String((tick() as HTMLInputElement).checked)).toBe("false");
+  }, 40000);
+});
+
+describe("Send Request on a draft with no payee (fault #5, 23/11/2026)", () => {
+  it("opens Edit Request with the payee's four fields marked, and sends nothing", async () => {
+    await as("chidera@mycityapp.io", <MyRequestsPage />, "My Requests");
+    const cats = await api.call("GET /api/v1/expense-categories", { query: { active: "true" } as never });
+    const draft = await api.call("POST /api/v1/expenses/mine", {
+      body: { purpose: "Ikeja activation", expense_category_id: cats.data[0]!.expense_category_id, lines: [{ description: "Banners", quantity: "1", unit_price: "45000.00" }], payee_type: "vendor", uses_profile_account: false, submit: false } as never,
+    });
+    invalidate("/api/v1/expenses");
+    fireEvent.click(await screen.findByText(draft.number, {}, { timeout: 5000 }));
+    const dialog = await screen.findByRole("dialog", { name: "Expense Request" }, { timeout: 5000 });
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Send Request" }, { timeout: 5000 }));
+    const form = await screen.findByRole("dialog", { name: "Edit Request" }, { timeout: 5000 });
+    await waitFor(() => expect(within(form).getAllByText("Required")).toHaveLength(4), { timeout: 5000 });
+    // The form's own Send Request marks them again before anything is saved or sent.
+    fireEvent.click(within(form).getByRole("button", { name: "Send Request" }));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByText(`${draft.number} sent`)).toBeNull();
+    expect((await api.call("GET /api/v1/expenses/:id", { params: { id: draft.expense_request_id } })).status).toBe("draft");
   }, 40000);
 });
 
