@@ -499,7 +499,33 @@ CLIENT = OrderedDict([
 # ---------------------------------------------------------------- fixed by JBS Praxis since
 # The tracker's open items fixed in our own PRs: ID -> (PR, merged on, what was done, for MyCity).
 # Refs stay as first issued: a fix ticks its row, it never moves it.
-FIXED_NOW = {}
+FIXED_NOW = {k: ("#173", "2026-11-24", v) for k, v in {
+    "F72a": "Basic Salary must now be above zero on every offer, and no pay line can be negative. "
+            "An intern's offer may be unpaid only with a reason, which the approvers see.",
+    "F02d": "A run now warns when an advance or fine instalment is not being taken, and on "
+            "approval the missed instalment moves to the person's next paid month.",
+    "F02f": "The build account is never counted in a payroll run, has no pay or bank details, and "
+            "is archived at handover.",
+    "F06c": "Obianuju Nwoye now replaces Cynthia Osakunih as Operations & People Lead in the staff "
+            "list loaded at go-live.",
+    "F57b": "A request whose line manager has left now goes to the next active manager above, or "
+            "the CEO.",
+    "F66a": "An unregistered device now raises one exception per person, device and day; later "
+            "punches that day join it and are decided with it.",
+    "F56b": "New Request now shows the budget left and the Over Budget flag before the request is "
+            "sent. It stays a warning.",
+    "F32a": "Submit for Approval and Send Offer now refuse a start date that has passed.",
+    "F73a": "The letter can now have different wording per employment type, and draft contractor, "
+            "consultant and intern clauses are included for MyCity to review.",
+    "F54b": "The duplicate check now catches near names (St for Street, plurals, small "
+            "misspellings) and also checks website, email and phone.",
+    "F11a": "Bank Details Required now applies to the open run from its next Compute or Submit.",
+    "F77b": "Every score and rating now shows how much of the scorecard it rests on, for example "
+            "32.5 of 100 scored. The rating rules are unchanged.",
+    "F55b": "Every form now asks before Esc, clicking outside or closing discards what was typed.",
+    "F33b": "Approvers now see the person's sanctions in force and the next step, and a proposal "
+            "below it is marked Below Next Step.",
+}.items()}
 
 # ---------------------------------------------------------------- compile
 SEV_ORDER = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
@@ -614,7 +640,8 @@ meta = dict(
     howto=[
         "Bugs & Gaps is the fix tracker: only verified bugs, gaps, improvements and seed-data fixes. "
         "JBS Praxis ticks Fixed ✓ with the PR and date as each fix merges; MyCity records its retest.",
-        "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them.",
+        "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them. "
+        "Every High and Medium item was fixed in #173 (24/11/2026); its note for MyCity starts with what changed.",
         "To be Discussed (Change Report) holds requests outside the signed milestones, or that change a "
         "decision already agreed. Nothing there is built until a change request is agreed.",
         "MyCity Actions are setup, data and policy tasks the hub already supports and MyCity does itself.",

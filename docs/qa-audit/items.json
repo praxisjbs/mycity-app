@@ -14,7 +14,10 @@
    "milestone": "M5",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Confirmed: an offer could be made and approved at ₦0 when the vacancy had no pay range. We will refuse an offer with no pay, so it cannot reach an approver or a candidate."
+   "mycity": "Fixed 24/11/2026 (#173): Basic Salary must now be above zero on every offer, and no pay line can be negative. An intern's offer may be unpaid only with a reason, which the approvers see. Confirmed: an offer could be made and approved at ₦0 when the vacancy had no pay range. We will refuse an offer with no pay, so it cannot reach an approver or a candidate.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-002",
@@ -30,7 +33,10 @@
    "milestone": "M6",
    "effort": "M",
    "owner": "LA",
-   "mycity": "You were right that the system does not warn here, and we found the money is never recovered if that person is left out of the run. We will fix it so the instalment is flagged and carried to the next run."
+   "mycity": "Fixed 24/11/2026 (#173): A run now warns when an advance or fine instalment is not being taken, and on approval the missed instalment moves to the person's next paid month. You were right that the system does not warn here, and we found the money is never recovered if that person is left out of the run. We will fix it so the instalment is flagged and carried to the next run.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-003",
@@ -46,7 +52,10 @@
    "milestone": "M6",
    "effort": "S",
    "owner": "LA",
-   "mycity": "The only salary in that run was our own build account, which should never be in MyCity's payroll. We will remove its pay and close its record at handover. The other 20 staff need their salaries entered on People · Employees before the first live run."
+   "mycity": "Fixed 24/11/2026 (#173): The build account is never counted in a payroll run, has no pay or bank details, and is archived at handover. The only salary in that run was our own build account, which should never be in MyCity's payroll. We will remove its pay and close its record at handover. The other 20 staff need their salaries entered on People · Employees before the first live run.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-004",
@@ -62,7 +71,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "Our copy of your staff list still names Cynthia as Operations & People Lead, which would recreate her on the live system. Please send the new lead's details (name, email, start date) and we will update the list before go-live."
+   "mycity": "Fixed 24/11/2026 (#173): Obianuju Nwoye now replaces Cynthia Osakunih as Operations & People Lead in the staff list loaded at go-live. Our copy of your staff list still names Cynthia as Operations & People Lead, which would recreate her on the live system. Please send the new lead's details (name, email, start date) and we will update the list before go-live.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-005",
@@ -78,7 +90,10 @@
    "milestone": "M0",
    "effort": "S",
    "owner": "TB",
-   "mycity": "If a manager leaves before their team is moved to someone else, their team's requests wait on the person who left until the CEO steps in. We will send them to the next manager up automatically; meanwhile, move a leaver's team on the org chart when they leave."
+   "mycity": "Fixed 24/11/2026 (#173): A request whose line manager has left now goes to the next active manager above, or the CEO. If a manager leaves before their team is moved to someone else, their team's requests wait on the person who left until the CEO steps in. We will send them to the next manager up automatically; meanwhile, move a leaver's team on the org chart when they leave.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-006",
@@ -94,7 +109,10 @@
    "milestone": "M1",
    "effort": "M",
    "owner": "LA",
-   "mycity": "Confirmed: each punch from an unregistered device raises its own exception, as built. We will group them to one per device per day so People's queue is not doubled."
+   "mycity": "Fixed 24/11/2026 (#173): An unregistered device now raises one exception per person, device and day; later punches that day join it and are decided with it. Confirmed: each punch from an unregistered device raises its own exception, as built. We will group them to one per device per day so People's queue is not doubled.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-007",
@@ -110,7 +128,10 @@
    "milestone": "M8",
    "effort": "M",
    "owner": "AJ",
-   "mycity": "Over-budget requests are flagged to the line manager and Operations & People before they decide, as agreed, and never blocked. We will also show the remaining budget on the form so the requester sees it before sending."
+   "mycity": "Fixed 24/11/2026 (#173): New Request now shows the budget left and the Over Budget flag before the request is sent. It stays a warning. Over-budget requests are flagged to the line manager and Operations & People before they decide, as agreed, and never blocked. We will also show the remaining budget on the form so the requester sees it before sending.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-008",
@@ -126,7 +147,10 @@
    "milestone": "M5",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "An offer could be sent with a start date that had already gone by. We will stop that at Send, so the start date is corrected first."
+   "mycity": "Fixed 24/11/2026 (#173): Submit for Approval and Send Offer now refuse a start date that has passed. An offer could be sent with a start date that had already gone by. We will stop that at Send, so the start date is corrected first.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-009",
@@ -142,7 +166,10 @@
    "milestone": "M5",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "The letter is your standard offer letter, which was written for employees, and one letter for all offers is what was agreed. We can let the wording change with the employment type so contractor and intern offers drop employee clauses; you would need to give us (or type into Offer Settings) the contractor, consultant and intern wording."
+   "mycity": "Fixed 24/11/2026 (#173): The letter can now have different wording per employment type, and draft contractor, consultant and intern clauses are included for MyCity to review. The letter is your standard offer letter, which was written for employees, and one letter for all offers is what was agreed. We can let the wording change with the employment type so contractor and intern offers drop employee clauses; you would need to give us (or type into Offer Settings) the contractor, consultant and intern wording.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-010",
@@ -158,7 +185,10 @@
    "milestone": "M7",
    "effort": "S",
    "owner": "LA",
-   "mycity": "The duplicate check catches exact names but misses small spelling differences, and the screen only checks the name. We will make it match near names and also check the contact's email, phone and website."
+   "mycity": "Fixed 24/11/2026 (#173): The duplicate check now catches near names (St for Street, plurals, small misspellings) and also checks website, email and phone. The duplicate check catches exact names but misses small spelling differences, and the screen only checks the name. We will make it match near names and also check the contact's email, phone and website.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-011",
@@ -174,7 +204,10 @@
    "milestone": "M6",
    "effort": "S",
    "owner": "LA",
-   "mycity": "Turning the switch on now only takes effect from next month's run, although the screen says it applies at once. We will fix it so it applies to the run in progress."
+   "mycity": "Fixed 24/11/2026 (#173): Bank Details Required now applies to the open run from its next Compute or Submit. Turning the switch on now only takes effect from next month's run, although the screen says it applies at once. We will fix it so it applies to the run in progress.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-012",
@@ -190,7 +223,10 @@
    "milestone": "M2",
    "effort": "M",
    "owner": "TB",
-   "mycity": "The rating counts only the lines that could be scored, as agreed, so a review where most lines had no evidence can still read Exceeds. We recommend showing how much of the scorecard was scored next to every rating, and, if you choose a minimum (for example half the weight), withholding the rating below it."
+   "mycity": "Fixed 24/11/2026 (#173): Every score and rating now shows how much of the scorecard it rests on, for example 32.5 of 100 scored. The rating rules are unchanged. The rating counts only the lines that could be scored, as agreed, so a review where most lines had no evidence can still read Exceeds. We recommend showing how much of the scorecard was scored next to every rating, and, if you choose a minimum (for example half the weight), withholding the rating below it.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-013",
@@ -206,7 +242,10 @@
    "milestone": "M0",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Confirmed: a filled-in form closed with Esc, a click outside or the X is lost without warning. We will make every form ask \"Discard Changes\" first when something has been typed."
+   "mycity": "Fixed 24/11/2026 (#173): Every form now asks before Esc, clicking outside or closing discards what was typed. Confirmed: a filled-in form closed with Esc, a click outside or the X is lost without warning. We will make every form ask \"Discard Changes\" first when something has been typed.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-014",
@@ -222,7 +261,10 @@
    "milestone": "M3",
    "effort": "S",
    "owner": "GE",
-   "mycity": "Each manager sees only their own queries, so the final check sits with Operations & People. We will show them the person's current sanctions and flag any proposal lighter than the next step, so a repeat Caution is always a conscious choice."
+   "mycity": "Fixed 24/11/2026 (#173): Approvers now see the person's sanctions in force and the next step, and a proposal below it is marked Below Next Step. Each manager sees only their own queries, so the final check sits with Operations & People. We will show them the person's current sanctions and flag any proposal lighter than the next step, so a repeat Caution is always a conscious choice.",
+   "done": "✓",
+   "pr": "#173",
+   "fixed_on": "2026-11-24"
   },
   {
    "ref": "BG-015",
@@ -2492,7 +2534,7 @@
   "subtitle": "JBS Praxis response to MyCity's QA audit of staging (16 and 17/11/2026, findings F01 to F83). Every finding was tested or read against the code on main (697f1db) on 24/11/2026.",
   "howto": [
    "Bugs & Gaps is the fix tracker: only verified bugs, gaps, improvements and seed-data fixes. JBS Praxis ticks Fixed ✓ with the PR and date as each fix merges; MyCity records its retest.",
-   "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them.",
+   "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them. Every High and Medium item was fixed in #173 (24/11/2026); its note for MyCity starts with what changed.",
    "To be Discussed (Change Report) holds requests outside the signed milestones, or that change a decision already agreed. Nothing there is built until a change request is agreed.",
    "MyCity Actions are setup, data and policy tasks the hub already supports and MyCity does itself.",
    "Audit Reconciliation shows every one of the 83 findings, our verdict and the sheet it went to."
