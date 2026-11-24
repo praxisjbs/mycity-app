@@ -37,6 +37,18 @@ const MAX_CITIES = 20;
 
 const notFound = () => new AppError("NOT_FOUND", "That partner does not exist, or you cannot see it.", 404);
 const invalid = (field, message) => new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { [field]: [message] });
+
+/**
+ * One email a record (§6.2): its own rule, so a brief names it. Only the server holds every contact a
+ * record has (a 360 shows 25), so no screen can say it first: answered on the field, never recorded on
+ * System Health (shared/errors.js `recorded`; fault #7 of the 23/11 staging brief).
+ */
+function emailTaken(field) {
+  const err = new AppError("CONTACT_EMAIL_TAKEN", "Check the highlighted fields", 422, { [field]: ["Already a contact"] });
+  err.recorded = false;
+  return err;
+}
+
 const leads = () => require("../leads/leads.service");
 
 /* ------------------------------------------------------------------ *
@@ -82,7 +94,7 @@ const contactsOf = (db, record) => repo.contactsOf(db, record);
  */
 async function contactIn(client, actor, record, body, { primary = false, field = null } = {}) {
   const at = (k) => (field ? `${field}.${k}` : k);
-  if (await repo.emailTaken(client, record, body.email)) throw invalid(at("email"), "Already a contact");
+  if (await repo.emailTaken(client, record, body.email)) throw emailTaken(at("email"));
   const { rows } = await client.query(`SELECT count(*)::int AS n FROM partner_contact WHERE ${record.kind}_id = $1`, [record.id]);
   const isPrimary = primary || Boolean(body.primary_contact) || rows[0].n === 0;
   const id = await repo.insertContact(client, {
@@ -130,7 +142,7 @@ async function updateContact(actor, scope, id, body) {
     const was = await repo.contact(client, id);
     if (!was) throw new AppError("NOT_FOUND", "That contact does not exist, or you cannot see it.", 404);
     const record = await contactRecord(client, was, scope);
-    if (body.email && (await repo.emailTaken(client, record, body.email, id))) throw invalid("email", "Already a contact");
+    if (body.email && (await repo.emailTaken(client, record, body.email, id))) throw emailTaken("email");
     const changes = {};
     for (const k of ["first_name", "last_name", "job_title", "email", "signatory", "primary_contact"]) if (body[k] !== undefined) changes[k] = body[k];
     if (body.phones !== undefined) Object.assign(changes, { phones: body.phones.length ? body.phones : null, phone: body.phones[0] || null });

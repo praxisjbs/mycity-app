@@ -208,6 +208,20 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       expect(made.contacts).toEqual([expect.objectContaining({ first_name: "Ngozi", primary_contact: true, phones: ["+2348031234500"] })]);
       expect(made.kpis).toMatchObject({ projected_value: "2500000.00", days_at_stage: 0, health: "on_track" });
     });
+
+    test("one email a record: a second contact with it is refused on Email, under its own rule, and never recorded", async () => {
+      const { lead } = await newLead("staff", "Owerri Book Fair");
+      const first = await as("staff").post("/partnerships/contacts", { lead_id: lead.lead_id, first_name: "Ama", last_name: "Eze", email: "ama@bookfair.test" });
+      expect(first.status).toBe(201);
+      const again = await as("staff").post("/partnerships/contacts", { lead_id: lead.lead_id, first_name: "Amaka", last_name: "Eze", email: "AMA@bookfair.test" });
+      expect([again.status, again.body.error.code, again.body.error.fields]).toEqual([422, "CONTACT_EMAIL_TAKEN", { email: ["Already a contact"] }]);
+      const edited = await as("staff").post("/partnerships/contacts", { lead_id: lead.lead_id, first_name: "Obi", last_name: "Eze", email: "obi@bookfair.test" });
+      const moved = await as("staff").patch(`/partnerships/contacts/${edited.body.partner_contact_id}`, { email: "ama@bookfair.test" });
+      expect([moved.status, moved.body.error.code]).toEqual([422, "CONTACT_EMAIL_TAKEN"]);
+      // Fault #7 of the 23/11 staging brief: only the server holds every contact, so no screen can say it first.
+      await require("../../src/shared/observability/error-reporter").flush();
+      expect(await one("SELECT count(*)::int AS n FROM error_event WHERE request_id = ANY($1)", [[again.body.request_id, moved.body.request_id]])).toEqual({ n: 0 });
+    });
   });
 
   describe("who sees what (§6.1)", () => {
