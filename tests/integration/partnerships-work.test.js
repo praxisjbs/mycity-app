@@ -334,6 +334,27 @@ describeDb("partnerships: work connected to a partner", () => {
       expect((await keptEvent(dealId)).cancelled_at).not.toBeNull();
     });
 
+    test("an owner who has left: the checklist is raised for the person who signed", async () => {
+      // Fault #11 of the 23/11 staging brief: the tasks service refused the departed owner ("Not on the staff")
+      // and the checklist was never raised, though the deal stayed signed.
+      const made = await newLead("staff", "Calabar Carnival Village");
+      const dealId = made.deal.deal_id;
+      const copy = await signedCopy("staff");
+      ok(await as("staff").post(`/partnerships/deals/${dealId}/stage`, { stage: "partnership_signed", signed_copy_document_id: copy }));
+      await q("UPDATE partnership_opportunity SET owner_id = $1 WHERE partnership_opportunity_id = $2", [emp("other"), dealId]);
+      await q("UPDATE employee SET status = 'left' WHERE employee_id = $1", [emp("other")]);
+      try {
+        await drain();
+        const raised = await deliverables(dealId);
+        expect(raised.map((d) => d.title)).toEqual(["Amplification across our channels", "Event registration on MyCityApp"]);
+        for (const d of raised) expect(d.primary_assignee_id).toBe(emp("staff"));
+        const told = await one("SELECT payload FROM event_log WHERE event_key = 'deal.deliverables_raised' AND entity_id = $1", [dealId]);
+        expect(told.payload).toMatchObject({ owner_id: emp("other"), holder_id: emp("staff"), count: 2 });
+      } finally {
+        await q("UPDATE employee SET status = 'active' WHERE employee_id = $1", [emp("other")]);
+      }
+    });
+
     test("New Partner signed before the hub raises no deliverables; with a signed copy it does", async () => {
       const before = await newPartner("staff", "Eko Hotels Group", { event_starts_on: "2026-12-05" }, { signed_before_hub: true });
       await drain();

@@ -8,7 +8,8 @@
  *                A24 allows), due `due_days` after signing or before the event's start (from signing
  *                when the deal has no event date), connected to the partner and the deal, inside the
  *                deal's most recent active connected project when it has one
- *   once         a checklist item is raised once a deal (deal_deliverable_item_uq), so a repeated
+ *   left         an owner no longer on the staff: the tasks are the signer's, set by them (holderOf)
+ *   once        a checklist item is raised once a deal (deal_deliverable_item_uq), so a repeated
  *                event or a retry raises nothing twice; a checklist changed later never changes a
  *                deal already signed
  *   skipped      a deal signed by the tracker import (source `import`) and New Partner's "signed before
@@ -41,6 +42,24 @@ async function ownerActor(client, ownerId, fallbackUserId = null) {
   const user = userId || fallbackUserId;
   if (!user) return null;
   return { user_id: user, employee_id: ownerId, display_name: null };
+}
+
+/**
+ * Who the checklist is for: the deal's owner while they are on the staff (their login, else the signer's
+ * press as the rows' maker); once the owner has left, the person who signed the deal, who may reassign
+ * each task (JBS Praxis, 24/11/2026; fault #11 of the 23/11 staging brief, where the tasks service
+ * refused a departed owner and the checklist was never raised). Null when neither is on the staff.
+ */
+async function holderOf(client, ownerId, signerUserId = null) {
+  const { rows } = await client.query("SELECT 1 AS x FROM employee WHERE employee_id = $1 AND status = 'active'", [ownerId || null]);
+  if (rows.length) return ownerActor(client, ownerId, signerUserId);
+  if (!signerUserId) return null;
+  const { rows: signer } = await client.query(
+    `SELECT u.user_id, u.employee_id FROM app_user u JOIN employee e ON e.employee_id = u.employee_id
+      WHERE u.user_id = $1 AND u.status = 'active' AND e.status = 'active'`,
+    [signerUserId],
+  );
+  return signer[0] ? { user_id: signer[0].user_id, employee_id: signer[0].employee_id, display_name: null } : null;
 }
 
 /** The owner's own scope: a task they set for themselves. */
@@ -84,9 +103,9 @@ async function raise(event) {
       [deal.partner_category_id, deal.deal_id],
     );
     if (!items.length) return 0;
-    const actor = await ownerActor(client, deal.owner_id, event.actor_user_id || null);
+    const actor = await holderOf(client, deal.owner_id, event.actor_user_id || null);
     if (!actor) {
-      logger.warn({ deal_id: deal.deal_id }, "deliverables not raised: the deal's owner has no login");
+      logger.warn({ deal_id: deal.deal_id }, "deliverables not raised: neither the deal's owner nor its signer is on the staff with a login");
       return 0;
     }
     const tasks = require("../tasks/tasks.service");
@@ -97,7 +116,7 @@ async function raise(event) {
       const due = dueOf(item, deal);
       const task = await tasks.create(
         actor,
-        ownScope(deal.owner_id),
+        ownScope(actor.employee_id),
         {
           title,
           ...(item.description ? { description: item.description } : {}),
@@ -119,7 +138,7 @@ async function raise(event) {
       key: EVENTS.DEAL_DELIVERABLES_RAISED,
       entity: { type: "partner_deal", id: deal.deal_id },
       actor,
-      payload: { deal_id: deal.deal_id, number: deal.number, owner_id: deal.owner_id, count: items.length },
+      payload: { deal_id: deal.deal_id, number: deal.number, owner_id: deal.owner_id, holder_id: actor.employee_id, count: items.length },
     });
     return items.length;
   });
