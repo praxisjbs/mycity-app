@@ -27,6 +27,19 @@ const PERMANENT = new Set([
   "MESSAGE_REFUSED",
 ]);
 
+/**
+ * The mail server refused the password typed. Only the mail server knows a password, so no screen
+ * can say so first: the person types it again, and it is never a fault on System Health
+ * (shared/errors.js `recorded`; fault #1 of the 23/11 staging brief).
+ */
+function passwordRefused() {
+  const err = new AppError("MAIL_AUTH_FAILED", "The mail server refused the password", 422, {
+    password: ["Password refused"],
+  });
+  err.recorded = false;
+  return err;
+}
+
 const replyCode = (err) => Number(err && err.responseCode) || null;
 const replyText = (err) =>
   String((err && err.response) || (err && err.message) || err || "");
@@ -36,14 +49,7 @@ function mapSmtpError(err) {
   const code = replyCode(err);
   const raw = replyText(err);
   const details = { smtp_code: code, smtp_response: raw.slice(0, 300) };
-  if ((err && err.code === "EAUTH") || code === 535 || AUTH.test(raw)) {
-    return new AppError(
-      "MAIL_AUTH_FAILED",
-      "The mail server refused the password",
-      422,
-      { password: ["Password refused"] },
-    );
-  }
+  if ((err && err.code === "EAUTH") || code === 535 || AUTH.test(raw)) return passwordRefused();
   if (
     SENDER.test(raw) ||
     ((code === 550 || code === 553) && /verif/i.test(raw))
@@ -94,14 +100,7 @@ function mapSmtpError(err) {
 function mapImapError(err) {
   if (err instanceof AppError) return err;
   const raw = String((err && (err.responseText || err.message)) || err || "");
-  if ((err && err.authenticationFailed) || IMAP_AUTH.test(raw)) {
-    return new AppError(
-      "MAIL_AUTH_FAILED",
-      "The mail server refused the password",
-      422,
-      { password: ["Password refused"] },
-    );
-  }
+  if ((err && err.authenticationFailed) || IMAP_AUTH.test(raw)) return passwordRefused();
   if (
     /ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(raw) ||
     (err && /ENOTFOUND|EAI_AGAIN/.test(String(err.code)))
