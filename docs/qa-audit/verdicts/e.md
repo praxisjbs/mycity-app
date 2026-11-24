@@ -308,3 +308,36 @@ Scope ref: ess.md §5 line 147 and §10.1 line 427 (Record History); FRONTEND_GU
 Fix: In summaryOf, fall back to the event catalogue's own summary for the key (or a short label map) instead of the raw key, and decide whether reminders such as commitments.due belong in Record History at all (filter them in historyOf). Add a unit test over every key emitted on the employee entity.
 Effort: S
 For MyCity: Confirmed: some entries in Record History show a system name instead of words. We will word every entry and leave reminders out of the record's history.
+
+ID: F48a
+Title: New Lead in the header and in the floating button's fan
+Verdict: BY_DESIGN
+Severity: Low
+Module: Platform (phone shell) / Partnerships
+Evidence: app/src/features/partnerships/Pipeline.tsx:34 gives the screen's New Lead to the floating button (`useScreenAction`) and :40 keeps New Lead in the page header. Both are specified: F18 (docs/FRONTEND_FOUNDATION.md line 75) makes the floating button a fan of the screen's New action, Clock In or Out, Praxis AI and Help on every phone screen, and docs/guides/partnerships.md §10.2 line 1275 puts "New Lead, full width" on the phone's Pipeline; line 1456 (TB, 06/11/2026) records that the header buttons stay beside the fan's action. The "+" is not a second New Lead button: it opens the fan, with Hide Here.
+Scope ref: FRONTEND_FOUNDATION F18; partnerships.md §10.2, §13 (TB, 06/11/2026)
+Fix: None.
+Effort: S
+For MyCity: This is intended: the round button opens a short menu (the page's New action, Clock In, Praxis AI and Help) that is the same on every phone screen, and the page keeps its own New Lead button. It can be hidden on a page with Hide Here.
+
+ID: F48b
+Title: Small tap targets on Goals and Employees on a phone
+Verdict: NOT_REPRODUCED
+Severity: Low
+Module: Platform (phone shell) / Performance / People
+Evidence: Built the staff app's demo (vite build --mode demo into a scratch folder) and measured every control at 375 px with Chromium on Performance · Goals, People · Employees and Partnerships · Pipeline. Under 32 px on Goals: 2 help terms and 8 record codes (ORG-2026-01, BM-KR1.1) 20 px tall; on Employees: 2 help terms; on Pipeline: 2 help terms. The record codes are each card's open button with `stretch-link` (packages/ui/src/data/DataView.tsx:284; packages/ui/src/styles/base.css:132 to 137, an ::after covering the whole card), so their real tap area is the full card; a script counting element boxes reports them as tiny. Help terms are the one written exception to 44 px (docs/FRONTEND_GUIDE.md line 366). Every other control was 44 px or more (`phone:size-control`, tokens.css line 278). Staging's larger data gives more cards, hence the auditor's higher counts.
+Scope ref: FRONTEND_FOUNDATION F5 (44 px on a phone); FRONTEND_GUIDE §7 line 366; gate 11 (scripts/check/two-shells.js)
+Fix: None.
+Effort: S
+For MyCity: We measured these screens at phone width: the small items are the card titles, and the whole card responds to a tap, and the small "?" help words, which are the agreed exception. Nothing needs changing.
+
+ID: F50
+Title: First search after the server starts is slower than later ones
+Verdict: IMPROVEMENT
+Severity: Low
+Module: Platform (⌘K search)
+Evidence: Throwaway integration test (since deleted) on the real migrations, as a Management login, GET /api/v1/search five times in one fresh process: "Kora" 944 ms, "invoice" 281 ms, "Kora" again 199 ms, "leave" 268 ms, "Ada" 231 ms. So the first search in a process pays a one-off cost and later ones, including the same term, are fast. Part of it is the User Guide group: the manual's 18 chapters are parsed and word-indexed on first use (src/modules/user_guide/user_guide.chapters.js:30 to 51, user_guide.service.js:173 to 180; about 0.45 s measured with node), not at boot (src/server.js:70 to 71 loads only the registries). Staging's smaller machine and real data plausibly push that past 2 s. One-word terms like "Kora" never wait on the model (user_guide.search.js:38 to 40). No milestone sets a search latency target.
+Scope ref: foundation.md §6.7 (⌘K); MILESTONES §15 (⌘K finds every page, tab and record)
+Fix: Warm the search at boot in src/server.js: load and index the User Guide chapters, and open the pool and pg_trgm check, before the server takes traffic. Then measure p95 on staging from the request log.
+Effort: S
+For MyCity: Confirmed in part: the first search after the system restarts takes longer while it prepares; later searches answer in about a quarter of a second. We will do that preparation at start-up so the first person does not wait.

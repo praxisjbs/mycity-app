@@ -395,6 +395,25 @@ CLIENT = OrderedDict([
                          "days) and press Activate.",
                   where="Queries & Sanctions · Rules",
                   why="The rule exists but stays in Draft until MyCity sets it.")),
+    ("F29b", dict(area="Performance", golive="Recommended",
+                  action="Replace each [TBC] and \"approved ceiling\" target in the Q4 plan with its "
+                         "final figure (Change Target on the key result, approved by the CEO).",
+                  where="Performance · Goals (the key result's sheet)",
+                  why="The headline score cannot be read against provisional targets.")),
+    ("F80a", dict(area="Recruitment", golive="Yes, before interviews are rated",
+                  action="On each vacancy, drop or replace the interview traits that do not fit the "
+                         "role; optionally change the Default Traits.",
+                  where="Recruitment · Vacancies (the vacancy's Questions); Careers Settings",
+                  why="Every vacancy starts from the same ten standard traits.")),
+    ("F82b", dict(area="People", golive="Yes",
+                  action="Confirm which department the CTO belongs to (Technology & Back-office Ops on "
+                         "the staff list, General Management on staging) and set his record to match.",
+                  where="People · Employees (the CTO's record)",
+                  why="His scorecard and his record name different departments.")),
+    ("F82e", dict(area="Performance", golive="No (staging only)",
+                  action="Delete the test goals \"test run\" and \"another test\".",
+                  where="Performance · Goals (Delete Goal on the goal's sheet)",
+                  why="They were typed on staging during testing; production starts clean.")),
     ("F43a", dict(area="My Workspace", golive="No (staging only)",
                   action="Move the tasks of each duplicate project to the one you keep, then complete "
                          "the spare.",
