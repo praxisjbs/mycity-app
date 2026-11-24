@@ -270,7 +270,7 @@ its amount, and the CEO decides the requisition as a whole.
    changed). A request already approved counts in its line's committed and keeps the flag it was
    decided with. **New Request shows it before Send Request** (QA audit BG-007, 24/11/2026): once a
    category is picked, the form reads `GET /expenses/mine/budget-check` (`expenses.budget-check.js`
-   `preview`: the same line, day and count as sending) and shows Budget Left (the line's) and
+   `estimate`: the same line, day and count as sending) and shows Budget Left (the line's) and
    Department Left, and the Over Budget pill once the lines' total is more than the line has left
    (or there is no line). It stays a warning: Send Request is never refused for it. The figures are
    the ones the requester's own request shows them once sent; nothing about anyone's request. **The recount locks its lines first** (audit F6), in one order, in a statement of
@@ -550,7 +550,7 @@ None.
 
 ## 14 · Change log
 
-- 24/11/2026 · JP · QA audit BG-007 (F56b): Over Budget was flagged to the approvers but the requester saw nothing before Send Request. New Request now shows Budget Left, Department Left and the Over Budget pill once a category is picked, from the new read `GET /expenses/mine/budget-check` (`ExpenseBudgetCheckQuery`, `ExpenseBudgetCheck`; `expenses.budget-check.js` `preview`, the same count as sending). Still a warning, never a block (§3 step 7, §5, §6.6 rule 3, §10.1, §11). `budgets.test.js`, `Expenses.test.tsx`.
+- 24/11/2026 · JP · QA audit BG-007 (F56b): Over Budget was flagged to the approvers but the requester saw nothing before Send Request. New Request now shows Budget Left, Department Left and the Over Budget pill once a category is picked, from the new read `GET /expenses/mine/budget-check` (`ExpenseBudgetCheckQuery`, `ExpenseBudgetCheck`; `expenses.budget-check.js` `estimate`, the same count as sending). Still a warning, never a block (§3 step 7, §5, §6.6 rule 3, §10.1, §11). `budgets.test.js`, `Expenses.test.tsx`.
 - 24/11/2026 · JP · From the 23/11 staging faults brief (fault #5, `PAYEE_INCOMPLETE` at `POST /expenses/mine/:id/submit`) and JBS Praxis's answer: Send Request on a draft with a blank payee was refused after the press, the form having already saved its edit. `expenses.payeeProblems` in the contract is the one rule; the form marks Payee Name, Bank, Account Name and Account Number before it saves, and the window's Send Request opens Edit Request with them marked (§6 rule 2). `Expenses.test.tsx`, `expenses.test.js`.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Read Invoice, Suggest Category and Check Duplicate; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 16/11/2026 · TB · §9: the Document Centre's Library lists a request's invoice and a disbursement's receipt (`expenses.library.js`, `disbursements.library.js`; `document-centre.md` §6.2), each for the readers the vault already lets open it and nobody else. Nothing on an Expenses screen changed.

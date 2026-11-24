@@ -11,7 +11,7 @@
  * module whenever a request on it moves, and the flag of a request still deciding is worked out
  * again with them (expenses.service countIn), so it is never older than the line.
  *
- * preview() answers the same question for New Request before anything is saved, with the figures the
+ * estimate() answers the same question for New Request before anything is saved, with the figures the
  * approvers will see beside the flag, so the requester sees them before Send Request.
  */
 const m = require("../../shared/money/money");
@@ -50,7 +50,7 @@ async function check(db, request, sentOn) {
  * flag check() would set if it were sent on `sentOn`. Reads only.
  * @returns {Promise<{department_id: string|null, budget_remaining: string|null, department_remaining: string|null, over_budget: boolean}>}
  */
-async function preview(db, request, sentOn) {
+async function estimate(db, request, sentOn) {
   const departmentId = request.department_id || null;
   if (!departmentId) return { department_id: null, budget_remaining: null, department_remaining: null, over_budget: true };
   const line = await lineOf(db, departmentId, request.expense_category_id, sentOn);
@@ -68,4 +68,4 @@ async function preview(db, request, sentOn) {
   };
 }
 
-module.exports = { check, preview };
+module.exports = { check, estimate };

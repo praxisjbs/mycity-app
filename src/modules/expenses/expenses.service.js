@@ -144,7 +144,7 @@ async function budgetPreview(actor, query) {
     expense_category_id: query.expense_category_id,
     amount: query.amount || "0.00",
   };
-  return budget.preview(pool, request, lagos.today());
+  return budget.estimate(pool, request, lagos.today());
 }
 
 /** The requests waiting on the caller now (Expenses · Approvals), oldest sent first. */
