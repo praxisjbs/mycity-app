@@ -1,0 +1,127 @@
+## Create Tests
+Create-flow tests (records prefixed QA-AUDIT, left in place as evidence) |  |  |  |  |  | 
+Run on staging 16/11/2026 as Etudor Edidiong (Management role). Submissions were authorised; staff were already told hub records are test data. |  |  |  |  |  | 
+Test | Area | Scenario | Expected | Actual | Result | Record created
+T01 | CRM | New Lead with empty form | Required fields flagged | Name and Category flagged Required | Pass | —
+T02 | CRM | New Lead with the exact name of an existing partner | Blocked or warned with merge option | Warning shown; Next still allowed | Partial | —
+T03 | CRM | New Lead with a near-duplicate name | Warned | Not detected | Fail | —
+T04 | CRM | Contact with invalid email and 2-digit phone | Rejected | 'Check the email', 'Not a phone number' | Pass | —
+T05 | CRM | Deal value −5,000 | Rejected | 'Not below zero' | Pass | —
+T06 | CRM | Deal value 500000 after the rejection | Accepted | 'Check the format'; field corrupted to 50000500000 | Fail | —
+T07 | CRM | Deal expected close 01/01/2020 | Rejected | Accepted; health On Track | Fail | DEAL-2026-0014
+T08 | CRM | Lead created without Source | Source required | Accepted | Fail | QA-AUDIT-Lead-01
+T09 | CRM | Work tab on the new lead | Loads | HTTP 500 | Fail | —
+T10 | CRM | Create task from the lead's Work tab, past due date | Past date rejected; task visible on the record | Past date rejected; TSK-0115 created but not visible on the record | Partial | TSK-0115
+T11 | CRM | Move deal to Partnership Signed without a signed copy | Blocked | 'Attach the signed copy' | Pass | —
+T12 | CRM | Sign deal with copy attached, value ₦0 | Value required; agreement recorded | Signed with ₦0; no agreement in Contracts & MOUs | Fail | QA-AUDIT-Lead-01 (partner)
+T13 | CRM | Counts after signing | +1 everywhere | Pipeline, Partners, Home, Analytics all 6 → 7 | Pass | —
+T14 | CRM | Log interaction; check Last Contact on partner and lead | Both update | Partner 16:42; lead 'Never' | Fail | 1 interaction
+T15 | CRM | Reassign partner owner to a new employee | Saved | Saved | Pass | —
+T16 | HR | Archive that employee: does it force reassignment? | Reassignment forced | No archive action for the Management role | Not testable | —
+T17 | ERP | Expense ₦100,000 against ₦52,000 remaining budget | Warn or block; reserve budget | Sent with no warning; budget unchanged | Fail | EXP-0020
+T18 | ERP | Expense with fake bank, mismatched account name, account 0000000000, no invoice | Rejected or flagged | Accepted | Fail | EXP-0020
+T19 | ERP | Expense approval route | Line Manager → Operations & People | Went straight to Operations & People | Fail (verify) | EXP-0020
+T20 | ERP | Project with no due date, no budget; then the same name again | Warned or required | Both created silently | Fail | PRJ-2026-000007, 000008
+T21 | HR | Employee with future date of birth | Rejected | Rejected | Pass | —
+T22 | HR | Employee aged 6, ₦5,000 pay, tax ID 'abc', pension PIN '123', no bank or line manager | Rejected or warned | Accepted | Fail | Employee 00039
+T23 | HR | Probation and contract end before the start date | Rejected | Rejected | Pass | —
+T24 | HR | Headcounts after adding an employee | +1 everywhere | Employees, Team, Attendance table, Workspace +1; Home expected and Payroll unchanged (definitions) | Pass | —
+T25 | HR | Vacancy without department | Rejected | Rejected; no default | Pass | — (cancelled, not published)
+T26 | HR | Leave over entitlement (24 days, 20 left) | Rejected | Server refused, message after Send | Pass | —
+T27 | HR | Valid 5-day leave: routing | Line manager | 'Sent to Ifeoma Mbonu' | Pass | Leave 01/12 to 05/12/2026
+T28 | Platform | Escape inside a multi-step form | Close popover only | Whole form discarded, no confirm | Fail | —
+T29 | CRM | Fresh form: type 750000 into Projected Value | Accepted | 'Check the format'; only 750000.00 passes | Fail | QA-AUDIT-Lead-02
+T30 | CRM | Edit Deal value 900000 | Accepted | 'Check the format' on Save; 900000.00 saved | Fail | DEAL-2026-0015
+T31 | CRM | Skip stages: Prospect → Proposal Sent | Blocked or reason required | Moved with no proposal on file | Fail | DEAL-2026-0015
+T32 | CRM | Jump to Active Partnership | Signed copy required | Signed copy required | Pass | —
+T33 | CRM | Closed Lost without reason; reopen | Reason required both ways | Reason required (10+ chars) both ways | Pass | —
+T34 | CRM | Lost deal health | Shows lost/closed | Still 'On Track' | Fail | —
+T35 | CRM | AI proposal from partner | Questions then draft | 'The questions did not arrive'; retry stuck | Fail | PRO-0003
+T36 | CRM | Generate agreement: Vendor category | Template or clear path | 'No template' for Vendor | Fail | —
+T37 | CRM | Generate agreement: Event category | Draft with partner data | AGR-2026-0004 draft; submit hidden until placeholders filled | Pass | AGR-2026-0004
+T38 | CRM | Enter Returns: units 5, downloads 10, money with decimals | Saved | 'Required' on filled optional fields; cannot save | Fail | —
+T39 | CRM | Returns: commission larger than gross | Flagged | Not flagged | Fail | —
+T40 | CRM | Duplicate contact on same partner | Blocked | 'Already a contact' | Pass | —
+T41 | CRM | Close partner with a signed deal | Partnership ended, deal stays won | Deal moved to Closed Lost | Fail | QA-AUDIT-Lead-01
+T42 | CRM | Convert lead to partner | Signed copy required | Signed copy required; converted | Pass | QA-AUDIT-Lead-02 (partner)
+T43 | Platform | Lead name 349 chars with HTML and emoji | Length limit; text escaped | 150-char limit; markup shown as text, no script ran | Pass | LED-0011
+T44 | ERP | Draft without payee, then Send | Draft saves; Send blocked | Draft saved; 'Add the payee's bank details' | Pass | EXP-0021
+T45 | ERP | Bank picker | Choose from maintained list | Any user can 'Add' a bank; fake bank now offered to all | Fail | —
+T46 | ERP | Expense on project with no budget | Warn or block; commit | Accepted; Committed unchanged | Fail | EXP-0021
+T47 | ERP | Cancel a sent expense | Cancelled | 'EXP-0021 cancelled' | Pass | EXP-0021
+T48 | ERP | Identical expense same day | Duplicate warning | Sent with no warning | Fail | EXP-0022 (cancelled)
+T49 | ERP | Line rounding 3 × 333.33 | 999.99 | 999.99 | Pass | —
+T50 | ERP | Record ₦1,000,000 advance for ₦5,000 earner | Limit or warning | Future date blocked; then 'You do not have access to this' after filling | Partial | —
+T51 | ERP | Payroll run with new joiner | Joiner flagged | Not in run, no warning | Fail | —
+T52 | HR | Raise query: self, no signature, then signed | Self excluded; signature required | Both enforced; QRY-0014 raised and letter sent | Pass | QRY-0014
+T53 | HR | Sanction a fresh query | Wait for response window | Not offered until 24h passes | Pass | —
+T54 | HR | Overlapping leave | Blocked | 409 'already have leave' | Pass | —
+T55 | HR | Back-dated sick leave | Allowed with limits | 'Pick 16/11/2026 or later' | Fail (verify) | —
+T56 | HR | Cancel leave | Balance restored | Restored to 20; double 'Withdrawn / Cancelled' label | Partial | Leave 01/12 to 05/12
+T57 | HR | Clock in after shift end, unregistered device; clock out | One exception; checks applied | Accepted; 2 exceptions; location not checked | Fail | Punch 17:22
+T58 | HR | KPI with no numeric target | Target required | Created PG-K09 with '[TBC]' | Fail | PG-K09
+T59 | HR | Department duplicate name 'marketing' | Blocked | 'Already in use' | Pass | —
+T60 | Platform | Announcement to empty department | Warn | Published, '0 of 0 read' | Fail | Announcement
+T61 | Platform | Accessibility basics on 4 screens | Labels, names, H1, lang | All present | Pass | —
+T62 | Platform | Phone-size New Request | Usable | Fits; actions at end of long scroll | Partial | —
+T63 | HR | Careers form submitted empty | Required fields flagged | Flagged | Pass | —
+T64 | HR | Upload a .txt CV | Rejected | 'This file type is not accepted here' | Pass | —
+T65 | HR | Submit without privacy consent | Blocked | 'Tick to agree' | Pass | —
+T66 | HR | Apply twice with the same email | Blocked | 'You Have Already Applied', APP-0013 kept | Pass | APP-0013
+T67 | HR | AI screening of an under-qualified applicant | Low score with reasons | 0, correct reasons | Pass | APP-0013
+T68 | HR | Move a 0-score candidate to offer with assessment unfinished and interview not held | Blocked or reason required | Reached Make Offer, no warning | Fail | APP-0013
+T69 | HR | Schedule interview: no link, past date, end before start, no panel | All blocked | All blocked | Pass | Interview 20/11/2026
+T70 | HR | Submit interview card before the interview | Blocked with a message, or submitted | Draft only, no message (rule to verify) | Partial | —
+T71 | HR | Offer with ₦0 pay | Rejected | Drafted OFF-0003 at ₦0 | Fail | OFF-0003
+T72 | HR | Offer start date in the past | Rejected | 'Pick 17/11/2026 or later' | Pass | —
+T73 | HR | Send ₦0 offer for approval | Blocked | Sent to Head of Department | Fail | OFF-0003
+T74 | HR | Verify a company-signed offer on the public page | Found | 'Not Found' | Fail (verify) | OFF-0001
+T75 | HR | Change gross pay ₦5,000 → ₦350,000 as Management | Approval, effective date, audit of values | Saved directly; history lacks values | Fail | Employee 00039
+T76 | HR | Declare rent without evidence, address or landlord ID | Blocked | All three required; ₦3,000,000 declared | Pass | Employee 00039
+T77 | HR | Make an employee their own manager | Blocked | 'Nobody reports to themselves.' | Pass | —
+T78 | HR | Create a reporting loop | Blocked | 'That would make a loop' | Pass | —
+T79 | HR | Second scorecard for the same quarter | Blocked | 'Already has one' | Pass | —
+T80 | HR | New scorecard with no lines | Weights flagged | 'Results lines total 0, not 60' | Pass | QA-AUDIT scorecard
+T81 | HR | Submit a review with no lines scored | Blocked | Submitted; moved to Second Level | Fail | Adaeze Chike, October
+T82 | Platform | Complete a project with an open task | Confirm or block | Completed instantly; task left To Do | Fail | PRJ-2026-000007
+T83 | ERP | Completed project in the expense picker | Not offered | Not offered | Pass | —
+T84 | Platform | Praxis AI: open vacancies, applicants, pending expenses | Matches screens | Matches | Pass | —
+T85 | Platform | Praxis AI: restricted personal and bank data | Refused | Refused | Pass | —
+T86 | ERP | Enter statutory payroll items | Editable by the payroll owner | View-only for Management; needs Operations & People | Not testable | —
+ | Pass | =COUNTIF($F$5:$F$90,"Pass") |  |  |  | 
+ | Fail | =COUNTIF($F$5:$F$90,"Fail*") |  |  |  | 
+ | Partial | =COUNTIF($F$5:$F$90,"Partial") |  |  |  | 
+ | Not testable | =COUNTIF($F$5:$F$90,"Not testable") |  |  |  | 
+## Module Scorecard
+Module scorecard |  |  |  |  | 
+Rating 1 = not usable, 3 = works with notable issues, 5 = ready. Auditor's judgement. Cross-cutting findings (Platform, Navigation, Mobile, Finance, Sales) are not attributed to a module. |  |  |  |  | 
+Module | Tabs reviewed | Rating (1-5) | Verdict | Summary | Open findings
+Home / Dashboard | Overview, Team, Alerts, Reports | 3 | Works, with accuracy issues | Good command-centre idea; counts disagree, wrong chart caption, test goals visible. | =COUNTIFS(Findings!$B$5:$B$87,"Home*",Findings!$N$5:$N$87,"<>Closed")
+My Workspace | Today, Tasks, Projects, Calendar, Analytics | 3.5 | Works | Solid task and project basics; overdue discipline and labels need work. | =COUNTIFS(Findings!$B$5:$B$87,"Workspace*",Findings!$N$5:$N$87,"<>Closed")
+Employee Self-Service | 9 tabs | 3.5 | Works | Complete self-service set; status contradictions and a raw key leak. | =COUNTIFS(Findings!$B$5:$B$87,"Self-Service*",Findings!$N$5:$N$87,"<>Closed")
+People (HR core) | 7 tabs | 3 | Works, data issues | Rich feature set; reporting lines to vacant seats, overlapping departments, attendance unreliable. | =COUNTIFS(Findings!$B$5:$B$87,"People*",Findings!$N$5:$N$87,"<>Closed")
+Performance | 5 tabs | 2.5 | Works, scores unreliable | Strong framework; reviews pass unscored and one admin line can rate 'Exceeds'. | =COUNTIFS(Findings!$B$5:$B$87,"Performance*",Findings!$N$5:$N$87,"<>Closed")
+Queries & Sanctions | 4 tabs | 3.5 | Works | Rules engine and letters work; escalation needs verifying. | =COUNTIFS(Findings!$B$5:$B$87,"Queries*",Findings!$N$5:$N$87,"<>Closed")
+Recruitment | 8 tabs | 3 | Works, weak controls | Complete flow with good AI screening, but no stage gates, ₦0 offers allowed and one letter for every contract type. | =COUNTIFS(Findings!$B$5:$B$87,"Recruitment*",Findings!$N$5:$N$87,"<>Closed")
+Payroll | 4 tabs | 1.5 | Not go-live ready | Statutory items not set up (the setup screen exists); run computes with no deductions; blockers don't block; pay changes need no approval. | =COUNTIFS(Findings!$B$5:$B$87,"Payroll*",Findings!$N$5:$N$87,"<>Closed")
+Partnerships (CRM) | 7 tabs + partner 360 | 2.5 | Partially working | Good partner 360, but Work tab returns 500, owner is a leaver, contracts out of sync, partner-only scope. | =COUNTIFS(Findings!$B$5:$B$87,"Partnerships*",Findings!$N$5:$N$87,"<>Closed")
+Expenses (ERP) | 6 tabs + request form | 3 | Works, control gaps | Budget maths sound; no supplier list, purchase orders or payables. | =COUNTIFS(Findings!$B$5:$B$87,"Expenses*",Findings!$N$5:$N$87,"<>Closed")
+Staff Community | Channels, DMs, Announcements | 4 | Works well | Voice notes, recognition, polls, read tracking. | =COUNTIFS(Findings!$B$5:$B$87,"Community*",Findings!$N$5:$N$87,"<>Closed")
+Mailbox | Inbox, Sent | 2 | Not tested (not connected) | Needs a connected mailbox; fires failing calls until then. | =COUNTIFS(Findings!$B$5:$B$87,"Mailbox*",Findings!$N$5:$N$87,"<>Closed")
+Knowledge Hub | SOPs, User Guide | 4 | Works well | Versioned SOPs and an illustrated guide. | =COUNTIFS(Findings!$B$5:$B$87,"Knowledge*",Findings!$N$5:$N$87,"<>Closed")
+Praxis AI | Ask, History | 3 | Not exercised | Shows staff the cost of each question; high token use for simple questions. | =COUNTIFS(Findings!$B$5:$B$87,"Praxis*",Findings!$N$5:$N$87,"<>Closed")
+Settings | 10 tabs | 4 | Works well | Deep configuration; security defaults (two-step) unsafe for go-live. | =COUNTIFS(Findings!$B$5:$B$87,"Settings*",Findings!$N$5:$N$87,"<>Closed")
+Average rating |  | =AVERAGE(C5:C19) |  |  | 
+## Method & Limits
+Method and limits | 
+Environment | https://hub.staging.mycityapp.io, staging. Production will be hub.mycityapp.io after JBS Praxis hands over.
+Account | Etudor Edidiong, Program Manager (Management role). Screens for other roles were not seen.
+Round 1 | Read-only walkthrough of all 15 modules (about 80 tabs) at 1440×900 and 375px; network log scanned for failures.
+Round 2 | 28 create-flow scenarios (T01–T28) on Partnerships, Expenses, Projects, Employees, Vacancies and Leave. Didi authorised real submissions; records are prefixed QA-AUDIT and kept as evidence.
+Records created | QA-AUDIT-Lead-01 / DEAL-2026-0014 (signed, now a partner, owner QA-AUDIT Employee); TSK-0115; one logged call; EXP-0020 (₦100,000, with Operations & People); PRJ-2026-000007 and 000008; employee 00039 'QA-AUDIT Employee'; Annual leave 01/12 to 05/12/2026 (with Ifeoma Mbonu). Vacancy was cancelled, not published.
+Round 3 | 34 lifecycle scenarios (T29–T62). Lifecycle depth: edits, stage moves, close/lost/reopen, proposals, agreements, returns, contacts, expense drafts/cancel/duplicates, bank list, advances, payroll run problems, queries with signature, leave overlap/back-dating/cancel, clock in/out, device registration, KPI, department, announcement, edge inputs (length, HTML, emoji), accessibility scan, phone-size forms. Suspected failures re-run on a freshly loaded page with real keystrokes.
+Round 3 records | QA-AUDIT-Lead-02 → partner (DEAL-2026-0015, ₦900K signed); LED-0011/DEAL-2026-0016 (edge input); PRO-0003 (stuck); AGR-2026-0004 (draft); QA-AUDIT-Lead-01 closed; EXP-0021, EXP-0022 (cancelled); QRY-0014 (response due 17/11 17:20); clock-in/out 17:22 on Didi's account; KPI PG-K09; department QA-AUDIT DeptQAA; one announcement to that department.
+Round 4 | 24 end-to-end scenarios (T63–T86), 17/11/2026, 00:20 to 01:30. Round 4: 24 end-to-end tests (T63–T86) across Recruitment (careers application to offer), People (pay, statutory fields, rent relief, reporting lines), Performance (scorecards, reviews), Projects, Expenses and Praxis AI. Payroll setup, approvals, payouts and offboarding need an Operations & People login and were not done.
+Round 4 records | APP-0013 'QA-AUDIT Candidate' (Content Producer) with a Work Style Profile sent to its example.com address, an interview on 20/11/2026 10:00 with you as the only panellist, and offer OFF-0003 at ₦0 now waiting on the Head of Department; employee 00039 now on ₦350,000 a month, NHF on, Lagos, rent of ₦3,000,000 declared for 2026, reporting to the disposable 'Qa Preview' record, with a draft Q4 scorecard; Adaeze Chike's October review submitted under your name with no lines scored (now at Second Level); TSK-0121; PRJ-2026-000007 marked complete; two Praxis AI questions.
+Not tested | Approver actions (Head of Department, Operations & People, CEO); statutory payroll entry, recompute and payslips (Payroll is view-only for Management); expense approval and payout; offer acceptance and onboarding (the candidate step runs from an emailed link); offboarding; sanction escalation on QRY-0014; whether department announcements are visible company-wide.
+Side effects | Round 1: opening Direct Messages marked one thread read. Round 2: EXP-0020 and the leave request notified their approvers. Round 3: your account clocked in and out at 17:22, creating two device exceptions; QRY-0014 notified the QA employee and sent its query letter to that employee's test email; one announcement went to the empty QA department; EXP-0021 and EXP-0022 notified their approvers before being cancelled; the free-text bank 'Not A Real Bank' is now in the shared bank list for every requester and should be removed. Round 4: the test application, assessment invite and interview generated emails to qa-audit.candidate@example.com; OFF-0003 notified the Head of Department; Adaeze Chike's review moved to the second-level reviewer under your name and should be returned; the QA employee's pay and statutory fields changed.

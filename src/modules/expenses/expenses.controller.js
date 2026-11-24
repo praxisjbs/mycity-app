@@ -24,6 +24,8 @@ module.exports = {
 
   mineSummary: async (req, res) => ok(res, await service.mineSummary(me(req))),
 
+  budgetCheck: async (req, res) => ok(res, await service.budgetPreview(req.user, req.validated.query)),
+
   create: async (req, res) => created(res, await service.create(withActor(req), body(req))),
 
   update: async (req, res) => ok(res, await service.update(withActor(req), id(req), body(req))),

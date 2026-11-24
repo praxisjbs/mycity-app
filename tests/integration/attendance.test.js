@@ -512,6 +512,56 @@ describeDb("attendance against the real migrations", () => {
       expect(known.today.device).toMatchObject({ state: "registered", registered_count: 1, can_register: false });
     });
 
+    test("an unregistered device opens one exception a day; its later punches attach and are decided with it (§6.6)", async () => {
+      await setPolicy("off", "warn");
+      const morning = nextMorning();
+      const date = morning.slice(0, 10);
+      const evening = `${date}T16:00:00Z`;
+      const who = people.staff.employee.employee_id;
+      const inn = await punchAt("staff", morning);
+      const out = await punchAt("staff", evening, { event_type: "clock_out" });
+      expect(inn).toMatchObject({ validation_state: "review", reasons: ["unknown_device"] });
+      expect(out).toMatchObject({ validation_state: "review", reasons: ["unknown_device"] });
+      const onDay = () =>
+        q(
+          `SELECT x.attendance_exception_id, x.attendance_event_id, x.attendance_device_id, x.status, x.outcome
+             FROM attendance_exception x JOIN attendance_day d ON d.attendance_day_id = x.attendance_day_id
+            WHERE d.employee_id = $1 AND d.attendance_date = $2 AND x.exception_type = 'unknown_device'
+            ORDER BY x.created_at`,
+          [who, date],
+        ).then((r) => r.rows);
+      const [one] = await onDay();
+      expect(await onDay()).toHaveLength(1);
+      expect(one).toMatchObject({ attendance_event_id: inn.attendance_event_id, attendance_device_id: expect.any(String), status: "open" });
+      const links = await q("SELECT attendance_event_id FROM attendance_exception_punch WHERE attendance_exception_id = $1", [one.attendance_exception_id]);
+      expect(links.rows).toEqual([{ attendance_event_id: out.attendance_event_id }]);
+      const queued = (await as("ops").get(`/attendance/exceptions?status=open&exception_type=unknown_device&employee_id=${who}&date=${date}`)).body.data;
+      expect(queued).toEqual([expect.objectContaining({ detail: expect.stringMatching(/, 2 punches$/) })]);
+
+      // Rejecting it rejects both punches: the day counts neither, and the person may clock in again.
+      const rejected = await as("ops").post(`/attendance/exceptions/${one.attendance_exception_id}/decision`, {
+        decision: "reject",
+        resolution: "Not a device we know of",
+      });
+      expect(rejected.status).toBe(200);
+      const events = await repo.eventsOn(pool, who, date);
+      expect(events.map((e) => [e.event_type, e.excluded])).toEqual([
+        ["clock_in", true],
+        ["clock_out", true],
+      ]);
+      expect(await repo.getDay(pool, who, date)).toMatchObject({ first_clock_in_at: null });
+
+      // Once decided, the next punch from the device that day opens a new exception of its own.
+      const again = await punchAt("staff", `${date}T16:30:00Z`);
+      expect(again).toMatchObject({ validation_state: "review", reasons: ["unknown_device"] });
+      const after = await onDay();
+      expect(after.map((x) => [x.status, x.outcome])).toEqual([
+        ["resolved", "rejected"],
+        ["open", null],
+      ]);
+      expect(after[1].attendance_event_id).toBe(again.attendance_event_id);
+    });
+
     test("a device clock ahead of the server is held for review whatever the modes", async () => {
       await setPolicy("off", "off");
       const at = nextMorning();

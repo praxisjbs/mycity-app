@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import offerSchemas from "@mycity/contract/schemas/offers.js";
 import type { OfferDetail, OfferRow, OfferStatus } from "@mycity/contract/contract.gen.ts";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { saveBlob, useFileBlob } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
@@ -223,6 +223,8 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
   const submit = useMutation("POST /api/v1/recruitment/offers/:id/submit");
   const send = useMutation("POST /api/v1/recruitment/offers/:id/send");
   const resend = useMutation("POST /api/v1/recruitment/offers/:id/resend");
+  // A refused Submit, Send or Resend says why on the line under the buttons (a start date that has passed).
+  const [refusal, setRefusal] = useState<string | null>(null);
   const o = read.data;
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!o) return <Card><LoadingRows count={8} /></Card>;
@@ -231,12 +233,13 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
     invalidate("/api/v1/recruitment/offers");
   };
   const step = (run: () => Promise<unknown>, said: string) => async () => {
+    setRefusal(null);
     try {
       await run();
       reload();
       toast(said);
     } catch (e) {
-      say(e);
+      setRefusal(e instanceof ApiError ? e.message : "Not saved. Try again.");
     }
   };
   const body = { params: { id }, body: {} };
@@ -305,6 +308,7 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
             {o.can_send && <Button variant="primary" icon="send" className={primary} onClick={step(() => send.run(body), `${o.number} sent to ${o.candidate_name.split(" ")[0]}`)}>Send Offer</Button>}
           </div>
         </ActionGroup>
+        <FormError>{refusal}</FormError>
       </Card>
       {/* In the dialog the approval sits under Monthly Pay, in the same card; a phone's sheet keeps its own card. */}
       {wide ? (
@@ -377,7 +381,17 @@ function PayCard({ o, children }: { o: OfferDetail; children?: React.ReactNode }
   const range = o.salary_min || o.salary_max ? `${o.salary_min ? formatMoney(o.salary_min) : "Any"} to ${o.salary_max ? formatMoney(o.salary_max) : "Any"}` : null;
   return (
     <Card>
-      <CardHeader title="Monthly Pay" right={o.outside_range ? <Pill tone="warn">Outside Range</Pill> : undefined} />
+      <CardHeader
+        title="Monthly Pay"
+        right={
+          o.outside_range || o.zero_basic_reason ? (
+            <span className="inline-flex flex-wrap justify-end gap-1.5">
+              {o.zero_basic_reason && <Pill tone="warn">No Basic Salary</Pill>}
+              {o.outside_range && <Pill tone="warn">Outside Range</Pill>}
+            </span>
+          ) : undefined
+        }
+      />
       <KeyValue
         items={[
           ...o.pay_lines.map((l) => [l.name, <Money key={l.offer_pay_line_id} value={l.monthly_amount} />] as [string, React.ReactNode]),
@@ -385,6 +399,8 @@ function PayCard({ o, children }: { o: OfferDetail; children?: React.ReactNode }
           ["Annual", <Money key="a" value={o.annual_compensation} />],
           ...(range ? [[<HelpTerm key="h" help={RANGE_HELP}>Vacancy Range</HelpTerm>, range] as [React.ReactNode, string]] : []),
           ...(o.outside_range && o.range_reason ? [["Why Outside", <span key="w" data-copy="content">{o.range_reason}</span>] as [string, React.ReactNode]] : []),
+          // An intern's offer at ₦0 Basic Salary: the reason is for the approvers to weigh.
+          ...(o.zero_basic_reason ? [["Why No Basic Salary", <span key="z" data-copy="content">{o.zero_basic_reason}</span>] as [string, React.ReactNode]] : []),
         ]}
       />
       {children}

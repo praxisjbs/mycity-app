@@ -44,7 +44,7 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { fieldMessage, figureOf, rating, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
+import { Coverage, fieldMessage, figureOf, rating, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
 
 const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const STEP: Record<ReviewDetail["chain"][number]["key"], string> = { check_in: "Check-In", reviewer: "Reviewer", second_level: "Second Level", hr: "HR" };
@@ -192,6 +192,7 @@ export function ReviewSheet({ id, close }: { id: string; close: () => void }) {
             ["Score This Month", score(r.score_month)],
             ["Score to Date", score(r.score_to_date)],
             ["Rating", rating(r.rating).text],
+            ["Coverage", <Coverage of={r} />],
             ...(r.conduct_note ? ([["Conduct", r.conduct_note]] as Array<[string, string]>) : []),
           ]}
         />

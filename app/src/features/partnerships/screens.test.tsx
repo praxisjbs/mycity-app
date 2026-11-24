@@ -13,7 +13,7 @@ import Partnerships from "./index";
 import { forgetKept, healthPill, moveNeeds } from "./lib";
 import { dealOnWire } from "./forms/parts";
 import { returnsOnWire } from "./forms/ReturnsForm";
-import { duplicateQuery } from "./forms/LeadForm";
+import { duplicateAskOf, duplicateQuery } from "./forms/LeadForm";
 
 /**
  * Pipeline, Partners and Leads with both 360s on the in-browser mock (docs/guides/partnerships.md §10):
@@ -350,12 +350,20 @@ describe("Partnerships on the contract", () => {
 
 describe("the duplicate check asks only what the contract takes (fault #6, 23/11/2026)", () => {
   it("a name from three characters to 150, an email only when it is one; nothing else is sent", () => {
-    expect(duplicateQuery("  Hevix Events ")).toEqual({ name: "Hevix Events" });
-    expect(duplicateQuery("Ab")).toBeNull();
+    expect(duplicateQuery({ name: "  Hevix Events " })).toEqual({ name: "Hevix Events" });
+    expect(duplicateQuery({ name: "Ab" })).toBeNull();
     // Past the contract's 150 the field marks the name; the hidden check is not sent to be refused.
-    expect(duplicateQuery("A".repeat(151))).toBeNull();
-    expect(duplicateQuery("A".repeat(151), "ngozi@hevix.ng")).toEqual({ email: "ngozi@hevix.ng" });
-    expect(duplicateQuery("Hevix", "ngozi@")).toEqual({ name: "Hevix" });
+    expect(duplicateQuery({ name: "A".repeat(151) })).toBeNull();
+    expect(duplicateQuery({ name: "A".repeat(151), email: "ngozi@hevix.ng" })).toEqual({ email: "ngozi@hevix.ng" });
+    expect(duplicateQuery({ name: "Hevix", email: "ngozi@" })).toEqual({ name: "Hevix" });
+  });
+
+  it("asks with the contact's email and phone and the website once each is whole (QA F54b)", () => {
+    const ask = duplicateAskOf({ name: "Hevix Events", website: "https://hevix.ng" }, { email: "ngozi@hevix.ng", phones: ["0803 123 4567"] });
+    expect(duplicateQuery(ask)).toEqual({ name: "Hevix Events", email: "ngozi@hevix.ng", phone: "0803 123 4567", website: "https://hevix.ng" });
+    // A phone half typed and an empty website are left out, never sent to be refused.
+    expect(duplicateQuery(duplicateAskOf({ name: "Hev", website: " " }, { email: "", phones: ["0803"] }))).toEqual({ name: "Hev" });
+    expect(duplicateQuery(duplicateAskOf({ name: "", website: "" }, { phones: ["+2348031234567"] }))).toEqual({ phone: "+2348031234567" });
   });
 });
 

@@ -40,7 +40,6 @@ import {
   toast,
   toMoneyString,
   useContractForm,
-  useUnsavedChanges,
 } from "@mycity/ui";
 import { bodySchema, EMPLOYMENT, PATTERNS } from "./shared";
 import { RENAME, type Values } from "./VacancyForm";
@@ -142,7 +141,6 @@ function Interview({ start, close, onDone, ai }: Props & { ai: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const shown = useRef(at);
   // Answers live only here until the vacancy is saved, so leaving asks first.
-  useUnsavedChanges(f.isDirty);
   useEffect(() => {
     if (shown.current === at) return;
     shown.current = at;

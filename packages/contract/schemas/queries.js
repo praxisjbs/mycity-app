@@ -64,6 +64,8 @@ const QuerySanctionRef = z
     sanction_id: uuid,
     number: z.string().nullable(),
     step_name: z.string(),
+    /** The rung's place on the ladder (guide §6.5), so a proposal is read against the rungs in force; null for a rung since removed. */
+    position: z.number().int().min(1).nullable(),
     status: z.enum(["pending_approval", "issued", "rejected", "withdrawn"]),
   })
   .strict();
@@ -381,7 +383,10 @@ const TABLES = {
   QueryResponse: { table: "query_response", virtual: { blocks: "body as RichTextBlock[], from the one Markdown renderer" } },
   QuerySanctionRef: {
     table: "sanction",
-    virtual: { step_name: "consequence_step.name, or sanction.sanction_type for a rung since removed" },
+    virtual: {
+      step_name: "consequence_step.name, or sanction.sanction_type for a rung since removed",
+      position: "consequence_step.position, null for a rung since removed",
+    },
   },
   Query: {
     table: "employee_query",

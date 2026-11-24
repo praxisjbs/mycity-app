@@ -2,7 +2,9 @@
  * New Offer and Edit Offer (docs/guides/offers.md §3 step 1, §6): a wizard, as the offer has more
  * than six fields. New Offer picks a shortlisted candidate and starts from `GET /offers/draft` (the
  * vacancy's terms); Edit changes a draft. Pay is monthly, line by line; the monthly total is shown
- * against the vacancy's range, and a reason is asked for only when it sits outside it. Additional
+ * against the vacancy's range, and a reason is asked for only when it sits outside it. The first
+ * line is Basic Salary, kept first and above ₦0; an intern's may be ₦0, with a reason the approvers
+ * read (Why No Basic Salary). Additional
  * Terms and Schedule A (the final job description) are Markdown, printed after the standard wording.
  */
 import { useEffect, useRef, useState } from "react";
@@ -56,6 +58,7 @@ type Values = {
   office_days: string;
   pay_lines: Line[];
   range_reason: string;
+  zero_basic_reason: string;
   start_date: string;
   probation_months: string;
   annual_leave_days: string;
@@ -69,7 +72,7 @@ type Values = {
 
 const STEPS: Array<Array<keyof Values>> = [
   ["application_id", "job_title", "department_id", "reports_to", "role_function", "role_scope", "employment_type", "work_pattern", "office_days"],
-  ["pay_lines", "range_reason"],
+  ["pay_lines", "range_reason", "zero_basic_reason"],
   ["start_date", "probation_months", "annual_leave_days", "working_hours", "incentives", "benefits", "valid_days"],
   ["additional_terms", "job_description"],
 ];
@@ -95,8 +98,10 @@ function bodyOf(v: Values, create: boolean) {
   return out;
 }
 
-/** A refused pay line (pay_lines.0.monthly_amount) is marked on the lines as a whole. */
+/** A refused pay line (pay_lines.1.monthly_amount) is marked on the lines as a whole; Basic Salary's on its own line. */
 const RENAME: Record<string, string> = { pay_lines: "pay_lines" };
+const BASIC = "pay_lines.0.monthly_amount";
+const BLANK_AMOUNT = "Enter an amount";
 
 export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: OfferDetail; applicationId?: string; close: () => void; onSaved?: (o: OfferDetail) => void }) {
   const create = !offer;
@@ -112,6 +117,7 @@ export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: Of
     office_days: text(offer?.office_days),
     pay_lines: offer?.pay_lines.map((l) => ({ name: l.name, monthly_amount: l.monthly_amount })) ?? [],
     range_reason: text(offer?.range_reason),
+    zero_basic_reason: text(offer?.zero_basic_reason),
     start_date: text(offer?.start_date),
     probation_months: text(offer?.probation_months),
     annual_leave_days: text(offer?.annual_leave_days),
@@ -131,6 +137,8 @@ export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: Of
   const save = useMutation("POST /api/v1/recruitment/offers");
   const patch = useMutation("PATCH /api/v1/recruitment/offers/:id");
   const [problem, setProblem] = useState<string | null>(null);
+  // Basic Salary's own mark, on its line: empty, or ₦0 for anyone but an intern.
+  const [basicProblem, setBasicProblem] = useState<string | null>(null);
   const [stepAt, setStepAt] = useState(0);
 
   // A candidate picked fills the form from their vacancy, once for each pick.
@@ -149,7 +157,8 @@ export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: Of
       probation_months: text(d.probation_months),
       start_date: d.start_date && d.start_date >= todayIso() ? d.start_date : v.start_date,
       job_description: text(d.job_description),
-      pay_lines: d.pay_lines.length ? d.pay_lines.map((l) => ({ ...l })) : [{ name: "Basic Salary", monthly_amount: "" }],
+      // Basic Salary starts at the vacancy's minimum, or empty when it has no range: never 0.00.
+      pay_lines: d.pay_lines.length ? d.pay_lines.map((l) => ({ name: l.name, monthly_amount: l.monthly_amount ?? "" })) : [{ name: "Basic Salary", monthly_amount: "" }],
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.data]);
@@ -160,15 +169,24 @@ export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: Of
   const outside = total > 0 && ((min !== null && total < kobo(min)) || (max !== null && total > kobo(max)));
   const lines = f.values.pay_lines;
   const setLines = (next: Line[]) => f.set("pay_lines", next);
+  const basic = lines[0]?.monthly_amount ?? "";
+  const intern = f.values.employment_type === "intern";
+  // An intern's Basic Salary typed as ₦0: the approvers read why (the server refuses it otherwise).
+  const zeroBasic = intern && basic.trim() !== "" && kobo(basic) === 0;
+  const setBasic = (v: string) => {
+    setBasicProblem(null);
+    setLines(lines.map((x, k) => (k === 0 ? { ...x, monthly_amount: v } : x)));
+  };
 
   const payCheck = () => {
+    const blank = basic.trim() === "" || (kobo(basic) === 0 && !intern);
+    if (blank) setBasicProblem(BLANK_AMOUNT);
     const clean = f.check(STEPS[1]);
-    if (!clean) return false;
-    if (outside && !f.values.range_reason.trim()) {
-      f.setServerErrors({ range_reason: ["Say why"] });
-      return false;
-    }
-    return true;
+    const asks: Record<string, string[]> = {};
+    if (outside && !f.values.range_reason.trim()) asks.range_reason = ["Say why"];
+    if (zeroBasic && !f.values.zero_basic_reason.trim()) asks.zero_basic_reason = ["Say why"];
+    if (Object.keys(asks).length) f.setServerErrors(asks);
+    return clean && !blank && Object.keys(asks).length === 0;
   };
 
   const finish = async () => {
@@ -182,10 +200,15 @@ export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: Of
       toast(offer ? `${saved.number} saved` : `${saved.number} drafted`);
       onSaved?.(saved);
     } catch (e) {
-      const fields = e instanceof ApiError ? renamed(e.fields, RENAME) : {};
-      sayRefusal(e instanceof ApiError ? Object.assign(e, { fields }) : e, f, setProblem);
+      if (!(e instanceof ApiError)) return sayRefusal(e, f, setProblem);
+      // Basic Salary's refusal sits on its own line; any other line's on the lines as a whole.
+      const basicRefusal = e.fields[BASIC]?.[0];
+      const fields = renamed(Object.fromEntries(Object.entries(e.fields).filter(([k]) => k !== BASIC)), RENAME);
+      if (basicRefusal) setBasicProblem(basicRefusal);
+      if (basicRefusal && Object.keys(fields).length === 0) setProblem(null);
+      else sayRefusal(Object.assign(e, { fields }), f, setProblem);
       // A refusal on an earlier step takes the person back to it.
-      const at = STEPS.findIndex((keys) => keys.some((k) => k in fields));
+      const at = STEPS.findIndex((keys) => keys.some((k) => k in fields || (basicRefusal && k === "pay_lines")));
       if (at >= 0) setStepAt(at);
     }
   };
@@ -270,11 +293,18 @@ export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: Of
                         </Field>
                       </span>
                       <span className="col-span-2 max-md:col-span-1">
-                        <Field label="Monthly Amount">
-                          <MoneyField name={`line-${i}-amount`} value={l.monthly_amount} onChange={(v) => setLines(lines.map((x, k) => (k === i ? { ...x, monthly_amount: v } : x)))} />
-                        </Field>
+                        {i === 0 ? (
+                          <Field label="Monthly Amount" state={basicProblem ? "bad" : undefined} message={basicProblem ?? undefined}>
+                            <MoneyField name="line-0-amount" value={l.monthly_amount} onChange={setBasic} />
+                          </Field>
+                        ) : (
+                          <Field label="Monthly Amount">
+                            <MoneyField name={`line-${i}-amount`} value={l.monthly_amount} onChange={(v) => setLines(lines.map((x, k) => (k === i ? { ...x, monthly_amount: v } : x)))} />
+                          </Field>
+                        )}
                       </span>
-                      {lines.length > 1 && (
+                      {/* Basic Salary stays the first line: only the lines after it are removed. */}
+                      {i > 0 && (
                         <span className="flex min-h-tap items-center">
                           <IconButton icon="trash" label={`Remove Line ${i + 1}`} onClick={() => setLines(lines.filter((_, k) => k !== i))} />
                         </span>
@@ -300,6 +330,11 @@ export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: Of
               {outside && (
                 <Field label="Why Outside the Range" {...f.status("range_reason")}>
                   <TextAreaField {...f.field("range_reason")} rows={3} />
+                </Field>
+              )}
+              {zeroBasic && (
+                <Field label="Why No Basic Salary" {...f.status("zero_basic_reason")}>
+                  <TextAreaField {...f.field("zero_basic_reason")} rows={3} />
                 </Field>
               )}
             </>

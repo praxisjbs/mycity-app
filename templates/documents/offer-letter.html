@@ -6,11 +6,31 @@ format: markdown
 
 Dear {{ candidate.first_name }},
 
+{{#if is_contractor}}
+## Offer of Engagement: {{ job_title }}
+
+We are pleased to offer to engage you as an independent contractor to {{ company }} ("the Company"), providing services as {{ job_title }}, with effect from {{ longdate start_date }}, on the terms and conditions set out in this letter.
+
+A summary of the offer is below. Your full terms of engagement follow in Sections 1 to 12{{#if job_description}}, and the services you will provide are described in Schedule A, which forms part of this letter{{/if}}.
+{{else}}{{#if is_consultant}}
+## Offer of Engagement: {{ job_title }}
+
+We are pleased to offer to engage you as an independent consultant to {{ company }} ("the Company"), providing services as {{ job_title }}, with effect from {{ longdate start_date }}, on the terms and conditions set out in this letter.
+
+A summary of the offer is below. Your full terms of engagement follow in Sections 1 to 12{{#if job_description}}, and the services you will provide are described in Schedule A, which forms part of this letter{{/if}}.
+{{else}}{{#if is_intern}}
+## Offer of Internship: {{ job_title }}
+
+We are pleased to offer you an internship with {{ company }} ("the Company") as {{ job_title }}, starting on {{ longdate start_date }}, on the terms and conditions set out in this letter.
+
+A summary of the offer is below. Your full terms of internship follow in Sections 1 to 12{{#if job_description}}, and the description of your role is set out in Schedule A, which forms part of this letter{{/if}}.
+{{else}}
 ## Offer of Employment: {{ job_title }}
 
 We are pleased to offer you employment with {{ company }} ("the Company") as {{ job_title }}, with effect from {{ longdate start_date }}, on the terms and conditions set out in this letter.
 
 A summary of the offer is below. Your full terms of employment follow in Sections 1 to 12{{#if job_description}}, and the description of your role is set out in Schedule A, which forms part of this letter{{/if}}.
+{{/if}}{{/if}}{{/if}}
 
 ### Offer Summary
 
@@ -31,6 +51,235 @@ A summary of the offer is below. Your full terms of employment follow in Section
 
 ## Terms and Conditions
 
+{{#if is_contractor}}
+### 1. Engagement and Services
+
+1.1 You are engaged as an independent contractor to provide services as {{ job_title }}.{{#if job_description}} The services are described in Schedule A.{{/if}} The Company may reasonably update the services from time to time by agreement with you.
+
+1.2 You will report to {{#if reports_to}}the {{ reports_to }}{{else}}the person the Company names{{/if}} on the services, or to such other person as the Company may designate in writing.
+
+1.3 You are not an employee of the Company, and nothing in this letter creates an employment relationship between you and the Company. You decide how the services are carried out, meeting the standards and deadlines agreed with the Company.
+
+1.4 You may provide services to others during this engagement, provided there is no conflict of interest with the Company's business and your services to the Company are not affected.
+
+### 2. Place of Work and Availability
+
+2.1 {{#if location}}You will provide the services from {{ location }}.{{else}}Where you provide the services will be agreed with you in writing.{{/if}}{{#if office_days}} You will attend the office {{ number office_days }} days each week.{{/if}}
+
+2.2 {{#if working_hours}}You will be available for the services during {{ working_hours }}.{{else}}Your availability for the services will be agreed with you in writing.{{/if}}
+
+### 3. Fees
+
+3.1 Your monthly fees are as follows:
+
+| Component | Monthly |
+|---|---|
+{{#each pay_lines}}| {{ name }} | {{ money monthly_amount }} |
+{{/each}}| **Total Monthly Compensation** | **{{ money monthly_total }}** |
+
+3.2 Fees are paid monthly in arrears, on receipt of your invoice for the month, as set out in this offer. The Company makes no PAYE tax or pension deduction from your fees, other than any deduction the law requires of it. You are responsible for your own tax and statutory obligations.
+
+3.3 Your fees are confidential and should not be discussed with anyone other than Management or the People function.
+
+### 4. Incentives
+
+4.1 {{#if incentives}}You are eligible for the following: {{ incentives }}.{{else}}No incentive applies unless the Company agrees one with you in writing.{{/if}} Incentives are subject to the Company's Incentive Policy and the approved plan in force from time to time, and do not form part of your fixed fees.
+
+### 5. Business Expenses
+
+5.1 Business expenses agreed with the Company in advance will be reimbursed in line with its expense approval and retirement procedures.
+
+### 6. Documents and Referees
+
+6.1 Before you start, you are required to provide a valid means of identification, your bank details and any other document the Company reasonably requests.
+
+6.2 You are required to provide two referees: one previous employer, and one notable individual who has known you for at least four years.
+
+### 7. Leave
+
+7.1 As an independent contractor, you are not entitled to paid annual leave. You will agree any period when you will not be available with the Company in advance.
+
+### 8. Confidentiality
+
+8.1 You must keep all Company information, including strategies, data, commercial terms and partnerships, strictly confidential during and after this engagement, and use it only to provide the services.
+
+### 9. Conduct and Conflicts of Interest
+
+9.1 You agree to act in the best interests of the Company in providing the services, to disclose any conflict of interest, and to comply with the Company's policies that apply to its contractors.
+
+### 10. Intellectual Property and Company Property
+
+10.1 All work you create in providing the services belongs absolutely to the Company. At the Company's request and expense, you will do everything necessary to vest all rights in it fully in the Company.
+
+10.2 All Company property, including equipment, documents, data, accounts and access credentials, must be returned when this engagement ends.
+
+### 11. Ending the Engagement
+
+11.1 Either party may end this engagement by giving two weeks' written notice.
+
+11.2 The Company may end this engagement without notice for a material breach of this letter, a breach of confidentiality, an undisclosed conflict of interest, or conduct that brings the Company into disrepute.
+
+11.3 When the engagement ends, the Company will pay the fees due for services provided up to the end date, on receipt of your final invoice.
+
+### 12. General
+
+12.1 This letter{{#if job_description}}, together with Schedule A,{{/if}} sets out the terms of your engagement; any variation must be in writing and signed on behalf of both parties.
+
+12.2 This letter is governed by the laws of the Federal Republic of Nigeria.
+
+{{else}}{{#if is_consultant}}
+### 1. Engagement and Services
+
+1.1 You are engaged as an independent consultant to provide services as {{ job_title }}.{{#if job_description}} The services are described in Schedule A.{{/if}} The Company may reasonably update the services from time to time by agreement with you.
+
+1.2 You will report to {{#if reports_to}}the {{ reports_to }}{{else}}the person the Company names{{/if}} on the services, or to such other person as the Company may designate in writing.
+
+1.3 You are not an employee of the Company, and nothing in this letter creates an employment relationship between you and the Company. You decide how the services are carried out, meeting the standards and deadlines agreed with the Company.
+
+1.4 You may provide services to others during this engagement, provided there is no conflict of interest with the Company's business and your services to the Company are not affected.
+
+### 2. Place of Work and Availability
+
+2.1 {{#if location}}You will provide the services from {{ location }}.{{else}}Where you provide the services will be agreed with you in writing.{{/if}}{{#if office_days}} You will attend the office {{ number office_days }} days each week.{{/if}}
+
+2.2 {{#if working_hours}}You will be available for the services during {{ working_hours }}.{{else}}Your availability for the services will be agreed with you in writing.{{/if}}
+
+### 3. Fees
+
+3.1 Your monthly fees are as follows:
+
+| Component | Monthly |
+|---|---|
+{{#each pay_lines}}| {{ name }} | {{ money monthly_amount }} |
+{{/each}}| **Total Monthly Compensation** | **{{ money monthly_total }}** |
+
+3.2 Fees are paid monthly in arrears, on receipt of your invoice for the month, as set out in this offer. The Company makes no PAYE tax or pension deduction from your fees, other than any deduction the law requires of it. You are responsible for your own tax and statutory obligations.
+
+3.3 Your fees are confidential and should not be discussed with anyone other than Management or the People function.
+
+### 4. Incentives
+
+4.1 {{#if incentives}}You are eligible for the following: {{ incentives }}.{{else}}No incentive applies unless the Company agrees one with you in writing.{{/if}} Incentives are subject to the Company's Incentive Policy and the approved plan in force from time to time, and do not form part of your fixed fees.
+
+### 5. Business Expenses
+
+5.1 Business expenses agreed with the Company in advance will be reimbursed in line with its expense approval and retirement procedures.
+
+### 6. Documents and Referees
+
+6.1 Before you start, you are required to provide a valid means of identification, your bank details and any other document the Company reasonably requests.
+
+6.2 You are required to provide two referees: one previous employer, and one notable individual who has known you for at least four years.
+
+### 7. Leave
+
+7.1 As an independent consultant, you are not entitled to paid annual leave. You will agree any period when you will not be available with the Company in advance.
+
+### 8. Confidentiality
+
+8.1 You must keep all Company information, including strategies, data, commercial terms and partnerships, strictly confidential during and after this engagement, and use it only to provide the services.
+
+### 9. Conduct and Conflicts of Interest
+
+9.1 You agree to act in the best interests of the Company in providing the services, to disclose any conflict of interest, and to comply with the Company's policies that apply to its consultants.
+
+### 10. Intellectual Property and Company Property
+
+10.1 All work you create in providing the services belongs absolutely to the Company. At the Company's request and expense, you will do everything necessary to vest all rights in it fully in the Company.
+
+10.2 All Company property, including equipment, documents, data, accounts and access credentials, must be returned when this engagement ends.
+
+### 11. Ending the Engagement
+
+11.1 Either party may end this engagement by giving two weeks' written notice.
+
+11.2 The Company may end this engagement without notice for a material breach of this letter, a breach of confidentiality, an undisclosed conflict of interest, or conduct that brings the Company into disrepute.
+
+11.3 When the engagement ends, the Company will pay the fees due for services provided up to the end date, on receipt of your final invoice.
+
+### 12. General
+
+12.1 This letter{{#if job_description}}, together with Schedule A,{{/if}} sets out the terms of your engagement; any variation must be in writing and signed on behalf of both parties.
+
+12.2 This letter is governed by the laws of the Federal Republic of Nigeria.
+
+{{else}}{{#if is_intern}}
+### 1. Role and Supervision
+
+1.1 You are offered an internship as {{ job_title }}.{{#if job_description}} Your duties are described in Schedule A.{{/if}} The Company may reasonably update these duties during your internship.
+
+1.2 You will be supervised by {{#if reports_to}}the {{ reports_to }}{{else}}your line manager{{/if}}, who will set your learning objectives and review your progress with you.
+
+1.3 Your internship runs from your start date for the period set out in this offer's Additional Terms, unless either party ends it earlier under Section 11. It does not lead to employment unless the Company offers you employment in writing.
+
+1.4 You shall not take up any other employment during your internship without the Company's prior written consent.
+
+### 2. Place of Work and Working Hours
+
+2.1 {{#if location}}Your place of work is {{ location }}.{{else}}Your place of work will be confirmed to you in writing.{{/if}}{{#if office_days}} You will work from the office {{ number office_days }} days each week and remotely for the remaining working days.{{/if}}
+
+2.2 {{#if working_hours}}Working hours are {{ working_hours }}.{{else}}Working hours are Monday to Friday, 9:00 a.m. to 5:00 p.m.{{/if}} You are entitled to a one-hour lunch break each working day.
+
+### 3. Stipend
+
+3.1 Your monthly stipend is as follows:
+
+| Component | Monthly |
+|---|---|
+{{#each pay_lines}}| {{ name }} | {{ money monthly_amount }} |
+{{/each}}| **Total Monthly Compensation** | **{{ money monthly_total }}** |
+
+3.2 The stipend is paid monthly in arrears, subject to any deduction the law requires.
+
+3.3 Your stipend is confidential and should not be discussed with anyone other than Management or the People function.
+
+### 4. Incentives
+
+4.1 {{#if incentives}}You are eligible for the following: {{ incentives }}.{{else}}No incentive applies unless the Company agrees one with you in writing.{{/if}} Incentives are subject to the Company's Incentive Policy and the approved plan in force from time to time, and do not form part of your fixed stipend.
+
+### 5. Business Expenses
+
+5.1 Approved business expenses incurred in the course of your internship will be met by the Company, in line with its expense approval and retirement procedures.
+
+### 6. Documents and Referees
+
+6.1 On resumption, you are required to submit your academic records, a letter from your institution where the internship is part of your studies, a valid means of identification, and any other document the Company reasonably requests.
+
+6.2 You are required to provide two referees: one previous employer or your institution, and one notable individual who has known you for at least four years.
+
+### 7. Leave and Public Holidays
+
+7.1 {{#if annual_leave_days}}You are entitled to {{ number annual_leave_days }} working days of leave during your internship{{else}}Any leave during your internship is agreed with your supervisor in advance{{/if}}, in addition to public holidays declared by the Federal Government of Nigeria.
+
+### 8. Confidentiality
+
+8.1 You must keep all Company information, including strategies, data, commercial terms and partnerships, strictly confidential during and after your internship, and use it only for the purposes of your duties.
+
+### 9. Conduct and Conflicts of Interest
+
+9.1 You agree to act in the best interests of the Company at all times, to avoid conflicts of interest unless disclosed and approved in writing, and to comply with Company policies as issued from time to time. A breach of Company policy may end your internship.
+
+### 10. Intellectual Property and Company Property
+
+10.1 All work you create in the course of your internship belongs absolutely to the Company. At the Company's request and expense, you will do everything necessary to vest all rights in it fully in the Company.
+
+10.2 All Company property, including equipment, documents, data, accounts and access credentials, must be returned when your internship ends.
+
+### 11. Ending the Internship
+
+11.1 Either party may end this internship by giving one week's written notice.
+
+11.2 The Company may end your internship without notice for gross misconduct, a breach of confidentiality, or conduct that brings the Company into disrepute.
+
+11.3 When your internship ends, the Company will pay any stipend accrued up to the end date.
+
+### 12. General
+
+12.1 This letter{{#if job_description}}, together with Schedule A,{{/if}} sets out the terms of your internship; any variation must be in writing and signed on behalf of both parties.
+
+12.2 This letter is governed by the laws of the Federal Republic of Nigeria.
+
+{{else}}
 ### 1. Role and Reporting
 
 1.1 You are employed as {{ job_title }}.{{#if job_description}} Your duties are described in Schedule A.{{/if}} The Company may reasonably update these duties from time to time in line with business needs.
@@ -116,6 +365,8 @@ A summary of the offer is below. Your full terms of employment follow in Section
 
 12.2 This letter is governed by the laws of the Federal Republic of Nigeria.
 
+{{/if}}{{/if}}{{/if}}
+
 ## Acceptance
 
 Please confirm your acceptance by signing this letter electronically{{#if expires_at}} by {{ longdate expires_at }}{{/if}}.
@@ -124,4 +375,4 @@ Congratulations, and welcome on board.
 
 {{#if signatory}}For {{ company }}: {{ signatory.name }}{{#if signatory.title}}, {{ signatory.title }}{{/if}}{{/if}}
 
-I accept the offer of employment on the terms and conditions set out in this letter{{#if job_description}} and Schedule A{{/if}}: {{ candidate.full_name }}
+{{#if is_contractor}}I accept this engagement on the terms and conditions set out in this letter{{#if job_description}} and Schedule A{{/if}}: {{ candidate.full_name }}{{else}}{{#if is_consultant}}I accept this engagement on the terms and conditions set out in this letter{{#if job_description}} and Schedule A{{/if}}: {{ candidate.full_name }}{{else}}{{#if is_intern}}I accept this internship on the terms and conditions set out in this letter{{#if job_description}} and Schedule A{{/if}}: {{ candidate.full_name }}{{else}}I accept the offer of employment on the terms and conditions set out in this letter{{#if job_description}} and Schedule A{{/if}}: {{ candidate.full_name }}{{/if}}{{/if}}{{/if}}

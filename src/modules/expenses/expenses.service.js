@@ -130,6 +130,23 @@ const banks = (query) => repo.banks(pool, query, COMMON_BANKS);
 
 const listMine = (employeeId, query) => repo.list(pool, { ...newestFirst(query), employee_id: employeeId }, ALL);
 
+/**
+ * GET /expenses/mine/budget-check: the budget New Request would count against if it were sent today
+ * (guide §6.6 rule 3): the category line's remaining, the department's for the year and the Over
+ * Budget flag, as the approvers will see them. The department is the requester's own when the form
+ * leaves it blank, as sending takes it. A warning on the form, never a block; nothing is kept. The
+ * figures are those the requester's own request shows them once sent, nothing about anyone's request.
+ */
+async function budgetPreview(actor, query) {
+  const employee = await requesterOf(pool, actor);
+  const request = {
+    department_id: query.department_id || employee.department_id || null,
+    expense_category_id: query.expense_category_id,
+    amount: query.amount || "0.00",
+  };
+  return budget.estimate(pool, request, lagos.today());
+}
+
 /** The requests waiting on the caller now (Expenses · Approvals), oldest sent first. */
 const approvals = (user, query) => repo.waitingOn(pool, user, query);
 
@@ -856,6 +873,7 @@ module.exports = {
   approvals,
   approvalsSummary,
   mineSummary,
+  budgetPreview,
   aiSummary,
   getFor,
   getOwn,

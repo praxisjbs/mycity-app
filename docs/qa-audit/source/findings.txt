@@ -1,0 +1,498 @@
+=== F01 | Payroll | ERP | Configuration / compliance | Critical | Statutory payroll items are not configured
+OBS: PAYE has a single band of ₦0 to ₦200 at 10%, marked 'No Legal Source'. Employee and employer pension, NHF, ITF, NSITF, rent relief and minimum wage are all 'Not Set'. Round 4: this is setup not done, not a missing capability. Payroll → Configurations holds each statutory item with a figure, base, legal source and status, and its help text says items are entered only once they apply ('pension from three employees, ITF from 25. No PAYE at or below the minimum wage') and that later runs compute them from the item's date while locked runs never change. Each employee record has a 'Contributes to NHF' switch, NHF number, pension administrator, state of residence and a yearly rent-relief declaration. There is no per-employee switch to exempt someone from pension or PAYE. The Management role can only view Payroll, so the items could not be entered in this audit.
+REC: Load the current statutory PAYE bands, pension, NHF, NSITF and ITF rates from their official sources, with the source recorded on each item. Block computing a run while any mandatory item is 'Not Set'. Have Operations & People enter the 2026 items now: PAYE bands under the Nigeria Tax Act 2025 (first ₦800,000 at 0%, then 15%, 18%, 21%, 23%, 25% above ₦50M), pension 8% employee and 10% employer, NHF 2.5% of basic, NSITF 1%, ITF 1%, rent relief 20% capped at ₦500,000, minimum wage ₦70,000. Ask the vendor for a per-employee pension/PAYE exemption with a reason and evidence.
+WHERE: /payroll?tab=configurations | VER: Confirmed (configuration capability checked; entry needs Operations & People) | CFV: Config / product gap
+EVID: Setup not done. The capability exists (dated items with legal source; per-employee NHF and rent relief). Missing: per-employee pension or PAYE exemption. Entry needs an Operations & People login.
+STATUS: Open None
+=== F02 | Payroll | ERP | Bug / calculation | Critical | November payroll run computes with zero deductions and 20 blocking issues
+OBS: PAY-2026-11 shows 'Computed' for 21 staff: gross ₦1,850,000, deductions ₦0, net ₦1,850,000. Only 1 of 21 payslips has a salary; the other 20 are ₦0. PAYE is 'In Force' but nothing was deducted, and the pending ₦5,000 fine and the active ₦150,000 advance are not applied. The run reports '20 blocking, 21 warnings' but can still move to the next stage. Round 3: the run's problem list explains part of it: the ₦5,000 fine 'waits for payroll' until someone accepts, spreads or waives it. The ₦150,000 advance belongs to an employee with no salary, so it cannot be recovered, and the run does not warn. Employee 00039 (joined 16/11) is not in the computed run and nothing flags the missing joiner.
+REC: Make blocking issues actually block the run (it should stay in Draft). Apply PAYE, fines and advance recoveries during computation, not later. Load salaries for every employee before the first live run. Warn when an active employee is missing from a computed run and when a deduction cannot be recovered.
+WHERE: /payroll?tab=payroll-runs | VER: Confirmed (deduction timing to verify with vendor) | CFV: Config / product gap
+EVID: Run computed before this round; not recomputed to avoid altering the November run.
+STATUS: Open None
+=== F03 | Finance (missing) | ERP | Functional gap | Critical | No finance core: no invoicing, receivables, payables, ledger or reconciliation
+OBS: No module covers invoices, accounts receivable, bills, a chart of accounts, a general ledger, bank reconciliation, VAT or WHT. Yet the company's own key results call for invoicing and reconciling LASG platform fees, ₦30M of contracted and invoiced partnership revenue, an 'On-time invoice collection rate' KPI and a 'Reconcile revenue by stream to bank and invoice records' task. Global search surfaces all of these.
+REC: Decide whether to build or integrate. Recommended: integrate an accounting system (ledger, invoicing, payables, bank feeds) and post to it from Payroll, Expenses and Partnership returns, rather than building a ledger inside the hub.
+WHERE: Whole app | VER: Confirmed | CFV: Config / product gap
+EVID: No module exists to create invoices, bills or ledger entries.
+STATUS: Open None
+=== F04 | Sales / inventory (missing) | ERP | Functional gap | Critical | No products, inventory, orders or revenue capture
+OBS: Organisational goals include 'Grow Revenue to #2bn through the sales of inventory', 'Sell tickets to 2,000 events through the apps' and '₦2 billion plan-year revenue'. Nothing in the hub records products, stock, orders, ticket sales or revenue, so these goals cannot be measured in the system.
+REC: Define the sales and inventory scope (listings, ticket inventory, orders, settlements per partner) and source revenue from the apps' transaction data, rather than entering it by hand.
+WHERE: /performance?tab=goals | VER: Confirmed | CFV: Config / product gap
+EVID: No module exists to create products, stock or orders.
+STATUS: Open None
+=== F05 | Partnerships | CRM | Bug | High | Partner record Work tab fails to load (HTTP 500)
+OBS: Opening a partner, then Work, shows 'This did not load' for Tasks, Projects and Events. GET /api/v1/partnerships/work?partner_id=…&kind=task|project|event returns 500 for all three. Reproduced on Kora Street Kitchens.
+REC: Fix the /partnerships/work endpoint, add an API test for each kind, and re-test on every partner.
+WHERE: /partnerships?tab=partners → Kora Street Kitchens → Work | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: New lead QA-AUDIT-Lead-01: Work tab returns 500 (lead_id). Task TSK-0115 was created from that tab but never appears on the record.
+STATUS: Open None
+=== F06 | Partnerships / People | CRM | Data integrity / offboarding gap | High | Departed Operations & People lead still owns the partnership book
+OBS: The 05/11 announcement says Cynthia O. has been replaced and she is no longer in the Employees list. She is still owner of 5 of 6 partners and 6 of 7 leads, is the top lead owner in Partnerships analytics, is head of People & Culture, owns 2 projects, is the only recipient of the Daily Attendance report and co-recipient of Weekly Headcount. Round 4: she still owns active projects PRJ-2026-000005 and 000006 and still holds the Operations & People role (see F75).
+REC: Add an offboarding step that forces every owned record (deals, leads, partners, projects, department head, report audiences, approvals) to be reassigned before an employee is archived. Bulk-reassign these records now.
+WHERE: /partnerships?tab=leads, /people?tab=departments, /home?tab=reports | VER: Confirmed | CFV: Not testable (role)
+EVID: No archive or exit action is available to the Management role, so offboarding reassignment could not be exercised. Evidence remains the departed owner's book.
+STATUS: Open None
+=== F07 | Partnerships | CRM | Data integrity | High | Signed partnerships have no contract on file
+OBS: 6 partnerships are 'Signed' (₦15.8M), but Contracts & MOUs shows 0 Active agreements. The 3 agreements on record all belong to deals that are not yet signed. The card says 'In Approval 2' while the rows say 'In Review'. Round 3: generating an agreement needs a template for the partner's category; the Vendor category has none ('No template'), so vendor partners cannot get a generated agreement. Event category works (AGR-2026-0004 created as a draft, placeholders highlighted, and it cannot be submitted until they are filled).
+REC: Require an agreement (or a 'signed before the hub' upload) before a deal can move to Partnership Signed. Make the status names match between cards and rows.
+WHERE: /partnerships?tab=contracts-and-mous | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Moving QA-AUDIT-Deal-01 to Partnership Signed requires a signed copy (good), but no agreement is created in Contracts & MOUs (Active stays 0).
+STATUS: Open None
+=== F08 | Partnerships | CRM | Functional gap | High | The CRM covers partners only, not customers, support or campaigns
+OBS: Partnerships handles B2B merchants and partners well. There is no record of app end-users or customers, no support or ticket queue, and no campaign records. Branding & Marketing KPIs (campaign attribution, social enquiry response rate, cost per activated user) have nowhere to get their data.
+REC: Scope a customer view (app users linked to transactions and enquiries), a support or ticket queue, and campaign records that feed the marketing KPIs. Otherwise state plainly that the hub's CRM is a partner CRM only.
+WHERE: Whole app | VER: Confirmed | CFV: Config / product gap
+EVID: No customer, ticket or campaign records can be created.
+STATUS: Open None
+=== F09 | Expenses | ERP | Control gap | High | No supplier list: payee bank details are typed free-hand on each request
+OBS: The New Request form asks the requester to type the vendor, bank, account name and account number every time. There is no supplier list, no bank-detail check and no purchase order, and the invoice is optional. Round 3: the Bank field lets any requester add a new bank to the shared list (it offers 'Add "Zenith"'). 'Not A Real Bank' from EXP-0020 is now offered to everyone as 'Not A Real Bank · 1 request'.
+REC: Add a supplier list maintained by Finance, with checked bank details. Payees should be picked from it, never typed. Require an invoice above a set amount, and add purchase orders for capital categories. Remove free-text 'Add' from the bank picker; only Finance maintains the bank list.
+WHERE: /expenses?tab=approvals → New Request | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: EXP-0020 accepted with bank 'Not A Real Bank' (not in the bank list), account name different from payee, account 0000000000, no invoice.
+STATUS: Open None
+=== F10 | Settings / Security | Platform | Security | High | Two-step sign-in is off for everyone, including admins and payroll
+OBS: Two-step is on for 0 of 22 users, including System Administrator, Management and Operations & People, all of whom can see payroll and bank data. There were 9 failed sign-ins in 7 days, and several logins use personal Gmail addresses.
+REC: Make two-step sign-in mandatory for System Administrator, Management, Operations & People and Implementation roles before go-live, and require work email addresses for staff logins.
+WHERE: /settings?tab=security | VER: Confirmed | CFV: Config / product gap
+EVID: Security setting, not data.
+STATUS: Open None
+=== F11 | Payroll | ERP | Configuration / control | High | Payroll allows staff without bank details
+OBS: 'Bank Details Required' is Off. The test profile lists a bank but no account number, and a run can still include such staff. Round 3: in the November run's problem list, 'No Bank Details' is only a Warning (4 staff), while 'No Salary Set' is Blocking (20).
+REC: Turn on Bank Details Required and block approval of a run that includes an employee without verified payout details.
+WHERE: /payroll?tab=configurations | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: QA-AUDIT Employee (00039) created with no bank, no account number and ₦5,000 gross.
+STATUS: Open None
+=== F13 | People / Approvals | HR | Control gap | High | Approvals route to vacant seats and to the requester themself
+OBS: Several staff report to the vacant seat 'Head, Strategy, Partnerships & Growth'. A pending leave request from JBS Praxis Team is 'Waiting On: JBS Praxis Team'. The CEO is listed as reviewer of their own review. Round 4: OFF-0001 shows Head of Department approval and CEO approval both given by Ifeoma Mbonu, so the two-step offer approval collapsed to one person.
+REC: Block self-approval, and fall back to the next level when an approver seat is vacant. Show a 'needs fixing' warning in Settings → Approvals (it currently says 'Needs Fixing 0').
+WHERE: /people?tab=leave, /people?tab=organogram, /performance?tab=reviews | VER: Confirmed | CFV: Not testable (role)
+EVID: Normal case works: new leave request went to the line manager ('Sent to Ifeoma Mbonu'). Vacant-seat and self-approval cases could not be created with this role. See F57 for the expense route.
+STATUS: Open None
+=== F14 | People / Attendance | HR | Adoption / data reliability | High | Attendance data is too sparse to rely on
+OBS: Most staff are absent 10 of 12 working days, with 226 absences this month and a 17% on-time rate. There are 47 open exceptions, almost all 'Unregistered device', and 11 clock-in devices are still 'New' with no one approving them. All 22 staff are remote, but geofence and device checks still apply.
+REC: Before go-live, decide whether remote staff must clock in. Give someone the job of approving devices. Run a two-week adoption push and only then turn on lateness and absence sanctions.
+WHERE: /people?tab=attendance, /people?tab=devices | VER: Confirmed | CFV: Not create-related
+EVID: Adoption and policy decision; no record created.
+STATUS: Open None
+=== F51 | Partnerships | CRM | Bug (to verify) | High | Money fields reject normal numbers: only '750000.00' is accepted
+OBS: Root cause found in round 3. On a clean New Lead form, typing 750000 (real keystrokes) gives 'Check the format'. Tested values: 750000, 750,000, 750,000.00, 750000.5, 7500, 75, 1 and 0 are all rejected; only 750000.00 (exactly two decimals) passes. Edit Deal has the same rule (error appears on Save). The Enter Returns money fields behave the same. Most users will not guess this, so deals end up with no value.
+REC: Accept plain and comma-grouped numbers with 0 to 2 decimals, normalise on save, and say the expected format if anything is rejected. Apply the fix to every currency input (deal create/edit, returns).
+WHERE: /partnerships → New Lead → Deal step | VER: Confirmed (fresh page, real keystrokes) | CFV: Gap reproduced on new record
+EVID: QA-AUDIT-Lead-02: 750000 rejected; 750000.00 accepted. Edit Deal: 900000 rejected on Save; 900000.00 saved.
+STATUS: Open None
+=== F56 | Expenses | ERP | Control gap | High | No budget check: over-budget requests go through and pending spend isn't reserved
+OBS: EXP-0020 for ₦100,000 was charged to People & Culture, which had ₦52,000 remaining. The request was sent with no warning, and afterwards the budget still showed Committed ₦48,000, Remaining ₦52,000. Round 3: the request page does show 'Over Budget' and 'Department Left ₦52,000' after submission (approvers can see it), but the requester gets no warning. EXP-0021 linked to QA-AUDIT-Project-01 (no budget) was accepted and Committed stayed ₦0 for the project and unchanged for the department.
+REC: Show remaining budget on the form, warn or block when a request exceeds it (with an override reason), and reserve the amount as Committed when the request is submitted. Do not allow spend against a project or category with no budget line without an explicit override.
+WHERE: /expenses → New Request; /expenses?tab=budgets | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F58 | People | HR | Validation | High | New employee record accepts invalid personal, pay and statutory data
+OBS: QA-AUDIT Employee (00039) was created with date of birth 01/01/2020 (age 6), gross pay ₦5,000 a month (no minimum-wage check), tax ID 'abc', pension PIN '123', and no line manager, bank or account. Future birth dates and probation or contract dates before the start date are correctly blocked.
+REC: Add a minimum age, a minimum-wage floor once that statutory item is set, format checks for tax ID and pension PIN, and require line manager and bank details before the employee joins a payroll run.
+WHERE: /people → Add Employee | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F61 | Partnerships | CRM | Bug | High | Partner returns cannot be saved
+OBS: Enter Returns on QA-AUDIT-Lead-02 (active partner), freshly loaded page, real keystrokes: Units Sold 5 and Downloads 10 are rejected as 'Required' although both are filled and labelled Optional; leaving them empty gives the same error. The money fields also need two decimals (see F51). With the money fixed, Units and Downloads still block the save. Nothing can be saved, so returns, commission and 'Returns This Year' cannot be recorded. There is also no check that commission plus payout fit within gross sales (₦150,000 commission on ₦100,000 gross was not flagged).
+REC: Fix the integer field validation, then add consistency checks (commission ≤ gross, payout ≤ gross − commission) and auto-calculate commission from the category rate (Event is 8%).
+WHERE: Partner → Returns → Enter Returns | VER: Confirmed (fresh page, real keystrokes) | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F62 | Partnerships | CRM | Bug | High | AI proposal writing fails
+OBS: PRO-0003 (QA-AUDIT-Deal-01) stayed at 'Asking' for over ten minutes, then showed 'The questions did not arrive'. Try Again went back to 'Asking' and had not finished 40 seconds later. The proposal cannot get past step 2 of 5.
+REC: Check the AI job (timeouts, provider errors) and surface failures within about 30 seconds with a reason. Offer a manual 'write it myself' path so a proposal is never blocked by the AI.
+WHERE: /partnerships?tab=proposals → PRO-0003 | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F71 | Recruitment | HR | Process control | High | Candidates can reach an offer without passing any stage
+OBS: QA-AUDIT Candidate (APP-0013) was scored 0 by AI screening ('one year of experience falls short of the two years required'). Within three minutes the candidate moved to Assessment, to Interview while the assessment was still only 'Sent', to Shortlist before the interview (20/11) had taken place, and then to Make Offer. No step warned. From Applied, the menu also offers 'Move to Shortlist' directly.
+REC: Gate each stage: block or require a reason to move on with a failed screening, an unfinished assessment or an interview with no submitted card. Remove direct jumps from Applied to Shortlist.
+WHERE: /recruitment?tab=candidates → APP-0013 | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F72 | Recruitment | HR | Validation | High | Offers can be made and sent for approval at ₦0 pay
+OBS: OFF-0003 was drafted with Basic Salary ₦0.00 (Monthly Total ₦0.00, Annual ₦0.00) and submitted for approval without a warning. The generated letter states 'Total monthly compensation · ₦0.00'. The Content Producer vacancy has no pay range, so nothing checks the figure; OFF-0001 shows that a range check exists when a vacancy has one.
+REC: Require pay above the minimum wage on every offer, require a pay range on every vacancy, and flag offers outside the range for the approver.
+WHERE: /recruitment?tab=offers → OFF-0003 | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F75 | Settings / Security | Platform | Security / offboarding | High | A leaver still holds full Payroll and Settings rights
+OBS: Settings → Roles & Permissions → Operations & People lists Cynthia Osakunih with status 'Left'. The role has Full access to Payroll, Settings, People and Expenses and approves expenses, leave, sanctions and reviews. The role header says '2 people' while the list shows 3, including 'JBS test' on an external Gmail address.
+REC: Remove roles automatically when an employee leaves, and make the role count match its member list. Move vendor test accounts out of production roles before go-live.
+WHERE: /settings?tab=roles-and-permissions | VER: Confirmed | CFV: Config / product gap
+EVID: Role membership not cleaned when the employee left.
+STATUS: Open None
+=== F76 | People / Payroll | HR | Control gap | High | Salary changes need no approval and leave no before-and-after record
+OBS: As Management (Payroll is View-only for this role) the QA employee's gross monthly pay was changed from ₦5,000 to ₦350,000 in Edit Record and saved at once. There is no approval step and no effective date. History says only 'Record changed: … Gross Monthly …' with no old or new value, and dates the change 16/11/2026 although it was made at 00:45 on 17/11 Lagos time.
+REC: Route pay changes through an approval flow with an effective date, record old and new values in history, show times in Africa/Lagos, and restrict pay edits to Payroll owners.
+WHERE: /people?tab=employees → 00039 → Edit Record, History | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F77 | Performance | HR | Process control | High | Reviews pass with unscored lines, and one admin line can earn 'Exceeds'
+OBS: Adaeze Chike's October review was submitted by the reviewer with none of its eight manual lines scored and no comment; it moved to Second Level with no score. Oladotun Shola-Adido's closed review reads 1.00 'Exceeds' with only one of 11 lines scored ('Team scorecards and reviews'); the ten results and KPI lines are blank. Bode Oluwasanmi's reads the same, and Chinyere Elechi's closed with no score at all.
+REC: Block submission until every line is scored or marked not applicable with a reason. Compute the rating only over a minimum share of weighted lines, and show coverage next to the score.
+WHERE: /performance?tab=reviews | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F12 | Platform-wide | Platform | Data consistency | Medium | Totals use different, unlabelled definitions (new records count correctly)
+OBS: Headcount reads 22 on Home, 24 in the Team roster and Employees, 25 in Attendance This Month, 23 in Workspace and Users, and the sidebar People badge reads 53. Alerts: the tab badge says 21, the page says 16 open. Policies: the card says 4 to acknowledge, the table lists 2. Scorecards: the tab says 15, the card 19, and agreed plus awaiting adds up to 17. Tasks: the Done column header says 2 but shows 3 cards.
+REC: Define one counting rule per entity (active, expected, including or excluding archived and QA records) and use the same query for cards, badges and tables. Add a regression test that compares them.
+WHERE: /home, /people, /performance?tab=targets, /ess?tab=policy-updates | VER: Confirmed | CFV: Prevented at creation
+EVID: New records move every count by one (pipeline, partners, Home, analytics, headcount, leave pending, expenses awaiting). The remaining differences are definitions: Home 'of 22' expected, headcount 25, payroll 21. Label them.
+STATUS: Open None
+=== F15 | Home | Platform | UX | Medium | Policy pop-ups chain one after another on every page load
+OBS: Each full page load opens a 'Policy Update' dialog for every pending policy, one after another. Closing them only defers them until the next load.
+REC: Show one combined, non-blocking prompt ('2 policies need your acknowledgement') linking to ESS → Policy Updates. Block the screen only after a grace period.
+WHERE: Any page, full reload | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F16 | Navigation | Platform | UX | Medium | Sidebar badges don't say what they count
+OBS: Badges such as Home 21, Self-Service 41 (later 40), People 53, Performance 24 and the mobile 'More 79' don't say whether they mean unread items, tasks or alerts. 'More 79' adds up unrelated counts.
+REC: Badge only actionable items addressed to the user, and label them in a tooltip ('3 approvals waiting on you'). Drop the aggregated badge on More.
+WHERE: Sidebar, mobile bottom nav | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F18 | Home | Platform | Accuracy | Medium | Attendance chart caption contradicts the chart
+OBS: The caption says 'Dips are Saturdays, a half day', but the line is low (2 to 3 in) on almost every day. The only peaks are 06/11 (20 in) and 11/11 (21 in).
+REC: Remove the fixed caption, or generate it from the data.
+WHERE: /home?tab=overview | VER: Confirmed | CFV: Not create-related
+EVID: Static caption bug.
+STATUS: Open None
+=== F19 | Home / Alerts | Platform | Accuracy / UX | Medium | Alert ages contradict their titles, and some alerts are duplicated
+OBS: 'Expense Request…: waiting 10 days' shows Age 'Today' and Over By '+0'. Two 'Temporary Site for JBS Praxis Team' alerts (25 and 26 days) appear for what looks like one request. 'Requisition: waiting 10 days' doesn't say what it is for. 'Alert Sources' lists Budget Threshold 1, but no budget alert appears in the list.
+REC: Measure age from when the request started waiting, remove duplicate alerts per record, always include the subject, and keep the source counts consistent with the list.
+WHERE: /home?tab=alerts | VER: Confirmed | CFV: Not create-related
+EVID: Alert ageing logic; not exercised with new records.
+STATUS: Open None
+=== F20 | Home / Reports | Platform | Bug (to verify) | Medium | Scheduled reports show no runs
+OBS: 'Daily Attendance: every working day at 18:00' is Scheduled, but Runs This Month is 0 and Recent Runs shows 'No Runs Yet'. The recipients card says 1, but there are 2 distinct recipients.
+REC: Check the scheduler is running on staging and that runs are recorded. Fix the recipient count.
+WHERE: /home?tab=reports | VER: Needs verification | CFV: Not create-related
+EVID: Scheduler; not exercised.
+STATUS: Open None
+=== F21 | Partnerships | CRM | Data model / UX | Medium | Two status systems for deals, and the last stage is never reached
+OBS: Leads have a status (New, Qualified, Contacted, Converted) and also a 13-stage pipeline. Every signed partner sits at 'Partnership Signed'; 'Active Partnership' holds 0, yet the partners are labelled Active.
+REC: Use one lifecycle. Cut the pipeline to about 7 stages and make 'Active' a derived health or status, not a stage.
+WHERE: /partnerships?tab=pipeline, /partnerships?tab=leads | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: New lead started 'Qualified' at Contract Review, then 'Converted'; still two status systems.
+STATUS: Open None
+=== F22 | Partnerships | CRM | UX / data capture | Medium | Lead source is hidden and optional, so source reporting is empty
+OBS: 'Source' sits under 'Advanced' in the New Lead form and is optional. All 7 of 7 leads show 'No Source', so the Leads by Source report is meaningless.
+REC: Move Source onto step 1 as a required pick-list.
+WHERE: /partnerships → New Lead | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: QA-AUDIT-Lead-01 created without a source; Source is optional under Advanced.
+STATUS: Open None
+=== F23 | Partnerships | CRM | Data integrity | Medium | 'Last Contact' is not rolled up from interactions
+OBS: Leads in Negotiation or Contract Review show Last Contact 'Never'. Gidi Food Carnival shows 'Never' as a lead but 03/11/2026 as a partner.
+REC: Derive Last Contact from logged interactions, meetings and emails across the linked lead, deal and partner.
+WHERE: /partnerships?tab=leads | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: After logging a call, the partner row shows 16:42 but the converted lead row still shows 'Never'. Before any interaction the header said 'Today' while the list said 'Never'.
+STATUS: Open None
+=== F24 | Partnerships | CRM | UI / layout | Medium | Partner screen is cramped: filters take half the screen and the detail is squeezed
+OBS: At 1440×900, the KPI cards, five filter controls and status pills fill more than half the viewport before any list appears. The partner detail opens in a narrow right panel: health badges truncate ('Follow-Up Requ…') and the 13 stage chips wrap over three lines.
+REC: Collapse the filters into one filter bar with a 'Filters' popover. Open the partner 360 as a full page (deep link already exists via ?id=). Show stage as a compact progress bar.
+WHERE: /partnerships?tab=partners | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F25 | Platform | Platform | Performance | Medium | Duplicate API calls
+OBS: Opening one partner calls /partnerships/lists/partnership_stage about 10 times and the same deal endpoint 4 times. The Goals tab sends about 25 separate /notifications/unread-records calls.
+REC: Cache reference lists per session and batch the unread-records lookups into one call per page.
+WHERE: Network log | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F26 | Expenses | ERP | UX / permissions | Medium | Locked tabs are still shown
+OBS: Requisitions and Disbursements appear for a Program Manager but only say 'Not Open to You', while Home shows ₦1.9M of expenses awaiting approval. Round 3: Payroll → Record Advance shows the full form to this role; after filling it in, saving returns 'You do not have access to this'. The server correctly refuses, but the user wastes the effort.
+REC: Hide tabs the role can't open, or explain who to ask for access.
+WHERE: /expenses?tab=requisitions | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F27 | Home / Workspace | Platform | UX / labels | Medium | 'Overdue' means different things on different screens
+OBS: Home shows Overdue Tasks 78 (company-wide). My Workspace shows Overdue 0 (personal). Neither label says which.
+REC: Label the scope ('Company overdue tasks', 'My overdue').
+WHERE: /home, /workspace | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F28 | Workspace | Platform | Process | Medium | Task discipline isn't enforced
+OBS: 78 tasks are overdue, all with 'No Reason Recorded', and 51 of them by 15 days or more. 98 of 100 open tasks are 'Normal' priority. The Overdue Tasks query rule is still Draft.
+REC: Require a reason when a due date passes, and turn on the overdue-task rule once data is clean.
+WHERE: /workspace?tab=analytics, /queries?tab=rules | VER: Confirmed | CFV: Seed data only
+EVID: Process discipline; new task required a future due date (good).
+STATUS: Open None
+=== F29 | Performance | HR | Data completeness | Medium | Performance headline score rests on almost no data
+OBS: 47 of 50 KPIs are 'Awaiting Actual' and 41 key results are 'Awaiting Report', yet Company Score shows 0.72. KPI targets include '[TBC]' and '≤ approved ceiling'. 'Marketing consent violations' has a target of 1; it should be 0. Round 3: a new KPI (PG-K09) was accepted with target wording '[TBC]' and no numeric target. The numeric Target is optional; only the wording is required.
+REC: Hide the score until enough lines are reported (show the coverage %), finalise the TBC targets, and fix the consent target. Require a numeric target (or an explicit qualitative flag) before a KPI goes live.
+WHERE: /performance?tab=kpis, /performance?tab=goals | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: KPI PG-K09 created with '[TBC]' and no numeric target.
+STATUS: Open None
+=== F32 | Recruitment | HR | Validation | Medium | Offer dates aren't checked against each other
+OBS: OFF-0001 has a start date of 17/11/2026, before its 22/11/2026 expiry, and the same candidate has another interview scheduled on 17/11 at 10:00. Round 4: re-confirmed; OFF-0001 is still 'With Candidate' with start 17/11 and expiry 22/11.
+REC: Check that the start date falls after acceptance or expiry, and warn when interviews are scheduled after an offer has been sent.
+WHERE: /recruitment?tab=offers | VER: Confirmed | CFV: Not testable (role)
+EVID: Not exercised: needs a candidate at offer stage.
+STATUS: Open None
+=== F33 | Queries & Sanctions | HR | Logic (to verify) | Medium | Repeat cautions don't escalate up the sanction ladder
+OBS: One employee received four Cautions between 29/10 and 04/11 (QRY-0005, 0007, 0009, 0011) without ever reaching a Warning. Round 3: Chain Settings define Caution → Warning → Second Warning → Suspension → Dismissal with Cautions in force for 365 days, so the four Cautions break the configured ladder. A new query (QRY-0014) cannot be sanctioned until its 24-hour response window ends, which is a good control.
+REC: Check the escalation rules in Chain Settings, and make the system propose the next rung automatically.
+WHERE: /queries?tab=sanctions | VER: Confirmed (config vs issued sanctions) | CFV: Gap reproduced on new record
+EVID: Ladder is configured but not enforced when issuing; live escalation on QRY-0014 can be checked after 17/11 17:20.
+STATUS: Open None
+=== F34 | Praxis AI | Platform | Cost / UX | Medium | AI history shows staff the token count and naira cost of each question
+OBS: History shows the tokens and naira cost per question. A simple 'where do I request leave' question used about 23,600 tokens (₦24).
+REC: Move cost reporting to admin AI Control. Reduce context for navigation questions (answer from the user guide index first).
+WHERE: /praxis-ai?tab=history | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F35 | Settings / Users | Platform | Adoption | Medium | Most staff have never signed in
+OBS: 13 of 23 users are 'Invited' with the invite 'Not Sent', and their Last Seen is 'Never'. Only 2 of 22 staff acknowledged the latest announcement.
+REC: Send invites in waves with a go-live checklist, and track activation per department.
+WHERE: /settings?tab=users | VER: Confirmed | CFV: Seed data only
+EVID: None
+STATUS: Open None
+=== F36 | Platform | Platform | UI / layout | Medium | Announcement banner takes a full row on every screen
+OBS: The 'System Testing Queries' banner (1 of 3) sits above every page, including mobile, where its text is cut off.
+REC: Collapse it after the first view, or show announcements in the bell or Home only.
+WHERE: All pages | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F43 | Workspace / Projects | ERP | Data | Medium | Duplicate and incomplete projects
+OBS: 'Lekki Branch Launch' and 'Lekki Launch' both exist. 4 of 5 projects have no due date and 2 have no budget.
+REC: Merge the duplicates. Require a due date and budget when a project becomes Active.
+WHERE: /workspace?tab=projects, /expenses?tab=projects | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Two projects named QA-AUDIT-Project-01 (PRJ-2026-000007 and 000008) created with no warning, no due date, and no budget field on the form.
+STATUS: Open None
+=== F52 | Partnerships | CRM | Validation | Medium | Deals accept a close date in the past and still show 'On Track'
+OBS: QA-AUDIT-Deal-01 was created with Expected Close 01/01/2020, and Health shows On Track. Tasks, by contrast, reject past due dates ('Pick 16/11/2026 or later').
+REC: Reject past close dates on create. Turn health to 'Overdue' once the close date passes without signature.
+WHERE: /partnerships → New Lead → Deal step | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F53 | Partnerships | CRM | Control gap | Medium | A deal can be signed with no value
+OBS: QA-AUDIT-Deal-01 moved to Partnership Signed with Projected Value 'None' (₦0 signed value).
+REC: Require a value (or an explicit 'non-monetary' flag) before Partnership Signed.
+WHERE: Deal → Move to Partnership Signed | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F54 | Partnerships | CRM | Data quality | Medium | Duplicate check catches only exact names and only warns
+OBS: Typing 'Kora Street Kitchens' or 'kora street kitchens' shows 'Already here: Kora Street Kitchens, PAR-0003' but Next still works. 'kora street kitchen' (one letter off) is not detected.
+REC: Use fuzzy matching (name similarity, website, email domain, phone). Require an explicit 'Create anyway' with a reason.
+WHERE: /partnerships → New Lead | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F55 | Platform | Platform | UX / data loss | Medium | Escape closes a multi-step form and discards everything
+OBS: Pressing Escape to dismiss a date picker on step 3 of New Lead closed the whole dialog with no confirmation. Reopening showed an empty form; nothing was kept as a draft.
+REC: Only close the inner popover on Escape. Ask 'Discard changes?' when a dirty form is closed, and keep an unsent draft per form.
+WHERE: /partnerships → New Lead (any multi-step dialog) | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F57 | Expenses / Approvals | ERP | Routing (to verify) | Medium | Expense request skipped the Line Manager stage
+OBS: The Expense Request flow is defined as Line Manager → Operations & People, but EXP-0020 went straight to 'Operations & People'. The leave request from the same person did go to the line manager.
+REC: Confirm whether Management-role requesters skip line approval by design. If not, fix the routing and show the route on submit.
+WHERE: /ess?tab=my-requests, /settings?tab=approvals | VER: Needs verification | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F63 | Partnerships | CRM | Data integrity | Medium | Closing a partner turns its signed deal into 'Closed Lost'
+OBS: Closing QA-AUDIT-Lead-01 moved its signed deal QA-AUDIT-Deal-01 to 'Closed Lost' with the close reason as the loss reason (Stage History and audit log). 'Signed This Year' stayed at 7, but the deal record now reads as a loss.
+REC: Ending a relationship should end or expire the partnership, not rewrite a won deal as lost. Keep 'Closed Lost' for deals that were never won.
+WHERE: Partner → More → Close Partner | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F64 | Partnerships | CRM | Process control | Medium | Stages can be skipped, and a lost deal stays 'On Track'
+OBS: QA-AUDIT-Deal-02 moved from Prospect Identified straight to Proposal Sent with no proposal on file. Only Partnership Signed and Active Partnership are guarded (signed copy). After Closed Lost, Health still showed 'On Track'.
+REC: Require the evidence each stage implies (a proposal for Proposal Sent, a meeting for Meeting Held) or at least record a reason when skipping. Set health to Closed/Lost automatically.
+WHERE: Lead → Move to … | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F65 | Expenses | ERP | Control gap | Medium | No duplicate-expense check
+OBS: EXP-0022 was sent with the same purpose, category, department, payee, account and ₦100,000 amount as EXP-0020 on the same day, with no warning. (Cancelled afterwards to protect approvers.)
+REC: Warn on same payee + amount + period, and on a reused invoice number.
+WHERE: /ess?tab=my-requests → New Request | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F66 | People / Attendance | HR | Process / data quality | Medium | Attendance punches create noise and skip key checks
+OBS: Clock-in at 17:22 (after the 17:00 shift end) was accepted and marked 'Late 8h 22m'. Each punch from an unregistered device created a separate exception (two for one day), which explains the 47 open exceptions. Remote clock-ins show 'Clock Location: Not Checked'.
+REC: Raise one exception per device per day. Block or flag clock-ins after shift end. Decide whether remote staff need any location or device check.
+WHERE: Clock In / Clock Out; /ess?tab=my-attendance | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F67 | Self-Service / Leave | HR | Policy gap (to verify) | Medium | Staff cannot record sick leave after the fact
+OBS: A sick-leave request for 10/11 to 11/11 was refused: 'Pick 16/11/2026 or later'. Sick leave is usually recorded on return.
+REC: Allow back-dated sick leave (with a limit and evidence upload), or confirm HR records it via People → Leave → Record Leave and say so in the form.
+WHERE: /ess?tab=my-leave → Request Leave → Sick | VER: Confirmed (HR path not checked) | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F73 | Recruitment | HR | Content / compliance | Medium | Offer letter ignores the employment type and the company's working week
+OBS: OFF-0003 is for a Contractor, but the letter uses employee terms: 'You are employed as', a 6-month probation, 20 days' annual leave, PAYE and pension deductions, an NYSC certificate and a full-time exclusivity clause. It also states 'Monday to Friday, 9:00 a.m. to 5:00 p.m.' while Settings → Working Week includes Saturday 09:00 to 15:00.
+REC: Use a separate letter template per employment type (contractor, consultant, intern), and fill working hours from the employee's work schedule.
+WHERE: OFF-0003 → View Letter | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F74 | Recruitment | HR | Bug (to verify) | Medium | Public document check says a genuine offer does not exist
+OBS: On go.staging.mycityapp.io/verify, OFF-0001 (approved, signed for the company by the CEO on 15/11 and sent to the candidate) returns 'Not Found. No document has this reference.' OFF-0002 and AGR-2026-0004 return the same. The page asks for exactly this format ('for example OFF-0018').
+REC: Confirm when a document becomes verifiable. If only after the candidate signs, say 'Issued, awaiting signature' instead of 'Not Found', which makes a real letter look forged.
+WHERE: go.staging.mycityapp.io/verify | VER: Confirmed (rule to verify with vendor) | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F78 | Settings / Approvals | Platform | Control gap | Medium | Approval chains for money are thin
+OBS: Settings → Approvals: Payroll Run needs only the CEO, with no Operations & People or finance check before it. Expense Request goes Line Manager → Operations & People with no amount threshold that brings in the CEO. Requisition is CEO only. Nothing stops one person filling two levels of a chain (see F13).
+REC: Add an amount threshold to expenses, a preparer-and-checker step before the CEO on payroll, and a rule that each level must be a different person.
+WHERE: /settings?tab=approvals | VER: Confirmed | CFV: Config / product gap
+EVID: Approval flows as configured in Settings → Approvals.
+STATUS: Open None
+=== F79 | My Workspace | Platform | Process control | Medium | Projects close with open tasks, and work can be assigned to people who cannot log in
+OBS: PRJ-2026-000007 was completed instantly with TSK-0121 still 'To Do'; no confirmation was asked. TSK-0121 was assigned to QA-AUDIT Employee, who has no login, without a warning. Leaver Cynthia Osakunih still owns active projects. A completed project is correctly removed from the expense project picker.
+REC: Confirm before completing a project with open tasks and offer to close or move them. Warn when assigning to someone with no login. Reassign a leaver's projects at exit.
+WHERE: /workspace?tab=projects → PRJ-2026-000007 | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F17 | Home | Platform | Data hygiene | Low | Test records show up in company-level views
+OBS: Home 'Goals This Quarter' lists 'another test', 'Testing', 'test run' and 'Set new' (ORG-2026-05 to 09). QA records (QADeep20261026 Disposable, Qa Preview, JBS test) appear in the roster, attendance, payroll and performance stats, and there is a #qa-e2e channel.
+REC: Purge QA records before the production cut-over, or flag them as test so they are left out of every count. Allow goals to be archived.
+WHERE: /home, /performance?tab=goals | VER: Confirmed | CFV: Seed data only
+EVID: Clean-up before go-live.
+STATUS: Open None
+=== F30 | People | HR | Data consistency | Low | Status contradictions in seed records (new records consistent)
+OBS: My profile says 'On Probation' while the Employees list says 'Active' for the same person. A leave request shows 'Withdrawn' in the Approver column and 'Cancelled' as its status. Round 3: a newly cancelled leave request (01/12 to 05/12) again shows 'Withdrawn' in the Approver column and 'Cancelled' as status.
+REC: Use one employment-status field everywhere. Show the withdrawn state once, in one column.
+WHERE: /ess?tab=my-profile, /people?tab=employees, /ess?tab=my-leave | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Employee status consistent on a new record; the leave 'Withdrawn / Cancelled' double label reproduces.
+STATUS: Open None
+=== F31 | Recruitment | HR | Data | Low | Seed vacancies filed under 'Implementation' (new vacancies require a department)
+OBS: All 7 vacancies sit in the Implementation department, including Head, Sales & Revenue, Customer Support Lead and Graphics and Motion Designer, so per-department hiring and budget views are wrong.
+REC: Make department required, with no default, and correct the existing vacancies.
+WHERE: /recruitment?tab=vacancies | VER: Confirmed | CFV: Prevented at creation
+EVID: New Vacancy has no default department; Department and Hiring Manager are required.
+STATUS: Open None
+=== F37 | People / Organogram | HR | Data | Low | Organogram has an extra vacant CEO seat
+OBS: A vacant 'CEO' seat sits above the actual CEO, and the page warns '2 people and roles sit at the top'.
+REC: Remove the duplicate seat.
+WHERE: /people?tab=organogram | VER: Confirmed | CFV: Seed data only
+EVID: None
+STATUS: Open None
+=== F38 | People / Departments | HR | Data | Low | Departments overlap and their codes are inconsistent
+OBS: 'Marketing' and 'Branding & Marketing' both exist. Codes mix styles (BM, PG and TBO next to IMPLEMENTATION and MARKETING), Technology & Back-office Ops shows the avatar 'TO' while its code is TBO, and Branding & Marketing has no head.
+REC: Merge or rename the departments, standardise the codes and set the heads.
+WHERE: /people?tab=departments | VER: Confirmed | CFV: Seed data only
+EVID: None
+STATUS: Open None
+=== F39 | Platform | Platform | UI | Low | Wrong avatar initials for multi-word names
+OBS: 'JBS Praxis Team' shows the initials 'JT' in queries, payroll and projects.
+REC: Take the first letters of the first two words ('JP'), or use a logo for organisation accounts.
+WHERE: /queries, /payroll?tab=payslips | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F40 | Queries & Sanctions | HR | Copy | Low | Automatic queries show the rule name as the person who raised them
+OBS: Raised By shows 'Unregistered Device', which is a rule, not a person.
+REC: Show 'System (rule: Unregistered Device)'.
+WHERE: /queries?tab=queries | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F41 | Self-Service | HR | Copy | Low | Raw internal key in Record History
+OBS: Record History shows 'commitments.due' instead of a readable label.
+REC: Map the event keys to plain-language labels.
+WHERE: /ess?tab=my-profile | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F42 | People / Attendance | HR | Clarity | Low | Hours worked don't match the clock-out shown
+OBS: On 06/11 the screen shows 09:24 to 18:30 'System Clock-Out' but 7h 36m worked (capped at 17:00), with no explanation.
+REC: Show 'capped at shift end' or show the actual time the system clocked the person out.
+WHERE: /ess?tab=my-attendance | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F44 | Master data | Platform | Copy | Low | Typos in master data
+OBS: 'Markerting' appears in 3 job titles, 'Infrastructuaral' in an expense category and '#2bn' in a goal (meant as ₦2bn).
+REC: Correct them before the production import.
+WHERE: People, Expenses categories, Goals | VER: Confirmed | CFV: Seed data only
+EVID: None
+STATUS: Open None
+=== F45 | Partnerships | CRM | Clarity | Low | Analytics figures have no units
+OBS: 'Returns per Month: November 2026: 86000' has no currency, and '510 downloads' is attributed to a lead owner with no definition.
+REC: Add units and a one-line definition to each metric.
+WHERE: /partnerships?tab=analytics | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F46 | Partnerships | CRM | Copy | Low | Region field adds nothing
+OBS: All 13 leads and partners are 'National' because the form pre-selects National.
+REC: Remove the default, or replace region with the state or city served.
+WHERE: /partnerships → New Lead | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: New Lead form pre-selects 'National'.
+STATUS: Open None
+=== F47 | Mailbox | Platform | Performance | Low | Mailbox fires failing calls when no account is connected
+OBS: Before an account is connected, each folder visit makes 3 thread calls that all return 409.
+REC: Check the connection first and skip the thread calls.
+WHERE: /mailbox | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F48 | Mobile | Platform | UI | Low | Mobile has a duplicate call to action and small tap targets
+OBS: The Pipeline screen at 375px shows a 'New Lead' button and a floating '+' that do the same thing. Goals has 68 controls under 32px tall, Employees 13.
+REC: Keep one primary action on mobile and make tap targets at least 40 to 44px.
+WHERE: /partnerships?tab=pipeline, /performance?tab=goals (375px) | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F49 | Partnerships | CRM | Copy | Low | Third-party model name in product copy
+OBS: Proposals are subtitled 'Written with Claude, sent by you'.
+REC: Use the product's own AI name (Praxis AI) or a neutral phrase.
+WHERE: /partnerships?tab=proposals | VER: Confirmed | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F50 | Search | Platform | Performance (to verify) | Low | Slow first search result
+OBS: The first search ('Kora') was still 'Loading' after 2 seconds. The second ('invoice') returned good results across modules within 2 seconds.
+REC: Measure p95 search latency on staging and warm the index.
+WHERE: Cmd+K | VER: Needs verification | CFV: Not create-related
+EVID: None
+STATUS: Open None
+=== F59 | Partnerships | CRM | UX | Low | Log Interaction is hidden in the More menu
+OBS: The Activity tab's empty state says 'Log a call, meeting or note.' but has no button. Logging is only reachable via More → Log Interaction.
+REC: Put a 'Log interaction' button on the Activity tab and in the record header.
+WHERE: Partner → Activity | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F60 | Self-Service | HR | UX | Low | Leave form shows the day count only after you send
+OBS: The working-day count and balance check ('24 working days, 20 left') appear only after pressing Send Request; the server correctly refuses. The 5-day request 01/12 to 05/12 counts Saturday as a full day although Saturday is a half day.
+REC: Show the computed working days and remaining balance as soon as dates are picked. Confirm how half-day Saturdays should count.
+WHERE: /ess?tab=my-leave → Request Leave | VER: Confirmed (Saturday rule to verify) | CFV: Gap reproduced on new record
+EVID: Found while creating records.
+STATUS: Open None
+=== F68 | Community | Platform | Validation (to verify) | Low | Announcement to an empty department publishes silently, and retired departments are offered
+OBS: An announcement targeted at the empty department QA-AUDIT DeptQAA published with '0 of 0 read' and no warning; the toast said 'Published to #announcements' (the company-wide channel), so department-targeted posts may be visible to everyone. The audience list also offers 'Technology', which appears to be the retired department.
+REC: Warn when an audience has no members, hide retired departments, and confirm department-only announcements are not shown in the all-staff channel.
+WHERE: /community?tab=announcements → New Announcement | VER: Partly confirmed (visibility to verify) | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F69 | Settings / Audit | Platform | Clarity | Low | Audit log mixes record numbers and raw IDs
+OBS: Some entries name the record (DEAL-2026-0016, LED-0011, AGR-2026-0004); others show internal IDs (Partner deal · aeb9ac4f, Partner · dfe5907e).
+REC: Always show the record number and name, with a link.
+WHERE: /settings?tab=audit-log | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F70 | Mobile | Platform | UI | Low | Mobile forms put Save/Send at the end of a long scroll
+OBS: At 375px the New Request sheet scrolls about two screens before Save Draft and Send Request appear; the buttons are not pinned. Buttons are 44px tall and nothing overflows horizontally.
+REC: Pin the primary actions to the bottom of the sheet on mobile.
+WHERE: /expenses → New Request at 375px | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 3 lifecycle tests.
+STATUS: Open None
+=== F80 | Recruitment | HR | UX / bug (to verify) | Low | Interview scorecard is generic, and an early card submit silently does nothing
+OBS: Every role uses the same ten criteria, including 'Experience in Sales and Marketing' and 'Appearance and Grooming' for a Content Producer. Submitting a complete card (10 ratings, Select, comment) three days before the interview and confirming 'Your card locks once it is submitted' only saved a draft: submitted_at stayed empty and no message explained why.
+REC: Let each vacancy set its own criteria. If cards cannot be submitted before the interview, disable Submit Card and say so.
+WHERE: /recruitment?tab=interviews → QA-AUDIT Candidate → My Card | VER: Confirmed (rule to verify) | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F81 | Recruitment | HR | UX / accuracy | Low | Applicant scores and application form mislead
+OBS: Before screening, APP-0013 showed a provisional score of 58 from 'Form only' for an applicant who does not meet the minimum experience; 'Score With AI' returned 200 but changed nothing; the real AI screening ran only on Move to Screening and gave 0. The application link expires in 2 days although the vacancy closes 06/12. Step 2 promises 'a few questions' but shows none. The CV field says 'PDF or Word' and accepts .doc, but the error says 'Accepted: PDF, DOCX'.
+REC: Hide provisional scores until screening runs, make Score With AI run the screening, align link expiry with the closing date, and make the file-type text consistent.
+WHERE: go.staging.mycityapp.io/jobs/content-producer-lagos; /recruitment?tab=candidates | VER: Confirmed | CFV: Gap reproduced on new record
+EVID: Found in round 4 end-to-end tests.
+STATUS: Open None
+=== F82 | Performance / Data | HR | Data consistency | Low | Status and score labels contradict each other
+OBS: Key result CO-KR2.2 is 'Done' with a score of 0.45. Bode Oluwasanmi's scorecard sits under Technology & Back-office Ops while his record says General Management. The CEO's scorecard is 'Agreed' with no reviewer. Praxis AI lists QA-AUDIT Employee as 'Active' while the record says 'On Probation'. Test goals ('test run', 'another test') are live in Q4 and shown on Home.
+REC: Derive status from score thresholds, keep scorecard department in sync with the employee record, use one status vocabulary, and remove test goals before go-live.
+WHERE: /performance?tab=goals, /performance?tab=targets, Praxis AI | VER: Confirmed | CFV: Not create-related
+EVID: Mixed seed data and labelling.
+STATUS: Open None
+=== F83 | Knowledge Hub | Platform | Functional gap (to verify) | Low | No way to add or edit an SOP from the Management role
+OBS: Management has 'Edit · All' on Knowledge Hub, but the SOP screens show no New SOP or Edit control. SOPs exist for 5 departments; Marketing and Implementation have none.
+REC: Confirm who maintains SOPs; if Management should, expose create, edit and new-version actions.
+WHERE: /knowledge?tab=sops | VER: Confirmed (role rule to verify) | CFV: Not testable (role)
+EVID: No create/edit control visible to Management.
+STATUS: Open None

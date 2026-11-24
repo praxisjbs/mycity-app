@@ -474,7 +474,12 @@ element outside the form components (§8.6).
   submitted it. Never `onClick={() => void save()}`: the button cannot see the work, and the lint
   refuses it (`mycity/no-void-press`). Never `disabled={busy}` either: busy stays focusable.
 - Enter submits a single-line form. Esc closes a form with no changes; with changes it asks once
-  whether to discard.
+  whether to discard (Keep Editing or Discard Changes), and so do the scrim, the close button and a
+  drag down on a phone. The form system says so itself: `useContractForm` tells the modal, side panel
+  or sheet around it whenever it holds changes, a wizard's steps included, and a save that settles
+  with no refusal clears it (`saved()` for a form saved through `check()`; JBS Praxis, 24/11/2026). A
+  screen calls `useUnsavedChanges` only for changes held outside a form (cards being picked), and a
+  form whose entries are not worth keeping (a search box) passes `{ unsaved: false }`.
 
 ### 8.5 After saving
 

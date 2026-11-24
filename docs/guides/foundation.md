@@ -276,7 +276,8 @@ longer than 4.5 seconds.
 - The repository is private (TB, 16/10/2026), so the roster is committed: track A adds
   `seeds/staff/staff-list.xlsx` (MyCity's staff sheet as TB gives it in that chat) and
   `seeds/staff/roles.json` (each person's roles, the CEO flag, and the work email of the Operations
-  & People Lead, which the sheet lacks; TB gives it in that chat). The sheet holds 18 people and 2 vacant seats (Head
+  & People Lead, which the sheet lacks; TB gives it in that chat; since 24/11/2026 Obianuju Nwoye's,
+  `obianuju@mycityapp.io`, below). The sheet holds 18 people and 2 vacant seats (Head
   Sales & Revenue, Technical Assistant), with Staff ID, name, designation, team, gender, joining
   date, date of birth, line manager, email, phone, employment type, work arrangement, work hours and
   bank name.
@@ -336,6 +337,15 @@ longer than 4.5 seconds.
   People Lead is Operations & People Lead, and its `roles.json` key with it; two work emails had a
   mistyped domain (gheil.com and gpril.com, for gmail.com). A person already loaded is never written
   over, so staging takes these on screen (`docs/runbooks/staff-roster.md` §6).
+- **A post that changes hands changes its row** (JBS Praxis, 24/11/2026; QA BG-004). Cynthia Osasere
+  Osakunih has left MyCity, and Obianuju Nwoye is the Operations & People Lead from 01/11/2026: her
+  row (Staff ID 00038, People & Culture, FTE, Remote, under the Program Manager, Gender left empty as
+  not recorded) takes the place of Cynthia's (S/N 6, 00018), and `roles.json` gives the post
+  `obianuju@mycityapp.io`. On staging, where People added her on screen as 00038, the loader finds
+  her by that number and the post's email and leaves her exactly as entered; Cynthia, no longer on
+  the sheet, stays as People left her (archived), never restored, renumbered or removed. A fresh
+  database (production's first deploy) creates Obianuju with an invited login, Operations & People,
+  and as head of People & Culture (`nomenclature.json` names the post as its head).
 - FTE is `full_time`; Remote and Hybrid are `remote` and `hybrid`. The working hours column (Monday
   to Friday 09:00 to 17:00, Saturday 09:00 to 15:00) is the organisation's working week (A22), set by
   track C, not per person.
@@ -487,7 +497,10 @@ As built (17/10/2026):
   `shared/workflow/definitions.js` DEFAULTS: stage `line_manager` (the subject's line manager, 48 hours),
   then `operations_people` (the role, 48 hours) when `days > 5`. A subject who reports to a vacant
   seat goes to the first person above the seat (`employee_effective_manager`, organogram guide §6;
-  TB, 19/10/2026); one with nobody above them goes to the CEO (the engine's rule). The leave module (M1, `src/modules/leave`) opens it with `{ days }`
+  TB, 19/10/2026), and one whose line manager has left (archived, left or suspended) to the next
+  active manager above them (JBS Praxis, 24/11/2026; QA BG-005; `migrations/1161`); one with nobody
+  active above them goes to the CEO (the engine's rule). The approver is fixed when the stage starts:
+  a request already waiting on someone who then leaves is reassigned by Operations & People. The leave module (M1, `src/modules/leave`) opens it with `{ days }`
   in the transaction that saves the request, and copies its outcome onto the request after commit
   (`docs/guides/ess.md` §6). People · Leave decides with the same approve and reject routes.
 - **A person the request names** (`employee_in_context`, TB, 22/10/2026; `docs/guides/performance.md`
@@ -542,7 +555,8 @@ and the `// pagination:complete` marker (BACKEND_STRUCTURE §16.3). Vacant seats
 Team scope (`shared/rbac/grants-cache.js`), the line-manager approver (`shared/workflow/approvers.js`),
 the notifications that reach a person's managers (`shared/notifications/fanout.js`) and search's
 "manages people" read the same tree through `employee_effective_manager`: someone under an empty
-seat answers to the first person above it (TB, 19/10/2026). A seat's line or status changing bumps
+seat answers to the first person above it (TB, 19/10/2026), and someone whose line manager has left
+to the next active manager above (JBS Praxis, 24/11/2026; `migrations/1161`). A seat's line or status changing bumps
 the team cache as a person's line does. A loop is refused whether it runs through people or seats.
 
 ### 6.7 Search reaches everything
@@ -1205,6 +1219,7 @@ screen.
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · QA BG-004, BG-005, BG-013 (JBS Praxis decisions). §6.1: Obianuju Nwoye replaces Cynthia Osasere Osakunih, who has left, as Operations & People Lead in `seeds/staff/staff-list.xlsx` (S/N 6, now 00038) and `roles.json` (`obianuju@mycityapp.io`); the loader matches her staging record by number and email and leaves Cynthia's as it is (`tests/integration/organisation.test.js`, `staff-nomenclature.test.js`). §6.5, §6.6: a line manager who has left is passed over to the next active manager above, or the CEO (`migrations/1161`, `organogram.md` §6; `tests/integration/workflow.test.js`). Every form in a modal, side panel or sheet, wizards included, now asks Keep Editing or Discard Changes before Esc, the scrim, the close button or a drag loses its entries: `useContractForm` reports its own changes (FRONTEND_GUIDE §8.4; `packages/ui/src/form/useContractForm.test.tsx`).
 - 24/11/2026 · JP · Add Employee and Edit Record: a line or dotted manager who is the person themselves (`REPORTS_TO_SELF`) is refused on the field as before and never recorded on System Health, as on the organogram (`organogram.md` §5; faults #3 and #4 of the 23/11 staging brief).
 - 17/11/2026 · JP · The leave flow (`leave.approval`, §6.5) is unchanged: a leave request may now name a relief officer and carry a handover note, read by its approvers where they decide on People · Leave (`docs/guides/ess.md` §6, §8). `workflow.service` exports `mayRead`, the approval's own reader check, which the handover note's vault rule reuses. No foundation screen changed.
 - 17/11/2026 · TB · For the Document Centre's PR 2 (`document-centre.md` §6.5, §6.7, §6.8): the vault gains `setDetails` (a file's title and expiry, beside `setTitle`); the Word writer (`shared/documents/docx.js`) gains a header with a picture and a rule, and a footer, and may leave its title out; `documents.generate` takes `blank: true` (the letterhead prints no date); `services/media/pdf-text.js` takes its page and character limits, its time and memory, and answers done, empty or failed with `detail`, the CV's limits unchanged.

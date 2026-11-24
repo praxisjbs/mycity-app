@@ -19,6 +19,7 @@ const ROW = `s.scorecard_id, s.performance_period_id, p.name AS period_name, s.e
   (SELECT ro.name FROM role ro WHERE ro.code = s.reviewer_role_code) AS reviewer_role,
   s.dotted_employee_id, ${PERSON("dm", "dd")} AS dotted,
   s.employee_agreed_at, s.reviewer_agreed_at, s.disagreed_at, trim_scale(s.score_to_date)::text AS score_to_date, s.rating,
+  trim_scale(s.weight_scored)::text AS weight_scored, trim_scale(s.weight_total)::text AS weight_total,
   (SELECT count(*)::int FROM employee_target t WHERE t.scorecard_id = s.scorecard_id) AS line_count,
   s.created_at, s.updated_at, s.scope_text, s.reviewer_reason, s.disagree_reason,
   s.results_weight, s.kpis_weight, s.accountability_weight, p.status AS period_status, p.starts_on AS period_starts_on,

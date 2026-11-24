@@ -185,6 +185,24 @@ describe("dedup", () => {
     expect(dedup.norm.company("Zenith Ventures Ltd.")).toBe("zenith");
   });
 
+  test("company names meet across plurals, common abbreviations and joining words", () => {
+    expect(dedup.norm.company("Kora St. Kitchens Ltd")).toBe(dedup.norm.company("kora street kitchen"));
+    expect(dedup.norm.company("Ade & Sons Intl")).toBe(dedup.norm.company("Ade and Son International"));
+    expect(dedup.norm.company("Lagos Creative Agencies")).toBe(dedup.norm.company("Lagos Creative Agency"));
+    expect(dedup.norm.company("The Glass House")).toBe("glass house");
+  });
+
+  test("a likeness the candidate's query measured counts as similarity, and similarWeight scores it flat", () => {
+    const named = [{ key: "name", weight: 60, similarWeight: 55, normalize: dedup.norm.company, label: "name", similar: true }];
+    expect(dedup.score({ name: "Kora Strt Kitchenz" }, { name: "Kora Street Kitchens" }, named).score).toBe(0);
+    expect(dedup.score({ name: "Kora Strt Kitchenz" }, { name: "Kora Street Kitchens", likeness: { name: 0.7 } }, named)).toEqual({
+      score: 55,
+      reasons: ["name (similar)"],
+    });
+    // Without similarWeight a similar value still scores in proportion, as people records do.
+    expect(dedup.score({ full_name: "Ada Okafor" }, { full_name: "Adaeze Okafor", likeness: { full_name: 0.75 } }, signals).score).toBe(30);
+  });
+
   test("ranks by score with reasons, drops weak matches", () => {
     const input = { work_email: "Ada@MyCity.io", phone: "08031234567", full_name: "Adaeze N. Okafor" };
     const ranked = dedup.rank(input, [

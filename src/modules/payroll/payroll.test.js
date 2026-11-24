@@ -245,6 +245,36 @@ describe("totals are the sums of the lines (§6.8)", () => {
   });
 });
 
+describe("an instalment a run did not take moves on (§6.6 rule 10)", () => {
+  const row = (id, period, status = "scheduled") => ({ payroll_deduction_instalment_id: id, period, status });
+  const none = new Set();
+
+  test("the missed month and every later one move a month on, latest first, so no month holds two", () => {
+    const rows = [row("nov", "2026-11-01"), row("dec", "2026-12-01"), row("jan", "2027-01-01")];
+    expect(lock.carryPlan("2026-11-01", rows, new Set(["nov"]), none)).toEqual([
+      { id: "jan", from: "2027-01-01", to: "2027-02-01" },
+      { id: "dec", from: "2026-12-01", to: "2027-01-01" },
+      { id: "nov", from: "2026-11-01", to: "2026-12-01" },
+    ]);
+  });
+
+  test("a month whose run is already sent, or that holds an instalment taken, is stepped over", () => {
+    const rows = [row("nov", "2026-11-01"), row("dec", "2026-12-01", "in_run"), row("feb", "2027-02-01")];
+    expect(lock.carryPlan("2026-11-01", rows, new Set(["nov"]), new Set(["2027-01-01"]))).toEqual([
+      { id: "feb", from: "2027-02-01", to: "2027-03-01" },
+      { id: "nov", from: "2026-11-01", to: "2027-02-01" },
+    ]);
+  });
+
+  test("a later instalment with a free month before it stays where it is, and an earlier one still open is not moved", () => {
+    const rows = [row("sep", "2026-09-01"), row("oct", "2026-10-01"), row("nov", "2026-11-01"), row("mar", "2027-03-01")];
+    expect(lock.carryPlan("2026-11-01", rows, new Set(["oct", "nov"]), none)).toEqual([
+      { id: "nov", from: "2026-11-01", to: "2027-01-01" },
+      { id: "oct", from: "2026-10-01", to: "2026-12-01" },
+    ]);
+  });
+});
+
 describe("the pay date (§6.11 rule 1)", () => {
   test("the pay day is the month's own day, or its last when it is past the end", () => {
     expect(calc.payDate("2026-10-01", 30)).toBe("2026-10-30");

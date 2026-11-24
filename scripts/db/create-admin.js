@@ -43,7 +43,8 @@
  *
  *   node scripts/db/create-admin.js --build-account --env=staging
  *       The implementation team's login (BUILD_ACCOUNT below): a complete
- *       employee record, role Implementation Team, suspended at handover. Asks
+ *       employee record with no pay or bank details (never in a payroll run),
+ *       role Implementation Team, closed at handover. Asks
  *       only for the work email and the password; neither is ever in the
  *       repository (docs/runbooks/first-accounts.md).
  *
@@ -211,14 +212,16 @@ function sampleEmployee(workEmail) {
 
 /**
  * The implementation team's login: a complete employee record, held by the Implementation Team
- * role for the length of the build and suspended at handover (docs/runbooks/first-accounts.md).
+ * role for the length of the build; at handover its record is archived and its login closed
+ * (docs/runbooks/first-accounts.md §5).
  * Every employee field is filled except the ones that point at other records (worksite, line
- * and dotted managers, seats: a remote first account has none to point at), left_on, and the
- * home address, which is picked on My Profile after sign-in (F27: a terminal cannot pick one). The
- * email is typed at the terminal and serves as both work and personal email, so it is never kept
- * here. A consultant has no probation, so confirmation is due and done on the start date. A
- * two-month consultancy of N3,700,000, so N1,850,000 a month. The account number is ten zeros on
- * purpose: it reaches no one, so no payment run can ever send money to a real account.
+ * and dotted managers, seats: a remote first account has none to point at), left_on, the
+ * home address, which is picked on My Profile after sign-in (F27: a terminal cannot pick one), and
+ * the pay and bank details. The account is the implementation partner's, never one of MyCity's
+ * staff, so it carries no salary and no bank account and is never in a payroll run (payroll guide
+ * §6.1 rule 6, which leaves out every holder of this role whatever pay they are given). The email
+ * is typed at the terminal and serves as both work and personal email, so it is never kept here.
+ * A consultant has no probation, so confirmation is due and done on the start date.
  */
 const BUILD_ACCOUNT = Object.freeze({
   role_code: "implementation",
@@ -242,9 +245,6 @@ const BUILD_ACCOUNT = Object.freeze({
     next_of_kin_name: "JBS Praxis Office",
     next_of_kin_phone: "08027492738",
     next_of_kin_relationship: "Employer",
-    bank_name: "Zenith Bank",
-    account_number: "0000000000",
-    gross_monthly: "1850000.00",
   }),
 });
 

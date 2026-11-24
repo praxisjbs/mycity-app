@@ -145,13 +145,17 @@ A proposed sanction waits on the query's card for whoever must approve it.
 
 1. Open the query on [Queries & Sanctions · Queries](/queries?tab=queries). Its status is
    **Escalated**, and **Waiting On** names who must approve.
-2. If it waits on you, press **Approve Sanction**.
+2. If you see every query, as Operations & People do, the card also shows **In Force**: the
+   sanctions this person holds now, from every query. **Next Step** is the step a new offence is
+   offered. **Below Next Step** beside the sanction means a step at or above it is already in force,
+   so it may repeat one. Approve it only if that is meant.
+3. If it waits on you, press **Approve Sanction**.
    ![Approve Sanction](shot:queries-approve)
-3. At **Operations & People**, sign in **Your Signature**, or keep the one you saved. It is printed
+4. At **Operations & People**, sign in **Your Signature**, or keep the one you saved. It is printed
    on the sanction's letters, with your name and job title.
-4. Press **Approve Sanction**. The hub says it was sent on to the CEO, or that the sanction was
+5. Press **Approve Sanction**. The hub says it was sent on to the CEO, or that the sanction was
    approved and its letter follows. The card shows the sanction's number once it is issued.
-5. To refuse it, press **Reject**, type the **Reason** and press **Reject**. The hub says
+6. To refuse it, press **Reject**, type the **Reason** and press **Reject**. The hub says
    **Sanction rejected**, the query is back **Under Review**, and its sanction reads **Not
    Approved**.
 
@@ -469,7 +473,7 @@ marks:
 open: /queries?tab=queries
 as: operations
 do:
-  - click: text "Yusuf Musa"
+  - click: css [data-ui=page] tbody tr:has-text("Client shoot missed"), [data-ui=page] ul[data-copy=content] > li:has-text("Client shoot missed")
   - wait: button "Approve Sanction"
   - click: button "Approve Sanction"
   - wait: label "Your Signature"

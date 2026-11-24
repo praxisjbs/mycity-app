@@ -618,7 +618,7 @@ An exception is a punch the hub could not accept on its own.
 | **Outside Worksite** | A clock-in or check-in beyond the place's circle |
 | **Outside Home** | A remote day's clock-in beyond the approved home's circle |
 | **Location Unclear** | The reading could not prove where they were |
-| **Unknown Device** | A device they have not registered |
+| **Unknown Device** | A device they have not registered. One a day for each device, holding all its punches |
 | **Device Time Ahead** | The device's clock was ahead of the hub's |
 | **Missing Clock-Out** | They clocked in and never clocked out |
 | **System Clock-Out** | The hub clocked them out |
@@ -638,6 +638,8 @@ An exception is a punch the hub could not accept on its own.
      to leave it open.
    - **System Clock-Out**: **Accept** keeps the hub's time; **Correct Time** records the
      **Clock-Out Time** they gave.
+   - **Unknown Device**: one exception holds the day's punches from that device, and its **Detail**
+     ends with how many. **Accept** or **Reject** decides them all.
    - A check-in's flag: **Accept** clears it; **Reject** keeps it flagged. The shift does not
      change.
    - A punch refused at the clock (its **Detail** starts *Refused*): neither choice makes it

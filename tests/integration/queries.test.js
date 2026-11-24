@@ -666,7 +666,8 @@ describeDb("queries and sanctions against the real migrations", () => {
       const res = await propose(id, "Caution");
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ status: "under_review", escalated: true, can_decide: false });
-      expect(res.body.sanction).toMatchObject({ step_name: "Caution", status: "pending_approval", number: null });
+      // The rung's place on the ladder travels with it, so the approver's card reads it against the standing (BG-014).
+      expect(res.body.sanction).toMatchObject({ step_name: "Caution", position: 1, status: "pending_approval", number: null });
       expect((await propose(id, "Caution")).status).toBe(409);
 
       // The card says who it waits on: the proposer may not decide it, Operations & People may, and sign.

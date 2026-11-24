@@ -1,0 +1,147 @@
+=== F05 | Partnerships | Bug | High | Partner record Work tab fails to load (HTTP 500)
+OBSERVED: Opening a partner, then Work, shows 'This did not load' for Tasks, Projects and Events. GET /api/v1/partnerships/work?partner_id=…&kind=task|project|event returns 500 for all three. Reproduced on Kora Street Kitchens.
+RECOMMENDED: Fix the /partnerships/work endpoint, add an API test for each kind, and re-test on every partner.
+WHERE: /partnerships?tab=partners → Kora Street Kitchens → Work
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: New lead QA-AUDIT-Lead-01: Work tab returns 500 (lead_id). Task TSK-0115 was created from that tab but never appears on the record.
+
+=== F06 | Partnerships / People | Data integrity / offboarding gap | High | Departed Operations & People lead still owns the partnership book
+OBSERVED: The 05/11 announcement says Cynthia O. has been replaced and she is no longer in the Employees list. She is still owner of 5 of 6 partners and 6 of 7 leads, is the top lead owner in Partnerships analytics, is head of People & Culture, owns 2 projects, is the only recipient of the Daily Attendance report and co-recipient of Weekly Headcount. Round 4: she still owns active projects PRJ-2026-000005 and 000006 and still holds the Operations & People role (see F75).
+RECOMMENDED: Add an offboarding step that forces every owned record (deals, leads, partners, projects, department head, report audiences, approvals) to be reassigned before an employee is archived. Bulk-reassign these records now.
+WHERE: /partnerships?tab=leads, /people?tab=departments, /home?tab=reports
+AUDITOR VERDICT: Confirmed / Not testable (role)
+EVIDENCE: No archive or exit action is available to the Management role, so offboarding reassignment could not be exercised. Evidence remains the departed owner's book.
+
+=== F07 | Partnerships | Data integrity | High | Signed partnerships have no contract on file
+OBSERVED: 6 partnerships are 'Signed' (₦15.8M), but Contracts & MOUs shows 0 Active agreements. The 3 agreements on record all belong to deals that are not yet signed. The card says 'In Approval 2' while the rows say 'In Review'. Round 3: generating an agreement needs a template for the partner's category; the Vendor category has none ('No template'), so vendor partners cannot get a generated agreement. Event category works (AGR-2026-0004 created as a draft, placeholders highlighted, and it cannot be submitted until they are filled).
+RECOMMENDED: Require an agreement (or a 'signed before the hub' upload) before a deal can move to Partnership Signed. Make the status names match between cards and rows.
+WHERE: /partnerships?tab=contracts-and-mous
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Moving QA-AUDIT-Deal-01 to Partnership Signed requires a signed copy (good), but no agreement is created in Contracts & MOUs (Active stays 0).
+
+=== F21 | Partnerships | Data model / UX | Medium | Two status systems for deals, and the last stage is never reached
+OBSERVED: Leads have a status (New, Qualified, Contacted, Converted) and also a 13-stage pipeline. Every signed partner sits at 'Partnership Signed'; 'Active Partnership' holds 0, yet the partners are labelled Active.
+RECOMMENDED: Use one lifecycle. Cut the pipeline to about 7 stages and make 'Active' a derived health or status, not a stage.
+WHERE: /partnerships?tab=pipeline, /partnerships?tab=leads
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: New lead started 'Qualified' at Contract Review, then 'Converted'; still two status systems.
+
+=== F22 | Partnerships | UX / data capture | Medium | Lead source is hidden and optional, so source reporting is empty
+OBSERVED: 'Source' sits under 'Advanced' in the New Lead form and is optional. All 7 of 7 leads show 'No Source', so the Leads by Source report is meaningless.
+RECOMMENDED: Move Source onto step 1 as a required pick-list.
+WHERE: /partnerships → New Lead
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: QA-AUDIT-Lead-01 created without a source; Source is optional under Advanced.
+
+=== F23 | Partnerships | Data integrity | Medium | 'Last Contact' is not rolled up from interactions
+OBSERVED: Leads in Negotiation or Contract Review show Last Contact 'Never'. Gidi Food Carnival shows 'Never' as a lead but 03/11/2026 as a partner.
+RECOMMENDED: Derive Last Contact from logged interactions, meetings and emails across the linked lead, deal and partner.
+WHERE: /partnerships?tab=leads
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: After logging a call, the partner row shows 16:42 but the converted lead row still shows 'Never'. Before any interaction the header said 'Today' while the list said 'Never'.
+
+=== F24 | Partnerships | UI / layout | Medium | Partner screen is cramped: filters take half the screen and the detail is squeezed
+OBSERVED: At 1440×900, the KPI cards, five filter controls and status pills fill more than half the viewport before any list appears. The partner detail opens in a narrow right panel: health badges truncate ('Follow-Up Requ…') and the 13 stage chips wrap over three lines.
+RECOMMENDED: Collapse the filters into one filter bar with a 'Filters' popover. Open the partner 360 as a full page (deep link already exists via ?id=). Show stage as a compact progress bar.
+WHERE: /partnerships?tab=partners
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F25 | Platform | Performance | Medium | Duplicate API calls
+OBSERVED: Opening one partner calls /partnerships/lists/partnership_stage about 10 times and the same deal endpoint 4 times. The Goals tab sends about 25 separate /notifications/unread-records calls.
+RECOMMENDED: Cache reference lists per session and batch the unread-records lookups into one call per page.
+WHERE: Network log
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F45 | Partnerships | Clarity | Low | Analytics figures have no units
+OBSERVED: 'Returns per Month: November 2026: 86000' has no currency, and '510 downloads' is attributed to a lead owner with no definition.
+RECOMMENDED: Add units and a one-line definition to each metric.
+WHERE: /partnerships?tab=analytics
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F46 | Partnerships | Copy | Low | Region field adds nothing
+OBSERVED: All 13 leads and partners are 'National' because the form pre-selects National.
+RECOMMENDED: Remove the default, or replace region with the state or city served.
+WHERE: /partnerships → New Lead
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: New Lead form pre-selects 'National'.
+
+=== F49 | Partnerships | Copy | Low | Third-party model name in product copy
+OBSERVED: Proposals are subtitled 'Written with Claude, sent by you'.
+RECOMMENDED: Use the product's own AI name (Praxis AI) or a neutral phrase.
+WHERE: /partnerships?tab=proposals
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F51 | Partnerships | Bug (to verify) | High | Money fields reject normal numbers: only '750000.00' is accepted
+OBSERVED: Root cause found in round 3. On a clean New Lead form, typing 750000 (real keystrokes) gives 'Check the format'. Tested values: 750000, 750,000, 750,000.00, 750000.5, 7500, 75, 1 and 0 are all rejected; only 750000.00 (exactly two decimals) passes. Edit Deal has the same rule (error appears on Save). The Enter Returns money fields behave the same. Most users will not guess this, so deals end up with no value.
+RECOMMENDED: Accept plain and comma-grouped numbers with 0 to 2 decimals, normalise on save, and say the expected format if anything is rejected. Apply the fix to every currency input (deal create/edit, returns).
+WHERE: /partnerships → New Lead → Deal step
+AUDITOR VERDICT: Confirmed (fresh page, real keystrokes) / Gap reproduced on new record
+EVIDENCE: QA-AUDIT-Lead-02: 750000 rejected; 750000.00 accepted. Edit Deal: 900000 rejected on Save; 900000.00 saved.
+
+=== F52 | Partnerships | Validation | Medium | Deals accept a close date in the past and still show 'On Track'
+OBSERVED: QA-AUDIT-Deal-01 was created with Expected Close 01/01/2020, and Health shows On Track. Tasks, by contrast, reject past due dates ('Pick 16/11/2026 or later').
+RECOMMENDED: Reject past close dates on create. Turn health to 'Overdue' once the close date passes without signature.
+WHERE: /partnerships → New Lead → Deal step
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+
+=== F53 | Partnerships | Control gap | Medium | A deal can be signed with no value
+OBSERVED: QA-AUDIT-Deal-01 moved to Partnership Signed with Projected Value 'None' (₦0 signed value).
+RECOMMENDED: Require a value (or an explicit 'non-monetary' flag) before Partnership Signed.
+WHERE: Deal → Move to Partnership Signed
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+
+=== F54 | Partnerships | Data quality | Medium | Duplicate check catches only exact names and only warns
+OBSERVED: Typing 'Kora Street Kitchens' or 'kora street kitchens' shows 'Already here: Kora Street Kitchens, PAR-0003' but Next still works. 'kora street kitchen' (one letter off) is not detected.
+RECOMMENDED: Use fuzzy matching (name similarity, website, email domain, phone). Require an explicit 'Create anyway' with a reason.
+WHERE: /partnerships → New Lead
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+
+=== F59 | Partnerships | UX | Low | Log Interaction is hidden in the More menu
+OBSERVED: The Activity tab's empty state says 'Log a call, meeting or note.' but has no button. Logging is only reachable via More → Log Interaction.
+RECOMMENDED: Put a 'Log interaction' button on the Activity tab and in the record header.
+WHERE: Partner → Activity
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+
+=== F61 | Partnerships | Bug | High | Partner returns cannot be saved
+OBSERVED: Enter Returns on QA-AUDIT-Lead-02 (active partner), freshly loaded page, real keystrokes: Units Sold 5 and Downloads 10 are rejected as 'Required' although both are filled and labelled Optional; leaving them empty gives the same error. The money fields also need two decimals (see F51). With the money fixed, Units and Downloads still block the save. Nothing can be saved, so returns, commission and 'Returns This Year' cannot be recorded. There is also no check that commission plus payout fit within gross sales (₦150,000 commission on ₦100,000 gross was not flagged).
+RECOMMENDED: Fix the integer field validation, then add consistency checks (commission ≤ gross, payout ≤ gross − commission) and auto-calculate commission from the category rate (Event is 8%).
+WHERE: Partner → Returns → Enter Returns
+AUDITOR VERDICT: Confirmed (fresh page, real keystrokes) / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F62 | Partnerships | Bug | High | AI proposal writing fails
+OBSERVED: PRO-0003 (QA-AUDIT-Deal-01) stayed at 'Asking' for over ten minutes, then showed 'The questions did not arrive'. Try Again went back to 'Asking' and had not finished 40 seconds later. The proposal cannot get past step 2 of 5.
+RECOMMENDED: Check the AI job (timeouts, provider errors) and surface failures within about 30 seconds with a reason. Offer a manual 'write it myself' path so a proposal is never blocked by the AI.
+WHERE: /partnerships?tab=proposals → PRO-0003
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F63 | Partnerships | Data integrity | Medium | Closing a partner turns its signed deal into 'Closed Lost'
+OBSERVED: Closing QA-AUDIT-Lead-01 moved its signed deal QA-AUDIT-Deal-01 to 'Closed Lost' with the close reason as the loss reason (Stage History and audit log). 'Signed This Year' stayed at 7, but the deal record now reads as a loss.
+RECOMMENDED: Ending a relationship should end or expire the partnership, not rewrite a won deal as lost. Keep 'Closed Lost' for deals that were never won.
+WHERE: Partner → More → Close Partner
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F64 | Partnerships | Process control | Medium | Stages can be skipped, and a lost deal stays 'On Track'
+OBSERVED: QA-AUDIT-Deal-02 moved from Prospect Identified straight to Proposal Sent with no proposal on file. Only Partnership Signed and Active Partnership are guarded (signed copy). After Closed Lost, Health still showed 'On Track'.
+RECOMMENDED: Require the evidence each stage implies (a proposal for Proposal Sent, a meeting for Meeting Held) or at least record a reason when skipping. Set health to Closed/Lost automatically.
+WHERE: Lead → Move to …
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F08 | Partnerships | Functional gap | High | The CRM covers partners only, not customers, support or campaigns
+OBSERVED: Partnerships handles B2B merchants and partners well. There is no record of app end-users or customers, no support or ticket queue, and no campaign records. Branding & Marketing KPIs (campaign attribution, social enquiry response rate, cost per activated user) have nowhere to get their data.
+RECOMMENDED: Scope a customer view (app users linked to transactions and enquiries), a support or ticket queue, and campaign records that feed the marketing KPIs. Otherwise state plainly that the hub's CRM is a partner CRM only.
+WHERE: Whole app
+AUDITOR VERDICT: Confirmed / Config / product gap
+EVIDENCE: No customer, ticket or campaign records can be created.
+

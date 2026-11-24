@@ -27,6 +27,13 @@ const MAX_PEOPLE = 5000;
 /** The most pay items, leave requests or instalments one run reads. */
 const MAX_ITEMS = 200000;
 
+/**
+ * The role `scripts/db/create-admin.js --build-account` gives JBS Praxis's accounts (BUILD_ACCOUNT.role_code): the
+ * implementation partner's build team, never MyCity's staff, so never in MyCity's payroll (§6.1 rule 6), whatever
+ * pay a record of theirs is given.
+ */
+const BUILD_TEAM_ROLE = "implementation";
+
 /** The leave request a person was granted: approved, or sent for approval and the approval approved. */
 const GRANTED = `(lr.status = 'approved' OR (lr.status = 'submitted' AND wi.state IN ('approved', 'timeout_approved')))`;
 
@@ -35,7 +42,8 @@ const GRANTED = `(lr.status = 'approved' OR (lr.status = 'submitted' AND wi.stat
  * not gone before its first, whatever their employment type and whether they are active or suspended. A
  * person who has left is paid for the days of their last month; an archived record, or one marked left
  * with no date, is never paid. A person with no start date is in the run, so its No Start Date problem
- * names them, never left out without a word (§6.1 rule 2).
+ * names them, never left out without a word (§6.1 rule 2). A person whose login holds the build team's role is never
+ * in a run (§6.1 rule 6): the account is the implementation partner's, not one of MyCity's staff.
  * @param {{query: Function}} db
  * @param {string} first  the month's first day
  * @param {string} last   the month's last day
@@ -54,8 +62,12 @@ async function peopleFor(db, first, last, only = null) {
         AND e.status IN ('active', 'suspended', 'left')
         AND (e.status <> 'left' OR e.left_on IS NOT NULL)
         AND ($3::uuid[] IS NULL OR e.employee_id = ANY($3::uuid[]))
+        AND NOT EXISTS (SELECT 1 FROM app_user u
+                          JOIN user_role ur ON ur.user_id = u.user_id
+                          JOIN role r ON r.role_id = ur.role_id
+                         WHERE u.employee_id = e.employee_id AND r.code = $4)
       ORDER BY e.staff_number, e.employee_id`,
-    [first, last, only],
+    [first, last, only, BUILD_TEAM_ROLE],
     { label: "The people paid in a month", ceiling: MAX_PEOPLE },
   );
   return rows;
@@ -203,4 +215,4 @@ async function yearToDateFor(db, employeeIds, period) {
   return new Map(rows.map((r) => [r.employee_id, { taxable_pay: r.taxable_pay, tax: r.tax }]));
 }
 
-module.exports = { MAX_PEOPLE, peopleFor, payItemsFor, unpaidLeaveFor, unpaidSuspensionsFor, instalmentsFor, yearToDateFor };
+module.exports = { MAX_PEOPLE, BUILD_TEAM_ROLE, peopleFor, payItemsFor, unpaidLeaveFor, unpaidSuspensionsFor, instalmentsFor, yearToDateFor };

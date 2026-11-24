@@ -254,6 +254,8 @@ const STEPS: ConsequenceStep[] = (
 }));
 const stepView = (s: ConsequenceStep): ConsequenceStep => ({ ...s, letter_ready: LETTERS.some((t) => t.key === s.letter_template && t.status === "active") });
 const ordered = () => [...STEPS].sort((a, b) => a.position - b.position);
+/** A rung's place on the ladder, as the query's sanction carries it; null for a rung since removed. */
+const positionOf = (stepId: string | null) => STEPS.find((x) => x.consequence_step_id === stepId)?.position ?? null;
 const renumber = (list: ConsequenceStep[]) => list.forEach((s, i) => ((s.position = i + 1), (s.updated_at = now())));
 
 route("GET /api/v1/sanctions/chain", (req) =>
@@ -362,6 +364,11 @@ const QUERIES: Row[] = [
   Object.assign(mk(9, "yusuf", "Client shoot missed", "emeka", 4, { status: "under_review", response: "I was sent to another shoot that morning." }), {
     details: "The Ikoyi client shoot on Monday started without a videographer.",
   }),
+  // An earlier Warning on Yusuf, raised by Tolu, still in force: Emeka cannot see it, so his Caution
+  // sits below it, and the card marks it Below Next Step for Operations & People (guide §6.5).
+  Object.assign(mk(8, "yusuf", "Camera kit returned damaged", "tolu", 40, { status: "resolved", outcome: "sanctioned", response: "The bag tore on the way back from Ibadan." }), {
+    details: "The camera kit came back from the Ibadan shoot with a cracked lens and no report.",
+  }),
 ];
 
 const SANCTIONS: SanctionDetail[] = [];
@@ -377,16 +384,17 @@ function issue(q: Row, stepName: string, daysAgo: number, fine: string | null): 
     evidence: [], letter_document_id: sid(`sanltr:${q.number}`), fine_letter_document_id: fine ? sid(`sanfine:${q.number}`) : null, workflow_instance_id: null, waiting_on: null,
   };
   SANCTIONS.unshift(s);
-  q.sanction = { sanction_id: s.sanction_id, number: s.number, step_name: s.step_name, status: s.status };
+  q.sanction = { sanction_id: s.sanction_id, number: s.number, step_name: s.step_name, position: positionOf(s.consequence_step_id), status: s.status };
   return s;
 }
 issue(QUERIES[4], "Warning", 14, "12500.00");
 issue(QUERIES[6], "Warning", 20, null);
+issue(QUERIES[8], "Warning", 38, null);
 {
   const q = QUERIES[7];
   const s = issue(q, "Caution", 1, null);
   Object.assign(s, { number: null, status: "pending_approval", reason: "The explanation does not account for the missed shoot.", decided_by: uid("emeka"), decided_by_name: nameOf("emeka"), letter_document_id: null, waiting_on: "Operations & People", workflow_instance_id: sid(`wf:${s.sanction_id}`) });
-  q.sanction = { sanction_id: s.sanction_id, number: null, step_name: s.step_name, status: "pending_approval" };
+  q.sanction = { sanction_id: s.sanction_id, number: null, step_name: s.step_name, position: positionOf(s.consequence_step_id), status: "pending_approval" };
   Object.assign(q, { escalated: true, workflow_instance_id: s.workflow_instance_id });
 }
 
@@ -561,7 +569,7 @@ route("POST /api/v1/queries/:id/decision", (req) => {
   const s = issue(q, step.name, 0, b.fine_amount || null);
   s.evidence = b.evidence ?? [];
   Object.assign(s, { number: null, status: "pending_approval", reason: b.reason.trim(), decided_by: uid(user), decided_by_name: nameOf(user), letter_document_id: null, fine_letter_document_id: null, waiting_on: "Operations & People", workflow_instance_id: sid(`wf:${s.sanction_id}`) });
-  q.sanction = { sanction_id: s.sanction_id, number: null, step_name: s.step_name, status: "pending_approval" };
+  q.sanction = { sanction_id: s.sanction_id, number: null, step_name: s.step_name, position: positionOf(s.consequence_step_id), status: "pending_approval" };
   Object.assign(q, { status: "under_review", escalated: true, workflow_instance_id: s.workflow_instance_id });
   return ok(view(q, user));
 });
@@ -707,7 +715,7 @@ route("GET /api/v1/sanctions/standing", (req) => {
   const held = SANCTIONS.filter((s) => s.employee.employee_id === who && s.status === "issued");
   return ok({
     employee_id: who,
-    in_force: held.map((s) => ({ sanction_id: s.sanction_id, number: s.number!, step_name: s.step_name, position: STEPS.find((x) => x.consequence_step_id === s.consequence_step_id)?.position ?? 1, effective_on: s.effective_on, in_force_until: null })),
+    in_force: held.map((s) => ({ sanction_id: s.sanction_id, number: s.number!, step_name: s.step_name, position: positionOf(s.consequence_step_id) ?? 1, effective_on: s.effective_on, in_force_until: null })),
     next_step: nextStepOf(who),
   });
 });
@@ -754,7 +762,7 @@ route("POST /api/v1/sanctions/:id/approve", (req) => {
     fine_letter_document_id: s!.fine ? sid(`sanfine:${q!.number}`) : null,
     effective_on: s!.effective_on || isoDaysAgo(0),
   });
-  q!.sanction = { sanction_id: s!.sanction_id, number, step_name: s!.step_name, status: "issued" };
+  q!.sanction = { sanction_id: s!.sanction_id, number, step_name: s!.step_name, position: positionOf(s!.consequence_step_id), status: "issued" };
   Object.assign(q!, { status: "resolved", outcome: "sanctioned", escalated: false, reviewed_at: now(), reviewed_by_name: s!.decided_by_name });
   return ok(s!);
 });
@@ -765,7 +773,7 @@ route("POST /api/v1/sanctions/:id/reject", (req) => {
   if (d.refused) return d.refused;
   const { s, q } = d;
   Object.assign(s!, { status: "rejected", waiting_on: null });
-  q!.sanction = { sanction_id: s!.sanction_id, number: null, step_name: s!.step_name, status: "rejected" };
+  q!.sanction = { sanction_id: s!.sanction_id, number: null, step_name: s!.step_name, position: positionOf(s!.consequence_step_id), status: "rejected" };
   Object.assign(q!, { status: "under_review", escalated: false });
   return ok(s!);
 });

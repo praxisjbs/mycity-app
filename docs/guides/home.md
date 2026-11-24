@@ -880,6 +880,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · Nothing on Home changed: New Alert Rule and New Report lost their own unsaved-changes call, since every form now asks before it is discarded (`docs/FRONTEND_GUIDE.md` §8.4; QA audit BG-013).
 - 17/11/2026 · JP · Tests only: the `Me` fixtures of `Team.test.tsx` and `createActions.test.ts` carry `ai_available` (`identity.md`, `ai-control.md` §6.7); Home's screens are unchanged.
 - 17/11/2026 · TB · §6 Alerts: `document_expiry` raises a Document Centre company document under the subject `library_item`, so its alert opens Document Centre · Library on it; an archived company document raises none (`document-centre.md` §6.9, its PR 2). Every other document opens where it did.
 

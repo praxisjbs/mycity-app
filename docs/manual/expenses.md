@@ -37,6 +37,9 @@ My Requests lists every request you raised, newest first, with who it waits on n
    **Add Line** for another item, and the bin beside an item to take it out. For a discount, add a
    line with a minus before its **Unit Price** (-100,000). The **Total** under the lines is what
    the invoice asks to be paid, and must stay above zero.
+   Once a category is picked, **Budget Left** under the items shows what the department has left
+   for that category this year, and **Department Left** what it has left in all. **Over Budget**
+   means the total is more than the category has left. You can still send it; the approvers see it.
 7. Pick the **Payee**: **Staff**, **Vendor**, **Partner** or **Dedicated Task Team (DTT)**.
 8. For yourself, tick **Use My Company Account** to be paid into the bank account on your profile.
    For anyone else, fill in **Payee Name**, **Bank**, **Account Name** and **Account Number**.
@@ -58,7 +61,8 @@ My Requests lists every request you raised, newest first, with who it waits on n
 > ([Attach a document](#praxis-ask-attach)).
 
 > **Tip:** **Over Budget** on a request means it is more than its department has left for that
-> category this year. It is still sent; the approvers see it.
+> category this year. The form shows it before you press **Send Request**. It is still sent; the
+> approvers see it.
 
 ### Follow a request {#expenses-follow}
 

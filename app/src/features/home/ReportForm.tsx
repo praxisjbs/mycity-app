@@ -21,7 +21,6 @@ import {
   useContractForm,
   useDismiss,
   useModal,
-  useUnsavedChanges,
   Wizard,
   type ContractSchema,
   type WizardStep,
@@ -298,7 +297,6 @@ function ReportForm({ report, close }: { report?: HomeReport; close: () => void 
   const sources = offeredSources(me, (module) => can(module));
   const [opened] = useState(() => (report ? reportValues(report, me) : newReportValues(me, sources[0]?.[0] ?? "")));
   const f = useContractForm<ReportValues>(opened, REPORT_RULES);
-  useUnsavedChanges(f.isDirty);
   const create = useMutation("POST /api/v1/home/reports");
   const update = useMutation("PATCH /api/v1/home/reports/:id");
   /* The step to show again when saving finds a problem on an earlier one: the wizard starts over there. */

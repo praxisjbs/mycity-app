@@ -1447,6 +1447,8 @@ route("POST /api/v1/performance/scorecards", (req) => {
     disagreed_at: null,
     score_to_date: null,
     rating: null,
+    weight_scored: null,
+    weight_total: null,
     line_count: 2,
     created_at: now(),
     updated_at: now(),

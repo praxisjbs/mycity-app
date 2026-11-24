@@ -5,7 +5,7 @@ import { ApiError } from "@/api/client";
 import { useApi, useInfinite, usePaged } from "@/api/hooks";
 import { paging } from "@/features/shared/wire";
 import type { PersonRef } from "@/api/types/common";
-import { ComboField, formatMonth, formatNumber, plural, shortMessage, todayIso, Who, type ComboFieldProps, type ContractSchema, type ServerFields } from "@mycity/ui";
+import { ComboField, formatMonth, formatNumber, HelpTerm, plural, shortMessage, todayIso, Who, type ComboFieldProps, type ContractSchema, type ServerFields } from "@mycity/ui";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
@@ -212,6 +212,22 @@ const RATING: Record<string, [string, Tone]> = {
   partly_meets: ["Partly Meets", "warn"],
   below: ["Below", "err"],
 };
+
+/** What Coverage means, behind its help term (§10.1): support text, never open on the screen. */
+export const COVERAGE_HELP = "How much of the scorecard's weight had a score. Unscored and Not Assessable lines are left out of the score and the rating.";
+
+/**
+ * The weight a score to date rests on, as people read it: "32.5 of 100 scored" (§6.9; BG-012), or
+ * null before a review has closed and written it.
+ */
+export const coverageText = (c: { weight_scored: string | null; weight_total: string | null } | null | undefined) =>
+  !c || c.weight_scored === null || c.weight_total === null ? null : `${c.weight_scored} of ${c.weight_total} scored`;
+
+/** Coverage beside Score to Date and Rating, its meaning behind a help term; the empty marker when there is none. */
+export function Coverage({ of }: { of: { weight_scored: string | null; weight_total: string | null } | null | undefined }) {
+  const text = coverageText(of);
+  return text ? <HelpTerm help={COVERAGE_HELP}>{text}</HelpTerm> : <>–</>;
+}
 
 /** A rating as a pill; null before the first review closes. */
 export const rating = (r: string | null | undefined) => {

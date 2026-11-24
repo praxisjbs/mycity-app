@@ -176,6 +176,8 @@ scheduler and run history read; and, for Activity Today, `event_log (occurred_at
 when the date changes · `1160` `employee_effective_manager`, a view: the person each employee
 answers to, their line manager or, under a vacant seat, the first person above the seat, read by
 approvals, team scope and the notifications that follow it (`docs/guides/organogram.md` §4, §6) ·
+`1161` the same view skips a manager who is not active (left, archived or suspended) and climbs to
+the next active one above, as for a vacant seat (QA audit BG-005) ·
 `1199` Home
 reference data: the
 capabilities `home.team`, `home.reports` and `alerts.manage` with their role grants (and
@@ -248,6 +250,9 @@ everyone on a temporary site) · `1460` `attendance_check_in` (one row per check
 append-only: its point, accuracy, matched address, distance, verdict, evidence and policy version,
 unique per person and Idempotency-Key), `attendance_exception.attendance_check_in_id` (a flag a
 check-in opened), and `1300`'s day index narrowed to exceptions of neither a punch nor a check-in ·
+`1465` one unregistered-device exception per person, device and work date (attendance.md §6.6):
+`attendance_exception.attendance_device_id` with a unique index on the day and device while open, and
+`attendance_exception_punch` (the later punches from the device attached to it, decided with it) ·
 `1470` the `temporary_site` numbering scheme and version 1 of the `attendance.temporary_site`
 approval (Operations & People, 48 hours) · `1475` a temporary site's hours: `hours` (`usual`, `site`),
 `starts_at` and `ends_at` on `attendance_temporary_site`, both for Site Hours with the end after the
@@ -338,6 +343,9 @@ Withdrawn (`withdrawn_at`, `withdrawn_reason`; the status `withdrawn`, `NOT VALI
 `rejected`, the instance, who asked, the decision and its reason; one pending request per plan) and the
 plan's two states `unbound` and `revising` on the `performance_plan` status check (`docs/guides/performance.md`
 §6.22, JBS Praxis, 27/10/2026) · `2321` seed: the flow `performance.plan_change`, the CEO alone ·
+`2330` a score to date's coverage on `performance_review` and `scorecard` (`weight_scored` of
+`weight_total`, `numeric(7,2)`, written at close; reviews closed before it filled from their lines)
+(BG-012, `docs/guides/performance.md` §6.9, JBS Praxis, 24/11/2026) ·
 `2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
 missed commitment's Recovery task (Performance PR 4) · `2500` projects get a screen: `project.created_by`,
 its status CHECK (`active`, `completed`) and indexes · `2510` Why Late's reasons (`task_late_reason`,
@@ -504,6 +512,7 @@ as that section says (08/11/2026, amended by its Change log):
 | `6030_leave_unpaid.sql` | `leave_type.unpaid` | `boolean NOT NULL DEFAULT false` |
 | `6040_statutory_sources.sql` | `statutory_rate.source_title`, `source_section`, `source_url`, `source_document_id` (`document`, `ON DELETE SET NULL`, indexed), `source_checked_on`, `no_legal_source` (`NOT NULL DEFAULT false`), `no_source_reason`; `statutory_rate_source_check` | Built in PR 10 (11/11/2026). Every statutory version carries its legal source (title, section and the day checked; a link and the instrument in the vault, a `statutory_source` document, when there are any) or `no_legal_source` with a reason, and the CHECK holds a row to exactly one (TB, 11/11/2026; `docs/guides/payroll.md` §4.2, §6.16). Rows saved before it are marked No Legal Source, "Entered before sources were required", in its UP. `payroll_setting.paye_basis` left the screen (every deduction is monthly); unset, a run read it as annualised until PR 11, which computes PAYE cumulatively and reads it no more |
 | `6050_statutory_law.sql` | `employee_rent_declaration`, `employee_pay_to_date`; `payslip.taxable_pay`; `employee.nhf_contributes` (`NOT NULL DEFAULT false`), `employee.state_of_residence` (indexed); the checks of `statutory_rate` (items `rent_relief` and `minimum_wage`, the base `rent`, the flat-amount items) and `payslip_line.code` (`paye_refund`) widened | Built in PR 11 (12/11/2026), off by default; nothing seeded. A rent declaration is one a person a tax year (unique on `employee_id`, `year`), its months in order, at least one landlord identifier, its evidence a `rent_evidence` document (`ON DELETE SET NULL`) and its address a place (`docs/guides/addresses.md` §6.9); a Pay to Date (Prior Pay) is one a person a year, with a `leaving_certificate` when there is one. `payslip.taxable_pay` is the month's taxable pay an advanced payslip kept, never negative, which the next month's cumulative PAYE reads. The retired `relief` stays in the item check so its old rows remain valid; `payroll_setting`'s conventions and `paye_basis` stay as columns, unread (a merged migration is never edited; `docs/guides/payroll.md` §4.2). Its DOWN drops the two tables and the two columns and narrows the checks back, deleting the rows they would refuse (marked DESTRUCTIVE) |
+| `6060_build_account_no_pay.sql` | No schema: clears `gross_monthly`, `bank_name` and `account_number` on the employee whose login holds the `implementation` role (the build account `create-admin --build-account` makes) | Built 24/11/2026 (QA BG-003, JBS Praxis): the build account is never in a payroll run (`docs/guides/payroll.md` §6.1 rule 6), which the run also holds by rule. Found by the role, never by name; a database with no such login is unchanged. Its DOWN puts nothing back (the figures were never MyCity's pay) and changes no schema |
 | `seeds/reference/6099_seed_payroll.sql` | Reference data only (A26) | The `payroll.run` approval (version 1, the CEO, 72 hours, context `{ net_total: "money" }`), the `payroll.configure` capability held by Operations & People and the Implementation Team, and the Unpaid leave type flagged unpaid. No setting row, rate, band, grade, run or pay day |
 
 Every table has its own `<table>_set_updated_at` trigger, an index on every foreign key and an `ON DELETE`

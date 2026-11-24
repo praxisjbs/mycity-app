@@ -400,6 +400,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
     // Settled once the day's exceptions are open: Location Flags counts them (§6.16). A refused punch
     // changes nothing on the day, but opens its exception there, so People see every refusal (§6.7).
     const opened = [];
+    const attached = [];
     const r = await reconcile.recomputeDay(client, person, workDate, { settle: false, keep: reasons.length > 0 });
     const dayId = r.day ? r.day.attendance_day_id : null;
     for (const type of reasons) {
@@ -417,14 +418,25 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
                 accuracy_m: body.accuracy_m,
                 event_type: body.event_type,
               };
+      // An unregistered device opens one exception a day (§6.6): a later punch from it attaches to
+      // the one still open, so People decide the day's punches from that device together.
+      const byDevice = type === "unknown_device" && device ? device.attendance_device_id : null;
       const x = await repo.insertException(client, {
         attendance_day_id: dayId,
         attendance_event_id: row.attendance_event_id,
+        attendance_device_id: byDevice,
         exception_type: type,
         severity: SEVERITY[type],
         evidence: result === "rejected" ? { ...evidence, refused: true } : evidence,
       });
       if (x) opened.push(x);
+      else if (byDevice) {
+        const held = await repo.openDeviceException(client, dayId, byDevice);
+        if (held) {
+          await repo.attachPunch(client, held.attendance_exception_id, row.attendance_event_id);
+          attached.push(held.attendance_exception_id);
+        }
+      }
     }
     await reconcile.settle(client, person, r);
 
@@ -455,6 +467,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         work_date: workDate,
         reasons,
         device: device ? { attendance_device_id: device.attendance_device_id, first_seen: device.first_seen } : null,
+        ...(attached.length > 0 && { attached_to: attached }),
       },
       payload: facts,
     });

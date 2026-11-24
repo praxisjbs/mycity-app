@@ -1,0 +1,112 @@
+=== F01 | Payroll | Configuration / compliance | Critical | Statutory payroll items are not configured
+OBSERVED: PAYE has a single band of ₦0 to ₦200 at 10%, marked 'No Legal Source'. Employee and employer pension, NHF, ITF, NSITF, rent relief and minimum wage are all 'Not Set'. Round 4: this is setup not done, not a missing capability. Payroll → Configurations holds each statutory item with a figure, base, legal source and status, and its help text says items are entered only once they apply ('pension from three employees, ITF from 25. No PAYE at or below the minimum wage') and that later runs compute them from the item's date while locked runs never change. Each employee record has a 'Contributes to NHF' switch, NHF number, pension administrator, state of residence and a yearly rent-relief declaration. There is no per-employee switch to exempt someone from pension or PAYE. The Management role can only view Payroll, so the items could not be entered in this audit.
+RECOMMENDED: Load the current statutory PAYE bands, pension, NHF, NSITF and ITF rates from their official sources, with the source recorded on each item. Block computing a run while any mandatory item is 'Not Set'. Have Operations & People enter the 2026 items now: PAYE bands under the Nigeria Tax Act 2025 (first ₦800,000 at 0%, then 15%, 18%, 21%, 23%, 25% above ₦50M), pension 8% employee and 10% employer, NHF 2.5% of basic, NSITF 1%, ITF 1%, rent relief 20% capped at ₦500,000, minimum wage ₦70,000. Ask the vendor for a per-employee pension/PAYE exemption with a reason and evidence.
+WHERE: /payroll?tab=configurations
+AUDITOR VERDICT: Confirmed (configuration capability checked; entry needs Operations & People) / Config / product gap
+EVIDENCE: Setup not done. The capability exists (dated items with legal source; per-employee NHF and rent relief). Missing: per-employee pension or PAYE exemption. Entry needs an Operations & People login.
+
+=== F02 | Payroll | Bug / calculation | Critical | November payroll run computes with zero deductions and 20 blocking issues
+OBSERVED: PAY-2026-11 shows 'Computed' for 21 staff: gross ₦1,850,000, deductions ₦0, net ₦1,850,000. Only 1 of 21 payslips has a salary; the other 20 are ₦0. PAYE is 'In Force' but nothing was deducted, and the pending ₦5,000 fine and the active ₦150,000 advance are not applied. The run reports '20 blocking, 21 warnings' but can still move to the next stage. Round 3: the run's problem list explains part of it: the ₦5,000 fine 'waits for payroll' until someone accepts, spreads or waives it. The ₦150,000 advance belongs to an employee with no salary, so it cannot be recovered, and the run does not warn. Employee 00039 (joined 16/11) is not in the computed run and nothing flags the missing joiner.
+RECOMMENDED: Make blocking issues actually block the run (it should stay in Draft). Apply PAYE, fines and advance recoveries during computation, not later. Load salaries for every employee before the first live run. Warn when an active employee is missing from a computed run and when a deduction cannot be recovered.
+WHERE: /payroll?tab=payroll-runs
+AUDITOR VERDICT: Confirmed (deduction timing to verify with vendor) / Config / product gap
+EVIDENCE: Run computed before this round; not recomputed to avoid altering the November run.
+
+=== F11 | Payroll | Configuration / control | High | Payroll allows staff without bank details
+OBSERVED: 'Bank Details Required' is Off. The test profile lists a bank but no account number, and a run can still include such staff. Round 3: in the November run's problem list, 'No Bank Details' is only a Warning (4 staff), while 'No Salary Set' is Blocking (20).
+RECOMMENDED: Turn on Bank Details Required and block approval of a run that includes an employee without verified payout details.
+WHERE: /payroll?tab=configurations
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: QA-AUDIT Employee (00039) created with no bank, no account number and ₦5,000 gross.
+
+=== F58 | People | Validation | High | New employee record accepts invalid personal, pay and statutory data
+OBSERVED: QA-AUDIT Employee (00039) was created with date of birth 01/01/2020 (age 6), gross pay ₦5,000 a month (no minimum-wage check), tax ID 'abc', pension PIN '123', and no line manager, bank or account. Future birth dates and probation or contract dates before the start date are correctly blocked.
+RECOMMENDED: Add a minimum age, a minimum-wage floor once that statutory item is set, format checks for tax ID and pension PIN, and require line manager and bank details before the employee joins a payroll run.
+WHERE: /people → Add Employee
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+
+=== F76 | People / Payroll | Control gap | High | Salary changes need no approval and leave no before-and-after record
+OBSERVED: As Management (Payroll is View-only for this role) the QA employee's gross monthly pay was changed from ₦5,000 to ₦350,000 in Edit Record and saved at once. There is no approval step and no effective date. History says only 'Record changed: … Gross Monthly …' with no old or new value, and dates the change 16/11/2026 although it was made at 00:45 on 17/11 Lagos time.
+RECOMMENDED: Route pay changes through an approval flow with an effective date, record old and new values in history, show times in Africa/Lagos, and restrict pay edits to Payroll owners.
+WHERE: /people?tab=employees → 00039 → Edit Record, History
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F75 | Settings / Security | Security / offboarding | High | A leaver still holds full Payroll and Settings rights
+OBSERVED: Settings → Roles & Permissions → Operations & People lists Cynthia Osakunih with status 'Left'. The role has Full access to Payroll, Settings, People and Expenses and approves expenses, leave, sanctions and reviews. The role header says '2 people' while the list shows 3, including 'JBS test' on an external Gmail address.
+RECOMMENDED: Remove roles automatically when an employee leaves, and make the role count match its member list. Move vendor test accounts out of production roles before go-live.
+WHERE: /settings?tab=roles-and-permissions
+AUDITOR VERDICT: Confirmed / Config / product gap
+EVIDENCE: Role membership not cleaned when the employee left.
+
+=== F10 | Settings / Security | Security | High | Two-step sign-in is off for everyone, including admins and payroll
+OBSERVED: Two-step is on for 0 of 22 users, including System Administrator, Management and Operations & People, all of whom can see payroll and bank data. There were 9 failed sign-ins in 7 days, and several logins use personal Gmail addresses.
+RECOMMENDED: Make two-step sign-in mandatory for System Administrator, Management, Operations & People and Implementation roles before go-live, and require work email addresses for staff logins.
+WHERE: /settings?tab=security
+AUDITOR VERDICT: Confirmed / Config / product gap
+EVIDENCE: Security setting, not data.
+
+=== F13 | People / Approvals | Control gap | High | Approvals route to vacant seats and to the requester themself
+OBSERVED: Several staff report to the vacant seat 'Head, Strategy, Partnerships & Growth'. A pending leave request from JBS Praxis Team is 'Waiting On: JBS Praxis Team'. The CEO is listed as reviewer of their own review. Round 4: OFF-0001 shows Head of Department approval and CEO approval both given by Ifeoma Mbonu, so the two-step offer approval collapsed to one person.
+RECOMMENDED: Block self-approval, and fall back to the next level when an approver seat is vacant. Show a 'needs fixing' warning in Settings → Approvals (it currently says 'Needs Fixing 0').
+WHERE: /people?tab=leave, /people?tab=organogram, /performance?tab=reviews
+AUDITOR VERDICT: Confirmed / Not testable (role)
+EVIDENCE: Normal case works: new leave request went to the line manager ('Sent to Ifeoma Mbonu'). Vacant-seat and self-approval cases could not be created with this role. See F57 for the expense route.
+
+=== F78 | Settings / Approvals | Control gap | Medium | Approval chains for money are thin
+OBSERVED: Settings → Approvals: Payroll Run needs only the CEO, with no Operations & People or finance check before it. Expense Request goes Line Manager → Operations & People with no amount threshold that brings in the CEO. Requisition is CEO only. Nothing stops one person filling two levels of a chain (see F13).
+RECOMMENDED: Add an amount threshold to expenses, a preparer-and-checker step before the CEO on payroll, and a rule that each level must be a different person.
+WHERE: /settings?tab=approvals
+AUDITOR VERDICT: Confirmed / Config / product gap
+EVIDENCE: Approval flows as configured in Settings → Approvals.
+
+=== F30 | People | Data consistency | Low | Status contradictions in seed records (new records consistent)
+OBSERVED: My profile says 'On Probation' while the Employees list says 'Active' for the same person. A leave request shows 'Withdrawn' in the Approver column and 'Cancelled' as its status. Round 3: a newly cancelled leave request (01/12 to 05/12) again shows 'Withdrawn' in the Approver column and 'Cancelled' as status.
+RECOMMENDED: Use one employment-status field everywhere. Show the withdrawn state once, in one column.
+WHERE: /ess?tab=my-profile, /people?tab=employees, /ess?tab=my-leave
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Employee status consistent on a new record; the leave 'Withdrawn / Cancelled' double label reproduces.
+
+=== F35 | Settings / Users | Adoption | Medium | Most staff have never signed in
+OBSERVED: 13 of 23 users are 'Invited' with the invite 'Not Sent', and their Last Seen is 'Never'. Only 2 of 22 staff acknowledged the latest announcement.
+RECOMMENDED: Send invites in waves with a go-live checklist, and track activation per department.
+WHERE: /settings?tab=users
+AUDITOR VERDICT: Confirmed / Seed data only
+EVIDENCE: None
+
+=== F37 | People / Organogram | Data | Low | Organogram has an extra vacant CEO seat
+OBSERVED: A vacant 'CEO' seat sits above the actual CEO, and the page warns '2 people and roles sit at the top'.
+RECOMMENDED: Remove the duplicate seat.
+WHERE: /people?tab=organogram
+AUDITOR VERDICT: Confirmed / Seed data only
+EVIDENCE: None
+
+=== F38 | People / Departments | Data | Low | Departments overlap and their codes are inconsistent
+OBSERVED: 'Marketing' and 'Branding & Marketing' both exist. Codes mix styles (BM, PG and TBO next to IMPLEMENTATION and MARKETING), Technology & Back-office Ops shows the avatar 'TO' while its code is TBO, and Branding & Marketing has no head.
+RECOMMENDED: Merge or rename the departments, standardise the codes and set the heads.
+WHERE: /people?tab=departments
+AUDITOR VERDICT: Confirmed / Seed data only
+EVIDENCE: None
+
+=== F44 | Master data | Copy | Low | Typos in master data
+OBSERVED: 'Markerting' appears in 3 job titles, 'Infrastructuaral' in an expense category and '#2bn' in a goal (meant as ₦2bn).
+RECOMMENDED: Correct them before the production import.
+WHERE: People, Expenses categories, Goals
+AUDITOR VERDICT: Confirmed / Seed data only
+EVIDENCE: None
+
+=== F39 | Platform | UI | Low | Wrong avatar initials for multi-word names
+OBSERVED: 'JBS Praxis Team' shows the initials 'JT' in queries, payroll and projects.
+RECOMMENDED: Take the first letters of the first two words ('JP'), or use a logo for organisation accounts.
+WHERE: /queries, /payroll?tab=payslips
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F69 | Settings / Audit | Clarity | Low | Audit log mixes record numbers and raw IDs
+OBSERVED: Some entries name the record (DEAL-2026-0016, LED-0011, AGR-2026-0004); others show internal IDs (Partner deal · aeb9ac4f, Partner · dfe5907e).
+RECOMMENDED: Always show the record number and name, with a link.
+WHERE: /settings?tab=audit-log
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+

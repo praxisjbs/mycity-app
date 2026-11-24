@@ -93,6 +93,39 @@ describe("Queries & Sanctions · approving a sanction", () => {
   }, 30000);
 });
 
+describe("Queries & Sanctions · the person's standing on the card (BG-014)", () => {
+  // Yusuf holds a Warning from QRY-0008, raised by Tolu; Emeka cannot see it and proposed a Caution on QRY-0009.
+  it("shows Operations & People the sanctions in force and the next step, and marks a proposal below it", async () => {
+    await signedInAs("cynthia@mycityapp.io", "queries", YUSUF);
+    expect(await screen.findByText("QRY-0009 · Yusuf Musa")).toBeTruthy();
+    expect(await screen.findByText("In Force", {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.getByText(/^Warning, SAN-\d{4}/)).toBeTruthy();
+    expect(screen.getByText("Next Step")).toBeTruthy();
+    expect(screen.getByText("Second Warning")).toBeTruthy();
+    expect(screen.getByText("Below Next Step")).toBeTruthy();
+    // Shown and marked only: Approve Sanction is still there to press.
+    expect(screen.getByRole("button", { name: "Approve Sanction" })).toBeTruthy();
+    expect(await axe(document.body)).toHaveNoViolations();
+  }, 30000);
+
+  it("shows the proposer neither the standing nor the mark", async () => {
+    await signedInAs("emeka@mycityapp.io", "queries", YUSUF);
+    expect(await screen.findByText("QRY-0009 · Yusuf Musa")).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByText("In Force")).toBeNull();
+    expect(screen.queryByText("Below Next Step")).toBeNull();
+  }, 30000);
+
+  it("marks nothing where the proposal is the next step", async () => {
+    // Tobi's QRY-0013 holds no sanction: the card shows the standing, None in force and Caution next.
+    await signedInAs("cynthia@mycityapp.io", "queries", sid("qry:13"));
+    expect(await screen.findByText("In Force", {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.getByText("None")).toBeTruthy();
+    expect(screen.getByText("Caution")).toBeTruthy();
+    expect(screen.queryByText("Below Next Step")).toBeNull();
+  }, 30000);
+});
+
 describe("Queries & Sanctions · Rules", () => {
   it("opens a rule for Edit Rule; the form counts no lateness and has no Measure", async () => {
     await signedInAs("cynthia@mycityapp.io", "rules");

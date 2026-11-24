@@ -30,6 +30,11 @@ export interface ToastOptions {
 
 type Kind = "success" | "error" | "info";
 
+let errorsShown = 0;
+
+/** How many error toasts have shown so far: a form's save that raised one was refused (useContractForm). */
+export const errorToastCount = (): number => errorsShown;
+
 /** Shows one toast and returns its id. */
 export type ShowToast = (text: string, options?: ToastOptions) => string | number;
 
@@ -59,7 +64,10 @@ function show(kind: Kind, text: string, o: ToastOptions = {}): string | number {
 
 export const toast: ToastApi = Object.assign((text: string, options?: ToastOptions) => show("success", text, options), {
   success: (text: string, options?: ToastOptions) => show("success", text, options),
-  error: (text: string, options?: ToastOptions) => show("error", text, options),
+  error: (text: string, options?: ToastOptions) => {
+    errorsShown += 1;
+    return show("error", text, options);
+  },
   info: (text: string, options?: ToastOptions) => show("info", text, options),
   dismiss: (id?: string | number) => {
     sonner.dismiss(id);

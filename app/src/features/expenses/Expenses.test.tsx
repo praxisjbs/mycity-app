@@ -248,3 +248,47 @@ describe("New Request · a line that takes money off (TB, 13/11/2026)", () => {
     expect(within(form).getByText(/^Total/).textContent).toMatch(/149,999\.50/);
   }, 40000);
 });
+
+describe("New Request · the budget before Send Request (BG-007)", () => {
+  it("shows Budget Left and Department Left once a category is picked, and Over Budget once the total passes the line, never blocking", async () => {
+    // Chidera is in Content, whose Travel and Transport line is ₦450,000.00 with ₦192,000.00 committed in the mock.
+    await as("chidera@mycityapp.io", <MyRequestsPage />, "My Requests");
+    fireEvent.click(screen.getAllByRole("button", { name: "New Request" })[0]);
+    const form = await screen.findByRole("dialog", { name: "New Request" }, { timeout: 5000 });
+    // Nothing to show before a category.
+    expect(within(form).queryByText("Budget Left")).toBeNull();
+    fireEvent.click(within(form).getByRole("button", { name: "Pick Category" }));
+    const pop = await screen.findByRole("dialog", { name: "Pick Category" }, { timeout: 5000 });
+    fireEvent.click(await within(pop).findByRole("option", { name: /Travel and Transport/ }, { timeout: 5000 }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Pick Category" })).toBeNull(), { timeout: 3000 });
+    await within(form).findByText("Budget Left", {}, { timeout: 5000 });
+    expect(await within(form).findByText(/258,000\.00/, {}, { timeout: 5000 })).toBeTruthy();
+    expect(within(form).getByText("Department Left")).toBeTruthy();
+    expect(within(form).queryByText("Over Budget")).toBeNull();
+
+    // A total within the line: no flag.
+    const price = within(form).getAllByRole("textbox", { name: "Unit Price" })[0];
+    fireEvent.change(price, { target: { value: "100,000" } });
+    await new Promise((r) => setTimeout(r, 700));
+    expect(within(form).queryByText("Over Budget")).toBeNull();
+    // Past what the line has left: flagged, and Send Request is still there to press.
+    fireEvent.change(price, { target: { value: "300,000" } });
+    expect(await within(form).findByText("Over Budget", {}, { timeout: 5000 })).toBeTruthy();
+    expect(within(form).getByRole("button", { name: "Send Request" })).toBeTruthy();
+  }, 40000);
+
+  it("a category the department has no line for reads No Budget Line, and any total is Over Budget", async () => {
+    await as("chidera@mycityapp.io", <MyRequestsPage />, "My Requests");
+    fireEvent.click(screen.getAllByRole("button", { name: "New Request" })[0]);
+    const form = await screen.findByRole("dialog", { name: "New Request" }, { timeout: 5000 });
+    fireEvent.click(within(form).getByRole("button", { name: "Pick Category" }));
+    const pop = await screen.findByRole("dialog", { name: "Pick Category" }, { timeout: 5000 });
+    fireEvent.click(within(pop).getByRole("radio", { name: "Capital" }));
+    const option = await within(pop).findAllByRole("option", {}, { timeout: 5000 });
+    fireEvent.click(option[0]);
+    expect(await within(form).findByText("No budget line", {}, { timeout: 5000 })).toBeTruthy();
+    expect(within(form).queryByText("Over Budget")).toBeNull();
+    fireEvent.change(within(form).getAllByRole("textbox", { name: "Unit Price" })[0], { target: { value: "5,000" } });
+    expect(await within(form).findByText("Over Budget", {}, { timeout: 5000 })).toBeTruthy();
+  }, 40000);
+});

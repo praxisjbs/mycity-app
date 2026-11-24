@@ -724,7 +724,8 @@ An offer goes through these, in order:
    when the offer was made. While it is with the candidate, **Expires** gives its last day; once
    that day has passed unsigned, **Expired On**.
 7. **Monthly Pay** lists each pay line, the **Monthly Total** and the year's pay. **Vacancy Range**
-   is the role's monthly range. A total outside it shows **Outside Range**, with the reason.
+   is the role's monthly range. A total outside it shows **Outside Range**, with the reason. An
+   intern's offer with no basic salary shows **No Basic Salary**, with **Why No Basic Salary**.
 8. **Approval**, under the pay on a computer, shows each stage and who approved or rejected it, with any reason.
 9. **Signers**, under the offer's details on a computer, shows who signs for MyCity and the candidate, and whether each has signed.
 10. **History** lists when it was made, submitted, approved, signed, sent and how it ended.
@@ -742,10 +743,13 @@ Only a candidate at **Shortlist** can get an offer, and only one open offer at a
 3. Pick the **Candidate**. The form fills in from their vacancy: the **Job Title**, the
    **Department**, who they report to, the work pattern and the job description.
 4. Change anything that differs for this offer, then press **Next**.
-5. Under **Pay Lines**, type each line's name and its **Monthly Amount**. Press **Add Pay Line** for
-   another, such as an allowance. The **Monthly Total** adds them up.
+5. Under **Pay Lines**, type each line's name and its **Monthly Amount**. The first line is the
+   basic salary: it is empty when the vacancy has no pay range, and it must be more than ₦0 (the line
+   says *Enter an amount* until it is). Press **Add Pay Line** for another, such as an allowance; an
+   allowance can be ₦0, never less. The **Monthly Total** adds them up.
 6. If the total is outside the vacancy's range, type **Why Outside the Range**. The approvers read
-   it. Press **Next**.
+   it. For an **Intern**, the basic salary can be ₦0: type **Why No Basic Salary**, which the
+   approvers read too. Press **Next**.
 7. Pick the **Start Date**. **Days to Sign** is how long the candidate has once it is sent, 15 unless
    you change it. Fill in the rest that applies, then press **Next**.
 8. Type any **Additional Terms** for this offer alone. **Schedule A** is the job description printed
@@ -762,8 +766,10 @@ To change a draft, press **Edit Offer**, change it and press **Save Offer**.
 1. Open the draft on [Recruitment · Offers](/recruitment?tab=offers).
 2. Press **Submit for Approval**. It shows as **With Approval**.
 
-It needs a **Department** and a **Start Date**, and an Offer Signatory named in
-[Offer settings](#recruitment-offers-settings). The Head of Department approves first, then the CEO.
+It needs a **Department**, a **Start Date** that has not passed and a basic salary above ₦0 (or an
+intern's reason), and an Offer Signatory named in [Offer settings](#recruitment-offers-settings). If
+the start date has passed, the line under the buttons says so: press **Edit Offer**, pick a later
+**Start Date** and press **Save Offer**. The Head of Department approves first, then the CEO.
 If one rejects it, it comes back as **Draft** with their reason under **Approval**.
 
 ### Approve or reject an offer {#recruitment-offers-approve}
@@ -771,7 +777,8 @@ If one rejects it, it comes back as **Draft** with their reason under **Approval
 You approve an offer only when it waits for you. The bell tells you when it does.
 
 1. Open the offer on [Recruitment · Offers](/recruitment?tab=offers).
-2. Read the pay and the reason if it is outside the range. Press **View Letter** to read the letter.
+2. Read the pay, and the reason if it is outside the range or if an intern's offer has no basic
+   salary. Press **View Letter** to read the letter.
 3. Press **Approve Offer**. Or press **Reject Offer**, type the **Reason** and press **Reject Offer**.
 
 When the CEO approves, the letter is made with the standard wording then in force, and the Offer
@@ -806,6 +813,10 @@ decline, or it expires, their card goes back to **Shortlist** and you can make a
 
 An offer cannot be sent to someone already on MyCity's staff: a move inside MyCity goes through People.
 
+If the start date has passed by the time the offer is signed, **Send Offer** says so on the line under
+the buttons and nothing is sent. An approved offer cannot change, so
+[withdraw it](#recruitment-offers-withdraw) and make a new one with a later start date.
+
 ### When the email does not arrive {#recruitment-offers-email needs="recruitment edit"}
 
 If the mail server refuses the candidate's address, the offer says so in red at the top, with the
@@ -838,7 +849,11 @@ or the CEO. An accepted offer cannot be withdrawn.
 2. Press **Offer Signatory**, pick who **Signs for the Company** and press **Save Signatory**. They
    need a login to sign.
 3. Press **Standard Offer Letter** to change the letter's wording. It is Markdown; the names in
-   braces under it, such as `{{ job_title }}`, are filled from each offer.
+   braces under it, such as `{{ job_title }}`, are filled from each offer. The letter words each
+   employment type apart: text between `{{#if is_contractor}}` and the next `{{else}}` is for a
+   contractor, and `is_consultant`, `is_intern` and `is_employee` (full time or part time) work the
+   same way. The contractor, consultant and intern wording is a draft for Operations & People to
+   check and change.
 4. Press **Save Letter**. Offers approved from now on use it; those already approved keep theirs.
 5. **Restore Default** puts MyCity's own wording back. Yours stays in the history.
 

@@ -156,6 +156,15 @@ const PROBLEM_WORDS = Object.freeze({
     message: (n) => `${n.n} ${n.n === 1 ? "fine waits" : "fines wait"} for payroll for ${n.name}`,
     action: "Accept, spread or waive it on Deductions",
   },
+  // Left out or no pay with an instalment due (§6.6 rule 10): on approval it moves to their next paid month.
+  ADVANCE_NOT_TAKEN: {
+    message: (n) => `${n.n === 1 ? "Salary Advance Repayment" : `${n.n} Salary Advance Repayments`} not taken for ${n.name}`,
+    action: "Include them, or it moves to their next paid month",
+  },
+  FINE_NOT_TAKEN: {
+    message: (n) => `${n.n === 1 ? "Fine instalment" : `${n.n} fine instalments`} not taken for ${n.name}`,
+    action: "Include them, or it moves to their next paid month",
+  },
 });
 
 /** GET /payroll/runs/:id/problems: blocking first, then the warnings. */

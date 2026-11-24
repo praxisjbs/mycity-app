@@ -1,0 +1,91 @@
+=== F71 | Recruitment | Process control | High | Candidates can reach an offer without passing any stage
+OBSERVED: QA-AUDIT Candidate (APP-0013) was scored 0 by AI screening ('one year of experience falls short of the two years required'). Within three minutes the candidate moved to Assessment, to Interview while the assessment was still only 'Sent', to Shortlist before the interview (20/11) had taken place, and then to Make Offer. No step warned. From Applied, the menu also offers 'Move to Shortlist' directly.
+RECOMMENDED: Gate each stage: block or require a reason to move on with a failed screening, an unfinished assessment or an interview with no submitted card. Remove direct jumps from Applied to Shortlist.
+WHERE: /recruitment?tab=candidates → APP-0013
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F72 | Recruitment | Validation | High | Offers can be made and sent for approval at ₦0 pay
+OBSERVED: OFF-0003 was drafted with Basic Salary ₦0.00 (Monthly Total ₦0.00, Annual ₦0.00) and submitted for approval without a warning. The generated letter states 'Total monthly compensation · ₦0.00'. The Content Producer vacancy has no pay range, so nothing checks the figure; OFF-0001 shows that a range check exists when a vacancy has one.
+RECOMMENDED: Require pay above the minimum wage on every offer, require a pay range on every vacancy, and flag offers outside the range for the approver.
+WHERE: /recruitment?tab=offers → OFF-0003
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F73 | Recruitment | Content / compliance | Medium | Offer letter ignores the employment type and the company's working week
+OBSERVED: OFF-0003 is for a Contractor, but the letter uses employee terms: 'You are employed as', a 6-month probation, 20 days' annual leave, PAYE and pension deductions, an NYSC certificate and a full-time exclusivity clause. It also states 'Monday to Friday, 9:00 a.m. to 5:00 p.m.' while Settings → Working Week includes Saturday 09:00 to 15:00.
+RECOMMENDED: Use a separate letter template per employment type (contractor, consultant, intern), and fill working hours from the employee's work schedule.
+WHERE: OFF-0003 → View Letter
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F74 | Recruitment | Bug (to verify) | Medium | Public document check says a genuine offer does not exist
+OBSERVED: On go.staging.mycityapp.io/verify, OFF-0001 (approved, signed for the company by the CEO on 15/11 and sent to the candidate) returns 'Not Found. No document has this reference.' OFF-0002 and AGR-2026-0004 return the same. The page asks for exactly this format ('for example OFF-0018').
+RECOMMENDED: Confirm when a document becomes verifiable. If only after the candidate signs, say 'Issued, awaiting signature' instead of 'Not Found', which makes a real letter look forged.
+WHERE: go.staging.mycityapp.io/verify
+AUDITOR VERDICT: Confirmed (rule to verify with vendor) / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F80 | Recruitment | UX / bug (to verify) | Low | Interview scorecard is generic, and an early card submit silently does nothing
+OBSERVED: Every role uses the same ten criteria, including 'Experience in Sales and Marketing' and 'Appearance and Grooming' for a Content Producer. Submitting a complete card (10 ratings, Select, comment) three days before the interview and confirming 'Your card locks once it is submitted' only saved a draft: submitted_at stayed empty and no message explained why.
+RECOMMENDED: Let each vacancy set its own criteria. If cards cannot be submitted before the interview, disable Submit Card and say so.
+WHERE: /recruitment?tab=interviews → QA-AUDIT Candidate → My Card
+AUDITOR VERDICT: Confirmed (rule to verify) / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F81 | Recruitment | UX / accuracy | Low | Applicant scores and application form mislead
+OBSERVED: Before screening, APP-0013 showed a provisional score of 58 from 'Form only' for an applicant who does not meet the minimum experience; 'Score With AI' returned 200 but changed nothing; the real AI screening ran only on Move to Screening and gave 0. The application link expires in 2 days although the vacancy closes 06/12. Step 2 promises 'a few questions' but shows none. The CV field says 'PDF or Word' and accepts .doc, but the error says 'Accepted: PDF, DOCX'.
+RECOMMENDED: Hide provisional scores until screening runs, make Score With AI run the screening, align link expiry with the closing date, and make the file-type text consistent.
+WHERE: go.staging.mycityapp.io/jobs/content-producer-lagos; /recruitment?tab=candidates
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F32 | Recruitment | Validation | Medium | Offer dates aren't checked against each other
+OBSERVED: OFF-0001 has a start date of 17/11/2026, before its 22/11/2026 expiry, and the same candidate has another interview scheduled on 17/11 at 10:00. Round 4: re-confirmed; OFF-0001 is still 'With Candidate' with start 17/11 and expiry 22/11.
+RECOMMENDED: Check that the start date falls after acceptance or expiry, and warn when interviews are scheduled after an offer has been sent.
+WHERE: /recruitment?tab=offers
+AUDITOR VERDICT: Confirmed / Not testable (role)
+EVIDENCE: Not exercised: needs a candidate at offer stage.
+
+=== F31 | Recruitment | Data | Low | Seed vacancies filed under 'Implementation' (new vacancies require a department)
+OBSERVED: All 7 vacancies sit in the Implementation department, including Head, Sales & Revenue, Customer Support Lead and Graphics and Motion Designer, so per-department hiring and budget views are wrong.
+RECOMMENDED: Make department required, with no default, and correct the existing vacancies.
+WHERE: /recruitment?tab=vacancies
+AUDITOR VERDICT: Confirmed / Prevented at creation
+EVIDENCE: New Vacancy has no default department; Department and Hiring Manager are required.
+
+=== F77 | Performance | Process control | High | Reviews pass with unscored lines, and one admin line can earn 'Exceeds'
+OBSERVED: Adaeze Chike's October review was submitted by the reviewer with none of its eight manual lines scored and no comment; it moved to Second Level with no score. Oladotun Shola-Adido's closed review reads 1.00 'Exceeds' with only one of 11 lines scored ('Team scorecards and reviews'); the ten results and KPI lines are blank. Bode Oluwasanmi's reads the same, and Chinyere Elechi's closed with no score at all.
+RECOMMENDED: Block submission until every line is scored or marked not applicable with a reason. Compute the rating only over a minimum share of weighted lines, and show coverage next to the score.
+WHERE: /performance?tab=reviews
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F29 | Performance | Data completeness | Medium | Performance headline score rests on almost no data
+OBSERVED: 47 of 50 KPIs are 'Awaiting Actual' and 41 key results are 'Awaiting Report', yet Company Score shows 0.72. KPI targets include '[TBC]' and '≤ approved ceiling'. 'Marketing consent violations' has a target of 1; it should be 0. Round 3: a new KPI (PG-K09) was accepted with target wording '[TBC]' and no numeric target. The numeric Target is optional; only the wording is required.
+RECOMMENDED: Hide the score until enough lines are reported (show the coverage %), finalise the TBC targets, and fix the consent target. Require a numeric target (or an explicit qualitative flag) before a KPI goes live.
+WHERE: /performance?tab=kpis, /performance?tab=goals
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: KPI PG-K09 created with '[TBC]' and no numeric target.
+
+=== F82 | Performance / Data | Data consistency | Low | Status and score labels contradict each other
+OBSERVED: Key result CO-KR2.2 is 'Done' with a score of 0.45. Bode Oluwasanmi's scorecard sits under Technology & Back-office Ops while his record says General Management. The CEO's scorecard is 'Agreed' with no reviewer. Praxis AI lists QA-AUDIT Employee as 'Active' while the record says 'On Probation'. Test goals ('test run', 'another test') are live in Q4 and shown on Home.
+RECOMMENDED: Derive status from score thresholds, keep scorecard department in sync with the employee record, use one status vocabulary, and remove test goals before go-live.
+WHERE: /performance?tab=goals, /performance?tab=targets, Praxis AI
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: Mixed seed data and labelling.
+
+=== F33 | Queries & Sanctions | Logic (to verify) | Medium | Repeat cautions don't escalate up the sanction ladder
+OBSERVED: One employee received four Cautions between 29/10 and 04/11 (QRY-0005, 0007, 0009, 0011) without ever reaching a Warning. Round 3: Chain Settings define Caution → Warning → Second Warning → Suspension → Dismissal with Cautions in force for 365 days, so the four Cautions break the configured ladder. A new query (QRY-0014) cannot be sanctioned until its 24-hour response window ends, which is a good control.
+RECOMMENDED: Check the escalation rules in Chain Settings, and make the system propose the next rung automatically.
+WHERE: /queries?tab=sanctions
+AUDITOR VERDICT: Confirmed (config vs issued sanctions) / Gap reproduced on new record
+EVIDENCE: Ladder is configured but not enforced when issuing; live escalation on QRY-0014 can be checked after 17/11 17:20.
+
+=== F40 | Queries & Sanctions | Copy | Low | Automatic queries show the rule name as the person who raised them
+OBSERVED: Raised By shows 'Unregistered Device', which is a rule, not a person.
+RECOMMENDED: Show 'System (rule: Unregistered Device)'.
+WHERE: /queries?tab=queries
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+

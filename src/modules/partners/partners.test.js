@@ -44,4 +44,15 @@ describe("duplicates (§6.2)", () => {
     expect(rank({ phone: "+2348031234567" }, { phone: "+2348031234567" })).toHaveLength(0);
     expect(rank({ name: "House of Hevix Ltd" }, { name: "House of Hevix" })).toHaveLength(1);
   });
+
+  test("a near name is a match on its own: a plural, an abbreviation, or a trigram likeness of 0.6 (QA F54b)", () => {
+    const rank = (input, candidate) => dedup.rank(input, [{ key: "x", ...candidate }], SIGNALS, { min: 55, idKey: "key" });
+    const kora = { name: "Kora Street Kitchens" };
+    expect(rank({ name: "kora street kitchen" }, kora)).toEqual([{ id: "x", score: 60, reasons: ["name"] }]);
+    expect(rank({ name: "Kora St Kitchens" }, kora)).toEqual([{ id: "x", score: 60, reasons: ["name"] }]);
+    // A misspelling shares no word: the likeness the duplicate query measured makes it similar.
+    expect(rank({ name: "Kora Strt Kitchenz" }, kora)).toEqual([]);
+    expect(rank({ name: "Kora Strt Kitchenz" }, { ...kora, likeness: { name: 0.62 } })).toEqual([{ id: "x", score: 55, reasons: ["name (similar)"] }]);
+    expect(rank({ name: "Lagos Food Festival" }, { name: "Lagos Fashion Festival", likeness: { name: 0.58 } })).toEqual([]);
+  });
 });

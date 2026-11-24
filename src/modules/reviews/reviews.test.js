@@ -74,7 +74,27 @@ describe("a late check-in, Score Without Check-In and Withdrawn (§11)", () => {
     expect(v.no_check_in_reason).toBe("No check-in by 3 November");
     expect(v.lines[0]).toMatchObject({ actual: "No check-in", evidence: "No check-in", self: "No check-in", action: null, note: "Reviewer: Seen at work" });
     expect(v.lines[1]).toMatchObject({ actual: "Late", evidence: "System record", final: "0.00" });
+    expect(v.coverage).toBe("Not recorded");
     expect(c.reviews.ReviewSummaryVars.safeParse(v).success).toBe(true);
+  });
+
+  test("the PDF prints the weight the score to date rests on beside it (BG-012)", () => {
+    const pdf = require("./reviews.pdf");
+    const review = {
+      employee: { display_name: "Ada", job_title: null, department: null },
+      reviewer: { display_name: "Tolu" },
+      round_name: "September 2026",
+      score_month: "1",
+      score_to_date: "1",
+      rating: "exceeds",
+      weight_scored: "32.5",
+      weight_total: "100",
+    };
+    const v = pdf.variables(review, [], { done: [], ongoing: [], next_month: [] }, []);
+    expect(v).toMatchObject({ score_to_date: "1.00", rating: "Exceeds", coverage: "32.5 of 100 scored" });
+    expect(c.reviews.ReviewSummaryVars.safeParse(v).success).toBe(true);
+    const html = require("node:fs").readFileSync(require("node:path").join(__dirname, "../../../templates/documents/review-summary.html"), "utf8");
+    expect(html).toContain("{{ coverage }}");
   });
 });
 

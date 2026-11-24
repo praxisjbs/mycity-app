@@ -235,6 +235,11 @@ mycity-app/
 │   │                         training-videos (a milestone's handover video, start to finish)
 │   ├── handoff/              a build carried across sessions: its decisions, plan and log
 │   │                         (push-notifications, m3-queries-sanctions)
+│   ├── qa-audit/             MyCity's QA audit of staging (16-17/11/2026) and our response:
+│   │                         MyCity-QA-Audit-Response.xlsx (the fix tracker shared with MyCity),
+│   │                         README.md (where it stands), BRIEF.md (how a finding is verified),
+│   │                         source/ (MyCity's tracker), groups/, verdicts/ (one block per finding),
+│   │                         compile.py (verdicts to items.json) and build.py (items.json to the workbook)
 │   └── manual/               the User Guide (Knowledge Hub · User Guide, docs/guides/user-guide.md): one
 │       │                     chapter per module plus getting-started.md and quick-start.md, written as
 │       │                     each milestone is approved; README.md says how to write one; img/<chapter>/

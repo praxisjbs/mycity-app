@@ -1,0 +1,70 @@
+=== F09 | Expenses | Control gap | High | No supplier list: payee bank details are typed free-hand on each request
+OBSERVED: The New Request form asks the requester to type the vendor, bank, account name and account number every time. There is no supplier list, no bank-detail check and no purchase order, and the invoice is optional. Round 3: the Bank field lets any requester add a new bank to the shared list (it offers 'Add "Zenith"'). 'Not A Real Bank' from EXP-0020 is now offered to everyone as 'Not A Real Bank · 1 request'.
+RECOMMENDED: Add a supplier list maintained by Finance, with checked bank details. Payees should be picked from it, never typed. Require an invoice above a set amount, and add purchase orders for capital categories. Remove free-text 'Add' from the bank picker; only Finance maintains the bank list.
+WHERE: /expenses?tab=approvals → New Request
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: EXP-0020 accepted with bank 'Not A Real Bank' (not in the bank list), account name different from payee, account 0000000000, no invoice.
+
+=== F26 | Expenses | UX / permissions | Medium | Locked tabs are still shown
+OBSERVED: Requisitions and Disbursements appear for a Program Manager but only say 'Not Open to You', while Home shows ₦1.9M of expenses awaiting approval. Round 3: Payroll → Record Advance shows the full form to this role; after filling it in, saving returns 'You do not have access to this'. The server correctly refuses, but the user wastes the effort.
+RECOMMENDED: Hide tabs the role can't open, or explain who to ask for access.
+WHERE: /expenses?tab=requisitions
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F56 | Expenses | Control gap | High | No budget check: over-budget requests go through and pending spend isn't reserved
+OBSERVED: EXP-0020 for ₦100,000 was charged to People & Culture, which had ₦52,000 remaining. The request was sent with no warning, and afterwards the budget still showed Committed ₦48,000, Remaining ₦52,000. Round 3: the request page does show 'Over Budget' and 'Department Left ₦52,000' after submission (approvers can see it), but the requester gets no warning. EXP-0021 linked to QA-AUDIT-Project-01 (no budget) was accepted and Committed stayed ₦0 for the project and unchanged for the department.
+RECOMMENDED: Show remaining budget on the form, warn or block when a request exceeds it (with an override reason), and reserve the amount as Committed when the request is submitted. Do not allow spend against a project or category with no budget line without an explicit override.
+WHERE: /expenses → New Request; /expenses?tab=budgets
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+
+=== F57 | Expenses / Approvals | Routing (to verify) | Medium | Expense request skipped the Line Manager stage
+OBSERVED: The Expense Request flow is defined as Line Manager → Operations & People, but EXP-0020 went straight to 'Operations & People'. The leave request from the same person did go to the line manager.
+RECOMMENDED: Confirm whether Management-role requesters skip line approval by design. If not, fix the routing and show the route on submit.
+WHERE: /ess?tab=my-requests, /settings?tab=approvals
+AUDITOR VERDICT: Needs verification / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+
+=== F65 | Expenses | Control gap | Medium | No duplicate-expense check
+OBSERVED: EXP-0022 was sent with the same purpose, category, department, payee, account and ₦100,000 amount as EXP-0020 on the same day, with no warning. (Cancelled afterwards to protect approvers.)
+RECOMMENDED: Warn on same payee + amount + period, and on a reused invoice number.
+WHERE: /ess?tab=my-requests → New Request
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F70 | Mobile | UI | Low | Mobile forms put Save/Send at the end of a long scroll
+OBSERVED: At 375px the New Request sheet scrolls about two screens before Save Draft and Send Request appear; the buttons are not pinned. Buttons are 44px tall and nothing overflows horizontally.
+RECOMMENDED: Pin the primary actions to the bottom of the sheet on mobile.
+WHERE: /expenses → New Request at 375px
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F43 | Workspace / Projects | Data | Medium | Duplicate and incomplete projects
+OBSERVED: 'Lekki Branch Launch' and 'Lekki Launch' both exist. 4 of 5 projects have no due date and 2 have no budget.
+RECOMMENDED: Merge the duplicates. Require a due date and budget when a project becomes Active.
+WHERE: /workspace?tab=projects, /expenses?tab=projects
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Two projects named QA-AUDIT-Project-01 (PRJ-2026-000007 and 000008) created with no warning, no due date, and no budget field on the form.
+
+=== F79 | My Workspace | Process control | Medium | Projects close with open tasks, and work can be assigned to people who cannot log in
+OBSERVED: PRJ-2026-000007 was completed instantly with TSK-0121 still 'To Do'; no confirmation was asked. TSK-0121 was assigned to QA-AUDIT Employee, who has no login, without a warning. Leaver Cynthia Osakunih still owns active projects. A completed project is correctly removed from the expense project picker.
+RECOMMENDED: Confirm before completing a project with open tasks and offer to close or move them. Warn when assigning to someone with no login. Reassign a leaver's projects at exit.
+WHERE: /workspace?tab=projects → PRJ-2026-000007
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 4 end-to-end tests.
+
+=== F28 | Workspace | Process | Medium | Task discipline isn't enforced
+OBSERVED: 78 tasks are overdue, all with 'No Reason Recorded', and 51 of them by 15 days or more. 98 of 100 open tasks are 'Normal' priority. The Overdue Tasks query rule is still Draft.
+RECOMMENDED: Require a reason when a due date passes, and turn on the overdue-task rule once data is clean.
+WHERE: /workspace?tab=analytics, /queries?tab=rules
+AUDITOR VERDICT: Confirmed / Seed data only
+EVIDENCE: Process discipline; new task required a future due date (good).
+
+=== F27 | Home / Workspace | UX / labels | Medium | 'Overdue' means different things on different screens
+OBSERVED: Home shows Overdue Tasks 78 (company-wide). My Workspace shows Overdue 0 (personal). Neither label says which.
+RECOMMENDED: Label the scope ('Company overdue tasks', 'My overdue').
+WHERE: /home, /workspace
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+

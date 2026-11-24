@@ -218,6 +218,33 @@ const ExpenseApprovalsSummary = z
   })
   .strict();
 
+/**
+ * GET /expenses/mine/budget-check: what New Request shows before it is sent (guide §6.6 rule 3).
+ * The category picked, the department (the requester's own when left blank) and the lines' total
+ * so far (none read as 0.00). A read: nothing is kept, and the request is never refused for it.
+ */
+const ExpenseBudgetCheckQuery = z
+  .object({
+    expense_category_id: uuid,
+    department_id: blank(uuid),
+    amount: blank(money),
+  })
+  .strict();
+
+/**
+ * The budget a request would count against if it were sent today, as the approvers will see it: the
+ * category line's remaining (null with no line), the department's remaining for the year across every
+ * line (null with no budget), and whether the amount is over the line (a flag, never a block).
+ */
+const ExpenseBudgetCheck = z
+  .object({
+    department_id: uuid.nullable(),
+    budget_remaining: money.nullable(),
+    department_remaining: money.nullable(),
+    over_budget: z.boolean(),
+  })
+  .strict();
+
 /* ------------------------------------------------------------------ *
  * Writing
  * ------------------------------------------------------------------ */
@@ -332,6 +359,8 @@ const TABLES = {
   ExpenseBankListQuery: { table: null, reason: "list controls for the banks New Request suggests" },
   ExpenseBank: { table: null, reason: "a bank New Request suggests: a common bank, or one a request named, and how many name it" },
   ExpenseBankPage: { table: null, reason: "a page of the banks New Request suggests" },
+  ExpenseBudgetCheckQuery: { table: null, reason: "the category, department and total New Request asks the budget check about" },
+  ExpenseBudgetCheck: { table: null, reason: "the budget line's and the department's remaining before a request is sent; never kept" },
   ExpenseLine: { table: "expense_request_line" },
   ExpenseRow: {
     table: "expense_request",
@@ -536,6 +565,8 @@ module.exports = {
   ExpenseBankListQuery,
   ExpenseBank,
   ExpenseBankPage,
+  ExpenseBudgetCheckQuery,
+  ExpenseBudgetCheck,
   ExpenseMineSummary,
   ExpenseApprovalsSummary,
   ExpenseLineInput,

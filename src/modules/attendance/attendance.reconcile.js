@@ -200,8 +200,11 @@ function detailOf(type, evidence = {}) {
       if (ev.reason === "edge")
         return `At the edge: ${ev.distance_m} m from ${ev.place === "client_visit" ? "the client's site" : ev.worksite_name}, radius ${ev.radius_m} m, accurate to ${Math.round(ev.accuracy_m)} m`;
       return `No reading: ${LOCATION_REASON[ev.reason] || "no location reading"}`;
-    case "unknown_device":
-      return ev.device_label ? `Unregistered device: ${ev.device_label}` : "No registered device";
+    case "unknown_device": {
+      // A day's punches from one device share one exception (§6.6): how many it holds, from two.
+      const what = ev.device_label ? `Unregistered device: ${ev.device_label}` : "No registered device";
+      return ev.punches > 1 ? `${what}, ${ev.punches} punches` : what;
+    }
     case "suspicious_timestamp":
       return `Device clock ${Math.max(1, Math.round(Math.abs(ev.skew_seconds || 0) / 60))} min ahead`;
     case "missing_clock_out":
@@ -242,8 +245,12 @@ const REFUSED_TEXT = Object.freeze({
   accepted: "the refusal stands",
   rejected: "the refusal is noted as wrong, and the punch still does not count",
 });
-const outcomeText = (type, outcome) =>
-  type === "automatic_clock_out" && outcome === "corrected" ? "the clock-out time was corrected" : OUTCOME_TEXT[outcome];
+const outcomeText = (type, outcome, punches = 1) =>
+  type === "automatic_clock_out" && outcome === "corrected"
+    ? "the clock-out time was corrected"
+    : outcome === "rejected" && punches > 1
+      ? "the punches from that device do not count"
+      : OUTCOME_TEXT[outcome];
 
 /**
  * People decide an open exception: accept it, reject the punch, or add the missing
@@ -275,6 +282,8 @@ async function decide(actor, scope, id, body) {
     // The punch it is about: one refused at the clock never counts, whatever People decide (§6.8).
     const punch = x.attendance_event_id ? await repo.eventFor(client, x.attendance_event_id) : null;
     const refused = Boolean(punch && punch.validation_state === "rejected");
+    // An unregistered device's exception holds the day's later punches from it too (§6.6), decided with it.
+    const punches = punch ? [punch, ...(await repo.attachedPunches(client, id))] : [];
     if (body.decision === "add_clock_out") {
       const ctx = await calendar.contextFor(client, person, x.work_date);
       const events = counted(await repo.eventsOn(client, x.employee_id, x.work_date));
@@ -311,7 +320,9 @@ async function decide(actor, scope, id, body) {
     // clock-out opens now, as the day-close would have, and Add Clock-Out recalculates the day.
     if (!x.attendance_check_in_id) {
       const r = await recomputeDay(client, person, x.work_date, { settle: false });
-      if (body.decision === "reject" && punch && !refused && punch.event_type === "clock_out" && r.day && r.day.closed_at)
+      // Rejected together, a clock-in and its clock-out leave no shift to close.
+      const clockOutOnly = punches.some((p) => p.event_type === "clock_out") && !punches.some((p) => p.event_type === "clock_in");
+      if (body.decision === "reject" && punch && !refused && clockOutOnly && r.day && r.day.closed_at)
         await openMissingClockOut(client, person, r);
       await settle(client, person, r);
     }
@@ -320,7 +331,13 @@ async function decide(actor, scope, id, body) {
       entity: { type: "attendance_exception", id },
       actor,
       before: { status: "open", outcome: null },
-      after: { status: "resolved", outcome, resolution: body.resolution, clock_out_time: body.clock_out_time || null },
+      after: {
+        status: "resolved",
+        outcome,
+        resolution: body.resolution,
+        clock_out_time: body.clock_out_time || null,
+        ...(punches.length > 1 && { attendance_event_ids: punches.map((p) => p.attendance_event_id) }),
+      },
       payload: {
         attendance_exception_id: id,
         employee_id: x.employee_id,
@@ -332,7 +349,7 @@ async function decide(actor, scope, id, body) {
           ? CHECK_IN_TEXT[outcome]
           : refused
             ? REFUSED_TEXT[outcome]
-            : outcomeText(x.exception_type, outcome),
+            : outcomeText(x.exception_type, outcome, punches.length),
       },
     });
   });

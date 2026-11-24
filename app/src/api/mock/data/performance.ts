@@ -19,6 +19,7 @@ import type {
   ScorecardLine,
   TargetChange,
 } from "@mycity/contract/contract.gen.ts";
+import scoring from "@mycity/contract/schemas/scoring.js";
 import { at, sid } from "../core";
 import { byKey, refKey } from "./people";
 
@@ -244,6 +245,8 @@ const line = (
 
 const card = (key: string, reviewer: string, lines: ScorecardLine[], score: string, rating: ScorecardDetail["rating"], agreed = true): ScorecardDetail => {
   const p = refKey(key);
+  // The weight the score rests on, worked out from the lines as a close writes it (§6.9).
+  const covered = rating ? scoring.weightCoverage(lines) : null;
   return {
     scorecard_id: sid(`perf:card:${key}`),
     performance_period_id: PERIOD.performance_period_id,
@@ -261,6 +264,8 @@ const card = (key: string, reviewer: string, lines: ScorecardLine[], score: stri
     disagreed_at: null,
     score_to_date: score,
     rating,
+    weight_scored: covered ? scoring.formatWeight(covered.scored) : null,
+    weight_total: covered ? scoring.formatWeight(covered.total) : null,
     line_count: lines.length,
     created_at: at(30, "09:00"),
     updated_at: at(3, "09:00"),
@@ -326,6 +331,8 @@ export const GRACE_CARD: ScorecardDetail = {
   status: "draft",
   score_to_date: null,
   rating: null,
+  weight_scored: null,
+  weight_total: null,
   created_at: at(4, "09:00"),
   updated_at: at(2, "10:00"),
   amendment_instance_id: sid("perf:wf:amend:grace"),

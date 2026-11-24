@@ -1,0 +1,140 @@
+=== F12 | Platform-wide | Data consistency | Medium | Totals use different, unlabelled definitions (new records count correctly)
+OBSERVED: Headcount reads 22 on Home, 24 in the Team roster and Employees, 25 in Attendance This Month, 23 in Workspace and Users, and the sidebar People badge reads 53. Alerts: the tab badge says 21, the page says 16 open. Policies: the card says 4 to acknowledge, the table lists 2. Scorecards: the tab says 15, the card 19, and agreed plus awaiting adds up to 17. Tasks: the Done column header says 2 but shows 3 cards.
+RECOMMENDED: Define one counting rule per entity (active, expected, including or excluding archived and QA records) and use the same query for cards, badges and tables. Add a regression test that compares them.
+WHERE: /home, /people, /performance?tab=targets, /ess?tab=policy-updates
+AUDITOR VERDICT: Confirmed / Prevented at creation
+EVIDENCE: New records move every count by one (pipeline, partners, Home, analytics, headcount, leave pending, expenses awaiting). The remaining differences are definitions: Home 'of 22' expected, headcount 25, payroll 21. Label them.
+
+=== F15 | Home | UX | Medium | Policy pop-ups chain one after another on every page load
+OBSERVED: Each full page load opens a 'Policy Update' dialog for every pending policy, one after another. Closing them only defers them until the next load.
+RECOMMENDED: Show one combined, non-blocking prompt ('2 policies need your acknowledgement') linking to ESS → Policy Updates. Block the screen only after a grace period.
+WHERE: Any page, full reload
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F16 | Navigation | UX | Medium | Sidebar badges don't say what they count
+OBSERVED: Badges such as Home 21, Self-Service 41 (later 40), People 53, Performance 24 and the mobile 'More 79' don't say whether they mean unread items, tasks or alerts. 'More 79' adds up unrelated counts.
+RECOMMENDED: Badge only actionable items addressed to the user, and label them in a tooltip ('3 approvals waiting on you'). Drop the aggregated badge on More.
+WHERE: Sidebar, mobile bottom nav
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F17 | Home | Data hygiene | Low | Test records show up in company-level views
+OBSERVED: Home 'Goals This Quarter' lists 'another test', 'Testing', 'test run' and 'Set new' (ORG-2026-05 to 09). QA records (QADeep20261026 Disposable, Qa Preview, JBS test) appear in the roster, attendance, payroll and performance stats, and there is a #qa-e2e channel.
+RECOMMENDED: Purge QA records before the production cut-over, or flag them as test so they are left out of every count. Allow goals to be archived.
+WHERE: /home, /performance?tab=goals
+AUDITOR VERDICT: Confirmed / Seed data only
+EVIDENCE: Clean-up before go-live.
+
+=== F18 | Home | Accuracy | Medium | Attendance chart caption contradicts the chart
+OBSERVED: The caption says 'Dips are Saturdays, a half day', but the line is low (2 to 3 in) on almost every day. The only peaks are 06/11 (20 in) and 11/11 (21 in).
+RECOMMENDED: Remove the fixed caption, or generate it from the data.
+WHERE: /home?tab=overview
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: Static caption bug.
+
+=== F19 | Home / Alerts | Accuracy / UX | Medium | Alert ages contradict their titles, and some alerts are duplicated
+OBSERVED: 'Expense Request…: waiting 10 days' shows Age 'Today' and Over By '+0'. Two 'Temporary Site for JBS Praxis Team' alerts (25 and 26 days) appear for what looks like one request. 'Requisition: waiting 10 days' doesn't say what it is for. 'Alert Sources' lists Budget Threshold 1, but no budget alert appears in the list.
+RECOMMENDED: Measure age from when the request started waiting, remove duplicate alerts per record, always include the subject, and keep the source counts consistent with the list.
+WHERE: /home?tab=alerts
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: Alert ageing logic; not exercised with new records.
+
+=== F20 | Home / Reports | Bug (to verify) | Medium | Scheduled reports show no runs
+OBSERVED: 'Daily Attendance: every working day at 18:00' is Scheduled, but Runs This Month is 0 and Recent Runs shows 'No Runs Yet'. The recipients card says 1, but there are 2 distinct recipients.
+RECOMMENDED: Check the scheduler is running on staging and that runs are recorded. Fix the recipient count.
+WHERE: /home?tab=reports
+AUDITOR VERDICT: Needs verification / Not create-related
+EVIDENCE: Scheduler; not exercised.
+
+=== F34 | Praxis AI | Cost / UX | Medium | AI history shows staff the token count and naira cost of each question
+OBSERVED: History shows the tokens and naira cost per question. A simple 'where do I request leave' question used about 23,600 tokens (₦24).
+RECOMMENDED: Move cost reporting to admin AI Control. Reduce context for navigation questions (answer from the user guide index first).
+WHERE: /praxis-ai?tab=history
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F36 | Platform | UI / layout | Medium | Announcement banner takes a full row on every screen
+OBSERVED: The 'System Testing Queries' banner (1 of 3) sits above every page, including mobile, where its text is cut off.
+RECOMMENDED: Collapse it after the first view, or show announcements in the bell or Home only.
+WHERE: All pages
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F41 | Self-Service | Copy | Low | Raw internal key in Record History
+OBSERVED: Record History shows 'commitments.due' instead of a readable label.
+RECOMMENDED: Map the event keys to plain-language labels.
+WHERE: /ess?tab=my-profile
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F42 | People / Attendance | Clarity | Low | Hours worked don't match the clock-out shown
+OBSERVED: On 06/11 the screen shows 09:24 to 18:30 'System Clock-Out' but 7h 36m worked (capped at 17:00), with no explanation.
+RECOMMENDED: Show 'capped at shift end' or show the actual time the system clocked the person out.
+WHERE: /ess?tab=my-attendance
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F14 | People / Attendance | Adoption / data reliability | High | Attendance data is too sparse to rely on
+OBSERVED: Most staff are absent 10 of 12 working days, with 226 absences this month and a 17% on-time rate. There are 47 open exceptions, almost all 'Unregistered device', and 11 clock-in devices are still 'New' with no one approving them. All 22 staff are remote, but geofence and device checks still apply.
+RECOMMENDED: Before go-live, decide whether remote staff must clock in. Give someone the job of approving devices. Run a two-week adoption push and only then turn on lateness and absence sanctions.
+WHERE: /people?tab=attendance, /people?tab=devices
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: Adoption and policy decision; no record created.
+
+=== F66 | People / Attendance | Process / data quality | Medium | Attendance punches create noise and skip key checks
+OBSERVED: Clock-in at 17:22 (after the 17:00 shift end) was accepted and marked 'Late 8h 22m'. Each punch from an unregistered device created a separate exception (two for one day), which explains the 47 open exceptions. Remote clock-ins show 'Clock Location: Not Checked'.
+RECOMMENDED: Raise one exception per device per day. Block or flag clock-ins after shift end. Decide whether remote staff need any location or device check.
+WHERE: Clock In / Clock Out; /ess?tab=my-attendance
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F67 | Self-Service / Leave | Policy gap (to verify) | Medium | Staff cannot record sick leave after the fact
+OBSERVED: A sick-leave request for 10/11 to 11/11 was refused: 'Pick 16/11/2026 or later'. Sick leave is usually recorded on return.
+RECOMMENDED: Allow back-dated sick leave (with a limit and evidence upload), or confirm HR records it via People → Leave → Record Leave and say so in the form.
+WHERE: /ess?tab=my-leave → Request Leave → Sick
+AUDITOR VERDICT: Confirmed (HR path not checked) / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F60 | Self-Service | UX | Low | Leave form shows the day count only after you send
+OBSERVED: The working-day count and balance check ('24 working days, 20 left') appear only after pressing Send Request; the server correctly refuses. The 5-day request 01/12 to 05/12 counts Saturday as a full day although Saturday is a half day.
+RECOMMENDED: Show the computed working days and remaining balance as soon as dates are picked. Confirm how half-day Saturdays should count.
+WHERE: /ess?tab=my-leave → Request Leave
+AUDITOR VERDICT: Confirmed (Saturday rule to verify) / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+
+=== F68 | Community | Validation (to verify) | Low | Announcement to an empty department publishes silently, and retired departments are offered
+OBSERVED: An announcement targeted at the empty department QA-AUDIT DeptQAA published with '0 of 0 read' and no warning; the toast said 'Published to #announcements' (the company-wide channel), so department-targeted posts may be visible to everyone. The audience list also offers 'Technology', which appears to be the retired department.
+RECOMMENDED: Warn when an audience has no members, hide retired departments, and confirm department-only announcements are not shown in the all-staff channel.
+WHERE: /community?tab=announcements → New Announcement
+AUDITOR VERDICT: Partly confirmed (visibility to verify) / Gap reproduced on new record
+EVIDENCE: Found in round 3 lifecycle tests.
+
+=== F83 | Knowledge Hub | Functional gap (to verify) | Low | No way to add or edit an SOP from the Management role
+OBSERVED: Management has 'Edit · All' on Knowledge Hub, but the SOP screens show no New SOP or Edit control. SOPs exist for 5 departments; Marketing and Implementation have none.
+RECOMMENDED: Confirm who maintains SOPs; if Management should, expose create, edit and new-version actions.
+WHERE: /knowledge?tab=sops
+AUDITOR VERDICT: Confirmed (role rule to verify) / Not testable (role)
+EVIDENCE: No create/edit control visible to Management.
+
+=== F48 | Mobile | UI | Low | Mobile has a duplicate call to action and small tap targets
+OBSERVED: The Pipeline screen at 375px shows a 'New Lead' button and a floating '+' that do the same thing. Goals has 68 controls under 32px tall, Employees 13.
+RECOMMENDED: Keep one primary action on mobile and make tap targets at least 40 to 44px.
+WHERE: /partnerships?tab=pipeline, /performance?tab=goals (375px)
+AUDITOR VERDICT: Confirmed / Not create-related
+EVIDENCE: None
+
+=== F50 | Search | Performance (to verify) | Low | Slow first search result
+OBSERVED: The first search ('Kora') was still 'Loading' after 2 seconds. The second ('invoice') returned good results across modules within 2 seconds.
+RECOMMENDED: Measure p95 search latency on staging and warm the index.
+WHERE: Cmd+K
+AUDITOR VERDICT: Needs verification / Not create-related
+EVIDENCE: None
+
+=== F55 | Platform | UX / data loss | Medium | Escape closes a multi-step form and discards everything
+OBSERVED: Pressing Escape to dismiss a date picker on step 3 of New Lead closed the whole dialog with no confirmation. Reopening showed an empty form; nothing was kept as a draft.
+RECOMMENDED: Only close the inner popover on Escape. Ask 'Discard changes?' when a dirty form is closed, and keep an unsent draft per form.
+WHERE: /partnerships → New Lead (any multi-step dialog)
+AUDITOR VERDICT: Confirmed / Gap reproduced on new record
+EVIDENCE: Found while creating records.
+

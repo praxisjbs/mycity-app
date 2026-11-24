@@ -10,7 +10,7 @@
 | Capabilities | none; who approves an offer is the `recruitment.offer` flow on Settings · Approvals, not a capability |
 | Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, #112 Upload Documents (added with PR 6a; `new:screen` makes staff-app tabs only); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
 | Status | Built |
-| Last changed | 16/11/2026 |
+| Last changed | 24/11/2026 |
 
 The public pages (`public-app/src/pages/SignOffer.tsx`, `Verify.tsx`) joined **Frontend paths** with
 PR 4, which wired them; Upload Documents with PR 7. The People 360 Documents tab joined with PR 7 as
@@ -48,21 +48,24 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    vacancy and follows MyCity's offer letter: the Offer Summary (position, function, scope, reports
    to, location and work pattern with office days, start date, employment type, probation, annual
    leave, incentives), the monthly pay lines (Basic Salary, Internet & Recharge Allowance,
-   Transportation Allowance, and any other; their total within the vacancy's range), working hours,
+   Transportation Allowance, and any other; their total within the vacancy's range; Basic Salary,
+   always the first line, above ₦0 unless an intern's offer says why it is ₦0), working hours,
    the final job description for Schedule A (copied from the vacancy's, editable), expiry (15 days
    by default). The weighted scorecard total and the interview decision are copied onto the
    offer when it is created (they are worked out on read in M4 and would otherwise drift).
 2. **Approval.** Submit for Approval starts the `recruitment.offer` flow from Settings · Approvals.
    The offer keeps the flow active when it was created (the rule sanctions follow). Approvers act
    on the offer's card and in My Approvals. Rejected returns it to draft with the reason. Submit
-   needs a department on the offer and the **Offer Signatory** named on the Offers settings (the
+   needs a start date not yet passed, Basic Salary above ₦0 (or an intern's reason), a department
+   on the offer and the **Offer Signatory** named on the Offers settings (the
    Operations & People Lead on MyCity's letter), with a login. **The company signs here**: when the
    flow approves it, the letter is generated with the standard wording then in force (its version
    kept as `terms_version`, so a later edit never changes it), the signature request is opened with
    the Offer Signatory first and the candidate second, and the signatory is told; they press Sign
    for the company on the offer, already signed in, with no email code.
 3. **Send.** Once the company has signed, Send Offer starts the expiry (`valid_days`, 15 by
-   default), makes the candidate's link (`signatures.issueLinks`) and emails `offer-sent` with it
+   default; refused with `START_PAST` once the start date has passed, as an approved offer cannot be
+   edited: it is withdrawn and made again), makes the candidate's link (`signatures.issueLinks`) and emails `offer-sent` with it
    after commit: the link is never stored and never sits in the outbox. In the same transaction it
    calls `candidates.advanceIn(client, actor, applicationId, "offer")` (GE's), so the card moves to
    the Offer column. `offer-sent` is worded on Candidate Emails with M4's other mails; its variables
@@ -276,6 +279,8 @@ employee record (masked, never sent to an AI model).
 
 - An offer is made only for an active application at `shortlist`, or at `offer` when its last offer ended; one open offer an application.
 - Pay is monthly, line by line; the monthly total times twelve is `annual_compensation`, and the total must sit within the vacancy's `salary_min` to `salary_max` unless the approver overrides it with a reason. Money through `shared/money`.
+- No pay line is below zero (`OfferPayLineInput.monthly_amount`, the contract: *Not below zero*); an allowance may be ₦0. The first line is Basic Salary, kept first on the form, and it is above ₦0 at New Offer, at each edit and again at Submit for Approval (`NO_BASIC_SALARY`, *Enter an amount* on that line), so an offer at ₦0 never reaches an approver or a candidate. The one exception is an offer whose employment type is `intern`: its Basic Salary may be ₦0 with a reason (`zero_basic_reason`, kept in `terms`; `ZERO_BASIC_REASON` without one), which the approvers read on the offer beside Monthly Pay. A Basic Salary above ₦0 drops the reason. The assistant's card takes a basic salary above ₦0 only (`OfferCard.basic_salary` is `positiveMoney`); an intern at ₦0 is drafted on the form, where the reason is asked. JBS Praxis, 24/11/2026 (QA audit BG-001).
+- New Offer starts Basic Salary at the vacancy's `salary_min`, or empty (`null` in `OfferDraft`) when the vacancy has no range: never 0.00.
 - The company signs an offer when it is approved, before it is sent; the candidate signs second.
 - An offer is approved before it is sent; the flow is the one active when the offer was submitted (the instance keeps its definition).
 - Withdrawing an offer still with its approval withdraws the approval too, which only its submitter or the CEO may do (the approval engine's rule); Not Progressing withdraws it as its submitter.
@@ -286,6 +291,17 @@ employee record (masked, never sent to an AI model).
 - A signed document is locked; edits make a new offer.
 - Submit for Approval needs the start date, the department, the employment type and the work
   pattern, every field the employee is created from, so an approved offer can always be accepted.
+- The start date may not have passed (Lagos's day; today still counts) when an offer is written,
+  submitted or sent (`START_PAST`, 422 with *Pick a later date* on the start date). At Submit it
+  reads *The start date has passed. Change it in Edit Offer.*; at Send, *The start date has passed.
+  Withdraw it and make a new offer.*, since an approved offer is not edited. The screen shows either
+  on the line under the record's buttons (QA audit BG-008, 24/11/2026).
+- The letter words each employment type: `OfferLetterVars` carries `is_employee` (`full_time`,
+  `part_time`), `is_contractor`, `is_consultant` and `is_intern`, each a boolean, all false while a
+  draft has no type, so the standard wording branches with `{{#if}}` (the template language compares
+  nothing). The shipped wording keeps MyCity's employee text unchanged for employees and for a draft
+  with no type, and words a contractor's, a consultant's and an intern's letter apart (§13, drafts
+  for MyCity's review).
 - Send Offer is refused until the onboarding checklist has at least one active required item, and for a candidate whose address is an active employee's work or personal email (`CANDIDATE_IS_EMPLOYEE`; an archived or left record does not count).
 - An offer's employment type is the employee's spelling (`full_time`, `part_time`, `contractor`, `consultant`, `intern`; 5070); New Offer maps a vacancy's `contract` and `internship` to `contractor` and `intern`.
 - New Offer from the chat card states the reason when its basic salary sits outside the vacancy's range, as the form does (`OfferCard.range_reason`); there is no stock reason.
@@ -386,7 +402,7 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list across the page (number, candidate, role, start date, annual compensation with Outside Range, status, sent, expiry); a pressed row opens the offer in a wide dialog (F31 as amended 08/11/2026): the offer's summary with Signers under its details in the same card, beside Monthly Pay with Approval under the pay in the same card, then History across it, and Close at its foot; the offer's summary, Monthly Pay with Outside Range and its reason, Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates); the expiry, as Expires while the offer is with the candidate and Expired On once it lapsed (an offer accepted, declined or withdrawn shows none); View Letter beside Withdraw Offer, which opens the letter in a dialog of its own: the PDF with Open in Tab and Download PDF once it is made (as a query's letter, M3), the wording on paper before; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
+| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list across the page (number, candidate, role, start date, annual compensation with Outside Range, status, sent, expiry); a pressed row opens the offer in a wide dialog (F31 as amended 08/11/2026): the offer's summary with Signers under its details in the same card, beside Monthly Pay with Approval under the pay in the same card, then History across it, and Close at its foot; the offer's summary, Monthly Pay with Outside Range and its reason (and No Basic Salary with Why No Basic Salary for an intern at ₦0), Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates); the expiry, as Expires while the offer is with the candidate and Expired On once it lapsed (an offer accepted, declined or withdrawn shows none); View Letter beside Withdraw Offer, which opens the letter in a dialog of its own: the PDF with Open in Tab and Download PDF once it is made (as a query's letter, M3), the wording on paper before; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings; a refused Submit, Send or Resend on the line under the buttons; in the form, Enter an amount on the Basic Salary line and Why No Basic Salary for an intern at ₦0 | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
 | Recruitment · Onboarding | the figures (Documentation with the documents to verify, Pre-Onboarding, Onboarding with the steps overdue, Hired This Month); the cases list across the page (hire, role, department, start date, outstanding, status); a pressed row opens the case in the wide dialog (F31 as amended 11/11/2026): the case (role, department, start date, Pre-Onboarding with what it waits on, BVN and Home Address entered or not, the privacy notice, Send Reminder, Withdraw Hire, Complete Onboarding), Documents (each item's state, View File, Verify, Reject with the reason), Guarantors (each one's check, date of birth, both addresses, Convicted, Recommends, View Form, View ID, Record Check), Contract (the signers, Download PDF, Sign for Company, Resend Contract, Reissue Contract) two by two, then Onboarding Plan across it (owner, due day, SOP, Overdue, Mark Step Done); Onboarding Settings (Checklist, Onboarding Plans, Standard Contract), shown to whom `can_configure` names. Verify, Reject, Record Check, Send Reminder, Complete Onboarding and Withdraw Hire show only for `can_check`, `can_complete` and `can_withdraw` | help on Pre-Onboarding: what the gate needs; help on BVN: where it is entered and that it is never shown | why documentation comes first: §3 here |
 | Public · Sign Offer | the letter, Signers, the three steps (Read the Letter, Confirm Your Email, Sign Below), Send Code, the code, full name, title, Draw or Type, Agree to Sign Electronically, Accept and Sign, Decline the Offer, the outcome | help on Email Code | "this document is locked and verifiable" reassurance: never shown |
 | Public · Upload Documents | the role and start date with how many documents are sent; the privacy notice to accept first; then Your Documents (each item with its state, a rejection's reason, Choose a File or the value), Your Guarantors (two, each with its check: name, relationship, phone, date of birth, Contact Address and Residential Address picked, Ever Convicted with What Happened, Recommends You, the Guarantor Form and the ID Copy), Your Address (Home Address, picked; Change Address), Your BVN (Change BVN); Documents Complete once documentation is done | help on BVN; help on Guarantor Form; help on ID Copy | how the files are stored: the manual |
@@ -537,6 +553,27 @@ Decided 11/11/2026 (AJ), for PR 6b:
   does; a `line_manager` step's owner is read from the vacancy's Organogram seat while the hire's
   record names no line manager.
 
+Decided 24/11/2026 (JBS Praxis), the QA audit's BG-001, BG-008 and BG-009 (§6):
+
+- **No offer at ₦0.** Basic Salary is above ₦0 at New Offer, Edit and Submit for Approval, and no
+  pay line is below zero (an allowance may be ₦0). An intern's offer may be ₦0, only with a reason
+  the approvers read. The draft starts Basic Salary empty, not 0.00.
+- **Send refuses a start date that has passed** (`START_PAST`, as at Submit), shown on the line under
+  the buttons.
+- **The letter words each employment type**: per-type flags in the letter's variables, and default
+  contractor, consultant and intern clauses in the shipped wording. The employee wording stays as it
+  was. **The contractor, consultant and intern clauses are drafts written for MyCity's review**
+  (engagement as an independent contractor or consultant, no employment relationship, fees against an
+  invoice with no PAYE or pension deduction by the company beyond any the law requires, no paid leave,
+  two weeks' notice; an internship's supervision, stipend, its period in the offer's Additional
+  Terms, one week's notice). Operations & People adopt or change them on Offer Settings · Standard
+  Offer Letter. They live in the shipped file (`templates/documents/offer-letter.html`, version 0),
+  not a seed, so a wording MyCity has saved stays theirs; Restore Default brings in the new text. An
+  offer approved under version 0 renders with the file as it stands: a contractor's, consultant's or
+  intern's offer approved before this change and not yet signed reads the new clauses from then on
+  (an employee's reads exactly as before). Before release, check for one:
+  `SELECT number FROM offer WHERE terms_version = 0 AND status IN ('approved','sent') AND employment_type IN ('contractor','consultant','intern')`.
+
 Open, for MyCity: the privacy notice's wording (`onboarding.upload.privacyNotice`) is written from
 what the system does; Operations & People to confirm it before go-live.
 
@@ -556,6 +593,8 @@ Decided 12/11/2026 (AJ), found filming the Milestone 5 video:
   own and stops none: the hire may have the page open, sending the rest.
 
 ## 14 · Change log
+
+- 24/11/2026 · JP · QA audit fixes (JBS Praxis's decisions, §3 steps 1 to 3, §6, §10, §13): BG-001, Basic Salary above ₦0 at New Offer, Edit and Submit, no pay line below zero, an intern at ₦0 with `zero_basic_reason` shown to the approvers, the draft's Basic Salary empty with no range (`OfferDraftPayLine`), the card's basic salary above ₦0; BG-008, Submit and Send refuse a start date that has passed (`START_PAST`), said under the record's buttons; BG-009, `is_employee`, `is_contractor`, `is_consultant`, `is_intern` in `OfferLetterVars` and the shipped wording's drafted contractor, consultant and intern clauses (employee wording unchanged).
 
 - 16/11/2026 · TB · §9: the Document Centre's Library lists the letter an offer holds and the contract a hire holds, the sealed copy once signed (`offers.library.js`, `employment_contracts.library.js`; `document-centre.md` §6.2), by the vault's default rule. Nothing on Offers or Onboarding changed.
 - 13/11/2026 · JP · Praxis AI's offer and onboarding summaries (`praxis-ai.md` Appendix B PR 5, §9): offers and cases in figures for the Overview's charts, within the lists' own scope, an offer's pay only for a reader who sees pay. No screen changed.

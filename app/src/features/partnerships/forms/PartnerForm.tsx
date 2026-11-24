@@ -5,7 +5,7 @@ import { upload } from "@/api/upload";
 import { invalidate, useMutation } from "@/api/hooks";
 import { CheckboxField, Field, toast, UploadField, useContractForm, Wizard, type PlaceValue } from "@mycity/ui";
 import { failed, useCategoryDefaults, useFieldDefs, useHoldsMoney, useStages } from "../lib";
-import { DuplicateNotice } from "./LeadForm";
+import { duplicateAskOf, DuplicateNotice } from "./LeadForm";
 import { checkedOnWire, ContactPart, contactStart, customForCreate, DealPart, dealBody, dealOnWire, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
 
 /**
@@ -48,6 +48,7 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
     if (!deal.values.stage && signed[0]) deal.set("stage", signed[0].code);
   }, [signed, deal]);
   const save = useMutation("POST /api/v1/partnerships/partners");
+  const ask = duplicateAskOf(org.values, contact.values);
   const submit = async () => {
     if (!evidence.copy && !evidence.before) {
       setProblem("Attach the signed copy");
@@ -98,12 +99,21 @@ export function PartnerForm({ close, onCreated }: { close: () => void; onCreated
           check: () => org.check(),
           body: (
             <>
-              <DuplicateNotice name={org.values.name} />
+              <DuplicateNotice {...ask} />
               <OrganisationPart f={org as unknown as Bound} kind="partner" owner={me} custom={partnerDefs} />
             </>
           ),
         },
-        { title: "Contact", check: () => contact.check(), body: <ContactPart f={contact as unknown as Bound} /> },
+        {
+          title: "Contact",
+          check: () => contact.check(),
+          body: (
+            <>
+              <DuplicateNotice {...ask} />
+              <ContactPart f={contact as unknown as Bound} />
+            </>
+          ),
+        },
         {
           title: "Signed Deal",
           check: () => deal.check(),

@@ -52,7 +52,6 @@ import {
   useContractForm,
   useModal,
   useIsPhone,
-  useUnsavedChanges,
 } from "@mycity/ui";
 import { MyCard } from "./MyCard";
 import { ScheduleForm } from "./ScheduleInterview";
@@ -415,7 +414,6 @@ function CancelForm({ interview, close, onSaved }: { interview: InterviewDetail;
 
 function ReportForm({ interview, close, onSaved }: { interview: InterviewDetail; close: () => void; onSaved: () => void }) {
   const f = useContractForm({ report: interview.round.report ?? "", decision: interview.round.decision ?? "" }, interviewSchemas.RoundReport);
-  useUnsavedChanges(f.isDirty);
   const save = useMutation("PUT /api/v1/recruitment/interviews/:id/report");
   const [problem, setProblem] = useState<string | null>(null);
   const submit = async () => {

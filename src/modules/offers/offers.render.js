@@ -40,6 +40,18 @@ const PATTERN = { on_site: "On site", hybrid: "Hybrid", remote: "Remote" };
 const FROM_VACANCY = Object.freeze({ full_time: "full_time", part_time: "part_time", contract: "contractor", internship: "intern" });
 const employmentFromVacancy = (type) => (type ? FROM_VACANCY[type] || null : null);
 
+/**
+ * The employment type as the standard wording's flags (OfferLetterVars), so Offer Settings can word
+ * an employee's, a contractor's, a consultant's and an intern's letter apart with {{#if}}: the
+ * template language compares nothing, it only asks whether a value is set. All false with no type.
+ */
+const typeFlags = (type) => ({
+  is_employee: type === "full_time" || type === "part_time",
+  is_contractor: type === "contractor",
+  is_consultant: type === "consultant",
+  is_intern: type === "intern",
+});
+
 const day = (v) => (v ? (v instanceof Date ? lagos.dateOf(v) : String(v).slice(0, 10)) : null);
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
@@ -72,6 +84,7 @@ function varsOf(o, pay, { company, signatory = null, date = null, sealing = null
     location: o.worksite_name || o.vacancy_location || null,
     start_date: day(o.start_date),
     employment_type: EMPLOYMENT[o.employment_type] || null,
+    ...typeFlags(o.employment_type),
     work_pattern: PATTERN[o.work_pattern] || null,
     office_days: o.work_pattern === "hybrid" && o.office_days ? Number(o.office_days) : null,
     probation_months: o.probation_months === null || o.probation_months === undefined ? null : Number(o.probation_months),
@@ -163,4 +176,4 @@ async function lines(db, o, vars) {
   return out;
 }
 
-module.exports = { TEMPLATE, EMPLOYMENT, PATTERN, FROM_VACANCY, employmentFromVacancy, varsOf, canonicalOf, appendixOf, textBlocks, wordingOf, lines, totalOf, annualOf };
+module.exports = { TEMPLATE, EMPLOYMENT, PATTERN, FROM_VACANCY, employmentFromVacancy, typeFlags, varsOf, canonicalOf, appendixOf, textBlocks, wordingOf, lines, totalOf, annualOf };

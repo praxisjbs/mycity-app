@@ -53,6 +53,49 @@ describe("the employment type", () => {
   });
 });
 
+describe("the letter for each employment type (QA audit BG-009)", () => {
+  const templates = require("../../shared/templates/template-store");
+  const { renderMarkdown } = require("../../shared/documents/render");
+  const c = require("@mycity/contract");
+  const offer = { number: "OFF-0001", candidate_name: "Chidi Okafor", candidate_first_name: "Chidi", candidate_email: "chidi@example.test", job_title: "Content Producer", reports_to: "Head of Content", start_date: "2026-12-14", work_pattern: "on_site", job_description: "Produce the guides.", expires_at: null };
+  const pay = [{ name: "Basic Salary", monthly_amount: "200000.00" }];
+  const letter = (type) => {
+    const vars = render.varsOf({ ...offer, employment_type: type }, pay, { company: "MyCity App Ltd", date: "2026-11-24" });
+    expect(c.offers.OfferLetterVars.safeParse(vars).success).toBe(true);
+    return render.textBlocks(renderMarkdown(templates.shipped("document", render.TEMPLATE).body, vars)).join("\n");
+  };
+
+  test("the flags name one type each, and none while a draft has no type", () => {
+    expect(render.typeFlags("full_time")).toEqual({ is_employee: true, is_contractor: false, is_consultant: false, is_intern: false });
+    expect(render.typeFlags("part_time").is_employee).toBe(true);
+    expect(render.typeFlags("contractor")).toEqual({ is_employee: false, is_contractor: true, is_consultant: false, is_intern: false });
+    expect(render.typeFlags("consultant").is_consultant).toBe(true);
+    expect(render.typeFlags("intern").is_intern).toBe(true);
+    expect(Object.values(render.typeFlags(null)).some(Boolean)).toBe(false);
+  });
+
+  test("an employee's letter, or one with no type yet, keeps the employee wording; the others drop it", () => {
+    for (const type of ["full_time", "part_time", null]) {
+      const t = letter(type);
+      expect(t).toContain("1.1 You are employed as Content Producer.");
+      expect(t).toContain("1.3 You shall devote your full working time");
+      expect(t).toContain("including PAYE tax and pension contributions where applicable");
+    }
+    for (const [type, word] of [["contractor", "contractor"], ["consultant", "consultant"]]) {
+      const t = letter(type);
+      expect(t).toContain(`1.1 You are engaged as an independent ${word} to provide services as Content Producer.`);
+      expect(t).toContain("The Company makes no PAYE tax or pension deduction from your fees");
+      expect(t).toContain("nothing in this letter creates an employment relationship");
+      expect(t).not.toMatch(/You are employed as|You shall devote your full working time|Probation and Confirmation/);
+    }
+    const intern = letter("intern");
+    expect(intern).toContain("1.1 You are offered an internship as Content Producer.");
+    expect(intern).toContain("1.2 You will be supervised by the Head of Content, who will set your learning objectives");
+    expect(intern).toContain("3.1 Your monthly stipend is as follows:");
+    expect(intern).not.toMatch(/You are employed as|PAYE tax and pension contributions/);
+  });
+});
+
 describe("routes", () => {
   test("every route holds a recruitment grant; New Offer needs create, the writes edit, the company's signature view", () => {
     const rs = routesOf(routes.router);

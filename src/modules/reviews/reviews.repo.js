@@ -29,6 +29,7 @@ const ROW = `pr.performance_review_id, pr.performance_cycle_id, c.name AS round_
   pr.review_kind, pr.review_type, pr.status, pr.employee_id, ${PERSON("e", "ed")} AS employee,
   pr.reviewer_employee_id, ${PERSON("r", "rd")} AS reviewer, pr.check_in_submitted_at, pr.submitted_at, pr.closed_at,
   trim_scale(pr.score_month)::text AS score_month, trim_scale(pr.score_to_date)::text AS score_to_date, pr.rating,
+  trim_scale(pr.weight_scored)::text AS weight_scored, trim_scale(pr.weight_total)::text AS weight_total,
   (${DUE}) AS due_on, pr.dotted_employee_id, ${PERSON("dm", "dd")} AS dotted, pr.dotted_input, pr.dotted_input_at,
   pr.second_level_employee_id, ${PERSON("sl", "sld")} AS second_level, pr.conduct_breach, pr.conduct_note,
   pr.probation_outcome, pr.returned_reason, pr.no_check_in_at, pr.no_check_in_reason, pr.withdrawn_at, pr.withdrawn_reason,
@@ -230,7 +231,7 @@ function ofEmployee(db, employeeId, query) {
 const REVIEW_WRITABLE = [
   "performance_cycle_id", "scorecard_id", "employee_id", "reviewer_employee_id", "review_type", "review_kind",
   "status", "check_in_submitted_at", "submitted_at", "closed_at", "returned_reason", "workflow_instance_id",
-  "dotted_employee_id", "dotted_input", "dotted_input_at", "second_level_employee_id", "score_month", "score_to_date",
+  "dotted_employee_id", "dotted_input", "dotted_input_at", "second_level_employee_id", "score_month", "score_to_date", "weight_scored", "weight_total",
   "rating", "conduct_breach", "conduct_note", "probation_outcome", "document_id", "no_check_in_at", "no_check_in_reason",
   "withdrawn_at", "withdrawn_reason",
 ];
@@ -554,8 +555,15 @@ async function closedMonths(db, scorecardId) {
   return rows;
 }
 
-const setScorecardScore = (client, scorecardId, { score_to_date: s, rating }) =>
-  client.query("UPDATE scorecard SET score_to_date = $2, rating = $3 WHERE scorecard_id = $1", [scorecardId, s, rating]);
+/** A closed review's score to date, rating and coverage, onto its scorecard. */
+const setScorecardScore = (client, scorecardId, { score_to_date: s, rating, weight_scored: scored = null, weight_total: total = null }) =>
+  client.query("UPDATE scorecard SET score_to_date = $2, rating = $3, weight_scored = $4, weight_total = $5 WHERE scorecard_id = $1", [
+    scorecardId,
+    s,
+    rating,
+    scored,
+    total,
+  ]);
 
 /** Has a person had a probation extended before (at most once, as the handbook allows)? */
 const extendedBefore = async (db, employeeId, exceptId) =>

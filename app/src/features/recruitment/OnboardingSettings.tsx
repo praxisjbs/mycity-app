@@ -35,7 +35,6 @@ import {
   useConfirm,
   useContractForm,
   useModal,
-  useUnsavedChanges,
 } from "@mycity/ui";
 import { say, sayRefusal } from "./shared";
 
@@ -152,7 +151,6 @@ function RequirementForm({ row, close }: { row: DocumentRequirement | null; clos
     // A new requirement is made with its code; an edit never sends one (a code is kept once made).
     (row ? onboardingSchemas.DocumentRequirementEdit : onboardingSchemas.DocumentRequirementCreate) as never,
   );
-  useUnsavedChanges(f.isDirty);
   const create = useMutation("POST /api/v1/recruitment/onboarding/requirements");
   const save = useMutation("PATCH /api/v1/recruitment/onboarding/requirements/:id");
   const [problem, setProblem] = useState<string | null>(null);
@@ -262,7 +260,6 @@ function PlanForm({ plan, close }: { plan: OnboardingPlan | null; close: () => v
     },
     onboardingSchemas.OnboardingPlanSave as never,
   );
-  useUnsavedChanges(f.isDirty);
   const create = useMutation("POST /api/v1/recruitment/onboarding/plans");
   const save = useMutation("PUT /api/v1/recruitment/onboarding/plans/:id");
   const [problem, setProblem] = useState<string | null>(null);
@@ -400,7 +397,6 @@ function ContractForm({ close }: { close: () => void }) {
 
 function ContractFields({ wording, close }: { wording: { body: string; version: number; is_default: boolean; variables: string[]; updated_at: string | null }; close: () => void }) {
   const f = useContractForm({ body: wording.body }, contractSchemas.ContractTemplateSave);
-  useUnsavedChanges(f.isDirty);
   const save = useMutation("PUT /api/v1/recruitment/contracts/settings/template");
   const restore = useMutation("POST /api/v1/recruitment/contracts/settings/template/restore");
   const confirm = useConfirm();

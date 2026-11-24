@@ -180,6 +180,31 @@ describeDb("staff nomenclature against the real migrations", () => {
     expect(result.stats.error).toBe(0);
     await expectChartNames();
     expect(await department("Technology")).toBeUndefined();
+
+    // Operations & People Lead is Obianuju Nwoye's post from 01/11/2026; Cynthia, who held it, has left (QA BG-004).
+    const lead = (
+      await rows(
+        `SELECT e.first_name, e.last_name, e.staff_number::text AS staff_number, e.work_email::text AS work_email, e.start_date::text AS start_date,
+                d.name AS department, d.head_employee_id = e.employee_id AS heads,
+                ARRAY(SELECT r.code::text FROM user_role ur JOIN role r ON r.role_id = ur.role_id WHERE ur.user_id = u.user_id ORDER BY r.code) AS roles
+           FROM employee e JOIN department d ON d.department_id = e.department_id
+           JOIN app_user u ON u.employee_id = e.employee_id
+          WHERE e.job_title = 'Operations & People Lead'`,
+      )
+    );
+    expect(lead).toEqual([
+      {
+        first_name: "Obianuju",
+        last_name: "Nwoye",
+        staff_number: "00038",
+        work_email: "obianuju@mycityapp.io",
+        start_date: "2026-11-01",
+        department: "People & Culture",
+        heads: true,
+        roles: expect.arrayContaining(["operations_people"]),
+      },
+    ]);
+    expect(await rows("SELECT 1 FROM employee WHERE last_name = 'Osakunih' OR staff_number = '00018' OR work_email = 'cynthia@mycityapp.io'")).toEqual([]);
   });
 
   test("an edit made on screen stays", async () => {

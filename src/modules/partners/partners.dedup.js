@@ -7,7 +7,10 @@
  * Candidates come from SQL (a similar name by trigram, a contact's email or phone, the website's
  * host), at most 25; shared/dedup scores them, and a match is 55 or more:
  *
- *   name      60, in proportion to the words shared when not the same (company suffixes dropped)
+ *   name      60 when the same (company suffixes dropped, abbreviations written out, plurals made
+ *             singular: "Kora St Kitchens Ltd" is "kora street kitchen"); 55, a match on its own,
+ *             when similar: 60% of the words shared or a trigram likeness of 0.6, the one the SQL
+ *             already measured ("Kora Strt Kitchens")
  *   email     60, a contact's address
  *   website   55, the same host
  *   phone     45, a contact's number
@@ -20,7 +23,7 @@ const dedup = require("../../shared/dedup/dedup");
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
 
 const SIGNALS = [
-  { key: "name", weight: 60, normalize: dedup.norm.company, label: "name", similar: true },
+  { key: "name", weight: 60, similarWeight: 55, normalize: dedup.norm.company, label: "name", similar: true },
   { key: "email", weight: 60, normalize: dedup.norm.email, label: "email" },
   { key: "website", weight: 55, label: "website" },
   { key: "phone", weight: 45, normalize: dedup.norm.phone, label: "phone" },
@@ -82,6 +85,7 @@ async function find(query) {
   const candidates = page.data.map((r) => ({
     key: `${r.type}:${r.id}`,
     name: r.name,
+    likeness: { name: Number(r.likeness) || 0 },
     email: r.email_match ? query.email : null,
     phone: r.phone_match ? query.phone : null,
     website: r.host_match ? host : null,

@@ -5,7 +5,8 @@
  *
  *   list(), get(), summary(), draft()   what Recruitment · Offers reads
  *   create(), edit()                    New Offer and a draft's edits: monthly pay lines, the total
- *                                       checked against the vacancy's monthly range (outside it, a reason)
+ *                                       checked against the vacancy's monthly range (outside it, a reason),
+ *                                       Basic Salary above ₦0 (an intern's at ₦0 with a reason)
  *   submit()                            Submit for Approval: the `recruitment.offer` flow, kept as it
  *                                       was when submitted (the instance holds its definition)
  *   settleApproval()                    the flow's outcome (outbox): approved generates the letter and
@@ -182,6 +183,7 @@ async function detailOf(db, o, user) {
     salary_min: o.salary_min ? money.toWire(o.salary_min) : null,
     salary_max: o.salary_max ? money.toWire(o.salary_max) : null,
     range_reason: o.range_reason,
+    zero_basic_reason: terms.zero_basic_reason || null,
     job_description: o.job_description,
     additional_terms: o.additional_terms,
     working_hours: o.working_hours,
@@ -332,7 +334,8 @@ async function draft(applicationId, _user, scope) {
     salary_min: v.salary_min ? money.toWire(v.salary_min) : null,
     salary_max: v.salary_max ? money.toWire(v.salary_max) : null,
     job_description: v.description || null,
-    pay_lines: [{ name: "Basic Salary", monthly_amount: v.salary_min ? money.toWire(v.salary_min) : "0.00" }],
+    // Empty, never 0.00, when the vacancy has no range: the person types the salary (BG-001).
+    pay_lines: [{ name: "Basic Salary", monthly_amount: v.salary_min ? money.toWire(v.salary_min) : null }],
     score: card && card.weighted_total !== null ? Number(card.weighted_total) : null,
   };
 }
@@ -344,6 +347,8 @@ async function draft(applicationId, _user, scope) {
 /** The pay lines, their total against the vacancy's monthly range, and the columns they set. */
 function payOf(lines, v, reason) {
   if (!lines.length) throw refused("NO_PAY", "Add a pay line", 422, { pay_lines: ["Add a pay line"] });
+  const negative = lines.findIndex((l) => money.compare(l.monthly_amount, "0.00") < 0);
+  if (negative >= 0) throw refused("PAY_NEGATIVE", "A pay line cannot be below zero", 422, { [`pay_lines.${negative}.monthly_amount`]: ["Not below zero"] });
   const total = money.sum(lines.map((l) => l.monthly_amount));
   const below = v.salary_min && money.compare(total, v.salary_min) < 0;
   const above = v.salary_max && money.compare(total, v.salary_max) > 0;
@@ -356,7 +361,26 @@ function payOf(lines, v, reason) {
   };
 }
 
-/** The columns of OfferFields; `terms` keeps valid_days and benefits. */
+/**
+ * Basic Salary, the first pay line, is above ₦0 (JBS Praxis, 24/11/2026): an offer at ₦0 must not reach
+ * an approver or a candidate. An internship may carry none, but only with a reason the approvers read.
+ * Asked at New Offer, at each edit and again at Submit for Approval (a draft written before the rule).
+ * @returns {string|null} the reason to keep in `terms`, null when Basic Salary is above ₦0
+ */
+function zeroBasicReasonOf(lines, employmentType, reason) {
+  const basic = lines[0];
+  if (!basic || money.compare(basic.monthly_amount, "0.00") > 0) return null;
+  if (employmentType !== "intern")
+    throw refused("NO_BASIC_SALARY", "Basic Salary must be above ₦0", 422, { "pay_lines.0.monthly_amount": ["Enter an amount"] });
+  if (!reason) throw refused("ZERO_BASIC_REASON", "Say why this internship has no basic salary", 422, { zero_basic_reason: ["Say why"] });
+  return reason;
+}
+
+/** A start date already gone (the day in Lagos): refused when the offer is written, submitted or sent. */
+const startPast = (startDate, message = "The start date has passed") =>
+  startDate && String(startDate).slice(0, 10) < lagos.today() ? refused("START_PAST", message, 422, { start_date: ["Pick a later date"] }) : null;
+
+/** The columns of OfferFields; `terms` keeps valid_days, benefits and zero_basic_reason. */
 function columnsOf(body, terms) {
   const out = {};
   for (const k of [
@@ -378,8 +402,8 @@ function columnsOf(body, terms) {
     "additional_terms",
   ])
     if (body[k] !== undefined) out[k] = body[k];
-  if (body.start_date !== undefined && body.start_date < lagos.today())
-    throw refused("START_PAST", "The start date has passed", 422, { start_date: ["Pick a later date"] });
+  const gone = body.start_date !== undefined ? startPast(body.start_date) : null;
+  if (gone) throw gone;
   const next = { ...terms };
   if (body.valid_days !== undefined) next.valid_days = body.valid_days || VALID.default;
   if (body.benefits !== undefined) next.benefits = body.benefits || null;
@@ -405,6 +429,9 @@ async function createIn(client, actor, scope, body) {
   const v = await repo.vacancyTerms(client, a.vacancy_id);
   const lines = body.pay_lines;
   const card = await candidates.scorecardOf(client, a.application_id);
+  const columns = columnsOf({ department_id: v.department_id, worksite_id: v.worksite_id, ...stripBlank(body) }, { valid_days: VALID.default });
+  const pay = payOf(lines, v, body.range_reason);
+  columns.terms.zero_basic_reason = zeroBasicReasonOf(lines, body.employment_type || null, body.zero_basic_reason || null);
   const { number } = await numbering.allocate(client, "offer", { date: lagos.today() });
   let id;
   try {
@@ -415,8 +442,8 @@ async function createIn(client, actor, scope, body) {
       created_by: actor.user_id,
       score_snapshot: card && card.weighted_total !== null ? card.weighted_total : null,
       decision_snapshot: await repo.interviewDecision(client, a.application_id),
-      ...columnsOf({ department_id: v.department_id, worksite_id: v.worksite_id, ...stripBlank(body) }, { valid_days: VALID.default }),
-      ...payOf(lines, v, body.range_reason),
+      ...columns,
+      ...pay,
     });
   } catch (err) {
     if (err.code === "23505") throw refused("OFFER_OPEN", "This candidate already has an open offer");
@@ -460,6 +487,9 @@ async function edit(actor, scope, id, body) {
     const lines = body.pay_lines || (await repo.payLines(client, id));
     const reason = body.range_reason !== undefined ? body.range_reason : o.range_reason;
     Object.assign(patch, payOf(lines, { salary_min: o.salary_min, salary_max: o.salary_max }, reason));
+    const type = body.employment_type !== undefined ? body.employment_type : o.employment_type;
+    const zero = body.zero_basic_reason !== undefined ? body.zero_basic_reason : (o.terms || {}).zero_basic_reason;
+    patch.terms.zero_basic_reason = zeroBasicReasonOf(lines, type || null, zero || null);
     await repo.update(client, id, patch);
     if (body.pay_lines) await repo.setPayLines(client, id, body.pay_lines);
     const after = await repo.get(client, id);
@@ -478,12 +508,17 @@ async function submit(actor, scope, id) {
     if (!(await mayEdit(actor, o))) throw notFound();
     if (o.status !== "draft") throw refused("NOT_DRAFT", "Only a draft offer can be submitted");
     if (!o.start_date) throw refused("NO_START", "Set the start date", 422, { start_date: ["Set the start date"] });
+    // Approval can take days: a start date that has passed since the draft was written goes back to Edit Offer.
+    const gone = startPast(o.start_date, "The start date has passed. Change it in Edit Offer.");
+    if (gone) throw gone;
     if (!o.department_id) throw refused("NO_DEPARTMENT", "Set the department", 422, { department_id: ["Set the department"] });
     // The employee is created from these at acceptance (guide §6), so an approved offer can always
     // be accepted: both are NOT NULL on the employee record.
     if (!o.employment_type)
       throw refused("NO_EMPLOYMENT_TYPE", "Set the employment type", 422, { employment_type: ["Set the employment type"] });
     if (!o.work_pattern) throw refused("NO_WORK_PATTERN", "Set the work pattern", 422, { work_pattern: ["Set the work pattern"] });
+    // A draft written before the Basic Salary rule is held to it here, so no ₦0 offer reaches an approver.
+    zeroBasicReasonOf(await repo.payLines(client, id), o.employment_type, (o.terms || {}).zero_basic_reason || null);
     const signatory = await repo.signatory(client);
     if (!signatory || !signatory.user_id)
       throw refused("NO_SIGNATORY", "Name the Offer Signatory in Offers settings first");
@@ -624,6 +659,10 @@ async function send(actor, scope, id) {
     if (o.status !== "approved") throw refused("NOT_APPROVED", "Only an approved offer can be sent");
     const company = o.signature_request_id ? (await signatures.signersOf(client, o.signature_request_id)).find((s) => s.role === "mycity") : null;
     if (!company || company.status !== "signed") throw refused("NOT_SIGNED", "The company has not signed yet");
+    // The approval and the company's signature took long enough for the start date to pass: an approved
+    // offer cannot be edited, so it is withdrawn and made again with a later date (BG-008).
+    const gone = startPast(o.start_date, "The start date has passed. Withdraw it and make a new offer.");
+    if (gone) throw gone;
     // An accepted offer builds its checklist from the requirements in force, so an empty list would
     // open a case with nothing to ask the hire for (guide §11).
     // Acceptance creates an employee: someone already on the staff moves through People, not a hire.

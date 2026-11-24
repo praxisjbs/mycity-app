@@ -1578,6 +1578,78 @@ describeDb("the organisation module against the real migrations", () => {
       expect(res.body.mapping.columns.map((col) => col.header).slice(0, 4)).toEqual(["Ref", "Who", "Post", "Unit"]);
     });
 
+    test("a post's new holder, already added on screen, replaces the leaver's row: no second record, nothing written over, the leaver left as they are (QA BG-004)", async () => {
+      // As on staging: the roster loaded the post's first holder, who then left (archived on screen);
+      // the new holder was added on screen; the sheet then names the new holder on the post's row.
+      const clearingRoles = (email) => {
+        const file = path.join(temp, "roles-clearing.json");
+        fs.writeFileSync(
+          file,
+          JSON.stringify({
+            default: { roles: ["employee"] },
+            by_job_title: {
+              "Chief Executive Officer": { roles: ["management"], is_ceo: true },
+              "Head of Trading": { roles: ["head_of_department"], work_email: "trading@mycity.test" },
+              "Head of Clearing": { roles: ["manager"], work_email: email },
+            },
+          }),
+        );
+        return file;
+      };
+      const postRow = (number, name, gender) => [number, name, "Head of Clearing", "Trading Desk", gender, new Date(Date.UTC(2026, 0, 5)), "", "Zuri Danladi", "", "#0000000000", "FTE", "Remote", "Mon - Fri", ""];
+      const first = path.join(temp, "clearing-first.xlsx");
+      fs.writeFileSync(first, await sheet([...rows(), postRow("T0901", "Ruth Ade", "Female")]));
+      const loaded = await loader.loadStaff({ db: pool, sheet: first, rolesFile: clearingRoles("clearing@mycity.test"), nomenclatureFile: namesFile() });
+      expect(loaded.stats).toMatchObject({ error: 0 });
+      const ruth = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0901'");
+      expect((await asOps()(request(app).post(`/api/v1/employees/${ruth.employee_id}/archive`)).send({ archive_reason: "Left MyCity" })).status).toBe(200);
+
+      const trading = await one("SELECT department_id FROM department WHERE name = 'Trading Desk'");
+      const zuri = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0001'");
+      const added = await asOps()(request(app).post("/api/v1/employees")).send({
+        line_manager_id: zuri.employee_id,
+        first_name: "Ngozi",
+        last_name: "Eze",
+        work_email: "ngozi.clearing@mycity.test",
+        phone: "08031234599",
+        job_title: "Head of Clearing",
+        start_date: "2026-11-01",
+        employment_type: "full_time",
+        work_pattern: "remote",
+        department_id: trading.department_id,
+      });
+      expect(added.status).toBe(201);
+      const ngozi = await one(
+        "SELECT employee_id, staff_number::text AS staff_number, phone, start_date, gender, line_manager_id FROM employee WHERE employee_id = $1",
+        [added.body.employee_id],
+      );
+
+      const replaced = path.join(temp, "clearing-replaced.xlsx");
+      fs.writeFileSync(replaced, await sheet([...rows(), postRow(ngozi.staff_number, "Ngozi Eze", "")]));
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: replaced, rolesFile: clearingRoles("ngozi.clearing@mycity.test"), nomenclatureFile: namesFile(), log: (m) => log.push(m) });
+      expect(result.status).toBe("loaded");
+      expect(result.stats).toMatchObject({ create: 0, update: 0, error: 0 });
+      expect(log.join("\n")).not.toMatch(/WARNING/);
+
+      // One record for the new holder, as entered on screen; the roster gives no login to someone People added.
+      expect(await one("SELECT count(*)::int AS n FROM employee WHERE first_name = 'Ngozi' AND last_name = 'Eze'")).toEqual({ n: 1 });
+      expect(
+        await one("SELECT employee_id, staff_number::text AS staff_number, phone, start_date, gender, line_manager_id FROM employee WHERE work_email = 'ngozi.clearing@mycity.test'"),
+      ).toEqual(ngozi);
+      expect(await one("SELECT 1 AS x FROM app_user WHERE employee_id = $1", [ngozi.employee_id])).toBeUndefined();
+
+      // The leaver keeps their number and stays archived: nothing restores, renumbers or deletes them.
+      expect(
+        await one("SELECT status, staff_number::text AS staff_number, work_email::text AS work_email FROM employee WHERE employee_id = $1", [ruth.employee_id]),
+      ).toEqual({ status: "archived", staff_number: "T0901", work_email: "clearing@mycity.test" });
+
+      // A second deploy of the same sheet changes nothing.
+      const again = await loader.loadStaff({ db: pool, sheet: replaced, rolesFile: clearingRoles("ngozi.clearing@mycity.test"), nomenclatureFile: namesFile() });
+      expect(again.status).toBe("already_loaded");
+      expect((await one("SELECT status FROM employee WHERE employee_id = $1", [ruth.employee_id])).status).toBe("archived");
+    });
+
     test("no sheet in the build means nothing happens at all", async () => {
       const result = await loader.loadStaff({ db: pool, sheet: path.join(temp, "missing.xlsx") });
       expect(result.status).toBe("no_sheet");

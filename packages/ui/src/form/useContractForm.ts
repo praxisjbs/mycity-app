@@ -20,10 +20,21 @@
  * outside the field's min and max). Messages are at most 4
  * words (gate 12): the contract's own message when it is that short, else a
  * short one chosen by the kind of problem.
+ *
+ * Unsaved changes: the form tells the modal, side panel or sheet around it
+ * whether it holds changes (useUnsavedChanges), so Esc, the scrim, the close
+ * button or a drag asks once before discarding them (FRONTEND_GUIDE §8.4), a
+ * wizard's steps included. A successful save clears it: submit() does so when
+ * its save settles with no refusal (no rejection, no server marks, no error
+ * toast, not `false`); a form saved through check() calls saved(), or reset().
+ * A save that closes its overlay with `close` is not a dismissal and never asks.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm as useHookForm, type DefaultValues, type FieldErrors, type FieldValues, type Path, type PathValue, type Resolver } from "react-hook-form";
 import type { FieldBinding, FieldState, ServerFields } from "./binding";
+import { useUnsavedChanges } from "../overlay/context";
+import { isThenable } from "../actions/press";
+import { errorToastCount } from "../feedback/toast";
 
 /** Milliseconds of no typing after which an untouched field is first checked. */
 export const PAUSE_MS = 600;
@@ -42,6 +53,11 @@ export interface ContractSchema {
 export interface ContractFormOptions {
   /** The pause before an untouched field is first checked; 600 ms. */
   pauseMs?: number;
+  /**
+   * false: the overlay around it is not told of its changes (a search or filter box that holds
+   * nothing worth keeping). Default true.
+   */
+  unsaved?: boolean;
 }
 
 const words = (s: string) => s.trim().split(/\s+/).filter((w) => /\p{L}/u.test(w));
@@ -175,6 +191,11 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
   const [own, setOwn] = useState<Record<string, string>>({});
   const timers = useRef<Record<string, number>>({});
   useEffect(() => () => Object.values(timers.current).forEach((t) => window.clearTimeout(t)), []);
+  // Each refusal the server marks on the form, so a save can tell it was refused.
+  const refusals = useRef(0);
+
+  const isDirty = form.formState.isDirty;
+  useUnsavedChanges(options.unsaved !== false && isDirty);
 
   const local = useMemo(() => problemsOf(values, rules), [values, rules]);
   const errors = useMemo(() => {
@@ -277,12 +298,24 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
     if (!check()) return;
     const v = form.getValues() as T;
     const r = rulesRef.current;
-    if (isSchema(r)) {
-      const parsed = r.safeParse(v);
-      return onValid((parsed.success ? parsed.data : v) as T);
-    }
-    return onValid(v);
+    const parsed = isSchema(r) ? r.safeParse(v) : null;
+    const before = { refusals: refusals.current, toasts: errorToastCount() };
+    const out = onValid((parsed?.success ? parsed.data : v) as T);
+    // A save that settles with no refusal makes what it sent the saved state: no question on close.
+    // One that catches its own failure still refused (a server mark, an error toast, or `false`).
+    if (isThenable(out))
+      return Promise.resolve(out).then((result) => {
+        if (result !== false && refusals.current === before.refusals && errorToastCount() === before.toasts) saved(v);
+        return result;
+      });
+    return out;
   };
+
+  /**
+   * The values now (or `next`) are what is saved: the form has no unsaved changes until the next
+   * edit, and nothing else changes (its marks stay). For a save that keeps the form open.
+   */
+  const saved = (next?: T) => form.reset((next ?? form.getValues()) as DefaultValues<FieldValues>, { keepValues: true, keepErrors: true, keepTouched: true, keepIsSubmitted: true, keepSubmitCount: true });
 
   /** Back to the initial values (or `next`), with no marks. */
   const reset = (next?: T) => {
@@ -297,7 +330,8 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
   };
 
   /** The server's per-field messages on the marks, each kept to four words like the form's own. */
-  const setServerErrors = (fields: ServerFields) =>
+  const setServerErrors = (fields: ServerFields) => {
+    refusals.current += 1;
     setServer(
       Object.fromEntries(
         // Only a list of messages marks a field: a refusal's details (a mail server's reason, a code) are not marks.
@@ -306,8 +340,9 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
           .map(([k, msgs]) => [k, msgs.map((m) => shortMessage({ type: "custom", message: m }) ?? m)]),
       ),
     );
+  };
 
-  return { values, setValues, set, field, status, errors, check, submit, reset, setServerErrors, isDirty: form.formState.isDirty, valid: Object.keys(errors).length === 0 };
+  return { values, setValues, set, field, status, errors, check, submit, saved, reset, setServerErrors, isDirty, valid: Object.keys(errors).length === 0 };
 }
 
 /** Common INTERIM rules. Messages are at most 4 words (gate 12). */

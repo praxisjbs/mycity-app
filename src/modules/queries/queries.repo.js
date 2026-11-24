@@ -32,7 +32,7 @@ const ROWS = `
               ELSE json_build_object('body', qr.body, 'submitted_at', qr.submitted_at) END AS response,
          (SELECT (array_agg(json_build_object(
                    'sanction_id', s.sanction_id, 'number', s.number::text,
-                   'step_name', COALESCE(cs.name, s.sanction_type), 'status', s.status)
+                   'step_name', COALESCE(cs.name, s.sanction_type), 'position', cs.position, 'status', s.status)
                    ORDER BY s.created_at DESC, s.sanction_id DESC))[1]
             FROM sanction s LEFT JOIN consequence_step cs ON cs.consequence_step_id = s.consequence_step_id
            WHERE s.employee_query_id = q.employee_query_id) AS sanction,

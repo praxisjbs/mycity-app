@@ -60,7 +60,7 @@ export interface ModalProps {
   full?: boolean;
   /** A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. */
   side?: boolean;
-  /** Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. */
+  /** Unsaved changes: a dismissal asks once to discard them. A useContractForm inside says so itself; other changes say so with useUnsavedChanges. */
   dirty?: boolean;
   /** false: Esc, the scrim and a drag do nothing; the close button and the footer still close it. Default true. */
   dismissible?: boolean;
@@ -96,7 +96,14 @@ export function Modal({
 }: ModalProps) {
   const phone = useIsPhone();
   const box = useRef<HTMLDivElement>(null);
+  // Each form inside raises its own flag (useUnsavedChanges); the modal asks while any is up.
+  const raised = useRef(new Set<object>());
   const [formDirty, setFormDirty] = useState(false);
+  const setDirty = useCallback((key: object, on: boolean) => {
+    if (on) raised.current.add(key);
+    else raised.current.delete(key);
+    setFormDirty(raised.current.size > 0);
+  }, []);
   const [asking, setAsking] = useState(false);
   const returnFocus = useReturnFocus(open);
   // Its own group: the page behind may be busy (the button that opened it), and that must not hold it.
@@ -115,7 +122,7 @@ export function Modal({
     if (latest.current.unsaved) setAsking(true);
     else latest.current.onClose();
   }, [isBusy]);
-  const overlay = useMemo<OverlayState>(() => ({ setDirty: setFormDirty, dismiss }), [dismiss]);
+  const overlay = useMemo<OverlayState>(() => ({ setDirty, dismiss }), [setDirty, dismiss]);
 
   useEffect(() => {
     if (!open) setAsking(false);
@@ -123,6 +130,7 @@ export function Modal({
 
   const discard = () => {
     setAsking(false);
+    raised.current.clear();
     setFormDirty(false);
     onClose();
   };
@@ -273,7 +281,7 @@ export interface ModalSpec {
   full?: boolean;
   /** A side panel on desktop. */
   side?: boolean;
-  /** Unsaved changes from the start (forms usually say so with useUnsavedChanges instead). */
+  /** Unsaved changes from the start (a useContractForm inside says so itself). */
   dirty?: boolean;
   /** false: Esc, the scrim and a drag do nothing; the close button and the footer still close it (a prompt that must be answered). */
   dismissible?: boolean;

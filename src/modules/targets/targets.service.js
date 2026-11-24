@@ -66,6 +66,8 @@ function cardView(r) {
     disagreed_at: iso(r.disagreed_at),
     score_to_date: r.score_to_date,
     rating: r.rating,
+    weight_scored: r.weight_scored,
+    weight_total: r.weight_total,
     line_count: r.line_count,
     created_at: iso(r.created_at),
     updated_at: iso(r.updated_at),

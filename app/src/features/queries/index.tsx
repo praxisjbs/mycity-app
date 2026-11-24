@@ -2,13 +2,13 @@ import queries from "@mycity/contract/schemas/queries.js";
 import query_rules from "@mycity/contract/schemas/query_rules.js";
 import sanctions from "@mycity/contract/schemas/sanctions.js";
 import templates from "@mycity/contract/schemas/templates.js";
-import type { ConsequenceStep, LetterTemplate, LetterTemplateDetail, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
+import type { ConsequenceStep, LetterTemplate, LetterTemplateDetail, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction, SanctionStanding } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { saveBlob, useFileBlob } from "@/api/download";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth, useMe } from "@/auth/AuthProvider";
 import { Letter, LetterFile, PolicyCited } from "@/features/shared/Letter";
 import { withSignature } from "@/features/shared/signature";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -21,7 +21,7 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { offToast, WriteWithAiButton, WriteWithAiStep } from "./WriteWithAi";
 import {
   ActionGroup, Button, Card, IconButton, Menu, CardHeader, ChoiceField, Chips, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  DocumentPreview, KeyValue, PdfViewer, ListDetail, LoadingRows, Pager, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useConfirm, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
+  DocumentPreview, KeyValue, PdfViewer, ListDetail, LoadingRows, Pager, Pill, RecordPicker, RichText, RichTextField, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useConfirm, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
 /**
@@ -149,13 +149,35 @@ function useQuerySheet() {
   return (id: string) => modal.open({ title: "Query", wide: true, body: <QueryCard id={id} /> });
 }
 
+/** The help on the rung a new offence is offered, on the card and on Record Decision alike (guide §6.5). */
+const NEXT_STEP_HELP = "The step after the highest one still in force for this person.";
+
+/**
+ * A proposal at or below a rung still in force for the person (guide §6.5, BG-014): the approver
+ * sees the whole standing the proposer may not, so a repeat Caution is a choice made knowingly.
+ * Only a proposal still waiting is marked; nothing more is asked of whoever proposed it.
+ */
+function belowNextStep(sanction: QueryDetail["sanction"], standing: SanctionStanding | undefined): boolean {
+  if (!sanction || sanction.status !== "pending_approval" || sanction.position === null || !standing?.in_force.length) return false;
+  return sanction.position <= Math.max(...standing.in_force.map((s) => s.position));
+}
+
 function QueryCard({ id }: { id: string }) {
   const modal = useModal();
   const q = useApi("GET /api/v1/queries/:id", { params: { id } });
   const remind = useMutation("POST /api/v1/queries/:id/remind");
+  // The person's sanctions in force and the next rung, for a reader who sees every query (Operations &
+  // People approve every sanction, guide §6.4); the API answers no one else. Not once it is resolved.
+  const all = useMe().scopes?.queries === "all";
+  const standing = useApi("GET /api/v1/sanctions/standing", {
+    query: { employee_id: q.data?.employee.employee_id ?? "" },
+    enabled: all && !!q.data && q.data.status !== "resolved",
+  });
   if (q.error) return <ErrorState error={q.error} onRetry={q.reload} />;
   if (!q.data) return <LoadingRows />;
   const d = q.data;
+  const held = all && d.status !== "resolved" ? standing.data : undefined;
+  const below = belowNextStep(d.sanction, held);
   // A sanction settles after the approval commits (the worker issues it): read the card again then.
   const settled = () => {
     q.reload();
@@ -179,7 +201,23 @@ function QueryCard({ id }: { id: string }) {
           ...(d.policy ? ([["Policy", <PolicyCited key="p" policy={d.policy} clause={d.policy_clause} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.response ? ([["Response", <RichText key="r" blocks={d.response.blocks} top={4} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.responded_at ? ([["Responded", formatDateTime(d.responded_at)]] as Array<[string, string]>) : []),
-          ...(d.sanction ? ([["Sanction", sanctionLine(d.sanction)]] as Array<[string, string]>) : []),
+          ...(d.sanction
+            ? ([[
+                "Sanction",
+                below ? (
+                  <span key="s" className="flex flex-wrap items-center gap-2">
+                    {sanctionLine(d.sanction)}
+                    <HelpTerm help="A step at or above it is already in force for this person."><Pill tone="warn">Below Next Step</Pill></HelpTerm>
+                  </span>
+                ) : sanctionLine(d.sanction),
+              ]] as Array<[string, React.ReactNode]>)
+            : []),
+          ...(held
+            ? ([
+                ["In Force", held.in_force.length ? held.in_force.map((s) => `${s.step_name}, ${s.number}${s.in_force_until ? `, until ${formatDate(s.in_force_until)}` : ""}`).join("; ") : "None"],
+                [<HelpTerm key="n" help={NEXT_STEP_HELP}>Next Step</HelpTerm>, held.next_step?.name ?? "None"],
+              ] as Array<[React.ReactNode, string]>)
+            : []),
           ...(d.approval ? ([[<HelpTerm key="w" help={ESCALATED_HELP}>Waiting On</HelpTerm>, d.approval.stage_name]] as Array<[React.ReactNode, string]>) : []),
         ]}
       />
@@ -358,7 +396,7 @@ function Decide({ q, close, onDone, start = "no_action" }: { q: QueryDetail; clo
       </Field>
       {f.values.outcome === "sanction" && (
         <>
-          <Field label={<HelpTerm help="The step after the highest one still in force for this person.">Sanction</HelpTerm>} {...f.status("consequence_step_id")}>
+          <Field label={<HelpTerm help={NEXT_STEP_HELP}>Sanction</HelpTerm>} {...f.status("consequence_step_id")}>
             <SelectField placeholder="Pick a step" options={steps.map((s) => [s.consequence_step_id, s.consequence_step_id === q.next_step?.consequence_step_id ? `${s.name} (Next)` : s.name])} {...f.field("consequence_step_id")} />
           </Field>
           {chosen?.financial_effect === "unpaid_days" && (

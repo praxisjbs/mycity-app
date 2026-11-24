@@ -139,6 +139,31 @@ describeDb("budgets against the real migrations", () => {
     expect(staff.status).toBe(404);
   });
 
+  test("New Request's budget check: the line's and the department's remaining and Over Budget before sending, a read that never blocks (BG-007)", async () => {
+    const check = (who, query) => h.as(who).get("/expenses/mine/budget-check").query(query);
+    const before = (await one("SELECT count(*)::int AS n FROM expense_request")).n;
+
+    // The requester's own department when none is picked: Events has 300,000 left, the department 350,000.
+    const within = await check("staff", { expense_category_id: cat.events, amount: "100000.00" });
+    expect([within.status, within.body.error]).toEqual([200, undefined]);
+    expect(within.body).toEqual({ department_id: dept.programmes, budget_remaining: "300000.00", department_remaining: "350000.00", over_budget: false });
+    // More than the line has left is flagged, as sending would flag it.
+    expect((await check("staff", { expense_category_id: cat.events, department_id: dept.programmes, amount: "300000.01" })).body).toMatchObject({ over_budget: true, budget_remaining: "300000.00" });
+    // No total yet: the figures, and no flag while the line has room.
+    expect((await check("staff", { expense_category_id: cat.events, department_id: "" })).body).toMatchObject({ over_budget: false, budget_remaining: "300000.00" });
+    // A category the department set nothing aside for, and a department with no budget, are flagged.
+    expect((await check("staff", { expense_category_id: cat.office, amount: "5000.00" })).body).toEqual({ department_id: dept.programmes, budget_remaining: null, department_remaining: "350000.00", over_budget: true });
+    const ops = (await one("SELECT department_id FROM employee WHERE employee_id = $1", [h.people.ops.employee_id])).department_id;
+    expect((await check("staff", { expense_category_id: cat.events, department_id: ops, amount: "1.00" })).body).toEqual({ department_id: ops, budget_remaining: null, department_remaining: null, over_budget: true });
+
+    // A category is required and the amount is the contract's; nothing is kept by any of it.
+    expect((await check("staff", { amount: "1.00" })).status).toBe(422);
+    expect((await check("staff", { expense_category_id: cat.events, amount: "1000" })).status).toBe(422);
+    expect((await one("SELECT count(*)::int AS n FROM expense_request")).n).toBe(before);
+    const request = require("supertest");
+    expect((await request(app).get(`/api/v1/expenses/mine/budget-check?expense_category_id=${cat.events}`)).status).toBe(401);
+  });
+
   test("the recount: approved is committed, withdrawn leaves it, paid moves it to spent; a request still deciding is flagged again", async () => {
     const big = await raise({ purpose: "Stage and sound", lines: [{ description: "Stage", unit_price: "250000.00" }] });
     expect(big).toMatchObject({ over_budget: false, budget_remaining: "300000.00", department_remaining: "350000.00" });

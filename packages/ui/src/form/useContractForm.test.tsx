@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { act, render, renderHook, screen } from "@testing-library/react";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import organisation from "@mycity/contract/schemas/organisation.js";
 import { rules, useContractForm, shortMessage } from "./useContractForm";
@@ -7,6 +7,11 @@ import { DateField } from "./DateField";
 import { Field } from "./Field";
 import { TextField } from "./TextField";
 import { Form } from "./Form";
+import { Wizard } from "./Wizard";
+import { Modal } from "../overlay/Modal";
+import { useUnsavedChanges } from "../overlay/context";
+import { installOverlayTestEnv } from "../overlay/test-env";
+import { toast } from "../feedback/toast";
 
 const blank = {
   first_name: "",
@@ -299,5 +304,225 @@ describe("useContractForm and what only a control can see", () => {
     await user.click(screen.getByRole("button", { name: "Save Task" }));
     expect(await screen.findByText("Not a real date")).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+describe("useContractForm and the overlay around it (unsaved changes)", () => {
+  beforeAll(installOverlayTestEnv);
+
+  const named = { name: "", email: "" };
+  const need = { name: rules.required(), email: rules.email };
+
+  /** A two-step wizard in a modal's body, one form per step, as New Lead is. */
+  function LeadWizard({ onClose }: { onClose: () => void }) {
+    return (
+      <Modal open onClose={onClose} title="New Lead">
+        <LeadSteps onCancel={onClose} />
+      </Modal>
+    );
+  }
+
+  function LeadSteps({ onCancel }: { onCancel: () => void }) {
+    const org = useContractForm({ name: "" }, { name: rules.required() });
+    const contact = useContractForm({ email: "" }, { email: rules.email });
+    return (
+      <Wizard
+        finish="Create Lead"
+        onCancel={onCancel}
+        onFinish={() => undefined}
+        steps={[
+          {
+            title: "Organisation",
+            check: () => org.check(),
+            body: (
+              <Field label="Organisation" {...org.status("name")}>
+                <TextField {...org.field("name")} />
+              </Field>
+            ),
+          },
+          {
+            title: "Contact",
+            check: () => contact.check(),
+            body: (
+              <Field label="Email" {...contact.status("email")}>
+                <TextField {...contact.field("email")} />
+              </Field>
+            ),
+          },
+        ]}
+      />
+    );
+  }
+
+  it("closes a wizard with nothing typed at once", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<LeadWizard onClose={onClose} />);
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("asks once before Esc or the close button discards a wizard's entries, from any step", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<LeadWizard onClose={onClose} />);
+    await user.type(screen.getByLabelText("Organisation"), "Lekki Gardens");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(
+      screen.getByRole("heading", { name: "Contact" }),
+    ).toBeInTheDocument();
+
+    // The step in view has nothing typed; the step behind it does.
+    await user.keyboard("{Escape}");
+    expect(
+      screen.getByRole("alertdialog", { name: "Discard Changes" }),
+    ).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Keep Editing" }));
+    expect(
+      screen.getByRole("dialog", { name: "New Lead" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(
+      screen.getAllByRole("alertdialog", { name: "Discard Changes" }),
+    ).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Discard Changes" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  /** One form in a modal that stays open after saving; `extra` is a change the screen holds outside the form. */
+  function StaysOpen({
+    save,
+    onClose,
+    extra = false,
+    alsoScreen = false,
+    unsaved,
+  }: {
+    save: () => unknown;
+    onClose: () => void;
+    extra?: boolean;
+    alsoScreen?: boolean;
+    unsaved?: boolean;
+  }) {
+    function Body() {
+      const f = useContractForm(
+        named,
+        need,
+        unsaved === undefined ? {} : { unsaved },
+      );
+      // A screen that still says so itself, as some did before the form did: one flag each, never a clash.
+      useUnsavedChanges(alsoScreen ? f.isDirty : false);
+      useUnsavedChanges(extra);
+      return (
+        <Form onSubmit={f.submit(save)}>
+          <Field label="Name" {...f.status("name")}>
+            <TextField {...f.field("name")} />
+          </Field>
+          <Field label="Email" {...f.status("email")}>
+            <TextField {...f.field("email")} />
+          </Field>
+          <button type="submit">Save Contact</button>
+        </Form>
+      );
+    }
+    return (
+      <Modal open onClose={onClose} title="Edit Contact">
+        <Body />
+      </Modal>
+    );
+  }
+
+  const fill = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByLabelText("Name"), "Ada");
+    await user.type(screen.getByLabelText("Email"), "ada@mycity.app");
+  };
+
+  it("clears the question once a save succeeds, and raises it again on the next edit", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const save = vi.fn(() => Promise.resolve());
+    render(<StaysOpen save={save} onClose={onClose} alsoScreen />);
+    await fill(user);
+    await user.click(screen.getByRole("button", { name: "Save Contact" }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    await act(async () => undefined);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(onClose).toHaveBeenCalledOnce();
+
+    // The modal here stays open whatever onClose does; the next edit raises the question again.
+    await user.type(screen.getByLabelText("Name"), " Obi");
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("alertdialog", { name: "Discard Changes" })).toBeInTheDocument();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("keeps asking after a save that was refused, whether the server marked a field or only a toast said so", async () => {
+    const user = userEvent.setup();
+    const failToast = vi.fn(() =>
+      Promise.resolve(void toast.error("Not saved. Try again.")),
+    );
+    const { unmount } = render(
+      <StaysOpen save={failToast} onClose={() => undefined} />,
+    );
+    await fill(user);
+    await user.click(screen.getByRole("button", { name: "Save Contact" }));
+    await waitFor(() => expect(failToast).toHaveBeenCalledOnce());
+    await act(async () => undefined);
+    await user.keyboard("{Escape}");
+    expect(
+      screen.getByRole("alertdialog", { name: "Discard Changes" }),
+    ).toBeInTheDocument();
+    unmount();
+
+    const rejected = vi.fn(() => Promise.reject(new Error("422")));
+    render(
+      <StaysOpen
+        save={() => rejected().catch(() => false)}
+        onClose={() => undefined}
+      />,
+    );
+    await fill(user);
+    await user.click(screen.getByRole("button", { name: "Save Contact" }));
+    await waitFor(() => expect(rejected).toHaveBeenCalledOnce());
+    await act(async () => undefined);
+    await user.keyboard("{Escape}");
+    expect(
+      screen.getByRole("alertdialog", { name: "Discard Changes" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the screen's own flag up when the form has none", async () => {
+    const user = userEvent.setup();
+    render(
+      <StaysOpen save={() => undefined} onClose={() => undefined} extra />,
+    );
+    await user.keyboard("{Escape}");
+    expect(
+      screen.getByRole("alertdialog", { name: "Discard Changes" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing for a form that opts out", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <StaysOpen save={() => undefined} onClose={onClose} unsaved={false} />,
+    );
+    await fill(user);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("clears the flag with saved() for a form saved through check()", () => {
+    const { result } = renderHook(() => useContractForm(named, need));
+    act(() => result.current.set("name", "Ada"));
+    expect(result.current.isDirty).toBe(true);
+    act(() => result.current.saved());
+    expect(result.current.isDirty).toBe(false);
+    expect(result.current.values.name).toBe("Ada");
   });
 });

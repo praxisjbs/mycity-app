@@ -6,7 +6,7 @@ are needed before anyone else can be invited from Settings · Users:
 
 | Who | Role (`role_code`) | Why |
 |---|---|---|
-| The build account | `implementation` (Implementation Team) | Full access for the build team while the system is built; suspended (soft) after handover |
+| The build account | `implementation` (Implementation Team) | Full access for the build team while the system is built; its record archived and its login closed at handover (§5) |
 | The operations lead | `operations_people` (Operations & People) | Invites everyone else and gives them their roles |
 
 Everyone else gets a login by invitation (Settings · Users → Invite User, or Send Invite on the
@@ -30,12 +30,18 @@ script refuses if it is not this `.env`'s `APP_ENV`.
 
 The whole employee record is in the script (`BUILD_ACCOUNT` in `scripts/db/create-admin.js`):
 JBS Praxis Implementation Team (known as JBS Praxis), Implementation Partner in the Implementation
-department, consultant, remote, on a contract from 09/10/2026 to 09/12/2026 at ₦1,850,000.00 a
-month, confirmed from the start (a consultant has no probation), with phone 0802 749 2738, date of
-birth, next of kin and bank details. Every field is filled except the home address (an address is
-picked on screen, never typed into a script, F27), the worksite and managers, which a remote first
-account has none of, and the leaving date. You type two
-things: the email (kept as both work and personal email) and the password.
+department, consultant, remote, on a contract from 09/10/2026 to 09/12/2026, confirmed from the
+start (a consultant has no probation), with phone 0802 749 2738, date of birth and next of kin.
+Every field is filled except the home address (an address is picked on screen, never typed into a
+script, F27), the worksite and managers, which a remote first account has none of, the leaving date,
+and the pay and bank details. You type two things: the email (kept as both work and personal email)
+and the password.
+
+**The build account is never paid by MyCity's payroll** (JBS Praxis, 24/11/2026). It has no salary
+and no bank account, and a payroll run leaves out every login holding the Implementation Team role,
+even if someone later gives the record a salary (`docs/guides/payroll.md` §6.1 rule 6). Do not enter
+pay or bank details on it. An account made before 24/11/2026 was given a salary and a placeholder
+bank account; migration `6060_build_account_no_pay.sql` clears both on the next deploy.
 
 ```sh
 cd /srv/mycity/<env>/current
@@ -49,8 +55,7 @@ Password (at least 8 characters, upper and lower case, a number and a symbol): *
 Repeat password: ********
 ```
 
-It prints what it is about to create, then creates it. The bank account number is ten zeros on
-purpose, so no payment run can ever send money to a real account.
+It prints what it is about to create, then creates it.
 
 ## 3 · The operations lead
 
@@ -104,5 +109,16 @@ If the script says a role already has an active holder, add `--allow-additional`
 
 ## 5 · Removing the build account at handover
 
-Settings · Users → the build account → Suspend, with the reason. Suspending ends every session and
-refuses sign-in; the employee record and the audit history stay. Nothing is deleted.
+Close the employee record, not only the login (JBS Praxis, 24/11/2026), so the account is in no
+list, count or run as one of MyCity's staff:
+
+1. On People · Employees, open the build account (JBS Praxis Implementation Team) and press
+   **Archive Record**.
+2. Type the **Reason**, such as `Handover to MyCity`, choose the handover day as the **Last Day**, and
+   press **Archive Record**. The record reads **Archived**, with **Left** as its **Login**, and the
+   login stops working at once.
+3. Open Settings · Users and check the build account reads Suspended or Left. If it still reads
+   Active, press **Suspend** with the reason.
+
+Archiving ends every session and refuses sign-in; the employee record and the audit history stay.
+Nothing is deleted.

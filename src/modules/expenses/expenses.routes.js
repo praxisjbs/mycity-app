@@ -4,6 +4,8 @@
  *
  *   GET   /mine, /mine/summary     the caller's own requests and ESS · My Requests' four cards
  *   GET   /banks                   `expenses` create: the Bank field's suggestions, 25 a page
+ *   GET   /mine/budget-check      `expenses` create: New Request's budget figures and Over Budget
+ *                                  before it is sent (guide §6.6 rule 3); a read, never a block
  *   POST  /mine                    `expenses` create: New Request (`submit` sends it at once)
  *   PATCH /mine/:id                `expenses` edit: a draft or sent-back request of their own
  *   POST  /mine/:id/submit         `expenses` create: Send Request, Send Again
@@ -42,6 +44,10 @@ route(router, "get", "/mine/summary",
 route(router, "get", "/banks",
   { query: x.ExpenseBankListQuery, response: x.ExpenseBankPage, summary: "The banks New Request suggests" },
   requirePermission("expenses", "create"), controller.banks);
+
+route(router, "get", "/mine/budget-check",
+  { query: x.ExpenseBudgetCheckQuery, response: x.ExpenseBudgetCheck, summary: "The budget New Request would count against" },
+  requirePermission("expenses", "create"), controller.budgetCheck);
 
 route(router, "post", "/mine",
   { body: x.ExpenseCreate, response: x.ExpenseRequest, summary: "Raise an expense request" },
