@@ -473,7 +473,7 @@ marks:
 open: /queries?tab=queries
 as: operations
 do:
-  - click: text "QRY-0009"
+  - click: css [data-ui=page] tbody tr:has-text("Client shoot missed"), [data-ui=page] ul[data-copy=content] > li:has-text("Client shoot missed")
   - wait: button "Approve Sanction"
   - click: button "Approve Sanction"
   - wait: label "Your Signature"
