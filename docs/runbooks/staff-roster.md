@@ -112,7 +112,7 @@ Oluwasanmi.
 
 | Screen | Before | After |
 |---|---|---|
-| People · Organogram | "4 people and roles sit at the top"; the seven marketing officers under a seat at the top | No banner; one tree under Ifeoma Mbonu: Bode Oluwasanmi (with JBS Praxis Team and the back-end line), Etudor Edidiong (Chinyere Elechi, Cynthia Osakunih, Head Sales & Revenue with its seven) and Technical Assistant |
+| People · Organogram | "4 people and roles sit at the top"; the seven marketing officers under a seat at the top | No banner; one tree under Ifeoma Mbonu: Bode Oluwasanmi (with JBS Praxis Team and the back-end line), Etudor Edidiong (Chinyere Elechi, Obianuju Nwoye, Head Sales & Revenue with its seven) and Technical Assistant |
 | People · Employees, Needs a Decision | No Line Manager: 1 person | Gone |
 | ESS · Org Chart, as the build account | A card on its own, Direct Reports 0 | Reports To Bode Oluwasanmi |
 | Leave for the seven marketing officers | Approved by the CEO (nobody above their seat) | Approved by Etudor Edidiong, the first person above Head Sales & Revenue |
@@ -129,7 +129,6 @@ People · Employees, open the person, Edit Record:
 | David Idowu-Agida | Work Email | davididowuagida@gmail.com |
 | Gideon Ekom | Job Title | Marketing & Growth Officer - Enugu |
 | Adaeze Chike | Job Title | Marketing & Growth Officer - Abia |
-| Cynthia Osakunih | Job Title | Operations & People Lead |
 
 Two things the screen cannot do yet:
 
