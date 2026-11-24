@@ -496,6 +496,11 @@ CLIENT = OrderedDict([
                  why="They are not in our seed files; production starts clean.")),
 ])
 
+# ---------------------------------------------------------------- fixed by JBS Praxis since
+# The tracker's open items fixed in our own PRs: ID -> (PR, merged on, what was done, for MyCity).
+# Refs stay as first issued: a fix ticks its row, it never moves it.
+FIXED_NOW = {}
+
 # ---------------------------------------------------------------- compile
 SEV_ORDER = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
 LABEL = {"BUG": "Bug", "GAP": "Gap", "IMPROVEMENT": "Improvement", "FIXED_SINCE_AUDIT": "Fixed since audit",
@@ -540,6 +545,10 @@ for n, b in enumerate(track, start=1):
         dest[b["ID"]].append(("Fixed since audit", ref))
     else:
         dest[b["ID"]].append(("Bugs & Gaps", ref))
+        if b["ID"] in FIXED_NOW:
+            pr, day, done_note = FIXED_NOW[b["ID"]]
+            row.update(done="✓", pr=pr, fixed_on=day,
+                       mycity=f"Fixed {day[8:]}/{day[5:7]}/{day[:4]} ({pr}): {done_note} {row['mycity']}")
     tracker.append(row)
 
 change = []
