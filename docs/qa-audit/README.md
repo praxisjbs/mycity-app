@@ -46,6 +46,5 @@ python3 docs/qa-audit/compile.py docs/qa-audit/items.json
 python3 docs/qa-audit/build.py docs/qa-audit/items.json docs/qa-audit/MyCity-QA-Audit-Response.xlsx
 ```
 
-Then recalculate it (the xlsx skill's `recalc.py`). Rebuilding replaces the ticks typed into the
-workbook, so once fixing starts, tick in the workbook itself, or add `done`, `pr` and `fixed_on`
-to the verdict's tracker row in `compile.py` first.
+Then recalculate it (the xlsx skill's `recalc.py`). Rebuilding replaces any ticks typed into the
+workbook, so once fixing starts, tick in the workbook itself and do not rebuild it.
