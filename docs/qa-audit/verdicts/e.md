@@ -341,3 +341,58 @@ Scope ref: foundation.md §6.7 (⌘K); MILESTONES §15 (⌘K finds every page, t
 Fix: Warm the search at boot in src/server.js: load and index the User Guide chapters, and open the pool and pg_trgm check, before the server takes traffic. Then measure p95 on staging from the request log.
 Effort: S
 For MyCity: Confirmed in part: the first search after the system restarts takes longer while it prepares; later searches answer in about a quarter of a second. We will do that preparation at start-up so the first person does not wait.
+
+ID: F55a
+Title: Esc in an open date picker closes only the picker
+Verdict: NOT_REPRODUCED
+Severity: Low
+Module: Platform (forms)
+Evidence: Built the staff app's demo and drove it with Chromium (desktop, 1440 px): in Request Leave, Pick a Date opened the calendar (dialogs "Request Leave" and "Pick a Date"); one Esc closed the calendar and left Request Leave open. The calendar is a Radix popover layered over the Radix dialog (packages/ui/src/form/DateField.tsx:149 to 169, packages/ui/src/overlay/Popover.tsx:65 to 79), so Esc closes the top layer only. Esc does close the dialog when no calendar is open (tested with the cursor in a text field), which is the rule; what went wrong for the auditor is that nothing asked first (F55b).
+Scope ref: FRONTEND_GUIDE §8.4 line 476 (Esc closes a form with no changes)
+Fix: None for the picker.
+Effort: S
+For MyCity: Pressing Esc while the calendar is open closes only the calendar; we tested this. The real problem behind this report, that Esc on a filled form loses it without asking, is F55b.
+
+ID: F55b
+Title: Closing a filled form loses the entries without asking
+Verdict: BUG
+Severity: Medium
+Module: Platform (forms)
+Evidence: Reproduced in the demo build with Chromium: New Lead opened, the organisation name typed, Esc: the dialog closed with no Discard Changes question. The rule is FRONTEND_GUIDE §8.4 line 476 ("Esc closes a form with no changes; with changes it asks once whether to discard"). The Modal implements the question (packages/ui/src/overlay/Modal.tsx:107 to 127; its tests "asks once before Esc discards unsaved changes" pass, 22 of 22), but only when a form inside reports its changes with useUnsavedChanges, and only 3 of the 81 app files that use useContractForm do (grep); app/src/features/partnerships/forms/LeadForm.tsx and packages/ui/src/form/Wizard.tsx do not. So most dialogs, multi-step ones included, drop their entries on Esc, the scrim or the close button. Keeping an unsent draft per form is not in any decision and is not proposed here.
+Scope ref: FRONTEND_GUIDE §8.4; Modal's own contract (Modal.tsx:8, "With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard")
+Fix: Have useContractForm report its isDirty to the enclosing overlay itself (call useUnsavedChanges inside packages/ui/src/form/useContractForm.ts, cleared on a successful save), so every form gets the question without per-screen code; add a test with a Wizard in a Modal.
+Effort: S
+For MyCity: Confirmed: a filled-in form closed with Esc, a click outside or the X is lost without warning. We will make every form ask "Discard Changes" first when something has been typed.
+
+ID: F68a
+Title: An announcement to a department with nobody in it publishes silently
+Verdict: IMPROVEMENT
+Severity: Low
+Module: Community
+Evidence: Code reading, plus the contract checked with node: AnnouncementCreate accepts any department id (a random uuid parses, success true; packages/contract/schemas/announcements.js:22 to 27 only requires one id). publish() resolves the audience to the active logins in those departments (src/modules/announcements/announcements.repo.js:129 to 139) and stores audience_size as its count (announcements.service.js:90 to 104), so an empty department gives "0 of 0 read" with no warning, and neither the service nor the contract checks the department exists or is active. No guide rule asks for a warning (community.md §3 step 2, §5 line 332).
+Scope ref: community.md §3 step 2, §5 (POST /announcements)
+Fix: Refuse in announcements.service create and edit, 422 with "No one in this audience" on Departments, when the audience resolves to nobody or names a department that is not active; show the field error in the New Announcement form (app/src/features/community/index.tsx:1016 to 1020). Add an integration test.
+Effort: S
+For MyCity: Confirmed: an announcement can be sent to a department that has nobody in it, and nothing says so. We will refuse it with a short message on the Departments field.
+
+ID: F68b
+Title: Retired departments are offered as announcement audiences
+Verdict: BUG
+Severity: Low
+Module: Community
+Evidence: The Departments chips call GET /api/v1/departments with no `active` filter (app/src/features/community/index.tsx:40), and the list returns active and retired alike unless `active` is given (src/modules/organisation/organisation.repo.js:592 to 594; packages/contract/schemas/organisation.js:674). "Technology" is retired: seeds/staff/nomenclature.json:9 merges it into Technology & Back-office Ops and the loader retires it once empty, so it still appears as a chip. The same call reads only the first page of 25 departments, unpaged.
+Scope ref: community.md §10.1 line 558 (Audience: All Staff or Departments, then the department chips)
+Fix: Query `{ active: "true" }` in DepartmentChips (app/src/features/community/index.tsx:40), and refuse an inactive department on the server (F68a).
+Effort: S
+For MyCity: Confirmed: the audience list still shows the old Technology department, which was merged away. We will show only current departments.
+
+ID: F68c
+Title: A department announcement is posted in the all-staff #announcements channel
+Verdict: BY_DESIGN
+Severity: Low
+Module: Community
+Evidence: publish() writes one message in the #announcements system channel whatever the audience (src/modules/announcements/announcements.service.js:89 to 98), hence the toast "Published to #announcements". This is written down: docs/guides/community.md §5 lines 342 to 343, "An announcement for chosen departments notifies and tracks those departments; the post itself is in #announcements, which every member of staff reads"; only the audience is notified, tracked and given the urgent bar (line 640). So the auditor's suspicion is right, and it is the agreed behaviour.
+Scope ref: community.md §5 (lines 340 to 343), §3 step 2; decision of 17/10/2026 (line 707, New Announcement keeps its Audience)
+Fix: None, unless MyCity want department announcements hidden from other staff; that is a change to agree (a per-audience view of #announcements, M).
+Effort: S
+For MyCity: As agreed, a department announcement is visible to all staff in #announcements; only the chosen departments are alerted and tracked. Use a department channel for anything other staff should not read, or tell us if you want this changed.

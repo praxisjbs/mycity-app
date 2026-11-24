@@ -238,6 +238,24 @@ CHANGE = [
                "approval, and matching an invoice and payment to it.",
          recommend="The supplier list is the most useful part; consider it with the finance core "
                    "decision (CR for F03)."),
+    dict(ids=["F76a"], area="People", kind=OUTSIDE, size="M",
+         ask="An approval step and an effective date for each pay change, with the before and after "
+             "figures on the record.",
+         why="Pay changes were scoped as an edit on the employee record, checked when the CEO "
+             "approves each payroll run (MILESTONES §11 and its amendments; payroll guide §13.1). "
+             "The Audit Log already keeps the before and after values.",
+         cover="A pay-change request (new figure, reason, effective month) through a Settings · "
+               "Approvals flow, payroll reading the figure in force for the run's month, and the "
+               "record showing pending changes.",
+         recommend="Worth doing before many pay changes are made in the hub; agree it as a change "
+                   "request."),
+    dict(ids=["F78b"], area="Settings", kind=OUTSIDE, size="S",
+         ask="A rule that each approval stage of a money flow is a different person.",
+         why="The agreed approval engine stops people approving their own requests and lets the CEO "
+             "act at any stage (MILESTONES §5, A11, amended 14/10/2026: port it as it is).",
+         cover="A per-flow \"different person at each stage\" setting, whether the CEO exception still "
+               "applies, and what happens when only one eligible person remains.",
+         recommend="Discuss with the CEO; at MyCity's size the CEO exception is often needed."),
     dict(ids=["F09a"], area="Expenses", kind=AGREED, size="S",
          ask="Stop staff adding new bank names that everyone is then offered.",
          why="Typing a bank not on the list was agreed at the 11/11/2026 review, because the list "
@@ -414,6 +432,44 @@ CLIENT = OrderedDict([
                   action="Delete the test goals \"test run\" and \"another test\".",
                   where="Performance · Goals (Delete Goal on the goal's sheet)",
                   why="They were typed on staging during testing; production starts clean.")),
+    ("F10a", dict(area="Settings", golive="Yes",
+                  action="Switch on two-step sign-in for Implementation Team, Operations & People, "
+                         "Management and System Administrator; each holder sets it up at the next "
+                         "sign-in.",
+                  where="Settings · Security (Two-Step by Role)",
+                  why="Requiring two-step sign-in by role is built but switched off for every role.")),
+    ("F10b", dict(area="Settings", golive="Yes",
+                  action="Issue @mycityapp.io addresses to the seven staff whose logins use personal "
+                         "Gmail, update Work Email on each record and press Use Work Email for any "
+                         "login already in use.",
+                  where="People · Employees; Settings · Users",
+                  why="The staff list MyCity gave us has personal addresses for these seven people.")),
+    ("F35", dict(area="Settings", golive="Yes",
+                 action="Send the staff invitations (Invite All Pending, or in waves by department "
+                        "with Send Invite) and follow up anyone still Invited.",
+                 where="Settings · Users",
+                 why="Nobody is emailed until Operations & People invite them, so most staff have "
+                     "never signed in.")),
+    ("F76b", dict(area="People", golive="Recommended",
+                  action="Decide who may change pay. If only Operations & People, remove People edit "
+                         "from Management or mask Salary and pay for it.",
+                  where="Settings · Roles & Permissions",
+                  why="Management may edit employee records today, pay included.")),
+    ("F37a", dict(area="People", golive="No (staging only)",
+                  action="Remove the extra vacant CEO seat added on staging, or give it a line with "
+                         "Edit Role.",
+                  where="People · Organogram",
+                  why="It is not in the structure we loaded and will not exist on production.")),
+    ("F38a", dict(area="People", golive="Recommended",
+                  action="Merge Marketing into Branding & Marketing (Merge Department), set Branding & "
+                         "Marketing's head again and shorten any code you want shorter.",
+                  where="People · Departments",
+                  why="The duplicate department and missing head were changed on staging.")),
+    ("F44", dict(area="People", golive="Yes, in the go-live data",
+                 action="Correct the three job titles, the expense category name and the goal title, "
+                        "and use the corrected spellings in the data prepared for go-live.",
+                 where="People · Employees; Expenses · Categories; Performance · Goals",
+                 why="The typos were typed on staging; none is in anything we load.")),
     ("F43a", dict(area="My Workspace", golive="No (staging only)",
                   action="Move the tasks of each duplicate project to the one you keep, then complete "
                          "the spare.",
