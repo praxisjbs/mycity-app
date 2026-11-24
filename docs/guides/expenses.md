@@ -176,7 +176,11 @@ somebody else staged is refused, `invoice_document_id: Upload it again`.
    INV-..."), so Read Invoice's lines and Praxis AI's card come to what the invoice asks to be paid
    now. NGN only: a foreign invoice is converted before it is entered.
 2. Send Request needs Purpose, Category, Department, at least one line, a payee and its bank
-   details. An invoice is optional but asked for (the approvers see when there is none).
+   details. An invoice is optional but asked for (the approvers see when there is none). A draft may
+   leave the payee's bank blank; what sending needs of it is one rule in the contract
+   (`expenses.payeeProblems`), which the service refuses as `PAYEE_INCOMPLETE` and the screen marks
+   first: the form's Send Request marks the four fields before it saves anything, and a draft's Send
+   Request in its window opens Edit Request with them marked (JBS Praxis, 24/11/2026).
 3. Payee type `staff` with Use My Company Account copies the bank name, account name and account
    number from the requester's employee record at the moment it is sent, so a later change to the
    profile does not change a request already in flight. Any other payee type types them.
@@ -538,6 +542,7 @@ None.
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · From the 23/11 staging faults brief (fault #5, `PAYEE_INCOMPLETE` at `POST /expenses/mine/:id/submit`) and JBS Praxis's answer: Send Request on a draft with a blank payee was refused after the press, the form having already saved its edit. `expenses.payeeProblems` in the contract is the one rule; the form marks Payee Name, Bank, Account Name and Account Number before it saves, and the window's Send Request opens Edit Request with them marked (§6 rule 2). `Expenses.test.tsx`, `expenses.test.js`.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Read Invoice, Suggest Category and Check Duplicate; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 16/11/2026 · TB · §9: the Document Centre's Library lists a request's invoice and a disbursement's receipt (`expenses.library.js`, `disbursements.library.js`; `document-centre.md` §6.2), each for the readers the vault already lets open it and nobody else. Nothing on an Expenses screen changed.
 - 14/11/2026 · JP · `budgets.summary` failed when an allocation carried kobo (₦1,050,000.50): the repo's JSON gave the amount as the number 1050000.5, which money() refuses, and Praxis AI's budget question drew no Overview. Every amount of the summary now leaves the database as text (`budgets.repo.js` `aiSummary`). Found building `praxis-ai.md` Appendix B PR 3; its test (`ai-overview-export.test.js`) holds a budget with kobo.

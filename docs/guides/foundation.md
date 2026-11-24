@@ -1205,6 +1205,7 @@ screen.
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · Add Employee and Edit Record: a line or dotted manager who is the person themselves (`REPORTS_TO_SELF`) is refused on the field as before and never recorded on System Health, as on the organogram (`organogram.md` §5; faults #3 and #4 of the 23/11 staging brief).
 - 17/11/2026 · JP · The leave flow (`leave.approval`, §6.5) is unchanged: a leave request may now name a relief officer and carry a handover note, read by its approvers where they decide on People · Leave (`docs/guides/ess.md` §6, §8). `workflow.service` exports `mayRead`, the approval's own reader check, which the handover note's vault rule reuses. No foundation screen changed.
 - 17/11/2026 · TB · For the Document Centre's PR 2 (`document-centre.md` §6.5, §6.7, §6.8): the vault gains `setDetails` (a file's title and expiry, beside `setTitle`); the Word writer (`shared/documents/docx.js`) gains a header with a picture and a rule, and a footer, and may leave its title out; `documents.generate` takes `blank: true` (the letterhead prints no date); `services/media/pdf-text.js` takes its page and character limits, its time and memory, and answers done, empty or failed with `detail`, the CV's limits unchanged.
 

@@ -518,7 +518,8 @@ interface copy; the copy rules apply to the chrome around them.
 
 - **Wrong password / server refuses**: the connection test fails with the classified reason and
   the fix (`services/mail/smtp-errors.js`): "Password refused" or "Mail server not found" on the field; nothing is
-  saved.
+  saved. A refused password is never recorded on System Health: only the mail server knows it, so no
+  screen can say it first (`err.recorded = false`, system-health.md §6).
 - **Password changed on the mail server**: sync fails → connection marked `needs_reconnect` → a
   banner in Mailbox with **Reconnect**, which opens the Connect sheet with the address filled in.
 - **The staff mail server moves** (§3 step 11): every connected mailbox is re-pointed and synced; one
@@ -603,6 +604,7 @@ interface copy; the copy rules apply to the chrome around them.
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · From the 23/11 staging faults brief (fault #1, `MAIL_AUTH_FAILED: password` at `POST /mailbox/connection`): a password the mail server refuses is answered on the field as before and no longer recorded on System Health, in Connect Mailbox and wherever the mail errors are read (§11). `mailbox.test.js`.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Write With AI (with Tidy Email and Dictate) in the composer and Summarise Thread; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 08/11/2026 · JP · M7 PR 8 (`docs/guides/partnerships.md` §6.15): Link to Partner. `mailbox/binding/`
   filled (`mail-context.service`, `intake.service`, `context-tabs`, `convert.service`); `GET`, `POST` and
