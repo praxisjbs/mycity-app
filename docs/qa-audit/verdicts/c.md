@@ -163,3 +163,113 @@ Fix: Give Home's Overdue Tasks a help term naming its reach ("Overdue tasks of e
 Effort: S
 For MyCity: Home shows overdue tasks for everyone you can see, while My Workspace shows only yours. We will label the Home card so the difference is clear; you can also pick the My Overdue Tasks card on Home.
 
+ID: F56a
+Title: Committed counts approved requests only, not ones still waiting
+Verdict: BY_DESIGN
+Severity: Low
+Module: Expenses
+Evidence: Throwaway test (tests/integration/zz-audit-c-expenses.test.js, run on mycity_auditc_test, deleted): People & Culture budget line ₦100,000; a ₦48,000 request approved; then a ₦100,000 request sent. The line read Committed 48,000.00, Remaining 52,000.00 after the send, exactly the auditor's figures. Existing budgets.test.js "the recount" covers the same rule (committed moves only on approval, to spent on payment). The help on Committed says "Approved but not yet paid."
+Scope ref: docs/guides/expenses.md §6.6 rule 2 ("Committed is the sum of its requests that are approved, in_requisition or authorised") and §10.1 (help on Committed); MILESTONES §13 Definition of done (allocated, committed, spent, remaining).
+Fix: None.
+Effort: S
+For MyCity: Committed means approved but not yet paid, as agreed; a request still waiting for approval is not counted until Operations & People approve it.
+
+ID: F56b
+Title: Over budget is flagged to approvers, not warned on the form
+Verdict: IMPROVEMENT
+Severity: Medium
+Module: Expenses
+Evidence: Same throwaway test: the ₦100,000 request was accepted with over_budget true, budget_remaining 52,000.00 and department_remaining 52,000.00 in the send response, and the requester's own view of it shows the same; the modal shows the Over Budget pill and Department Left (app/src/features/expenses/parts.tsx:352, 386). So the M8 rule (flag before approval, never block) is met; what is missing is a figure on New Request before Send. No preview route exists (guide §5).
+Scope ref: MILESTONES §13 Definition of done ("flagged before approval, not after, with the department's whole remaining beside it"); docs/guides/expenses.md §6.6 rule 3 ("It is a flag, never a block") and §11 ("No budget ... flagged Over Budget, never blocked"). A hard block or an override reason would reverse that decision.
+Fix: Show "Left For Category" and Over Budget on New Request once Department and Category are picked, from a small read-only route that runs expenses.budget-check.js (contract, route, RequestForm in parts.tsx, guide §5 and §10.1, manual). Keep it a warning, not a block.
+Effort: M
+For MyCity: Over-budget requests are flagged to the line manager and Operations & People before they decide, as agreed, and never blocked. We will also show the remaining budget on the form so the requester sees it before sending.
+
+ID: F56c
+Title: Spending against a project with no budget is allowed
+Verdict: BY_DESIGN
+Severity: Low
+Module: Expenses
+Evidence: Same throwaway test: a request on a project with no budget was accepted (status submitted) and Expenses · Projects showed budget null, committed 0.00, requests 1, committed staying 0 because the request was not yet approved. The department-and-category check still applies to it.
+Scope ref: docs/guides/expenses.md §6.6 rule 6 ("A project's budget is optional"); handoff m8-expenses.md decision 7 ("A project has an optional budget too").
+Fix: None.
+Effort: S
+For MyCity: A project's budget is optional by agreement; the department budget check still applies to every request, project or not.
+
+ID: F57a
+Title: Expense request skipped the line manager for a Program Manager
+Verdict: BY_DESIGN
+Severity: Low
+Module: Expenses / Approvals
+Evidence: Existing test expenses.test.js "a line manager's own request goes straight to Operations & People" passes (18 of 18). Throwaway test: a Management-role "Program Manager" with a report went straight to Operations & People (waiting_on "Operations & People"). The expenses.request flow skips the Line Manager stage when requester_manages_people is true (src/shared/workflow/definitions.js:326-345; expenses.service.js:452); leave.approval has no such condition (definitions.js:83-103), which is why the same person's leave went to their manager. In MyCity's staff list the Program Manager has reports (seeds/staff/staff-list.xlsx: three rows name "Program Manager" as Line Manager) and the post holds Management (seeds/staff/roles.json:11). The route is shown on the request ("the chain with who it waits on", guide §10.1).
+Scope ref: handoff m8-expenses.md §1 item 1 ("straight to Operations & People when the requester is a line manager"); docs/guides/expenses.md §3 step 2, §6.3, §11. Settings · Approvals can change it without a deploy (A11).
+Fix: None. Small doc fix: guide §11 says a requester with no line manager "skips the stage"; the test shows the engine sends that stage to the CEO instead (approvers.js:80-86, via no_line_manager). Correct §11.
+Effort: S
+For MyCity: Requests from anyone who manages people go straight to Operations & People, as agreed at the 04/11/2026 review; leave works differently. If you want managers' requests to go to their own manager first, it is a change on Settings · Approvals.
+
+ID: F57b
+Title: A request whose line manager has left waits on the leaver
+Verdict: BUG
+Severity: Medium
+Module: Approvals engine (Expenses, Leave and every line-manager stage)
+Evidence: Throwaway test: an employee whose line manager was archived raised a request; the Line Manager stage's approver was the archived person (stage_approvers type employee, value the leaver's id), and Operations & People got 403 trying to decide it, so only the CEO (who may act on any stage) can move it. employee_effective_manager follows line_manager_id whatever that person's status (migrations/1160_employee_effective_manager.sql:19); approvers.js lineManagerOf does not check it either. Found while checking F57, not the auditor's own claim.
+Scope ref: src/shared/workflow/approvers.js header ("for someone who reports to a vacant seat, the first person above the seat"); A11; docs/guides/organogram.md §6 (a leaver is dropped from the line, their reports flagged as roots).
+Fix: In approvers.js lineManagerOf, skip a manager who is not active and climb to the next active manager (or the CEO), as for a vacant seat; integration test in tests/integration for leave and expenses. Also MyCity re-points reports when a manager leaves (People · Organogram, Change Reporting Line).
+Effort: S
+For MyCity: If a manager leaves before their team is moved to someone else, their team's requests wait on the person who left until the CEO steps in. We will send them to the next manager up automatically; meanwhile, move a leaver's team on the org chart when they leave.
+
+ID: F65a
+Title: Duplicate requests are detected and flagged on the request
+Verdict: NOT_REPRODUCED
+Severity: Low
+Module: Expenses
+Evidence: Throwaway test: two identical ₦100,000 requests to the same payee and account sent the same day. The second's send response and its record carried possible_duplicates [the first] for the requester, the line manager and Operations & People, so the modal shows the Possible Duplicate pill and the Possible Duplicates card with Check Duplicate (app/src/features/expenses/parts.tsx:353, 392-398). A cancelled one still counts for the other. Existing expenses.test.js "Possible Duplicates names only the requests the reader may open" passes. EXP-0022 would have shown it once sent; the auditor's "no warning" is about the form before sending (F65b).
+Scope ref: MILESTONES §13 Net-new ("duplicate-claim detection"); docs/guides/expenses.md §6.8 (same payee, same amount, within 30 days, shown to every approver).
+Fix: None.
+Effort: S
+For MyCity: Duplicate detection is built: a request with the same payee and amount within 30 days carries a Possible Duplicate warning that the requester and every approver see, with an AI comparison on request.
+
+ID: F65b
+Title: Requester is not warned of a likely duplicate before sending
+Verdict: IMPROVEMENT
+Severity: Low
+Module: Expenses
+Evidence: The duplicate flag appears only once a request is saved and sent (§6.8); New Request makes no check before Send. The service already has the lookup used for the AI invoice card (expenses.service.js:759-763 possibleDuplicatesOf over repo.duplicatesFor). Invoice numbers are not a field on a request (guide §4), so "a reused invoice number" cannot be checked without a new field.
+Scope ref: docs/guides/expenses.md §6.8 (flag for approvers, the agreed design); MILESTONES §13 Net-new.
+Fix: On Send Request, ask "Possible Duplicate. Send Anyway?" when possibleDuplicatesOf finds one the requester may open (a read route or a 409 the form answers; RequestForm in parts.tsx; guide §6.8 and §10.1). An invoice-number field and its check would be a Change Report.
+Effort: S
+For MyCity: Duplicates are flagged to approvers today. We will also warn the requester before they send one; checking invoice numbers would need a new field, which we can discuss.
+
+ID: F28a
+Title: Staging demo tasks go overdue with no reason and normal priority
+Verdict: SEED_DATA
+Severity: Low
+Module: My Workspace
+Evidence: Code reading (not run, to save time). seeds/staging/40_workspace.js sets due dates relative to the day it first ran (lines 85-87, day(n)) and skips the whole part once any numbered task exists (line 113), so its open tasks are never refreshed and drift into overdue with each week. Only four rows give a late reason (lines 123, 126, 129, 137, applied at 151), and most rows take the default Normal priority (plan 121-137; finished work 173). Further open tasks on staging are made by flows run on other staging records (a training assignment raises a "Complete <course>" task, src/modules/training/training.service.js around line 956; a signed deal's deliverables) and by people testing. Staging only: production is never seeded (A5).
+Scope ref: CLAUDE.md "Production is never seeded"; docs/guides/workspace.md §4 (staging seed); A5.
+Fix: In 40_workspace.js, move the open demo tasks' due dates relative to each deploy day (or give every overdue one a late reason) and spread priorities, keeping the seed idempotent; adjust tests/integration/workspace-staging-seed.test.js.
+Effort: S
+For MyCity: The 78 overdue tasks are largely our demonstration data ageing on staging, plus tasks created while testing. Production starts empty; we will refresh the staging demo so it stays realistic.
+
+ID: F28b
+Title: A reason is not forced the moment a task goes overdue
+Verdict: BY_DESIGN
+Severity: Low
+Module: My Workspace
+Evidence: Why Late is offered on an overdue task's panel and asked when an overdue card is moved to Done (guide §3 step 12; tasks.service.js move() writes late_reason, line 814); Analytics counts overdue by reason. The reasons are MyCity's to switch on or add (workspace.late_reasons). No screen can force someone to act when a date passes; the reason is collected when they next touch the task. Code reading.
+Scope ref: docs/guides/workspace.md §3 step 12 and §2 (Analytics "overdue tasks by reason"); MILESTONES §7 (A24).
+Fix: None.
+Effort: S
+For MyCity: The system asks why a task is late when it is opened or completed, and reports overdue tasks by reason; managers follow up the rest from Analytics.
+
+ID: F28c
+Title: Overdue Tasks query rule left in Draft on staging
+Verdict: CLIENT_ACTION
+Severity: Low
+Module: Queries & Sanctions
+Evidence: No rule is seeded (docs/guides/queries.md §4: "No rule is seeded: thresholds are MyCity's choice (A26)"); the staging seed makes only Unregistered Device (seeds/staging/50_queries.js:14, 62, 168-177). So the draft Overdue Tasks rule was entered on staging by a person. A draft never fires; the daily query-rule-sweep counts overdue_task only while such a rule is active (queries.md §7; src/jobs/schedulers/query-rule-sweep.js).
+Scope ref: A26; docs/guides/queries.md §4 and §6.3.
+Fix: None in code. MyCity decides the threshold (how many overdue tasks in how many days) and presses Activate on Queries & Sanctions · Rules, ideally once real task data is in use.
+Effort: S
+For MyCity: The overdue-task rule exists but only you can set its threshold and switch it on, on Queries & Sanctions · Rules; we suggest doing so after go-live once staff are using tasks.
+

@@ -44,3 +44,13 @@ each list's row reads.
    missing findings, with its own `*_test` database (the integration tests need one per agent).
 3. Compile everything into `items.json` and run `python3 build.py items.json <out>.xlsx`, then
    the xlsx skill's recalc.
+
+## Paused 24/11/2026 (usage limit): findings with no verdict yet
+
+- a_partnerships: 
+- b_payroll_people_settings: F10 F13 F30 F35 F37 F38 F39 F44 F69 F75 F76 F78 
+- c_expenses_workspace: 
+- d_recruitment_performance_queries: F29 F33 F40 F77 F80 F82 
+- e_home_platform_ess: F34 F36 F41 F48 F50 F55 F68 F83 
+
+The verifiers were stopped mid-run; their throwaway tests were deleted. Resume step 2 above with only these findings.

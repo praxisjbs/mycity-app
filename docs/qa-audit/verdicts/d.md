@@ -97,3 +97,80 @@ Fix: Remove .doc from accept in Apply.tsx and say "PDF or Word (.docx)"; keep th
 Effort: S
 For MyCity: The CV box let people pick old .doc files that are then refused. We will stop offering .doc and say which Word format is accepted.
 
+ID: F72a
+Title: An offer at ₦0 pay is accepted and sent for approval
+Verdict: BUG
+Severity: High
+Module: Offers
+Evidence: Throwaway integration test (tests/integration/zz-audit-d-offers.test.js, deleted) against mycity_auditd_test: on a vacancy with no pay range, GET /offers/draft started Basic Salary at 0.00; POST /recruitment/offers with every pay line 0.00 returned 201 (monthly_total 0.00, annual 0.00, outside_range false); the letter read "Total monthly compensation · ₦0.00"; Submit for Approval returned 200 (status approval). A negative line was refused only by the database CHECK (422 INVALID_VALUE "A value is not allowed here", migrations/5010_offer_terms.sql:34), not by the contract. Cause: OfferPayLineInput.monthly_amount is `money`, which allows 0.00 and negatives (packages/contract/schemas/offers.js:56-62; common.js:95), payOf checks only the range when the vacancy has one (src/modules/offers/offers.service.js:345-357), and submit checks no pay (lines 475-490). The draft's 0.00 default is at offers.service.js:335.
+Scope ref: docs/guides/offers.md §3 step 1 and §6 ("Pay is monthly, line by line ... Money through shared/money"); MILESTONES §10 decided 06/11/2026 ("Pay is monthly, line by line"). common.js positiveMoney exists for "a form that takes money in".
+Fix: Refuse an offer whose monthly total is not above zero, and a negative line, at create, edit and Submit (offers.service.js payOf and submit; contract: no negative monthly_amount, a field error "Enter an amount" on the Basic Salary line); start the draft's Basic Salary empty rather than 0.00. An allowance line of 0.00 can stay allowed.
+Effort: S
+For MyCity: Confirmed: an offer could be made and approved at ₦0 when the vacancy had no pay range. We will refuse an offer with no pay, so it cannot reach an approver or a candidate.
+
+ID: F72b
+Title: Vacancies may be published without a pay range
+Verdict: BY_DESIGN
+Severity: Low
+Module: Recruitment (Vacancies)
+Evidence: Publish needs title, department, hiring manager, location, description, requirements and a closing date, not a salary band (docs/guides/recruitment.md §6.1); the vacancy form's hint says "Leave the band empty if it is not settled yet" (§10.1). When a band exists the offer is checked against it and an offer outside it needs a reason the approvers see (offers.service.js:345-357; outside_range passed into the approval context at :496-497; Outside Range shown on the list, offers.md §10.1).
+Scope ref: docs/guides/recruitment.md §6.1 and §10.1; docs/guides/offers.md §6 (range check "unless the approver overrides it with a reason").
+Fix: None. A minimum wage floor on offers would be a small improvement, reading the minimum wage MyCity enters in Payroll · Statutory (src/modules/statutory): only once MyCity has entered that figure with its source.
+Effort: S
+For MyCity: A band is optional on purpose, since some roles are advertised before pay is settled; when a band is set, offers outside it are flagged to the approver. With the ₦0 fix above, every offer will need real pay. If you want offers checked against the national minimum wage, enter it in Payroll · Statutory and we can add that check.
+
+ID: F74a
+Title: An offer is verifiable only once everyone has signed
+Verdict: BY_DESIGN
+Severity: Low
+Module: Offers / Signatures (public verify)
+Evidence: Throwaway test (deleted): an offer approved, signed for the company and sent (request status pending, sealed_at null) returned 404 "No signed document has this reference" on GET /api/public/v1/verify/OFF-0002. src/modules/signatures/signatures.verify.js:12-13 ("Only a sealed copy is verifiable; anything else is the same 404 as an unknown reference") and signatures.repo.js:60-70 (status = 'completed' only). Existing tests/integration/signatures.test.js:216-262 assert a completed request verifies and a declined one is 404. OFF-0001, OFF-0002 and AGR-2026-0004 were not yet signed by the candidate or partner, so 404 is the rule working.
+Scope ref: docs/guides/offers.md §5 (GET /verify/:ref: "only a sealed copy"), §3 step 9; partnerships.md §13.2 line 1408 ("Verification by reference shows no content; only the QR's token shows the document"); MILESTONES §10 (A12, the verification page reports two verdicts on a signed document).
+Fix: None to the rule (references are sequential, so answering "exists, awaiting signature" would let anyone list offers and agreements).
+Effort: S
+For MyCity: A document becomes checkable on the public page once every party has signed it and the sealed copy exists; an offer the candidate has not yet signed is not yet a signed document. This is deliberate, so nobody can look up offers by guessing numbers.
+
+ID: F74b
+Title: Verify page wording makes an unsigned genuine letter look forged
+Verdict: IMPROVEMENT
+Severity: Low
+Module: Public site (Verify)
+Evidence: The API says "No signed document has this reference", but the page shows "Not Found. No document has this reference." (public-app/src/pages/Verify.tsx:106), dropping "signed" and giving no hint that signing may still be under way.
+Scope ref: docs/guides/offers.md §3 step 9 and §10.1; FRONTEND_GUIDE word limits (help 35, sentence 20).
+Fix: In Verify.tsx:106 say "No signed document has this reference." with the note "A document can be checked once everyone has signed it. Check the reference and try again." Same for the QR card at line 118 if wanted. Retake the User Guide picture for the verify screen.
+Effort: S
+For MyCity: We will reword the result so it says no signed document matches and that a document can be checked once everyone has signed, instead of a bare Not Found.
+
+ID: F32a
+Title: Send Offer accepts a start date that has already passed
+Verdict: BUG
+Severity: Medium
+Module: Offers
+Evidence: Throwaway test (deleted): an offer created with a start date 3 days ahead, approved, its start date then moved to yesterday (as if approval took longer), signed for the company and sent: Send returned 200 with start_date 2026-11-23 (yesterday) and expires_at 09/12/2026. create and edit refuse a past start date (src/modules/offers/offers.service.js:381-382 START_PAST) but submit (:475-490) and send (:620-645) do not check it again.
+Scope ref: docs/guides/offers.md §6 (Submit for Approval needs the start date; "An unsigned offer lapses at expires_at"); the service's own START_PAST rule.
+Fix: In offers.service.js send (and submit) refuse a start date before today with START_PAST, so the offer is edited back through draft or withdrawn and remade; show the reason on the Send button's error line.
+Effort: S
+For MyCity: An offer could be sent with a start date that had already gone by. We will stop that at Send, so the start date is corrected first.
+
+ID: F32b
+Title: Start date may fall before the offer expires
+Verdict: IMPROVEMENT
+Severity: Low
+Module: Offers
+Evidence: Same test: an offer starting in 2 days was sent with expiry 15 days later (200, start 26/11, expires 09/12). No rule ties the start date to the expiry; the guide handles a start date passing during documentation (offers.md §11 "The start date passes while the hire is still at documentation: the case waits").
+Scope ref: docs/guides/offers.md §6 and §11.
+Fix: At Send, warn (or refuse, MyCity to choose) when the start date is earlier than the expiry, suggesting a shorter Valid For or a later start (offers.service.js send; OfferForm.tsx Valid For).
+Effort: S
+For MyCity: The system does not stop a start date that falls before the reply deadline. We suggest a warning at Send; tell us if you would rather it be refused.
+
+ID: F32c
+Title: Interviews can still be scheduled after an offer is sent
+Verdict: IMPROVEMENT
+Severity: Low
+Module: Recruitment (Interviews)
+Evidence: Same test: POST /recruitment/interviews for a candidate already at Offer returned 201 and the stage stayed offer; src/modules/interviews/interviews.schedule.js:91-96 checks only that the application is active. Several rounds per candidate are allowed by design (interview_round), and in the auditor's case the 17/11 interview may have been booked before the offer.
+Scope ref: docs/guides/recruitment.md §3 step 8, §6.6.
+Fix: Warn on Schedule Interview when the candidate has an open offer (ScheduleInterview.tsx, from the application's stage), without refusing it.
+Effort: S
+For MyCity: A further interview can be booked for a candidate who already has an offer, which can be legitimate (a final meeting). We suggest a warning so it is a conscious choice.
+
