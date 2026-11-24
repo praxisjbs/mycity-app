@@ -146,6 +146,8 @@ def fixed_in(b):
 
 def how_verified(e):
     low = e.lower()
+    if "chromium" in low or "playwright" in low:
+        return "Browser reproduction"
     if "throwaway" in low or "zz-audit" in low or "reproduction test" in low:
         return "Reproduction test"
     if re.search(r"tests/integration/|jest|\.test\.js", e) and re.search(r"pass|ran|run|assert|fail", low):
@@ -163,7 +165,8 @@ TYPE = {"BUG": "Bug", "GAP": "Gap", "IMPROVEMENT": "Improvement", "SEED_DATA": "
         "FIXED_SINCE_AUDIT": "Bug"}
 TYPE_OVERRIDE = {"F06a": "Seed data"}  # ID: type, where the verdict alone does not say
 HOW_OVERRIDE = {"F06a": "Seed file read", "F79c": "Code reading", "F81d": "Code reading",
-                "F24": "Code reading", "F02f": "Code reading"}
+                "F24": "Code reading", "F02f": "Code reading",
+                "F68b": "Code reading", "F41": "Node reproduction"}
 
 # ---------------------------------------------------------------- Change Report rows
 # BY_DESIGN parts that ask MyCity's way to change an agreed decision; and every OUT_OF_SCOPE part.
@@ -470,6 +473,11 @@ CLIENT = OrderedDict([
                         "and use the corrected spellings in the data prepared for go-live.",
                  where="People · Employees; Expenses · Categories; Performance · Goals",
                  why="The typos were typed on staging; none is in anything we load.")),
+    ("F83b", dict(area="Knowledge Hub", golive="Yes",
+                  action="Have the department heads write their own SOPs (Marketing, Implementation "
+                         "and the rest); give Manage SOPs to anyone else who should write them.",
+                  where="Knowledge Hub · SOPs; Settings · Roles & Permissions (Manage SOPs)",
+                  why="The SOPs on staging are our demonstration seed and do not reach production.")),
     ("F43a", dict(area="My Workspace", golive="No (staging only)",
                   action="Move the tasks of each duplicate project to the one you keep, then complete "
                          "the spare.",
@@ -559,7 +567,7 @@ parts_of = defaultdict(list)
 for pid in blocks:
     parts_of[finding_of(pid)].append(pid)
 recon = []
-for fid, fx in FINDINGS.items():
+for fid, fx in sorted(FINDINGS.items(), key=lambda kv: int(kv[0][1:])):
     pids = sorted(parts_of.get(fid, []))
     if not pids:
         if "--partial" in sys.argv:

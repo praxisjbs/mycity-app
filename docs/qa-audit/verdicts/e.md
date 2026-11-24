@@ -396,3 +396,25 @@ Scope ref: community.md §5 (lines 340 to 343), §3 step 2; decision of 17/10/20
 Fix: None, unless MyCity want department announcements hidden from other staff; that is a change to agree (a per-audience view of #announcements, M).
 Effort: S
 For MyCity: As agreed, a department announcement is visible to all staff in #announcements; only the chosen departments are alerted and tracked. Use a department channel for anything other staff should not read, or tell us if you want this changed.
+
+ID: F83a
+Title: Management cannot write SOPs unless they head a department
+Verdict: BY_DESIGN
+Severity: Low
+Module: Knowledge Hub
+Evidence: Ran tests/integration/knowledge-sops.test.js on audit_e_test: 10 of 10 pass, including "only a writer of the department starts an SOP" (a non-writer gets 403 NOT_SOP_WRITER) and the Management-role user writing only after being given Manage SOPs (lines 153 to 164, 375 to 377; archiving still refused, as Management has no `knowledge` delete). The rule is decision K3 (docs/guides/knowledge.md line 48): a department's head writes its SOPs, and the Manage SOPs capability (`sops.manage`) writes any department's; §6.2 (lines 206 to 217) says SOP writing ignores the `knowledge` edit grant, so "Edit · All" alone gives no New SOP. The capability is seeded to Operations & People and Implementation only (seeds/reference/10490_seed_knowledge.sql:28 to 34; guide line 474).
+Scope ref: knowledge.md §1.1 K3, §6.2, §8 (TB, 11/11/2026)
+Fix: None in code.
+Effort: S
+For MyCity: As agreed, each department's head writes its SOPs, and People (Operations & People) and the Implementation team can write any department's. If Management should too, tick Manage SOPs on the Management role in Settings · Roles; no change from us is needed.
+
+ID: F83b
+Title: Marketing and Implementation have no SOPs yet
+Verdict: CLIENT_ACTION
+Severity: Low
+Module: Knowledge Hub
+Evidence: The SOPs on staging are our demonstration seed (seeds/staging/knowledge/sops.js, loaded by seeds/staging/90_knowledge.js) and production is never seeded with them (A5), so at go-live every SOP is one MyCity writes. The screen and its writer controls work for heads and Manage SOPs holders (F83a, tests pass).
+Scope ref: knowledge.md §1.1 K3; MILESTONES A5 (no demonstration data in production)
+Fix: None in code. Each department head (or a Manage SOPs holder) writes and publishes the department's SOPs from Knowledge Hub · SOPs · New SOP, Draft With AI helping from a pasted procedure or a PDF.
+Effort: S
+For MyCity: The SOP library on staging is sample content and will not go to production. Each head should write their department's procedures in Knowledge Hub · SOPs with New SOP; Draft With AI can turn an existing document into a first draft.
