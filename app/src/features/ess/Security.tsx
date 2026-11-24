@@ -4,6 +4,7 @@ import security from "@mycity/contract/schemas/security.js";
 import type { MyDevice, Passkey, SignIn, SignInMethods, TwoStepSetup } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useMe } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
 import { DEVICE_STATUS } from "@/features/attendance/labels";
@@ -609,16 +610,12 @@ function PinForm({ close }: { close: () => void }) {
 
 /* ───────────── The password ───────────── */
 
-/** The contract's rule for a new password, as a field mark. */
-const newPasswordRule = (v: string) => {
-  const r = identity.NewPassword.safeParse(v);
-  return r.success ? null : r.error.issues[0].message;
-};
-
 function PasswordForm({ close }: { close: () => void }) {
+  const me = useMe();
+  // The contract's rule for a new password with the person's own email, as a field mark.
   const f = useContractForm(
     { cur: "", next: "", again: "" },
-    { cur: (v) => (v ? null : "Enter your password"), next: newPasswordRule, again: (v, all) => (v !== all.next ? "Does not match" : null) },
+    { cur: (v) => (v ? null : "Enter your password"), next: (v) => identity.passwordProblem(v, { email: me.email }) || null, again: (v, all) => (v !== all.next ? "Does not match" : null) },
   );
   const save = useMutation("POST /api/v1/auth/password");
   const submit = async () => {

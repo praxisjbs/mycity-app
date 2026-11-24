@@ -411,6 +411,10 @@ describeDb("identity against the real migrations", () => {
       const check = await request(app).post("/api/v1/auth/link").send({ token });
       expect(check.status).toBe(200);
       expect(check.body).toEqual(expect.objectContaining({ purpose: "reset", email: "ops@mycity.test", first_name: "Ada" }));
+      // The minimum in force, so the page marks a short password before Save Password (fault #14, 23/11/2026).
+      expect(check.body.password_min_length).toBe(require("../../src/modules/settings/settings.security-rules").current().password_min_length);
+      const named = await request(app).post("/api/v1/auth/reset").send({ token, new_password: "Ops+Reset2026" });
+      expect([named.status, named.body.error.fields]).toEqual([422, { new_password: ["Contains your email name"] }]);
 
       const session = await signIn("ops@mycity.test", OPS_PASSWORD);
       const reset = await request(app).post("/api/v1/auth/reset").send({ token, new_password: "Reset+Done2026" });

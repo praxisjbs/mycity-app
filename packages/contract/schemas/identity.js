@@ -24,8 +24,8 @@ const PASSWORD_MAX = 200;
 
 /**
  * A password someone is choosing. The messages are field marks (at most four
- * words). The server also refuses one that contains the name part of the
- * person's email or appears in a known breach; those arrive as a 422 on the field.
+ * words). The rest of the rule is passwordProblem's, which a screen applies too;
+ * only a password found in a known breach arrives as a 422 on the field.
  */
 const NewPassword = z
   .string()
@@ -35,6 +35,25 @@ const NewPassword = z
   .refine((v) => /[A-Z]/.test(v), "Add an uppercase letter")
   .refine((v) => /[0-9]/.test(v), "Add a number")
   .refine((v) => /[^A-Za-z0-9]/.test(v), "Add a symbol");
+
+/**
+ * Every rule for a new password a screen can apply before the press, the same the API applies
+ * (identity.password-policy.js): NewPassword's shape, the minimum in force (Settings · Security
+ * may raise the contract's 8), and not the name part of the person's own email ("ada" in
+ * ada@...). Only the breach corpus stays the server's. The reset page applied the shape alone, so
+ * the other two reached the API as refusals (fault #14 of the 23/11 staging brief).
+ * @param {string} password
+ * @param {{email?: string|null, min?: number}} [ctx]
+ * @returns {string} the first problem as a field mark, or "" when there is none
+ */
+function passwordProblem(password, { email = null, min = PASSWORD_MIN } = {}) {
+  const shape = NewPassword.safeParse(password);
+  if (!shape.success) return shape.error.issues[0].message;
+  if (String(password).length < min) return `At least ${min} characters`;
+  const local = String(email || "").toLowerCase().split("@")[0];
+  if (local.length >= 3 && String(password).toLowerCase().includes(local)) return "Contains your email name";
+  return "";
+}
 
 /** A password someone is typing to prove who they are: never judged, only bounded. */
 const CurrentPassword = z.string().min(1, "Enter your password").max(PASSWORD_MAX);
@@ -203,6 +222,7 @@ const LinkCheck = z
     email: z.string(),
     first_name: z.string(),
     expires_at: isoDateTime,
+    password_min_length: z.number().int().min(PASSWORD_MIN),
   })
   .strict();
 
@@ -309,6 +329,7 @@ const TABLES = {
     virtual: {
       email: "the login's email (app_user), shown on the page the link opens",
       first_name: "the employee's first name, for the invitation's greeting",
+      password_min_length: "the minimum in force (Settings · Security), so the page marks a short password before the press",
     },
   },
   ResetBody: { table: null, reason: "a link token and the chosen password" },
@@ -350,6 +371,7 @@ module.exports = {
   DeviceAccount,
   PasswordChange,
   PasswordChanged,
+  passwordProblem,
   ForgotBody,
   Accepted,
   LinkCheckBody,

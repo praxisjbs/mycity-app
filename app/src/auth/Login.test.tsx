@@ -48,7 +48,7 @@ describe("choosing a password from an invitation", () => {
   it("an empty Confirm Password asks for it again, and a different one says it does not match", async () => {
     m.path = "/welcome";
     m.params = new URLSearchParams({ token: "t".repeat(43) });
-    m.call.mockResolvedValueOnce({ purpose: "invite", first_name: "Aaron", email: "aaron@mycityapp.io" });
+    m.call.mockResolvedValueOnce({ purpose: "invite", first_name: "Aaron", email: "aaron@mycityapp.io", password_min_length: 8 });
     render(<Login />);
     expect(await screen.findByText("Set Your Password")).toBeTruthy();
     await userEvent.type(screen.getByLabelText("New Password"), "Lagos-City-2026!");
@@ -58,5 +58,35 @@ describe("choosing a password from an invitation", () => {
     expect(screen.queryByText("Does not match")).toBeNull();
     await userEvent.type(screen.getByLabelText("Confirm Password"), "Lagos-City-2025!");
     expect(screen.getByText("Does not match")).toBeTruthy();
+  });
+});
+
+describe("choosing a password from a reset link (fault #14, 23/11/2026)", () => {
+  beforeAll(() => {
+    window.matchMedia ??= ((query: string) => ({ matches: false, media: query, onchange: null, addListener: () => undefined, removeListener: () => undefined, addEventListener: () => undefined, removeEventListener: () => undefined, dispatchEvent: () => false })) as typeof window.matchMedia;
+  });
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    m.path = "/login";
+    m.params = new URLSearchParams();
+  });
+
+  it("the page marks the API's own rules before Save Password: the email's name and the minimum in force", async () => {
+    m.path = "/reset";
+    m.params = new URLSearchParams({ token: "t".repeat(43) });
+    m.call.mockResolvedValueOnce({ purpose: "reset", first_name: "Aaron", email: "aaron@mycityapp.io", password_min_length: 12 });
+    render(<Login />);
+    expect(await screen.findByText("New Password", { selector: "h2" })).toBeTruthy();
+    const next = () => screen.getByLabelText("New Password");
+    await userEvent.type(next(), "Aaron-Lagos-2026!");
+    await userEvent.type(screen.getByLabelText("Confirm Password"), "Aaron-Lagos-2026!");
+    await userEvent.click(screen.getByRole("button", { name: "Save Password" }));
+    expect(screen.getByText("Contains your email name")).toBeTruthy();
+    await userEvent.clear(next());
+    await userEvent.type(next(), "Lagos-2026!");
+    expect(screen.getByText("At least 12 characters")).toBeTruthy();
+    // Neither reached the API: the only call was the link's check.
+    expect(m.call.mock.calls.map(([key]) => key)).toEqual(["POST /api/v1/auth/link"]);
   });
 });
