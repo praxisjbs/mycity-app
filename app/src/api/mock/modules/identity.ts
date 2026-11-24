@@ -1,3 +1,4 @@
+import identity from "@mycity/contract/schemas/identity.js";
 import type { Me, SignIn } from "@mycity/contract/contract.gen.ts";
 import { at, fail, invalid, mockSession, ok, noContent, paged, route, sid } from "../core";
 import { capabilitiesOf } from "../data/access";
@@ -187,7 +188,7 @@ route(
     const t = String(req.body.token ?? "");
     if (!/^[A-Za-z0-9_-]{43}$/.test(t) || t.startsWith("x")) return fail(404, "LINK_INVALID", "This link has expired or was already used.");
     const p = byKey("chidera")!;
-    return ok({ purpose: t.startsWith("i") ? ("invite" as const) : ("reset" as const), email: p.work_email, first_name: p.first_name, expires_at: new Date(Date.now() + 30 * 60000).toISOString() });
+    return ok({ purpose: t.startsWith("i") ? ("invite" as const) : ("reset" as const), email: p.work_email, first_name: p.first_name, expires_at: new Date(Date.now() + 30 * 60000).toISOString(), password_min_length: 8 });
   },
   { anonymous: true },
 );
@@ -197,7 +198,10 @@ route(
   (req) => {
     const t = String(req.body.token ?? "");
     if (!/^[A-Za-z0-9_-]{43}$/.test(t) || t.startsWith("x")) return fail(404, "LINK_INVALID", "This link has expired or was already used.");
-    return ok({ email: byKey("chidera")!.work_email });
+    const email = byKey("chidera")!.work_email;
+    const problem = identity.passwordProblem(String(req.body.new_password ?? ""), { email, min: 8 });
+    if (problem) return fail(422, "WEAK_PASSWORD", problem, { new_password: [problem] });
+    return ok({ email });
   },
   { anonymous: true },
 );

@@ -7,8 +7,9 @@
  *
  * Rules (decided 16/10/2026):
  *  - the shape is the contract's NewPassword: at least 8 characters, a lowercase
- *    letter, an uppercase letter, a number and a symbol. One definition, so the form
- *    marks the field with the same rule the API applies;
+ *    letter, an uppercase letter, a number and a symbol. One definition with the two
+ *    rules below (the contract's passwordProblem), so the form marks the field with the
+ *    same rule the API applies;
  *  - at least the minimum in force, when Settings · Security has raised it above the
  *    contract's eight (settings.security-rules.js; the caller loads the rules first);
  *  - not the name part of the person's own email ("ada" in ada@...);
@@ -65,6 +66,11 @@ async function checkBreached(password, { fetchImpl = fetch } = {}) {
   }
 }
 
+/** The shortest password in force: Settings · Security's, which never goes below the contract's 8. */
+function minimum() {
+  return rules.current().password_min_length;
+}
+
 function refuse(field, message) {
   return new AppError("WEAK_PASSWORD", message, 422, { [field]: [message] });
 }
@@ -87,16 +93,9 @@ function breachRefusal(field) {
  */
 async function assert(password, ctx = {}) {
   const field = ctx.field || "new_password";
-  const shape = c.identity.NewPassword.safeParse(password);
-  if (!shape.success) throw refuse(field, shape.error.issues[0].message);
-  const min = rules.current().password_min_length;
-  if (String(password).length < min) throw refuse(field, `At least ${min} characters`);
-
-  const local = String(ctx.email || "")
-    .toLowerCase()
-    .split("@")[0];
-  if (local.length >= 3 && String(password).toLowerCase().includes(local))
-    throw refuse(field, "Contains your email name");
+  // The rules a screen applies first, from one definition (the contract's passwordProblem).
+  const problem = c.identity.passwordProblem(password, { email: ctx.email, min: minimum() });
+  if (problem) throw refuse(field, problem);
 
   // Tests never reach the network: a test that checks the breach rule gives its own fetch.
   if (!config.PASSWORD_BREACH_CHECK || (config.APP_ENV === "test" && !ctx.fetchImpl))
@@ -108,4 +107,4 @@ async function assert(password, ctx = {}) {
   return { breach_checked: checked };
 }
 
-module.exports = { assert, checkBreached };
+module.exports = { assert, checkBreached, minimum };

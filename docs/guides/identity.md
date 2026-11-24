@@ -153,7 +153,7 @@ Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sig
 | `POST /api/v1/auth/logout` | `LogoutBody` → 204 | anonymous | | `reason: idle` records `inactivity_timeout` |
 | `GET /api/v1/auth/device` | → `DeviceAccount` | anonymous, device cookie | | Who last signed in on this browser |
 | `POST /api/v1/auth/forgot` | `ForgotBody` → `Accepted` | anonymous | | Same answer for every email; 5 per address in 15 minutes |
-| `POST /api/v1/auth/link` | `LinkCheckBody` → `LinkCheck` | anonymous | | 404 `LINK_INVALID` when expired or spent |
+| `POST /api/v1/auth/link` | `LinkCheckBody` → `LinkCheck` | anonymous | | 404 `LINK_INVALID` when expired or spent. Carries `password_min_length`, the minimum in force, for the page's own check |
 | `POST /api/v1/auth/reset` | `ResetBody` → `ResetDone` | anonymous | | Sets the password, ends every session |
 | `GET /api/v1/auth/me` | → `Me` | own account | | `grants` per module, `scopes` (each module's widest record scope over the person's roles: `all`, `team` or `own`), and `capabilities`: the codes the person holds through a role or directly, A to Z (the CEO's are every code in `capability`), the same the routes check (README §5.2); `ai_available`, false while AI is switched off on AI Control or the month's cap on all AI is reached (`ai-control.md` §6.7). Every session response carries the same `Me` |
 | `GET /api/v1/auth/security` | → `SecuritySummary` | own account | | |
@@ -217,6 +217,11 @@ either, never lengthen it (`foundation.md` §6.4); the minutes below are the def
   Only the server can know it, so no screen can say it first: the refusal (Found in a breach) is
   the rule working, and it is never recorded on System Health (`err.recorded = false`,
   system-health.md §6). Every other password rule is a screen's to check, and is recorded.
+- The shape, the minimum in force and the email rule are one function in the contract,
+  `identity.passwordProblem(password, { email, min })`, which the API applies and the reset,
+  invitation and My Security forms mark as the password is typed, so none reaches the API as a
+  refusal. `POST /auth/link` answers the minimum in force (`password_min_length`) with the link's
+  email; My Security knows the email only, so a raised minimum is still marked there by the API.
 - Hashed with Argon2id. Argon2 runs outside the transaction.
 
 **Wrong passwords** (`identity.throttle.js`): the first 5 cost nothing; then each attempt waits
@@ -475,6 +480,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · From the 23/11 staging faults brief (fault #14, `WEAK_PASSWORD: new_password` at `POST /auth/reset`, back after it was marked fixed): the 27/10 fix stopped recording only the breach rule, and the reset and invitation page still checked the contract's shape alone, so *Contains your email name* and a minimum raised on Settings · Security reached the API. Both now come from `identity.passwordProblem` in the contract, applied by the API and marked by the page as typed; `LinkCheck` carries `password_min_length`; My Security marks the email rule (§5, §6 Passwords). `Login.test.tsx`, `tests/integration/identity.test.js`.
 - 17/11/2026 · JP · `/auth/me` (and the sign-in answer's `user`) carries `ai_available` (`services/ai/governance.js` `available`): the hub hides Praxis AI and every AI button while it is false. The shell reads `/me` again at its refresh and on a move to another module (`rereadMe`, which keeps the person in hand when nothing changed), never on a timer; `can("praxis_ai")` answers false meanwhile (`ai-control.md` decisions 36 to 38, §6.7).
 - 14/11/2026 · JP · §10: Sign In clears a refused password unmarked: the refusal bar says why, and the field no longer also reads "Enter your password" (as the code and PIN steps already did). Reset and Welcome: an empty Confirm Password reads "Enter it again", a different one "Does not match"; "Enter it again" could not show before while New Password held anything. Found filming the Milestones 0 and 1 videos (`docs/runbooks/training-videos.md` §7); `Login.test.tsx`.
 - 11/11/2026 · AJ · `users.inviteIn(client, body, actor)`: Invite User's own step inside a caller's transaction, for M5's Complete Onboarding, which invites the hire's login on their company email with the role Staff all or nothing with the rest of that step (§3 step 1). The invitation, its link and its mail are unchanged.

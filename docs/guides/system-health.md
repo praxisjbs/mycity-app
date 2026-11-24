@@ -183,8 +183,13 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
 - **A refusal no screen can foresee is not a fault.** Where only the server can know and no fix
   could prevent it, the error says so (`err.recorded = false`, `shared/errors.js`) and is answered
   the same, never recorded: a password found in a breach (identity.md §6; fault #6 of the 27/10
-  brief, JBS Praxis). A rule a screen could check first stays recorded, since its count is how a
-  screen that lets it through is found (leave past the allowance stays, JBS Praxis, 27/10/2026).
+  brief, JBS Praxis), a password a mail server refuses (mailbox.md §11) and a contact email already
+  on a partner or lead (partnerships.md §6.2). A rule a screen could check first stays recorded, since
+  its count is how a screen that lets it through is found (leave past the allowance stays, JBS Praxis,
+  27/10/2026), and the fix is the screen: from the 23/11 brief, a payee Send Request needs
+  (expenses.md §6) and the reset page's password rules (identity.md §6). A rule left to the server
+  on purpose is not recorded either: a reporting loop or a self-report (organogram.md §5; JBS
+  Praxis, 24/11/2026).
 - Only `fatal` and `error` are told. A `warning` or `notice` group is grouped, counted and reopened
   when it comes back like any other, but never pushed as new, back again or happening fast, and
   never escalates (TB, 20/10/2026, fault #1). The roll-up reads the reporter's `ALERT_SEVERITIES`,
@@ -467,6 +472,7 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · The 23/11 staging brief, with JBS Praxis's answers: refused forms a screen cannot foresee stop being recorded (a mail server's refused password, a contact email already on the record), as do the two reporting-line rules the screens leave to the server; the screens that let a foreseeable refusal through were fixed instead (a blank payee on Send Request, the reset page's email and minimum rules). §6.
 - 03/11/2026 · JP · System Health's forms in the chat (`praxis-ai.md` decision 33): Save Targets, Save Fault and Add Note as Praxis AI cards under `system_health` edit, each the screen's own service function; the controller's `ai:none` gives way to the manifest, which still reads nothing (§9). No screen changed.
 - 27/10/2026 · JP · From the 27/10 staging faults brief (JBS Praxis's answers): a refusal no screen can foresee, a password found in a breach, is answered as before and never recorded as a fault (`err.recorded = false`, §6); a person choosing a breached password is the rule working, and three of them cost a fix session to rule out. Waits On's and Open Round's rules, which shared `VALIDATION_FAILED`, each have their own code, so a brief names the rule a person met (workspace.md, performance.md).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Checks reads Show All when every check is up and Show Fewer once all show; Download Brief, the bulk changes and a fault's status buttons say why they failed; more than 25 (a brief) or 50 (a status) ticked asks first, as §11 says; Take It On sends `assigned_to`, so Held By names the reader (§2, §10.1); Add Note saves a note with no status change (`POST /faults/:id/notes`); the fault's labels are Title Case (First Seen, Last Seen, How Often, Held By); Status keeps its title when it cannot load; a reader with view only gets no ticks. §10 updated.

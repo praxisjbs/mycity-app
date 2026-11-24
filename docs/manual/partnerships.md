@@ -338,7 +338,8 @@ full. A conversation linked from your mailbox shows there too. See
    ![Add Contact](shot:partnerships-contact-add)
 3. Fill in the **First Name** and **Last Name**. Add the **Position**, **Email** and **Phone**.
 4. Tick **Signs Agreements** if this person signs for the organisation.
-5. Press **Add Contact**. The message reads *Contact added*.
+5. Press **Add Contact**. The message reads *Contact added*. **Already a contact** under **Email**
+   means someone on this record has that email: use another, or edit that contact.
 6. To change a contact, press its row, edit it and press **Save Contact**.
 
 The table marks the main contact **Primary** and a signer **Signs**.

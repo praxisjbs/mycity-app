@@ -802,11 +802,14 @@ async function checkLink(token) {
   const link = await repo.findOpenLink(pool, cookies.hashToken(token));
   if (!link)
     throw new AppError("LINK_INVALID", "This link has expired or was already used.", 404);
+  await policy.load(pool);
   return {
     purpose: link.purpose,
     email: link.email,
     first_name: link.first_name,
     expires_at: new Date(link.expires_at).toISOString(),
+    // The page marks a password shorter than this before Save Password (identity.md §6).
+    password_min_length: passwordPolicy.minimum(),
   };
 }
 

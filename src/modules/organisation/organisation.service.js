@@ -31,6 +31,24 @@ const { employeeDateProblems, ON_SITE_PATTERNS } = require("@mycity/contract").o
 const HOME = "employee.home_address";
 const { EVENTS, CHART_DOC_TYPE, CHART_EXPORT } = require("./organisation.events");
 
+/*
+ * Nobody reports to themselves, and no line loops back on itself. Both are refused on the field and
+ * answered as they always were, but never recorded on System Health: the screens offer every active
+ * person and leave the rule to the server (JBS Praxis, 24/11/2026; faults #3 and #4 of the 23/11
+ * staging brief), so a count of them would only be people choosing again (shared/errors.js `recorded`).
+ */
+function reportsToSelf(key) {
+  const err = new AppError("REPORTS_TO_SELF", "Nobody reports to themselves.", 422, { [key]: ["Not themselves"] });
+  err.recorded = false;
+  return err;
+}
+
+function reportingLoop(key) {
+  const err = new AppError("REPORTING_LOOP", "That would make a loop in the reporting line.", 422, { [key]: ["Would make a loop"] });
+  err.recorded = false;
+  return err;
+}
+
 const findDepartmentByName = (client, name) => repo.findDepartmentByName(client, name);
 const findDepartmentByCode = (client, code) => repo.findDepartmentByCode(client, code);
 const findEmployeeByWorkEmail = (client, email) => repo.findEmployeeByWorkEmail(client, email);
@@ -580,7 +598,7 @@ async function assertReferences(client, body, employeeId = null) {
     const id = body[key];
     if (!id) continue;
     if (id === employeeId)
-      throw new AppError("REPORTS_TO_SELF", "Nobody reports to themselves.", 422, { [key]: ["Not themselves"] });
+      throw reportsToSelf(key);
     const manager = await repo.findEmployeeById(client, id);
     if (!manager || manager.status !== "active")
       throw new AppError("MANAGER_NOT_FOUND", "Pick a manager who works here now.", 422, {
@@ -896,9 +914,7 @@ async function setReportingLine(client, employeeId, input, actor) {
   ]) {
     if (!id) continue;
     if (id === employeeId)
-      throw new AppError("REPORTS_TO_SELF", "Nobody reports to themselves.", 422, {
-        [key]: ["Not themselves"],
-      });
+      throw reportsToSelf(key);
     const manager = await repo.findEmployeeById(client, id);
     if (!manager || manager.status !== "active")
       throw new AppError("MANAGER_NOT_FOUND", "That manager is not on the staff list now.", 422, {
@@ -916,12 +932,7 @@ async function setReportingLine(client, employeeId, input, actor) {
   }
   const above = patch.line_manager_id || patch.line_manager_seat_id;
   if (above && (await repo.wouldLoop(client, employeeId, above))) {
-    throw new AppError(
-      "REPORTING_LOOP",
-      "That would make a loop in the reporting line.",
-      422,
-      { [patch.line_manager_id ? "line_manager_id" : "line_manager_seat_id"]: ["Would make a loop"] },
-    );
+    throw reportingLoop(patch.line_manager_id ? "line_manager_id" : "line_manager_seat_id");
   }
 
   const after = await repo.setReporting(client, employeeId, patch);
@@ -988,9 +999,7 @@ async function changeSeat(client, seatId, patch, actor) {
   if ("line_manager_seat_id" in change && change.line_manager_seat_id) change.line_manager_id = null;
   const above = change.line_manager_id || change.line_manager_seat_id;
   if (above && (await repo.wouldLoop(client, seatId, above)))
-    throw new AppError("REPORTING_LOOP", "That would make a loop in the reporting line.", 422, {
-      [change.line_manager_id ? "line_manager_id" : "line_manager_seat_id"]: ["Would make a loop"],
-    });
+    throw reportingLoop(change.line_manager_id ? "line_manager_id" : "line_manager_seat_id");
   const after = await repo.updateSeat(client, seatId, change);
   await emit(client, {
     key: EVENTS.ORG_SEAT_UPDATED,

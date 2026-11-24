@@ -13,6 +13,7 @@ import Partnerships from "./index";
 import { forgetKept, healthPill, moveNeeds } from "./lib";
 import { dealOnWire } from "./forms/parts";
 import { returnsOnWire } from "./forms/ReturnsForm";
+import { duplicateQuery } from "./forms/LeadForm";
 
 /**
  * Pipeline, Partners and Leads with both 360s on the in-browser mock (docs/guides/partnerships.md §10):
@@ -345,6 +346,17 @@ describe("Partnerships on the contract", () => {
     expect((await screen.findAllByRole("button", { name: "Send for Signature" }, { timeout: 8000 })).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   }, 40000);
+});
+
+describe("the duplicate check asks only what the contract takes (fault #6, 23/11/2026)", () => {
+  it("a name from three characters to 150, an email only when it is one; nothing else is sent", () => {
+    expect(duplicateQuery("  Hevix Events ")).toEqual({ name: "Hevix Events" });
+    expect(duplicateQuery("Ab")).toBeNull();
+    // Past the contract's 150 the field marks the name; the hidden check is not sent to be refused.
+    expect(duplicateQuery("A".repeat(151))).toBeNull();
+    expect(duplicateQuery("A".repeat(151), "ngozi@hevix.ng")).toEqual({ email: "ngozi@hevix.ng" });
+    expect(duplicateQuery("Hevix", "ngozi@")).toEqual({ name: "Hevix" });
+  });
 });
 
 describe("the QA audit's rules on the screen (17/11/2026)", () => {

@@ -254,6 +254,24 @@ const ExpenseFields = z
   })
   .strict();
 
+/** The payee's bank, as a request carries it. */
+const PAYEE_FIELDS = ["payee_name", "bank_name", "account_name", "account_number"];
+
+/**
+ * What sending needs of the payee (docs/guides/expenses.md §6): a draft may leave the payee's bank blank,
+ * a request sent may not, unless a staff payee uses their company account. Each missing field is marked,
+ * so the form says so before Send Request rather than after (fault #5 of the 23/11 staging brief); the
+ * service refuses the same as PAYEE_INCOMPLETE. Empty when the payee is complete.
+ * @param {{payee_type?: string, uses_profile_account?: boolean|null} & Record<string, unknown>} v
+ * @returns {Record<string, string[]>}
+ */
+function payeeProblems(v) {
+  if (v.payee_type === "staff" && v.uses_profile_account) return {};
+  const out = {};
+  for (const k of PAYEE_FIELDS) if (!String(v[k] ?? "").trim()) out[k] = ["Required"];
+  return out;
+}
+
 /** New Request. `submit` sends it at once (Send Request); without it the request is a draft. */
 const ExpenseCreate = ExpenseFields.extend({ submit: z.boolean().default(false) }).strict();
 
@@ -522,6 +540,7 @@ module.exports = {
   ExpenseApprovalsSummary,
   ExpenseLineInput,
   ExpenseFields,
+  payeeProblems,
   ExpenseCreate,
   ExpenseUpdate,
   ExpenseCancel,

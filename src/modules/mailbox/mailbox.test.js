@@ -121,6 +121,17 @@ describe("what a mail server's refusal means", () => {
       }).code,
     ).toBe("MAIL_SERVER_NOT_FOUND");
   });
+  test("a refused password is answered on the field and never recorded as a fault", () => {
+    // Fault #1 of the 23/11 staging brief: only the mail server knows the password, so no screen can say it first.
+    for (const err of [
+      mapSmtpError({ code: "EAUTH", responseCode: 535, response: "535 Incorrect authentication data" }),
+      mapImapError({ authenticationFailed: true, message: "Command failed" }),
+    ]) {
+      expect([err.code, err.status, err.fields, err.recorded]).toEqual(["MAIL_AUTH_FAILED", 422, { password: ["Password refused"] }, false]);
+    }
+    // Every other refusal is recorded as it always was.
+    expect(mapImapError({ code: "ENOTFOUND", message: "getaddrinfo ENOTFOUND mail.x.test" }).recorded).toBeUndefined();
+  });
   test("a permanent refusal is never retried; a deferral is, three times", () => {
     expect(
       retryPlan(

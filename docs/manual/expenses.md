@@ -45,7 +45,9 @@ My Requests lists every request you raised, newest first, with who it waits on n
 9. Attach the invoice under **Invoice**. Press **Read Invoice** to fill the payee, their bank and the
    items from it, with its discounts and anything already paid as minus lines, then check every
    line. If the message says **Invoice asks** another amount, put the lines right before you send.
-10. Press **Send Request**. Or press **Save Draft** to finish it later.
+10. Press **Send Request**. Or press **Save Draft** to finish it later. A draft may leave the
+    payee's bank blank; **Send Request** marks each field still empty **Required**, and sends
+    nothing until they are filled.
 
 > **Tip:** In [Praxis AI · Ask](/praxis-ai?tab=ask), say "Raise an expense request". It asks **What are you paying
 > for? How many? How much is each?** and draws the request for you to check. To list several items,
@@ -65,6 +67,8 @@ My Requests lists every request you raised, newest first, with who it waits on n
    Press **In Flight** or **Disbursed This Year** to list those requests.
 3. Press a request. It opens over the list with its lines, its payee and its **History**.
 4. A request sent back to you says why. Press **Edit Request**, change it, then press **Send Again**.
+   A draft offers **Send Request**: if its payee's bank is missing, **Edit Request** opens with those
+   fields marked **Required**. Fill them in and press **Send Request**.
 5. Press **Cancel Request** to stop a request until Operations & People approve it, then
    **Cancel Request** again to confirm. After that, ask Operations & People to withdraw it.
 

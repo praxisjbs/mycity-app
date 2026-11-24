@@ -34,6 +34,22 @@ describe("who may change a request when", () => {
   });
 });
 
+describe("what sending needs of the payee (fault #5, 23/11/2026)", () => {
+  const { payeeProblems } = require("@mycity/contract").expenses;
+  test("a vendor's bank is needed in full; a draft's blanks are listed field by field", () => {
+    expect(payeeProblems({ payee_type: "vendor", payee_name: "Ikeja Prints", bank_name: " ", account_name: null })).toEqual({
+      bank_name: ["Required"],
+      account_name: ["Required"],
+      account_number: ["Required"],
+    });
+    expect(payeeProblems({ payee_type: "vendor", payee_name: "Ikeja Prints", bank_name: "Zenith Bank", account_name: "Ikeja Prints Ltd", account_number: "0123456789" })).toEqual({});
+  });
+  test("a staff payee on their company account needs none: the profile's bank is used", () => {
+    expect(payeeProblems({ payee_type: "staff", uses_profile_account: true })).toEqual({});
+    expect(Object.keys(payeeProblems({ payee_type: "staff", uses_profile_account: false }))).toHaveLength(4);
+  });
+});
+
 describe("the routes", () => {
   const routes = routesOf(require("./expenses.routes").router);
 

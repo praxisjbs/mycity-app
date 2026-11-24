@@ -666,6 +666,11 @@ describeDb("the organisation module against the real migrations", () => {
       ).send({ line_manager_id: people.staff.employee_id });
       expect(self.status).toBe(422);
       expect(self.body.error.code).toBe("REPORTS_TO_SELF");
+      expect([loop.body.error.fields, self.body.error.fields]).toEqual([{ line_manager_id: ["Would make a loop"] }, { line_manager_id: ["Not themselves"] }]);
+      // Faults #3 and #4 of the 23/11 staging brief: answered as before, never recorded on System Health.
+      await require("../../src/shared/observability/error-reporter").flush();
+      const recorded = await one("SELECT count(*)::int AS n FROM error_event WHERE request_id = ANY($1)", [[loop.body.request_id, self.body.request_id]]);
+      expect(recorded.n).toBe(0);
 
       const history = await one(
         "SELECT count(*)::int AS n FROM reporting_line WHERE employee_id = $1",

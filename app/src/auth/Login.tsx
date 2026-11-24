@@ -10,12 +10,6 @@ import { passkeyProblem, passkeysWork } from "./passkey";
 
 export const vEmail = (v: string) => (!v.trim() ? "Enter your email" : !v.includes("@") ? "Needs an @" : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? "Check the spelling" : "");
 export const vPass = (v: string) => (v ? "" : "Enter your password");
-/** The contract's rule for a new password: the first one it misses. */
-const vNew = (v: string) => {
-  const r = identity.NewPassword.safeParse(v);
-  return r.success ? "" : (r.error.issues[0]?.message ?? "Check the password");
-};
-
 /** The paths a credential link opens: a reset, or an invitation to choose a first password. */
 export const LINK_PATHS = ["/reset", "/welcome"];
 
@@ -621,7 +615,8 @@ function LinkForm({ token, onDone, onExpired }: { token: string; onDone: (email:
   }
 
   const invite = check.purpose === "invite";
-  const nErr = serverErr || vNew(next);
+  // Every rule the API applies but the breach corpus, with this person's email and the minimum in force.
+  const nErr = serverErr || identity.passwordProblem(next, { email: check.email, min: check.password_min_length });
   const aErr = again !== next ? "Does not match" : "";
   const submit = async () => {
     setTouched({ next: true, again: true });

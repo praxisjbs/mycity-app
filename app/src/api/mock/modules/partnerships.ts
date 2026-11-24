@@ -1076,7 +1076,7 @@ route("POST /api/v1/partnerships/contacts", (req) => {
   const r = recordOf(String(req.body.partner_id ?? req.body.lead_id ?? ""));
   if (!r) return invalid({ partner_id: ["Pick the lead or the partner"] });
   if (!str(req.body.first_name) || !str(req.body.last_name)) return invalid({ ...(!str(req.body.first_name) && { first_name: ["Required"] }), ...(!str(req.body.last_name) && { last_name: ["Required"] }) });
-  if (str(req.body.email) && contactsOf(r).some((c) => c.email === String(req.body.email).toLowerCase())) return invalid({ email: ["Already a contact"] });
+  if (str(req.body.email) && contactsOf(r).some((c) => c.email === String(req.body.email).toLowerCase())) return fail(422, "CONTACT_EMAIL_TAKEN", "Check the highlighted fields", { email: ["Already a contact"] });
   return created(contactFrom(req.body, r, Boolean(req.body.primary_contact) || contactsOf(r).length === 0));
 });
 route("PATCH /api/v1/partnerships/contacts/:id", (req) => {

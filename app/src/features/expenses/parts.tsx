@@ -1,7 +1,7 @@
 import expenses from "@mycity/contract/schemas/expenses.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
 import type { ExpenseBank, ExpenseCategory, ExpenseRequest, ExpenseRow } from "@mycity/contract/contract.gen.ts";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
@@ -131,8 +131,10 @@ const linesOnWire = (lines: LineValue[]) => lines.map((l) => ({ ...l, unit_price
  * New Request, and Edit of a draft or sent-back request (`existing`): Purpose, Category, Project,
  * Department, the lines, the payee, the invoice; Save Draft and Send Request in the footer.
  * Read Invoice and Suggest Category fill it for the person to check; nothing is saved until they press.
+ * Send Request marks a payee left blank before anything is saved; `sending` opens it with them marked,
+ * as the request's own Send Request does for a draft whose payee is incomplete.
  */
-export function RequestForm({ close, existing, project }: { close: () => void; existing?: ExpenseRequest; project?: string }) {
+export function RequestForm({ close, existing, project, sending }: { close: () => void; existing?: ExpenseRequest; project?: string; sending?: boolean }) {
   const projects = useInfinite("GET /api/v1/projects", { filters: { status: "active" } });
   const depts = useInfinite("GET /api/v1/departments", { filters: { active: "true" } });
   const [invoice, setInvoice] = useState(existing?.invoice ?? null);
@@ -166,9 +168,20 @@ export function RequestForm({ close, existing, project }: { close: () => void; e
   const lines = f.values.lines as LineValue[];
   const setLines = (next: LineValue[]) => f.set("lines", next);
   const profile = f.values.payee_type === "staff" && f.values.uses_profile_account;
+  /** Marks the payee's blank fields, as Send Request needs them; true when there were none. */
+  const payeeReady = () => {
+    const missing = expenses.payeeProblems(f.values);
+    const first = Object.keys(missing)[0];
+    if (!first) return true;
+    f.setServerErrors(missing);
+    window.requestAnimationFrame(() => (document.querySelector("[data-ui=modal]") ?? document).querySelector<HTMLElement>(`[name="${first}"]`)?.focus());
+    return false;
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the form opens from Send Request
+  useEffect(() => void (sending && payeeReady()), []);
 
   const save = (send: boolean) => async () => {
-    if (!f.check()) return;
+    if (!f.check() || (send && !payeeReady())) return;
     const body = { ...f.values, lines: linesOnWire(lines), invoice_document_id: invoice?.document_id ?? "" };
     try {
       let saved: ExpenseRequest;
@@ -478,6 +491,22 @@ export function OwnActions({ r, close }: { r: ExpenseRequest; close: () => void 
   const send = useMutation("POST /api/v1/expenses/mine/:id/submit");
   if (!r.can_edit && !r.can_cancel) return null;
   const cancels = CANCELLABLE.includes(r.status);
+  const editIt = (marked = false) => {
+    close();
+    modal.open({ title: "Edit Request", wide: true, body: (c) => <RequestForm close={c} existing={r} sending={marked} /> });
+  };
+  // A payee left blank on the draft is filled in Edit Request, its fields marked, before anything is sent.
+  const sendIt = async () => {
+    if (Object.keys(expenses.payeeProblems(r)).length) return editIt(true);
+    try {
+      await send.run({ params: { id: r.expense_request_id }, body: {} });
+      refreshAll();
+      close();
+      toast(`${r.number} sent`);
+    } catch (e) {
+      say(e);
+    }
+  };
   const cancelIt = async () => {
     if (!(await confirm({ title: "Cancel Request", body: `${r.number} stops here.`, confirmLabel: "Cancel Request", cancelLabel: "Keep Request", destructive: true }))) return;
     try {
@@ -495,9 +524,9 @@ export function OwnActions({ r, close }: { r: ExpenseRequest; close: () => void 
   };
   return (
     <ActionGroup>
-      {r.can_edit && <Button onClick={async () => { close(); modal.open({ title: "Edit Request", wide: true, body: (c) => <RequestForm close={c} existing={r} /> }); }}>Edit Request</Button>}
+      {r.can_edit && <Button onClick={async () => editIt()}>Edit Request</Button>}
       {r.can_edit && (
-        <Button variant="primary" onClick={async () => { try { await send.run({ params: { id: r.expense_request_id }, body: {} }); refreshAll(); close(); toast(`${r.number} sent`); } catch (e) { say(e); } }}>
+        <Button variant="primary" onClick={sendIt}>
           {r.status === "sent_back" ? "Send Again" : "Send Request"}
         </Button>
       )}
