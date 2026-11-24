@@ -10,7 +10,6 @@ import { passkeyProblem, passkeysWork } from "./passkey";
 
 export const vEmail = (v: string) => (!v.trim() ? "Enter your email" : !v.includes("@") ? "Needs an @" : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? "Check the spelling" : "");
 export const vPass = (v: string) => (v ? "" : "Enter your password");
-/** The contract's rule for a new password: the first one it misses. */
 /** The paths a credential link opens: a reset, or an invitation to choose a first password. */
 export const LINK_PATHS = ["/reset", "/welcome"];
 

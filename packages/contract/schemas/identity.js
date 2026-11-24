@@ -46,11 +46,11 @@ const NewPassword = z
  * @param {{email?: string|null, min?: number}} [ctx]
  * @returns {string} the first problem as a field mark, or "" when there is none
  */
-function passwordProblem(password, { email = null, min = PASSWORD_MIN } = {}) {
+function passwordProblem(password, { email: address = null, min = PASSWORD_MIN } = {}) {
   const shape = NewPassword.safeParse(password);
   if (!shape.success) return shape.error.issues[0].message;
   if (String(password).length < min) return `At least ${min} characters`;
-  const local = String(email || "").toLowerCase().split("@")[0];
+  const local = String(address || "").toLowerCase().split("@")[0];
   if (local.length >= 3 && String(password).toLowerCase().includes(local)) return "Contains your email name";
   return "";
 }
