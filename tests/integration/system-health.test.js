@@ -809,6 +809,16 @@ describeDb("System Health against the real migrations", () => {
 
     test("Download Brief on Status: the worker writes the whole system, problems first", async () => {
       expect((await as("ops").post("/system-health/status-briefs").send({})).status).toBe(403);
+      // An event that used up its retries (status brief of 24/11: staging's Events read "0 waiting", the brief never said which).
+      const ev = await q(
+        "INSERT INTO event_log (event_key, module_key, entity_type, entity_id) VALUES ('deal.signed', 'partnerships', 'partner_deal', gen_random_uuid()::text) RETURNING event_id",
+      );
+      const failedRow = await q(
+        "INSERT INTO event_outbox (event_id, event_key, status, attempts, max_attempts, last_error) VALUES ($1, 'deal.signed', 'failed', 8, 8, 'Not on the staff') RETURNING outbox_id",
+        [ev.rows[0].event_id],
+      );
+      const events = (await as("admin").get("/system-health/status")).body.checks.find((c) => c.key === "outbox");
+      expect([events.state, events.detail]).toEqual(["degraded", "1 failed"]);
       const res = await as("admin").post("/system-health/status-briefs").send({});
       expect(res.status).toBe(202);
       expect(res.body).toEqual({
@@ -835,6 +845,15 @@ describeDb("System Health against the real migrations", () => {
       }
       expect(md).toContain("`outbox-dispatch`");
       expect(md).toContain("cron 30 2 * * * Africa/Lagos");
+      // The failed event, named with the id a retry needs; the last day as Settings · Performance reads it.
+      expect(md).toContain("**The events that failed for good**");
+      expect(md).toContain(`\`${failedRow.rows[0].outbox_id}\``);
+      expect(md).toContain("Not on the staff");
+      expect(md).toContain("- **Availability:**");
+      // Both read: neither is listed under What could not be read (the queues are, with no Redis in tests).
+      expect(md).not.toContain("- The last 24 hours:");
+      expect(md).not.toContain("- Failed events:");
+      await q("DELETE FROM event_outbox WHERE outbox_id = $1", [failedRow.rows[0].outbox_id]);
       // A fault is one line: its stack is the Faults brief's.
       expect(md).toContain("Faults brief");
       expect(md).not.toContain("leave.service.js:40:11");

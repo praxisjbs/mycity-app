@@ -159,6 +159,16 @@ describe("how a check reads on screen", () => {
     }
   });
 
+  test("Events degraded by events that failed for good says so, not that the worker is behind (status brief of 24/11)", () => {
+    const failed = { status: "degraded", backlog: 0, failed: 2 };
+    expect(service.detailOf("outbox", failed)).toBe("2 failed");
+    expect(service.detailOf("outbox", { ...failed, backlog: 40 })).toBe("2 failed, 40 waiting");
+    expect(service.lookAt("outbox", failed)).toMatch(/^Follow-on work failed after every retry/);
+    // A backlog past 500 is still the worker's to catch up, whatever else failed.
+    expect(service.lookAt("outbox", { ...failed, backlog: 600 })).toMatch(/piling up/);
+    expect(service.lookAt("outbox", { status: "degraded", backlog: 600, failed: 0 })).toMatch(/piling up/);
+  });
+
   test("a probe nobody wrote words for still reads as something, never as a crash", () => {
     expect(service.label("brand_new_thing")).toBe("brand new thing");
     expect(service.lookAt("brand_new_thing")).toMatch(/logs/);
@@ -166,6 +176,7 @@ describe("how a check reads on screen", () => {
 
   test("a probe's detail says what it is doing", () => {
     expect(service.detailOf("outbox", { status: "degraded", backlog: 12 })).toContain("12 waiting");
+    expect(service.detailOf("outbox", { status: "up", backlog: 0, failed: 0 })).toBe("0 waiting");
     expect(service.detailOf("postgres", { status: "up", latency_ms: 3 })).toContain("3 ms");
     expect(service.detailOf("redis", { status: "down", error: "not connected" })).toBe("not connected");
   });
@@ -421,7 +432,19 @@ describe("the Status brief", () => {
     },
     queues: { queues: [{ queue: "email-send", summary: null, concurrency: 3, waiting: 40, active: 0, delayed: 0, failed: 2, paused: 0, last_failed_at: "2026-10-20T10:00:00.000Z", last_failure: "ENOSPC" }], error: null },
     changes: { rows: [{ at: "2026-10-20T10:00:00.000Z", key: "disk", label: "Disk Space", from: "degraded", to: "down", detail: "3% free" }], total: 1 },
-    last24: { uptime_pct: "91.0", gap_minutes: 0, recording: true, last_snapshot_at: "2026-10-20T11:55:00.000Z", points: [] },
+    last24: {
+      range: "day",
+      availability: { value: "99.4", target: "99.9", state: "missed" },
+      down_minutes: 8,
+      gap_minutes: 0,
+      requests: 1840,
+      response_p95: { value: "412", target: "800", state: "met" },
+      response_mean_ms: 96,
+      failed: { value: "0.2", target: "1", state: "met" },
+      recording: true,
+      last_sample_at: "2026-10-20T11:59:00.000Z",
+      points: [{ at: "2026-10-20T11:45:00.000Z", requests: 31, mean_ms: 88, error_pct: "0", cpu_busy_pct: "4.2", memory_in_use_pct: "15.0", disk_used_pct: "12.0" }],
+    },
     faults: { rows: [{ title: "Error: ENOSPC: no space left on device", severity: "error", origin: "worker", route: null, today: 12, total: 30, last_seen_at: "2026-10-20T11:50:00.000Z", status: "open", came_back: false }], total: 1 },
     host: null,
     unread: [],
@@ -491,10 +514,37 @@ describe("the Status brief", () => {
   });
 
   test("a since nobody knows is not claimed", () => {
-    const md = statusBrief.build(input({ last24: { uptime_pct: "0.0", gap_minutes: 1440, recording: false, last_snapshot_at: null, points: [] } }));
+    const md = statusBrief.build(input({ last24: { ...input().last24, gap_minutes: 1440, recording: false, last_sample_at: null, points: [] } }));
     expect(md).toContain("### 1 · Disk Space: down, since not known: nothing has been recorded recently");
     const recording = statusBrief.build(input());
     expect(recording).toContain("### 1 · Disk Space: down, changed within the last 5 minutes");
+  });
+
+  test("the last 24 hours read as Settings · Performance draws them, against their targets (status brief of 24/11)", () => {
+    const md = statusBrief.build(input());
+    expect(md).toContain("- **Availability:** 99.4% against 99.9% (missed); 8 minutes down, 0 minutes not recorded.");
+    expect(md).toContain("- **Requests:** 1840, p95 412 ms against 800 ms (met), mean 96 ms; failed 0.2% against 1% (met).");
+    expect(md).toContain("processor 4.2% busy, memory 15.0% in use, disk 12.0% used");
+    expect(md).toContain("**Last 24 hours:** the API answered 99.4% of the minutes; 0 minutes not recorded.");
+    expect(md).not.toContain("_Could not be read._");
+  });
+
+  test("Events failed for good: each event named with its tries, its error and the id a retry needs (status brief of 24/11)", () => {
+    const outbox = { key: "outbox", label: "Events", state: "degraded", detail: "1 failed", look_at: service.lookAt("outbox", { failed: 1, backlog: 0 }), since: null, facts: [] };
+    const md = statusBrief.build(
+      input({
+        checks: [...input().checks, outbox],
+        failed_events: {
+          rows: [{ event_key: "deal.signed", record: "partner_deal", attempts: 8, max_attempts: 8, done: ["calendar"], error: "Not on the staff", outbox_id: "7b0c5a8e-1111-4222-8333-944455556666", created_at: "2026-11-16T14:10:00.000Z", failed_at: "2026-11-16T14:48:00.000Z" }],
+          total: 1,
+        },
+      }),
+    );
+    expect(md).toContain("- **What that means:** Follow-on work failed after every retry.");
+    expect(md).toContain("**The events that failed for good**");
+    expect(md).toContain("| `deal.signed` | partner_deal | 8 of 8 | `calendar` |");
+    expect(md).toContain("`7b0c5a8e-1111-4222-8333-944455556666`");
+    expect(md).toContain("Not on the staff");
   });
 
   test("nothing down is said plainly; no em dash, no stack, no secret", () => {

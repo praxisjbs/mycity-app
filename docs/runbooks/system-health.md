@@ -122,7 +122,7 @@ list; these are the ones that reach somebody's phone.
 | Database | `systemctl status postgresql` | `docs/runbooks/backup-restore.md` if it will not start |
 | Cache and Sessions | `systemctl status redis-server` | Sessions and queued jobs are down until it is back |
 | Worker | `systemctl status mycity-worker-prod` | `journalctl -u mycity-worker-prod -n 100`. Mail, PDFs and notifications are waiting, not lost |
-| Events | `curl -s localhost:7000/api/health/ready \| jq '.checks.outbox'` | Degraded when any outbox row has **failed** for good, or the backlog passes 500. "0 waiting" and degraded means failed rows: read them in the Status brief (§7.1) and fix their handler; they are not pruned and stay until retried (no route or script retries them yet: `outbox.retryFailed` in code only). A backlog that keeps growing with a healthy worker means a handler is failing: `journalctl -u mycity-worker-prod \| grep outbox` |
+| Events | `curl -s localhost:7000/api/health/ready \| jq '.checks.outbox'` | Degraded when any outbox row has **failed** for good, or the backlog passes 500. Status then reads **N failed**: the Status brief (§7.1) names each failed event with its tries, the handlers already done, its last error and its outbox id. Fix the cause first, then retry it (§7.4); failed rows are not pruned and stay until retried (no route or script retries them: `outbox.retryFailed` in code only). A backlog that keeps growing with a healthy worker means a handler is failing: `journalctl -u mycity-worker-prod \| grep outbox` |
 | File Storage | `ls -ld /srv/mycity/prod/media` | It must be writable by the service user |
 | Upload Scanning | `systemctl status clamav-daemon` | Uploads are refused while it is down. Degraded, never fatal |
 | Disk Space | `df -h /` | Amber under 10% free, red under 5%. Old releases and dumps are pruned; media and logs grow |
@@ -236,6 +236,23 @@ WhatsApp) and tries the mail again at the next reading.
 
 **What it cannot cover:** the whole server being off or unreachable. Nothing on it can mail then;
 the uptime probe from outside (`docs/runbooks/monitoring.md` §2) is what notices (TB, 20/10/2026).
+
+
+### 7.4 Retrying an event that failed for good
+
+An outbox row that used up its retries keeps Events degraded until it is retried. Retry it only once
+its cause is fixed and deployed (a retry of an unfixed handler fails again after another 8 tries),
+one row at a time, with the outbox id the Status brief gives. It runs only the handlers not yet done
+on that row (`completed_handlers`), so a handler that finished is not run again.
+
+```
+sudo -u postgres psql -d mycity_<stg|prod> -c "UPDATE event_outbox SET status = 'pending', attempts = 0, next_attempt_at = now(), updated_at = now() WHERE status = 'failed' AND outbox_id = '<outbox id>'"
+```
+
+Proof: within a few seconds `SELECT status, left(last_error, 120) FROM event_outbox WHERE outbox_id
+= '<outbox id>'` reads `done`, and once no failed row is left the next five-minute snapshot shows
+Events Up on Settings · Status. Never delete a failed row: its follow-on work would never happen.
+(Found on staging, 24/11/2026: two rows had kept Events degraded for weeks, the brief only counting them.)
 
 ## 8 · Performance: the two things the server needs
 

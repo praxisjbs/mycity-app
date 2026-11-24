@@ -274,7 +274,11 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
   screen says Just Now.
 - **The Status brief** is problems first: each check not up, with since when, what its probe
   measured, what it means and the read-only commands to start from, written for this environment
-  (its units, paths, port and database). Then every check, every scheduler, every queue, the newest
+  (its units, paths, port and database). Events degraded by events that used up their retries reads
+  **N failed** (on Status too), and the brief names each one: its event, the record's type, its
+  tries, the handlers done, its last error (scrubbed) and its outbox id, 25 at most, for the retry
+  in `docs/runbooks/system-health.md` §7.4. The last 24 hours are Settings · Performance's day
+  (`performance.series`): availability, requests, p95 and failed requests against their targets. Then every check, every scheduler, every queue, the newest
   25 changes of the 7 days, the last 24 hours, and each open fault as one line (25 at most). It
   carries no stacks: those are the Faults brief's, which the Status brief points to.
 - **The Status brief's instructions**, in this order, and the receiving AI may not skip one:
@@ -472,6 +476,7 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · From the staging Status brief of 24/11 (Events degraded for weeks, "0 waiting"): Events degraded by failed events said "0 waiting" and "the worker is behind or down"; it now reads **N failed** with where to look for that, and the Status brief names each failed event with its outbox id (runbook §7.4 retries one). The brief's **The last 24 hours** had read *Could not be read* since the 20/10 Performance rebuild: it still called the removed `performance()`, so the name fell through to Node's global `performance` object; it reads `performance.series({ range: "day" })` now. Unit tests had built the old shape by hand; the integration test now plants a failed event and checks both. §6.
 - 24/11/2026 · JP · The 23/11 staging brief, with JBS Praxis's answers: refused forms a screen cannot foresee stop being recorded (a mail server's refused password, a contact email already on the record), as do the two reporting-line rules the screens leave to the server; the screens that let a foreseeable refusal through were fixed instead (a blank payee on Send Request, the reset page's email and minimum rules). §6.
 - 03/11/2026 · JP · System Health's forms in the chat (`praxis-ai.md` decision 33): Save Targets, Save Fault and Add Note as Praxis AI cards under `system_health` edit, each the screen's own service function; the controller's `ai:none` gives way to the manifest, which still reads nothing (§9). No screen changed.
 - 27/10/2026 · JP · From the 27/10 staging faults brief (JBS Praxis's answers): a refusal no screen can foresee, a password found in a breach, is answered as before and never recorded as a fault (`err.recorded = false`, §6); a person choosing a breached password is the rule working, and three of them cost a fix session to rule out. Waits On's and Open Round's rules, which shared `VALIDATION_FAILED`, each have their own code, so a brief names the rule a person met (workspace.md, performance.md).
