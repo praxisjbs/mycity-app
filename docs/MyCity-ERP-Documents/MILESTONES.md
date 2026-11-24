@@ -530,6 +530,12 @@ small, both are visible on day one, and neither exists in either donor.
 
 ### 6.5 Mailbox client — GE
 
+**Amended 24/11/2026 (JBS Praxis).** Mailbox is outside the go-live scope. It was offered to MyCity
+as a change request, which MyCity declined. No further work is done on it unless a change request
+is agreed, and the mailbox sentence in this milestone's Definition of done no longer applies.
+MyCity's QA audit finding on it (F47) is held on the Change Report of the audit response
+(`docs/qa-audit/`).
+
 `praxis-ls/src/modules/mail/mail/` — **12,250 loc / 39 files** of the module's 23,441.
 `mail.service.js` (1,808) is provider-agnostic; business code never calls a provider. Secrets live
 AES-256-GCM in the integration-secret vault keyed `mail_conn:<id>`, never on the connection row.
