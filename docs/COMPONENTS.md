@@ -2953,7 +2953,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 | `size` | `"sm" \| "md" \| "wide" \| "xl"` |  | Desktop width: `sm` a confirmation, `md` a form (the default), `wide` a table or document, `xl` a record whose cards sit side by side (an interview, an offer). |
 | `full` | `boolean` |  | A full-screen sheet on a phone (a composer, a long form, a reader). No change on desktop. |
 | `side` | `boolean` |  | A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. |
-| `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. |
+| `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. A useContractForm inside says so itself; other changes say so with useUnsavedChanges. |
 | `dismissible` | `boolean` |  | false: Esc, the scrim and a drag do nothing; the close button and the footer still close it. Default true. |
 | `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation that must be answered. Default `dialog`. |
