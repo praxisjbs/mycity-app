@@ -7,23 +7,34 @@ import { Banner, Button, toast, useContractForm, Wizard, type PlaceValue } from 
 import { failed, useCategoryDefaults, useFieldDefs, useHoldsMoney, useStages } from "../lib";
 import { checkedOnWire, ContactPart, contactStart, customForCreate, DealPart, dealBody, dealOnWire, dealStart, OrganisationPart, useMeAsPerson, type Bound, type CustomDraft } from "./parts";
 
+/** What is entered so far that the duplicate check can ask with (§6.2): the organisation's and its contact's. */
+export type DuplicateAsk = { name: string; email?: string; phone?: string; website?: string };
+
 /**
- * What the duplicate check asks with: a name once it has three characters and an email, each only as
- * DuplicateQuery takes it, so a name past 150 characters (the field marks it) is never sent to be
- * refused (fault #6 of the 23/11 staging brief). Null when there is nothing to ask.
+ * What the duplicate check asks with: a name once it has three characters, and the contact's email
+ * and phone and the website once each is whole, each only as DuplicateQuery takes it, so a name past
+ * 150 characters (the field marks it) or a phone half typed is never sent to be refused (fault #6 of
+ * the 23/11 staging brief). Null when there is nothing to ask.
  */
-export function duplicateQuery(name: string, email?: string): { name?: string; email?: string } | null {
+export function duplicateQuery({ name, email, phone, website }: DuplicateAsk): { name?: string; email?: string; phone?: string; website?: string } | null {
   const n = name.trim();
+  const w = (website ?? "").trim();
+  const takes = (part: Record<string, string>) => partners.DuplicateQuery.safeParse(part).success;
   const query = {
-    ...(n.length >= 3 && partners.DuplicateQuery.safeParse({ name: n }).success && { name: n }),
-    ...(email && partners.DuplicateQuery.safeParse({ email }).success && { email }),
+    ...(n.length >= 3 && takes({ name: n }) && { name: n }),
+    ...(email && takes({ email }) && { email }),
+    ...(phone && takes({ phone }) && { phone }),
+    ...(w && takes({ website: w }) && { website: w }),
   };
   return Object.keys(query).length ? query : null;
 }
 
-/** A likely duplicate of what is being entered (§6.2): advisory, never blocking. */
-export function DuplicateNotice({ name, email, onNewDeal }: { name: string; email?: string; onNewDeal?: (partnerId: string) => void }) {
-  const query = duplicateQuery(name, email);
+/**
+ * A likely duplicate of what is being entered (§6.2): advisory, never blocking. Shown on the
+ * Organisation and Contact steps, so the contact's email and phone are asked about once entered.
+ */
+export function DuplicateNotice({ onNewDeal, ...ask }: DuplicateAsk & { onNewDeal?: (partnerId: string) => void }) {
+  const query = duplicateQuery(ask);
   const dup = useApi("GET /api/v1/partnerships/duplicates", { query: query ?? {}, enabled: query !== null });
   const top = dup.data?.candidates[0];
   if (!top) return null;
@@ -36,6 +47,11 @@ export function DuplicateNotice({ name, email, onNewDeal }: { name: string; emai
       {`Already here: ${top.name}, ${top.number}.`}
     </Banner>
   );
+}
+
+/** The organisation's name and website and its contact's email and first phone, as the check asks. */
+export function duplicateAskOf(org: { name: string; website?: string }, contact: { email?: string; phones?: string[] }): DuplicateAsk {
+  return { name: org.name, website: org.website, email: contact.email, phone: contact.phones?.[0] };
 }
 
 /**
@@ -77,6 +93,7 @@ export function LeadForm({ close, onCreated, onNewDeal }: { close: () => void; o
     if (!deal.values.stage && open[0]) deal.set("stage", open[0].code);
   }, [open, deal]);
   const save = useMutation("POST /api/v1/partnerships/leads");
+  const ask = duplicateAskOf(org.values, contact.values);
   const submit = async () => {
     const v = org.values;
     try {
@@ -119,12 +136,21 @@ export function LeadForm({ close, onCreated, onNewDeal }: { close: () => void; o
           check: () => org.check(),
           body: (
             <>
-              <DuplicateNotice name={org.values.name} onNewDeal={onNewDeal} />
+              <DuplicateNotice {...ask} onNewDeal={onNewDeal} />
               <OrganisationPart f={org as unknown as Bound} kind="lead" owner={me} custom={leadDefs} />
             </>
           ),
         },
-        { title: "Contact", check: () => contact.check(), body: <ContactPart f={contact as unknown as Bound} /> },
+        {
+          title: "Contact",
+          check: () => contact.check(),
+          body: (
+            <>
+              <DuplicateNotice {...ask} onNewDeal={onNewDeal} />
+              <ContactPart f={contact as unknown as Bound} />
+            </>
+          ),
+        },
         {
           title: "Deal",
           check: () => deal.check(),

@@ -248,6 +248,9 @@ everyone on a temporary site) · `1460` `attendance_check_in` (one row per check
 append-only: its point, accuracy, matched address, distance, verdict, evidence and policy version,
 unique per person and Idempotency-Key), `attendance_exception.attendance_check_in_id` (a flag a
 check-in opened), and `1300`'s day index narrowed to exceptions of neither a punch nor a check-in ·
+`1465` one unregistered-device exception per person, device and work date (attendance.md §6.6):
+`attendance_exception.attendance_device_id` with a unique index on the day and device while open, and
+`attendance_exception_punch` (the later punches from the device attached to it, decided with it) ·
 `1470` the `temporary_site` numbering scheme and version 1 of the `attendance.temporary_site`
 approval (Operations & People, 48 hours) · `1475` a temporary site's hours: `hours` (`usual`, `site`),
 `starts_at` and `ends_at` on `attendance_temporary_site`, both for Site Hours with the end after the

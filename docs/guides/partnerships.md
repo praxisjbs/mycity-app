@@ -521,6 +521,18 @@ the keys `partnership_tracker` and `partnership_returns`. Exports are `POST /par
   answers only each candidate's number, name, score and reasons (§6.1). The form asks it only with
   what `DuplicateQuery` takes (`duplicateQuery` in `LeadForm.tsx`): a name of 3 to 150 characters, an
   email that is one; a longer name is the Name field's to mark, never sent to be refused.
+- **The scores** (`partners.dedup.js` `SIGNALS`): name 60 when the same, email 60, website host 55,
+  phone 45 (a contact's, so a shared switchboard alone is no match). Names are compared by
+  `dedup.norm.company`: accents, punctuation, legal suffixes (Ltd, Plc, Ventures...) and joining words
+  (and, the) dropped, common abbreviations written out (St is Street, Intl is International, Tech is
+  Technology) and plurals made singular, so "Kora St Kitchens Ltd" is the same name as "kora street
+  kitchen". A name not the same but similar scores 55, a match on its own: 60% of its words shared, or a
+  trigram likeness of 0.6 or more, the one the candidate query already measures (`likeness`), so
+  "Kora Strt Kitchens" meets "Kora Street Kitchens" (QA F54b, 24/11/2026).
+- **What the form asks with**: the Name and the Website (Organisation) and the contact's Email and
+  first Phone (Contact), each sent once `DuplicateQuery` takes it (a phone half typed is not). The
+  warning shows on both the Organisation and the Contact steps, so a match by the contact's details
+  is seen before **Add Lead** or **Add Partner**.
 - **Contacts:** one primary and one email a record. A second contact with an email already on the
   lead or partner is refused on Email (*Already a contact*, `CONTACT_EMAIL_TAKEN`), on Add Contact,
   Edit Contact, New Lead and New Partner. Only the server holds every contact a record has (the 360
@@ -2050,6 +2062,13 @@ counterparts; every list query has `page` and `q` only from `common.js`, never a
 
 ## 14 · Change log
 
+- 24/11/2026 · JP · QA F54b (BG-010): the duplicate check meets near names. `dedup.norm.company` writes
+  out common abbreviations, makes plurals singular and drops joining words; a similar name scores 55 (a
+  match on its own) from 60% of words shared or the trigram likeness the query already returned
+  (`likeness`, new in `shared/dedup`). New Lead and New Partner ask with the website and the contact's
+  email and phone too, and show the warning on the Contact step (§6.2). Still a warning, never a block.
+  Tests: `partners.test.js`, `tests/unit/foundation/domain.test.js`, `partnerships-records`,
+  `screens.test.tsx`.
 - 24/11/2026 · JP · From the 23/11 staging faults brief, with JBS Praxis's answers (§6.2, §6.7): a signed deal whose owner had left raised no checklist (fault #11: the tasks service refused the owner and the `deal.signed` handler ran out of retries); the tasks are now the signer's, and `deal.deliverables_raised` names the holder. The duplicate check asks only what `DuplicateQuery` takes (fault #6, a name over 150 characters). A contact email already on the record is `CONTACT_EMAIL_TAKEN`, never recorded (fault #7). Tests: `partnerships-work`, `-records`, `screens.test.tsx`.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides the Proposal Studio's Rewrite Section and Send Proposal's Write With AI, and Tidy With AI on agreement templates; Write It Myself and Build by Hand are the routes by hand and stay; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 17/11/2026 · JP · After the QA audit (§13.2): the Work tab answers every reader (F05: a reader with `all` was refused every kind, a parameter the task query never used); §6.1 an owner works in Partnerships; §6.5 signing needs a value or No Money Value, a signed copy is recorded as its agreement, no past close date, Overdue set by the morning job (migration `7130`, seed `7191`), a reason to skip a stage, a finished deal shows Lost or Completed; §6.6 Close Partner ends signed deals as Completed; §6.10 Write It Myself and a job asked once; §6.12 the morning's Overdue pass; §6.14 a month of returns adds up and the forms send typed amounts and counts as the contract takes them; §7 `agreement.recorded`; §10 Log Interaction on Activity, Source on New Lead's first step and required, no Region chosen, Analytics' units, Proposals' subtitle taken off; §11 the owner who leaves. A lead's last contact counts its partner's once converted (F23). One request for reads of the same thing mounted together (`createApi`, F25).

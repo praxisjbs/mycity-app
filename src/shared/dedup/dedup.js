@@ -24,6 +24,13 @@
  * Scores add up per signal and cap at 100. A `similar` signal scores in
  * proportion to word overlap when the values are not identical (60% or more of
  * the words shared), so "Adaeze N. Okafor" still meets "Adaeze Okafor".
+ *
+ * A candidate may carry the likeness its SQL already measured for a signal
+ * (`likeness: { name: 0.71 }`, pg_trgm's similarity): the better of that and
+ * the word overlap is the one scored, so "Kora Strt Kitchens" meets "Kora Street
+ * Kitchens" though no whole word but two is shared. A signal with
+ * `similarWeight` scores that flat for a similar value (60% or more alike),
+ * where a similar name alone should be a match.
  */
 
 /* ---------------- normalisers ---------------- */
@@ -56,14 +63,48 @@ const norm = {
       .filter((w) => w && !TITLES.has(w));
     return words.length ? words.sort().join(" ") : null;
   },
-  /** Company names: as `name`, without legal suffixes. */
+  /**
+   * Company names: as `name`, with common abbreviations written out, plurals made singular, and
+   * legal suffixes and joining words dropped, so "Kora St Kitchens Ltd" and "kora street kitchen" meet.
+   */
   company: (v) => {
     const n = norm.name(v);
     if (!n) return null;
-    const words = n.split(" ").filter((w) => !COMPANY_SUFFIXES.has(w));
-    return words.length ? words.join(" ") : n;
+    const words = n
+      .split(" ")
+      .map((w) => singular(ABBREVIATIONS[w] || w))
+      .filter((w) => !COMPANY_SUFFIXES.has(w) && !JOINING_WORDS.has(w));
+    return words.length ? words.sort().join(" ") : n;
   },
 };
+
+/** One word's singular: "kitchens" is "kitchen", "agencies" is "agency"; "glass" and "bus" stay. */
+function singular(w) {
+  if (w.length > 4 && w.endsWith("ies")) return `${w.slice(0, -3)}y`;
+  if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us")) return w.slice(0, -1);
+  return w;
+}
+
+/** Abbreviations in company names, written out (before plurals are made singular). */
+const ABBREVIATIONS = Object.freeze({
+  st: "street",
+  rd: "road",
+  ave: "avenue",
+  intl: "international",
+  int: "international",
+  natl: "national",
+  mgt: "management",
+  mgmt: "management",
+  svc: "service",
+  svcs: "service",
+  tech: "technology",
+  assoc: "association",
+  bros: "brother",
+  ctr: "centre",
+  center: "centre",
+});
+/** Words that join a name and tell two companies apart from nothing: "&" is dropped as punctuation. */
+const JOINING_WORDS = new Set(["and", "the"]);
 
 const TITLES = new Set([
   "mr",
@@ -80,6 +121,7 @@ const TITLES = new Set([
   "barr",
   "hon",
 ]);
+// Compared after plurals are made singular, so "enterprises" is "enterprise" here.
 const COMPANY_SUFFIXES = new Set([
   "ltd",
   "limited",
@@ -90,8 +132,8 @@ const COMPANY_SUFFIXES = new Set([
   "nigeria",
   "co",
   "company",
-  "enterprises",
-  "ventures",
+  "enterprise",
+  "venture",
 ]);
 
 /** Share of words in common: |a ∩ b| / |a ∪ b|. */
@@ -129,9 +171,10 @@ function score(input, candidate, signals) {
       total += s.weight;
       reasons.push(s.label);
     } else if (s.similar) {
-      const o = overlap(a, b);
+      const measured = Number((candidate.likeness || {})[s.key]) || 0;
+      const o = Math.max(overlap(a, b), measured);
       if (o >= SIMILAR_FROM) {
-        total += Math.round(s.weight * o);
+        total += s.similarWeight === undefined ? Math.round(s.weight * o) : s.similarWeight;
         reasons.push(`${s.label} (similar)`);
       }
     }
@@ -142,8 +185,8 @@ function score(input, candidate, signals) {
 /**
  * Rank candidates, best first, dropping those under `min`.
  * @param {object} input
- * @param {Array<object>} candidates  each with `id` and the signal keys
- * @param {Array<{key: string, weight: number, label: string, normalize?: Function, similar?: boolean}>} signals
+ * @param {Array<object>} candidates  each with `id` and the signal keys, and `likeness` ({key: 0 to 1}) when measured
+ * @param {Array<{key: string, weight: number, label: string, normalize?: Function, similar?: boolean, similarWeight?: number}>} signals
  * @param {{min?: number, cap?: number, idKey?: string}} [opts]
  */
 function rank(

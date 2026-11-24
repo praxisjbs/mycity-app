@@ -241,11 +241,13 @@ A lead becomes a partner when its deal is signed. Use this task for a partner th
    **Owner**.
    ![The first step of New Partner](shot:partnerships-partner-new-1)
 3. Read any warning that starts *Already here*. It names a partner or lead that looks the same. Press
-   **New Deal** in it to add a deal to the partner that exists instead.
+   **New Deal** in it to add a deal to the partner that exists instead. A similar name, the
+   **Website**, or the contact's **Email** or **Phone** can find it.
 4. Press **Advanced** for **Legal Name**, **Website**, **Headquarters** and **Partner Since**. Pick the
    headquarters from the address search.
 5. Press **Next**. On **Contact**, fill in the **First Name** and **Last Name**. Add the **Position**,
-   **Email** and **Phone** if you have them.
+   **Email** and **Phone** if you have them. An *Already here* warning shows here too if they match a
+   record.
    ![The Contact step](shot:partnerships-partner-new-2)
 6. Press **Next**. On **Signed Deal**, type the deal's **Title**, pick its **Stage** and fill in its
    **Projected Value**.
@@ -445,12 +447,13 @@ that deal's stage, so you never type it.
 5. Pick the **Lead Owner**. It starts as you. The owner must work in Partnerships, or the form says
    *Not in Partnerships*.
 6. Read any warning that starts *Already here*. It names a partner or lead that looks the same. It
-   never stops you.
+   never stops you. A similar name, the **Website**, or the contact's **Email** or **Phone** can find it.
 7. Press **Advanced** for the **Website**, **Impact**, **Impact Rating**, **Impact Note** and
    **Comments**. Type an **Impact**, or pick one it suggests. Press Enter or pick it; press the cross on
    one to take it off. A new one is added to its list.
 8. Press **Next**. On **Contact**, fill in the **First Name** and **Last Name**. Add the **Position**,
-   **Email** and **Phone** if you have them.
+   **Email** and **Phone** if you have them. An *Already here* warning shows here too if they match a
+   record.
    ![The Contact step](shot:partnerships-lead-new-2)
 9. Press **Next**. On **Deal**, type the **Title**, and the **Objective** if it helps.
    ![The Deal step](shot:partnerships-lead-new-3)

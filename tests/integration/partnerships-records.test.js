@@ -540,6 +540,28 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       expect(closed.body.deals.map((d) => d.status).sort()).toEqual(["completed", "lost"]);
     });
 
+    test("the duplicate check meets a near name, and a contact's phone with the website (QA F54b)", async () => {
+      const made = await newLead("staff", "Kora Street Kitchens", {
+        website: "https://www.korakitchens.example.test/menu",
+        contact: { first_name: "Ngozi", last_name: "Adebayo", email: "ngozi@korakitchens.example.test", phones: ["08039990011"] },
+      });
+      const ask = async (query) => {
+        const res = await as("staff").get(`/partnerships/duplicates?${new URLSearchParams(query)}`);
+        expect(res.status).toBe(200);
+        return res.body.candidates.find((c) => c.id === made.lead.lead_id);
+      };
+      // An abbreviation and a missing plural are the same name; a misspelling is similar by trigram.
+      expect(await ask({ name: "Kora St Kitchens" })).toMatchObject({ type: "lead", score: 60, reasons: ["name"] });
+      expect(await ask({ name: "kora street kitchen" })).toMatchObject({ score: 60, reasons: ["name"] });
+      expect(await ask({ name: "Kora Strt Kitchens" })).toMatchObject({ score: 55, reasons: ["name"] });
+      expect(await ask({ name: "Kora Bakery" })).toBeUndefined();
+      // The contact's details and the website, as New Lead and New Partner send them once entered.
+      expect(await ask({ website: "korakitchens.example.test" })).toMatchObject({ score: 55, reasons: ["website"] });
+      expect(await ask({ phone: "+234 803 999 0011" })).toBeUndefined();
+      expect(await ask({ phone: "+234 803 999 0011", website: "http://korakitchens.example.test" })).toMatchObject({ score: 100, reasons: ["website", "phone"] });
+      expect(await ask({ name: "Something Else", email: "ngozi@korakitchens.example.test" })).toMatchObject({ reasons: ["email"] });
+    });
+
     test("New Partner needs a signed or active stage and its evidence", async () => {
       const res = await as("staff").post("/partnerships/partners", {
         name: "No Evidence Ltd",

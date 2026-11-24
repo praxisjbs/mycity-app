@@ -662,6 +662,8 @@ describe("what a person reads", () => {
     );
     expect(detailOf("unknown_device", { device_label: "Chrome on Android", refused: true })).toBe("Refused: Unregistered device: Chrome on Android");
     expect(detailOf("unknown_device", { device_label: "Chrome on Android" })).toBe("Unregistered device: Chrome on Android");
+    // A day's punches from one unregistered device share one exception (§6.6).
+    expect(detailOf("unknown_device", { device_label: "Chrome on Android", punches: 2 })).toBe("Unregistered device: Chrome on Android, 2 punches");
     expect(detailOf("suspicious_timestamp", { skew_seconds: -540 })).toBe("Device clock 9 min ahead");
     expect(detailOf("missing_clock_out", { clock_in_at: "2026-10-16T07:58:00Z", timezone: TZ })).toBe("Clocked in 08:58, no clock-out");
     expect(detailOf("automatic_clock_out", { clock_out_at: "2026-10-16T16:00:00Z", timezone: TZ })).toBe("System Clock-Out at 17:00");

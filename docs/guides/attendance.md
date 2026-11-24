@@ -209,7 +209,7 @@ home checks: MyCity are told (§13).
 | `employee_attendance_policy` (1000) | `employee_id`, `attendance_policy_id`, `worksite_id`, `effective_from`, `effective_to` | Never written, and from PR 1 not read: one organisation policy (§6.1), and a person's own hours are their work schedule (§6.13). Dropped with `attendance_policy` |
 | `attendance_event` (1000, 1300, 1360) | `employee_id`, `event_type` (`clock_in`, `clock_out`), `work_date`, `occurred_at` (server time), `device_at`, `latitude`, `longitude`, `accuracy_m`, `distance_m`, `worksite_id`, `known_device_id`, `attendance_device_id`, `source` (`pwa`; `admin`, People's correction; `system`, an automatic clock-out, §6.14), `validation_state` (`accepted`, `review`, `rejected`), `validation` (evidence), `idempotency_key`, `attendance_policy_id` (to PR 1), `policy_version_id` (from PR 1, `1405`; a punch from before keeps its version in `attendance_policy_id`, the same id, since the table is append-only: read `COALESCE(policy_version_id, attendance_policy_id)`), `note`, `recorded_by`, `reason`, `slot` (`1380`: how many punches of its type that day, among the person's and People's, a decision had already excluded when it was written; 0 for the first) | Append-only: `slot` is written once, with the punch. Unique: one active (`accepted` or `review`) event of each type per person, work date and slot among the person's and People's punches (`1380`), so a punch People rejected keeps its row and its slot and the next takes the next slot, while two written at once still collide; one automatic clock-out per person per work date (`1360`), so People's correction stands beside the automatic one it replaces; one event per person per idempotency key |
 | `attendance_day` (1000, 1300, 1425) | `employee_id`, `attendance_date`, `status` (`present`, `late`, `absent`, `leave`, or none while nothing on an open day counts), `first_clock_in_at`, `last_clock_out_at`, `worked_minutes`, `late_minutes`, `early_minutes` (1425), `overtime_minutes`, `closed_at`; what judged it (1425): `policy_version_id` (the version its first clock-in was judged by, or for a day with none the version in force on its date when it closed; null for the type's defaults), `attendance_work_schedule_id` (the schedule in force, null for the company hours), `shift_working`, `shift_starts_at`, `shift_ends_at` (the shift it was judged against) and `judged_at` (when they were recorded: the first clock-in, or the day-close) | The projection, recalculated from the day's events in the punch's transaction and by the day-close job. A day is judged once (§6.4): once `judged_at` is set, a recalculation reads the recorded version (`policies.rulesOfVersion`) and shift, never a newer one |
-| `attendance_exception` (1000, 1300, 1310, 1360) | `attendance_day_id`, `attendance_event_id`, `exception_type` (`outside_worksite`, `outside_home`, `location_unverified`, `unknown_device`, `suspicious_timestamp`, `missing_clock_out`, `automatic_clock_out`: opened only when the person explains one, §6.14), `severity`, `status` (`open`, `resolved`), `outcome` (`accepted`, `rejected`, `corrected`), `evidence`, `employee_note`, `reviewed_by`, `reviewed_at`, `resolution` | One per event and type, one day-level `missing_clock_out` per day (partial unique indexes), so a retried job adds none |
+| `attendance_exception` (1000, 1300, 1310, 1360) | `attendance_day_id`, `attendance_event_id`, `exception_type` (`outside_worksite`, `outside_home`, `location_unverified`, `unknown_device`, `suspicious_timestamp`, `missing_clock_out`, `automatic_clock_out`: opened only when the person explains one, §6.14), `severity`, `status` (`open`, `resolved`), `outcome` (`accepted`, `rejected`, `corrected`), `evidence`, `employee_note`, `reviewed_by`, `reviewed_at`, `resolution` | One per event and type, except `unknown_device`: one open per day and device (§6.6, `1465`); one day-level `missing_clock_out` per day (partial unique indexes), so a retried job adds none |
 | `attendance_device` (1300) | `employee_id`, `known_device_id` (unique), `label`, `status` (`observed`, `registered`, `removed`), `first_seen_at`, `last_punch_at`, `registered_at`, `removed_at`, `removed_by`, `removal_reason` | Owned by `devices`. A device first seen on a punch is `observed`; the employee registers it; a removed one may be registered again. The device cookie and its hash never leave identity |
 | `worksite` (0040) | `code`, `name`, `address` (jsonb `{ text }`), `latitude`, `longitude`, `radius_m`, `timezone`, `active` | Written by `worksites` from this delivery; the employee's assignment is `employee.worksite_id` |
 | `attendance_home` (1310) | `employee_id`, `address`, `latitude`, `longitude`, `accuracy_m`, `status` (`pending`, `approved`, `rejected`, `superseded`), `requested_by`, `requested_at`, `decided_by`, `decided_at`, `decision_reason` | A remote employee's home location. At most one `pending` and one `approved` per person (partial unique indexes); approving supersedes the old approved one, a new request supersedes the one still waiting. Personal data: on the wire as `home_address`, `home_latitude`, `home_longitude`, masked under `employee.personal` and given only to the person and to `people` scope all. While the policy's Home Location is off (§1.3) its rows are kept as they are and read by nothing |
@@ -229,6 +229,8 @@ home checks: MyCity are told (§13).
 | `attendance_temporary_site_member` (`1450`) | `temporary_site_id`, `employee_id`, `added_at`, `removed_at`, `removed_by`, `removed_reason` | Up to 25 people. Taking someone off keeps their row with `removed_at`; a person is on at most one approved or waiting site a day (the service, under the person's lock) |
 | `attendance_check_in` (`1460`) | `employee_id`, `work_date`, `occurred_at` (the server's), `device_at`, `latitude`, `longitude`, `accuracy_m`, `temporary_site_location_id` (the address it was matched to), `distance_m`, `verdict` (`inside`, `outside`, `unverified`), `evidence` (the site, the address's name and radius, the mode, and why a reading was unclear: `poor_accuracy`, or the browser's `denied`, `unavailable`, `timeout`, `unsupported`, `no_location`), `policy_version_id`, `idempotency_key` (unique per person) | A stop on a temporary site's day (§6.12): evidence, never a shift. Append-only (`prevent_ledger_mutation()`) |
 | `attendance_exception.attendance_check_in_id` (`1460`) | The check-in a flag is about | One exception per check-in and type (a partial unique index), as one per punch and type. `1300`'s day-level index (`attendance_exception_day_type_uq`) now leaves check-ins out (`WHERE attendance_event_id IS NULL AND attendance_check_in_id IS NULL`), so two flagged check-ins on one day open two exceptions |
+| `attendance_exception.attendance_device_id` (`1465`) | The device an `unknown_device` exception is about (`ON DELETE SET NULL`) | One open `unknown_device` exception per day and device (`attendance_exception_device_day_uq`, partial on `status = 'open'`): the day is the person's, so it is one per person, device and work date. A punch with no device at all keeps one per punch. Rows from before `1465`: the device copied onto every decided one and the earliest open one of each day and device; a later open one of the same day keeps none and is decided on its own |
+| `attendance_exception_punch` (`1465`) | `attendance_exception_id` (`ON DELETE CASCADE`), `attendance_event_id`, `created_at` | A later punch from the device attached to the day's open `unknown_device` exception, unique per pair. Written with the punch, never changed. `EXCLUDED` reads it, so a rejection excludes every punch the exception holds (§6.8) |
 | `workflow_instance.excluded_employee_ids` (`1455`) | The employees who may never decide this approval, whatever role they hold | Set when the approval opens: a temporary site's people (§6.11; foundation.md §6.5). Empty for every other approval |
 
 Schema migrations: `migrations/1300_attendance_clock.sql`, `migrations/1310_attendance_home.sql`
@@ -237,7 +239,9 @@ Schema migrations: `migrations/1300_attendance_clock.sql`, `migrations/1310_atte
 their sites and people), `migrations/1340_attendance_schedule.sql` (hybrid staff's weekly
 schedule), `migrations/1350_attendance_client_visit_site.sql` (a client visit's site),
 `migrations/1360_attendance_clock_watch.sql` (the reminders sent, the `automatic_clock_out` type and
-the unique indexes that count an automatic clock-out apart), `migrations/1370_attendance_policy_versions.sql`
+the unique indexes that count an automatic clock-out apart),
+`migrations/1465_attendance_device_exception_day.sql` (one unknown-device exception per day and
+device, and the punches attached to it), `migrations/1370_attendance_policy_versions.sql`
 (policy versions, the three place modes, acknowledgements). Reference data:
 `seeds/reference/1390_seed_attendance.sql` (two exception types),
 `seeds/reference/1391_seed_attendance_home.sql` (Outside Home),
@@ -568,7 +572,16 @@ punch's point is never sent to the provider.
 - First seen on a punch, it is recorded as `observed` (devices register even when the policy is
   `off`). Known means `registered`; `observed`, `removed` or no device is unknown.
 - `off`: accepted. `warn` (Flag): unknown is `review` with an `unknown_device` exception. `block`
-  (Refuse): unknown is `rejected`, and opens the exception too (PR 2). The policy suggests Flag
+  (Refuse): unknown is `rejected`, and opens the exception too (PR 2).
+- **One exception per person, device and work date** (QA F66a, 24/11/2026). The first punch of the
+  day from an unknown device opens the `unknown_device` exception, carrying the device
+  (`attendance_device_id`); a later punch from it that day, while that exception is open, attaches to
+  it (`attendance_exception_punch`) and opens none, so People's queue holds one row a device a day.
+  The evidence counts the punches it holds (`punches`), and its detail ends with how many from two
+  (*Unregistered device: Tecno Spark, 2 punches*). Deciding it decides them all (§6.8). Once it is
+  decided, the next punch from that device opens a new one. A punch with no device at all (no
+  device cookie) cannot be told apart from another, so it keeps one exception per punch. The device
+  is the person's own (`attendance_device` is per person), and the day is the punch's work date. The policy suggests Flag
   (Cynthia agreed an unknown device is flagged, 13 October); the code's default stays `off` until a
   version sets it.
 - At most three registered devices per person (the 12 and 13 October meetings). Registering needs a
@@ -597,6 +610,11 @@ punch's point is never sent to the provider.
   counting (marked excluded, outcome `corrected`). People's clock-out stands in for the person's own
   (§6.4), so the day's worked minutes, early departure, overtime and pay items follow it. `reject` is
   refused (422 `DECISION_INVALID`): it would leave the shift open.
+- An `unknown_device` exception holding the day's later punches from its device (§6.6) is decided for
+  all of them: `reject` excludes each, so the day counts none of them; `accept` keeps each. Rejected
+  together, a clock-in and its clock-out leave no shift, so no missing clock-out opens; a clock-out
+  alone rejected on a closed day opens it as below. The person is told *the punches from that device
+  do not count*.
 - An exception on a rejected punch (PR 2) takes `accept`, which keeps the refusal as it was and
   records that People saw it ("the refusal stands"), or `reject`, which marks the refusal itself as
   wrong for the record ("the refusal is noted as wrong, and the punch still does not count"); neither
@@ -1682,6 +1700,15 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   sites use them (PR 4).
 
 ## 14 · Change log
+
+- 24/11/2026 · JP · QA F66a (BG-006): an unregistered device opens one `unknown_device` exception per
+  person, device and work date, not one per punch (§4, §6.6, §6.8). `1465` adds
+  `attendance_exception.attendance_device_id` with a partial unique index (one open a day and device)
+  and `attendance_exception_punch` for the later punches that attach to it; `EXCLUDED` reads the
+  links, so rejecting it excludes the day's punches from that device. Rows already on staging: the
+  earliest open one of each day and device takes the device, later open duplicates stay as they were.
+  Tests: `tests/integration/attendance.test.js` (an unregistered device opens one exception a day),
+  `attendance.test.js` (the detail).
 
 - 13/11/2026 · JP · §9: Praxis AI's summaries of the exceptions, the pay items, the temporary sites, the devices and the person's own month (`praxis-ai.md` Appendix B PR 7), each within its list's own scope, pay items' naira only for a reader who sees pay. No screen of Attendance changed.
 - 09/11/2026 · JP · M6 PR 2 (`payroll.md` §4.4, §6.9): the functions payroll calls are built in `attendance.pay.js`. `takeIntoRun(client, { run_id, items, actor })` freezes the pending deductions and confirmed overtime a run counted (`in_run`, the run's id), pricing an item that had no amount; it freezes all or none (409 `RUN_CHANGED` when one was waived, cut or taken since). `releaseFromRun(client, run_id, actor)` gives them back (a deduction to `pending`, overtime to `confirmed`), safe twice. `monthRates(db, person, date, shared)` and `monthContext` expose the working-days loop `ratesFor` prices a day with (which now calls it), so payroll and attendance count a month the same way; `pricesOf` prices items that have none. Two events, `attendance.pay_items_taken` and `attendance.pay_items_released`, one per call with a count and never an amount (§7). No screen and no rule of attendance changed.

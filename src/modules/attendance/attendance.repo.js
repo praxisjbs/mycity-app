@@ -104,9 +104,14 @@ const PUNCH_PLACE = `COALESCE(w.name, CASE ev.validation #>> '{geofence,place}' 
 /**
  * A punch the day does not count: an exception on it was decided rejected, or it is an automatic
  * clock-out whose exception People corrected, their clock-out standing in its place (§6.8, §6.14).
+ * A punch attached to an unregistered device's exception for the day (attendance_exception_punch,
+ * §6.6) is decided with it.
  */
 const EXCLUDED = (ev) => `EXISTS (SELECT 1 FROM attendance_exception x
-   WHERE x.attendance_event_id = ${ev}.attendance_event_id
+   WHERE (x.attendance_event_id = ${ev}.attendance_event_id
+          OR EXISTS (SELECT 1 FROM attendance_exception_punch xp
+                      WHERE xp.attendance_exception_id = x.attendance_exception_id
+                        AND xp.attendance_event_id = ${ev}.attendance_event_id))
      AND (x.outcome = 'rejected' OR (${ev}.source = 'system' AND x.outcome = 'corrected')))`;
 
 const nameOf = (alias) =>
@@ -335,11 +340,15 @@ function upsertDay(client, employeeId, date, p, { closed = false, judged = null 
 }
 
 /**
- * Open an exception, once: null when the same one is already there. One per punch and type, one per
- * check-in and type (§6.12), else one per day and type (a missing clock-out).
+ * Open an exception, once: null when the same one is already there. An unregistered device's is one
+ * open a day and device (§6.6: the punch's caller attaches a later punch to it), any other punch's
+ * one per punch and type, one per check-in and type (§6.12), else one per day and type (a missing
+ * clock-out).
  */
 function insertException(client, x) {
-  const target = x.attendance_event_id
+  const target = x.attendance_device_id
+    ? "(attendance_day_id, attendance_device_id) WHERE exception_type = 'unknown_device' AND status = 'open' AND attendance_device_id IS NOT NULL"
+    : x.attendance_event_id
     ? "(attendance_event_id, exception_type) WHERE attendance_event_id IS NOT NULL"
     : x.attendance_check_in_id
       ? "(attendance_check_in_id, exception_type) WHERE attendance_check_in_id IS NOT NULL"
@@ -347,8 +356,9 @@ function insertException(client, x) {
   return one(
     client,
     `INSERT INTO attendance_exception
-       (attendance_day_id, attendance_event_id, attendance_check_in_id, exception_type, severity, evidence)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+       (attendance_day_id, attendance_event_id, attendance_check_in_id, exception_type, severity, evidence,
+        attendance_device_id)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
      ON CONFLICT ${target} DO NOTHING
      RETURNING attendance_exception_id, exception_type`,
     [
@@ -358,8 +368,56 @@ function insertException(client, x) {
       x.exception_type,
       x.severity,
       JSON.stringify(x.evidence || {}),
+      x.attendance_device_id || null,
     ],
   );
+}
+
+/** The open unregistered-device exception of a day and device (§6.6), or null. */
+function openDeviceException(db, dayId, deviceId) {
+  return one(
+    db,
+    `SELECT attendance_exception_id, exception_type
+       FROM attendance_exception
+      WHERE attendance_day_id = $1 AND attendance_device_id = $2
+        AND exception_type = 'unknown_device' AND status = 'open'`,
+    [dayId, deviceId],
+  );
+}
+
+/**
+ * A later punch from the device attached to the day's open exception (§6.6), which then counts the
+ * punches it holds in its evidence (`punches`, the first included).
+ */
+async function attachPunch(client, exceptionId, eventId) {
+  await client.query(
+    `INSERT INTO attendance_exception_punch (attendance_exception_id, attendance_event_id)
+     VALUES ($1, $2) ON CONFLICT (attendance_exception_id, attendance_event_id) DO NOTHING`,
+    [exceptionId, eventId],
+  );
+  await client.query(
+    `UPDATE attendance_exception
+        SET evidence = jsonb_set(evidence, '{punches}',
+              to_jsonb(1 + (SELECT count(*)::int FROM attendance_exception_punch WHERE attendance_exception_id = $1)))
+      WHERE attendance_exception_id = $1`,
+    [exceptionId],
+  );
+}
+
+/** The punches attached to an exception after its first (§6.6), oldest first: at most a day's. */
+async function attachedPunches(db, exceptionId) {
+  // pagination:complete a day's punches from one device, which the decision needs every one of
+  const { rows } = await completeQuery(
+    db,
+    `SELECT ev.attendance_event_id, ev.event_type, ev.validation_state, ev.occurred_at
+       FROM attendance_exception_punch xp
+       JOIN attendance_event ev ON ev.attendance_event_id = xp.attendance_event_id
+      WHERE xp.attendance_exception_id = $1
+      ORDER BY ev.occurred_at, ev.attendance_event_id`,
+    [exceptionId],
+    { label: "an exception's punches", ceiling: 50 },
+  );
+  return rows;
 }
 
 /**
@@ -2247,6 +2305,9 @@ module.exports = {
   getDay,
   upsertDay,
   insertException,
+  openDeviceException,
+  attachPunch,
+  attachedPunches,
   openExceptionCount,
   listDays,
   daysSummary,

@@ -693,19 +693,29 @@ route("GET /api/v1/partnerships/partners/:id", (req) => {
   const r = recordOf(req.params.id);
   return r && r.kind === "partner" ? ok(partner360(r, holdsMoney(req))) : notFound();
 });
+/** A website's host, lower case, without `www.`, as the API compares it. */
+const hostOf = (website: string) =>
+  website.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").replace(/^www\./, "").split(/[/?#:]/)[0] ?? "";
+/** A phone's last ten digits, so +234 and 0 forms meet. */
+const digitsOf = (phone: string) => phone.replace(/\D/g, "").slice(-10);
 route("GET /api/v1/partnerships/duplicates", (req) => {
   const name = String(req.query.name ?? "").toLowerCase().trim();
   const email = String(req.query.email ?? "").toLowerCase();
+  const phone = digitsOf(String(req.query.phone ?? ""));
+  const host = hostOf(String(req.query.website ?? ""));
+  const WEIGHT = { name: 60, email: 60, website: 55, phone: 45 } as const;
   const candidates = RECORDS.filter((r) => r.status !== "converted" && r.status !== "closed")
     .map((r) => {
-      const reasons: Array<"name" | "email"> = [];
+      const reasons: Array<keyof typeof WEIGHT> = [];
       if (name.length >= 3 && r.name.toLowerCase().includes(name)) reasons.push("name");
       if (email && contactsOf(r).some((c) => c.email === email)) reasons.push("email");
-      return { r, reasons };
+      if (host && r.website && hostOf(r.website) === host) reasons.push("website");
+      if (phone.length === 10 && contactsOf(r).some((c) => (c.phones ?? []).some((p) => digitsOf(p) === phone))) reasons.push("phone");
+      return { r, reasons, score: Math.min(100, reasons.reduce((t, k) => t + WEIGHT[k], 0)) };
     })
-    .filter((x) => x.reasons.length)
+    .filter((x) => x.score >= 55)
     .slice(0, 25)
-    .map(({ r, reasons }) => ({ type: r.kind, id: r.id, number: r.number, name: r.name, score: Math.min(100, reasons.length * 60), reasons }));
+    .map(({ r, reasons, score }) => ({ type: r.kind, id: r.id, number: r.number, name: r.name, score, reasons }));
   return ok({ candidates });
 });
 route("GET /api/v1/partnerships/interactions", (req) =>
