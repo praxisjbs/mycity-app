@@ -61,8 +61,9 @@ problem stops **Submit for Approval** until it is fixed. A warning never stops i
 5. For no bank details, add them on the person's record. With **Bank Details Required** on, this
    is blocking.
 6. For fines waiting, accept, spread or waive them on [Payroll · Deductions](/payroll?tab=deductions).
-7. For a Salary Advance Repayment or fine instalment not taken, the person is left out or has no pay.
-   Press **Include** or set their pay. Otherwise, once the run is approved, it moves to their next paid month.
+7. For a Salary Advance Repayment or fine instalment not taken, the person is left out or has no
+   pay. Press **Include** or set their pay. Otherwise, once the run is approved, it moves to their
+   next paid month.
 8. Press **Compute Run** again. The line goes once nothing is left.
 
 ### Leave someone out, or put them back {#payroll-runs-exclude needs="payroll edit"}

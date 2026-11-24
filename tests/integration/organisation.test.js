@@ -1605,7 +1605,9 @@ describeDb("the organisation module against the real migrations", () => {
       expect((await asOps()(request(app).post(`/api/v1/employees/${ruth.employee_id}/archive`)).send({ archive_reason: "Left MyCity" })).status).toBe(200);
 
       const trading = await one("SELECT department_id FROM department WHERE name = 'Trading Desk'");
+      const zuri = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0001'");
       const added = await asOps()(request(app).post("/api/v1/employees")).send({
+        line_manager_id: zuri.employee_id,
         first_name: "Ngozi",
         last_name: "Eze",
         work_email: "ngozi.clearing@mycity.test",

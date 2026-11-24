@@ -115,8 +115,11 @@ reporting lines and the head's role follow (§6).
 **Who answers for an empty seat** (TB, 19/10/2026). The view `employee_effective_manager`
 (`migrations/1160_employee_effective_manager.sql`) gives every employee the person they answer to:
 their line manager, or, when they report to a vacant seat, the first person above that seat,
-through any vacant seats between. Approvals, team scope and the notifications that follow team
-scope read it (§6); the chart still draws the seat, because the seat is the true line.
+through any vacant seats between. Since `migrations/1161_effective_manager_skips_leavers.sql`
+(JBS Praxis, 24/11/2026) it also passes over a line manager who no longer works here (archived,
+left or suspended) to the next active manager above them, however many have gone. Approvals, team
+scope and the notifications that follow team scope read it (§6); the chart still draws the seat,
+because the seat is the true line.
 
 ## 5 · API
 
@@ -161,6 +164,12 @@ stays off the table until MyCity is near that size.
   first person above it answers for its reports: their leave, expenses and tasks go to that person
   for approval, and they are in that person's team scope. Only a seat with nobody above it leaves
   them to the CEO (TB, 19/10/2026; `employee_effective_manager`, §4).
+- A **line manager who has left** (archived, left or suspended) is passed over the same way: until
+  their reports are given a new line manager (Change Manager, or a drag on the chart), the next
+  active manager above them approves their leave, expenses and every other line-manager stage, and
+  has them in team scope; with nobody active above, the CEO does (JBS Praxis, 24/11/2026; QA BG-005;
+  `employee_effective_manager`, §4). A request already waiting on a leaver when they leave keeps its
+  approver; Operations & People reassign it (`docs/guides/foundation.md` §6.5).
 - A vacant seat is **filled** by a hire (`organisation.fillSeat`, called by Recruitment's
   `vacancies.hiredIn` when M5's onboarding completes for a vacancy made from the seat;
   `recruitment.md` §6.1, Q-TB8, 06/11/2026). In the caller's transaction: the seat is marked filled by
@@ -404,7 +413,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   fills it only while the seat has none, so a line set on screen (Edit Role) stays.
 - **Dotted line to a vacant seat:** allowed; the dashed tag names the vacant role.
 - **Deactivated or departed employee:** drops out of the tree; their former reports surface as
-  needing a new line manager on the builder.
+  needing a new line manager on the builder. Meanwhile their reports' approvals and team scope pass
+  to the next active manager above the leaver, or the CEO (§6).
 - **Very wide span** (one manager, many reports): the branch collapses by default past a threshold
   with a "+N more" affordance.
 - **Very large org:** if the whole-tree read becomes heavy, children lazy-load on expand (§5, §13).
@@ -510,6 +520,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 24/11/2026 · JBS Praxis decision, QA BG-005 · A line manager who has left no longer holds up their reports' requests: `employee_effective_manager` (new `migrations/1161_effective_manager_skips_leavers.sql`) passes over a manager who is archived, left or suspended to the next active manager above them, or nobody (then the CEO), as it already did for a vacant seat (§4, §6, §11). Approvals (`shared/workflow/approvers.js`), team scope, the managers' notifications and the performance reviewer read it. Nothing on the Organogram or Org Chart changed. `tests/integration/workflow.test.js` ("a line manager who has left").
 - 24/11/2026 · JP · From the 23/11 staging faults brief (faults #3 and #4) and JBS Praxis's answer: Change Manager and a drag on the chart keep offering every active person; `REPORTS_TO_SELF` and `REPORTING_LOOP` are answered on the field as before and never recorded on System Health, on the line-manager route, an employee's own record and a seat (§5). `tests/integration/organisation.test.js`.
 - 17/11/2026 · JP · People · Leave and Leave Types gained the relief officer and handover note (`docs/guides/ess.md` §6, §10), in the People folder this guide shares. No Organogram or Departments screen changed.
 - 16/11/2026 · TB · Nothing on the Organogram or Org Chart changed. Beside them in `src/modules/organisation/`, `organisation.library.js` gives the Document Centre's Library a person's rent evidence (`document-centre.md` §6.2).

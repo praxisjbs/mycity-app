@@ -17,9 +17,9 @@
  *                   nowhere: the addresses are reserved). Not marked paid, so Mark Paid can be shown
  *   this month      opened and computed: the joiners, and the advance's first instalment
  *   an advance      ₦100,000.00 recorded for one test person, recovered over this month and next
- *   everyone else   every person who is not a test person (MyCity's staff, the Implementation Team) is
- *                   left out of both runs, "Not in the demonstration", so no real pay is ever computed;
- *                   leaving a person out tells them nothing
+ *   everyone else   every person who is not a test person (MyCity's staff) is left out of both runs,
+ *                   "Not in the demonstration", so no real pay is ever computed; leaving a person out tells
+ *                   them nothing. The Implementation Team's own logins are in no run at all (guide §6.1 rule 6)
  *
  * The pending fine is the queries seed's (50_queries.js: a Warning with a ₦5,000.00 fine on an
  * Implementation Team account, issued by the worker after the seeds): it waits on Deductions,
