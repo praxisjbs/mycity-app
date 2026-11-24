@@ -176,6 +176,8 @@ scheduler and run history read; and, for Activity Today, `event_log (occurred_at
 when the date changes · `1160` `employee_effective_manager`, a view: the person each employee
 answers to, their line manager or, under a vacant seat, the first person above the seat, read by
 approvals, team scope and the notifications that follow it (`docs/guides/organogram.md` §4, §6) ·
+`1161` the same view skips a manager who is not active (left, archived or suspended) and climbs to
+the next active one above, as for a vacant seat (QA audit BG-005) ·
 `1199` Home
 reference data: the
 capabilities `home.team`, `home.reports` and `alerts.manage` with their role grants (and
