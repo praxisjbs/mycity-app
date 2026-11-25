@@ -861,6 +861,8 @@ route("POST /api/v1/community/announcements", (req) => {
   if (when && when <= new Date().toISOString()) f.publish_at = ["Time already passed"];
   if (Object.keys(f).length) return invalid(f);
   const departments = audience.kind === "departments" ? DEPARTMENTS.filter((d) => audience.department_ids!.includes(sid(`dept:${d}`))) : [];
+  // An audience that reaches nobody is refused, as the server refuses it (QA audit BG-016): here, departments with nobody in them.
+  if (audience.kind === "departments" && !PEOPLE.some((p) => departments.includes(p.department))) return fail(422, "AUDIENCE_EMPTY", "No one is in this audience", { "audience.department_ids": ["No one in this audience"] });
   const urgency = (req.body.urgency as Announcement["urgency"] | undefined) ?? "normal";
   // The poster has read what they posted (acknowledged it, when urgent).
   const a: MockAnnouncement = { announcement_id: sid(`ann:${Date.now()}`), title: String(req.body.title), body: String(req.body.body), by: req.user!, publish_at: when ?? new Date().toISOString(), scheduled: !!when, departments, read: new Set(when ? [] : [req.user!]), reminded: null, urgency };

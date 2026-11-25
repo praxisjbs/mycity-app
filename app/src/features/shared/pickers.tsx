@@ -3,7 +3,7 @@ import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
-import { PersonPicker, RecordPicker } from "@mycity/ui";
+import { Avatar, PersonPicker, Pill, RecordPicker } from "@mycity/ui";
 
 /**
  * The pickers bound to this app's endpoints. `PersonPicker` and `RecordPicker`
@@ -76,19 +76,35 @@ export function HiringManagerPicker({ value, onChange }: { value: PersonRef[]; o
 /**
  * The people a task may be set for, or with `shared` shared with (My Workspace, GET /tasks/people):
  * the caller's own reach, never themselves, searched by the server. With `department`, who in that
- * department may lead a task shared with it, the caller included when they work there.
+ * department may lead a task shared with it, the caller included when they work there. Someone who
+ * cannot sign in yet reads No Login Yet beside their name: they see the task once invited.
  */
-export function TaskPeoplePicker({ shared, department, value, onChange, multiple }: { shared?: boolean; department?: string; value: PersonRef[]; onChange: (value: PersonRef[]) => void; multiple?: boolean }) {
+export function TaskPeoplePicker({ shared, department, value, onChange, multiple }: { shared?: boolean; department?: string; value: Array<PersonRef & { has_login?: boolean }>; onChange: (value: Array<PersonRef & { has_login?: boolean }>) => void; multiple?: boolean }) {
   const list = usePaged("GET /api/v1/tasks/people", { filters: { ...(shared ? { shared: "true" } : {}), ...(department ? { department_id: department } : {}) } });
   const photos = usePhotos(list.rows.map((row) => row.photo_url));
   return (
-    <PersonPicker
-      photo={(person) => photos(person.photo_url)}
+    <RecordPicker
       list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
       value={value}
       onChange={onChange}
       multiple={multiple}
+      placeholder="Search people"
+      id={(person) => person.employee_id}
+      title={(person) => (person.has_login === false ? <NoLoginYet name={person.display_name} /> : person.display_name)}
+      chip={(person) => person.display_name}
+      sub={(person) => [person.job_title, person.department].filter(Boolean).join(" · ")}
+      lead={(person) => <Avatar name={person.display_name} src={photos(person.photo_url)} size={30} />}
     />
+  );
+}
+
+/** A person's name with No Login Yet beside it (task pickers, workspace.md §10.1). */
+export function NoLoginYet({ name }: { name: string }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      {name}
+      <Pill tone="warn">No Login Yet</Pill>
+    </span>
   );
 }
 

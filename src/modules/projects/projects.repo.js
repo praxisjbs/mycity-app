@@ -31,6 +31,7 @@ function seen(scope, params) {
 const COLUMNS = (who) => `p.project_id, p.number::text AS number, p.name, p.description,
          to_char(p.due_on, 'YYYY-MM-DD') AS due_on, p.status, p.completed_at, p.created_at,
          p.owner_employee_id, p.partner_id, p.lead_id, p.deal_id, ${personJson("oe", "od")} AS owner,
+         COALESCE(oe.status IN ('left', 'archived'), false) AS owner_left,
          (SELECT count(*)::int FROM task t
            WHERE t.project_id = p.project_id AND t.archived_at IS NULL
              AND t.status NOT IN ('done', 'cancelled') AND ${who}) AS open,
@@ -91,7 +92,28 @@ async function insert(client, row) {
   return rows[0].project_id;
 }
 
-const WRITABLE = ["name", "description", "due_on", "status", "completed_at", "budget_amount", "partner_id", "lead_id", "deal_id"];
+const WRITABLE = ["name", "description", "owner_employee_id", "due_on", "status", "completed_at", "budget_amount", "partner_id", "lead_id", "deal_id"];
+
+/**
+ * The active project already called `name`, case and accents aside (search_fold, as the list's
+ * search folds), leaving out `exceptId`; null when none. New Project's warning (§6 Projects).
+ */
+async function sameName(db, name, exceptId = null) {
+  const { rows } = await db.query(
+    `SELECT p.project_id, p.number::text AS number, p.name FROM project p
+      WHERE p.status = 'active' AND search_fold(btrim(p.name)) = search_fold(btrim($1))
+        AND ($2::uuid IS NULL OR p.project_id <> $2)
+      ORDER BY p.created_at, p.project_id LIMIT 1`,
+    [name, exceptId],
+  );
+  return rows[0] || null;
+}
+
+/** Whether an employee is on the staff now (status active): who a project may be handed to. */
+async function activeEmployee(db, employeeId) {
+  const { rows } = await db.query("SELECT 1 FROM employee WHERE employee_id = $1 AND status = 'active'", [employeeId]);
+  return rows.length > 0;
+}
 
 async function update(client, id, changes) {
   const keys = Object.keys(changes).filter((k) => WRITABLE.includes(k));
@@ -177,4 +199,4 @@ async function aiSummary(db, q, scope, { now, today }) {
   return { projects: r.projects || {}, tasks: r.tasks || {}, by_status: r.by_status || [], by_project: r.by_project || [] };
 }
 
-module.exports = { list, get, lock, statusOf, insert, update, linkOf, ofDeal, relinkLead, aiSummary };
+module.exports = { list, get, lock, statusOf, insert, update, sameName, activeEmployee, linkOf, ofDeal, relinkLead, aiSummary };

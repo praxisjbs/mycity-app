@@ -7,6 +7,7 @@
  *   ratesOn(db, date)        the rows in force on a day as computeStatutory takes them (payroll.calc.js), with the
  *                            rows themselves for a run's snapshot
  *   anyInForce(db, date)     whether any rate is in force on a day: Switch On needs one (409 NO_RATES)
+ *   minimumWageOn(db, date)  the Minimum Wage version in force on a day, for People's warning on Gross Monthly
  *   saveVersion(client, …)   a new version of one item from a day that has not passed, with its legal source; the
  *                            version before it ends the day before, and one already starting that day is replaced
  *                            (shared/db/effective-dated)
@@ -83,6 +84,17 @@ async function ratesOn(db, date) {
     else rates[r.item] = { base: r.base, rate: r.rate };
   }
   return { rates, rows, misbased: [...misbased] };
+}
+
+/**
+ * The Minimum Wage version in force on a day: its month's amount and its first day, or both null while none is. Read by
+ * People · Employees to warn, never refuse, a Gross Monthly below it (docs/guides/foundation.md §6.16); a run warns the same
+ * way (payroll.repo.js BELOW_MINIMUM_WAGE).
+ * @returns {Promise<{amount: string|null, effective_from: string|null}>}
+ */
+async function minimumWageOn(db, date) {
+  const row = (await repo.inForce(db, date)).find((r) => r.item === "minimum_wage" && r.flat_amount !== null);
+  return row ? { amount: m.toWire(m.money(row.flat_amount)), effective_from: row.effective_from } : { amount: null, effective_from: null };
 }
 
 /** Whether any statutory rate is in force on a day. */
@@ -181,4 +193,4 @@ function removeVersion(client, { item, effective_from: from }) {
   return removeDated(client, { table: "statutory_rate", key: { item }, from });
 }
 
-module.exports = { present, sourceOf, sourceColumns, ratesOn, anyInForce, rowsOf, saveVersion, removeVersion };
+module.exports = { present, sourceOf, sourceColumns, ratesOn, anyInForce, minimumWageOn, rowsOf, saveVersion, removeVersion };

@@ -9,6 +9,7 @@ import { EmployeePicker } from "@/features/shared/pickers";
 import { hrefFor, useRouter } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import { Button, Card, CardHeader, Chips, DataView, type DataViewColumn, DateField, Field, formatMoney, formatMonth, FormFooter, HelpTerm, KeyValue, ListDetail, Money, MoneyField, PageHeader, Pill, SegmentedControl, SelectField, StatStrip, TextAreaField, toast, todayIso, toMoneyString, useContractForm, useModal, useSideBySide, Who } from "@mycity/ui";
+import { usePayrollGrant } from "./parts";
 
 /**
  * Payroll · Deductions (docs/guides/payroll.md §2, §3.3, §3.4, §6.6, §10): the money that comes off pay, in one
@@ -103,7 +104,9 @@ export default function Deductions() {
   const s = summary.data;
   const open = s?.open_period ?? null;
 
-  const recordAdvance = open ? () => modal.open({ title: "Record Advance", body: (close) => <AdvanceForm open={open} close={close} /> }) : null;
+  // Record Advance is offered only to a holder of payroll create, as POST /advances needs (QA F26c).
+  const mayRecord = usePayrollGrant("create");
+  const recordAdvance = open && mayRecord ? () => modal.open({ title: "Record Advance", body: (close) => <AdvanceForm open={open} close={close} /> }) : null;
   useScreenAction(recordAdvance ? { label: "Record Advance", onSelect: recordAdvance } : null);
   useUrlAction("advance", recordAdvance);
 
@@ -124,9 +127,11 @@ export default function Deductions() {
         title="Deductions"
         sub="Fines, advances and attendance"
         actions={
-          <Button variant="primary" icon="plus" onClick={() => recordAdvance?.()}>
-            Record Advance
-          </Button>
+          mayRecord && (
+            <Button variant="primary" icon="plus" onClick={() => recordAdvance?.()}>
+              Record Advance
+            </Button>
+          )
         }
       />
       <StatStrip
@@ -198,6 +203,14 @@ function FigureList({ filters }: { filters: { status?: Row["status"]; source?: R
 function DeductionCard({ row, open, onDone }: { row: Row; open: string; onDone: () => void }) {
   const modal = useModal();
   const { navigate } = useRouter();
+  // The server decides what a row offers (`can_*`); each also needs payroll edit, as its route does (QA F26c).
+  const mayEdit = usePayrollGrant("edit");
+  const can = {
+    accept: mayEdit && row.can_accept,
+    waive: mayEdit && row.can_waive,
+    release: mayEdit && row.can_release,
+    cancel: mayEdit && row.can_cancel,
+  };
   const accept = useMutation("POST /api/v1/deductions/fines/:sanction_fine_id/accept");
   const done = () => {
     invalidate("/api/v1/deductions");
@@ -223,7 +236,7 @@ function DeductionCard({ row, open, onDone }: { row: Row; open: string; onDone: 
   ];
   if (row.instalments !== null) items.push(["Recovered", `${row.instalments_applied ?? 0} of ${row.instalments} ${row.instalments === 1 ? "month" : "months"}`]);
   if (row.query_number) items.push(["Query", row.query_number]);
-  const actions = row.can_accept || row.can_waive || row.can_release || row.can_cancel || row.source === "attendance";
+  const actions = can.accept || can.waive || can.release || can.cancel || row.source === "attendance";
   return (
     <Card>
       <CardHeader record title={row.employee.display_name} right={statusPill(row)} />
@@ -233,21 +246,21 @@ function DeductionCard({ row, open, onDone }: { row: Row; open: string; onDone: 
           {row.source === "attendance" && (
             <Button onClick={() => navigate(hrefFor("people", "attendance"))}>Open Attendance</Button>
           )}
-          {row.can_waive && (
+          {can.waive && (
             <Button onClick={() => modal.open({ title: "Waive Fine", body: (close) => <ReasonForm kind="waive" row={row} close={close} onDone={done} /> })}>Waive</Button>
           )}
-          {row.can_accept && (
+          {can.accept && (
             <Button onClick={() => modal.open({ title: "Spread Fine", body: (close) => <SpreadForm row={row} open={open} close={close} onDone={done} /> })}>Spread Over Months</Button>
           )}
-          {row.can_accept && (
+          {can.accept && (
             <Button variant="primary" onClick={acceptThisMonth}>
               Accept This Month
             </Button>
           )}
-          {row.can_release && (
+          {can.release && (
             <Button onClick={() => modal.open({ title: "Release Fine", body: (close) => <ReasonForm kind="release" row={row} close={close} onDone={done} /> })}>Release</Button>
           )}
-          {row.can_cancel && (
+          {can.cancel && (
             <Button onClick={() => modal.open({ title: "Cancel Advance", body: (close) => <ReasonForm kind="cancel" row={row} close={close} onDone={done} /> })}>Cancel Advance</Button>
           )}
         </FormFooter>

@@ -44,7 +44,10 @@ opens that record.
    ![Filtering by Health](shot:partnerships-pipeline-filter)
 2. Pick **Every Stage**, **Every Category**, **Every Region**, **Every Owner** or **Any Health** to
    clear one filter.
-3. On a phone, press **All**, **Stalled**, **Follow-Up** or **On Track** above the list.
+3. **Owner** also lists anyone who has left MyCity but still owns records, marked **Left**. Pick them
+   to find their leads, partners and deals, then give each a new owner with **Edit Lead**, **Edit
+   Partner** or **Edit Deal**.
+4. On a phone, press **All**, **Stalled**, **Follow-Up** or **On Track** above the list.
    ![The phone's health chips](shot:partnerships-pipeline-chips)
 
 ### Open a record from the pipeline {#partnerships-pipeline-open}
@@ -255,7 +258,9 @@ A lead becomes a partner when its deal is signed. Use this task for a partner th
 7. Under **Signed Copy**, upload the signed agreement. If it was signed before MyCity used this system,
    tick **Signed Before the Hub** instead.
 8. If no money changes hands, such as a media swap, leave the value empty and tick **No Money Value**.
-9. Press **Add Partner**. The message reads *Partner added*.
+9. Press **Add Partner**. The message reads *Partner added*. A signed copy you attached is also on
+   [Partnerships · Contracts & MOUs](/partnerships?tab=contracts-and-mous) as its agreement, signed
+   outside the hub.
 
 If you press **Add Partner** with neither a copy nor the tick, the form says *Attach the signed copy*.
 With neither a value nor **No Money Value**, it asks you to add the deal's value.
@@ -316,6 +321,9 @@ A deal still open after its **Expected Close** reads **Overdue** the next mornin
 1. Press **Edit Deal** on the deal.
 2. Change what you need, as in [Open a deal](#partnerships-partners-deal).
 3. Press **Save Deal**. The message reads *Deal saved*.
+
+A signed deal keeps its value. Emptying its **Projected Value** is refused with *Add the deal's value*,
+unless it was signed with **No Money Value**.
 
 ### Log an interaction {#partnerships-partners-log needs="partnerships edit"}
 
@@ -378,6 +386,8 @@ Returns are what a partner's deal earned in a month.
 4. Pick the **Month**.
 5. Fill in the **Units Sold**, **Gross Sales**, **MyCity Commission**, **Paid to Partner** and
    **Downloads**. Add a **Note** if it helps. Type amounts plainly, such as 100000 or 100,000.
+   **MyCity Commission** fills in from **Gross Sales** at the deal's rate, or the category's when the
+   deal has none. Change it if the month differs; what you type stays.
 6. Press **Save Returns**. The message reads *Returns saved*.
 
 The figures must add up. **More than gross sales** means the commission is above the gross sales.
@@ -621,8 +631,8 @@ sealed with a reference and a QR code anyone can check.
 1. Open [Partnerships · Contracts & MOUs](/partnerships?tab=contracts-and-mous).
 2. Read the cards: **Active**, **In Approval**, **Awaiting Signature** and **Renewals 180 Days**.
    Hover over **Renewals 180 Days** to read what it counts.
-3. Press **All**, **Draft**, **In Review**, **In Approval**, **Sent**, **Active**, **Expiring** or
-   **Closed** to narrow the list.
+3. Press **All**, **Draft**, **In Approval**, **Sent**, **Active**, **Expiring** or **Closed** to
+   narrow the list. **In Approval** lists the agreements its card counts, waiting at any stage.
 4. Press an agreement. It opens on its own page. **Back to Agreements** returns to the list.
    ![An agreement open](shot:partnerships-agreement)
 5. On a computer, the line at the top follows it from **Draft** to **Renewed**.

@@ -475,7 +475,8 @@ announcements. Read them in **#announcements**.
 2. Type the **Headline** and the **Message**.
 3. Choose the **Level**: **Normal**, **Important** (the unread are reminded after 4 hours) or
    **Urgent** (red on everyone's screen until they acknowledge it).
-4. Under **Audience**, keep **All Staff**, or choose **Departments** and tick them.
+4. Under **Audience**, keep **All Staff**, or choose **Departments** and tick them. Only current
+   departments are offered.
 5. Under **When**, keep **Now**, or choose **Schedule** and pick the **Publish Date**. It goes out at
    09:00 Lagos time that day.
 6. Press **Publish Announcement**, or **Schedule Announcement**. **Published to #announcements**
@@ -487,6 +488,8 @@ announcements. Read them in **#announcements**.
 | **Add a headline** | Type a headline of at least four characters |
 | **Write the message** | Type a message of at least four characters |
 | **Choose a department** | Tick at least one department, or choose **All Staff** |
+| **No one in this audience** | Nobody works in the departments ticked. Tick another, or choose **All Staff** |
+| **Department no longer active** | A department ticked has closed. Choose **All Staff**, or tick current ones |
 | **Not a real date** | Pick the publish date |
 | **Time already passed** | Today's 09:00 has gone. Pick tomorrow, or choose **Now** |
 | *At most 120 characters* or *At most 4,000 characters* | The headline or the message is too long. Shorten it |

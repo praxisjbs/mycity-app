@@ -1030,6 +1030,67 @@ describeDb("my workspace against the real migrations", () => {
     expect(found.body.groups.flatMap((g) => g.items).map((i) => i.id)).toContain(id);
   });
 
+  test("projects: New Project hears of an active project already called that, case and accents aside, and may still save (QA BG-027)", async () => {
+    const lekki = (await as("peer").get("/projects?q=lekki")).body.data.find((p) => p.name === "Lekki Launch");
+    expect(lekki).toBeDefined();
+    const same = await as("peer").get(`/projects/same-name?name=${encodeURIComponent("  LÉKKI launch ")}`);
+    expect(same.status).toBe(200);
+    expect(same.body.project).toMatchObject({ project_id: lekki.project_id, number: lekki.number, name: "Lekki Launch" });
+    // Edit Project leaves out the project itself; another name finds nothing.
+    expect((await as("peer").get(`/projects/same-name?name=Lekki%20Launch&except=${lekki.project_id}`)).body.project).toBeNull();
+    expect((await as("peer").get("/projects/same-name?name=Lekki%20Launch%202")).body.project).toBeNull();
+    // Advisory: a second project of the same name still saves; a completed one is never named.
+    const twin = await as("peer").post("/projects", { name: "Lekki launch" });
+    expect(twin.status).toBe(201);
+    await as("peer").patch(`/projects/${twin.body.project_id}`, { status: "completed" });
+    expect((await as("peer").get(`/projects/same-name?name=lekki%20launch&except=${lekki.project_id}`)).body.project).toBeNull();
+    expect((await as("peer").get("/projects/same-name?name=")).status).toBe(422);
+  });
+
+  test("projects: a leaver's project shows Left and its Owner is handed to someone on the staff (QA BG-029)", async () => {
+    const made = await as("outsider").post("/projects", { name: "Kano Roadshow" });
+    expect(made.body.owner_left).toBe(false);
+    const id = made.body.project_id;
+    await q("UPDATE employee SET status = 'left' WHERE employee_id = $1", [emp("outsider")]);
+    try {
+      const read = (await as("ops").get(`/projects/${id}`)).body;
+      expect(read).toMatchObject({ owner_left: true, can_edit: true });
+      expect((await as("peer").get("/projects?q=kano")).body.data[0].owner_left).toBe(true);
+      // Only its owner or a grant that reaches everyone hands it on, and only to someone on the staff.
+      expect((await as("peer").patch(`/projects/${id}`, { owner_employee_id: emp("peer") })).status).toBe(403);
+      const gone = await as("ops").patch(`/projects/${id}`, { owner_employee_id: "00000000-0000-4000-8000-000000000000" });
+      expect(gone.status).toBe(422);
+      expect(gone.body.error.fields.owner_employee_id).toEqual(["Not on the staff"]);
+      const handed = await as("ops").patch(`/projects/${id}`, { owner_employee_id: emp("staff") });
+      expect(handed.status).toBe(200);
+      expect(handed.body.owner.employee_id).toBe(emp("staff"));
+      expect(handed.body.owner_left).toBe(false);
+      // The new owner now edits it; the event records the change.
+      expect((await as("staff").get(`/projects/${id}`)).body.can_edit).toBe(true);
+      const { rows } = await q("SELECT changed_fields FROM audit_ledger WHERE action = 'project.edited' AND entity_id::text = $1", [id]);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].changed_fields).toEqual(expect.arrayContaining(["owner"]));
+    } finally {
+      await q("UPDATE employee SET status = 'active' WHERE employee_id = $1", [emp("outsider")]);
+    }
+  });
+
+  test("tasks/people says who has no login yet, so Assign To and Lead can show No Login Yet (QA BG-028)", async () => {
+    const page = async () => (await as("manager").get("/tasks/people")).body.data;
+    expect((await page()).every((p) => p.has_login === true)).toBe(true);
+    await q("UPDATE app_user SET status = 'suspended' WHERE employee_id = $1", [emp("peer")]);
+    try {
+      const rows = await page();
+      expect(rows.find((p) => p.employee_id === emp("peer")).has_login).toBe(false);
+      expect(rows.find((p) => p.employee_id === emp("staff")).has_login).toBe(true);
+      // The task still saves: an employee may be set work before their login is made.
+      const t = await as("manager").post("/tasks", { title: "Read the field handbook", primary_assignee_id: emp("peer") });
+      expect(t.status).toBe(201);
+    } finally {
+      await q("UPDATE app_user SET status = 'active' WHERE employee_id = $1", [emp("peer")]);
+    }
+  });
+
   test("late reasons: six to start, holders add and switch them, and Why Late takes only those switched on", async () => {
     const on = await as("staff").get("/tasks/late-reasons");
     expect(on.status).toBe(200);

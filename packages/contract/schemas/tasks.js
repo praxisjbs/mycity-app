@@ -524,7 +524,9 @@ const TaskEdit = taskEditRules(TaskEditFields.refine((v) => Object.keys(v).lengt
  * work there: who may lead a task shared with the department.
  */
 const TaskPeopleQuery = listQuery({ shared: z.enum(["true", "false"]).optional(), department_id: uuid.optional() });
-const TaskPersonPage = Paged(PersonRef);
+/** Someone a task may be put on; `has_login` false shows No Login Yet beside them (they see it once invited). */
+const TaskPerson = PersonRef.extend({ has_login: z.boolean() });
+const TaskPersonPage = Paged(TaskPerson);
 
 /** POST /tasks/:id/move: drag to a column, before a card (null: the foot of the column). */
 const TaskMove = z
@@ -833,6 +835,7 @@ const TABLES = {
     },
   },
   TaskPeopleQuery: { table: null, reason: "list controls for the people a task may be set for or shared with" },
+  TaskPerson: { table: null, reason: "a person as the task pickers list them, with whether they hold a login" },
   TaskPersonPage: { table: null, reason: "a page of people" },
   TaskMove: {
     table: "task",
@@ -927,6 +930,7 @@ module.exports = {
   TaskPrefill,
   TaskEdit,
   TaskPeopleQuery,
+  TaskPerson,
   TaskPersonPage,
   TaskMove,
   TaskComplete,

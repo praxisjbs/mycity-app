@@ -21,7 +21,7 @@ function totalsOf(rows: DealReturn[]) {
  * `partnerships.money`: a deal's months as a table, a chart of MyCity's commission by month and the
  * year's totals, with Enter Returns a month at a time. Imported months say so.
  */
-export function ReturnsTab({ deals, readOnly }: { deals: DealRow[]; readOnly: boolean }) {
+export function ReturnsTab({ deals, readOnly, categoryId }: { deals: DealRow[]; readOnly: boolean; categoryId?: string | null }) {
   const modal = useModal();
   const signed = deals.filter((d) => d.status === "live" || d.status === "completed");
   const choices = signed.length ? signed : deals;
@@ -30,7 +30,7 @@ export function ReturnsTab({ deals, readOnly }: { deals: DealRow[]; readOnly: bo
   const [year, setYear] = useState(String(thisYear));
   const list = usePaged("GET /api/v1/partnerships/deals/:id/returns", { params: { id: dealId }, filters: { year: Number(year) }, enabled: Boolean(dealId) });
   if (!choices.length) return <EmptyState title="No Deals Yet" text="Returns follow a signed deal." />;
-  const enter = (held?: DealReturn) => modal.open({ title: "Enter Returns", body: (close) => <ReturnsForm dealId={dealId} held={held ?? null} close={close} /> });
+  const enter = (held?: DealReturn) => modal.open({ title: "Enter Returns", body: (close) => <ReturnsForm dealId={dealId} categoryId={categoryId} held={held ?? null} close={close} /> });
   const totals = totalsOf(list.rows);
   const chronological = [...list.rows].reverse();
   return (

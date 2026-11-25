@@ -103,7 +103,8 @@ function ByNumber({ number }: { number: string }) {
   const r = useApi("GET /api/public/v1/verify/:ref", { params: { ref: number } });
   if (r.error)
     return r.error.status === 404 ? (
-      <VerifyCard tone="err" title="Not Found" text="No document has this reference." items={[{ label: "Reference", value: number.toUpperCase() }]} note="Check the reference on the document and try again. It looks like OFF-0018." />
+      // Only a signed document can be checked: a genuine letter still being signed is not here yet.
+      <VerifyCard tone="err" title="Not Found" text="No signed document has this reference." items={[{ label: "Reference", value: number.toUpperCase() }]} note="A document can be checked once everyone has signed it. Check the reference and try again." />
     ) : (
       <Failed message={r.error.message} retry={r.reload} />
     );

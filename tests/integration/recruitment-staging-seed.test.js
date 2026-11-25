@@ -134,6 +134,18 @@ describeDb("Recruitment's staging seed against the real migrations", () => {
     expect(rows[5].close_reason).toBe("filled");
   });
 
+  test("each role is filed under one of MyCity's own departments, never the hiring manager's", async () => {
+    const { rows } = await q("SELECT v.title, d.name FROM vacancy v JOIN department d ON d.department_id = v.department_id ORDER BY v.number");
+    expect(rows.map((r) => [r.title, r.name])).toEqual([
+      ["Head, Sales & Revenue", "Partnership & Growth"],
+      ["Graphics and Motion Designer", "Branding & Marketing"],
+      ["Content Producer", "Branding & Marketing"],
+      ["Customer Support Lead", "Technology & Back-office Ops"],
+      ["Backend Engineer", "Technology & Back-office Ops"],
+      ["Partnerships Associate", "Partnership & Growth"],
+    ]);
+  });
+
   test("Careers Settings hold MyCity's ten traits, and each role's card rates them", async () => {
     const { rows } = await q("SELECT value FROM setting WHERE key = 'recruitment.default_traits'");
     expect(rows[0].value).toEqual(seed.TRAITS);
@@ -218,6 +230,32 @@ describeDb("Recruitment's staging seed against the real migrations", () => {
 
   test("a second run adds nothing", () => {
     expect(second).toEqual(first);
+  });
+
+  test("a role an earlier run left in Implementation moves to its own department; one a person filed elsewhere, or a closed one, stays", async () => {
+    const dept = async (name) => (await q("SELECT department_id FROM department WHERE name = $1", [name])).rows[0].department_id;
+    const where = async (title) =>
+      (await q("SELECT d.name FROM vacancy v JOIN department d ON d.department_id = v.department_id WHERE v.title = $1", [title])).rows[0].name;
+    const implementation = await dept("Implementation");
+    const people = await dept("People & Culture");
+    await q("UPDATE vacancy SET department_id = $1 WHERE title IN ('Graphics and Motion Designer', 'Partnerships Associate')", [implementation]);
+    await q("UPDATE vacancy SET department_id = $1 WHERE title = 'Backend Engineer'", [people]);
+    const said = [];
+    try {
+      const before = await counts();
+      await runFile(seed, said);
+      await settle();
+      expect(await counts()).toEqual(before);
+      expect(await where("Graphics and Motion Designer")).toBe("Branding & Marketing");
+      expect(await where("Backend Engineer")).toBe("People & Culture");
+      expect(await where("Partnerships Associate")).toBe("Implementation");
+      expect(said).toContain("recruitment: Graphics and Motion Designer moved to Branding & Marketing");
+      expect(said.some((m) => m.includes("Partnerships Associate is closed"))).toBe(true);
+      expect(said.filter((m) => m.includes("stopped"))).toEqual([]);
+    } finally {
+      await q("UPDATE vacancy SET department_id = $1 WHERE title IN ('Partnerships Associate')", [await dept("Partnership & Growth")]);
+      await q("UPDATE vacancy SET department_id = $1 WHERE title = 'Backend Engineer'", [await dept("Technology & Back-office Ops")]);
+    }
   });
 
   // Last: it changes what the runs above made.

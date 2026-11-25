@@ -39,6 +39,8 @@ export default function Queries({ tab, id }: ModuleScreenProps) {
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 const pill = (tone: Tone, text: string) => ({ tone, text });
 const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ?? undefined} />;
+/** Who raised a query: the person, or the rule that did, named as a rule ("Rule: Unregistered Device"). */
+const raisedBy = (q: Pick<Query, "raised_by_name" | "rule_name">) => q.raised_by_name ?? (q.rule_name ? `Rule: ${q.rule_name}` : "Rule");
 const useConfigure = () => {
   const { me } = useAuth();
   return !!me && hasCapability(me, "queries.configure");
@@ -122,7 +124,7 @@ function QueriesTab({ id }: { id: string | null }) {
           { key: "e", label: "Employee", render: (q) => person(q.employee) },
           { key: "n", label: "Number", render: (q) => q.number, desktop: true },
           { key: "s", label: "Subject", render: (q) => q.subject },
-          { key: "b", label: "Raised By", render: (q) => q.raised_by_name ?? q.rule_name ?? "Rule", desktop: true },
+          { key: "b", label: "Raised By", render: (q) => raisedBy(q), desktop: true },
           { key: "d", label: "Raised", render: (q) => formatDate(q.created_at) },
         ]}
       />
@@ -194,7 +196,7 @@ function QueryCard({ id }: { id: string }) {
       <KeyValue
         items={[
           ["Subject", d.subject],
-          ["Raised By", d.raised_by_name ?? d.rule_name ?? "Rule"],
+          ["Raised By", raisedBy(d)],
           ["Raised", formatDateTime(d.created_at)],
           ...(d.status === "awaiting_response" && d.response_due_at ? ([[<HelpTerm key="due" help="The employee has 24 hours to respond in writing.">Response Due</HelpTerm>, formatDateTime(d.response_due_at)]] as Array<[React.ReactNode, string]>) : []),
           ...(d.evidence.length ? ([["Counted", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),

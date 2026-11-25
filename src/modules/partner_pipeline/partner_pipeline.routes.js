@@ -24,6 +24,7 @@
  *   GET   /lists/:list                                  view: stages, impacts, sources, document kinds
  *   GET   /lists/:list/suggestions                      view: an open list's names as a form suggests them, 25 a page
  *   POST  /lists/:list, PATCH /lists/:list/:code        edit + configure
+ *   GET   /owners                                       view: the Owner filter's people, leavers who still own records marked (QA F06e)
  *   POST  /setup/from-tracker, /setup/from-tracker/apply   edit + configure: Start From Tracker
  *
  * tests/unit/partnerships-skeleton.test.js holds every route here to the partnerships key.
@@ -101,6 +102,10 @@ route(router, "get", "/lists/:list",
 route(router, "get", "/lists/:list/suggestions",
   { params: p.OpenListParams, query: p.ListSuggestionQuery, response: p.ListSuggestionPage, summary: "The names Kind, Source or Impact suggests" },
   view, controller.listSuggestions);
+
+route(router, "get", "/owners",
+  { query: p.OwnerQuery, response: p.OwnerPage, summary: "The people the Owner filter offers, leavers holding records marked" },
+  view, controller.listOwners);
 
 route(router, "post", "/lists/:list",
   { params: p.ListParams, body: p.ListValueCreate, response: p.ListValues, summary: "Add a value to a list" },

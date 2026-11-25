@@ -22,7 +22,7 @@ import type { ProposalContent, ProposalContentEdit, ProposalDetail, ProposalQues
 import SAMPLE_HTML from "@mycity/ui/samples/proposal-kit.sample.html?raw";
 import SAMPLE_CONTENT from "@mycity/ui/samples/proposal-kit.sample.json";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, uuid, type Req } from "../core";
-import { byId, byKey, refKey } from "../data/people";
+import { byId, byKey, PEOPLE, refKey } from "../data/people";
 import { PARTNERS, type MockPartner } from "../data/partners";
 import { pickedPlace, placeOf } from "./maps";
 import { exportFile } from "./shared";
@@ -657,6 +657,15 @@ route("GET /api/v1/partnerships/leads/:id", (req) => {
 });
 
 const quiet = (r: MockRecord) => r.status === "active" && sinceContact(r) >= 30;
+// The Owner filter's people (QA F06e): the demo's roster has no leaver, so nobody is marked Left.
+route("GET /api/v1/partnerships/owners", (req) =>
+  paged(
+    [...PEOPLE].sort((a, b) => a.display_name.localeCompare(b.display_name)).map((p) => ({ employee_id: p.employee_id, display_name: p.display_name, left: false })),
+    req,
+    { search: (o) => [o.display_name] },
+  ),
+);
+
 route("GET /api/v1/partnerships/partners/summary", () => {
   const partners = RECORDS.filter((r) => r.kind === "partner");
   const live = DEALS.filter((d) => d.status === "live");

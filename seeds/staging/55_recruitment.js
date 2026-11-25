@@ -113,14 +113,16 @@ const SALES_DESCRIPTION = `The Head, Sales & Revenue leads MyCityApp's commercia
 - Pipeline value and conversion, stage by stage.`;
 
 /**
- * The roles. `department` is looked for by name and falls back to the hiring manager's own;
- * `state` is where the role is left; `asks` its Apply questions; `parts_off` the scorecard parts it skips.
+ * The roles. `department` is one of MyCity's own (seeds/staff/nomenclature.json), looked for by name;
+ * only while it is missing (a database without the staff list) does a role fall back to the hiring
+ * manager's own. `state` is where the role is left; `asks` its Apply questions; `parts_off` the
+ * scorecard parts it skips.
  */
 const VACANCIES = Object.freeze([
   {
     key: "sales",
     title: "Head, Sales & Revenue",
-    department: "Marketing & Sales",
+    department: "Partnership & Growth",
     state: "open",
     employment_type: "full_time",
     work_pattern: "hybrid",
@@ -141,7 +143,7 @@ const VACANCIES = Object.freeze([
   {
     key: "design",
     title: "Graphics and Motion Designer",
-    department: "Studio",
+    department: "Branding & Marketing",
     state: "open",
     employment_type: "full_time",
     work_pattern: "on_site",
@@ -157,7 +159,7 @@ const VACANCIES = Object.freeze([
   {
     key: "content",
     title: "Content Producer",
-    department: "Content",
+    department: "Branding & Marketing",
     state: "open",
     employment_type: "contract",
     work_pattern: "hybrid",
@@ -170,7 +172,7 @@ const VACANCIES = Object.freeze([
   {
     key: "support",
     title: "Customer Support Lead",
-    department: "Support",
+    department: "Technology & Back-office Ops",
     state: "paused",
     employment_type: "full_time",
     work_pattern: "on_site",
@@ -183,7 +185,7 @@ const VACANCIES = Object.freeze([
   {
     key: "backend",
     title: "Backend Engineer",
-    department: "Engineering",
+    department: "Technology & Back-office Ops",
     state: "draft",
     employment_type: "full_time",
     work_pattern: "remote",
@@ -195,7 +197,7 @@ const VACANCIES = Object.freeze([
   {
     key: "partners",
     title: "Partnerships Associate",
-    department: "Marketing & Sales",
+    department: "Partnership & Growth",
     state: "closed",
     employment_type: "full_time",
     work_pattern: "hybrid",
@@ -434,17 +436,38 @@ module.exports = async function seed({ pool, log = () => {} }) {
     log("recruitment: Careers Settings saved with MyCity's ten traits");
   }
 
+  /*
+   * A role this seed made before MyCity's departments were named here sits in the hiring manager's
+   * (Implementation): it moves to its own department through Edit Vacancy's service, once. A role a
+   * person has since filed anywhere else stays where they put it, and a closed role cannot be edited
+   * (VACANCY_CLOSED), so it is left and said in the log.
+   */
+  const refile = async (vacancyId, spec, home) => {
+    if (!home) return;
+    const now = await one(
+      pool,
+      "SELECT v.department_id, v.status::text AS status, d.name FROM vacancy v JOIN department d ON d.department_id = v.department_id WHERE v.vacancy_id = $1",
+      [vacancyId],
+    );
+    if (!now || now.department_id === home.department_id || now.name !== TEAM) return;
+    if (now.status === "closed") return log(`recruitment: ${spec.title} is closed and stays in ${TEAM}; Edit Vacancy cannot move a closed role`);
+    await vacancies.update(recruiter, ALL, vacancyId, c.vacancies.VacancyEdit.parse({ department_id: home.department_id }));
+    log(`recruitment: ${spec.title} moved to ${spec.department}`);
+  };
+
   /* The roles. */
   const roles = {};
   let made = 0;
   for (const [n, spec] of VACANCIES.entries()) {
     const found = await one(pool, SEEDED_ROLE, [requestContext.getRequestId() || SEED_REQUEST, spec.title]);
+    const home = await one(pool, "SELECT department_id FROM department WHERE name = $1 AND active", [spec.department]);
     if (found) {
       roles[spec.key] = found.vacancy_id;
+      await refile(found.vacancy_id, spec, home);
       continue;
     }
     const manager = managers[n % managers.length];
-    const dept = (await one(pool, "SELECT department_id FROM department WHERE name = $1 AND active", [spec.department])) || { department_id: manager.department_id };
+    const dept = home || { department_id: manager.department_id };
     try {
       const v = await vacancies.create(
         recruiter,

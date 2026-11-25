@@ -63,6 +63,11 @@ export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
     /* Announcements is the posting and read-tracking side, for those who post (`announcements.post`, as every route asks); staff read them in #announcements. */
     if (mod.key === "community" && t.slug === "announcements") return hasCapability(me, "announcements.post");
     if (mod.key === "queries" && !FULL(me)) return t.slug === "queries";
+    /*
+     * Expenses · Disbursements is for those who record payments (`expenses.finance`, docs/guides/expenses.md §2);
+     * Management, who views Settings, never sees a tab that only says Not Open to You (QA audit BG-019).
+     */
+    if (mod.key === "expenses" && t.slug === "disbursements") return hasCapability(me, "expenses.finance");
     if (mod.key === "expenses" && !FULL(me)) return ["approvals", "budgets"].includes(t.slug) && (t.slug !== "approvals" || me.manages_people);
     if (mod.key === "performance" && !FULL(me) && !me.manages_people) return t.slug !== "analytics";
     return true;

@@ -801,13 +801,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
-| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 07/11/2026 |
-| 101 | Projects | `projects` | M2 | AJ | ☑ | ☑ | ☑ | Built | 07/11/2026 |
+| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 101 | Projects | `projects` | M2 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 07/11/2026 |
 | 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Tasks (#5) and Projects (#101), QA audit Low items BG-026 to BG-029: the staging seed keeps its open demo tasks on days counted from each deploy, each overdue one with its late reason and priorities spread, idempotent; New Project and Edit Project warn *Already a project* (advisory); Assign To and Lead show No Login Yet; Edit Project gains Owner (the owner or an all grant, an active employee), a leaver owner reads Left, and Praxis AI's Save Project card carries Owner. Tests: `workspace.test.js`, `workspace-staging-seed.test.js`, `ai-actions-workspace.test.js`, `Projects.test.tsx`. No tick changed. Left: nothing.
 - 14/11/2026 · JP · Projects (#101) and Calendar (#6) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 8, §6.13 Workspace, Knowledge Hub, Community, Home and Settings; `docs/guides/workspace.md` §9): `projects.summary` (every project, its tasks only those the reader could open on Tasks, stacked Done, Open and Overdue, by status) and `calendar.summary` (the person's own month by kind and by week stacked, meetings' hours, invitations waiting, leave days; it carries a matrix probe); the month and its summary read one list of items (`calendar.repo` `ITEMS`). No ticks change; nothing on screen changes. Left: nothing.
 - 07/11/2026 · AJ · Tasks (#5), Projects (#101) and Calendar (#6), Connect to Partner (M7 PR 5, `docs/guides/workspace.md` §6, `docs/guides/partnerships.md` §6.16): New Task, New Project and New Event, and their edits, take a partner or a lead and one of its deals (Connect to Partner shows Partner, leads marked, and Deal; Disconnect takes it off), checked against what the person sees in Partnerships; a task made in a connected project takes its link; a task's and an event's panel show Partner, opening the 360, or A Partner You Cannot See; Tasks and Projects filter by Partner; a lead's work moves to its partner on conversion; a signed deal's event days are an event its partner keeps (no Edit Event or Call Off). Praxis AI's task, project and event cards carry the partner and deal. User Guide, My Workspace: Connect work to a partner, the event days' tip, the stale pictures retaken. Tests: `tests/integration/partnerships-work.test.js`, `workspace/Workspace.test.tsx` (1 new). Left: nothing.
 - 02/11/2026 · AJ · Tasks (#5) and Calendar (#6), Custom Time reminders (TB at the M2 handover, 28/10/2026; `docs/guides/workspace.md` §6, §10, §11): Set Reminders and New Event's Reminder offer Custom Time, which asks Remind On and Remind At. A task's is a set time at or before the due time (the API now refuses one after it, "After the due time") and stays when the due date moves; an event's is at or before the start, at most 14 days before, sent as its lead time so it moves with the event, and the event's panel names it by the moment it comes. User Guide, My Workspace: both steps and their messages. Tests: `workspace/Workspace.test.tsx` (2 new), `tests/integration/workspace.test.js` (1 new). Left: nothing.
@@ -853,7 +854,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 24/11/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☑ | ☑ | ☑ | Built | 13/11/2026 |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
-| 56 | My Requests | `my-requests` | M8 | AJ | ☑ | ☑ | ☑ | Built | 24/11/2026 |
+| 56 | My Requests | `my-requests` | M8 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
@@ -865,6 +866,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 25/11/2026 · JP · My Requests (#56), QA audit Low items BG-018 and BG-020: an account number of one digit repeated is refused; a likely duplicate (same requester or account, same amount, within 30 days, not cancelled or rejected) is refused 409 until the requester presses **Send Anyway**, and the confirmation is kept (`migrations/8040`) and shown to approvers. Tests: `expenses.test.js`, `Expenses.test.tsx`. No tick changed. Left: a bank name check is a Change Report.
 - 25/11/2026 · JP · My Profile (#8), My Attendance (#9), My Leave (#12) and Policy Updates (#89), QA audit Low items BG-015, BG-050, BG-058, BG-059, BG-060, BG-061: My Profile's status pill uses People's probation rule; Record History words every event, reminders included, never a raw key, in Lagos time; a System Clock-Out day's Hours carries help; a cancelled request's Approver is empty; Request Leave shows the working days and what would be left before Send; the overdue policy sheet shows once per sign-in. Tests: `Profile.test.tsx`, `Leave.test.tsx`, `EssAttendance.test.tsx`, `AcknowledgeSheet.test.tsx`, `ess-profile.test.js`, `organisation.test.js`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · My Performance (#10), QA audit BG-012 (F77b): the Rating tile shows how much of the scorecard the score rests on (*32.5 of 100 scored*) as its caption, its meaning behind Rating's help. No tick changed. Left: retake the pictures with the Performance chapter's.
 - 24/11/2026 · JP · My Requests (#56), QA audit BG-007 (F56b): New Request shows **Budget Left**, **Department Left** and the Over Budget pill once a category is picked, from the new read `GET /expenses/mine/budget-check` (the same count as sending). A warning, never a block. Tests: `budgets.test.js`, `Expenses.test.tsx`. No tick changed. Left: nothing.
@@ -970,10 +972,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 15/11/2026 |
 | 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 25/10/2026 |
-| 17 | Announcements | `announcements` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 17 | Announcements | `announcements` | M1 | GE | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Announcements (#17), QA audit BG-016 and BG-017: an announcement whose audience reaches nobody, or names a department no longer active, is refused on Departments; the chips offer active departments only. Tests: `community.test.js`, `forms.test.tsx`. No tick changed. Left: the chips read one page of 25 departments.
 - 15/11/2026 · JP · Channels (#15), #announcements, reported by staff on staging: **Acknowledge** on an urgent card was recorded (the urgent bar closed) but the card kept asking, so it looked as if nothing happened. The thread keeps its own messages and the card only refreshed the cached reads; it now reads the thread again once the press lands, and `announcement.acknowledged` pushes `community.message_updated` to the person, so a press on the urgent bar or a second device turns the card too (`docs/guides/community.md` §7, §11). Tests: `Thread.test.tsx`, `community.test.js`. No ticks change. Left: nothing.
 - 14/11/2026 · JP · Announcements (#17) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 8, §6.13 Workspace, Knowledge Hub, Community, Home and Settings; `docs/guides/community.md` §9): `announcements.summary`, read rates and the ten newest stacked Read and Not Read for `announcements.post`, anyone else only what they received and read; `announcements.list` names it. No ticks change; nothing on screen changes. Left: nothing.
 - 26/10/2026 · JP · Channels (#15), QA DEF-09: a poll's options must differ, compared with spaces and case ignored: "Already an option" on the field as typed, refused by the contract, the service and the mock on Start Poll and Edit Poll. QA DEF-12: the shell's offers no longer cover the composer · nothing left
@@ -1064,6 +1067,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 25/11/2026 · JP · Employees (#24), QA audit BG-043, BG-044, BG-045: a start before the 18th birthday is refused (*Under 18 at start*; Child's Rights Act 2003 s.28(1)(b), s.277; Lagos Child's Right Law Cap. C7 s.25(1)(b), s.261); the Pension PIN is *PEN* then digits (PenCom 2019 §5.3.13); Tax ID keeps its rule (no format in the Nigeria Tax Administration Act 2025); Gross Monthly below the Minimum Wage in force is warned of and still saved. Tests: `organisation.test.js`, `EmployeeForm.test.tsx`. No tick changed. Left: nothing.
 - 25/11/2026 · JP · Employees (#24), Attendance (#25), Leave (#26) and Organogram (#92), QA audit Low items BG-041, BG-042, BG-046, BG-047: History reads in Lagos time with the time (and every other date shown from a timestamp); Edit Open Role has Close Role, refused while anyone reports to the role or it heads a department; the build account's department is coded IMP and retired at handover; Praxis AI's `employees.list` gives each row the status People see (On Probation). Tests: `Employee360.test.tsx`, `OrgTree.test.tsx`, `organisation.test.js`, `identity.test.js`, `assistant.test.js`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · Attendance (#25), QA audit BG-006 (F66a): an unregistered device opens one exception per person, device and work date; later punches from it that day attach to it and are decided with it (`migrations/1465`, `attendance_exception_punch`). Employees (#24): the staff seed names Obianuju Nwoye (00038) as Operations & People Lead in place of Cynthia Osakunih, who has left (BG-004); the loader leaves staging's on-screen record and the leaver's archived record alone. Organogram (#92): a request whose line manager has left goes to the next active manager above, or the CEO (BG-005, `migrations/1161`). Tests: `attendance.test.js`, `organisation.test.js`, `staff-nomenclature.test.js`, `workflow.test.js`. No tick changed. Left: requests already waiting on someone who leaves are reassigned by hand.
 - 24/11/2026 · JP · Employees (#24) and Organogram (#92), from the 23/11 System Health brief (faults #3 and #4), with JBS Praxis's answer (no screen change): `REPORTS_TO_SELF` and `REPORTING_LOOP` are answered on the field as before and never recorded on System Health, on Change Manager, a drag on the chart, an employee's own record and a seat. Test: `tests/integration/organisation.test.js`. No screen changed. Left: nothing.
@@ -1234,13 +1238,14 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 34 | Queries | `queries` | M3 | GE | ☑ | ☑ | ☑ | Built | 24/11/2026 |
+| 34 | Queries | `queries` | M3 | GE | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 35 | Rules | `rules` | M3 | GE | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 36 | Sanctions | `sanctions` | M3 | GE | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 37 | Letter Templates | `letter-templates` | M3 | GE | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Queries (#34), QA audit BG-052: Raised By names a rule as *Rule: Unregistered Device*. Test: `Queries.test.tsx`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · Queries (#34), QA audit BG-014 (F33b): for Operations & People and the CEO, an open query's card shows the person's sanctions In Force and the Next Step, and marks a waiting proposal at or below a rung in force *Below Next Step*. Nothing new is asked of the proposer. Tests: `Queries.test.tsx`, `queries.test.js`. No tick changed. Left: nothing.
 - 13/11/2026 · JP · Queries (#34) and Sanctions (#36) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 7, §6.13 People, performance and queries; `docs/guides/queries.md` §9): `queries.summary` (by status, by department, rule or raiser stacked, past the response time, days to close) and `sanctions.summary` (by step of the chain and department stacked, fines in naira only for a reader who sees pay), within §6.1's rule. No screen changed; nothing left.
 - 11/11/2026 · JP · Queries (#34), fault #9 of the 11/11 staging brief (`QUERY_SELF`): Raise a Query's Employee picker asks `GET /employees` for active people with the new `exclude_self` filter, so the raiser and a leaver are never offered (`docs/guides/queries.md` §6.2). Nothing left.
@@ -1280,17 +1285,18 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 38 | Vacancies | `vacancies` | M4 | GE | ☑ | ☑ | ☑ | Built | 11/11/2026 |
-| 39 | Candidates | `candidates` | M4 | GE | ☑ | ☑ | ☑ | Built | 11/11/2026 |
+| 38 | Vacancies | `vacancies` | M4 | GE | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 39 | Candidates | `candidates` | M4 | GE | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 40 | Assessments | `assessments` | M4 | GE | ☑ | ☑ | ☑ | Built | 11/11/2026 |
-| 41 | Interviews | `interviews` | M4 | GE | ☑ | ☑ | ☑ | Built | 08/11/2026 |
-| 42 | Offers | `offers` | M5 | AJ | ☑ | ☑ | ☑ | Built | 24/11/2026 |
+| 41 | Interviews | `interviews` | M4 | GE | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 42 | Offers | `offers` | M5 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 43 | Onboarding | `onboarding` | M5 | AJ | ☑ | ☑ | ☑ | Built | 12/11/2026 |
 | 44 | Talent Pool | `talent-pool` | M4 | GE | ☑ | ☑ | ☑ | Built | 10/11/2026 |
 | 111 | Analytics | `analytics` | M4 | GE | ☑ | ☑ | ☑ | Built | 11/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Vacancies (#38), Candidates (#39), Interviews (#41) and Offers (#42), QA audit BG-031, BG-053 to BG-057: staging vacancies sit under MyCity's departments; Schedule Interview warns for an open offer; Score With AI says *Reading the CV* and the sheet asks again until the read lands; New Offer and Send Offer warn *Starts before the offer expires*. Tests: `recruitment-staging-seed.test.js`, `Candidates.test.tsx`, `Offers.test.tsx`. No tick changed. Left: the closed Partnerships Associate on staging stays under Implementation unless edited by hand.
 - 24/11/2026 · JP · Offers (#42), QA audit BG-001, BG-008, BG-009 (F72a, F32a, F73a): Basic Salary must be above ₦0 at New Offer, Edit and Submit, and no pay line may be below zero; an intern's offer may be ₦0 with a reason the approvers see (**Why No Basic Salary**). Submit and Send refuse a start date that has passed, on a line under the record's buttons. The letter has per-type flags (`is_employee`, `is_contractor`, `is_consultant`, `is_intern`) and the shipped wording has drafted contractor, consultant and intern clauses for MyCity's review; employee wording is unchanged. Tests: `offers.test.js` (unit and integration), `Offers.test.tsx`. No tick changed. Left: MyCity to review the drafted clauses.
 - 13/11/2026 · JP · Vacancies (#38), Candidates (#39), Assessments (#40), Interviews (#41), Offers (#42), Onboarding (#43) and Talent Pool (#44) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 5, §6.13 Recruitment and onboarding; `docs/guides/recruitment.md` §9, `docs/guides/offers.md` §9): seven summaries, `vacancies.summary`, `candidates.summary`, `interviews.summary`, `assessments.summary`, `offers.summary`, `onboarding.summary` and `talent_pool.summary`, each one SQL in its module's repo with the screens' own scope, so the Overview charts vacancies by status and department, the candidate funnel and each role by stage, interviewers' cards submitted and waiting, the average score by assessment, offers by outcome (pay only for a role that sees pay), cases by status and the pool by role. No screen changed, no tick changed. Tests: `tests/integration/ai-summaries-recruitment.test.js`, the matrix's summary probes. Left: nothing.
 - 12/11/2026 · AJ · The two questions left from filming, decided and fixed (`docs/guides/offers.md` §13, §14): Upload Documents (#112) has a write limit of its own, 60 a minute a link, in place of the public limit of 20 an address (`onboardLimiter`); a file the hire sends again becomes the next version of the one before (`vault.follow`), so a rejected file no longer stays on Employee 360's Documents tab as Awaiting Check; and a rejected item or a failed guarantor check is mailed to the hire with a link (`onboarding-document-rejected`, a tenth Candidate Email, for GE to review). No ticks changed. Tests: `rate-limit.test.js`, `onboarding.test.js` (integration), the Candidate Emails counts.
@@ -1344,15 +1350,16 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 45 | Payroll Runs | `payroll-runs` | M6 | LA | ☑ | ☑ | ☑ | Built | 24/11/2026 |
+| 45 | Payroll Runs | `payroll-runs` | M6 | LA | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 46 | Payslips | `payslips` | M6 | LA | ☑ | ☑ | ☑ | Built | 13/11/2026 |
 | 47 | Salary Structure | `salary-structure` | M6 | LA | ☐ | ☐ | ☐ | Dropped | 12/11/2026 |
-| 48 | Deductions | `deductions` | M6 | LA | ☑ | ☑ | ☑ | Built | 13/11/2026 |
+| 48 | Deductions | `deductions` | M6 | LA | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 49 | Statutory | `statutory` | M6 | LA | ☐ | ☐ | ☐ | Dropped | 12/11/2026 |
 | 109 | Configurations | `configurations` | M6 | LA | ☑ | ☑ | ☑ | Built | 24/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Payroll Runs (#45) and Deductions (#48), QA audit BG-039, BG-040, BG-044: a Computed run says *Records changed since Compute* with Compute Run beside it; Record Advance and the row buttons follow the payroll grants; a run warns anyone paid below the Minimum Wage in force. Tests: `payroll-run.test.js`, `Payroll.test.tsx`, `Deductions.test.tsx`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · Payroll Runs (#45) and Configurations (#109), QA audit BG-002, BG-003, BG-011 (F02d, F02f, F11a): a run warns when an instalment due is not taken (*Salary Advance Repayment not taken*, *Fine instalment not taken*), and on approval the missed instalment moves to the person's next paid month. The build account is never in a run (holders of the Implementation Team role are left out by rule); create-admin gives it no pay or bank, and `migrations/6060` clears both where it was given them. Bank Details Required holds the open run from its next Compute or Submit. Tests: `payroll-run.test.js`, `payroll.test.js`, `identity.test.js`. No tick changed. Left: nothing.
 - 14/11/2026 · JP · Both Milestone 6 handover videos made (`docs/runbooks/training-videos.md` §8; `scripts/video/scenes/m6-payroll-1.js`, `m6-payroll-2.js`): part 1, Running the Month, 6:04 in 8 chapters; part 2, Payslips and Pay Day, 4:23 in 7; both -16.4 LUFS, on one development database the same day, MyCity's real staff by name with example salaries (JBS Praxis's choice). Found filming and fixed: a person with no start date was left out of every run without a word, and the roster loads Operations & People's lead, the CTO and the Program Manager with none; they are now in the run with the blocking problem No Start Date (`NO_START_DATE`, guide §6.1, §6.15, §11; the User Guide's Deal with problems). Every payslip PDF printed its month followed by an empty "·": the document engine's own number (none for a payslip) blanked the payslip's, as it did an employment contract's reference; the record's number now stands, in the letterhead as the agreed sample has it (`shared/documents/generate.js`, `templates/documents/payslip.html`). Tests: `payroll-run.test.js`, `payslips.test.js`. No tick changed. Left: before the first real run, People set a start date for those three on People · Employees; the videos uploaded to Drive.
 - 13/11/2026 · JP · Payroll Runs (#45), Payslips (#46), Deductions (#48) and My Payslips (#11) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 4, `docs/guides/payroll.md` §9): `payroll.month` gains the month's payslips by department (gross stacked as Net Pay and Deductions) and by status, its money now read as naira; `payroll.trend` (runs and people paid, gross, deductions and net by month), `deductions.summary` (by source, status, department and month, with what is scheduled, recovered and owed on advances) and `my_pay.summary` (a person's own published payslips of a year, never hidden from them); pay left out for a reader whose role hides it. Tests: `tests/integration/ai-summaries-finance.test.js`. Rows stay Built. Left: nothing.
@@ -1384,16 +1391,17 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 50 | Pipeline | `pipeline` | M7 | LA | ☑ | ☑ | ☑ | Built | 24/11/2026 |
+| 50 | Pipeline | `pipeline` | M7 | LA | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 104 | Categories | `categories` | M7 | LA | ☑ | ☑ | ☑ | Built | 16/11/2026 |
-| 51 | Partners | `partners` | M7 | LA | ☑ | ☑ | ☑ | Built | 24/11/2026 |
-| 52 | Leads | `leads` | M7 | LA | ☑ | ☑ | ☑ | Built | 24/11/2026 |
+| 51 | Partners | `partners` | M7 | LA | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 52 | Leads | `leads` | M7 | LA | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 53 | Proposals | `proposals` | M7 | LA | ☑ | ☑ | ☑ | Built | 17/11/2026 |
-| 54 | Contracts & MOUs | `contracts-and-mous` | M7 | LA | ☑ | ☑ | ☑ | Built | 16/11/2026 |
+| 54 | Contracts & MOUs | `contracts-and-mous` | M7 | LA | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 55 | Analytics | `analytics` | M7 | LA | ☑ | ☑ | ☑ | Built | 17/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Pipeline (#50), Partners (#51), Leads (#52) and Contracts & MOUs (#54), QA audit BG-033 to BG-038: the Owner filter offers leavers who still own records, tagged Left; New Partner's signed copy is recorded as its agreement; In Review reads In Approval and its chip lists what the card counts; custom money fields take commas; a signed deal keeps its value; Enter Returns suggests MyCity Commission from the deal's or category's rate. Tests: `partnerships-records.test.js`, `partnerships-agreements.test.js`, `screens.test.tsx`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · Partners (#51) and Leads (#52), QA audit BG-010 (F54b): the duplicate check matches near names (abbreviations written out, plurals made singular, trigram likeness of 0.6 or more), and New Lead and New Partner ask with the website and the contact's email and phone as well as the name. Still a warning, never a block. Tests: `partnerships-records.test.js`, `partners.test.js`, `domain.test.js`, `screens.test.tsx`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · From the 23/11 System Health brief, with JBS Praxis's answers: Pipeline (#50), a signed deal whose owner has left raised no checklist (fault #11: the tasks service refused the owner, the `deal.signed` handler failed and its outbox row ran out of retries); the tasks are now the signer's, `deal.deliverables_raised` naming the holder. Leads (#52) and Partners (#51): the duplicate check on New Lead and New Partner asks only with what `DuplicateQuery` takes (fault #6: a name over 150 characters was refused behind the person's back); a contact email already on the record is `CONTACT_EMAIL_TAKEN`, answered on Email as before and never recorded (fault #7). The Work tab's 500s (faults #2, #9, #10, #12) were fixed on 17/11 (F05 above) and Add Partner Document's card refusing a new kind (#13) by `05f0772`. Tests: `partnerships-work`, `-records` (integration), `screens.test.tsx`. No tick changed. Left: on staging, retry the one `deal.signed` row that failed on 16/11 (the PR gives the command).
 - 17/11/2026 · JP · Pipeline (#50), Partners (#51), Leads (#52), Proposals (#53) and Analytics (#55), after the QA audit's Partnerships findings, with JBS Praxis's answers (`docs/guides/partnerships.md` §13.2): the 360s' Work tab loads for every reader (F05: a reader with company-wide scope got 500 on every kind, a query parameter never used); typed amounts and counts reach the API as it takes them (F51, F61: 750000 read "Check the format", a filled Units Sold "Required"), and a month of returns must add up; Write It Myself on the Proposal Studio, the questions asked once and a silent job shown failed (F62); Log Interaction on Activity (F59); a converted lead's Last Contact counts its partner's (F23); Analytics' bars in deals and naira (F45); Proposals' subtitle naming the model taken off (F49); one request for reads of one thing mounted together (`createApi`, F25). Controls: an owner works in Partnerships (F06); a signed deal needs a value or No Money Value (F53) and a signed copy is recorded in Contracts & MOUs as its agreement (F07); no past close date, Overdue each morning (F52; migration `7130`, seed `7191`); a reason to skip a stage, a finished deal shows Lost or Completed (F64); Close Partner ends signed deals as Completed (F63); Source required on New Lead's first step, no Region chosen (F22, F46). The staging seed's records belong to Partnership & Growth and Branding & Marketing staff, and a second run moves its own records there (F06). The chapter's steps and pictures follow. No ticks or Status changed. Tests: `partnerships-work`, `-records`, `-proposals`, `-staging-records` and the suites whose fixtures follow the rules (integration), `screens.test.tsx`, `createApi.test.tsx`. Left for MyCity in Settings: untick Partnerships on the Operations & People role, set the Program Manager as acting head of Partnership & Growth, hand Cynthia's records to their owners; the QA-AUDIT records on staging closed or lost on screen. F08 (customers, tickets, campaigns) not scoped.
@@ -1423,14 +1431,15 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 58 | Requisitions | `requisitions` | M8 | AJ | ☑ | ☑ | ☑ | Built | 13/11/2026 |
-| 57 | Approvals | `approvals` | M8 | AJ | ☑ | ☑ | ☑ | Built | 13/11/2026 |
-| 59 | Disbursements | `disbursements` | M8 | AJ | ☑ | ☑ | ☑ | Built | 13/11/2026 |
+| 57 | Approvals | `approvals` | M8 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 59 | Disbursements | `disbursements` | M8 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 106 | Projects | `projects` | M8 | AJ | ☑ | ☑ | ☑ | Built | 05/11/2026 |
 | 60 | Budgets | `budgets` | M8 | AJ | ☑ | ☑ | ☑ | Built | 13/11/2026 |
 | 61 | Categories | `categories` | M8 | AJ | ☑ | ☑ | ☑ | Built | 13/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Approvals (#57) and Disbursements (#59), QA audit BG-018, BG-019, BG-020: approvers see Name Differs when the account name does not hold the payee's, and *Sent despite a possible duplicate*; Disbursements is shown only to holders of `expenses.finance`. Tests: `expenses.test.js`, `screens.test.js`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · New Request's form, opened from Requisitions, Approvals and ESS · My Requests (#56): Send Request marks a blank payee before anything is saved (fault #5 of the 23/11 System Health brief; see Employee Self-Service). No tick changed. Left: nothing.
 - 13/11/2026 · JP · Approvals (#57), Requisitions (#58), Disbursements (#59), Categories (#61) and My Requests (#56) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 4, `docs/guides/expenses.md` §9): `expenses.summary` charts the requests by status and by category, department, project or payee type as stacked bars of Paid, Approved and Waiting, with the top requesters and asked and paid by month, within the reader's own audience (their own, those waiting on them, or their scope); `requisitions.summary` and `disbursements.summary` for holders of `expenses.finance`. Tests: `tests/integration/ai-summaries-finance.test.js`. Rows stay Built. Left: nothing.
 - 14/11/2026 · JP · Budgets (#60) in Praxis AI: `budgets.summary` failed on an allocation with kobo (its JSON carried ₦1,050,000.50 as a number money() refuses), so the budget question drew no Overview; its amounts now leave the database as text (`docs/guides/expenses.md` §14). Found building Praxis AI's Download PDF; `tests/integration/ai-overview-export.test.js` holds a budget with kobo. No tick changed. Left: nothing.
@@ -1828,16 +1837,17 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 107 | Home | `/` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
 | 80 | Careers | `/jobs` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
 | 81 | Vacancy | `/jobs/<slug>` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
-| 82 | Apply | `/apply/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
+| 82 | Apply | `/apply/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 83 | Assessment | `/assess/<token>` | M4 | GE | ☑ | ☑ | ☑ | Built | 06/11/2026 |
 | 84 | Sign Offer | `/sign/<token>` | M5 | AJ | ☑ | ☑ | ☑ | Built | 07/11/2026 |
-| 85 | Verify Document | `/verify/<number>` | M5 | AJ | ☑ | ☑ | ☑ | Built | 07/11/2026 |
+| 85 | Verify Document | `/verify/<number>` | M5 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 112 | Upload Documents | `/onboard/<token>` | M5 | AJ | ☑ | ☑ | ☑ | Built | 12/11/2026 |
 | 108 | Help | `/help` | M4 | GE | ☑ | ☑ | ☑ | Built | 08/11/2026 |
 | 105 | Proposal | `/proposal/<token>` | M7 | LA | ☑ | ☑ | ☑ | Built | 08/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Apply (#82) and Verify Document (#85), QA audit BG-032, BG-056, BG-057: step 2 is *Your CV* for a role with no questions; the CV picker offers PDF or Word (.docx) only; a reference not found says *No signed document has this reference.* Tests: `Apply.test.tsx`, `Verify.test.tsx`. No tick changed. Left: nothing.
 - 12/11/2026 · AJ · M5 PR 7, Upload Documents (#112) UI and Mobile (`docs/guides/offers.md` §3 step 6, §10): `/onboard/<token>` on the onboarding routes: the privacy notice first, then each document (a file, a value or both, a rejection's reason), the two guarantors with their forms and checks, the BVN once; Documents Complete after the gate. Three demo links on the mock. User Guide: Upload Documents in `public-site.md`, with its picture.
 - 11/11/2026 · TB · Verify Document (#85) also checks a training certificate by its number (M10 PR 4, `docs/guides/knowledge.md` §6.10): Awarded To, Course, Completed and Published By beside the two verdicts; the public-site chapter's Check a training certificate with its pictures. Offers and agreements read as before. No tick changed. Left: nothing.
 - 09/11/2026 · AI · Hide Apply, Assessment and Sign Offer from public navigation; candidates still

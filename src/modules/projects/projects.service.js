@@ -5,8 +5,9 @@
  *
  *   list(), getFor()   every project, with the open and done tasks in it the reader can see
  *   create()           anyone with `workspace` create; the caller owns it
- *   edit()             its owner, or a reader whose grant is `all`: words, due day, and
- *                      `status` (completed completes it, active reopens it)
+ *   edit()             its owner, or a reader whose grant is `all`: words, due day, its owner
+ *                      (an active employee), and `status` (completed completes it, active reopens it)
+ *   sameName()         New Project's warning: an active project already called that
  *   assertOpen()       what the tasks service asks before a task joins a project
  *   setBudget()        Expenses · Projects' Set Budget (docs/guides/expenses.md §6.6 rule 6): the
  *                      project's optional budget, by an `expenses.finance` holder, whoever owns it
@@ -54,6 +55,7 @@ function toProject(row, scope) {
     name: row.name,
     description: row.description ?? null,
     owner: row.owner || null,
+    owner_left: Boolean(row.owner_left),
     due_on: row.due_on || null,
     status: row.status,
     completed_at: iso(row.completed_at),
@@ -112,6 +114,11 @@ async function edit(actor, scope, id, body) {
     const changes = {};
     for (const k of ["name", "due_on"]) if (k in body) changes[k] = body[k];
     if ("description" in body) changes.description = body.description || null;
+    // Owner: handed to someone on the staff now (a leaver's projects, §6 Projects); the same owner changes nothing.
+    if (body.owner_employee_id && body.owner_employee_id !== locked.owner_employee_id) {
+      if (!(await repo.activeEmployee(client, body.owner_employee_id))) throw invalid("owner_employee_id", "Not on the staff");
+      changes.owner_employee_id = body.owner_employee_id;
+    }
     // Connect to Partner: only what changes, checked (workspace.md §6).
     const relinked = links().merged(locked, body);
     if (relinked.changed) {
@@ -137,6 +144,16 @@ async function edit(actor, scope, id, body) {
     });
     return after;
   });
+}
+
+/**
+ * New Project's warning (§6 Projects): the active project already called `name`, case and accents
+ * aside, or null. Advisory: a second project of the same name still saves.
+ * @param {{name: string, except?: string}} query
+ */
+async function sameName(query) {
+  const row = await repo.sameName(pool, query.name, query.except || null);
+  return { project: row ? { project_id: row.project_id, number: row.number || "", name: row.name } : null };
 }
 
 /**
@@ -255,4 +272,4 @@ async function aiSummary(client, params, actor, now = new Date()) {
   };
 }
 
-module.exports = { list, getFor, create, edit, setBudget, assertOpen, toProject, cardRecords, assertCardProject, linkOf, ofDeal, relinkIn, aiSummary };
+module.exports = { list, getFor, create, edit, sameName, setBudget, assertOpen, toProject, cardRecords, assertCardProject, linkOf, ofDeal, relinkIn, aiSummary };

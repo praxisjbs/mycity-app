@@ -25,6 +25,11 @@ const { SignatureRequestStatus, SignatureMethod, SignaturePng } = require("./sig
 const { SealedSigner, CertificateLine } = require("./offers");
 
 const AgreementStatus = z.enum(["draft", "review", "approval", "sent", "viewed", "signed", "active", "expiring", "renewed", "closed"]);
+/**
+ * The list's status filter: a status, or `in_approval`, every agreement waiting on an approver at any
+ * stage (Review or Approval with its approval pending), as the In Approval card counts them (QA F07c).
+ */
+const AgreementStatusFilter = z.enum([...AgreementStatus.options, "in_approval"]);
 /** Which side a signer signs for: the partner's signatory, or MyCity's countersignatory. */
 const SignerSide = z.enum(["partner", "mycity"]);
 /**
@@ -331,7 +336,7 @@ const AgreementDetail = AgreementRow.extend({
 
 const AgreementListQuery = listQuery(
   {
-    status: AgreementStatus.optional(),
+    status: AgreementStatusFilter.optional(),
     kind: TemplateKind.optional(),
     partner_id: uuid.optional(),
     lead_id: uuid.optional(),
@@ -468,6 +473,7 @@ module.exports = {
   AgreementSummaryBy,
   AgreementSummaryQuery,
   AgreementStatus,
+  AgreementStatusFilter,
   SignerSide,
   SignerState,
   FieldValues,

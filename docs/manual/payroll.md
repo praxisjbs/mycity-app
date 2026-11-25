@@ -43,6 +43,8 @@ changes again.
 3. Read **Staff in Run**, **Gross**, **Deductions** and **Net** on the run's card.
 4. Press **Compute Run** again whenever something changes: a salary set, a fine accepted, a
    day waived. Adjustments and the people left out stay as they are.
+5. If the card says "Records changed since Compute", someone joined or a record the run reads changed
+   after it was computed. Press **Compute Run** beside it to bring the figures up to date.
 
 ### Deal with problems {#payroll-runs-problems needs="payroll edit"}
 
@@ -64,7 +66,10 @@ problem stops **Submit for Approval** until it is fixed. A warning never stops i
 7. For a Salary Advance Repayment or fine instalment not taken, the person is left out or has no
    pay. Press **Include** or set their pay. Otherwise, once the run is approved, it moves to their
    next paid month.
-8. Press **Compute Run** again. The line goes once nothing is left.
+8. For someone *paid below the minimum wage*, check their **Gross Monthly** on
+   [People · Employees](/people?tab=employees). It is a warning only, shown while a Minimum Wage is
+   set on [Payroll · Configurations](/payroll?tab=configurations).
+9. Press **Compute Run** again. The line goes once nothing is left.
 
 ### Leave someone out, or put them back {#payroll-runs-exclude needs="payroll edit"}
 

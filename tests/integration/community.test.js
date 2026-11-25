@@ -923,6 +923,39 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("ceo").post(`/community/announcements/${live.body.announcement_id}/cancel`).send({})).status).toBe(409);
   });
 
+  test("an audience that reaches nobody, or names a department no longer active, is refused on Departments (QA audit BG-016, BG-017)", async () => {
+    const at = (mins) => new Date(Date.now() + mins * 60_000).toISOString();
+    const empty = (await one("INSERT INTO department (code, name) VALUES ('ANN_EMPTY', 'Nobody Here') RETURNING department_id")).department_id;
+    const retired = (await one("INSERT INTO department (code, name, active) VALUES ('ANN_OLD', 'Merged Away', false) RETURNING department_id")).department_id;
+    const staffed = (await one("SELECT department_id FROM employee WHERE employee_id = $1", [people.bola.employee.employee_id])).department_id;
+    const post = (ids, extra = {}) => as("ceo").post("/community/announcements").send({ title: "Team lunch", body: "Friday at 1.", audience: { kind: "departments", department_ids: ids }, ...extra });
+    const before = (await one("SELECT count(*)::int AS n FROM announcement")).n;
+
+    const nobody = await post([empty]);
+    expect([nobody.status, nobody.body.error.code, nobody.body.error.fields]).toEqual([422, "AUDIENCE_EMPTY", { "audience.department_ids": ["No one in this audience"] }]);
+    // Scheduled for later, the same: nobody would ever be told.
+    expect((await post([empty], { publish_at: at(60) })).body.error.code).toBe("AUDIENCE_EMPTY");
+    const old = await post([staffed, retired]);
+    expect([old.status, old.body.error.code, old.body.error.fields]).toEqual([422, "AUDIENCE_DEPARTMENT_INACTIVE", { "audience.department_ids": ["Department no longer active"] }]);
+    // A department that does not exist is no current one either.
+    expect((await post([crypto.randomUUID()])).body.error.code).toBe("AUDIENCE_DEPARTMENT_INACTIVE");
+    expect((await one("SELECT count(*)::int AS n FROM announcement")).n).toBe(before);
+
+    // A department with people in it goes out, and Edit is held to the same rule.
+    const sched = await post([staffed], { publish_at: at(60) });
+    expect([sched.status, sched.body.status]).toEqual([201, "scheduled"]);
+    const edit = (ids) => as("ceo").put(`/community/announcements/${sched.body.announcement_id}`).send({ title: "Team lunch", body: "Friday at 1.", audience: { kind: "departments", department_ids: ids }, publish_at: at(90) });
+    expect((await edit([empty])).body.error.fields).toEqual({ "audience.department_ids": ["No one in this audience"] });
+    expect((await edit([retired])).body.error.code).toBe("AUDIENCE_DEPARTMENT_INACTIVE");
+    expect((await edit([staffed, empty])).status).toBe(200);
+
+    // The Departments chips read the current departments only.
+    const chips = await as("ceo").get("/departments?active=true");
+    const ids = chips.body.data.map((d) => d.department_id);
+    expect(ids).toContain(staffed);
+    expect(ids).not.toContain(retired);
+  });
+
   test("celebrations post today's birthday and anniversary cards to #general once, and Celebrate counts", async () => {
     const first = await community.postCelebrations(lagos.today());
     expect(first).toMatchObject({ due: 2, posted: 2 });

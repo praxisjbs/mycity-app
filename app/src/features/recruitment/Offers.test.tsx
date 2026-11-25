@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { sid } from "@/api/mock/core";
 import { choose, copyProblems, dialog, openAs, openRow, press, settled } from "./testKit";
+import { startsBeforeExpiry } from "./OfferForm";
 
 /**
  * Recruitment · Offers on the in-browser mock (docs/guides/offers.md §3, §10): the list with its
@@ -110,6 +111,8 @@ describe("Recruitment · Offers", () => {
     await press(dialog(), "Sign Offer");
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Sign for the Company" })).toBeNull());
     await waitFor(() => expect(within(record("Tunde Bakare")).getByRole("button", { name: "Send Offer" })).toBeTruthy());
+    // Three weeks' start and 15 Days to Sign: it would start after it expires, so nothing warns.
+    expect(within(record("Tunde Bakare")).queryByText(/Starts before the offer expires/)).toBeNull();
     await press(record("Tunde Bakare"), "Send Offer");
     await waitFor(() => expect(within(record("Tunde Bakare")).getAllByText("With Candidate").length).toBeGreaterThan(0));
     expect(within(record("Tunde Bakare")).getByText("Expires")).toBeTruthy();
@@ -149,6 +152,37 @@ describe("Recruitment · Offers", () => {
     expect(within(dialog()).getByLabelText("Start Date")).toBeTruthy();
     expect(copyProblems(dialog())).toEqual([]);
   }, 60000);
+
+  it("New Offer warns when it would start before it expires, and still drafts (BG-031)", async () => {
+    await openAs("cynthia@mycityapp.io", `/recruitment?tab=offers&new=1&application=${sid("app:18")}`);
+    let d = dialog();
+    await waitFor(() => expect((within(d).getByLabelText("Job Title") as HTMLInputElement).value).toBe("Graphics and Motion Designer"));
+    await press(d, "Next");
+    d = dialog();
+    fireEvent.change(within(d).getAllByLabelText("Monthly Amount")[0]!, { target: { value: "350,000" } });
+    await press(d, "Next");
+    d = dialog();
+    // Starting in three days with 15 Days to Sign: it could start before the candidate must reply.
+    fireEvent.change(within(d).getByLabelText("Start Date"), { target: { value: "10/11/2026" } });
+    await settled();
+    const warning = "Starts before the offer expires: use a shorter Days to Sign or a later start.";
+    expect(within(dialog()).getByText(warning)).toBeTruthy();
+    expect(copyProblems(dialog())).toEqual([]);
+    // A shorter Days to Sign clears it; the offer is drafted either way.
+    fireEvent.change(within(dialog()).getByLabelText("Days to Sign"), { target: { value: "2" } });
+    await settled();
+    expect(within(dialog()).queryByText(warning)).toBeNull();
+  }, 60000);
+
+  it("Send Offer's warning: on or before the day the offer would expire, counted from today (BG-031)", () => {
+    // The audit's case: a start two days away, 15 days to sign.
+    expect(startsBeforeExpiry("2026-11-09", 15, "2026-11-07")).toBe(true);
+    expect(startsBeforeExpiry("2026-11-22", 15, "2026-11-07")).toBe(true);
+    expect(startsBeforeExpiry("2026-11-23", 15, "2026-11-07")).toBe(false);
+    // Days to Sign left empty is the default, 15.
+    expect(startsBeforeExpiry("2026-11-10", "", "2026-11-07")).toBe(true);
+    expect(startsBeforeExpiry(null, 15, "2026-11-07")).toBe(false);
+  });
 
   it("New Offer from a link starts from the candidate's vacancy and drafts the offer", async () => {
     // Seun Okonkwo declined an offer and is back at Shortlist: another may be made.

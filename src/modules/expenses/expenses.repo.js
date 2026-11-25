@@ -40,6 +40,7 @@ const ROWS = `
          er.payee_type, er.over_budget, er.submitted_at,
          er.employee_id, er.expense_category_id, er.project_id, er.department_id, rd.name AS department,
          er.payee_name, er.bank_name, er.account_name, er.account_number, er.uses_profile_account,
+         er.duplicate_confirmed_at,
          CASE WHEN doc.document_id IS NULL THEN NULL ELSE json_build_object(
            'document_id', doc.document_id, 'file_name', COALESCE(doc.original_name, doc.title, 'invoice'),
            'size_bytes', doc.bytes, 'mime_type', doc.mime) END AS invoice,
@@ -86,7 +87,7 @@ const ROW_OUT = `v.expense_request_id, v.number, v.purpose, v.amount, v.status, 
 
 /** ExpenseRow's keys and what ExpenseRequest adds, with what the service needs to decide. */
 const FULL_OUT = `${ROW_OUT}, v.expense_category_id, v.project_id, v.department_id, v.department, v.currency,
-  v.payee_name, v.bank_name, v.account_name, v.account_number, v.uses_profile_account, v.invoice,
+  v.payee_name, v.bank_name, v.account_name, v.account_number, v.uses_profile_account, v.duplicate_confirmed_at, v.invoice,
   v.invoice_document_id, v.needed_on, v.requisition_id, v.requisition_number, v.workflow_instance_id,
   v.approval_state, v.approval_opened_by, v.budget_line_id, v.budget_remaining, v.department_remaining, v.approved_at,
   v.authorised_at, v.disbursed_at, v.rejected_at, v.cancelled_at, v.created_at, v.employee_id`;
@@ -369,25 +370,41 @@ const OTHER_STATUS = STATUS.replace(/\brwi\./g, "orwi.").replace(/\bwi\./g, "owi
 /** How many possible duplicates a request shows: a warning, never a list a person pages. */
 const DUPLICATES_SHOWN = 5;
 
+/** The days either side of a request within which another may be its duplicate (guide §6.8). */
+const DUPLICATE_WINDOW = "30 days";
+
 /**
- * Other requests sent within 30 days either side of this one, to the same payee (the same account
- * number, or the same payee name with case and accents set aside) for the same amount (guide §6.8).
- * A draft has none; a cancelled or rejected one is still shown, as a request sent again.
+ * Another request `o` that may be the same one (guide §6.8 rule 1, tightened by QA audit BG-020):
+ * sent, by the same requester or to the same account number, for the same amount, and not
+ * cancelled or rejected (as its status reads, the approval's outcome counted before it is copied).
+ * The caller's `$` params give the requester, the account number and the amount.
+ */
+const DUPLICATE_MATCH = (requester, account, amount) => `o.submitted_at IS NOT NULL
+        AND o.amount = ${amount}
+        AND (o.employee_id = ${requester} OR (${account} IS NOT NULL AND o.account_number = ${account}))
+        AND ${OTHER_STATUS} NOT IN ('cancelled', 'rejected')`;
+
+/** The columns a possible duplicate is read with: what the modal names, and what decides who may see it. */
+const DUPLICATE_COLS = `o.expense_request_id, o.number, o.purpose, o.amount, ${OTHER_STATUS} AS status, o.submitted_at,
+            o.employee_id, o.workflow_instance_id, owi.state AS approval_state`;
+const DUPLICATE_JOINS = `LEFT JOIN workflow_instance owi ON owi.workflow_instance_id = o.workflow_instance_id
+       LEFT JOIN requisition orq ON orq.requisition_id = o.requisition_id
+       LEFT JOIN workflow_instance orwi ON orwi.workflow_instance_id = orq.workflow_instance_id`;
+
+/**
+ * Other requests sent within 30 days either side of this one that may be the same one
+ * (DUPLICATE_MATCH). A draft has none.
  */
 async function duplicatesOf(db, id) {
   const { rows } = await db.query(
-    `SELECT o.expense_request_id, o.number, o.purpose, o.amount, ${OTHER_STATUS} AS status, o.submitted_at,
-            o.employee_id, o.workflow_instance_id, owi.state AS approval_state
+    `SELECT ${DUPLICATE_COLS}
        FROM expense_request er
-       JOIN expense_request o ON o.expense_request_id <> er.expense_request_id AND o.amount = er.amount
-            AND o.submitted_at IS NOT NULL
-            AND o.submitted_at BETWEEN COALESCE(er.submitted_at, now()) - interval '30 days' AND COALESCE(er.submitted_at, now()) + interval '30 days'
-            AND ((o.account_number IS NOT NULL AND o.account_number = er.account_number)
-                 OR (o.payee_name IS NOT NULL AND search_fold(o.payee_name) = search_fold(er.payee_name)))
-       LEFT JOIN workflow_instance owi ON owi.workflow_instance_id = o.workflow_instance_id
-       LEFT JOIN requisition orq ON orq.requisition_id = o.requisition_id
-       LEFT JOIN workflow_instance orwi ON orwi.workflow_instance_id = orq.workflow_instance_id
+       JOIN expense_request o ON o.expense_request_id <> er.expense_request_id
+            AND o.submitted_at BETWEEN COALESCE(er.submitted_at, now()) - interval '${DUPLICATE_WINDOW}'
+                                   AND COALESCE(er.submitted_at, now()) + interval '${DUPLICATE_WINDOW}'
+       ${DUPLICATE_JOINS}
       WHERE er.expense_request_id = $1 AND er.status <> 'draft'
+        AND ${DUPLICATE_MATCH("er.employee_id", "er.account_number", "er.amount")}
       ORDER BY o.submitted_at DESC, o.expense_request_id
       LIMIT ${DUPLICATES_SHOWN} -- pagination:batch the few possible duplicates a request's modal warns of`,
     [id],
@@ -502,9 +519,10 @@ async function setSending(client, id, s) {
   await client.query(
     `UPDATE expense_request
         SET payee_name = $2, bank_name = $3, account_name = $4, account_number = $5,
-            budget_line_id = $6, over_budget = $7, workflow_instance_id = $8, updated_at = now()
+            budget_line_id = $6, over_budget = $7, workflow_instance_id = $8,
+            duplicate_confirmed_at = CASE WHEN $9::boolean THEN now() END, updated_at = now()
       WHERE expense_request_id = $1`,
-    [id, s.payee_name, s.bank_name, s.account_name, s.account_number, s.budget_line_id, s.over_budget, s.workflow_instance_id],
+    [id, s.payee_name, s.bank_name, s.account_name, s.account_number, s.budget_line_id, s.over_budget, s.workflow_instance_id, s.duplicate_confirmed === true],
   );
 }
 
@@ -643,24 +661,23 @@ function banks(db, query, common) {
 }
 
 /**
- * Requests sent within 30 days of now to a payee (the same account number, or the same name with case
- * and accents set aside) for an amount: what an invoice attached on Praxis AI might repeat
- * (praxis-ai.md §6.18; guide §6.8). The service names only those the reader may open.
+ * Requests sent within 30 days before now that a request about to be sent may repeat
+ * (DUPLICATE_MATCH): by `employee_id`, or to `account_number`, for `amount`, never the request
+ * itself (`expense_request_id`, when it is saved). Send Request asks before it sends one, and an
+ * invoice attached on Praxis AI names one (praxis-ai.md §6.18; guide §6.8). The service names
+ * only those the reader may open.
  */
-async function duplicatesFor(db, { account_number: accountNumber, payee_name: payeeName, amount }) {
+async function duplicatesFor(db, { expense_request_id: id, employee_id: employeeId, account_number: accountNumber, amount }) {
   const { rows } = await db.query(
-    `SELECT o.expense_request_id, o.number, o.purpose, o.amount, ${OTHER_STATUS} AS status, o.submitted_at,
-            o.employee_id, o.workflow_instance_id, owi.state AS approval_state
+    `SELECT ${DUPLICATE_COLS}
        FROM expense_request o
-       LEFT JOIN workflow_instance owi ON owi.workflow_instance_id = o.workflow_instance_id
-       LEFT JOIN requisition orq ON orq.requisition_id = o.requisition_id
-       LEFT JOIN workflow_instance orwi ON orwi.workflow_instance_id = orq.workflow_instance_id
-      WHERE o.amount = $3::numeric AND o.submitted_at >= now() - interval '30 days'
-        AND (($1::text IS NOT NULL AND o.account_number = $1::text)
-             OR ($2::text IS NOT NULL AND o.payee_name IS NOT NULL AND search_fold(o.payee_name) = search_fold($2::text)))
+       ${DUPLICATE_JOINS}
+      WHERE o.expense_request_id IS DISTINCT FROM $1::uuid
+        AND o.submitted_at >= now() - interval '${DUPLICATE_WINDOW}'
+        AND ${DUPLICATE_MATCH("$2::uuid", "$3::text", "$4::numeric")}
       ORDER BY o.submitted_at DESC, o.expense_request_id
-      LIMIT ${DUPLICATES_SHOWN} -- pagination:batch the few possible duplicates an attached invoice warns of`,
-    [accountNumber || null, payeeName || null, amount],
+      LIMIT ${DUPLICATES_SHOWN} -- pagination:batch the few possible duplicates a request about to be sent warns of`,
+    [id || null, employeeId || null, accountNumber || null, amount],
   );
   return rows;
 }

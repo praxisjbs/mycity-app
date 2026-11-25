@@ -126,6 +126,16 @@ function stats(db) {
   );
 }
 
+/** The chosen departments that are not current: retired (inactive), or no department at all. */
+async function departmentsNotActive(db, ids) {
+  const { rows } = await db.query(
+    `SELECT x AS department_id FROM unnest($1::uuid[]) AS x
+      WHERE NOT EXISTS (SELECT 1 FROM department d WHERE d.department_id = x AND d.active)`,
+    [ids],
+  );
+  return rows.map((r) => r.department_id);
+}
+
 async function audienceUsers(db, audience) {
   const all = !audience || audience.kind !== "departments";
   const { rows } = await db.query(
@@ -303,6 +313,7 @@ module.exports = {
   insert,
   markPublished,
   audienceUsers,
+  departmentsNotActive,
   addAudience,
   readers,
   unreadUsers,

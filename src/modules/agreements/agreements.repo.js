@@ -39,6 +39,13 @@ const DETAIL = `${ROW}, a.partner_id, a.lead_id, a.owner_id, a.proposal_id, a.te
 
 const SORTS = { starts_on: "a.starts_on", ends_on: "a.ends_on", created_at: "a.created_at", number: "a.number" };
 
+/**
+ * Waiting on an approver at any stage (Review is the first, Approval a later one, §6.8): the In Approval
+ * card's count and the list's In Approval chip, so the two always agree (QA F07c).
+ */
+const IN_APPROVAL = `a.status IN ('review', 'approval') AND a.workflow_instance_id IS NOT NULL
+        AND EXISTS (SELECT 1 FROM workflow_instance wi WHERE wi.workflow_instance_id = a.workflow_instance_id AND wi.state = 'pending')`;
+
 /** The filters the list takes, as SQL; appends params. */
 function filters(query, params) {
   const out = [];
@@ -46,7 +53,8 @@ function filters(query, params) {
     params.push(v);
     return params.length;
   };
-  if (query.status) out.push(`a.status = $${add(query.status)}`);
+  if (query.status === "in_approval") out.push(IN_APPROVAL);
+  else if (query.status) out.push(`a.status = $${add(query.status)}`);
   if (query.kind) out.push(`a.kind = $${add(query.kind)}`);
   if (query.partner_id) out.push(`a.partner_id = $${add(query.partner_id)}`);
   if (query.lead_id) out.push(`a.lead_id = $${add(query.lead_id)}`);
@@ -113,8 +121,7 @@ async function summary(db, scope) {
   return one(
     db,
     `SELECT count(*) FILTER (WHERE a.status IN ('active', 'expiring'))::int AS active,
-            count(*) FILTER (WHERE a.status IN ('review', 'approval') AND a.workflow_instance_id IS NOT NULL
-                              AND EXISTS (SELECT 1 FROM workflow_instance wi WHERE wi.workflow_instance_id = a.workflow_instance_id AND wi.state = 'pending'))::int AS in_approval,
+            count(*) FILTER (WHERE ${IN_APPROVAL})::int AS in_approval,
             count(*) FILTER (WHERE a.status IN ('sent', 'viewed'))::int AS awaiting_signature,
             count(*) FILTER (WHERE a.status IN ('signed', 'active', 'expiring') AND a.ends_on IS NOT NULL
                               AND a.ends_on - a.renewal_notice_days <= ${TODAY} + 180 AND a.ends_on >= ${TODAY})::int AS renewals_180

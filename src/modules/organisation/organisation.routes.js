@@ -28,6 +28,10 @@ route(router, "get", "/employees/summary",
   { response: c.organisation.EmployeesSummary, summary: "Counts above the register" },
   view, controller.summary);
 
+route(router, "get", "/employees/minimum-wage",
+  { response: c.organisation.MinimumWage, summary: "The minimum wage in force today, for the Gross Monthly warning" },
+  view, controller.minimumWage);
+
 route(router, "post", "/employees",
   { body: c.organisation.EmployeeAdd, response: c.organisation.Employee360, summary: "Add an employee" },
   create, controller.create);

@@ -276,7 +276,12 @@ route("GET /api/v1/partnerships/agreements", (req) =>
     {
       search: (r) => [r.number, r.title, r.record.name],
       filters: {
-        status: (r, v) => r.status === v,
+        // In Approval: waiting on an approver at any stage, as the card counts them (QA F07c).
+        status: (r, v) => {
+          if (v !== "in_approval") return r.status === v;
+          const a = AGREEMENTS.find((x) => x.id === r.partnership_agreement_id);
+          return Boolean(a && (a.status === "review" || a.status === "approval") && a.approval?.state === "waiting");
+        },
         kind: (r, v) => r.kind === v,
         partner_id: (r, v) => r.record.type === "partner" && r.record.id === v,
         lead_id: (r, v) => r.record.type === "lead" && r.record.id === v,

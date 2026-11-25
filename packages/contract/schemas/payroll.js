@@ -67,6 +67,8 @@ const ProblemCode = z.enum([
   // rule 10): it moves to their next paid month when the run is approved. One code for each kind of deduction.
   "ADVANCE_NOT_TAKEN",
   "FINE_NOT_TAKEN",
+  // A person whose monthly gross is below the Minimum Wage in force on the month's last day (§6.15): a warning, never a block.
+  "BELOW_MINIMUM_WAGE",
 ]);
 
 /** A reason a person types: 10 to 500 characters. */
@@ -112,6 +114,11 @@ const PayrollRun = z
     chain: z.array(RouteStage),
     blocking_problems: z.number().int().min(0),
     warnings: z.number().int().min(0),
+    /**
+     * A Computed run whose figures are out of date: a record it reads (a person paid in its month, their pay
+     * items, unpaid leave or suspension, a deduction or its instalment) changed after Compute (§6.9, QA F02e).
+     */
+    changed_since_compute: z.boolean(),
     can_compute: z.boolean(),
     can_submit: z.boolean(),
     can_decide: z.boolean(),
@@ -353,6 +360,7 @@ const RUN_VIRTUAL = {
   chain: "the approval's route, from workflow_instance; empty on a list row",
   blocking_problems: "how many blocking problems it reports, worked out from its payslips",
   warnings: "how many warnings it reports, worked out from its payslips",
+  changed_since_compute: "Computed, and a record it reads changed after computed_at (employee, attendance_pay_item, leave_request, sanction, payroll_deduction, payroll_deduction_instalment)",
   can_compute: "Draft or Computed, and the reader may edit payroll",
   can_submit: "Computed, and the reader may edit payroll",
   can_decide: "Submitted, and the reader is the approver its approval waits on",

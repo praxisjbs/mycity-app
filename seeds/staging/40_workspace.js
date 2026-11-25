@@ -25,6 +25,12 @@
  * 10_staff.js and before 60_home.js, so Home's sweep sees these records. Idempotent: each part
  * is left alone once it has records of its own (a numbered task, an event). A part that fails is
  * logged and the rest carry on, so a demonstration gap never stops a deploy.
+ *
+ * Every deploy runs it, so the board never ages (QA BG-026): the open demo tasks are moved back to
+ * their days counted from the deploy's day, each overdue one keeps its late reason, a priority still
+ * at the default takes the plan's, and an earlier week's copy of the weekly report left open is done.
+ * Through the tasks service as the person who set each task; on the day the tasks were made, or a
+ * second run the same day, nothing changes.
  */
 const path = require("node:path");
 const c = require("@mycity/contract");
@@ -111,31 +117,41 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
 
   /* ---------------- My Workspace ---------------- */
 
+  const ops = staff.operations;
+  const mgmt = staff.management;
+  const headTeam3 = headTeam.slice(0, 3);
+  // Every open task has a day counted from the run's day and a priority of its own, spread over the
+  // four, so the board reads as a working week on every deploy (refreshed below, QA BG-026).
+  // [setter, assignee, task, column, extras]
+  const plan = [
+    [ceo, ops, { title: "Sign off the payroll preview", priority: "high", cadence: "weekly", due_on: day(3) }, "in_review"],
+    // Overdue, so Home's Overdue Tasks and My Overdue Tasks have something to show, each with its reason.
+    [ceo, ops, { title: "Review the partnerships shortlist", priority: "normal", due_on: day(-2) }, "todo", { late: "waiting_on_others", steps: [["Collect the four proposals", true], ["Score them against the brief", false]] }],
+    [ceo, ops, { title: "Close out Q4 departmental targets", due_on: day(1), priority: "high" }, "in_progress", { steps: [["Content", true], ["Partnerships", true], ["Studio", false], ["Finance", false]] }],
+    [ceo, ops, { title: "Approve the October expense requests", priority: "urgent", due_on: day(0) }, "todo"],
+    [ceo, mgmt[0], { title: "Close out departmental targets", priority: "high", due_on: day(-1) }, "todo", { late: "underestimated" }],
+    [ceo, mgmt[1], { title: "Fix clock-in retry on Android", priority: "urgent", due_on: day(3) }, "in_review", { block: ["Waiting on the vendor's new build", day(2)] }],
+    [ceo, mgmt[0], { title: "Plan the Enugu launch week", priority: "normal", due_on: day(6) }, "in_progress"],
+    [head, headTeam[0], { title: "Prepare the social calendar", priority: "low", due_on: day(-3) }, "todo", { late: "deprioritised" }],
+    [head, headTeam[0], { title: "Design the partner pitch deck", priority: "normal", cadence: "weekly", due_on: day(4) }, "in_progress", { steps: [["Draft the story", true], ["Pricing slide", false], ["Case studies", false]] }],
+    [head, headTeam[1], { title: "Update the partner contact log", priority: "low", due_on: day(2) }, "in_progress"],
+    [head, headTeam[2], { title: "Chase the Eko Hotels proposal", priority: "high", due_on: day(1) }, "todo", { block: ["Their legal team is reviewing", day(3)] }],
+    [head, headTeam[1], { title: "Confirm venue list with MTN", priority: "urgent", due_on: day(0) }, "in_review"],
+    [head, headTeam[2], { title: "Send the MOU to Lagos State Tourism", priority: "normal", due_on: day(4) }, "todo", { waitsOn: 11 }],
+    [manager, managerTeam[0], { title: "Update listings for the Enugu launch", priority: "low", cadence: "weekly", due_on: day(5) }, "in_progress"],
+    [manager, managerTeam[1] || managerTeam[0], { title: "Shoot the Yaba studio for the site", priority: "normal", due_on: day(5) }, "todo"],
+    [manager, managerTeam[0], { title: "Edit the Ember to Remember teaser", priority: "high", due_on: day(-4) }, "in_review", { late: "waiting_on_others" }],
+  ];
+  // The other open tasks this seed sets, with their days, refreshed the same way: [setter, assignee, task].
+  const ownTasks = headTeam3.filter((x) => as(x)).slice(0, 2).map((p) => [as(p), p, { title: "Draft my notes for the team meeting", due_on: day(1), priority: "low" }]);
+  const sharedLead = headTeam3.length >= 2 ? headTeam3[0] : staff.head;
+  const sharedTasks = [
+    [head, sharedLead, { title: "Prepare the Q4 partner review", priority: "high", due_on: day(4) }],
+    [ceo, staff.head, { title: "Collect the department's Q4 leave plans", priority: "normal", due_on: day(5) }],
+  ];
+
   await part(log, "tasks", async () => {
     if (await exists(pool, "SELECT 1 FROM task WHERE number IS NOT NULL LIMIT 1")) return log("tasks: already there");
-    const ops = staff.operations;
-    const mgmt = staff.management;
-    const headTeam3 = headTeam.slice(0, 3);
-    // [setter, assignee, task, column, extras]
-    const plan = [
-      [ceo, ops, { title: "Sign off the payroll preview", priority: "high", cadence: "weekly" }, "in_review"],
-      // Overdue, so Home's Overdue Tasks and My Overdue Tasks have something to show.
-      [ceo, ops, { title: "Review the partnerships shortlist", due_on: day(-2) }, "todo", { late: "waiting_on_others", steps: [["Collect the four proposals", true], ["Score them against the brief", false]] }],
-      [ceo, ops, { title: "Close out Q4 departmental targets", due_on: day(1), priority: "high" }, "in_progress", { steps: [["Content", true], ["Partnerships", true], ["Studio", false], ["Finance", false]] }],
-      [ceo, ops, { title: "Approve the October expense requests", due_on: day(0) }, "todo"],
-      [ceo, mgmt[0], { title: "Close out departmental targets", due_on: day(-1) }, "todo", { late: "underestimated" }],
-      [ceo, mgmt[1], { title: "Fix clock-in retry on Android", priority: "urgent", due_on: day(3) }, "in_review", { block: ["Waiting on the vendor's new build", day(2)] }],
-      [ceo, mgmt[0], { title: "Plan the Enugu launch week", due_on: day(6) }, "in_progress"],
-      [head, headTeam[0], { title: "Prepare the social calendar", due_on: day(-3) }, "todo", { late: "deprioritised" }],
-      [head, headTeam[0], { title: "Design the partner pitch deck", cadence: "weekly" }, "in_progress", { steps: [["Draft the story", true], ["Pricing slide", false], ["Case studies", false]] }],
-      [head, headTeam[1], { title: "Update the partner contact log", due_on: day(2) }, "in_progress"],
-      [head, headTeam[2], { title: "Chase the Eko Hotels proposal", priority: "high", due_on: day(1) }, "todo", { block: ["Their legal team is reviewing", day(3)] }],
-      [head, headTeam[1], { title: "Confirm venue list with MTN", priority: "urgent", due_on: day(0) }, "in_review"],
-      [head, headTeam[2], { title: "Send the MOU to Lagos State Tourism", due_on: day(4) }, "todo", { waitsOn: 11 }],
-      [manager, managerTeam[0], { title: "Update listings for the Enugu launch", cadence: "weekly" }, "in_progress"],
-      [manager, managerTeam[1] || managerTeam[0], { title: "Shoot the Yaba studio for the site", due_on: day(5) }, "todo"],
-      [manager, managerTeam[0], { title: "Edit the Ember to Remember teaser", priority: "high", due_on: day(-4) }, "in_review", { late: "waiting_on_others" }],
-    ];
     const made = [];
     for (const [by, to, body, column, extra = {}] of plan) {
       const t = await set(by, to, body);
@@ -160,6 +176,7 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
     // Six weeks of finished work, so Analytics has a history: done through the service, then
     // dated back to the week it was finished (a demonstration's past, which no service writes).
     const doers = [[head, headTeam[0]], [head, headTeam[1]], [head, headTeam[2]], [manager, managerTeam[0]], [ceo, ops], [ceo, mgmt[0]]];
+    const priorities = ["normal", "high", "low", "urgent", "normal", "low"];
     const finished = [
       "Publish the Partnerships Associate vacancy", "Onboard the Abuja hub lead", "Deliver MTN campaign assets",
       "Reconcile September disbursements", "Q3 people report", "Photograph the Ikeja venues", "Write three Enugu blog posts",
@@ -170,7 +187,7 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
     let back = 0;
     for (const [i, title] of finished.entries()) {
       const [by, to] = doers[i % doers.length];
-      const t = await set(by, to, { title, priority: i % 5 === 0 ? "high" : "normal" });
+      const t = await set(by, to, { title, priority: priorities[i % priorities.length] });
       if (!t) continue;
       await moveTo(by, t, "done");
       const daysAgo = 2 + ((i * 7) % 40);
@@ -187,10 +204,7 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
     }
     // A person's own work beside what was set for them (A24).
     let own = 0;
-    for (const p of headTeam3.filter((x) => as(x)).slice(0, 2)) {
-      const me = as(p);
-      if (await set(me, p, { title: "Draft my notes for the team meeting", due_on: day(1), priority: "low" })) own += 1;
-    }
+    for (const [me, p, body] of ownTasks) if (await set(me, p, body)) own += 1;
     log(`tasks: ${made.filter(Boolean).length} set, ${back} finished in the last six weeks, ${own} of people's own`);
   });
 
@@ -202,15 +216,14 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
       // The head shares it with their team's first three, the first of them leading (a lead other than
       // the caller is one of the people named); with only one, the head leads it beside them.
       const picked = headTeam.slice(0, 3);
-      const lead = picked.length >= 2 ? picked[0] : staff.head;
-      if (!picked.length || !lead) return log("shared with people: nobody to share with");
-      const t = await set(head, lead, { title: "Prepare the Q4 partner review", priority: "high", due_on: day(4), member_ids: picked.map((p) => p.employee_id) });
+      if (!picked.length || !sharedLead) return log("shared with people: nobody to share with");
+      const t = await set(head, sharedLead, { ...sharedTasks[0][2], member_ids: picked.map((p) => p.employee_id) });
       if (t) shared += 1;
     });
     await part(log, "shared with a department", async () => {
       // The CEO shares it with the head's department; its lead comes from that department.
       if (!staff.head || !staff.head.department_id) return log("shared with a department: no head of department");
-      const t = await set(ceo, staff.head, { title: "Collect the department's Q4 leave plans", due_on: day(5), department_id: staff.head.department_id });
+      const t = await set(ceo, staff.head, { ...sharedTasks[1][2], department_id: staff.head.department_id });
       if (t) shared += 1;
     });
     log(`shared tasks: ${shared} shared`);
@@ -225,6 +238,49 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
     const friday = lagos.addDays(today, wd <= 5 ? 5 - wd : 12 - wd);
     const t = await set(by, to, { title: "Send the weekly studio report", cadence: "weekly", due_on: friday, recurrence: { freq: "weekly", days: [5] } });
     log(t ? "repeating task: weekly, each Friday" : "repeating task: nobody to set it for");
+  });
+
+  // Every deploy (QA BG-026): the open demo tasks back to their days from the run's day, so staging's
+  // board never drifts into weeks of overdue work. Each through the tasks service as its setter, and
+  // only what differs, so a second run the same day changes nothing.
+  await part(log, "refresh", async () => {
+    let moved = 0;
+    for (const [by, to, body, , extra = {}] of [...plan, ...ownTasks, ...sharedTasks]) {
+      if (!by || !to) continue;
+      const { rows } = await pool.query(
+        `SELECT task_id, due_at, priority, late_reason FROM task
+          WHERE title = $1 AND set_by_employee_id = $2 AND primary_assignee_id = $3
+            AND status NOT IN ('done', 'cancelled') AND archived_at IS NULL AND recurrence IS NULL
+          ORDER BY created_at, task_id LIMIT 1`,
+        [body.title, by.employee_id, to.employee_id],
+      );
+      const t = rows[0];
+      if (!t) continue;
+      const change = {};
+      if (body.due_on && (!t.due_at || lagos.dateOf(new Date(t.due_at)) !== body.due_on)) change.due_on = body.due_on;
+      // A priority still at the default takes the plan's; one a person changed on staging is theirs.
+      if (body.priority && t.priority === "normal" && body.priority !== "normal") change.priority = body.priority;
+      if (extra.late && !t.late_reason) change.late_reason = extra.late;
+      if (!Object.keys(change).length) continue;
+      await tasks.edit(by, await edit(by), t.task_id, c.tasks.TaskEdit.parse(change));
+      moved += 1;
+    }
+    // The weekly report's copies from earlier weeks, left open, were sent: done, by whoever set them.
+    const { rows: past } = await pool.query(
+      `SELECT task_id, set_by_employee_id FROM task
+        WHERE title = 'Send the weekly studio report' AND recurrence IS NOT NULL
+          AND status NOT IN ('done', 'cancelled') AND archived_at IS NULL AND due_at < $1
+        ORDER BY due_at, task_id`,
+      [lagos.instant(today, "00:00")],
+    );
+    let closed = 0;
+    for (const r of past) {
+      const by = logins.get(r.set_by_employee_id);
+      if (!by) continue;
+      await tasks.move(by, await edit(by), r.task_id, c.tasks.TaskMove.parse({ status: "done", before_task_id: null, late_reason: "deprioritised" }));
+      closed += 1;
+    }
+    log(`refresh: ${moved} open tasks moved to this week's days, ${closed} earlier reports done`);
   });
 
   // Reminders on an open task (workspace.md §6): the panel's Reminders. Set by whoever set the task,

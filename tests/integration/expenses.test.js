@@ -55,8 +55,12 @@ describeDb("expenses against the real migrations", () => {
     account_number: "0123456789",
     ...over,
   });
+  /**
+   * A request raised, sent at once unless `submit` is false. These tests send the same request many
+   * times over, so each presses Send Anyway (guide §6.8 rule 2); the refusal itself is tested last.
+   */
   const raise = async (who, over = {}, submit = true) => {
-    const res = await h.as(who).post("/expenses/mine").send(body({ ...over, submit }));
+    const res = await h.as(who).post("/expenses/mine").send(body({ ...(submit ? { confirm_duplicate: true } : {}), ...over, submit }));
     expect([res.status, res.body.error]).toEqual([201, undefined]);
     return res.body;
   };
@@ -266,7 +270,7 @@ describeDb("expenses against the real migrations", () => {
 
     const fixed = await h.as("other").patch(`/expenses/mine/${r.expense_request_id}`).send(body({ purpose: "Ikeja activation water, invoice coming" }));
     expect(fixed.body.status).toBe("sent_back");
-    const again = await h.as("other").post(`/expenses/mine/${r.expense_request_id}/submit`).send({});
+    const again = await h.as("other").post(`/expenses/mine/${r.expense_request_id}/submit`).send({ confirm_duplicate: true });
     expect(again.status).toBe(200);
     expect(again.body).toMatchObject({ status: "submitted", waiting_on: "Line Manager" });
     expect(again.body.workflow_instance_id).not.toBe(r.workflow_instance_id);
@@ -451,7 +455,7 @@ describeDb("expenses against the real migrations", () => {
     expect((await h.as("outsider").get(`/expenses/${r.expense_request_id}/history`)).status).toBe(404);
   });
   test("Possible Duplicates names only the requests the reader may open; the rest are a count, and the AI gets the named ones (audit F8)", async () => {
-    const vendor = { payee_name: "Lekki Tents", account_name: "Lekki Tents Ltd", account_number: "0999999999", lines: [{ description: "Tent", unit_price: "77000.00" }] };
+    const vendor = { payee_name: "Lekki Tents", account_name: "Lekki Tents Ltd", account_number: "0999999990", lines: [{ description: "Tent", unit_price: "77000.00" }] };
     const theirs = await raise("outsider", { ...vendor, purpose: "Finance tent" });
     const ours = await raise("staff", { ...vendor, purpose: "Programmes tent" });
     const mine = (await h.as("staff").get(`/expenses/${ours.expense_request_id}`)).body;
@@ -484,5 +488,57 @@ describeDb("expenses against the real migrations", () => {
     );
     expect(approvedByHead.body.page.total).toBe(decided.n);
     expect((await h.as("other").get(`/expenses?approved_by_me_from=${month}`)).body.data).toEqual([]);
+  });
+  test("Send Request is refused 409 naming a possible duplicate until Send Anyway; the confirmation is kept for the approvers (QA audit BG-020)", async () => {
+    const count = async () => (await one("SELECT count(*)::int AS n FROM expense_request WHERE employee_id = $1", [h.people.other.employee_id])).n;
+    const tents = { purpose: "Yaba walk tents", payee_name: "Ojota Tents", account_name: "Ojota Tents", account_number: "2034567811", lines: [{ description: "Tent", unit_price: "31250.00" }] };
+    const first = await raise("other", { ...tents, confirm_duplicate: false });
+    expect(first).toMatchObject({ status: "submitted", duplicate_confirmed_at: null, possible_duplicates: [], possible_duplicates_hidden: 0 });
+
+    // The same requester, the same amount, another payee: refused at New Request's Send Request, nothing saved.
+    const before = await count();
+    const other = { ...tents, purpose: "Yaba walk canopies", payee_name: "Canopy Hire", account_name: "Canopy Hire", account_number: "2034567822" };
+    const refused = await h.as("other").post("/expenses/mine").send(body({ ...other, submit: true }));
+    expect([refused.status, refused.body.error]).toEqual([409, { code: "EXPENSE_POSSIBLE_DUPLICATE", message: `Possible duplicate of ${first.number}`, fields: { confirm_duplicate: [first.number] } }]);
+    expect(await count()).toBe(before);
+
+    // Saved as a draft, its Send Request is refused the same way until Send Anyway.
+    const draft = await raise("other", other, false);
+    const again = await h.as("other").post(`/expenses/mine/${draft.expense_request_id}/submit`).send({});
+    expect([again.status, again.body.error.code, again.body.error.fields]).toEqual([409, "EXPENSE_POSSIBLE_DUPLICATE", { confirm_duplicate: [first.number] }]);
+    expect(await status(draft.expense_request_id)).toBe("draft");
+    const sent = await h.as("other").post(`/expenses/mine/${draft.expense_request_id}/submit`).send({ confirm_duplicate: true });
+    expect([sent.status, sent.body.status]).toEqual([200, "submitted"]);
+    expect(sent.body.duplicate_confirmed_at).toEqual(expect.any(String));
+    // The line manager deciding it reads that it was sent anyway, and which request it may repeat.
+    const seen = (await h.as("manager").get(`/expenses/${draft.expense_request_id}`)).body;
+    expect(seen.duplicate_confirmed_at).toEqual(sent.body.duplicate_confirmed_at);
+    expect(seen.possible_duplicates.map((d) => d.number)).toEqual([first.number]);
+    const event = await one("SELECT payload FROM event_log WHERE event_key = 'expense_request.submitted' AND entity_id = $1", [draft.expense_request_id]);
+    expect(event.payload.sent_despite_duplicate).toBe(true);
+
+    // Another requester paying the same account the same amount: named only as a request they cannot open.
+    const theirs = await h.as("outsider").post("/expenses/mine").send(body({ ...tents, purpose: "Finance tents", submit: true }));
+    expect([theirs.status, theirs.body.error.fields]).toEqual([409, { confirm_duplicate: ["1 request you cannot open"] }]);
+
+    // A cancelled request is no duplicate: once both are cancelled, the same request goes at once.
+    for (const id of [first.expense_request_id, draft.expense_request_id])
+      expect((await h.as("other").post(`/expenses/mine/${id}/cancel`).send({})).body.status).toBe("cancelled");
+    const fresh = await raise("other", { ...tents, confirm_duplicate: false });
+    expect(fresh).toMatchObject({ status: "submitted", duplicate_confirmed_at: null });
+    // Another amount is another request.
+    expect((await raise("other", { ...tents, lines: [{ description: "Tent", unit_price: "31250.50" }], confirm_duplicate: false })).status).toBe("submitted");
+  });
+
+  test("an account number of one digit repeated is refused; Name Differs when the account name does not hold the payee's (QA audit BG-018)", async () => {
+    const fake = await h.as("staff").post("/expenses/mine").send(body({ account_number: "0000000000" }));
+    expect([fake.status, fake.body.error.fields]).toEqual([422, { account_number: ["Not a real number"] }]);
+    // A trading name paid to its registered company, case and accents set aside, is not flagged.
+    const same = await raise("staff", { purpose: "Café tea", payee_name: "Café Ade", account_name: "CAFE ADE ENTERPRISES", account_number: "3045678901", lines: [{ description: "Tea", unit_price: "6150.00" }] });
+    expect(same.account_name_differs).toBe(false);
+    const differs = await raise("staff", { purpose: "Ushers", payee_name: "Lekki Ushers", account_name: "Bayo Adeyemi", account_number: "3045678912", lines: [{ description: "Ushers", unit_price: "6275.00" }] });
+    expect(differs.account_name_differs).toBe(true);
+    // The approver sees it too, even with the bank details masked for their role.
+    expect((await h.as("manager").get(`/expenses/${differs.expense_request_id}`)).body.account_name_differs).toBe(true);
   });
 });

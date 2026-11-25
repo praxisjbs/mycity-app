@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Toaster } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { APPLICATIONS } from "@/api/mock/data/recruitment";
 import { choose, copyProblems, dialog, moreActions, openAs, openRow, press, type } from "./testKit";
@@ -91,6 +92,41 @@ describe("Recruitment · Candidates", () => {
     expect(copyProblems()).toEqual([]);
     const sheet = await openRow("Chinedu Okafor");
     expect(await moreActions(sheet)).toContain("Not Progressing");
+  }, 60000);
+
+  it("Score With AI says the CV is being read, and the sheet asks again until the read lands", async () => {
+    render(<Toaster />);
+    await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
+    const sheet = await openRow("Zainab Ibrahim");
+    expect(within(sheet).getByText("Form only")).toBeTruthy();
+    await choose(sheet, "Score With AI");
+    expect(await screen.findByText("Reading the CV")).toBeTruthy();
+    expect(screen.queryByText("CV read")).toBeNull();
+    // The request only queues the read: the sheet says so until a later read of it brings the score.
+    expect(within(dialog()).getByText("Being read")).toBeTruthy();
+    await waitFor(() => expect(within(dialog()).queryByText("Being read")).toBeNull(), { timeout: 10000 });
+    expect(app("Zainab").screening).not.toBeNull();
+    expect(within(dialog()).getByText(/Read the CV against the role's must haves/)).toBeTruthy();
+    expect(await moreActions(dialog())).not.toContain("Score With AI");
+  }, 60000);
+
+  it("Schedule Interview warns, never refuses, when the candidate already has an open offer", async () => {
+    const kunle = app("Kunle");
+    try {
+      kunle.stage = "offer";
+      await openAs("cynthia@mycityapp.io", `/recruitment?tab=candidates&id=${kunle.application_id}`);
+      await choose(await screen.findByRole("dialog"), "Schedule Interview");
+      const form = dialog();
+      expect(within(form).getByText("This candidate has an open offer.")).toBeTruthy();
+      expect(within(form).getByRole("button", { name: "Schedule Interview" })).toBeTruthy();
+    } finally {
+      kunle.stage = "shortlist";
+    }
+    cleanup();
+    // A candidate before Offer is not warned.
+    await openAs("cynthia@mycityapp.io", `/recruitment?tab=candidates&id=${kunle.application_id}`);
+    await choose(await screen.findByRole("dialog"), "Schedule Interview");
+    expect(within(dialog()).queryByText("This candidate has an open offer.")).toBeNull();
   }, 60000);
 
   it("Move To on the board offers only the moves the server allows: ahead, or one back", async () => {

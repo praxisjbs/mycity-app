@@ -30,7 +30,7 @@ module.exports = {
 
   update: async (req, res) => ok(res, await service.update(withActor(req), id(req), body(req))),
 
-  submit: async (req, res) => ok(res, await service.submit(withActor(req), id(req))),
+  submit: async (req, res) => ok(res, await service.submit(withActor(req), id(req), body(req))),
 
   cancel: async (req, res) => ok(res, await service.cancelOwn(withActor(req), id(req), body(req))),
 

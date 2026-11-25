@@ -299,7 +299,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "GE",
-   "mycity": "Confirmed: an announcement can be sent to a department that has nobody in it, and nothing says so. We will refuse it with a short message on the Departments field."
+   "mycity": "Fixed 25/11/2026 (#175): An announcement whose audience reaches nobody is now refused on Departments. Confirmed: an announcement can be sent to a department that has nobody in it, and nothing says so. We will refuse it with a short message on the Departments field.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-017",
@@ -315,7 +318,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "GE",
-   "mycity": "Confirmed: the audience list still shows the old Technology department, which was merged away. We will show only current departments."
+   "mycity": "Fixed 25/11/2026 (#175): Only active departments are now offered as announcement audiences. Confirmed: the audience list still shows the old Technology department, which was merged away. We will show only current departments.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-018",
@@ -331,7 +337,10 @@
    "milestone": "M8",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Bank details are typed as agreed, with a ten-digit check only. We will add a warning to approvers when the account name does not match the payee and refuse obviously fake numbers; checking names with the bank itself would need a payment-provider integration outside the contract."
+   "mycity": "Fixed 25/11/2026 (#175): An account number of one digit repeated is refused, and approvers see Name Differs when the account name does not hold the payee's name. Bank details are typed as agreed, with a ten-digit check only. We will add a warning to approvers when the account name does not match the payee and refuse obviously fake numbers; checking names with the bank itself would need a payment-provider integration outside the contract.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-019",
@@ -347,7 +356,10 @@
    "milestone": "M8",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Disbursements was showing as a locked tab to managers who cannot use it. We will hide it for anyone who does not record payments."
+   "mycity": "Fixed 25/11/2026 (#175): Expenses · Disbursements is now shown only to those who can record payments. Disbursements was showing as a locked tab to managers who cannot use it. We will hide it for anyone who does not record payments.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-020",
@@ -363,7 +375,10 @@
    "milestone": "M8",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Duplicates are flagged to approvers today. We will also warn the requester before they send one; checking invoice numbers would need a new field, which we can discuss."
+   "mycity": "Fixed 25/11/2026 (#175): A likely duplicate (same requester or account, same amount, within 30 days) is now refused until the requester presses Send Anyway, and approvers see it was sent despite a possible duplicate. Duplicates are flagged to approvers today. We will also warn the requester before they send one; checking invoice numbers would need a new field, which we can discuss.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-021",
@@ -474,7 +489,10 @@
    "milestone": "M2",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "The 78 overdue tasks are largely our demonstration data ageing on staging, plus tasks created while testing. Production starts empty; we will refresh the staging demo so it stays realistic."
+   "mycity": "Fixed 25/11/2026 (#175): Staging demo tasks now keep their dates from each deploy, with late reasons and spread priorities. The 78 overdue tasks are largely our demonstration data ageing on staging, plus tasks created while testing. Production starts empty; we will refresh the staging demo so it stays realistic.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-027",
@@ -490,7 +508,10 @@
    "milestone": "M2",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Nothing stopped a second project with the same name. We will warn when a name is already used by an active project."
+   "mycity": "Fixed 25/11/2026 (#175): New Project now warns when an active project already has the name. Nothing stopped a second project with the same name. We will warn when a name is already used by an active project.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-028",
@@ -506,7 +527,10 @@
    "milestone": "M2",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "An employee can be given work before their account is set up. We will mark people who cannot sign in yet in the picker; before go-live, make sure every member of staff has been invited from People."
+   "mycity": "Fixed 25/11/2026 (#175): Assign To and Lead now show No Login Yet beside someone who cannot sign in yet. An employee can be given work before their account is set up. We will mark people who cannot sign in yet in the picker; before go-live, make sure every member of staff has been invited from People.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-029",
@@ -522,7 +546,10 @@
    "milestone": "M2",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Projects of someone who leaves can still be managed by Management or Operations & People, but cannot be handed to a new owner. We will add a way to change the owner."
+   "mycity": "Fixed 25/11/2026 (#175): Edit Project now has Owner, so a leaver's project can be handed on; a leaver owner reads Left. Projects of someone who leaves can still be managed by Management or Operations & People, but cannot be handed to a new owner. We will add a way to change the owner.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-030",
@@ -557,7 +584,10 @@
    "milestone": "M5",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "The system does not stop a start date that falls before the reply deadline. We suggest a warning at Send; tell us if you would rather it be refused."
+   "mycity": "Fixed 25/11/2026 (#175): New Offer and Send Offer now warn when the start date falls before the offer expires. The system does not stop a start date that falls before the reply deadline. We suggest a warning at Send; tell us if you would rather it be refused.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-032",
@@ -573,7 +603,10 @@
    "milestone": "M5",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "We will reword the result so it says no signed document matches and that a document can be checked once everyone has signed, instead of a bare Not Found."
+   "mycity": "Fixed 25/11/2026 (#175): Verify now says no signed document has the reference, and that a document is checkable once signed. We will reword the result so it says no signed document matches and that a document can be checked once everyone has signed, instead of a bare Not Found.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-033",
@@ -589,7 +622,10 @@
    "milestone": "M7",
    "effort": "S",
    "owner": "LA",
-   "mycity": "We will let the Owner filter show people who have left but still own records, so their book is easy to find and hand over."
+   "mycity": "Fixed 25/11/2026 (#175): Former staff who still own partnership records now appear in the Owner filter, tagged Left. We will let the Owner filter show people who have left but still own records, so their book is easy to find and hand over.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-034",
@@ -605,7 +641,10 @@
    "milestone": "M7",
    "effort": "S",
    "owner": "LA",
-   "mycity": "A partner added with New Partner and its signed copy does not yet show an agreement in Contracts & MOUs. We will record it there, as we now do for deals signed on the pipeline."
+   "mycity": "Fixed 25/11/2026 (#175): New Partner's signed copy is now recorded as the partner's agreement. A partner added with New Partner and its signed copy does not yet show an agreement in Contracts & MOUs. We will record it there, as we now do for deals signed on the pipeline.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-035",
@@ -621,7 +660,10 @@
    "milestone": "M7",
    "effort": "S",
    "owner": "LA",
-   "mycity": "\"In Review\" agreements are counted under the In Approval card because both are waiting for an approver. We will make the names match."
+   "mycity": "Fixed 25/11/2026 (#175): In Review now reads In Approval, and the In Approval chip lists what its card counts. \"In Review\" agreements are counted under the In Approval card because both are waiting for an approver. We will make the names match.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-036",
@@ -637,7 +679,10 @@
    "milestone": "M7",
    "effort": "S",
    "owner": "LA",
-   "mycity": "One small case remains: a custom money field you add to a category refuses an amount typed with commas. We will fix it."
+   "mycity": "Fixed 25/11/2026 (#175): Custom money fields now accept amounts typed with commas. One small case remains: a custom money field you add to a category refuses an amount typed with commas. We will fix it.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-037",
@@ -653,7 +698,10 @@
    "milestone": "M7",
    "effort": "S",
    "owner": "LA",
-   "mycity": "Once signed, a deal's value can still be emptied through Edit Deal. We will close that gap so a signed deal always keeps its value or its No Money Value mark."
+   "mycity": "Fixed 25/11/2026 (#175): A signed deal's value can no longer be cleared. Once signed, a deal's value can still be emptied through Edit Deal. We will close that gap so a signed deal always keeps its value or its No Money Value mark.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-038",
@@ -669,7 +717,10 @@
    "milestone": "M7",
    "effort": "S",
    "owner": "LA",
-   "mycity": "Commission on a month's returns is typed in. We can pre-fill it from the deal's rate (for example 8% for Events) as a suggestion you can change."
+   "mycity": "Fixed 25/11/2026 (#175): Enter Returns now suggests MyCity Commission from the deal's or category's rate. Commission on a month's returns is typed in. We can pre-fill it from the deal's rate (for example 8% for Events) as a suggestion you can change.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-039",
@@ -685,7 +736,10 @@
    "milestone": "M6",
    "effort": "S",
    "owner": "LA",
-   "mycity": "A new joiner is always included when the run is sent for approval, because the system recalculates then. We will add a notice so the screen also says the figures are out of date."
+   "mycity": "Fixed 25/11/2026 (#175): A computed run now says Records changed since Compute when a joiner or a record it reads changed. A new joiner is always included when the run is sent for approval, because the system recalculates then. We will add a notice so the screen also says the figures are out of date.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-040",
@@ -701,7 +755,10 @@
    "milestone": "M6",
    "effort": "S",
    "owner": "LA",
-   "mycity": "The server already refuses the save correctly; we will hide Record Advance from anyone who is not allowed to record one, so nobody fills in the form for nothing."
+   "mycity": "Fixed 25/11/2026 (#175): Record Advance and the deduction buttons now follow the payroll grants. The server already refuses the save correctly; we will hide Record Advance from anyone who is not allowed to record one, so nobody fills in the form for nothing.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-041",
@@ -755,7 +812,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "The form only checks that a birth date is before the start date. We can add a minimum age; please confirm the age MyCity wants and its basis."
+   "mycity": "Fixed 25/11/2026 (#175): A start before the 18th birthday is now refused, as the Child's Rights Act 2003 s.28 and Lagos Child's Right Law s.25 require. The form only checks that a birth date is before the start date. We can add a minimum age; please confirm the age MyCity wants and its basis.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-044",
@@ -771,7 +831,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "Nothing checks pay against the minimum wage yet, and the minimum wage figure is not entered. Once it is, we can warn when a salary is below it."
+   "mycity": "Fixed 25/11/2026 (#175): Pay below the Minimum Wage in force is now warned of on the record and in the payroll run. Nothing checks pay against the minimum wage yet, and the minimum wage figure is not entered. Once it is, we can warn when a salary is below it.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-045",
@@ -787,7 +850,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "These fields accept any letters and digits today. We can add format checks once the official formats are confirmed from the issuing bodies."
+   "mycity": "Fixed 25/11/2026 (#175): The pension PIN must now be PEN followed by digits (PenCom's format); the Tax ID has no legal format, so it keeps its rule. These fields accept any letters and digits today. We can add format checks once the official formats are confirmed from the issuing bodies.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-046",
@@ -917,7 +983,10 @@
    "milestone": "M3",
    "effort": "S",
    "owner": "GE",
-   "mycity": "Showing the rule that raised a query is intended, but the label should make clear it is a rule and not a person. We will prefix it with \"Rule:\"."
+   "mycity": "Fixed 25/11/2026 (#175): Raised By now names a rule as Rule: Unregistered Device. Showing the rule that raised a query is intended, but the label should make clear it is a rule and not a person. We will prefix it with \"Rule:\".",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-053",
@@ -933,7 +1002,10 @@
    "milestone": "M4",
    "effort": "S",
    "owner": "GE",
-   "mycity": "This is demonstration data we loaded on staging, not something the product does: the sample roles named departments that do not exist in your structure and fell back to our team's. New vacancies must have a department. We will correct the sample roles; nothing of this reaches production."
+   "mycity": "Fixed 25/11/2026 (#175): Staging vacancies now sit under MyCity's own departments. This is demonstration data we loaded on staging, not something the product does: the sample roles named departments that do not exist in your structure and fell back to our team's. New vacancies must have a department. We will correct the sample roles; nothing of this reaches production.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-054",
@@ -949,7 +1021,10 @@
    "milestone": "M4",
    "effort": "S",
    "owner": "GE",
-   "mycity": "A further interview can be booked for a candidate who already has an offer, which can be legitimate (a final meeting). We suggest a warning so it is a conscious choice."
+   "mycity": "Fixed 25/11/2026 (#175): Schedule Interview now warns when the candidate has an open offer. A further interview can be booked for a candidate who already has an offer, which can be legitimate (a final meeting). We suggest a warning so it is a conscious choice.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-055",
@@ -965,7 +1040,10 @@
    "milestone": "M4",
    "effort": "S",
    "owner": "GE",
-   "mycity": "Score With AI does work, but in the background: the screen said \"CV read\" before the reading had finished and did not refresh when the score arrived, which made it look as if nothing happened. We will change the message and refresh the score when it lands."
+   "mycity": "Fixed 25/11/2026 (#175): Score With AI now says Reading the CV, and the sheet updates when the read lands. Score With AI does work, but in the background: the screen said \"CV read\" before the reading had finished and did not refresh when the score arrived, which made it look as if nothing happened. We will change the message and refresh the score when it lands.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-056",
@@ -981,7 +1059,10 @@
    "milestone": "M4",
    "effort": "S",
    "owner": "GE",
-   "mycity": "When a role has no extra questions the form still mentioned them. We will make the wording follow the role."
+   "mycity": "Fixed 25/11/2026 (#175): Apply's step 2 is now Your CV for a role with no questions. When a role has no extra questions the form still mentioned them. We will make the wording follow the role.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-057",
@@ -997,7 +1078,10 @@
    "milestone": "M4",
    "effort": "S",
    "owner": "GE",
-   "mycity": "The CV box let people pick old .doc files that are then refused. We will stop offering .doc and say which Word format is accepted."
+   "mycity": "Fixed 25/11/2026 (#175): The CV picker now offers PDF or Word (.docx) only, as the server accepts. The CV box let people pick old .doc files that are then refused. We will stop offering .doc and say which Word format is accepted.",
+   "done": "✓",
+   "pr": "#175",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-058",
@@ -2597,7 +2681,7 @@
   "subtitle": "JBS Praxis response to MyCity's QA audit of staging (16 and 17/11/2026, findings F01 to F83). Every finding was tested or read against the code on main (697f1db) on 24/11/2026.",
   "howto": [
    "Bugs & Gaps is the fix tracker: only verified bugs, gaps, improvements and seed-data fixes. JBS Praxis ticks Fixed ✓ with the PR and date as each fix merges; MyCity records its retest.",
-   "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them. Every High and Medium item was fixed in #173 (24/11/2026), and the Low items in #174 and the PR after it; each fixed row's note for MyCity starts with what changed.",
+   "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them. Every High and Medium item was fixed in #173 (24/11/2026), and every Low item in #174 and #175 (25/11/2026); each fixed row's note for MyCity starts with what changed.",
    "To be Discussed (Change Report) holds requests outside the signed milestones, or that change a decision already agreed. Nothing there is built until a change request is agreed.",
    "MyCity Actions are setup, data and policy tasks the hub already supports and MyCity does itself.",
    "Audit Reconciliation shows every one of the 83 findings, our verdict and the sheet it went to."

@@ -10,7 +10,7 @@
 | Capabilities | `expenses.finance` (group approved requests into requisitions, record disbursements, set budgets, manage categories) |
 | Screens (PROGRESS.md rows) | #56 (in ESS), #57, #58, #59, #60, #61, #106 Projects |
 | Status | Agreed |
-| Last changed | 24/11/2026 |
+| Last changed | 25/11/2026 |
 
 Agreed by AJ on 04/11/2026 from the Modules Review meeting of the same day (TB handed every M8
 decision to AJ). The decisions and the build plan are in `docs/handoff/m8-expenses.md`; where this
@@ -34,7 +34,7 @@ Projects).
 | ESS · My Requests (`my-requests`, #56) | staff app, ESS | every employee, own requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the requests list; a request's detail in a modal | New Request, Save Draft, Send Request, Edit and Send Again a sent-back request, Cancel Request |
 | Expenses · Requisitions (`requisitions`, #58) | staff app | `expenses.finance` holders and the CEO | approved requests not yet in a requisition; the requisitions and their status | tick requests and Create Requisition; open a request and Withdraw it; the CEO opens one, removes a request, approves or rejects it; New Request (their own), for anyone with `expenses` create, even where the list is not open to them |
 | Expenses · Approvals (`approvals`, #57) | staff app | anyone a request's approval waits on (line managers, Operations & People) | requests waiting on the reader, with the invoice and the chain | Approve, Send Back, Reject; New Request (their own) |
-| Expenses · Disbursements (`disbursements`, #59) | staff app | `expenses.finance` holders and the CEO | requests the CEO authorised, waiting to be paid; paid ones with their bank reference | open a waiting request, then Record Disbursement or Withdraw; Add Reference on one saved without it |
+| Expenses · Disbursements (`disbursements`, #59) | staff app | `expenses.finance` holders and the CEO; the tab is hidden from everyone else, Management included (QA audit BG-019) | requests the CEO authorised, waiting to be paid; paid ones with their bank reference | open a waiting request, then Record Disbursement or Withdraw; Add Reference on one saved without it |
 | Expenses · Projects (`projects`, #106) | staff app | `expenses` view, all scope | each project's budget, committed, spent and remaining, and the requests under it | New Request with the project filled; Set Budget (with `expenses.finance`); open a request (Withdraw with `expenses.finance`) |
 | Expenses · Budgets (`budgets`, #60) | staff app | `expenses` view; a head sees their own department | each department's budget for the year by category: allocated, committed, spent, remaining | New Budget, Edit Budget (with `expenses.finance`); Budget History |
 | Expenses · Categories (`categories`, #61) | staff app | `expenses` view | the categories, their type, this month's spend | New Category, Edit Category, Deactivate; Add Suggested Categories while there are none |
@@ -55,6 +55,7 @@ Projects).
    entered. Category is picked in a popover: filtered by type and searched by name, never a long
    list to scroll. Save Draft keeps it; Send Request submits it
    (`expense_request.submitted`) and opens the `expenses.request` approval in the same transaction.
+   A request that may repeat another (§6.8) is refused until the requester presses Send Anyway.
 2. **Line manager.** The approval reaches the requester's line manager, unless the requester
    manages people themselves, then it goes straight to Operations & People (the stage's condition,
    §6.3). The request shows on Expenses · Approvals for them and in the bell. They Approve, Send
@@ -91,7 +92,7 @@ Projects).
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `expense_request` | `number` (EXP-0001), `employee_id`, `department_id`, `expense_category_id`, `project_id`, `budget_line_id`, `purpose`, `amount` (sum of its lines), `currency` (NGN), `status`, `payee_type`, `payee_name`, `bank_name`, `account_name`, `account_number`, `uses_profile_account`, `invoice_document_id`, `requisition_id`, `workflow_instance_id`, `needed_on`, `submitted_at`, `approved_at`, `rejected_at` | 8000, widened by 8010. Bank fields are masked as `employee.bank`. `requisition_id` is the requisition that holds it now |
+| `expense_request` | `number` (EXP-0001), `employee_id`, `department_id`, `expense_category_id`, `project_id`, `budget_line_id`, `purpose`, `amount` (sum of its lines), `currency` (NGN), `status`, `payee_type`, `payee_name`, `bank_name`, `account_name`, `account_number`, `uses_profile_account`, `invoice_document_id`, `requisition_id`, `workflow_instance_id`, `needed_on`, `submitted_at`, `approved_at`, `rejected_at`, `duplicate_confirmed_at` | 8000, widened by 8010 and 8040. Bank fields are masked as `employee.bank`. `requisition_id` is the requisition that holds it now. `duplicate_confirmed_at` is when its requester pressed Send Anyway on a possible duplicate (§6.8 rule 2), null otherwise |
 | `expense_request_line` | `expense_request_id`, `position`, `description`, `quantity`, `unit_price`, `amount` | 8010. `amount` is quantity times unit price, two places, written by the service |
 | `expense_category` | `code`, `name`, `type` (operating, capital), `description`, `active` | 8000, widened by 8010. No approval threshold (decision 1). Entered by MyCity (A26) |
 | `requisition` | `number` (REQ-0001), `requester_id` (who grouped it), `status`, `total_amount`, `workflow_instance_id`, `submitted_at`, `approved_at` | 8000, widened by 8010. `expense_request_id` (one request each) and `supplier_name` are no longer used: a requisition owns many requests through `expense_request.requisition_id` |
@@ -102,7 +103,8 @@ Projects).
 | `requisition_line`, `expense_transaction` | | 8000, not used by M8. Dropped one release after M8 ships, if still unused |
 
 Schema migration file(s): `migrations/8000_expenses.sql` (merged), `migrations/8010_expenses_chain.sql`,
-`migrations/8030_expense_line_discount.sql` (a line's unit price and amount may be negative, §6.1 rule 1; the quantity stays above zero).
+`migrations/8030_expense_line_discount.sql` (a line's unit price and amount may be negative, §6.1 rule 1; the quantity stays above zero),
+`migrations/8040_expense_duplicate_confirmed.sql` (`expense_request.duplicate_confirmed_at`, §6.8 rule 2).
 Reference-data file(s): `seeds/reference/8099_seed_expenses.sql` (merged),
 `seeds/reference/8100_seed_expense_flows.sql` (the two approval flows, the statuses, the
 `expenses.finance` capability, numbering).
@@ -123,13 +125,13 @@ Implementation Team's own accounts.
 | `GET /api/v1/expenses/mine/summary` | → `ExpenseMineSummary` | self | no | the four KPI cards |
 | `GET /api/v1/expenses/banks` | `ExpenseBankListQuery` → `ExpenseBankPage` | `expenses` create | yes, 25 | the Bank field's suggestions: the common banks, then every bank a request names, most used first; `q` narrows (§6.1 rule 7) |
 | `GET /api/v1/expenses/mine/budget-check` | `ExpenseBudgetCheckQuery` → `ExpenseBudgetCheck` | `expenses` create · the caller's own form | no | New Request's Budget Left, Department Left and Over Budget before it is sent (§6.6 rule 3): the category, the department (the caller's own when blank) and the total so far; a read, nothing kept, never a refusal |
-| `POST /api/v1/expenses/mine` | `ExpenseCreate` → `ExpenseRequest` | `expenses` create · own | | `submit: true` sends it at once |
+| `POST /api/v1/expenses/mine` | `ExpenseCreate` → `ExpenseRequest` | `expenses` create · own | | `submit: true` sends it at once; 409 `EXPENSE_POSSIBLE_DUPLICATE` on a possible duplicate, nothing saved, until `confirm_duplicate: true` (§6.8 rule 2) |
 | `PATCH /api/v1/expenses/mine/:id` | `ExpenseUpdate` → `ExpenseRequest` | `expenses` edit · own | | draft or sent back only |
-| `POST /api/v1/expenses/mine/:id/submit` | `EmptyBody` → `ExpenseRequest` | `expenses` create · own | | Send Request, Send Again |
+| `POST /api/v1/expenses/mine/:id/submit` | `ExpenseSubmit` → `ExpenseRequest` | `expenses` create · own | | Send Request, Send Again; 409 `EXPENSE_POSSIBLE_DUPLICATE` naming the earlier requests (`fields.confirm_duplicate`) until `confirm_duplicate: true`, Send Anyway (§6.8 rule 2) |
 | `POST /api/v1/expenses/mine/:id/cancel` | `ExpenseCancel` → `ExpenseRequest` | `expenses` edit · own | | until Operations & People approve |
 | `GET /api/v1/expenses` | `ExpenseListQuery` → `ExpensePage` | `expenses` view · all/team/own | yes, 25 | filters `status`, `category_id`, `project_id`, `department_id`, `payee_type`, `q`; `disbursed_from` (paid on or after a Lagos day) and `approved_by_me_from` (approved by the reader on or after a day), for the KPI cards (audit F21) |
 | `GET /api/v1/expenses/:id/history` | `PageQuery` → `ExpenseHistoryPage` | as `GET /:id` | yes, 25 | the modal's history: the request's own events, its approval's, and its requisition's and disbursement's that name it (audit F3) |
-| `GET /api/v1/expenses/:id` | → `ExpenseRequest` | `expenses` view, or named on its approval | | lines, chain, history, budget check; `possible_duplicates` only those the reader may open, `possible_duplicates_hidden` the rest (§6.8) |
+| `GET /api/v1/expenses/:id` | → `ExpenseRequest` | `expenses` view, or named on its approval | | lines, chain, history, budget check; `possible_duplicates` only those the reader may open, `possible_duplicates_hidden` the rest, `duplicate_confirmed_at` (§6.8); `account_name_differs` (§6.1 rule 8) |
 | `GET /api/v1/expenses/approvals` | `ExpenseListQuery` → `ExpensePage` | `expenses` approve | yes, 25 | waiting on the reader |
 | `POST /api/v1/expenses/mine/invoice-reading` | `ExpenseInvoiceReading` → `ExpenseInvoiceSuggestion` | `expenses` create · own staged file | | Read Invoice (PR 6): payee, the payee's bank, lines (a discount a negative line) and category for the form; nothing kept |
 | `POST /api/v1/expenses/mine/category-suggestion` | `ExpenseCategoryHint` → `ExpenseCategorySuggestion` | `expenses` create | | Suggest Category (PR 6); nothing kept |
@@ -208,6 +210,15 @@ somebody else staged is refused, `invoice_document_id: Upload it again`.
    and kept as typed, so it is suggested to everyone from then on. Only bank names are read for
    the suggestions, never an account, and no request is named. Not a table: a bank is the text a
    request was saved with, as a KPI's unit is.
+8. **The payee's account is checked, not verified** (QA audit BG-018, JBS Praxis 25/11/2026). An
+   account number is ten digits and never one digit repeated (`0000000000`; the contract's
+   `account_number`, "Not a real number"; Read Invoice leaves such a number out). The account name
+   is compared with the payee's name, case, accents, punctuation and spacing set aside: when it
+   does not hold the payee's name as whole words, the request carries `account_name_differs` and
+   its modal shows **Name Differs** to whoever opens it, the approvers before they decide. A trading
+   name paid to its registered company ("Chuks Stores" to "Chuks Stores Ltd") is not flagged. It is
+   a flag, never a refusal. Asking the bank whose account it is (a name enquiry) needs a payment
+   provider no milestone includes: a Change Report.
 
 ### 6.2 Statuses
 
@@ -323,14 +334,29 @@ its amount, and the CEO decides the requisition as a whole.
 ### 6.8 Possible duplicates
 
 1. A sent request shows **Possible Duplicate** when another was sent within 30 days either side of
-   it to the same payee (the same account number, or the same payee name with case and accents set
-   aside) for the same amount: `possible_duplicates` on the request, at most five, the newest first,
-   whatever their status (one sent again after a rejection is shown too). The flag is the
-   database's, so every approver sees it without a model. **A duplicate is named only to a reader
-   who may open it** (audit F8): their own, one in their `expenses` scope, or one whose pending
-   stage names them, as `getFor` decides; the rest are a count, `possible_duplicates_hidden`
-   ("1 request you cannot open"), never their number, purpose or amount.
-2. **Check Duplicate** on the modal asks the model (Default) to compare their purposes and lines and
+   it **by the same requester or to the same account number, for the same amount, and is not
+   cancelled or rejected** (QA audit BG-020, JBS Praxis 25/11/2026: tightened from the same payee
+   name or account in any status; a request sent again after a rejection is no longer flagged, and
+   every sent request carries an account number, so the name match added nothing):
+   `possible_duplicates` on the request, at most five, the newest first (`expenses.repo`
+   `DUPLICATE_MATCH`, one rule for the modal, Send Request and Praxis AI's invoice note). The flag
+   is the database's, so every approver sees it without a model. **A duplicate is named only to a
+   reader who may open it** (audit F8): their own, one in their `expenses` scope, or one whose
+   pending stage names them, as `getFor` decides; the rest are a count,
+   `possible_duplicates_hidden` ("1 request you cannot open"), never their number, purpose or
+   amount.
+2. **A likely duplicate never goes out unnoticed** (QA audit BG-020). Send Request and Send Again
+   (and New Request sent at once, and Praxis AI's New Request and Send Request cards) look for a
+   possible duplicate sent in the 30 days before, by rule 1, in the sending transaction. One found,
+   the send is refused 409 `EXPENSE_POSSIBLE_DUPLICATE`, nothing saved or sent, its message and
+   `fields.confirm_duplicate` naming the earlier requests the requester may open (their own, or
+   one whose pending stage names them; the rest "1 request you cannot open"). The form asks
+   **Possible Duplicate** ("Same amount as EXP-0004, sent within 30 days.") with **Send Anyway**
+   and **Go Back**; Send Anyway sends it again with `confirm_duplicate: true` (a card carries it as
+   Send Anyway). The request then keeps `duplicate_confirmed_at` (migration 8040), set again at
+   each send (null when none is found), the event says `sent_despite_duplicate`, and its modal
+   reads "Sent despite a possible duplicate" under Possible Duplicates for everyone who opens it.
+3. **Check Duplicate** on the modal asks the model (Default) to compare their purposes and lines and
    name the one it most likely repeats, with a sentence why. It is given numbers, purposes, days,
    statuses and lines, never the requester, the payee or the bank details, and only the duplicates
    the reader is named (rule 1). Nothing is kept: the approver reads it and decides. Its verdict
@@ -342,7 +368,7 @@ its amount, and the CEO decides the requisition as a whole.
 | Event / job | When | Does |
 |---|---|---|
 | `expense_request.created`, `.updated` | a draft is saved | audit only |
-| `expense_request.submitted` | Send Request, Send Again | opens `expenses.request`; the engine tells the first approver |
+| `expense_request.submitted` | Send Request, Send Again | opens `expenses.request`; the engine tells the first approver. Its payload carries `sent_despite_duplicate` (§6.8 rule 2) |
 | `workflow.completed` for `expenses.request` | the last stage decides | copies the outcome onto the request (approved or rejected), recounts the budget line; the engine tells the requester |
 | `workflow.changes_requested` for `expenses.request` | Send Back | the approval is withdrawn for its opener (`engine.cancel` with `sentBack`, so no approver is told it was withdrawn) and the request is `sent_back` (`expense_request.sent_back`, §6.1 rule 6); the engine tells the requester with the reason |
 | `workflow.cancelled` for `expenses.request` | withdrawn from the approvals screen | a request still `submitted` is `cancelled`; one already sent back or cancelled is left alone |
@@ -400,7 +426,9 @@ requester always sees theirs.
   audit F20). Remove (`RequisitionRemove`) has no card: it is the CEO's press with a reason on the
   requisition's own modal, one request at a time, and no create or edit form, so the CEO is pointed
   to Expenses · Requisitions (`requisitions.ai.js` says why). An invoice or a receipt is a file and stays on the form. Each runs the
-  module's own service function. New Category, Record Disbursement and New Budget carry their
+  module's own service function. New Request (both cards) and Send Request carry Send Anyway
+  (`confirm_duplicate`, off by default): a possible duplicate refuses the press, named, until the
+  person says to send it anyway (§6.8 rule 2). New Category, Record Disbursement and New Budget carry their
   form's own schema (PR 7); the others say `form: "none: <reason>"`, because their form never names
   its record (Edit, Add Reference, Edit Budget, Set Budget), holds many lines (New Request), or is a
   press on ticked rows (Create Requisition).
@@ -492,9 +520,9 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. Category opens a popover (Pick Category) with a Category Type filter (All, Operating, Capital) and a search over the categories, 25 a page; Bank suggests banks as typed and offers Add for one it does not know; Payee Name and Account Name show a person's name as their example, never the reader's own. Unit Price takes a minus for a line that takes money off (a discount, an amount already paid), shown red with (less). The modal's lines are two columns, Item (its quantity and the price of each under it) and Amount, so an invoice's long descriptions read in the modal. Read Invoice fills each price as a person types it ("-100,000") and names the category it picked. Edit Request shows a request's lines the same way ("1", "85,000"). A Send Back no longer tells its approvers "The requester withdrew this" (`engine.cancel` `sentBack`, expenses, agreements and payroll). The form: the lines (Item, Quantity, Unit Price, a minus taken for a discount, the Amount of each and the Total under them, Add Line), Read Invoice once an invoice is attached (the payee, the bank and the lines), Suggest Category in its footer, each filling the form for the person to check, Read Invoice's toast naming the amount the invoice asks for when the lines add up to another; once a category is picked, Budget Left (the category line's, or No budget line) and Department Left under the lines, and the Over Budget pill once the total passes the line, a warning beside Send Request, never a block (§6.6 rule 3); nothing is saved until they press Edit Budget and Set Budget show their amounts as typed too; a budget opens in the wide dialog, so its five columns fit; a requisition's Remove column has no label, so a phone card reads Remove once. | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." Help on Budget Left: "What the department has left for this category this year." Help on Over Budget, as on Approvals | the approval routing and the budget recount: §3, §6 here, the manual |
+| ESS · My Requests | KPI cards In Flight, Disbursed This Year, Average Turnaround, Rejected; the list (Reference, Purpose, Amount, Submitted, Stage); New Request. The modal: lines, total, payee, invoice, the chain with who it waits on, history; Edit, Send Again, Cancel Request (it asks first; after approval the request shows Withdraw to an `expenses.finance` holder instead). Disbursed This Year lists this year's paid requests (`disbursed_from`). Switching Payee off Staff clears Use My Company Account. Category opens a popover (Pick Category) with a Category Type filter (All, Operating, Capital) and a search over the categories, 25 a page; Bank suggests banks as typed and offers Add for one it does not know; Payee Name and Account Name show a person's name as their example, never the reader's own. Unit Price takes a minus for a line that takes money off (a discount, an amount already paid), shown red with (less). The modal's lines are two columns, Item (its quantity and the price of each under it) and Amount, so an invoice's long descriptions read in the modal. Read Invoice fills each price as a person types it ("-100,000") and names the category it picked. Edit Request shows a request's lines the same way ("1", "85,000"). A Send Back no longer tells its approvers "The requester withdrew this" (`engine.cancel` `sentBack`, expenses, agreements and payroll). The form: the lines (Item, Quantity, Unit Price, a minus taken for a discount, the Amount of each and the Total under them, Add Line), Read Invoice once an invoice is attached (the payee, the bank and the lines), Suggest Category in its footer, each filling the form for the person to check, Read Invoice's toast naming the amount the invoice asks for when the lines add up to another; Send Request on a possible duplicate asks Possible Duplicate ("Same amount as EXP-0004, sent within 30 days."; Send Anyway, Go Back), and so does the modal's Send Request (§6.8 rule 2); an Account Number of one digit repeated reads "Not a real number"; once a category is picked, Budget Left (the category line's, or No budget line) and Department Left under the lines, and the Over Budget pill once the total passes the line, a warning beside Send Request, never a block (§6.6 rule 3); nothing is saved until they press Edit Budget and Set Budget show their amounts as typed too; a budget opens in the wide dialog, so its five columns fit; a requisition's Remove column has no label, so a phone card reads Remove once. | help on Use My Company Account: "Pays the bank account on your profile." Help on Stage: "Who the request is waiting on now." Help on Budget Left: "What the department has left for this category this year." Help on Over Budget, as on Approvals | the approval routing and the budget recount: §3, §6 here, the manual |
 | Expenses · Requisitions | New Request (secondary beside Create Requisition; alone, primary, above Not Open to You for a reader without `expenses.finance`); Approved Requests (tick boxes, Create Requisition), each opening its request in the modal with Withdraw (a reason, after a confirm); Requisitions (Reference, Requests, Total, Submitted, Status). The modal: its requests, each opening, Remove, Approve, Reject (the CEO) | help on Requisitions: "Approved requests grouped for the CEO." | why requests are batched: MILESTONES §13, the manual |
-| Expenses · Approvals | New Request; KPI cards With You, Total Value, Oldest, Approved This Month (opens the requests the reader approved since the 1st, `approved_by_me_from`); the list; the modal with lines, invoice (opens as a PDF), budget remaining (the line's, and the department's beside it), an Over Budget pill, a Possible Duplicate pill with Check Duplicate; Approve, Send Back, Reject | help on Over Budget: "More than the department has left for this category this year." Help on Possible Duplicate: "Same payee and amount within 30 days." | the chain's configuration: Settings · Approvals, this guide |
+| Expenses · Approvals | New Request; KPI cards With You, Total Value, Oldest, Approved This Month (opens the requests the reader approved since the 1st, `approved_by_me_from`); the list; the modal with lines, invoice (opens as a PDF), budget remaining (the line's, and the department's beside it), an Over Budget pill, a Possible Duplicate pill with Check Duplicate and, when its requester pressed Send Anyway, "Sent despite a possible duplicate" (§6.8 rule 2); a Name Differs pill when the account name does not hold the payee's (§6.1 rule 8); Approve, Send Back, Reject | help on Over Budget: "More than the department has left for this category this year." Help on Possible Duplicate: "Same amount within 30 days, from the same requester or to the same account." Help on Name Differs: "The account name does not include the payee's name." | the chain's configuration: Settings · Approvals, this guide |
 | Expenses · Disbursements | KPI cards Waiting to Pay and Reference Missing, each opening its list; Waiting to Pay, a request opening in the modal with Record Disbursement and Withdraw; Paid; Record Disbursement (Bank Reference, Receipt, Paid On), No on Save Without Reference? back on Bank Reference; a Reference Missing pill and Add Reference; a paid one's Receipt row with Open Receipt when one was uploaded (TB, 11/11/2026). No chart (decision 7) | help on Bank Reference: "The bank's transaction ID for this transfer." | audit-anchor reasoning: §6.5 here |
 | Expenses · Projects | projects with Budget, Committed, Spent, Remaining, to `expenses` view at scope all (a refused read is Not Open to You); a project's requests in its modal, each opening; New Request (the project filled), Set Budget (`expenses.finance`), Remove Budget after a confirm | help on Committed: "Approved but not yet paid." | how spend is counted: §6.6 |
 | Expenses · Budgets | Year picker; departments with Allocated, Committed, Spent, Remaining; a budget's lines by category; New Budget, Edit Budget, Budget History | help on Remaining: "Allocated less committed and spent." | the 90% warning rule: §6.6 |
@@ -524,6 +552,11 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 - **Double press** of Send Request, Create Requisition or Record Disbursement: one press, one
   request (F26); a second Record Disbursement for the same request is refused 409.
 - **A request in two requisitions**: refused; grouping locks the requests and checks `approved`.
+- **A possible duplicate the requester cannot open** (another requester paying the same account):
+  Send Request names it as "1 request you cannot open", and Send Anyway sends it; the approvers who
+  may open it see its number (§6.8).
+- **Go Back on a possible duplicate in Edit Request**: the edit is already saved, as Save Draft
+  saves it; the request stays a draft (or sent back) until it is sent.
 - **Profile bank details missing** with Use My Company Account: refused on the bank fields, "Add
   your bank details to your profile first".
 - **Category deactivated** while a request uses it: the request keeps it.
@@ -549,6 +582,8 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 None.
 
 ## 14 · Change log
+
+- 25/11/2026 · JP · QA audit BG-018, BG-019, BG-020 (JBS Praxis's decisions of 25/11/2026). An account number of one digit repeated is refused and the modal shows Name Differs when the account name does not hold the payee's name (§6.1 rule 8, `account_name_differs`). Expenses · Disbursements is hidden from readers without `expenses.finance` (§2; `app/src/shell/access.ts` and `src/shared/search/screens.js` together). Possible duplicates are the same requester or the same account, the same amount, within 30 days, not cancelled or rejected; Send Request is refused 409 `EXPENSE_POSSIBLE_DUPLICATE` naming the earlier requests until Send Anyway (`confirm_duplicate` on `ExpenseCreate`, the new `ExpenseSubmit` and the cards), kept as `duplicate_confirmed_at` (migration 8040) and shown to the approvers (§3, §4, §5, §6.8 rules 1 and 2, §7, §10.1, §11). `expenses.test.js` (integration and unit), `expenses-ai.test.js`, `budgets.test.js`, `screens.test.js`, `Expenses.test.tsx`.
 
 - 25/11/2026 · JP · §10.2: on a phone, New Request's Save Draft and Send Request stay pinned in the sheet's footer, as every form in a sheet now does (`docs/FRONTEND_GUIDE.md` §8.4; QA audit BG-021).
 - 24/11/2026 · JP · QA audit BG-007 (F56b): Over Budget was flagged to the approvers but the requester saw nothing before Send Request. New Request now shows Budget Left, Department Left and the Over Budget pill once a category is picked, from the new read `GET /expenses/mine/budget-check` (`ExpenseBudgetCheckQuery`, `ExpenseBudgetCheck`; `expenses.budget-check.js` `estimate`, the same count as sending). Still a warning, never a block (§3 step 7, §5, §6.6 rule 3, §10.1, §11). `budgets.test.js`, `Expenses.test.tsx`.

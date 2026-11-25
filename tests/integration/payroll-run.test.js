@@ -462,6 +462,36 @@ describeDb("a month's payroll run against the real migrations", () => {
     expect((await one("SELECT count(*)::int AS n FROM payslip WHERE employee_id = $1", [id])).n).toBe(0);
   });
 
+  test("anyone paid below the Minimum Wage in force is warned of, never blocked, and only while a version is in force", async () => {
+    const before = p.PayrollRun.parse((await as("ops").get(`/payroll/runs/${octoberRun}`)).body);
+    const below = async () =>
+      p.PayrollProblemPage.parse((await as("ops").get(`/payroll/runs/${octoberRun}/problems`)).body).data.filter((x) => x.code === "BELOW_MINIMUM_WAGE");
+    expect(await below()).toEqual([]);
+    // In force on the month's last day; a later version is not.
+    await q(
+      `INSERT INTO statutory_rate (item, kind, base, rate, flat_amount, effective_from, effective_to, source_title, source_section, source_checked_on)
+       VALUES ('minimum_wage', 'employee', 'gross', 0, 120000, '2026-01-01', '2026-12-01', 'Test Act', 's.1', '2026-01-01'),
+              ('minimum_wage', 'employee', 'gross', 0, 500000, '2026-12-01', NULL, 'Test Act', 's.1', '2026-01-01')`,
+    );
+    try {
+      const found = await below();
+      expect(found.map((x) => x.employee && x.employee.display_name)).toContain("Nobank Tester");
+      expect(found.map((x) => x.employee && x.employee.display_name)).not.toContain("Ada Tester");
+      expect(found.map((x) => x.employee && x.employee.display_name)).not.toContain("Nosalary Tester");
+      expect(found.every((x) => x.severity === "warning")).toBe(true);
+      expect(found.find((x) => x.employee.display_name === "Nobank Tester")).toMatchObject({
+        message: "Nobank Tester is paid below the minimum wage",
+        action: "Check their pay on People · Employees",
+      });
+      const run = p.PayrollRun.parse((await as("ops").get(`/payroll/runs/${octoberRun}`)).body);
+      expect(run.blocking_problems).toBe(before.blocking_problems);
+      expect(run.warnings).toBe(before.warnings + found.length);
+    } finally {
+      await q("DELETE FROM statutory_rate WHERE item = 'minimum_wage'");
+    }
+    expect(await below()).toEqual([]);
+  });
+
   /* ---------------------------------------------------------------- *
    * Submit
    * ---------------------------------------------------------------- */
@@ -538,6 +568,36 @@ describeDb("a month's payroll run against the real migrations", () => {
     expect((await as("ops").delete(`/payroll/runs/${octoberRun}/adjustments/${adjustment.payroll_adjustment_id}`)).status).toBe(404);
     expect((await as("ops").post(`/payroll/runs/${octoberRun}/compute`)).status).toBe(200);
     expect((await slip(octoberRun, "ada")).net_pay).toBe("362576.93");
+  });
+
+  test("a record the run reads changed after Compute shows on the run until Compute runs again (QA F02e)", async () => {
+    const read = async () => p.PayrollRun.parse((await as("ops").get(`/payroll/runs/${octoberRun}`)).body);
+    const listed = async () => p.PayrollRunPage.parse((await as("ops").get("/payroll/runs")).body).data.find((r) => r.payroll_run_id === octoberRun);
+    expect((await as("ops").post(`/payroll/runs/${octoberRun}/compute`)).status).toBe(200);
+    expect((await read()).changed_since_compute).toBe(false);
+    expect((await listed()).changed_since_compute).toBe(false);
+
+    // A joiner hired after Compute has no payslip yet: the run says its figures are out of date.
+    await hire("octoberjoiner", { gross: "300000.00", start: "2026-10-20" });
+    expect((await read()).changed_since_compute).toBe(true);
+    expect((await listed()).changed_since_compute).toBe(true);
+    await q("DELETE FROM employee WHERE employee_id = $1", [employeeId("octoberjoiner")]);
+    expect((await read()).changed_since_compute).toBe(false);
+
+    // A person's record edited (as the People screens save it), and a pay item added for the month.
+    await q("UPDATE employee SET job_title = 'Senior Officer', updated_at = now() WHERE employee_id = $1", [employeeId("ada")]);
+    expect((await read()).changed_since_compute).toBe(true);
+    expect((await as("ops").post(`/payroll/runs/${octoberRun}/compute`)).status).toBe(200);
+    expect((await read()).changed_since_compute).toBe(false);
+    await item("ada", "2026-10-28", "late", "500.00", { minutes: 5 });
+    expect((await read()).changed_since_compute).toBe(true);
+    await q("DELETE FROM attendance_pay_item WHERE employee_id = $1 AND work_date = '2026-10-28'", [employeeId("ada")]);
+    // A deduction recorded for a later month leaves this one as it is.
+    expect((await as("ops").post(`/payroll/runs/${octoberRun}/compute`)).status).toBe(200);
+    await deduct("ada", { source: "salary_advance", total: "30000.00", months: 1, from: "2026-12-01" });
+    expect((await read()).changed_since_compute).toBe(false);
+    await q("DELETE FROM payroll_deduction WHERE employee_id = $1 AND start_period = '2026-12-01'", [employeeId("ada")]);
+    expect((await read()).changed_since_compute).toBe(false);
   });
 
   test("a changed total is a 409 RUN_CHANGED with the totals that now stand, nothing frozen, and the recompute kept", async () => {

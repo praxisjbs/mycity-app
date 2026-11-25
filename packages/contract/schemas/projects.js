@@ -36,6 +36,8 @@ const Project = z
     name: z.string(),
     description: z.string().nullable(),
     owner: PersonRef.nullable(),
+    /** Its owner has left the staff (archived or left): the screen shows Left beside them, and Edit Project hands it on. */
+    owner_left: z.boolean(),
     due_on: isoDate.nullable(),
     status: ProjectStatus,
     completed_at: isoDateTime.nullable(),
@@ -81,10 +83,27 @@ const ProjectPrefill = z
   })
   .strict();
 
-/** PATCH /projects/:id: its owner, or a reader whose grant is `all`. `completed` completes it, `active` reopens it. */
+/**
+ * GET /projects/same-name: an active project already called `name`, case and accents aside, for New
+ * Project's warning (advisory: a second project of the same name still saves). `except` leaves out
+ * the project being edited.
+ */
+const ProjectNameQuery = z
+  .object({
+    name: text(120),
+    except: uuid.optional(),
+  })
+  .strict();
+const ProjectNameMatch = z.object({ project: ProjectRef.nullable() }).strict();
+
+/**
+ * PATCH /projects/:id: its owner, or a reader whose grant is `all`. `completed` completes it, `active`
+ * reopens it. `owner_employee_id` hands it to another active employee (a leaver's projects).
+ */
 const ProjectEditFields = z
   .object({
     name: text(120).optional(),
+    owner_employee_id: uuid.optional(),
     description: z.string().trim().max(2000).nullable().optional(),
     due_on: isoDate.nullable().optional(),
     status: ProjectStatus.optional(),
@@ -122,6 +141,7 @@ const TABLES = {
     table: "project",
     virtual: {
       owner: "the person in project.owner_employee_id",
+      owner_left: "the employee in project.owner_employee_id is left or archived",
       open: "count of the project's open tasks the reader can see",
       done: "count of the project's done tasks the reader can see",
       can_edit: "the reader owns it, or their workspace grant is all",
@@ -130,6 +150,8 @@ const TABLES = {
   },
   ProjectPage: { table: null, reason: "a page of projects" },
   ProjectListQuery: { table: null, reason: "list controls and filters for the projects" },
+  ProjectNameQuery: { table: null, reason: "the name New Project asks about, and the project being edited" },
+  ProjectNameMatch: { table: null, reason: "the active project already holding a name, or none" },
   ProjectSummaryQuery: { table: null, reason: "the filters and grouping of the assistant's project summary; figures, never a row" },
   ProjectCreate: { table: "project" },
   ProjectPrefill: { table: "project" },
@@ -144,6 +166,8 @@ module.exports = {
   Project,
   ProjectPage,
   ProjectListQuery,
+  ProjectNameQuery,
+  ProjectNameMatch,
   ProjectSummaryBy,
   ProjectSummaryQuery,
   ProjectCreate,

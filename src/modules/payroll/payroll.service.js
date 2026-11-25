@@ -63,7 +63,7 @@ async function grantsOf(user) {
  * A repo row as the contract's PayrollRun. A list row has an empty chain and cannot be decided; the run a
  * person opens carries the approval's route and whether it waits on them.
  */
-function present(row, { grants, counts = null, approval = null }) {
+function present(row, { grants, counts = null, approval = null, changed = false }) {
   const open = row.status === "draft" || row.status === "computed";
   return {
     payroll_run_id: row.payroll_run_id,
@@ -89,6 +89,7 @@ function present(row, { grants, counts = null, approval = null }) {
     chain: approval ? approval.route : [],
     blocking_problems: counts ? counts.blocking : 0,
     warnings: counts ? counts.warnings : 0,
+    changed_since_compute: row.status === "computed" && changed,
     can_compute: open && grants.edit,
     can_submit: row.status === "computed" && grants.edit,
     can_decide: Boolean(approval && approval.can_decide && row.status === "submitted"),
@@ -112,15 +113,16 @@ async function approvalOf(user, row) {
 async function getRun(user, id) {
   const row = await repo.getRun(pool, id);
   if (!row) throw new AppError("NOT_FOUND", "That payroll run does not exist", 404);
-  const [grants, approval, counts] = await Promise.all([grantsOf(user), approvalOf(user, row), repo.problemCounts(pool, [id])]);
-  return present(row, { grants, approval, counts: counts.get(id) || null });
+  const [grants, approval, counts, changed] = await Promise.all([grantsOf(user), approvalOf(user, row), repo.problemCounts(pool, [id]), repo.changedSinceCompute(pool, [id])]);
+  return present(row, { grants, approval, counts: counts.get(id) || null, changed: changed.has(id) });
 }
 
 /** GET /payroll/runs: Run History, 25 a page. */
 async function listRuns(user, query) {
   const page = await repo.listRuns(pool, query);
-  const [grants, counts] = await Promise.all([grantsOf(user), repo.problemCounts(pool, page.data.map((r) => r.payroll_run_id))]);
-  return { ...page, data: page.data.map((r) => present(r, { grants, counts: counts.get(r.payroll_run_id) || null })) };
+  const ids = page.data.map((r) => r.payroll_run_id);
+  const [grants, counts, changed] = await Promise.all([grantsOf(user), repo.problemCounts(pool, ids), repo.changedSinceCompute(pool, ids)]);
+  return { ...page, data: page.data.map((r) => present(r, { grants, counts: counts.get(r.payroll_run_id) || null, changed: changed.has(r.payroll_run_id) })) };
 }
 
 /** GET /payroll/runs/summary: the run to show first, the runs by status and the last twelve months' net. */
@@ -151,6 +153,7 @@ const PROBLEM_WORDS = Object.freeze({
   },
   NO_BANK: { message: (n) => `No Bank Details for ${n.name}`, action: "Add them on People · Employees" },
   CONTRACT_ENDED: { message: (n) => `${n.name}'s contract has ended`, action: "Check the person, exclude if needed" },
+  BELOW_MINIMUM_WAGE: { message: (n) => `${n.name} is paid below the minimum wage`, action: "Check their pay on People · Employees" },
   NO_PAY_SPLIT: { message: (n) => `No Pay Split for ${n.name}`, action: "Set the split on Configurations" },
   FINE_WAITING: {
     message: (n) => `${n.n} ${n.n === 1 ? "fine waits" : "fines wait"} for payroll for ${n.name}`,

@@ -1,7 +1,7 @@
 {
   "qs-add-employee": {
     "spec": "ecaa81f3ffa184d4",
-    "source": "6263b8739d74f783",
+    "source": "2c0b899ed3d29df1",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "qs-add-lead": {
     "spec": "48889f8a9b486996",
-    "source": "46fe2827414aabee",
+    "source": "63f24ffea567249a",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "qs-add-task": {
     "spec": "221d9119480a0a72",
-    "source": "cac7e5cdf71a8164",
+    "source": "53f6d19152fe2eea",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "qs-agreement": {
     "spec": "46d926cf44de79b9",
-    "source": "46fe2827414aabee",
+    "source": "63f24ffea567249a",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "qs-announcement": {
     "spec": "db708f827aaf9de8",
-    "source": "8d2789c428ad1da3",
+    "source": "d76402d644e4e8c0",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "qs-approve-leave": {
     "spec": "f974e711363d9efc",
-    "source": "170a4586b4c6d5d5",
+    "source": "cb424bd6d6f329f4",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "qs-channel": {
     "spec": "344266c761e21850",
-    "source": "8d2789c428ad1da3",
+    "source": "d76402d644e4e8c0",
     "devices": [
       "desktop",
       "phone"
@@ -105,7 +105,7 @@
   },
   "qs-commitments": {
     "spec": "16ba03ab7983c1b5",
-    "source": "cac7e5cdf71a8164",
+    "source": "53f6d19152fe2eea",
     "devices": [
       "desktop",
       "phone"
@@ -113,7 +113,7 @@
   },
   "qs-department-head": {
     "spec": "068ea5be43f180ff",
-    "source": "6263b8739d74f783",
+    "source": "2c0b899ed3d29df1",
     "devices": [
       "desktop",
       "phone"
@@ -129,7 +129,7 @@
   },
   "qs-import": {
     "spec": "402734ecb1661d71",
-    "source": "6263b8739d74f783",
+    "source": "2c0b899ed3d29df1",
     "devices": [
       "desktop",
       "phone"
@@ -145,7 +145,7 @@
   },
   "qs-log-interaction": {
     "spec": "2866c5e00fda28af",
-    "source": "46fe2827414aabee",
+    "source": "63f24ffea567249a",
     "devices": [
       "desktop",
       "phone"
@@ -177,7 +177,7 @@
   },
   "qs-plan-day": {
     "spec": "0abe755a36a0bce0",
-    "source": "cac7e5cdf71a8164",
+    "source": "53f6d19152fe2eea",
     "devices": [
       "desktop",
       "phone"
@@ -249,7 +249,7 @@
   },
   "qs-send-proposal": {
     "spec": "ebe5e4751c49aeea",
-    "source": "46fe2827414aabee",
+    "source": "63f24ffea567249a",
     "devices": [
       "desktop",
       "phone"
@@ -281,7 +281,7 @@
   },
   "qs-team-tasks": {
     "spec": "62cb18ba88056ba8",
-    "source": "cac7e5cdf71a8164",
+    "source": "53f6d19152fe2eea",
     "devices": [
       "desktop",
       "phone"

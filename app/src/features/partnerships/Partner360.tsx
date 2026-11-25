@@ -129,7 +129,7 @@ export function Partner360({ id }: { id: string }) {
           />
         )}
         {tab === "documents" && <DocumentsTab record={record} readOnly={readOnly} signedOutside={partner.signed_outside} />}
-        {tab === "returns" && <ReturnsTab deals={x.deals} readOnly={readOnly} />}
+        {tab === "returns" && <ReturnsTab deals={x.deals} readOnly={readOnly} categoryId={partner.partner_category_id} />}
         {tab === "work" && <WorkTab record={record} dealId={unfinished.length === 1 ? unfinished[0]!.deal_id : null} readOnly={readOnly} />}
         {tab === "activity" && <ActivityTab record={record} history={x.history} onLog={readOnly ? undefined : logInteraction} />}
         {tab === "contacts" && <ContactsTab record={record} contacts={x.contacts} readOnly={readOnly} />}

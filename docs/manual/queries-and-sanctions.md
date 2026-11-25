@@ -37,9 +37,9 @@ Queries lists each query you may see, newest first, with its outcome.
 6. The query shows its **Subject**, who raised it (**Raised By**), when (**Raised**), the
    **Response Due** time, the **Policy** it cites, the employee's **Response** and when they sent it
    (**Responded**).
-7. A query a rule raised also shows **Counted**: the days or tasks the rule counted. One the
-   Attendance policy raised shows **Attendance Policy** under **Raised By**, and the late days it
-   counted.
+7. A query a rule raised names the rule under **Raised By**, such as *Rule: Unregistered Device*,
+   in the list and on the query. It also shows **Counted**: the days or tasks the rule counted. One
+   the Attendance policy raised reads *Rule: Attendance Policy*, with the late days it counted.
 8. While a proposed sanction waits, **Waiting On** says who must approve it.
 9. Press **View Letter** to read the letter the employee received.
 

@@ -112,8 +112,9 @@ the one before.
 1. On **About You**, type your **Full Name**, **Email** and **Phone**.
    ![About You](shot:public-apply)
 2. Set **Years of Experience** with its minus and plus, or type the number, then press **Next**.
-3. On **CV and Questions**, press **Choose Your CV** and pick a PDF or Word file of up to 10 MB.
-   **Replace** swaps it for another.
+3. On **CV and Questions** (**Your CV** when the role asks no questions), press **Choose Your CV** and
+   pick a PDF or a Word file (.docx) of up to 10 MB. An older Word file (.doc) is not taken: save it as
+   .docx or PDF first. **Replace** swaps it for another.
    ![CV and Questions](shot:public-apply-questions)
 4. Answer the role's own questions, if it has any: a yes or no, one of the options given, or a few
    words. Then press **Next**.
@@ -128,7 +129,7 @@ the one before.
 | **Email** | An address where MyCity can reach you | Yes |
 | **Phone** | A Nigerian number after +234, or a number abroad in international form | Yes |
 | **Years of Experience** | A whole number, such as `5` | Yes |
-| **Your CV** | A PDF or Word file, up to 10 MB | Yes |
+| **Your CV** | A PDF or Word file (.docx), up to 10 MB | Yes |
 | The role's questions | As each question asks | When marked as needed |
 | **Why This Role** | At least 20 characters | Yes |
 
@@ -420,7 +421,9 @@ whether it is genuine and unchanged, never what it says. A training certificate 
 4. **Content Hash** and **Artifact Hash** each read **Matches** or **Differs**. *Not This Document*
    says which was altered: the record, the stored file, or both.
 
-A reference nobody issued shows *Not Found*.
+A reference with no signed document shows *Not Found* and *No signed document has this reference.*
+A document can be checked once everyone has signed it, so a letter still being signed shows this
+too. Check the reference on the document and try again.
 
 ### Check an agreement {#public-verify-agreement}
 
@@ -501,7 +504,7 @@ do:
   - click: button "Next"
   - wait: heading "CV and Questions"
 marks:
-  1: text "Choose Your CV" | A PDF or Word file, up to 10 MB
+  1: text "Choose Your CV" | A PDF or Word file (.docx), up to 10 MB
 ```
 
 ```shot public-assessment-start

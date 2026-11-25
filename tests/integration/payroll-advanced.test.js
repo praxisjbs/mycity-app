@@ -469,9 +469,9 @@ describeDb("the advanced option against the real migrations", () => {
   });
 
   test("each person's side through the organisation service: NHF by choice, the State, the tax numbers", async () => {
-    const ada = await as("ops").patch(`/employees/${employeeId("ada")}`, { nhf_contributes: true, state_of_residence: "lagos", pension_pin: "PEN000000000TEST" });
+    const ada = await as("ops").patch(`/employees/${employeeId("ada")}`, { nhf_contributes: true, state_of_residence: "lagos", pension_pin: "PEN000000000123" });
     expect(ada.status).toBe(200);
-    expect(ada.body).toMatchObject({ nhf_contributes: true, state_of_residence: "lagos", pension_pin: "PEN000000000TEST", nhf_number: null });
+    expect(ada.body).toMatchObject({ nhf_contributes: true, state_of_residence: "lagos", pension_pin: "PEN000000000123", nhf_number: null });
     expect((await as("ops").patch(`/employees/${employeeId("chidi")}`, { nhf_contributes: true })).status).toBe(200);
     const bola = await as("ops").patch(`/employees/${employeeId("bola")}`, { state_of_residence: "ogun", tax_id: "tin-0000-test" });
     expect(bola.body).toMatchObject({ nhf_contributes: false, state_of_residence: "ogun", tax_id: "TIN-0000-TEST" });
@@ -692,7 +692,7 @@ describeDb("the advanced option against the real migrations", () => {
     const html = doc.render_html;
     expect(html).toContain("Statutory Report");
     expect(html).toContain("TIN-0000-TEST");
-    expect(html).toContain("PEN000000000TEST");
+    expect(html).toContain("PEN000000000123");
     expect(html).toContain("Not Set");
     expect(html).toContain("₦107,000.00");
     expect(html).toContain("₦285,000.00");

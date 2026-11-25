@@ -62,3 +62,13 @@ describe("Document Centre · Categories", () => {
     expect(tabVisible({ module: "documents", tab: "library" }, reader({ documents: ["view"] }))).toBe(true);
   });
 });
+
+describe("Expenses · Disbursements (QA audit BG-019)", () => {
+  const disbursements = { module: "expenses", tab: "disbursements" };
+  test("follows expenses.finance, as every disbursement route asks: Management, with Settings, is not offered it", () => {
+    expect(tabVisible(disbursements, reader({ expenses: ["view"], settings: ["view"] }))).toBe(false);
+    expect(tabVisible(disbursements, reader({ expenses: ["view", "create"], settings: ["view"] }, { capabilities: ["expenses.finance"] }))).toBe(true);
+    expect(tabVisible(disbursements, reader({ expenses: ["view"] }, { is_ceo: true }))).toBe(true);
+    expect(tabVisible({ module: "expenses", tab: "requisitions" }, reader({ expenses: ["view"], settings: ["view"] }))).toBe(true);
+  });
+});

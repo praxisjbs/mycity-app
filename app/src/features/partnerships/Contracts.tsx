@@ -1,4 +1,4 @@
-import type { AgreementDetail, AgreementRow, AgreementStatus } from "@mycity/contract/contract.gen.ts";
+import type { AgreementDetail, AgreementRow, AgreementStatus, AgreementStatusFilter } from "@mycity/contract/contract.gen.ts";
 import { saveFile } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -38,13 +38,13 @@ import { agreementPill, fail, KIND_LABEL, SIGNER_STATE, useKept, useMay } from "
 import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { RecordPage, RecordState } from "./record";
 
-type View = "all" | AgreementStatus;
+type View = "all" | AgreementStatusFilter;
 
 const VIEWS: Array<[View, string]> = [
   ["all", "All"],
   ["draft", "Draft"],
-  ["review", "In Review"],
-  ["approval", "In Approval"],
+  // Waiting on an approver at any stage, as the In Approval card counts them (QA F07c).
+  ["in_approval", "In Approval"],
   ["sent", "Sent"],
   ["active", "Active"],
   ["expiring", "Expiring"],

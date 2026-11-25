@@ -292,9 +292,12 @@ with a virus never opens, and the sheet says so.
 ### Score one candidate with AI {#recruitment-candidates-score needs="recruitment edit"}
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
-2. Press **More Actions**, then **Score With AI**.
+2. Press **More Actions**, then **Score With AI**. The message says *Reading the CV*, and **Read** on
+   the **Screening** card says *Being read*.
 3. AI reads the CV, the cover letter and the answers against the role and its must-meet conditions.
-4. The score, from 0 to 100, and a short summary replace the estimate. **Provisional** goes.
+   This takes a few seconds; keep the candidate open and the sheet shows the result when it lands.
+4. The score, from 0 to 100, and a short summary replace the estimate. **Provisional** goes. If you
+   closed the sheet, open the candidate again to see it.
 
 **Score With AI** shows only while the CV is ready and the candidate has no AI score. A candidate is
 read once.
@@ -583,6 +586,9 @@ A candidate at the **Interview** stage shows here only once an interview is sche
    names them.
 7. Press **Schedule Interview**.
 
+If the candidate already has an open offer, the form says *This candidate has an open offer.* You can
+still schedule the interview: check with the hiring manager first.
+
 The candidate moves to **Interview** and gets an email with a calendar file. Each panelist gets a
 calendar invite, also on [My Workspace · Calendar](/workspace?tab=calendar).
 
@@ -751,7 +757,9 @@ Only a candidate at **Shortlist** can get an offer, and only one open offer at a
    it. For an **Intern**, the basic salary can be ₦0: type **Why No Basic Salary**, which the
    approvers read too. Press **Next**.
 7. Pick the **Start Date**. **Days to Sign** is how long the candidate has once it is sent, 15 unless
-   you change it. Fill in the rest that applies, then press **Next**.
+   you change it. If the job would start before the candidate must reply, the form says *Starts
+   before the offer expires*: give fewer **Days to Sign** or a later **Start Date**. Fill in the
+   rest that applies, then press **Next**.
 8. Type any **Additional Terms** for this offer alone. **Schedule A** is the job description printed
    at the end; change it if this role differs.
 9. Press **Draft Offer**. It shows as **Draft**.
@@ -812,6 +820,9 @@ When they sign, it shows as **Accepted** and both of you get the signed copy by 
 decline, or it expires, their card goes back to **Shortlist** and you can make another offer.
 
 An offer cannot be sent to someone already on MyCity's staff: a move inside MyCity goes through People.
+
+If the job would start before the offer expires, the offer says *Starts before the offer expires*
+above **Send Offer**. You can still send it; the candidate then has until the expiry to reply.
 
 If the start date has passed by the time the offer is signed, **Send Offer** says so on the line under
 the buttons and nothing is sent. An approved offer cannot change, so

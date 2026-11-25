@@ -91,8 +91,10 @@ const ExpenseRow = z
   })
   .strict();
 
-/** One request as its modal shows it. Bank details are masked for a reader without `employee.bank`. */
-/** Another request to the same payee for the same amount within 30 days. */
+/**
+ * Another request that may be the same one (guide §6.8): sent by the same requester or to the same
+ * account number, for the same amount, within 30 days, and not cancelled or rejected.
+ */
 const ExpenseDuplicateRef = z
   .object({
     expense_request_id: uuid,
@@ -104,6 +106,7 @@ const ExpenseDuplicateRef = z
   })
   .strict();
 
+/** One request as its modal shows it. Bank details are masked for a reader without `employee.bank`. */
 const ExpenseRequest = ExpenseRow.extend({
   expense_category_id: uuid,
   project_id: uuid.nullable(),
@@ -116,6 +119,8 @@ const ExpenseRequest = ExpenseRow.extend({
   account_name: z.string().nullable(),
   account_number: z.string().nullable(),
   uses_profile_account: z.boolean(),
+  /** The account name does not contain the payee's name, case and accents set aside: Name Differs for the approvers (guide §6.1 rule 8). */
+  account_name_differs: z.boolean(),
   invoice: DocumentRef.nullable(),
   needed_on: isoDate.nullable(),
   requisition_id: uuid.nullable(),
@@ -124,10 +129,12 @@ const ExpenseRequest = ExpenseRow.extend({
   budget_remaining: money.nullable(),
   /** What the request's department has left this year across every category, shown beside the line's (guide §6.6). */
   department_remaining: money.nullable(),
-  /** Other requests sent within 30 days to the same payee for the same amount (guide §6.8). */
+  /** Other requests by the same requester or to the same account for the same amount within 30 days (guide §6.8). */
   possible_duplicates: z.array(ExpenseDuplicateRef).max(5),
   /** Possible duplicates the reader may not open: counted, never shown (audit F8). */
   possible_duplicates_hidden: z.number().int().min(0),
+  /** When its requester sent it despite a possible duplicate (Send Anyway; guide §6.8 rule 2), else null. */
+  duplicate_confirmed_at: isoDateTime.nullable(),
   can_edit: z.boolean(),
   can_cancel: z.boolean(),
   approved_at: isoDateTime.nullable(),
@@ -262,6 +269,15 @@ const ExpenseLineInput = z
   })
   .strict();
 
+/**
+ * A payee's account number: ten digits, never one digit repeated ("0000000000"), which no bank issues
+ * (QA audit BG-018). The bank itself is not asked: a name enquiry needs a payment provider.
+ */
+const accountNumber = z
+  .string()
+  .regex(/^\d{10}$/, "Ten digits")
+  .refine((v) => !/^(\d)\1{9}$/.test(v), "Not a real number");
+
 /** The request's fields, shared by New Request and Edit. */
 const ExpenseFields = z
   .object({
@@ -276,7 +292,7 @@ const ExpenseFields = z
     payee_name: optionalText(150),
     bank_name: optionalText(100),
     account_name: optionalText(150),
-    account_number: blank(z.string().regex(/^\d{10}$/, "Ten digits")),
+    account_number: blank(accountNumber),
     invoice_document_id: blank(uuid),
   })
   .strict();
@@ -299,8 +315,17 @@ function payeeProblems(v) {
   return out;
 }
 
+/**
+ * Send Anyway (guide §6.8 rule 2): a request with a possible duplicate is refused, 409
+ * EXPENSE_POSSIBLE_DUPLICATE naming the earlier requests, until it is sent again with this true.
+ */
+const confirmDuplicate = z.boolean().default(false);
+
 /** New Request. `submit` sends it at once (Send Request); without it the request is a draft. */
-const ExpenseCreate = ExpenseFields.extend({ submit: z.boolean().default(false) }).strict();
+const ExpenseCreate = ExpenseFields.extend({ submit: z.boolean().default(false), confirm_duplicate: confirmDuplicate }).strict();
+
+/** Send Request and Send Again on a draft or sent-back request; `confirm_duplicate` is Send Anyway. */
+const ExpenseSubmit = z.object({ confirm_duplicate: confirmDuplicate }).strict();
 
 /** Edit, while a draft or sent back. Every field is sent again, as the form holds them all. */
 const ExpenseUpdate = ExpenseFields;
@@ -322,6 +347,7 @@ const ExpenseRequestAdd = ExpenseFields.omit({ lines: true, invoice_document_id:
     quantity: quantity.default("1"),
     unit_price: money,
     submit: z.boolean().default(true),
+    confirm_duplicate: confirmDuplicate,
   })
   .strict();
 
@@ -342,7 +368,7 @@ const ExpenseLineAdd = z
   .strict();
 
 /** Send Request's card: a draft or sent-back request of the person's own, sent as the modal's Send Request sends it. */
-const ExpenseSend = z.object({ expense_request_id: uuid }).strict();
+const ExpenseSend = z.object({ expense_request_id: uuid, confirm_duplicate: confirmDuplicate }).strict();
 
 /**
  * New Request's card from an invoice attached on Praxis AI (praxis-ai.md §6.18, decision 45): the
@@ -353,6 +379,7 @@ const ExpenseSend = z.object({ expense_request_id: uuid }).strict();
 const ExpenseRequestFromInvoice = ExpenseFields.extend({
   invoice_document_id: uuid,
   submit: z.boolean().default(true),
+  confirm_duplicate: confirmDuplicate,
 }).strict();
 
 const TABLES = {
@@ -384,7 +411,8 @@ const TABLES = {
       requisition_number: "requisition.number",
       budget_remaining: "the budget line's allocation less committed and spent",
       department_remaining: "the department's budget for the year, every line's allocation less committed and spent",
-      possible_duplicates: "other expense_request rows to the same payee for the same amount within 30 days",
+      account_name_differs: "the account name does not contain the payee name, case and accents set aside",
+      possible_duplicates: "other expense_request rows by the same requester or to the same account for the same amount within 30 days",
       possible_duplicates_hidden: "how many of those the reader may not open",
       can_edit: "draft or sent back, and the reader is its requester",
       can_cancel: "the reader may cancel or withdraw it now",
@@ -410,8 +438,9 @@ const TABLES = {
   ExpenseFields: { table: "expense_request", virtual: { lines: "written to expense_request_line" } },
   ExpenseCreate: {
     table: "expense_request",
-    virtual: { lines: "written to expense_request_line", submit: "sends it at once" },
+    virtual: { lines: "written to expense_request_line", submit: "sends it at once", confirm_duplicate: "Send Anyway: sets duplicate_confirmed_at when a possible duplicate is found" },
   },
+  ExpenseSubmit: { table: null, reason: "Send Request's press; Send Anyway sets duplicate_confirmed_at" },
   ExpenseUpdate: { table: "expense_request", virtual: { lines: "written to expense_request_line" } },
   ExpenseCancel: { table: null, reason: "a reason for the history, not a column" },
   ExpenseRequestAdd: {
@@ -421,14 +450,15 @@ const TABLES = {
       quantity: "the first line, written to expense_request_line",
       unit_price: "the first line, written to expense_request_line",
       submit: "sends it at once",
+      confirm_duplicate: "Send Anyway: sets duplicate_confirmed_at when a possible duplicate is found",
     },
   },
   ExpenseChange: { table: "expense_request" },
   ExpenseLineAdd: { table: "expense_request_line" },
-  ExpenseSend: { table: "expense_request" },
+  ExpenseSend: { table: "expense_request", virtual: { confirm_duplicate: "Send Anyway: sets duplicate_confirmed_at when a possible duplicate is found" } },
   ExpenseRequestFromInvoice: {
     table: "expense_request",
-    virtual: { lines: "written to expense_request_line", submit: "sends it at once" },
+    virtual: { lines: "written to expense_request_line", submit: "sends it at once", confirm_duplicate: "Send Anyway: sets duplicate_confirmed_at when a possible duplicate is found" },
   },
 };
 
@@ -574,6 +604,7 @@ module.exports = {
   payeeProblems,
   ExpenseCreate,
   ExpenseUpdate,
+  ExpenseSubmit,
   ExpenseCancel,
   ExpenseRequestAdd,
   ExpenseChange,

@@ -44,13 +44,18 @@ My Requests lists every request you raised, newest first, with who it waits on n
 8. For yourself, tick **Use My Company Account** to be paid into the bank account on your profile.
    For anyone else, fill in **Payee Name**, **Bank**, **Account Name** and **Account Number**.
    Type the **Bank** and pick it from the list; if it is not there, press **Add** to keep it as
-   typed, and it is offered to everyone from then on.
+   typed, and it is offered to everyone from then on. An **Account Number** of one digit repeated
+   (0000000000) reads **Not a real number**: type the payee's own.
 9. Attach the invoice under **Invoice**. Press **Read Invoice** to fill the payee, their bank and the
    items from it, with its discounts and anything already paid as minus lines, then check every
    line. If the message says **Invoice asks** another amount, put the lines right before you send.
 10. Press **Send Request**. Or press **Save Draft** to finish it later. A draft may leave the
     payee's bank blank; **Send Request** marks each field still empty **Required**, and sends
     nothing until they are filled.
+11. If you, or anyone paying the same account, sent a request for the same amount in the last 30
+    days, **Possible Duplicate** asks first and names it (*Same amount as EXP-0004, sent within 30
+    days.*). Press **Go Back** to check it, or **Send Anyway** if it is a different payment. The
+    approvers see that you sent it anyway.
 
 > **Tip:** In [Praxis AI · Ask](/praxis-ai?tab=ask), say "Raise an expense request". It asks **What are you paying
 > for? How many? How much is each?** and draws the request for you to check. To list several items,
@@ -72,7 +77,8 @@ My Requests lists every request you raised, newest first, with who it waits on n
 3. Press a request. It opens over the list with its lines, its payee and its **History**.
 4. A request sent back to you says why. Press **Edit Request**, change it, then press **Send Again**.
    A draft offers **Send Request**: if its payee's bank is missing, **Edit Request** opens with those
-   fields marked **Required**. Fill them in and press **Send Request**.
+   fields marked **Required**. Fill them in and press **Send Request**. Either may ask
+   **Possible Duplicate** first, as a new request does: **Send Anyway** or **Go Back**.
 5. Press **Cancel Request** to stop a request until Operations & People approve it, then
    **Cancel Request** again to confirm. After that, ask Operations & People to withdraw it.
 
@@ -110,8 +116,11 @@ Approvals lists the requests waiting on you, the oldest first.
    **Approved This Month**. Press **With You** or **Approved This Month** to list those requests.
 3. Press a request. It opens with its lines, the invoice (**Open Invoice**) and the budget it draws on.
 4. **Over Budget** means it is more than the department has left for its category this year.
-   **Possible Duplicate** means another request went to the same payee for the same amount within
-   30 days. Press **Check Duplicate** to compare them.
+   **Possible Duplicate** means another request asked the same amount within 30 days, from the
+   same requester or to the same account. Press **Check Duplicate** to compare them.
+   *Sent despite a possible duplicate* under them means the requester pressed **Send Anyway**.
+   **Name Differs** means the **Account Name** does not include the payee's name: check who the
+   money goes to before you approve.
 5. Press **Approve**, **Send Back** or **Reject**. Send Back and Reject ask for a **Reason**.
 
 ```shot expenses-approvals

@@ -34,6 +34,25 @@ export function useRaise(): (() => void) | null {
 }
 
 export const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
+
+/**
+ * Send Anyway (docs/guides/expenses.md §6.8 rule 2): a send the server refuses as a possible duplicate
+ * asks first, naming the earlier requests (or "1 request you cannot open"), and goes again only on
+ * Send Anyway, which the request keeps for its approvers. Null when the person goes back instead.
+ */
+export function useSendAnyway() {
+  const confirm = useConfirm();
+  return async <T,>(send: (confirmDuplicate: boolean) => Promise<T>): Promise<T | null> => {
+    try {
+      return await send(false);
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.code !== "EXPENSE_POSSIBLE_DUPLICATE") throw e;
+      const names = (e.fields.confirm_duplicate ?? []).join(", ");
+      const yes = await confirm({ title: "Possible Duplicate", body: `Same amount as ${names}, sent within 30 days.`, confirmLabel: "Send Anyway", cancelLabel: "Go Back" });
+      return yes ? send(true) : null;
+    }
+  };
+}
 export const refreshAll = () => {
   invalidate("/api/v1/expenses");
   invalidate("/api/v1/requisitions");
@@ -124,6 +143,9 @@ export const asTyped = (wire: string) => {
  * New Request and Edit
  * ------------------------------------------------------------------ */
 
+/** Possible Duplicate's help on the request's modal (guide §6.8 rule 1). */
+const DUPLICATE_HELP = "Same amount within 30 days, from the same requester or to the same account.";
+
 /** Over Budget's help, on the form and on the request's modal alike. */
 const OVER_BUDGET_HELP = "More than the department has left for this category this year.";
 
@@ -209,6 +231,7 @@ export function RequestForm({ close, existing, project, sending }: { close: () =
   const create = useMutation("POST /api/v1/expenses/mine");
   const edit = useMutation("PATCH /api/v1/expenses/mine/:id");
   const submitOne = useMutation("POST /api/v1/expenses/mine/:id/submit");
+  const anyway = useSendAnyway();
   const read = useMutation("POST /api/v1/expenses/mine/invoice-reading");
   const suggest = useMutation("POST /api/v1/expenses/mine/category-suggestion");
   const lines = f.values.lines as LineValue[];
@@ -230,11 +253,13 @@ export function RequestForm({ close, existing, project, sending }: { close: () =
     if (!f.check() || (send && !payeeReady())) return;
     const body = { ...f.values, lines: linesOnWire(lines), invoice_document_id: invoice?.document_id ?? "" };
     try {
-      let saved: ExpenseRequest;
+      let saved: ExpenseRequest | null;
       if (existing) {
         saved = await edit.run({ params: { id: existing.expense_request_id }, body });
-        if (send) saved = await submitOne.run({ params: { id: existing.expense_request_id }, body: {} });
-      } else saved = await create.run({ body: { ...body, submit: send } });
+        if (send) saved = await anyway((confirm_duplicate) => submitOne.run({ params: { id: existing.expense_request_id }, body: { confirm_duplicate } }));
+      } else saved = send ? await anyway((confirm_duplicate) => create.run({ body: { ...body, submit: true, confirm_duplicate } })) : await create.run({ body: { ...body, submit: false } });
+      // Go Back on a possible duplicate: the form stays open, an edit already saved as a draft.
+      if (!saved) return refreshAll();
       refreshAll();
       close();
       toast(send ? `${saved.number} sent` : `${saved.number} saved`);
@@ -397,7 +422,8 @@ export function RequestCard({ id, actions }: { id: string; actions?: (r: Expense
       <CardHeader record title={`${r.number}, ${r.purpose}`} right={stagePill(r)} />
       <span className="mb-2 flex flex-wrap gap-2">
         {r.over_budget && <HelpTerm help={OVER_BUDGET_HELP}><Pill tone="err">Over Budget</Pill></HelpTerm>}
-        {r.possible_duplicates.length + r.possible_duplicates_hidden > 0 && <HelpTerm help="Same payee and amount within 30 days."><Pill tone="warn">Possible Duplicate</Pill></HelpTerm>}
+        {r.possible_duplicates.length + r.possible_duplicates_hidden > 0 && <HelpTerm help={DUPLICATE_HELP}><Pill tone="warn">Possible Duplicate</Pill></HelpTerm>}
+        {r.account_name_differs && <HelpTerm help="The account name does not include the payee's name."><Pill tone="warn">Name Differs</Pill></HelpTerm>}
       </span>
       <DataView
         rows={r.lines}
@@ -436,13 +462,14 @@ export function RequestCard({ id, actions }: { id: string; actions?: (r: Expense
           ]}
         />
       </div>
-      {r.possible_duplicates.length + r.possible_duplicates_hidden > 0 && (
+      {(r.possible_duplicates.length + r.possible_duplicates_hidden > 0 || r.duplicate_confirmed_at) && (
         <div className="mt-3">
           <CardHeader title="Possible Duplicates" right={aiOn && r.possible_duplicates.length > 0 && <Button size="sm" icon="spark" onClick={check}>Check Duplicate</Button>} />
           {r.possible_duplicates.map((o) => (
             <Sub key={o.expense_request_id}>{o.number}, {o.purpose}, <Money value={o.amount} /></Sub>
           ))}
           {r.possible_duplicates_hidden > 0 && <Sub>{r.possible_duplicates_hidden === 1 ? "1 request you cannot open" : `${r.possible_duplicates_hidden} requests you cannot open`}</Sub>}
+          {r.duplicate_confirmed_at && <Sub>Sent despite a possible duplicate</Sub>}
           {verdict && <p className="mt-1 text-xs font-semibold">{verdict.line}</p>}
           {verdict?.why && <Details title="Duplicate Check">{verdict.why}</Details>}
         </div>
@@ -536,6 +563,7 @@ export function OwnActions({ r, close }: { r: ExpenseRequest; close: () => void 
   const confirm = useConfirm();
   const cancel = useMutation("POST /api/v1/expenses/mine/:id/cancel");
   const send = useMutation("POST /api/v1/expenses/mine/:id/submit");
+  const anyway = useSendAnyway();
   if (!r.can_edit && !r.can_cancel) return null;
   const cancels = CANCELLABLE.includes(r.status);
   const editIt = (marked = false) => {
@@ -546,7 +574,7 @@ export function OwnActions({ r, close }: { r: ExpenseRequest; close: () => void 
   const sendIt = async () => {
     if (Object.keys(expenses.payeeProblems(r)).length) return editIt(true);
     try {
-      await send.run({ params: { id: r.expense_request_id }, body: {} });
+      if (!(await anyway((confirm_duplicate) => send.run({ params: { id: r.expense_request_id }, body: { confirm_duplicate } })))) return;
       refreshAll();
       close();
       toast(`${r.number} sent`);

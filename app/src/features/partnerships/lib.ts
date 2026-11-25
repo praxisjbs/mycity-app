@@ -77,10 +77,13 @@ export function useCategoryDefaults(categoryId?: string | null) {
   return c.data ? { commission: c.data.default_commission_pct, validity: c.data.default_validity_days } : null;
 }
 
-/** The people a list may be narrowed to by owner, 25 at a time as the menu nears its end (F32). */
-export function useOwnerOptions() {
-  const list = useInfinite("GET /api/v1/employees", { filters: { status: "active" } });
-  return { options: list.rows.map((e) => [e.employee_id, e.display_name] as [string, string]), ...paging(list) };
+/**
+ * The people a list may be narrowed to by owner, 25 at a time as the menu nears its end (F32): every
+ * active employee, and a former one who still owns records, marked `left` (QA F06e).
+ */
+export function useOwners() {
+  const list = useInfinite("GET /api/v1/partnerships/owners");
+  return { owners: list.rows, ...paging(list) };
 }
 
 /** The categories as options, 25 at a time as the menu nears its end (F32). */
@@ -161,10 +164,13 @@ const DEAL_STATUS: Record<DealRow["status"], { label: string; tone: Tone }> = {
 };
 export const dealPill = (s: DealRow["status"]) => ({ tone: DEAL_STATUS[s].tone, text: DEAL_STATUS[s].label });
 
-/** An agreement's status as Contracts & MOUs names it (§6.8): approval reads In Approval while it waits. */
+/**
+ * An agreement's status as Contracts & MOUs names it (§6.8): review and approval both wait on an
+ * approver, so both read In Approval, as the card and the chip that count them (QA F07c).
+ */
 export const AGREEMENT_STATUS: Record<AgreementStatus, { label: string; tone: Tone }> = {
   draft: { label: "Draft", tone: "neutral" },
-  review: { label: "In Review", tone: "warn" },
+  review: { label: "In Approval", tone: "warn" },
   approval: { label: "In Approval", tone: "warn" },
   sent: { label: "Sent", tone: "info" },
   viewed: { label: "Viewed", tone: "info" },

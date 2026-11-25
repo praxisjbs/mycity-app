@@ -378,10 +378,14 @@ export function CustomFieldsPart({ defs, f }: { defs: CustomField[]; f: Bound })
 
 const isBlank = (v: unknown) => v === "" || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
 
-/** A custom value as the API takes it: a number typed is a number; nothing typed is nothing. */
+/**
+ * A custom value as the API takes it: a number typed is a number, an amount typed plain or with commas
+ * is a money string like every other amount (QA F51b); nothing typed is nothing.
+ */
 function customOnWire(d: CustomField, v: CustomValue | undefined): CustomValue | undefined {
   if (isBlank(v)) return undefined;
   if (d.field_type === "number") return Number(v);
+  if (d.field_type === "money" && typeof v === "string") return toMoneyString(v);
   return v as CustomValue;
 }
 

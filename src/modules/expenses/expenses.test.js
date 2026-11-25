@@ -50,6 +50,30 @@ describe("what sending needs of the payee (fault #5, 23/11/2026)", () => {
   });
 });
 
+describe("the payee's bank details (QA audit BG-018)", () => {
+  const { ExpenseFields } = require("@mycity/contract").expenses;
+  const fields = (accountNumber) => ExpenseFields.shape.account_number.safeParse(accountNumber);
+
+  test("an account number is ten digits, never one digit repeated", () => {
+    expect(fields("0123456789").success).toBe(true);
+    expect(fields("1000000000").success).toBe(true);
+    for (const fake of ["0000000000", "1111111111", "9999999999"]) expect(fields(fake).error.issues[0].message).toBe("Not a real number");
+    expect(fields("012345678").error.issues[0].message).toBe("Ten digits");
+  });
+
+  test("Name Differs when the account name does not hold the payee's name, case, accents and punctuation set aside", () => {
+    expect(service.nameDiffers("Chuks Stores", "Chuks Stores Ltd")).toBe(false);
+    expect(service.nameDiffers("Café Adé", "CAFE ADE ENTERPRISES")).toBe(false);
+    expect(service.nameDiffers("Ade O. Bello", "Ade O Bello")).toBe(false);
+    expect(service.nameDiffers("Lekki Ushers", "Bayo Adeyemi")).toBe(true);
+    // A word cut short is another name: "Ade" is not "Adeyemi".
+    expect(service.nameDiffers("Ade", "Adeyemi Stores")).toBe(true);
+    // Nothing to compare flags nothing.
+    expect(service.nameDiffers(null, "Bayo Adeyemi")).toBe(false);
+    expect(service.nameDiffers("Lekki Ushers", "")).toBe(false);
+  });
+});
+
 describe("the routes", () => {
   const routes = routesOf(require("./expenses.routes").router);
 

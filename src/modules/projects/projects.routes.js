@@ -3,6 +3,7 @@
  * /api/v1/projects: My Workspace · Projects (docs/guides/workspace.md §5).
  *
  *   GET   /, /:id    `workspace` view: every project, with the tasks in it the reader can see
+ *   GET   /same-name `workspace` view: an active project already called this (New Project's warning)
  *   POST  /          `workspace` create: the caller owns it
  *   PATCH /:id       `workspace` edit: its owner, or a grant that reaches everyone (the service decides)
  */
@@ -19,6 +20,10 @@ const one = { params: c.common.IdParams };
 route(router, "get", "/",
   { query: p.ProjectListQuery, response: p.ProjectPage, summary: "Every project" },
   requirePermission("workspace", "view"), controller.list);
+
+route(router, "get", "/same-name",
+  { query: p.ProjectNameQuery, response: p.ProjectNameMatch, summary: "An active project already called this" },
+  requirePermission("workspace", "view"), controller.sameName);
 
 route(router, "get", "/:id",
   { ...one, response: p.Project, summary: "One project" },
