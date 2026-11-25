@@ -189,9 +189,12 @@ describe("projects, late reasons and the live board", () => {
     await screen.findByText("Completed, 30d", undefined, { timeout: 8000 });
     fireEvent.click(screen.getAllByRole("button", { name: /New Task/ })[0]!);
     const form = await screen.findByRole("dialog", { name: "New Task" });
-    fireEvent.change(within(form).getAllByPlaceholderText("Search people")[0]!, { target: { value: musa.first_name } });
-    const option = await within(form).findByRole("option", { name: new RegExp(musa.display_name) }, { timeout: 5000 });
+    // Assign To shows once the form knows the reader sets work for others (its own read).
+    const people = await within(form).findByRole("listbox", { name: /Assign To/ }, { timeout: 8000 });
+    const option = await within(people).findByRole("option", { name: new RegExp(musa.display_name) }, { timeout: 8000 });
     expect(within(option).getByText("No Login Yet")).toBeTruthy();
+    // Someone with a login reads plainly.
+    expect(within(people).getAllByRole("option").some((o) => !o.textContent?.includes("No Login Yet"))).toBe(true);
   }, 30000);
 
   it("New Event opens filled with the attendees Praxis AI named", async () => {
