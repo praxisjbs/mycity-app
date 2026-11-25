@@ -623,7 +623,7 @@ sources:
   - app/src/shell/nav.ts
   - packages/ui/src/data/DataView.tsx
 marks:
-  1: tab "Leave 1" | What waits on this screen
+  1: tab "Leave 1 unread notice" | What waits on this screen
   2: css :is(tr, li):has([data-unread]) | A request with something new
 ```
 

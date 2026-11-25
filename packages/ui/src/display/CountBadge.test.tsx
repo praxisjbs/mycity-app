@@ -14,6 +14,15 @@ describe("CountBadge", () => {
     expect(screen.getByText("3 approvals waiting")).toHaveClass("sr-only");
   });
 
+  it("holds its words inside itself, so a badge in a scrolling tab strip never widens a phone's page", () => {
+    // An absolute sr-only span escapes a scroller whose nearest positioned ancestor sits outside it.
+    render(<CountBadge count={4} words={unreadNotices(4)} />);
+    expect(screen.getByText("4 unread notices").parentElement).toHaveClass("relative");
+    render(<CountBadge count={2} words={unreadNotices(2)} className="absolute" />);
+    expect(screen.getByText("2 unread notices").parentElement).toHaveClass("absolute");
+    expect(screen.getByText("2 unread notices").parentElement).not.toHaveClass("relative");
+  });
+
   it("caps at max on screen but says the full count", () => {
     render(<CountBadge count={1200} />);
     expect(screen.getByText("99+")).toBeInTheDocument();

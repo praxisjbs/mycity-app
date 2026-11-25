@@ -1079,7 +1079,6 @@ crop: modal
 marks:
   1: label "Department" | Pick the department
   2: label "Start Date" | Their first day
-  3: label "Worksite" | Their office
 ```
 
 ```shot people-record

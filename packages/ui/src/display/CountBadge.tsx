@@ -47,9 +47,10 @@ export function CountBadge({ count, max = 99, tone = "primary", label, words, ti
   const badge = (
     <span
       data-count={count}
-      className={cn("inline-flex h-4.5 min-w-4.5 flex-none items-center justify-center rounded-full px-1.5 text-2xs leading-none font-strong tabular-nums", TONE[tone], className)}
+      className={cn("relative inline-flex h-4.5 min-w-4.5 flex-none items-center justify-center rounded-full px-1.5 text-2xs leading-none font-strong tabular-nums", TONE[tone], className)}
     >
       <span aria-hidden={spoken ? true : undefined}>{shown}</span>
+      {/* The badge is the words' containing block, so a badge in a sideways-scrolling strip keeps them inside it and never widens the page. */}
       {spoken && <span className="sr-only">{spoken}</span>}
     </span>
   );
