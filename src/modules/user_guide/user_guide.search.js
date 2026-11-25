@@ -7,7 +7,8 @@
  * A description (three words or more) is searched by meaning too. Its vector is asked for in
  * `prepare`, before ⌘K's transaction opens, and given little time: ⌘K is typed into all day, and
  * a word or two is found by its words as well as by its meaning. Not a table: the guide is files,
- * so the matches are made in memory, a page of 25 like every group.
+ * so the matches are made in memory, a page of 25 like every group. The chapters and their words
+ * index are built at boot (`warm`), before the API listens, not by the first person to search.
  */
 const routeMap = require("../../shared/route-map");
 const { pageOf, envelope, PAGE_SIZE } = require("../../shared/http/paged");
@@ -35,6 +36,10 @@ module.exports = Object.freeze({
   owned: false,
   capability: null,
   columns: [],
+  /** At boot (shared/search/warm.js): the chapters read and word-indexed, so the first search finds them ready. */
+  warm() {
+    service.indexOf(service.load());
+  },
   async prepare({ term, user }) {
     if (term.split(" ").filter(Boolean).length < MEANING_WORDS) return null;
     return meaning.embedSearch({ q: term, user, timeoutMs: MEANING_WAIT_MS });

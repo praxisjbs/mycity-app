@@ -14,7 +14,10 @@
  *            screens they may open, the routes to the screens where a change is made, and the
  *            actions they may draft as a card (only when the asking screen draws cards)
  *   tools    one per read and per summary the person may run (authorise.allowedReads,
- *            allowedSummaries); a read they may not run is never offered
+ *            allowedSummaries); a read they may not run is never offered. A question asking how
+ *            to do something in the hub (howTo) starts narrower (§6.1 step 3): the User Guide's
+ *            search alone, the screens and routes, no actions, and the engine's `more_reads` to
+ *            be offered the rest when the guide is not enough
  *   loop     the engine's: the model calls reads or answers. Each call runs through authorise
  *            here (runTool), so the grant, the scope, the page of 25 and the field mask are
  *            code's, never the model's. At most 5 reads; a repeated read, the fifth read or the
@@ -60,6 +63,25 @@ const engine = createEngine({ limits: { maxReads: MAX_READS, maxRounds: MAX_ROUN
 const { toolName, keyOf, stable } = turn;
 
 const ISO_DAY = "^\\d{4}-\\d{2}-\\d{2}$";
+
+/** The read a how-to question starts from (`user_guide.ai.js`). */
+const GUIDE_READ = "guide.search";
+
+/**
+ * A question asking how to do something in the hub, in the words people ask it: "How do I request
+ * leave?", "how to add a holiday", "Where can I change my PIN?", "Which screen shows payslips?".
+ * "How many", "how much" and "how long" ask for figures, and are not.
+ */
+const HOW_TO =
+  /^\s*(?:(?:please|hi|hello)[\s,]+)?(?:how\s+(?:do|can|could|should|would|does|will)\s+(?:i|we|you|one|someone|a\s+\w+|staff|people)\b|how\s+to\b|where\s+(?:do|can|could|should|would)\s+(?:i|we)\b|where\s+(?:is|are)\s+(?:the\s+)?(?:\w+\s+){0,4}(?:button|screen|tab|page|menu|setting)s?\b|what\s+(?:do|should)\s+i\s+(?:press|click|tap|open)\b|which\s+(?:screen|button|tab|page|menu)\b)/i;
+
+/** Whether a question asks how to do something in the hub, rather than for records or figures. */
+const isHowTo = (question) => HOW_TO.test(String(question || ""));
+
+/** What `more_reads` says it does, for the model choosing whether to call it. */
+const MORE_READS =
+  "Offers every read and summary this person may run, and the actions they may draft as a card. Call it when the User Guide cannot answer: the question needs the person's records or figures, or asks you to make a change, not how to do something in the hub.";
+const MORE_GIVEN = "Every read and summary this person may run is offered now, and the actions they may draft are listed in the first message again.";
 
 /**
  * The fields a schema takes, each with the form its value is written in, for the lists the model
@@ -172,7 +194,7 @@ function askedFromLines(ctx, context) {
  * The system turn: the prompt, then the facts of this question, in a fixed order every round
  * (decision 24: a stable prefix).
  */
-function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = false } = {}) {
+function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = false, held = false } = {}) {
   const today = lagos.today(now);
   const labelOf = (module, tab) => (ctx.screens.find((s) => s.module === module && s.tab === tab) || {}).label || `${module}.${tab}`;
   const who = [
@@ -203,7 +225,11 @@ function systemTurn(prompt, ctx, now, { context = null, actions = [], pane = fal
       : ["- none"]),
     "",
     "Actions you may draft as a card for the person to confirm (name one by its key in \"action\"; the person presses it; you never say it was done):",
-    ...(actions.length ? actions.map((a) => actionLine(a, today)) : ["- none: offer a route instead"]),
+    ...(actions.length
+      ? actions.map((a) => actionLine(a, today))
+      : held
+        ? ["- held back while the User Guide answers: call more_reads to be offered them"]
+        : ["- none: offer a route instead"]),
     "",
     ...(pane
       ? [
@@ -352,8 +378,9 @@ async function answer({ db, actor, question, history = [], context = null, shows
       type: "function",
       function: { name: toolName(r.key), description: describe(r), parameters: jsonSchemaOf(r.params) },
     }));
+    const turnOpts = { context, actions: allowedActions, pane: wants.has("pane") };
     const messages = [
-      systemTurn(talk.prompt, ctx, now, { context, actions: allowedActions, pane: wants.has("pane") }),
+      systemTurn(talk.prompt, ctx, now, turnOpts),
       ...historyTurns(history, keep),
       { role: "user", content: `${question}${fresh ? documentLine(file, keep, true) : ""}` },
     ];
@@ -439,10 +466,26 @@ async function answer({ db, actor, question, history = [], context = null, shows
       }
     };
 
+    // A how-to question starts from the User Guide and the screens (§6.1 step 3): the guide's search
+    // alone, and no actions, until the model calls more_reads. Not with a document to read, nor
+    // while a card is being gathered.
+    const guide = tools.find((t) => t.function.name === toolName(GUIDE_READ));
+    const gathering = Boolean(history.length && history[history.length - 1].ask);
+    const start =
+      guide && !fresh && !gathering && isHowTo(question)
+        ? {
+            tools: [guide],
+            system: allowedActions.length ? systemTurn(talk.prompt, ctx, now, { ...turnOpts, actions: [], held: true }) : null,
+            more: MORE_READS,
+            given: MORE_GIVEN,
+          }
+        : null;
+
     const { draft } = await engine.runTurn({
       talk,
       messages,
       tools,
+      start,
       output: AiAnswerDraft,
       runTool,
       parse: (text, schema) => parseStructured(text, schema),
@@ -494,4 +537,4 @@ async function rescue(talk, question, reads, deadline = null) {
   return { text: text.slice(0, 4000), table: null, route: null, prefill: null, more: false, action: null, overview: null };
 }
 
-module.exports = { answer, MAX_READS, MAX_ROUNDS, HISTORY_TURNS, DEADLINE_MS, toolName, keyOf, resultContent, historyTurns, systemTurn, schemaFields, documentLine, fileRead, offeredWith };
+module.exports = { answer, MAX_READS, MAX_ROUNDS, HISTORY_TURNS, DEADLINE_MS, GUIDE_READ, toolName, keyOf, resultContent, historyTurns, systemTurn, schemaFields, documentLine, fileRead, offeredWith, isHowTo };

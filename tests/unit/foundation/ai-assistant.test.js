@@ -22,6 +22,12 @@ const { AppError } = require("../../../src/shared/errors");
 const fieldMask = require("../../../src/shared/rbac/field-mask");
 const c = require("@mycity/contract");
 
+/** The real manifests, read before any test mocks the registry: a how-to question is measured against them. */
+const REAL = (() => {
+  registry.load();
+  return { reads: registry.reads(), summaries: registry.summaries(), actions: registry.actions(), routes: registry.routes() };
+})();
+
 const ACTOR = { user_id: "u1", employee_id: "e1", display_name: "Ada Obi", role_ids: ["r1"], is_ceo: false };
 const db = {
   query: async (sql) => {
@@ -273,6 +279,86 @@ describe("one question", () => {
     expect(out.draft.text).toBe("[AI placeholder]");
     expect(vendors.stub.complete.mock.calls[0][0].tools).toBeNull();
     expect(authorise.runRead).not.toHaveBeenCalled();
+  });
+});
+
+describe("a how-to question starts from the User Guide (praxis-ai.md §6.1 step 3; QA BG-051)", () => {
+  const GUIDE_ROW = { slug: "my-leave-request", chapter: "My Leave", title: "Request leave", text: "Press Request Leave, pick the type and the days, then Send Request." };
+  /** One round as the model was sent it: its tools by name, its first message, and its size in characters. */
+  const roundOf = (r) => ({
+    tools: (r.tools || []).map((t) => t.function.name),
+    system: r.messages[0].content,
+    chars: JSON.stringify({ messages: r.messages, tools: r.tools }).length,
+  });
+  const askReal = (vendors, question, over = {}) => ask(vendors, { question, shows: ["cards", "pane"], ...over });
+
+  beforeEach(() => {
+    // The whole catalogue, offered as to the CEO from the full screen, which draws cards and the pane.
+    authorise.allowedReads.mockResolvedValue(REAL.reads);
+    authorise.allowedSummaries.mockResolvedValue(REAL.summaries);
+    jest.spyOn(authorise, "allowedActions").mockResolvedValue(REAL.actions);
+    registry.read.mockImplementation((k) => REAL.reads.find((r) => r.key === k) || null);
+    registry.routes.mockReturnValue(REAL.routes);
+    jest.spyOn(search, "readerOf").mockResolvedValue({ ...READER, is_ceo: true });
+    jest.spyOn(fieldMask, "maskedKeysFor").mockResolvedValue([]);
+    jest.spyOn(authorise, "runRead").mockResolvedValue({ list: true, page: { number: 1, size: 25, total: 1, pages: 1, has_next: false }, data: [GUIDE_ROW], citations: [] });
+  });
+
+  test("isHowTo: how to do something in the hub, in the words people ask it; figures and records are not", () => {
+    for (const q of ["How do I request leave?", "how can I change my PIN", "How to add a public holiday", "Where do I find my payslip?", "Where is the Clock In button?", "Which screen shows overdue tasks?", "What do I press to approve an expense?", "Please, how do I invite a new user?", "How does a manager approve leave?"])
+      expect([q, orchestrator.isHowTo(q)]).toEqual([q, true]);
+    for (const q of ["How many people are on leave today?", "How much did we spend on travel in October?", "How long has Ada worked here?", "Who is absent today?", "Show my tasks due this week", "Is Tunde on leave?"])
+      expect([q, orchestrator.isHowTo(q)]).toEqual([q, false]);
+  });
+
+  test("the first round offers guide.search and more_reads, with the screens and routes and no actions, far smaller than a data question's", async () => {
+    const data = model([reply(DRAFT())]);
+    await askReal(data, "How many leave requests wait on me?");
+    const today = roundOf(data.gemini.complete.mock.calls[0][0]);
+    expect(today.tools).toHaveLength(REAL.reads.length + REAL.summaries.length);
+    expect(today.tools).not.toContain("more_reads");
+
+    const howTo = model([reply("", [call("guide__search", { q: "request leave" }, "g1")]), reply(DRAFT({ text: "Open My Leave and press Request Leave." }))]);
+    const out = await askReal(howTo, "How do I request leave?");
+    const [first, second] = howTo.gemini.complete.mock.calls.map(([r]) => r);
+    const one = roundOf(first);
+    expect(one.tools).toEqual(["guide__search", "more_reads"]);
+    expect(one.system).toContain("Screens this person can open:");
+    expect(one.system).toContain("Routes to the screen where a change is made");
+    expect(one.system).toContain("- held back while the User Guide answers: call more_reads to be offered them");
+    expect(today.system).not.toContain("held back");
+    // The prompt, today, who is asking and the screens are the same words: only the catalogue is held back.
+    expect(one.system.split("Actions you may draft")[0]).toBe(today.system.split("Actions you may draft")[0]);
+    expect(authorise.runRead).toHaveBeenCalledWith(db, ACTOR, "guide.search", { q: "request leave" });
+    expect(out.draft.text).toBe("Open My Leave and press Request Leave.");
+    expect(out.reads).toEqual([expect.objectContaining({ n: 1, key: "guide.search", ok: true })]);
+    // Far fewer: the first round a fifth of today's at most, and both rounds together less than today's one.
+    expect(one.chars).toBeLessThan(today.chars / 5);
+    expect(one.chars + roundOf(second).chars).toBeLessThan(today.chars);
+  });
+
+  test("more_reads offers the whole catalogue and the actions from the next round; it is not one of the five reads", async () => {
+    const vendors = model([reply("", [call("more_reads", { needs: "the requests waiting" }, "m1")]), reply(DRAFT({ text: "None wait on you." }))]);
+    const out = await askReal(vendors, "How do I see the leave requests waiting on me?");
+    const [first, second] = vendors.gemini.complete.mock.calls.map(([r]) => roundOf(r));
+    expect(first.tools).toEqual(["guide__search", "more_reads"]);
+    expect(second.tools).toHaveLength(REAL.reads.length + REAL.summaries.length + 1);
+    expect(second.tools.at(-1)).toBe("more_reads");
+    expect(second.system).not.toContain("held back");
+    expect(second.system).toContain("- tasks.create: ");
+    expect(out.reads).toEqual([]);
+  });
+
+  test("not narrowed: a document to read, a card being gathered, or a person without the User Guide", async () => {
+    const full = REAL.reads.length + REAL.summaries.length;
+    const firstTools = async (over) => {
+      const vendors = model([reply(DRAFT())]);
+      await askReal(vendors, "How do I request leave?", over);
+      return roundOf(vendors.gemini.complete.mock.calls[0][0]).tools.length;
+    };
+    expect(await firstTools({ history: [{ question: "Request leave for me", answer: "Which type?", ask: { action: "leave.request", field: "leave_type_id" } }] })).toBe(full);
+    authorise.allowedReads.mockResolvedValue(REAL.reads.filter((r) => r.key !== "guide.search"));
+    expect(await firstTools({})).toBe(full - 1);
   });
 });
 

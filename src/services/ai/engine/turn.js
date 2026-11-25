@@ -14,6 +14,7 @@
  *     parse,                // (text, schema) => { ok, value, issues }
  *     rescue,               // async (talk, deadline) => a draft, or throws
  *     limits: { maxReads, maxRounds, deadlineMs },
+ *     start,                // optional: a narrower first offer (below)
  *     now, toolKey, stable,
  *   });
  *   // → { draft, attempts, forcedAt }
@@ -25,7 +26,12 @@
  *   - a reply that does not parse is sent back once with its problems; a second failure is the
  *     rescue; the rescue throwing is the caller's AI_BAD_OUTPUT;
  *   - past the deadline the model is not asked again: AI_UNAVAILABLE through talk.fail;
- *   - on a forced round the tools stay offered with none to call (Claude needs them defined).
+ *   - on a forced round the tools stay offered with none to call (Claude needs them defined);
+ *   - a narrower start (`start: { tools, system?, more, given }`) offers `start.tools` and one tool
+ *     more, `more_reads` (described by `more`), with `start.system` in place of the first message.
+ *     Calling `more_reads` offers every tool from the next round and puts the first message back,
+ *     answered with `given`; it is not a read and never counts as one. A call to a tool held back
+ *     widens the offer the same way and then runs: the person's rights are the adapter's either way.
  */
 const { EngineError } = require("./errors");
 
@@ -44,6 +50,19 @@ function stable(v) {
 const toolName = (key) => key.replace(".", "__");
 const keyOf = (name) => String(name || "").replace("__", ".");
 
+/** The tool a narrower start adds, by which the model asks for every other. A key has a dot, so no tool is named this. */
+const MORE = "more_reads";
+
+/** `more_reads` as a function tool; one optional field, since Gemini refuses an object with no properties. */
+const moreTool = (description) => ({
+  type: "function",
+  function: {
+    name: MORE,
+    description,
+    parameters: { type: "object", properties: { needs: { type: "string", description: "What the question needs that the tools offered cannot give" } } },
+  },
+});
+
 function argsOf(call) {
   try {
     const v = JSON.parse(call.function.arguments || "{}");
@@ -57,7 +76,7 @@ function argsOf(call) {
  * @param {object} q
  * @returns {Promise<{draft: object, attempts: number}>}
  */
-async function runTurn({ talk, messages, tools, output, runTool, parse, rescue, limits, now = () => Date.now() }) {
+async function runTurn({ talk, messages, tools, output, runTool, parse, rescue, limits, start = null, now = () => Date.now() }) {
   const { maxReads, maxRounds, deadlineMs } = limits;
   const started = now();
   const deadline = started + deadlineMs;
@@ -68,9 +87,33 @@ async function runTurn({ talk, messages, tools, output, runTool, parse, rescue, 
   let corrected = false;
   let draft = null;
 
+  // A narrower start: its tools and `more_reads`, its own first message, until the model asks for more.
+  const narrow = Boolean(start && !forced);
+  let offered = narrow ? [...start.tools, moreTool(start.more)] : tools;
+  let names = new Set(offered.map((t) => t.function && t.function.name));
+  const held = narrow && start.system ? messages[0] : null;
+  if (held) messages[0] = start.system;
+  let widened = !narrow;
+  const widen = () => {
+    widened = true;
+    // `more_reads` stays defined: Claude needs every tool the conversation has called.
+    offered = [...tools, moreTool(start.more)];
+    names = new Set(offered.map((t) => t.function && t.function.name));
+    if (held) messages[0] = held;
+  };
+
   /** One tool call: run it with the person's rights (the adapter's job) and say what came back. */
   const handle = async (call) => {
-    const key = keyOf(call.function && call.function.name);
+    const name = call.function && call.function.name;
+    if (name === MORE) {
+      if (!start) return JSON.stringify({ key: MORE, error: "not_available" });
+      if (widened) return JSON.stringify({ key: MORE, error: "already_offered", message: "Every tool is offered already." });
+      widen();
+      return JSON.stringify({ key: MORE, ok: true, message: start.given || "Every tool is offered now." });
+    }
+    // A tool held back by a narrower start, called anyway: offered from now on, then run as asked.
+    if (!widened && !names.has(name)) widen();
+    const key = keyOf(name);
     const params = argsOf(call);
     if (attempts >= maxReads) return JSON.stringify({ error: "read_limit", message: "No more reads for this question. Answer with what you have." });
     attempts += 1;
@@ -102,7 +145,7 @@ async function runTurn({ talk, messages, tools, output, runTool, parse, rescue, 
       messages,
       // The tools stay offered on a forced round, with none to call: Claude needs them defined
       // for the calls already in the conversation (llm.service ask()).
-      tools: tools.length ? tools : null,
+      tools: offered.length ? offered : null,
       toolChoice: forced ? "none" : "auto",
       output: forced ? output : null,
       kind: corrected && forced ? "retry" : "completion",
@@ -140,4 +183,4 @@ async function runTurn({ talk, messages, tools, output, runTool, parse, rescue, 
   return { draft, attempts };
 }
 
-module.exports = { runTurn, stable, toolName, keyOf, argsOf };
+module.exports = { runTurn, stable, toolName, keyOf, argsOf, MORE };

@@ -613,6 +613,15 @@ As built (17/10/2026):
 - A record group also stands down while its feature is switched off: a provider's `available(client)`
   (`shared/search/provider.js`) is asked before its query, and false leaves the group out for
   everyone (Home Locations while the Attendance policy's Home Location is off, `attendance.md` §1.3).
+- **Warmed at boot** (QA BG-049, 25/11/2026). Before the API listens, `src/server.js` runs
+  `shared/search/warm.js`: each provider's own `warm()` (the User Guide's group reads and word-indexes
+  the chapters, about half a second), then one pooled connection opened and pg_trgm looked up (and,
+  when it is there, one similarity asked so its library is loaded). The first search after a restart
+  no longer pays for it. Warming never stops a boot: it waits 10 seconds at most, and a step that
+  fails or a wait that runs out is logged ("search: warming took too long; the API listens
+  regardless") and the boot carries on; "search warmed" logs the time and each step. The p95 of
+  `GET /search` on staging is read from the request log after a deploy; none was measured from the
+  build session.
 - Work a provider needs from outside the database is its `prepare({ term, user })`, run for every
   provider that will search before the transaction opens, so no connection waits on a network
   call; what it returns reaches its search as `prepared`, and one that fails costs only itself. The
@@ -1219,6 +1228,7 @@ screen.
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · QA BG-049. §6.7: search is warmed at boot before the API listens (`shared/search/warm.js`; the User Guide's chapters indexed, a connection opened, pg_trgm looked up and loaded), bounded at 10 seconds and logged, never stopping a boot. Tests: `tests/unit/foundation/search-warm.test.js`, `tests/integration/server-boot.test.js`.
 - 24/11/2026 · JP · QA BG-004, BG-005, BG-013 (JBS Praxis decisions). §6.1: Obianuju Nwoye replaces Cynthia Osasere Osakunih, who has left, as Operations & People Lead in `seeds/staff/staff-list.xlsx` (S/N 6, now 00038) and `roles.json` (`obianuju@mycityapp.io`); the loader matches her staging record by number and email and leaves Cynthia's as it is (`tests/integration/organisation.test.js`, `staff-nomenclature.test.js`). §6.5, §6.6: a line manager who has left is passed over to the next active manager above, or the CEO (`migrations/1161`, `organogram.md` §6; `tests/integration/workflow.test.js`). Every form in a modal, side panel or sheet, wizards included, now asks Keep Editing or Discard Changes before Esc, the scrim, the close button or a drag loses its entries: `useContractForm` reports its own changes (FRONTEND_GUIDE §8.4; `packages/ui/src/form/useContractForm.test.tsx`).
 - 24/11/2026 · JP · Add Employee and Edit Record: a line or dotted manager who is the person themselves (`REPORTS_TO_SELF`) is refused on the field as before and never recorded on System Health, as on the organogram (`organogram.md` §5; faults #3 and #4 of the 23/11 staging brief).
 - 17/11/2026 · JP · The leave flow (`leave.approval`, §6.5) is unchanged: a leave request may now name a relief officer and carry a handover note, read by its approvers where they decide on People · Leave (`docs/guides/ess.md` §6, §8). `workflow.service` exports `mayRead`, the approval's own reader check, which the handover note's vault rule reuses. No foundation screen changed.

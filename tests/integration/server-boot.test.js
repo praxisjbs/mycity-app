@@ -8,7 +8,8 @@
  * fault in the boot itself passed the whole suite and failed only on staging, where deploy-gate
  * waited 120 s for a readiness answer that never came and switched back. This file starts
  * src/server.js as its own process and waits for the answer deploy-gate waits for:
- * /api/health/ready with ok true and this build's sha (scripts/deploy/deploy-gate, wait_ready).
+ * /api/health/ready with ok true and this build's sha (scripts/deploy/deploy-gate, wait_ready),
+ * and checks the boot warmed search before it listened (shared/search/warm.js).
  *
  * Refuses to run unless the database name ends in "_test": it drops and rebuilds the public
  * schema.
@@ -105,6 +106,13 @@ describeDb("src/server.js boots", () => {
           `src/server.js was not ready within ${READY_WITHIN_MS / 1000}s. Last answer: ${JSON.stringify(body)}\n${last}`,
         );
       expect(body.status).toMatch(/^(ready|degraded)$/);
+      // Search is warmed before the API listens (foundation.md §6.7; QA BG-049): the User Guide
+      // indexed and pg_trgm looked up, so the first person to search does not pay for it.
+      const warmed = output.indexOf("search warmed");
+      expect(warmed).toBeGreaterThan(-1);
+      expect(warmed).toBeLessThan(output.indexOf("mycity api listening"));
+      expect(output).toMatch(/"guide_section":"ready"/);
+      expect(output).toMatch(/"trigram":"ready"/);
     },
     READY_WITHIN_MS + 60_000,
   );

@@ -327,7 +327,7 @@ src/
 │   │                  daily limit as a hard stop) · refusals (the addresses the mail server refused)
 │   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms;
 │   │                  screens.test: which tabs a reader sees) · actions (⌘K actions: each screen's
-│   │                  New action, Clock In, Request Leave)
+│   │                  New action, Clock In, Request Leave) · warm (readies search at boot)
 │   ├── ai/            manifest (reads, summaries, actions and routes, checked at load) · registry · catalogue-sync ·
 │   │                  authorise (a read, a summary or an action with the person's rights, inside a 3 second
 │   │                  statement timeout) · summary (the shape of a summary's figures, groups, series and
