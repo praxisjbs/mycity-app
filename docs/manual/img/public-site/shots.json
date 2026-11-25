@@ -25,15 +25,15 @@
   },
   "public-apply": {
     "spec": "b6f0b9175d8ca747",
-    "source": "bf9619edce2b406a",
+    "source": "11fdceaf1f856f56",
     "devices": [
       "desktop",
       "phone"
     ]
   },
   "public-apply-questions": {
-    "spec": "0c5521efda000ca1",
-    "source": "bf9619edce2b406a",
+    "spec": "7d1c20bae2765e14",
+    "source": "11fdceaf1f856f56",
     "devices": [
       "desktop",
       "phone"
@@ -137,7 +137,7 @@
   },
   "public-verify": {
     "spec": "bdadc6d729a58dae",
-    "source": "ddd32f07e982c923",
+    "source": "b369dd8ee3206ab5",
     "devices": [
       "desktop",
       "phone"
@@ -145,7 +145,7 @@
   },
   "public-verify-agreement": {
     "spec": "674cb11364f1e7be",
-    "source": "ddd32f07e982c923",
+    "source": "b369dd8ee3206ab5",
     "devices": [
       "desktop",
       "phone"
@@ -153,7 +153,7 @@
   },
   "public-verify-certificate": {
     "spec": "e9c161869823d53c",
-    "source": "ddd32f07e982c923",
+    "source": "b369dd8ee3206ab5",
     "devices": [
       "desktop",
       "phone"
