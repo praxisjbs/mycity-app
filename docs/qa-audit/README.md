@@ -35,9 +35,11 @@ each list's row reads.
       milestone and owner, Change Report rows, MyCity Actions rows).
 - [x] Workbook built: `MyCity-QA-Audit-Response.xlsx` (zero formula errors, 83 of 83 findings
       reconciled once each).
-- [ ] Before PR #173 is ready: give `docs/qa-audit/` its lines in `README.MD` (README §11), or
-      move the folder out of the repository.
-- [ ] Fix the open items, ticking Fixed ✓ with the PR and date.
+- [x] `docs/qa-audit/` mapped in `README.MD` (README §11).
+- [x] Every item fixed and ticked: High and Medium in #173 (24/11/2026), the Low items in #174 and
+      #175 (25/11/2026), per `LOW-ITEMS-PLAN.md`. All 81 rows of Bugs & Gaps carry Fixed ✓.
+- [ ] MyCity retests and fills the MyCity retest column; MyCity Actions and the Change Report are
+      theirs to act on and decide.
 
 ## To rebuild the workbook
 

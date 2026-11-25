@@ -551,6 +551,40 @@ FIXED_NOW.update({k: ("#174", "2026-11-25", v) for k, v in {
     "F69": "The Audit Log now names partners, leads, deals and proposals by number and title.",
     "F75b": "A role's People tab now opens on active logins, so its count and list agree.",
 }.items()})
+FIXED_NOW.update({k: ("#175", "2026-11-25", v) for k, v in {
+    "F09c": "An account number of one digit repeated is refused, and approvers see Name Differs "
+                                "when the account name does not hold the payee's name.",
+    "F26b": "Expenses · Disbursements is now shown only to those who can record payments.",
+    "F65b": "A likely duplicate (same requester or account, same amount, within 30 days) is now refused "
+            "until the requester presses Send Anyway, and approvers see it was sent despite a possible duplicate.",
+    "F68a": "An announcement whose audience reaches nobody is now refused on Departments.",
+    "F68b": "Only active departments are now offered as announcement audiences.",
+    "F06e": "Former staff who still own partnership records now appear in the Owner filter, tagged Left.",
+    "F07b": "New Partner's signed copy is now recorded as the partner's agreement.",
+    "F07c": "In Review now reads In Approval, and the In Approval chip lists what its card counts.",
+    "F51b": "Custom money fields now accept amounts typed with commas.",
+    "F53b": "A signed deal's value can no longer be cleared.",
+    "F61b": "Enter Returns now suggests MyCity Commission from the deal's or category's rate.",
+    "F02e": "A computed run now says Records changed since Compute when a joiner or a record it reads changed.",
+    "F26c": "Record Advance and the deduction buttons now follow the payroll grants.",
+    "F28a": "Staging demo tasks now keep their dates from each deploy, with late reasons and spread priorities.",
+    "F43b": "New Project now warns when an active project already has the name.",
+    "F79b": "Assign To and Lead now show No Login Yet beside someone who cannot sign in yet.",
+    "F79c": "Edit Project now has Owner, so a leaver's project can be handed on; a leaver owner reads Left.",
+    "F32b": "New Offer and Send Offer now warn when the start date falls before the offer expires.",
+    "F74b": "Verify now says no signed document has the reference, and that a document is checkable once signed.",
+    "F40": "Raised By now names a rule as Rule: Unregistered Device.",
+    "F31": "Staging vacancies now sit under MyCity's own departments.",
+    "F32c": "Schedule Interview now warns when the candidate has an open offer.",
+    "F81b": "Score With AI now says Reading the CV, and the sheet updates when the read lands.",
+    "F81d": "Apply's step 2 is now Your CV for a role with no questions.",
+    "F81e": "The CV picker now offers PDF or Word (.docx) only, as the server accepts.",
+    "F58a": "A start before the 18th birthday is now refused, as the Child's Rights Act 2003 s.28 and Lagos "
+            "Child's Right Law s.25 require.",
+    "F58b": "Pay below the Minimum Wage in force is now warned of on the record and in the payroll run.",
+    "F58c": "The pension PIN must now be PEN followed by digits (PenCom's format); the Tax ID has no legal "
+            "format, so it keeps its rule.",
+}.items()})
 
 # ---------------------------------------------------------------- compile
 SEV_ORDER = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
@@ -666,7 +700,7 @@ meta = dict(
         "Bugs & Gaps is the fix tracker: only verified bugs, gaps, improvements and seed-data fixes. "
         "JBS Praxis ticks Fixed ✓ with the PR and date as each fix merges; MyCity records its retest.",
         "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them. "
-        "Every High and Medium item was fixed in #173 (24/11/2026), and the Low items in #174 and the PR after it; "
+        "Every High and Medium item was fixed in #173 (24/11/2026), and every Low item in #174 and #175 (25/11/2026); "
         "each fixed row's note for MyCity starts with what changed.",
         "To be Discussed (Change Report) holds requests outside the signed milestones, or that change a "
         "decision already agreed. Nothing there is built until a change request is agreed.",
