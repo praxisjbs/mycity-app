@@ -514,7 +514,8 @@ of the people you manage.
 
 1. Open [Performance · Scorecards](/performance?tab=targets).
 2. The tiles count the **Scorecards**, how many are **Agreed**, **Awaiting Agreement**, and
-   **Below Meets**.
+   **Below Meets**. **Scorecards** counts every scorecard of the quarter, Drafts and Closed ones
+   too, so it can be more than Agreed and Awaiting Agreement together.
 3. Narrow the list with **Quarter**, **Department** and **Status**, or type in **Search People**.
    **Department** lists only the departments of the people you can see. With one, it is left off.
 4. Each row shows the **Employee**, **Department**, **Reviewer**, **Status**, **Score to Date**
