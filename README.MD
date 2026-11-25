@@ -238,6 +238,7 @@ mycity-app/
 │   ├── qa-audit/             MyCity's QA audit of staging (16-17/11/2026) and our response:
 │   │                         MyCity-QA-Audit-Response.xlsx (the fix tracker shared with MyCity),
 │   │                         README.md (where it stands), BRIEF.md (how a finding is verified),
+│   │                         LOW-ITEMS-PLAN.md (the two PRs that clear the Low items),
 │   │                         source/ (MyCity's tracker), groups/, verdicts/ (one block per finding),
 │   │                         compile.py (verdicts to items.json) and build.py (items.json to the workbook)
 │   └── manual/               the User Guide (Knowledge Hub · User Guide, docs/guides/user-guide.md): one
