@@ -50,3 +50,25 @@ Every other item follows its tracker row's Fix as written.
 Guide chapters changed with the screens and their pictures retaken (`npm run guide:shots -- --stale`),
 the tracker rows ticked and the workbook rebuilt and recalculated with zero formula errors, then
 GitHub's CI green and the PR merged.
+
+## Research for PR 2 (checked 25/11/2026 from the primary texts)
+
+- **Minimum age at the start date: 18.** Child's Rights Act 2003, s.28(1)(b): "no child shall be ...
+  employed to work in any capacity except where he is employed by a member of his family on light
+  work of an agricultural, horticultural or domestic character"; s.277: "'child' means, a person
+  under the age of eighteen years" (PLAC copy, https://placng.org/lawsofnigeria/laws/C50.pdf). Lagos
+  State's own Child's Right Law, Cap. C7, s.25(1)(b) says the same ("a child must not be ... employed
+  to work in any capacity except ... by a member of his family on light work ... approved by the
+  Commissioner"), and s.261 defines a child as "a person under the age of eighteen (18) years"
+  (https://sabilaw.org/wp-content/uploads/2022/04/Childs-Right-Law-of-Lagos-State-2007-1.pdf).
+  The Labour Act, Cap. L1, s.59 could not be read (the online copy refused automated reads); the
+  Child's Rights Act s.29 applies its young-person sections to children, and the Act's own s.28 is
+  the stricter rule. So Add Employee and Edit Record refuse a start date before the 18th birthday.
+- **Tax ID: no format check.** The Nigeria Tax Administration Act 2025 (Official Gazette No. 117,
+  26/06/2025; https://gazettengr.com/wp-content/uploads/NIGERIA-TAX-ADMINISTRATION-ACT-2025.pdf),
+  ss.4, 7 and 8, requires a Tax ID and says how it is issued and used, but prescribes no format. The
+  field keeps today's rule (letters, digits and hyphens, up to 30), and the guide says so in plain words.
+- **Pension PIN: "PEN" then digits.** PenCom's Revised Guidelines for Retirement Savings Account
+  Registration 2019 (https://www.pencom.gov.ng/wp-content/uploads/2019/06/REVISED-RSA-REGISTRATION-GUIDELINES.pdf)
+  show every RSA PIN as "PEN" followed by digits (§5.3.13 and its sample file) and publish no length.
+  The field checks the prefix and that only digits follow; no length is enforced.
