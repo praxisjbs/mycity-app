@@ -175,6 +175,7 @@ const PROJECTS: MockProject[] = [
   due_on: isoDaysAhead(dueIn as number),
   status: status as Project["status"],
   completed_at: status === "completed" ? at(12, "16:00") : null,
+  owner_left: false,
   partner_link: null,
   created_at: at(30 - i, "09:00"),
 }));
@@ -253,6 +254,8 @@ const manages = (user: string, t: Task) => t.set_by?.employee_id === me(user) ||
 /** Whether a person (by key) can see a task: they lead, share or set it, or its lead is in their team. */
 const seesTask = (user: string, t: Task) => mine(user, t) || Boolean(t.assignee && teamOf(user).some((p) => p.employee_id === t.assignee!.employee_id));
 const colleague = (user: string, id: string) => byId(id)?.department === byKey(user)?.department;
+/** Whether someone can sign in: Settings · Users' mock gives a login to the roster's first 22 (No Login Yet beside the rest). */
+const hasLogin = (id: string) => PEOPLE.findIndex((p) => p.employee_id === id) < 22;
 /** Who the user may put on a task (GET /tasks/people): their team, and to share one, their department; never themselves. */
 const reachable = (user: string, shared: boolean) =>
   PEOPLE.filter((p) => p.employee_id !== me(user) && (canSetFor(user, p.employee_id) || (shared && colleague(user, p.employee_id))));
@@ -377,7 +380,7 @@ route("GET /api/v1/tasks/people", (req) => {
   const rows = dept
     ? PEOPLE.filter((p) => sid(`dept:${p.department}`) === dept && canSetFor(req.user!, p.employee_id))
     : reachable(req.user!, shared === "true");
-  return paged(rows.map((p) => ref(p)!), { ...req, query }, { search: (p) => [p.display_name] });
+  return paged(rows.map((p) => ({ ...ref(p)!, has_login: hasLogin(p.employee_id) })), { ...req, query }, { search: (p) => [p.display_name] });
 });
 /** A shared task's lead, as the API's checkLead decides: from the department, or the user or one of the people. */
 function leadProblem(user: string, leadId: string, b: { primary_assignee_id?: string; member_ids?: string[]; department_id?: string }): Record<string, string[]> | null {
@@ -437,6 +440,14 @@ route("GET /api/v1/projects", (req) => {
     },
   });
 });
+/** New Project's warning: an active project already called that, case and accents aside (§6 Projects). */
+const fold = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+route("GET /api/v1/projects/same-name", (req) => {
+  const { name = "", except } = req.query as { name?: string; except?: string };
+  if (!name.trim()) return invalid({ name: ["Enter a name"] });
+  const hit = PROJECTS.find((p) => p.status === "active" && p.project_id !== except && fold(p.name) === fold(name));
+  return ok({ project: hit ? projectRef(hit) : null });
+});
 route("GET /api/v1/projects/:id", (req) => {
   const p = PROJECTS.find((x) => x.project_id === req.params.id);
   return p ? ok(projectFor(req.user!, p)) : notFound();
@@ -453,6 +464,7 @@ route("POST /api/v1/projects", (req) => {
     name: b.name.trim(),
     description: b.description || null,
     owner: refKey(req.user!),
+    owner_left: false,
     due_on: b.due_on || null,
     status: "active",
     completed_at: null,
@@ -466,7 +478,14 @@ route("PATCH /api/v1/projects/:id", (req) => {
   const p = PROJECTS.find((x) => x.project_id === req.params.id);
   if (!p) return notFound();
   if (!projectFor(req.user!, p).can_edit) return fail(403, "FORBIDDEN", "Only its owner can change this project");
-  const b = req.body as { name?: string; description?: string | null; due_on?: string | null; status?: Project["status"] };
+  const b = req.body as { name?: string; description?: string | null; due_on?: string | null; status?: Project["status"]; owner_employee_id?: string };
+  // Owner: handed to someone on the staff (a leaver's projects).
+  if (b.owner_employee_id && b.owner_employee_id !== p.owner?.employee_id) {
+    const next = byId(b.owner_employee_id);
+    if (!next) return invalid({ owner_employee_id: ["Not on the staff"] });
+    p.owner = ref(next)!;
+    p.owner_left = false;
+  }
   if (typeof b.name === "string") p.name = b.name.trim();
   if ("description" in b) p.description = b.description || null;
   if ("due_on" in b) p.due_on = b.due_on || null;

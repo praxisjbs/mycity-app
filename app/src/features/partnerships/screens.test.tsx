@@ -11,9 +11,10 @@ import { RouterProvider, useRouter } from "@/lib/router";
 import { ScreenActionProvider } from "@/shell/screen-action";
 import Partnerships from "./index";
 import { forgetKept, healthPill, moveNeeds } from "./lib";
-import { dealOnWire } from "./forms/parts";
-import { returnsOnWire } from "./forms/ReturnsForm";
+import { customForCreate, customForEdit, dealOnWire } from "./forms/parts";
+import { returnsOnWire, suggestCommission } from "./forms/ReturnsForm";
 import { duplicateAskOf, duplicateQuery } from "./forms/LeadForm";
+import { ownerOption } from "./filters";
 
 /**
  * Pipeline, Partners and Leads with both 360s on the in-browser mock (docs/guides/partnerships.md §10):
@@ -140,6 +141,34 @@ describe("Partnerships on the contract", () => {
     const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
     for (const label of ["Month", "Units Sold", "Gross Sales", "MyCity Commission", "Paid to Partner", "Downloads", "Note"]) expect(within(dialog).getAllByText(label).length).toBeGreaterThan(0);
     expect(within(dialog).getByRole("button", { name: "Save Returns" })).toBeTruthy();
+    // MyCity Commission follows Gross Sales at the deal's rate until the person types their own (QA F61b).
+    const gross = within(dialog).getByLabelText("Gross Sales") as HTMLInputElement;
+    const commission = within(dialog).getByLabelText(/^MyCity Commission/) as HTMLInputElement;
+    fireEvent.change(gross, { target: { value: "100,000" } });
+    fireEvent.change(commission, { target: { value: "5,000" } });
+    fireEvent.change(gross, { target: { value: "200,000" } });
+    expect(commission.value).toBe("5,000");
+  }, 30000);
+
+  it("Enter Returns suggests MyCity Commission at the category's default when the deal has no rate (QA F61b)", async () => {
+    await open("/partnerships?tab=partners");
+    // Every category at 8%: the first partner's deal, with no rate of its own, takes its category's.
+    const categories = await api.call("GET /api/v1/partnerships/categories", { query: {} });
+    const had = categories.data.map((c) => [c.partner_category_id, c.default_commission_pct] as const);
+    for (const [id] of had) await api.call("PATCH /api/v1/partnerships/categories/:id", { params: { id }, body: { default_commission_pct: "8.00" } });
+    try {
+      await openFirst("Back to Partners");
+      fireEvent.mouseDown(await screen.findByRole("tab", { name: "Returns" }, { timeout: 8000 }), { button: 0 });
+      fireEvent.click(await screen.findByRole("button", { name: "Enter Returns" }, { timeout: 8000 }));
+      const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+      // The suggestion's rate is the help term's text, in the page though hidden until asked for.
+      const rateOf = () => /Suggested at ([\d.]+)%/.exec(document.body.textContent ?? "")?.[1];
+      await waitFor(() => expect(rateOf()).toBe("8"), { timeout: 8000 });
+      fireEvent.change(within(dialog).getByLabelText("Gross Sales"), { target: { value: "250,000" } });
+      expect((within(dialog).getByLabelText(/^MyCity Commission/) as HTMLInputElement).value).toBe("20000.00");
+    } finally {
+      for (const [id, pct] of had) await api.call("PATCH /api/v1/partnerships/categories/:id", { params: { id }, body: { default_commission_pct: pct } });
+    }
   }, 30000);
 
   it("Partners: the desktop filters, the Owner column, and the 360's Activity naming each deal's history", async () => {
@@ -376,6 +405,36 @@ describe("the QA audit's rules on the screen (17/11/2026)", () => {
     expect(dealOnWire({ estimated_value: "750,000", options: [{ deal_price: "15000", original_price: "" }] })).toMatchObject({ estimated_value: "750000.00", options: [{ deal_price: "15000.00", original_price: "" }] });
     expect(returnsOnWire({ units_sold: "5", gross_sales: "100,000", mycity_commission: "", paid_to_partner: "92000.5", downloads: "10", note: " " })).toEqual({ units_sold: 5, downloads: 10, gross_sales: "100000.00", paid_to_partner: "92000.50" });
     expect(returnsOnWire({ units_sold: "", gross_sales: "", mycity_commission: "", paid_to_partner: "", downloads: "", note: "" })).toEqual({ units_sold: undefined, downloads: undefined });
+  });
+
+  it("the Owner filter marks a leaver who still owns records Left (F06e)", () => {
+    const id = "5a1d0c10-0000-4000-8000-0000000000aa";
+    expect(ownerOption({ employee_id: id, display_name: "Ngozi Adebayo", left: false })).toEqual([id, "Ngozi Adebayo"]);
+    const [value, label] = ownerOption({ employee_id: id, display_name: "Tobi Former", left: true });
+    expect(value).toBe(id);
+    render(<>{label}</>);
+    expect(screen.getByText("Tobi Former")).toBeTruthy();
+    expect(screen.getByText("Left")).toBeTruthy();
+  });
+
+  it("MyCity Commission is suggested from gross sales at the rate, to the kobo (F61b)", () => {
+    expect(suggestCommission("100,000", "8.00")).toBe("8000.00");
+    expect(suggestCommission("1250.50", "7.5")).toBe("93.79");
+    expect(suggestCommission("0.06", "8")).toBe("0.00");
+    expect(suggestCommission("0.07", "8")).toBe("0.01");
+    expect(suggestCommission("100000", null)).toBe("");
+    expect(suggestCommission("", "8")).toBe("");
+  });
+
+  it("a category's custom money field goes out as an amount, typed plain or with commas (F51b)", () => {
+    const defs = [
+      { key: "budget", label: "Budget", field_type: "money", active: true },
+      { key: "guests", label: "Guests", field_type: "number", active: true },
+    ] as never;
+    expect(customForCreate(defs, { budget: "750,000", guests: "40" })).toEqual({ budget: "750000.00", guests: 40 });
+    // Unchanged after the commas go is no change; a new amount is sent as one.
+    expect(customForEdit(defs, { budget: "750,000", guests: "40" }, { budget: "750000.00", guests: 40 })).toBeUndefined();
+    expect(customForEdit(defs, { budget: "1,250,000.5" }, { budget: "750000.00" })).toEqual({ budget: "1250000.50" });
   });
 
   it("the next stage needs no reason, a skip does (F64); signing a deal with no value asks for No Money Value (F53)", () => {

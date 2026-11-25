@@ -56,6 +56,8 @@ describeDb("budgets against the real migrations", () => {
       account_name: "Chuks Stores Ltd",
       account_number: "0123456789",
       submit: true,
+      // The same request is raised many times over here: each presses Send Anyway (expenses.md §6.8 rule 2).
+      confirm_duplicate: true,
       ...over,
     });
     expect([res.status, res.body.error]).toEqual([201, undefined]);

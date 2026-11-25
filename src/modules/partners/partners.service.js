@@ -263,6 +263,8 @@ async function createIn(client, actor, body, { held, source = "person" }) {
       origin: "signed_copy",
       field: "signed_copy_document_id",
     });
+    // The signed copy is the partner's agreement: recorded in Contracts & MOUs as signed outside the hub.
+    await require("../agreements/agreements.generate").recordedIn(client, actor, deal.deal_id, body.signed_copy_document_id);
   }
   await syncStatus(client, actor, made.partner_id);
   await emit(client, {

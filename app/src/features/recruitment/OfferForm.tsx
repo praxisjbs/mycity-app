@@ -14,6 +14,8 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import { paging } from "@/features/shared/wire";
 import {
+  addDaysIso,
+  Banner,
   Button,
   ChoiceField,
   DateField,
@@ -69,6 +71,21 @@ type Values = {
   additional_terms: string;
   job_description: string;
 };
+
+/**
+ * Whether an offer would start on or before the day it expires if sent today: Days to Sign counts from
+ * Send (offers.md §6). Send Offer and the form warn, and the offer still sends (JBS Praxis, 25/11/2026).
+ */
+export function startsBeforeExpiry(start: string | null | undefined, validDays: number | string | null | undefined, today = todayIso()): boolean {
+  const days = Number(validDays || offerSchemas.OFFER_VALID_DAYS.default);
+  if (!start || !Number.isInteger(days) || days < 1) return false;
+  return start <= addDaysIso(today, days);
+}
+
+/** The warning itself: one line, the decision's words and what would avoid it. */
+export function StartsBeforeExpiry({ className }: { className?: string }) {
+  return <Banner tone="warn" className={className}>Starts before the offer expires: use a shorter Days to Sign or a later start.</Banner>;
+}
 
 const STEPS: Array<Array<keyof Values>> = [
   ["application_id", "job_title", "department_id", "reports_to", "role_function", "role_scope", "employment_type", "work_pattern", "office_days"],
@@ -359,6 +376,7 @@ export function OfferForm({ offer, applicationId, close, onSaved }: { offer?: Of
                   <NumberField {...f.field("annual_leave_days")} />
                 </Field>
               </Grid>
+              {startsBeforeExpiry(String(f.values.start_date ?? ""), String(f.values.valid_days ?? "")) && <StartsBeforeExpiry className="mb-3" />}
               <Field label="Working Hours" optional {...f.status("working_hours")}>
                 <TextField {...f.field("working_hours")} placeholder="09:00 to 17:00" maxLength={160} />
               </Field>

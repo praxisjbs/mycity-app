@@ -725,6 +725,76 @@ describeDb("partnerships: leads, partners, deals and the 360s", () => {
       expect(agreement).toEqual({ status: "signed", signed_outside: true, signed_document_id: copy, on_partner: true });
     });
 
+    test("the Owner filter offers a leaver who still owns records, marked Left, until the book is reassigned (F06e)", async () => {
+      const made = {};
+      for (const [key, first] of [["leaver", "Tobi"], ["gone", "Sade"]]) {
+        await tx(async (client) => {
+          made[key] = await createAdmin(
+            client,
+            {
+              employee: { first_name: first, last_name: "Former", work_email: `${key}@mycity.test`, phone: "08031234567", job_title: "Growth Officer", department_name: "Growth", start_date: "2026-01-05", employment_type: "full_time", work_pattern: "on_site" },
+              role_code: "employee",
+            },
+            PASSWORD,
+            { allowAdditional: true },
+          );
+        });
+      }
+      const lead = await newLead("ops", "Lekki Food Week");
+      await q("UPDATE lead SET owner_id = $1 WHERE lead_id = $2", [made.leaver.employee.employee_id, lead.lead.lead_id]);
+      await q("UPDATE employee SET status = 'left' WHERE employee_id = ANY($1::uuid[])", [[made.leaver.employee.employee_id, made.gone.employee.employee_id]]);
+      const offered = async () => {
+        const all = [];
+        for (let page = 1; ; page += 1) {
+          const res = await as("staff").get(`/partnerships/owners?page=${page}`);
+          expect(res.status).toBe(200);
+          all.push(...res.body.data);
+          if (!res.body.page.has_next) return all;
+        }
+      };
+      const first = await offered();
+      expect(first.find((o) => o.employee_id === made.leaver.employee.employee_id)).toEqual({ employee_id: made.leaver.employee.employee_id, display_name: "Tobi Former", left: true });
+      expect(first.find((o) => o.employee_id === emp("staff"))).toMatchObject({ left: false });
+      // A leaver who owns nothing is not offered.
+      expect(first.find((o) => o.employee_id === made.gone.employee.employee_id)).toBeUndefined();
+      // The leaver's book is found by the filter, then reassigned with Edit Lead.
+      const book = await as("ops").get(`/partnerships/leads?owner_id=${made.leaver.employee.employee_id}`);
+      expect(book.body.data.map((l) => l.lead_id)).toContain(lead.lead.lead_id);
+      expect((await as("ops").patch(`/partnerships/leads/${lead.lead.lead_id}`, { owner_id: emp("staff") })).status).toBe(200);
+      expect((await offered()).find((o) => o.employee_id === made.leaver.employee.employee_id)).toBeUndefined();
+    });
+
+    test("New Partner's signed copy is its agreement (F07b), and a signed deal's value cannot be cleared (F53b)", async () => {
+      const copy = (await as("staff").upload("harbour-signed.pdf")).body.document_id;
+      const made = await as("staff").post("/partnerships/partners", {
+        name: "Harbour Point Lounge",
+        partner_category_id: cat.hospitality,
+        region: { scope: "national" },
+        owner_id: emp("staff"),
+        contact: { first_name: "Uche", last_name: "Obi" },
+        deal: { title: "Harbour Listing", owner_id: emp("staff"), estimated_value: "750000.00" },
+        signed_copy_document_id: copy,
+      });
+      expect([made.status, made.body.error]).toEqual([201, undefined]);
+      const dealId = made.body.deals[0].deal_id;
+      const agreement = await one(
+        "SELECT status, signed_outside, signed_document_id, partner_id = $2 AS on_partner FROM partnership_agreement WHERE partnership_opportunity_id = $1",
+        [dealId, made.body.partner.partner_id],
+      );
+      expect(agreement).toEqual({ status: "signed", signed_outside: true, signed_document_id: copy, on_partner: true });
+
+      // Edit Deal keeps a signed deal's value: emptied or zero is refused, a new value is taken.
+      for (const estimated_value of [null, "0.00"]) {
+        const refused = await as("staff").patch(`/partnerships/deals/${dealId}`, { estimated_value });
+        expect([refused.status, refused.body.error.fields]).toEqual([422, { estimated_value: ["Add the deal's value"] }]);
+      }
+      const changed = await as("staff").patch(`/partnerships/deals/${dealId}`, { estimated_value: "800000.00" });
+      expect([changed.status, changed.body.estimated_value]).toEqual([200, "800000.00"]);
+      // A deal signed with No Money Value may stay without one.
+      const free = await as("staff").patch(`/partnerships/deals/${signedDeal}`, { estimated_value: null });
+      expect(free.status).toBe(200);
+    });
+
     test("a converted lead's last contact is its partner's (F23)", async () => {
       const partnerId = (await one("SELECT converted_partner_id FROM lead WHERE lead_id = $1", [leadId])).converted_partner_id;
       const logged = await as("staff").post("/partnerships/interactions", {

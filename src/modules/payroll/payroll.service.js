@@ -151,6 +151,7 @@ const PROBLEM_WORDS = Object.freeze({
   },
   NO_BANK: { message: (n) => `No Bank Details for ${n.name}`, action: "Add them on People · Employees" },
   CONTRACT_ENDED: { message: (n) => `${n.name}'s contract has ended`, action: "Check the person, exclude if needed" },
+  BELOW_MINIMUM_WAGE: { message: (n) => `${n.name} is paid below the minimum wage`, action: "Check their pay on People · Employees" },
   NO_PAY_SPLIT: { message: (n) => `No Pay Split for ${n.name}`, action: "Set the split on Configurations" },
   FINE_WAITING: {
     message: (n) => `${n.n} ${n.n === 1 ? "fine waits" : "fines wait"} for payroll for ${n.name}`,

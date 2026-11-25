@@ -123,13 +123,29 @@ const accountNumber = z
   .trim()
   .regex(/^\d{10}$/, "Ten digits");
 
-/** A tax or pension number as it is issued: letters, digits and hyphens (a TIN, a pension PIN, an NHF number). */
+/**
+ * A tax or NHF number as it is issued: letters, digits and hyphens. The Tax ID keeps this rule: the Nigeria
+ * Tax Administration Act 2025 (ss.4, 7 and 8) says a Tax ID is issued and used but prescribes no format
+ * (docs/guides/foundation.md §6.16, checked 25/11/2026).
+ */
 const statutoryNumber = z
   .string()
   .trim()
   .toUpperCase()
   .max(30, "At most 30 characters")
   .regex(/^[A-Z0-9]+(?:[-/][A-Z0-9]+)*$/, "Letters and digits");
+
+/**
+ * A pension PIN (the RSA PIN): "PEN" then digits, as PenCom's Revised Guidelines for RSA Registration 2019
+ * show every PIN (§5.3.13 and its sample file). PenCom publishes no length, so none is enforced beyond the
+ * field's 30 characters; a lower-case "pen" is read as "PEN" (docs/guides/foundation.md §6.16, checked 25/11/2026).
+ */
+const pensionPin = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .max(30, "At most 30 characters")
+  .regex(/^PEN\d+$/, "PEN then digits");
 
 /** Gross pay: an amount, never below zero (employee_gross_monthly_check, migration 0110). */
 const pay = money.refine((v) => !v.startsWith("-"), "Not below zero");
@@ -192,7 +208,7 @@ const employeeRestricted = {
  */
 const employeeStatutory = {
   tax_id: blank(statutoryNumber),
-  pension_pin: blank(statutoryNumber),
+  pension_pin: blank(pensionPin),
   pension_administrator: optionalText(100),
   nhf_number: blank(statutoryNumber),
   nhf_contributes: z.boolean().optional(),
@@ -200,9 +216,23 @@ const employeeStatutory = {
 };
 
 /**
+ * The youngest a person may be on their start date: 18. The Child's Rights Act 2003, s.28(1)(b), lets no
+ * child be employed in any capacity (save light family work), and s.277 makes a child anyone under 18; Lagos
+ * State's Child's Right Law, Cap. C7, s.25(1)(b) and s.261 say the same (docs/guides/foundation.md §6.16,
+ * checked 25/11/2026).
+ */
+const MINIMUM_START_AGE = 18;
+
+/** The day a person born on `born` (YYYY-MM-DD) turns `years`, as YYYY-MM-DD (29 February reads as 1 March in a common year). */
+function birthdayAt(born, years) {
+  return `${String(Number(born.slice(0, 4)) + years).padStart(4, "0")}${born.slice(4)}`;
+}
+
+/**
  * The order an employee's dates keep (migrations 0040 and 0210 hold the first two in the
  * database too): a contract, a probation and its confirmation never end before the start date,
- * and a person is born before they start. Each issue lands on its own field, so the form marks
+ * a person is born before they start, and they start on or after their 18th birthday
+ * (MINIMUM_START_AGE, refused on Start Date). Each issue lands on its own field, so the form marks
  * it as it is filled rather than when Add Employee is pressed (docs/guides/foundation.md §6.16).
  * The service applies the same to a correction against the stored record (employeeDateProblems).
  */
@@ -213,6 +243,8 @@ function employeeDateProblems(v) {
   for (const key of ["contract_ends_on", "confirmation_due_on", "confirmed_on"])
     if (v[key] && v[key] < start) out.push({ path: key, message: "Not before the start" });
   if (v.date_of_birth && v.date_of_birth >= start) out.push({ path: "date_of_birth", message: "Before the start date" });
+  else if (v.date_of_birth && start < birthdayAt(v.date_of_birth, MINIMUM_START_AGE))
+    out.push({ path: "start_date", message: "Under 18 at start" });
   return out;
 }
 
@@ -325,6 +357,18 @@ const EmployeePage = Paged(EmployeeRow);
 
 /** A tone a pill or a count carries on screen. */
 const Tone = z.enum(["ok", "warn", "err", "info", "neutral"]);
+
+/**
+ * GET /employees/minimum-wage: the Minimum Wage version in force today (Payroll · Configurations,
+ * docs/guides/payroll.md §6.12), so Add Employee and Edit Record can warn, never refuse, when Gross
+ * Monthly is below it. Both null while none is in force.
+ */
+const MinimumWage = z
+  .object({
+    amount: money.nullable(),
+    effective_from: isoDate.nullable(),
+  })
+  .strict();
 
 /** The counts above the register, and the records waiting for a decision. */
 const EmployeesSummary = z
@@ -473,7 +517,7 @@ const EmployeeUpdateFields = z
     gross_monthly: clearable(pay),
     /** Tax and pension (`employee.statutory`), read by payroll in advanced mode (docs/guides/payroll.md §6.12). */
     tax_id: clearable(statutoryNumber),
-    pension_pin: clearable(statutoryNumber),
+    pension_pin: clearable(pensionPin),
     pension_administrator: clearable(z.string().trim().max(100)),
     nhf_number: clearable(statutoryNumber),
     nhf_contributes: z.boolean(),
@@ -923,7 +967,7 @@ const EmployeeImportRow = z
     bank_name: optionalText(100),
     /** Tax and pension, as People · Employees' Tax and Pension step takes them (`employee.statutory`). */
     tax_id: statutoryNumber.optional(),
-    pension_pin: statutoryNumber.optional(),
+    pension_pin: pensionPin.optional(),
     pension_administrator: optionalText(100),
     nhf_number: statutoryNumber.optional(),
     nhf_contributes: z.boolean().optional(),
@@ -1130,6 +1174,7 @@ const TABLES = {
     table: null,
     reason: "the counts and the decisions above the register, each one computed",
   },
+  MinimumWage: { table: null, reason: "the statutory_rate minimum_wage version in force today, read for a warning" },
   EmployeeLogin: {
     table: null,
     reason: "the login block of the 360: app_user and its roles, which identity owns",
@@ -1265,6 +1310,7 @@ module.exports = {
   EmployeeAdd,
   ON_SITE_PATTERNS,
   employeeDateProblems,
+  MINIMUM_START_AGE,
   EmployeePrefill,
   EmployeeUpdate,
   WORK_RECORD,
@@ -1277,6 +1323,7 @@ module.exports = {
   EmployeeRow,
   EmployeePage,
   EmployeesSummary,
+  MinimumWage,
   EmployeeLogin,
   Employee360,
   EMPLOYEE_FIELD_LABELS,

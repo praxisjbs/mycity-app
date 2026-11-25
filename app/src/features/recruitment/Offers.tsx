@@ -65,7 +65,7 @@ import {
   type StatusTone,
   type TimelineItem,
 } from "@mycity/ui";
-import { OfferForm } from "./OfferForm";
+import { OfferForm, startsBeforeExpiry, StartsBeforeExpiry } from "./OfferForm";
 import { OfferSettingsPanel } from "./OfferSettings";
 import { SignForm } from "./OfferSign";
 import { pill, say, sayRefusal } from "./shared";
@@ -295,6 +295,10 @@ export function OfferRecord({ id, onPicked, wide = false }: { id: string; onPick
             </h3>
             {signers}
           </section>
+        )}
+        {/* Send Offer warns, and still sends, when the offer would start before it expires (guide §6). */}
+        {o.can_send && startsBeforeExpiry(o.start_date, o.valid_days) && (
+          <StartsBeforeExpiry className="mt-3" />
         )}
         <ActionGroup>
           <div className="mt-3 flex flex-wrap justify-end gap-2">

@@ -9,9 +9,12 @@ import projects from "@mycity/contract/schemas/projects.js";
 import type { Project } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
+import type { PersonRef } from "@/api/types/common";
+import { ColleaguePicker } from "@/features/shared/pickers";
 import { useSearchParams } from "@/lib/router";
 import { useAddressPrefill, useNewLink, useScreenAction, useUrlAction } from "@/shell/screen-action";
 import {
+  Banner,
   Button,
   DataView,
   DateField,
@@ -37,6 +40,17 @@ import { refresh, say, useLiveTasks } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
 import { TaskForm } from "./TaskForms";
 import { TaskBoard, usePaused } from "./TaskBoard";
+
+/** An owner by name, with Left beside one who has left the staff (§6 Projects): Edit Project hands it on. */
+export function OwnerName({ p }: { p: Project }) {
+  if (!p.owner) return null;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <Who name={p.owner.display_name} />
+      {p.owner_left && <Pill tone="warn">Left</Pill>}
+    </span>
+  );
+}
 import { filterOf, linkBody, linkEdit, linkOf, linkProblem, NO_LINK, PartnerFilter, PartnerLinkFields, useMayConnect, type PartnerLinkValue } from "./PartnerLink";
 
 type Status = Project["status"];
@@ -86,7 +100,7 @@ function ProjectList({ onOpen }: { onOpen: (id: string) => void }) {
         empty={{ title: "No Projects Yet" }}
         columns={[
           { key: "name", label: "Project", sortable: true, render: (p) => <span data-copy="content"><b className="font-semibold">{p.number}</b> {p.name}</span> },
-          { key: "owner", label: "Owner", render: (p) => (p.owner ? <Who name={p.owner.display_name} /> : "") },
+          { key: "owner", label: "Owner", render: (p) => <OwnerName p={p} /> },
           { key: "due_on", label: "Due", sortable: true, render: (p) => (p.due_on ? formatDate(p.due_on) : "No date") },
           { key: "open", label: "Open", render: (p) => String(p.open) },
           { key: "done", label: "Done", render: (p) => String(p.done) },
@@ -143,6 +157,7 @@ function ProjectPage({ id, back }: { id: string; back: () => void }) {
         }
       >
         {p.status === "completed" && <Pill tone="ok">Completed</Pill>}
+        {p.owner_left && <Pill tone="warn">Owner Left</Pill>}
         {p.partner_link && <Pill>{p.partner_link.name ?? "A Partner You Cannot See"}</Pill>}
       </PageHeader>
       <Toolbar>
@@ -155,8 +170,26 @@ function ProjectPage({ id, back }: { id: string; back: () => void }) {
 }
 
 /**
+ * New Project's warning (§6 Projects): an active project already holding the name typed, case and
+ * accents aside. Advisory: the project still saves. Edit Project leaves out the project itself.
+ */
+export function SameNameNotice({ name, except }: { name: string; except?: string }) {
+  const typed = usePaused(name);
+  const ask = typed.length >= 3 && projects.ProjectNameQuery.safeParse({ name: typed }).success;
+  const same = useApi("GET /api/v1/projects/same-name", { query: { name: typed, ...(except ? { except } : {}) }, enabled: ask });
+  const hit = ask ? same.data?.project : null;
+  if (!hit) return null;
+  return (
+    <Banner tone="warn" className="mb-3">
+      {`Already a project: ${hit.number} ${hit.name}.`}
+    </Banner>
+  );
+}
+
+/**
  * New Project and Edit Project. A new one is the reader's; the address may fill it (ProjectPrefill), and
- * from a Partner 360 or a Lead 360 it opens already connected (`link`, partnerships.md §6.16).
+ * from a Partner 360 or a Lead 360 it opens already connected (`link`, partnerships.md §6.16). Edit
+ * Project hands it to another owner (a leaver's projects, §6 Projects).
  */
 export function ProjectForm({ close, project, onSaved, link: inLink }: { close: () => void; project?: Project; onSaved?: (p: Project) => void; link?: PartnerLinkValue }) {
   const filled = useAddressPrefill(projects.ProjectPrefill, !project);
@@ -170,12 +203,16 @@ export function ProjectForm({ close, project, onSaved, link: inLink }: { close: 
   const save = useMutation("PATCH /api/v1/projects/:id");
   const [link, setLink] = useState<PartnerLinkValue>(project ? linkOf(project.partner_link) : (inLink ?? NO_LINK));
   const [linkMark, setLinkMark] = useState<{ record?: string; deal?: string } | null>(null);
+  const [owner, setOwner] = useState<PersonRef[]>(project?.owner ? [project.owner] : []);
+  const [ownerMark, setOwnerMark] = useState<string | null>(null);
   const submit = async () => {
     if (!f.check()) return;
+    if (project && !owner.length) return setOwnerMark("Pick an owner");
     const v = f.values;
     try {
       if (project) {
-        await save.run({ params: { id: project.project_id }, body: { name: v.name, description: v.description || null, due_on: v.due_on || null, ...linkEdit(linkOf(project.partner_link), link) } });
+        const handed = owner[0] && owner[0].employee_id !== project.owner?.employee_id ? { owner_employee_id: owner[0].employee_id } : {};
+        await save.run({ params: { id: project.project_id }, body: { name: v.name, description: v.description || null, due_on: v.due_on || null, ...handed, ...linkEdit(linkOf(project.partner_link), link) } });
         toast("Project saved");
       } else {
         const made = await create.run({ body: { name: v.name, ...(v.description && { description: v.description }), ...(v.due_on && { due_on: v.due_on }), ...linkBody(link) } });
@@ -188,13 +225,29 @@ export function ProjectForm({ close, project, onSaved, link: inLink }: { close: 
       const onLink = linkProblem(e);
       setLinkMark(onLink);
       if (onLink) return;
+      const onOwner = e instanceof ApiError ? e.fields.owner_employee_id?.[0] : undefined;
+      if (onOwner) return setOwnerMark(onOwner);
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
     }
   };
   return (
     <>
+      <SameNameNotice name={String(f.values.name ?? "")} except={project?.project_id} />
       <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Lekki Launch" /></Field>
+      {project && (
+        <Field label="Owner" state={ownerMark ? "bad" : undefined} message={ownerMark ?? undefined}>
+          <ColleaguePicker
+            withSelf
+            placeholder="Search staff"
+            value={owner}
+            onChange={(p) => {
+              setOwner(p);
+              setOwnerMark(null);
+            }}
+          />
+        </Field>
+      )}
       <Field label="Notes" optional {...f.field("description")}><TextAreaField {...f.field("description")} /></Field>
       <Field label="Due" optional {...f.field("due_on")}><DateField {...f.field("due_on")} /></Field>
       <PartnerLinkFields

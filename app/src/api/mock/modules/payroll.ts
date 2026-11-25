@@ -819,6 +819,12 @@ route("GET /api/v1/statutory/items", (req) => {
   return ok({ items });
 });
 
+/** People · Employees' warning on Gross Monthly: the Minimum Wage version in force today, or nothing (organisation.MinimumWage). */
+route("GET /api/v1/employees/minimum-wage", () => {
+  const wage = RATES.find((r) => r.item === "minimum_wage" && r.flat_amount !== null && inForce(r, todayIso()));
+  return ok({ amount: wage?.flat_amount ?? null, effective_from: wage?.effective_from ?? null });
+});
+
 route("GET /api/v1/statutory/rates", (req) => {
   if (!canRun(req.user!)) return forbiddenRead();
   const day = todayIso();

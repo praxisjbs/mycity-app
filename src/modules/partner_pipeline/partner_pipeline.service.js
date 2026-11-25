@@ -27,6 +27,7 @@ const { AppError } = require("../../shared/errors");
 const numbering = require("../../shared/numbering/numbering");
 const places = require("../../shared/places/places");
 const grantsCache = require("../../shared/rbac/grants-cache");
+const money = require("../../shared/money/money");
 const lagos = require("../../shared/time/lagos");
 const { EVENTS } = require("./partner_pipeline.events");
 const repo = require("./partner_pipeline.repo");
@@ -386,6 +387,9 @@ async function update(actor, scope, id, body) {
     const starts = body.event_starts_on !== undefined ? body.event_starts_on : deal.event_starts_on;
     const ends = body.event_ends_on !== undefined ? body.event_ends_on : deal.event_ends_on;
     if (starts && ends && ends < starts) throw invalid("event_ends_on", "Ends before it starts");
+    // A signed deal keeps the value it was signed with, or its No Money Value mark (QA F53b).
+    const cleared = body.estimated_value === null || (body.estimated_value !== undefined && money.isZero(body.estimated_value));
+    if (cleared && deal.signed_at && !deal.non_monetary) throw invalid("estimated_value", "Add the deal's value");
     const category = await categoryOf(client, seen.partner_category_id);
     const changes = {};
     for (const k of ["title", "event_title", "event_starts_on", "event_ends_on", "expected_attendance", "objective", "estimated_value", "expected_close_on", "next_action", "next_action_on", "owner_id", "impact", "impact_rating", "impact_note", "comments"]) {
@@ -545,6 +549,7 @@ module.exports = {
   checkFieldValue: fields.checkValue,
   getList: lists.values,
   listSuggestions: lists.suggestions,
+  listOwners: (query) => repo.owners(pool, query),
   addListValue: lists.add,
   updateListValue: lists.update,
   readTracker: setup.read,

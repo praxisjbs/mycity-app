@@ -15,6 +15,7 @@ const id = (req) => req.validated.params.id;
 // Each project's partner is named only for a reader who sees it in Partnerships (workspace.md §6).
 module.exports = {
   list: async (req, res) => sendPaged(res, await named(req.user, await service.list(req.validated.query, scopeOf(req)))),
+  sameName: async (req, res) => ok(res, await service.sameName(req.validated.query)),
   get: async (req, res) => ok(res, await named(req.user, await service.getFor(id(req), scopeOf(req)))),
   create: async (req, res) => created(res, await named(req.user, await service.create(withActor(req), scopeOf(req), req.validated.body))),
   edit: async (req, res) => ok(res, await named(req.user, await service.edit(withActor(req), scopeOf(req), id(req), req.validated.body))),

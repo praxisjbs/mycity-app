@@ -362,6 +362,28 @@ function suggestions(db, domain, query) {
   );
 }
 
+/**
+ * The Owner filter's people, a page at a time by name (QA F06e): every active employee, and each former
+ * one (left or archived) who still owns a lead, a partner or a deal, marked `left`, so a leaver's book
+ * can be found and reassigned.
+ */
+function owners(db, query) {
+  return pageQuery(
+    db,
+    `SELECT e.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, e.status <> 'active' AS left, ${TOTAL_COL}
+       FROM employee e
+      WHERE (e.status = 'active'
+             OR (e.status IN ('left', 'archived')
+                 AND (EXISTS (SELECT 1 FROM lead l WHERE l.owner_id = e.employee_id)
+                      OR EXISTS (SELECT 1 FROM partner p WHERE p.owner_id = e.employee_id)
+                      OR EXISTS (SELECT 1 FROM partnership_opportunity po WHERE po.owner_id = e.employee_id))))
+        AND ($1::text IS NULL OR strpos(search_fold(e.first_name || ' ' || e.last_name), search_fold($1)) > 0)
+      ORDER BY e.first_name, e.last_name, e.employee_id`,
+    [query.q || null],
+    query,
+  );
+}
+
 const valueByLabel = (db, domain, label) =>
   one(db, `SELECT ${VALUE} FROM reference_value v WHERE v.domain = $1 AND lower(v.label) = lower($2) AND v.active`, [domain, label]);
 
@@ -1185,6 +1207,7 @@ module.exports = {
   valueByLabel,
   valueByWords,
   suggestions,
+  owners,
   codeTaken,
   nextValuePosition,
   insertValue,

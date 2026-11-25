@@ -22,11 +22,17 @@ const m = vi.hoisted(() => ({
   hidden: [] as string[],
   refreshMe: vi.fn(async () => undefined),
   toast: Object.assign(vi.fn(), { error: vi.fn() }),
+  /** The Minimum Wage in force (GET /employees/minimum-wage), null while none is. */
+  wage: null as string | null,
 }));
 vi.mock("@mycity/ui", async (actual) => ({ ...(await actual<typeof import("@mycity/ui")>()), toast: m.toast }));
 vi.mock("@/api/hooks", () => ({
   invalidate: vi.fn(),
-  useApi: () => ({ data: undefined, error: null, reload: () => undefined }),
+  useApi: (key: string) => ({
+    data: key === "GET /api/v1/employees/minimum-wage" ? { amount: m.wage, effective_from: m.wage ? "2026-01-01" : null } : undefined,
+    error: null,
+    reload: () => undefined,
+  }),
   useMutation: () => ({ run: m.run, pending: false }),
 }));
 vi.mock("@/auth/AuthProvider", () => ({
@@ -66,6 +72,7 @@ if (!("ResizeObserver" in window)) {
 beforeEach(() => {
   m.can = true;
   m.hidden = [];
+  m.wage = null;
 });
 afterEach(() => {
   cleanup();
@@ -141,6 +148,72 @@ describe("Add Employee", { timeout: 20000 }, () => {
     await user.type(screen.getByLabelText("Contract Ends"), "01/10/2026");
     await user.tab();
     expect(await screen.findByText(/Not before the start|or later/)).toBeTruthy();
+  });
+
+  it("refuses a start before the 18th birthday on Start Date, as it is filled", async () => {
+    const user = userEvent.setup();
+    open(<AddEmployee close={vi.fn()} />);
+    await user.type(screen.getByLabelText("Date of Birth"), "01/06/2010");
+    await person(user);
+    await user.type(screen.getByLabelText("Job Title"), "Content Associate");
+    await user.click(screen.getByRole("button", { name: "Pick Content" }));
+    await user.type(screen.getByLabelText("Start Date"), "01/11/2026");
+    await user.click(screen.getByRole("radio", { name: "Remote" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Under 18 at start")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Job" })).toBeTruthy();
+    // On the 18th birthday the start is taken.
+    const start = screen.getByLabelText("Start Date");
+    await user.clear(start);
+    await user.type(start, "01/06/2028");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByRole("heading", { name: "Pay and Bank" })).toBeTruthy();
+  });
+
+  it("warns, never refuses, a Gross Monthly below the minimum wage in force", async () => {
+    m.wage = "70000.00";
+    const user = userEvent.setup();
+    open(<AddEmployee close={vi.fn()} />);
+    await person(user);
+    await job(user);
+    const pay = screen.getByLabelText("Gross Monthly");
+    await user.type(pay, "50,000");
+    expect(await screen.findByText("Below the minimum wage of ₦70,000.00")).toBeTruthy();
+    await user.clear(pay);
+    await user.type(pay, "70,000");
+    await waitFor(() => expect(screen.queryByText(/Below the minimum wage/)).toBeNull());
+    await user.clear(pay);
+    await user.type(pay, "45000");
+    expect(await screen.findByText(/Below the minimum wage/)).toBeTruthy();
+    await toLastStep(user);
+    await user.click(screen.getByRole("button", { name: "Add Employee" }));
+    await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
+    expect((m.run.mock.calls[0]![0] as { body: Record<string, unknown> }).body.gross_monthly).toBe("45000.00");
+  });
+
+  it("says nothing about pay while no minimum wage is in force", async () => {
+    const user = userEvent.setup();
+    open(<AddEmployee close={vi.fn()} />);
+    await person(user);
+    await job(user);
+    await user.type(screen.getByLabelText("Gross Monthly"), "5,000");
+    await user.tab();
+    expect(screen.queryByText(/Below the minimum wage/)).toBeNull();
+  });
+
+  it("takes a pension PIN only as PEN then digits", async () => {
+    const user = userEvent.setup();
+    open(<AddEmployee close={vi.fn()} />);
+    await person(user);
+    await job(user);
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    const pin = screen.getByLabelText("Pension PIN");
+    await user.type(pin, "123");
+    await user.tab();
+    expect(await screen.findByText("PEN then digits")).toBeTruthy();
+    await user.clear(pin);
+    await user.type(pin, "pen100123456789");
+    await waitFor(() => expect(screen.queryByText("PEN then digits")).toBeNull());
   });
 
   it("sends a body the API accepts: no hidden field, the salary as the wire's amount", async () => {
@@ -316,6 +389,31 @@ describe("Edit Employee", { timeout: 20000 }, () => {
     await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
     const { body } = m.run.mock.calls[0]![0] as { body: Record<string, unknown> };
     expect(body).toEqual({ nhf_contributes: false });
+  });
+
+  it("refuses a moved start that falls before the 18th birthday, and sends nothing", async () => {
+    const user = userEvent.setup();
+    open(<EditEmployee employee={{ ...employee, date_of_birth: "2009-03-01", start_date: "2027-03-01" } as unknown as Employee360} close={vi.fn()} />);
+    const start = screen.getByLabelText("Start Date");
+    await user.clear(start);
+    await user.type(start, "01/12/2026");
+    await user.click(screen.getByRole("button", { name: "Save Record" }));
+    expect(await screen.findByText("Under 18 at start")).toBeTruthy();
+    expect(m.run).not.toHaveBeenCalled();
+  });
+
+  it("warns on a Gross Monthly below the minimum wage, and saves it", async () => {
+    m.wage = "70000.00";
+    const user = userEvent.setup();
+    open(<EditEmployee employee={employee} close={vi.fn()} />);
+    expect(screen.queryByText(/Below the minimum wage/)).toBeNull();
+    const pay = screen.getByLabelText("Gross Monthly");
+    await user.clear(pay);
+    await user.type(pay, "60000");
+    expect(await screen.findByText("Below the minimum wage of ₦70,000.00")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Save Record" }));
+    await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
+    expect((m.run.mock.calls[0]![0] as { body: Record<string, unknown> }).body).toEqual({ gross_monthly: "60000.00" });
   });
 
   it("names the person as saved in its toast", async () => {

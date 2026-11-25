@@ -18,6 +18,7 @@ import {
   Form,
   FormError,
   FormFooter,
+  formatMoney,
   MoneyField,
   PhoneField,
   SelectField,
@@ -47,6 +48,9 @@ import {
  * The Tax and Pension step holds what payroll reads in advanced mode (docs/guides/payroll.md §6.12, §13.1 items 44 and
  * 46): the tax and pension numbers, whether the person contributes to NHF (their own choice) and the State they live in.
  * Every one is masked as employee.statutory, so a role that hides them never sees the step.
+ *
+ * A Gross Monthly below the Minimum Wage in force (Payroll · Configurations) is warned under the field and still saved;
+ * a start before the 18th birthday is the contract's refusal on Start Date (foundation.md §6.16).
  */
 
 const EMPLOYMENT: Array<[string, string]> = [
@@ -136,6 +140,18 @@ const checked = (schema: { safeParse: (v: unknown) => unknown }, pick: (v: Value
   safeParse: (v: unknown) => schema.safeParse(toWire(pick(v as Values))) as ReturnType<typeof organisation.EmployeeAdd.safeParse>,
 });
 
+/** Whether a typed amount is below the floor, compared digit by digit as two-place strings (never as a float). */
+function below(typed: string, floor: string) {
+  const amount = toMoneyString(typed);
+  if (!/^\d+\.\d{2}$/.test(amount) || !/^\d+\.\d{2}$/.test(floor)) return false;
+  return amount.padStart(24, "0") < floor.padStart(24, "0");
+}
+
+/** The Minimum Wage in force today, read only when the form shows Gross Monthly; null while none is. */
+function useMinimumWage(shown: readonly string[]) {
+  return useApi("GET /api/v1/employees/minimum-wage", { enabled: shown.includes("gross_monthly") }).data?.amount ?? null;
+}
+
 /** A refusal's words for the line above the footer: the server's, or a plain retry. */
 const lineFor = (e: unknown) => (e instanceof ApiError && e.status !== 0 && e.message ? e.message : "Not saved. Check your connection and try again.");
 
@@ -152,7 +168,7 @@ function ViewOnly({ close }: { close: () => void }) {
 }
 
 /** The fields of one topic, each shown only when the person may set it. */
-function Fields({ keys, f, departments, setDepartments, worksites, setWorksites, manager, setManager }: {
+function Fields({ keys, f, departments, setDepartments, worksites, setWorksites, manager, setManager, wage }: {
   keys: Key[];
   f: ReturnType<typeof useContractForm<Values>>;
   departments: Department[];
@@ -161,6 +177,8 @@ function Fields({ keys, f, departments, setDepartments, worksites, setWorksites,
   setWorksites: (w: WorksiteChoice[]) => void;
   manager?: PersonRef[];
   setManager?: (p: PersonRef[]) => void;
+  /** The Minimum Wage in force, for the warning under Gross Monthly. */
+  wage?: string | null;
 }) {
   const has = (k: Key) => keys.includes(k);
   const v = f.values;
@@ -220,6 +238,9 @@ function Fields({ keys, f, departments, setDepartments, worksites, setWorksites,
       </Field>,
     );
   add("gross_monthly", <Field label="Gross Monthly" optional {...f.status("gross_monthly")}><MoneyField {...f.field("gross_monthly")} /></Field>);
+  // A warning, never a refusal: the person is still saved, and the payroll run warns again.
+  if (has("gross_monthly") && wage && below(v.gross_monthly ?? "", wage))
+    out.push(<Banner key="wage" tone="warn" className="mb-3.5">{`Below the minimum wage of ${formatMoney(wage)}`}</Banner>);
   add("bank_name", <Field label="Bank" optional {...f.status("bank_name")}><TextField {...f.field("bank_name")} /></Field>);
   add(
     "account_number",
@@ -258,6 +279,7 @@ function AddWizard({ close, onRefused }: { close: () => void; onRefused: () => v
   const [manager, setManager] = useState<PersonRef[]>([]);
   const [at, setAt] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const wage = useMinimumWage(shown);
   const save = useMutation("POST /api/v1/employees");
   const { navigate } = useRouter();
   const stepOf = (keys: string[]) => steps.findIndex((s) => s.keys.some((k) => keys.includes(k)));
@@ -292,7 +314,7 @@ function AddWizard({ close, onRefused }: { close: () => void; onRefused: () => v
   const wizardSteps: WizardStep[] = steps.map((s) => ({
     title: s.title,
     check: () => f.check(s.keys),
-    body: <Fields keys={s.keys} f={f} departments={departments} setDepartments={setDepartments} worksites={worksites} setWorksites={setWorksites} manager={manager} setManager={setManager} />,
+    body: <Fields keys={s.keys} f={f} departments={departments} setDepartments={setDepartments} worksites={worksites} setWorksites={setWorksites} manager={manager} setManager={setManager} wage={wage} />,
   }));
 
   return (
@@ -327,7 +349,13 @@ export function EditEmployee({ employee, close }: { employee: Employee360; close
   const withStart = (v: Values): Values => {
     const changed = changedOf(v);
     const dated = Object.keys(changed).some((k) => dates.includes(k));
-    const withDates = dated && v.start_date && !("start_date" in changed) ? { ...changed, start_date: v.start_date } : changed;
+    // A moved start is checked against every date the record holds, as the API checks it (the 18th birthday among them).
+    const withDates =
+      dated && v.start_date && !("start_date" in changed)
+        ? { ...changed, start_date: v.start_date }
+        : "start_date" in changed
+          ? { ...Object.fromEntries(dates.filter((k) => v[k]).map((k) => [k, v[k]])), ...changed }
+          : changed;
     // A pattern and its worksite are checked together once either moves: On Site and Hybrid keep one.
     const placed = "work_pattern" in changed || "worksite_id" in changed;
     return placed && shown.includes("worksite_id") ? { ...withDates, work_pattern: v.work_pattern, worksite_id: v.worksite_id } : withDates;
@@ -338,6 +366,7 @@ export function EditEmployee({ employee, close }: { employee: Employee360; close
   const [picked, setWorksites] = useState<WorksiteChoice[] | null>(null);
   const worksites = picked ?? (site.data ? [{ worksite_id: site.data.worksite_id, name: site.data.name, code: site.data.code }] : []);
   const [error, setError] = useState<string | null>(null);
+  const wage = useMinimumWage(shown);
   const save = useMutation("PATCH /api/v1/employees/:id");
 
   const submit = async () => {
@@ -364,7 +393,7 @@ export function EditEmployee({ employee, close }: { employee: Employee360; close
 
   return (
     <Form onSubmit={submit}>
-      <Fields keys={shown} f={f} departments={departments} setDepartments={setDepartments} worksites={worksites} setWorksites={setWorksites} />
+      <Fields keys={shown} f={f} departments={departments} setDepartments={setDepartments} worksites={worksites} setWorksites={setWorksites} wage={wage} />
       <FormError>{error}</FormError>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

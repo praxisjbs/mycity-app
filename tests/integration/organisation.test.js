@@ -471,6 +471,67 @@ describeDb("the organisation module against the real migrations", () => {
         });
       });
 
+      test("a start before the 18th birthday is refused on Start Date, on create and on Edit (Child's Rights Act 2003 s.28(1)(b))", async () => {
+        const young = await add({ date_of_birth: "2008-04-02" });
+        expect(young.status).toBe(422);
+        expect(young.body.error.fields).toEqual({ start_date: ["Under 18 at start"] });
+        // On the 18th birthday itself the start is taken.
+        const ok = await add({ date_of_birth: "2008-04-01" });
+        expect(ok.status).toBe(201);
+        const id = ok.body.employee_id;
+        const patch = (b) => asOps()(request(app).patch(`/api/v1/employees/${id}`)).send(b);
+        // A birthday corrected to a later year, and a start moved earlier, are each refused on Start Date.
+        const born = await patch({ date_of_birth: "2009-01-01" });
+        expect(born.status).toBe(422);
+        expect(born.body.error.fields).toEqual({ start_date: ["Under 18 at start"] });
+        const earlier = await patch({ start_date: "2026-03-31" });
+        expect(earlier.status).toBe(422);
+        expect(earlier.body.error.fields).toEqual({ start_date: ["Under 18 at start"] });
+        expect(await one("SELECT start_date::text AS start_date, date_of_birth::text AS date_of_birth FROM employee WHERE employee_id = $1", [id])).toEqual({
+          start_date: "2026-04-01",
+          date_of_birth: "2008-04-01",
+        });
+        // A correction elsewhere is never held up by the rule.
+        expect((await patch({ job_title: "Junior Delivery Analyst" })).status).toBe(200);
+      });
+
+      test("a pension PIN is PEN then digits, any length; a Tax ID keeps letters, digits and hyphens (no published format)", async () => {
+        for (const pin of ["123", "PEN-100123", "PIN100123456789", "PEN"]) {
+          const res = await add({ pension_pin: pin });
+          expect(res.status).toBe(422);
+          expect(res.body.error.fields).toEqual({ pension_pin: ["PEN then digits"] });
+        }
+        const ok = await add({ pension_pin: " pen100123456789 ", tax_id: "tin-0000-test" });
+        expect(ok.status).toBe(201);
+        expect(await one("SELECT pension_pin, tax_id FROM employee WHERE employee_id = $1", [ok.body.employee_id])).toEqual({
+          pension_pin: "PEN100123456789",
+          tax_id: "TIN-0000-TEST",
+        });
+        const short = await asOps()(request(app).patch(`/api/v1/employees/${ok.body.employee_id}`)).send({ pension_pin: "PEN1" });
+        expect(short.status).toBe(200);
+        const bad = await asOps()(request(app).patch(`/api/v1/employees/${ok.body.employee_id}`)).send({ pension_pin: "1234567890" });
+        expect(bad.status).toBe(422);
+        expect(bad.body.error.fields).toEqual({ pension_pin: ["PEN then digits"] });
+      });
+
+      test("the minimum wage in force is read for Gross Monthly's warning, and pay below it is still saved", async () => {
+        const none = await asOps()(request(app).get("/api/v1/employees/minimum-wage"));
+        expect(none.status).toBe(200);
+        expect(none.body).toEqual({ amount: null, effective_from: null });
+        await q(
+          `INSERT INTO statutory_rate (item, kind, base, rate, flat_amount, effective_from, source_title, source_section, source_checked_on)
+           VALUES ('minimum_wage', 'employee', 'gross', 0, 70000, '2026-01-01', 'Test Act', 's.1', '2026-01-01')`,
+        );
+        try {
+          const wage = await asOps()(request(app).get("/api/v1/employees/minimum-wage"));
+          expect(wage.body).toEqual({ amount: "70000.00", effective_from: "2026-01-01" });
+          const low = await add({ gross_monthly: "50000.00" });
+          expect(low.status).toBe(201);
+        } finally {
+          await q("DELETE FROM statutory_rate WHERE item = 'minimum_wage'");
+        }
+      });
+
       test("On Site without a worksite; a worksite that does not exist", async () => {
         const none = await add({ work_pattern: "on_site" });
         expect(none.status).toBe(422);

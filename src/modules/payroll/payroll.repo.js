@@ -614,6 +614,14 @@ const PROBLEMS = `
       FROM base b JOIN employee e ON e.employee_id = b.employee_id
      WHERE e.status = 'active' AND e.contract_ends_on IS NOT NULL AND e.contract_ends_on < b.last_day
     UNION ALL
+    -- Paid below the Minimum Wage in force on the month's last day (Payroll · Configurations, §6.15): warned, in either
+    -- mode, never blocked; with no version in force there is nothing to compare.
+    SELECT 'BELOW_MINIMUM_WAGE', 'warning', 6, b.payroll_run_id, b.employee_id, b.payslip_id, 1
+      FROM base b
+      JOIN statutory_rate w ON w.item = 'minimum_wage' AND w.flat_amount IS NOT NULL AND w.effective_from <= b.last_day
+                           AND (w.effective_to IS NULL OR w.effective_to > b.last_day)
+     WHERE b.gross_monthly IS NOT NULL AND b.gross_monthly < w.flat_amount
+    UNION ALL
     SELECT 'OVERTIME_WAITING', 'warning', 3, b.payroll_run_id, b.employee_id, b.payslip_id, w.n::int
       FROM base b
       JOIN LATERAL (SELECT count(*) AS n FROM attendance_pay_item i

@@ -67,6 +67,8 @@ const ProblemCode = z.enum([
   // rule 10): it moves to their next paid month when the run is approved. One code for each kind of deduction.
   "ADVANCE_NOT_TAKEN",
   "FINE_NOT_TAKEN",
+  // A person whose monthly gross is below the Minimum Wage in force on the month's last day (§6.15): a warning, never a block.
+  "BELOW_MINIMUM_WAGE",
 ]);
 
 /** A reason a person types: 10 to 500 characters. */

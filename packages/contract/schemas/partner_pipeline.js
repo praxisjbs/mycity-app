@@ -471,6 +471,15 @@ const ListSuggestionQuery = listQuery();
 const ListSuggestion = z.object({ label: z.string() }).strict();
 const ListSuggestionPage = Paged(ListSuggestion);
 
+/**
+ * One person the Owner filter offers on Leads, Partners and Pipeline (§10.1, QA F06e): an active
+ * employee, or a former one who still owns a lead, partner or deal (`left`), so a leaver's book can be
+ * found and reassigned with Edit.
+ */
+const OwnerQuery = listQuery();
+const OwnerOption = z.object({ employee_id: uuid, display_name: z.string(), left: z.boolean() }).strict();
+const OwnerPage = Paged(OwnerOption);
+
 /** A stage needs its meaning; the other lists have none. */
 const ListValueCreate = z
   .object({
@@ -1067,6 +1076,9 @@ const TABLES = {
   ListSuggestionQuery: { table: null, reason: "list controls for an open list's suggestions" },
   ListSuggestion: { table: null, reason: "a value a form suggests, by its name: reference_value.label" },
   ListSuggestionPage: { table: null, reason: "a page of an open list's suggestions" },
+  OwnerQuery: { table: null, reason: "list controls for the Owner filter's people" },
+  OwnerOption: { table: null, reason: "a person the Owner filter offers: employee and whether they have left" },
+  OwnerPage: { table: null, reason: "a page of the Owner filter's people" },
   ListValueCreate: {
     table: "reference_value",
     virtual: { meaning: "reference_value.metadata.meaning", position: "reference_value.display_order" },
@@ -1206,6 +1218,9 @@ module.exports = {
   ListSuggestionQuery,
   ListSuggestion,
   ListSuggestionPage,
+  OwnerQuery,
+  OwnerOption,
+  OwnerPage,
   ListValueCreate,
   ListValueUpdate,
   TrackerSetup,

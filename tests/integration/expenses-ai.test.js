@@ -145,8 +145,8 @@ describeDb("expenses' AI features against the real migrations", () => {
     expect(two.body).toMatchObject({ available: true, expense_category_id: null, category: null });
   });
 
-  test("Possible duplicates and Check Duplicate: the same payee and amount within 30 days is shown; the model names which one it repeats, told nothing about who", async () => {
-    const raise = async (purpose) => {
+  test("Possible duplicates and Check Duplicate: the same requester or account and amount within 30 days is shown; the model names which one it repeats, told nothing about who", async () => {
+    const raise = async (purpose, confirm = false) => {
       const res = await h.as("staff").post("/expenses/mine").send({
         purpose,
         expense_category_id: cat["Events and Activations"],
@@ -157,13 +157,17 @@ describeDb("expenses' AI features against the real migrations", () => {
         account_name: "Chuks Stores Ltd",
         account_number: "0123456789",
         submit: true,
+        confirm_duplicate: confirm,
       });
       expect(res.status).toBe(201);
       return res.body;
     };
     const first = await raise("Ikeja activation water");
     expect(first.possible_duplicates).toEqual([]);
-    const second = await raise("Water for Ikeja activation");
+    // Sending the second is refused until Send Anyway (guide §6.8 rule 2).
+    const refused = await h.as("staff").post("/expenses/mine").send({ purpose: "Water for Ikeja activation", expense_category_id: cat["Events and Activations"], lines: [{ description: "Crates of water", quantity: "2", unit_price: "4500.00" }], payee_type: "vendor", payee_name: "Chuks Stores", bank_name: "GTBank", account_name: "Chuks Stores Ltd", account_number: "0123456789", submit: true });
+    expect([refused.status, refused.body.error.fields]).toEqual([409, { confirm_duplicate: [first.number] }]);
+    const second = await raise("Water for Ikeja activation", true);
     expect(second.possible_duplicates).toEqual([expect.objectContaining({ number: first.number, amount: "9000.00", status: "submitted" })]);
 
     const seen = await h.as("manager").get(`/expenses/${second.expense_request_id}`);

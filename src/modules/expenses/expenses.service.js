@@ -5,7 +5,10 @@
  *
  *   create()      New Request: a draft, or sent at once with `submit`
  *   update()      Edit: the requester's own draft or sent-back request, every field sent again
- *   submit()      Send Request and Send Again: opens `expenses.request` in the same transaction
+ *   submit()      Send Request and Send Again: opens `expenses.request` in the same transaction;
+ *                 refused 409 EXPENSE_POSSIBLE_DUPLICATE while a possible duplicate is found, until
+ *                 the requester presses Send Anyway (`confirm_duplicate`, kept as
+ *                 `duplicate_confirmed_at` for the approvers; guide §6.8 rule 2)
  *   cancelOwn()   Cancel Request: the requester, while a draft, sent back or with its approval
  *   withdraw()    an `expenses.finance` holder, with a reason, once approved and until it is paid
  *   settle()      after commit, the approval's outcome copied onto the request (expenses.events.js)
@@ -253,11 +256,33 @@ async function publicView(row, reader, scope = null) {
   const dups = await readableDuplicates(reader, scope, row.possible_duplicates || []);
   return {
     ...out,
+    account_name_differs: nameDiffers(row.payee_name, row.account_name),
     possible_duplicates: dups.shown.map(duplicateRef),
     possible_duplicates_hidden: dups.hidden,
     can_edit: own && EDITABLE.includes(row.status),
     can_cancel: (own && CANCELLABLE.includes(row.status)) || finance,
   };
+}
+
+/** A name as compared: case, accents, punctuation and spacing set aside. */
+const foldName = (v) =>
+  String(v || "")
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * Name Differs (guide §6.1 rule 8; QA audit BG-018): the account name does not contain the payee's
+ * name, so the approvers look before the money goes. A trading name paid to its registered company
+ * ("Chuks Stores" to "Chuks Stores Ltd") is not flagged. Blank on either side flags nothing.
+ */
+function nameDiffers(payeeName, accountName) {
+  const payee = foldName(payeeName);
+  const account = foldName(accountName);
+  if (!payee || !account) return false;
+  return !` ${account} `.includes(` ${payee} `);
 }
 
 /** A possible duplicate as the contract carries it: nothing about whose it is. */
@@ -446,11 +471,37 @@ function payeeAsSent(row, employee) {
 }
 
 /**
- * Send a draft or sent-back request in the caller's transaction: the payee fixed, the budget line
- * and its flag set, `expense_request.submitted` emitted and the approval opened.
+ * Send Request's duplicate check (guide §6.8 rule 2; QA audit BG-020): a request that may repeat
+ * another (repo DUPLICATE_MATCH: the same requester or the same account, the same amount, within 30
+ * days, not cancelled or rejected) is refused 409 until its requester presses Send Anyway
+ * (`confirm`). The refusal names the earlier requests the requester may open; the rest are a count,
+ * as on the modal (audit F8). Answers whether one was found, for `duplicate_confirmed_at`.
  */
-async function sendIn(client, row, actor, employee) {
+async function duplicateCheckIn(client, row, actor, account, confirm) {
+  const found = await repo.duplicatesFor(client, {
+    expense_request_id: row.expense_request_id,
+    employee_id: row.employee_id,
+    account_number: account,
+    amount: row.amount,
+  });
+  if (!found.length) return false;
+  if (confirm === true) return true;
+  const { shown, hidden } = await readableDuplicates(actor, null, found);
+  const names = [
+    ...shown.map((d) => d.number),
+    ...(hidden ? [hidden === 1 ? "1 request you cannot open" : `${hidden} requests you cannot open`] : []),
+  ];
+  throw new AppError("EXPENSE_POSSIBLE_DUPLICATE", `Possible duplicate of ${names.join(", ")}`, 409, { confirm_duplicate: names });
+}
+
+/**
+ * Send a draft or sent-back request in the caller's transaction: the payee fixed, the possible
+ * duplicates checked (Send Anyway), the budget line and its flag set, `expense_request.submitted`
+ * emitted and the approval opened.
+ */
+async function sendIn(client, row, actor, employee, confirmDuplicate = false) {
   const payee = payeeAsSent(row, employee);
+  const duplicate = await duplicateCheckIn(client, row, actor, payee.account_number, confirmDuplicate);
   const counted = await budget.check(client, row, lagos.today());
   const moved = await repo.move(client, row.expense_request_id, EDITABLE, "submitted", { submitted_at: "now" });
   if (!moved) throw new AppError("EXPENSE_ALREADY_SENT", "This request was already sent", 409);
@@ -459,8 +510,8 @@ async function sendIn(client, row, actor, employee) {
     entity: { type: "expense", id: row.expense_request_id },
     actor,
     before: { status: row.status },
-    after: { status: "submitted", over_budget: counted.over_budget },
-    payload: payloadOf(row, { again: row.status === "sent_back" }),
+    after: { status: "submitted", over_budget: counted.over_budget, sent_despite_duplicate: duplicate },
+    payload: payloadOf(row, { again: row.status === "sent_back", sent_despite_duplicate: duplicate }),
   });
   const instance = await engine.openInstance(client, {
     definition_key: DEFINITION_KEY,
@@ -469,7 +520,7 @@ async function sendIn(client, row, actor, employee) {
     context: { amount: row.amount, requester_manages_people: employee.manages_people === true },
     actor,
   });
-  await repo.setSending(client, row.expense_request_id, { ...payee, ...counted, workflow_instance_id: instance.workflow_instance_id });
+  await repo.setSending(client, row.expense_request_id, { ...payee, ...counted, workflow_instance_id: instance.workflow_instance_id, duplicate_confirmed: duplicate });
 }
 
 /** New Request: a draft, or sent at once when `submit` is true. */
@@ -488,7 +539,7 @@ async function create(actor, body) {
       after: row,
       payload: payloadOf(row),
     });
-    if (body.submit) await sendIn(client, row, actor, employee);
+    if (body.submit) await sendIn(client, row, actor, employee, body.confirm_duplicate === true);
     return row.expense_request_id;
   });
   return getOwn(actor, id);
@@ -525,12 +576,12 @@ async function update(actor, id, body) {
   return getOwn(actor, id);
 }
 
-/** Send Request, and Send Again on a sent-back request. */
-async function submit(actor, id) {
+/** Send Request, and Send Again on a sent-back request; `body.confirm_duplicate` is Send Anyway. */
+async function submit(actor, id, body = {}) {
   const employee = await requesterOf(pool, actor);
   await tx(async (client) => {
     const row = await ownLocked(client, actor, id, EDITABLE, () => new AppError("EXPENSE_ALREADY_SENT", "This request was already sent", 409));
-    await sendIn(client, row, actor, employee);
+    await sendIn(client, row, actor, employee, body.confirm_duplicate === true);
   });
   return getOwn(actor, id);
 }
@@ -769,13 +820,13 @@ const projectIdOf = (db, name) => (db ? repo.projectIdByName(db, name) : null);
 
 /**
  * Requests the person may open that an invoice attached on Praxis AI might repeat (praxis-ai.md
- * §6.18; §6.8 here): sent within 30 days to the same payee for the same amount. The rest are never
- * named, as on a request's modal.
+ * §6.18; §6.8 here): sent within 30 days by the person or to the same account, for the same amount,
+ * and not cancelled or rejected. The rest are never named, as on a request's modal.
  * @returns {Promise<Array<{number: string, submitted_at: string}>>}
  */
-async function possibleDuplicatesOf(actor, scope, { account_number: accountNumber, payee_name: payeeName, amount }) {
-  if (!amount || (!accountNumber && !payeeName)) return [];
-  const dups = await repo.duplicatesFor(pool, { account_number: accountNumber, payee_name: payeeName, amount });
+async function possibleDuplicatesOf(actor, scope, { account_number: accountNumber, amount }) {
+  if (!amount) return [];
+  const dups = await repo.duplicatesFor(pool, { employee_id: actor.employee_id || null, account_number: accountNumber || null, amount });
   return (await readableDuplicates(actor, scope, dups)).shown;
 }
 
@@ -822,9 +873,9 @@ function nextAfter(r) {
   ];
 }
 
-/** Send Request's card: the person's own draft or sent-back request, sent as Send Request sends it. */
+/** Send Request's card: the person's own draft or sent-back request, sent as Send Request sends it (Send Anyway its `confirm_duplicate`). */
 function submitFromCard(actor, values) {
-  return submit(actor, values.expense_request_id);
+  return submit(actor, values.expense_request_id, { confirm_duplicate: values.confirm_duplicate === true });
 }
 
 /** The request a card names, by number and purpose, when it is the person's own. */
@@ -901,6 +952,7 @@ module.exports = {
   createFromInvoice,
   projectIdOf,
   possibleDuplicatesOf,
+  nameDiffers,
   fileName,
   changeFromCard,
   addLineFromCard,

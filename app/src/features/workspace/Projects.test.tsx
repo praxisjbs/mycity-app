@@ -12,7 +12,9 @@ import { mockSession, sid } from "@/api/mock/core";
 import { byKey } from "@/api/mock/data/people";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
+import type { Project } from "@mycity/contract/contract.gen.ts";
 import { CardPills } from "./shared";
+import { OwnerName } from "./Projects";
 import Workspace from "./index";
 
 /**
@@ -139,6 +141,55 @@ describe("projects, late reasons and the live board", () => {
     render(<CardPills t={t} />);
     expect(screen.getByText("Left")).toBeTruthy();
   });
+
+  it("New Project warns of an active project already called that, case and accents aside, and still saves (QA BG-027)", async () => {
+    await signedIn(<Workspace tab="projects" id={null} />);
+    await screen.findByText("Enugu Launch", undefined, { timeout: 8000 });
+    fireEvent.click(screen.getAllByRole("button", { name: /New Project/ })[0]!);
+    const form = await screen.findByRole("dialog", { name: "New Project" });
+    fireEvent.change(within(form).getByRole("textbox", { name: /Name/ }), { target: { value: "ÉNUGU launch" } });
+    await within(form).findByText("Already a project: PRJ-2026-000001 Enugu Launch.", undefined, { timeout: 5000 });
+    // A completed project's name is free again; a new name clears the warning.
+    fireEvent.change(within(form).getByRole("textbox", { name: /Name/ }), { target: { value: "Abuja Hub Opening" } });
+    await waitFor(() => expect(within(form).queryByText(/Already a project/)).toBeNull(), { timeout: 5000 });
+    fireEvent.change(within(form).getByRole("textbox", { name: /Name/ }), { target: { value: "Enugu Launch" } });
+    await within(form).findByText(/Already a project/, undefined, { timeout: 5000 });
+    fireEvent.click(within(form).getByRole("button", { name: "Create Project" }));
+    await closed("New Project");
+  }, 30000);
+
+  it("Edit Project hands the project to another owner (QA BG-029)", async () => {
+    const tolu = byKey("tolu")!;
+    await signedIn(<Workspace tab="projects" id={sid("project:2")} />);
+    await screen.findByRole("heading", { name: "Abuja Hub Opening" }, { timeout: 8000 });
+    fireEvent.click(screen.getByRole("button", { name: "Edit Project" }));
+    const form = await screen.findByRole("dialog", { name: "Edit Project" });
+    await within(form).findByRole("button", { name: /Remove Cynthia/ }, { timeout: 5000 });
+    fireEvent.change(within(form).getByPlaceholderText("Search staff"), { target: { value: tolu.first_name } });
+    fireEvent.click(await within(form).findByRole("option", { name: new RegExp(tolu.display_name) }, { timeout: 5000 }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save Project" }));
+    await closed("Edit Project");
+    const read = await api.call("GET /api/v1/projects/:id", { params: { id: sid("project:2") } });
+    expect(read.owner?.employee_id).toBe(tolu.employee_id);
+  }, 30000);
+
+  it("an owner who has left says Left beside their name (QA BG-029)", () => {
+    const p = { owner: { employee_id: sid("x"), display_name: "Ada Obi", job_title: null, department: null, photo_url: null }, owner_left: true } as unknown as Project;
+    render(<OwnerName p={p} />);
+    expect(screen.getByText("Ada Obi")).toBeTruthy();
+    expect(screen.getByText("Left")).toBeTruthy();
+  });
+
+  it("Assign To says No Login Yet beside someone who cannot sign in yet (QA BG-028)", async () => {
+    const musa = byKey("musa")!;
+    await signedIn(<Workspace tab="tasks" id={null} />);
+    await screen.findByText("Completed, 30d", undefined, { timeout: 8000 });
+    fireEvent.click(screen.getAllByRole("button", { name: /New Task/ })[0]!);
+    const form = await screen.findByRole("dialog", { name: "New Task" });
+    fireEvent.change(within(form).getAllByPlaceholderText("Search people")[0]!, { target: { value: musa.first_name } });
+    const option = await within(form).findByRole("option", { name: new RegExp(musa.display_name) }, { timeout: 5000 });
+    expect(within(option).getByText("No Login Yet")).toBeTruthy();
+  }, 30000);
 
   it("New Event opens filled with the attendees Praxis AI named", async () => {
     const kemi = byKey("kemi")!;

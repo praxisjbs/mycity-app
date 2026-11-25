@@ -35,10 +35,10 @@ const { formatDate } = require("../../shared/time/day-first");
 const MODULE = "expenses";
 
 const offInvoice = (reason) => ({ available: false, reason, payee_name: null, expense_category_id: null, category: null, lines: [], amount: null, amount_due: null, bank_name: null, account_name: null, account_number: null, ai_run_id: null });
-/** An account number a request takes: ten digits, as printed with its spaces taken out. */
+/** An account number a request takes: ten digits, as printed with its spaces taken out, never one digit repeated (guide §6.1 rule 8). */
 const accountOf = (v) => {
   const digits = String(v || "").replace(/[\s-]/g, "");
-  return /^\d{10}$/.test(digits) ? digits : null;
+  return /^\d{10}$/.test(digits) && !/^(\d)\1{9}$/.test(digits) ? digits : null;
 };
 const offCategory = (reason) => ({ available: false, reason, expense_category_id: null, category: null, ai_run_id: null });
 
@@ -196,7 +196,7 @@ async function duplicateNote(actor, payee, amount) {
   const service = require("./expenses.service");
   const found = await service.possibleDuplicatesOf(actor, scope, { ...payee, amount });
   const d = found[0];
-  return d ? `${d.number} asked the same payee for the same amount on ${formatDate(new Date(d.submitted_at))}.` : null;
+  return d ? `${d.number} asked the same amount on ${formatDate(new Date(d.submitted_at))}, by you or to the same account.` : null;
 }
 
 /**

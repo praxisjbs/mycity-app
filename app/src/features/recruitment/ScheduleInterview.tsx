@@ -4,7 +4,8 @@
  * Lagos, and the panel. Each panelist gets the calendar entry; the candidate gets the invitation with
  * its .ics. The panel picker offers only people who hold Recruitment (GET /interviews/panelists), and a
  * refusal names anyone who cannot sit. A person taken off the panel loses an unsent draft; a
- * submitted card stays.
+ * submitted card stays. A candidate already at Offer is warned of, never refused: a later round
+ * is allowed by design (§6.6).
  */
 import { useState } from "react";
 import interviewSchemas from "@mycity/contract/schemas/interviews.js";
@@ -14,7 +15,7 @@ import { ApiError } from "@/api/client";
 import { usePhotos } from "@/api/download";
 import { invalidate, useInfinite, useMutation, usePaged } from "@/api/hooks";
 import { paging } from "@/features/shared/wire";
-import { Button, ChoiceField, DateField, Field, FormError, FormFooter, Grid, PersonPicker, RecordPicker, SelectField, TextField, TimeField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { Banner, Button, ChoiceField, DateField, Field, FormError, FormFooter, Grid, PersonPicker, RecordPicker, SelectField, TextField, TimeField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { bodySchema, INTERVIEW_TYPE, renamed, sayRefusal } from "./shared";
 
 type Values = {
@@ -68,7 +69,20 @@ function PanelPicker({ value, onChange }: { value: PersonRef[]; onChange: (value
   );
 }
 
-export function ScheduleForm({ applicationId, interview, close, onSaved }: { applicationId?: string; interview?: InterviewDetail; close: () => void; onSaved?: (x: InterviewDetail) => void }) {
+export function ScheduleForm({
+  applicationId,
+  stage,
+  interview,
+  close,
+  onSaved,
+}: {
+  applicationId?: string;
+  /** The application's stage, when the form is opened from the candidate's sheet. */
+  stage?: string;
+  interview?: InterviewDetail;
+  close: () => void;
+  onSaved?: (x: InterviewDetail) => void;
+}) {
   const at = interview ? lagos(interview.scheduled_start) : null;
   const f = useContractForm<Values>(
     {
@@ -111,6 +125,8 @@ export function ScheduleForm({ applicationId, interview, close, onSaved }: { app
     }
   };
   const type = f.values.interview_type;
+  // An offer is open from the Offer stage: warned of, and the interview still books.
+  const offered = !interview && (stage ?? picked[0]?.stage) === "offer";
   return (
     <>
       {!applicationId && !interview && (
@@ -128,6 +144,11 @@ export function ScheduleForm({ applicationId, interview, close, onSaved }: { app
             placeholder="Search candidates"
           />
         </Field>
+      )}
+      {offered && (
+        <Banner tone="warn" icon="alert" className="mb-3.5">
+          This candidate has an open offer.
+        </Banner>
       )}
       <Grid cols={2}>
         <Field label="How" {...f.status("interview_type")}>

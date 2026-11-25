@@ -306,7 +306,8 @@ export function TaskForm({
     [me.employee_id, "You"],
     ...members
       .filter((p) => p.employee_id !== me.employee_id && (p.employee_id === task?.assignee?.employee_id || mayLead(p.employee_id)))
-      .map((p) => [p.employee_id, p.display_name] as [string, string]),
+      // Someone who cannot sign in yet says so, as the pickers do (workspace.md §10.1).
+      .map((p) => [p.employee_id, (p as { has_login?: boolean }).has_login === false ? `${p.display_name}, No Login Yet` : p.display_name] as [string, string]),
   ];
   const month = isCommitment && f.values.commitment_month ? String(f.values.commitment_month) : `${(f.values.due_on || todayIso()).slice(0, 7)}-01`;
   return (

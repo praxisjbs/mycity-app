@@ -728,8 +728,22 @@ R("POST /api/v1/recruitment/candidates/invitations", "create", (req) =>
   }),
 );
 
+/**
+ * Reads Score With AI queued, as the server's worker holds them: never done in the request, and not yet by the
+ * sheet's first read after it, so the sheet's asking again is what shows the score.
+ */
+const READS_QUEUED = new Map<string, number>();
+
 R("GET /api/v1/recruitment/candidates/:id", "view", (req) => {
   const a = app(req.params.id);
+  const left = a ? READS_QUEUED.get(a.application_id) : undefined;
+  if (a && left !== undefined) {
+    if (left > 0) READS_QUEUED.set(a.application_id, left - 1);
+    else {
+      READS_QUEUED.delete(a.application_id);
+      screen(a, vacancyOfApp(a).screening_conditions);
+    }
+  }
   return a ? ok(candidateDetail(a, req)) : appNotFound();
 });
 
@@ -799,7 +813,8 @@ R("POST /api/v1/recruitment/candidates/:id/score", "edit", (req) =>
     if (a.cv_state === "none") return fail(404, "NOT_FOUND", "This candidate sent no CV");
     if (a.cv_state === "checking") return fail(409, "CV_CHECKING", "The CV is still being checked");
     if (a.cv_state === "infected") return fail(409, "CV_INFECTED", "The CV failed the virus check");
-    screen(a, vacancyOfApp(a).screening_conditions);
+    // The server only queues the read and answers with the record unchanged (candidates.service.js requestScore).
+    READS_QUEUED.set(a.application_id, 1);
     return ok(candidateDetail(a, req));
   }),
 );

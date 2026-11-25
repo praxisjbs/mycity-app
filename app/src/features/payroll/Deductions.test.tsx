@@ -13,6 +13,19 @@ import { RouterProvider } from "@/lib/router";
 import { ScreenActionProvider } from "@/shell/screen-action";
 import Deductions from "./Deductions";
 
+/** A reader with payroll view only (as Management holds it): the grants the screen reads, narrowed for one test. */
+const viewOnly = vi.hoisted(() => ({ on: false }));
+vi.mock("./parts", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./parts")>();
+  return {
+    ...real,
+    usePayrollGrant: (action: Parameters<typeof real.usePayrollGrant>[0]) => {
+      const held = real.usePayrollGrant(action);
+      return viewOnly.on ? action === "view" : held;
+    },
+  };
+});
+
 /**
  * Payroll · Deductions on the in-browser mock, in the contract's shapes (docs/guides/payroll.md §3.3, §3.4,
  * §6.6, §10): the figures, the list pending first, a fine accepted for this month, spread or waived, an advance
@@ -34,6 +47,8 @@ beforeEach(() => setViewport(1440));
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  viewOnly.on = false;
+  window.history.replaceState(null, "", "/");
 });
 
 let auth: ReturnType<typeof useAuth> | null = null;
@@ -170,6 +185,19 @@ describe("Payroll · Deductions", () => {
     expect(within(form).getAllByText("Required")).toHaveLength(2);
     expect(within(form).getByText("Start Month")).toBeTruthy();
     expect(await axe(document.body)).toHaveNoViolations();
+  }, 40000);
+
+  it("with payroll view only, Record Advance and a row's buttons are not offered, nor opened from the link (QA F26c)", async () => {
+    viewOnly.on = true;
+    window.history.replaceState(null, "", "/payroll?tab=deductions&action=advance");
+    await open();
+    const fine = (await readPage()).data.find((r) => r.source === "fine" && r.can_accept)!;
+    const table = await screen.findByRole("table", { name: "Pending Deductions" });
+    expect(screen.queryByRole("button", { name: "Record Advance" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Record Advance" })).toBeNull();
+    fireEvent.click(within(table).getByText(fine.reason).closest("tr")!);
+    await waitFor(() => expect(screen.getAllByText(fine.reason).length).toBeGreaterThan(1));
+    for (const name of ["Accept This Month", "Spread Over Months", "Waive", "Release", "Cancel Advance"]) expect(screen.queryByRole("button", { name })).toBeNull();
   }, 40000);
 
   it("on a phone the deductions are cards and nothing opens until one is tapped", async () => {

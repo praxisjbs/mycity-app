@@ -71,6 +71,8 @@ module.exports = {
 
   summary: async (req, res) => ok(res, await service.summary(pool, scopeOf(req))),
 
+  minimumWage: async (req, res) => ok(res, await service.minimumWage(pool)),
+
   get: async (req, res) => ok(res, await maskUnlessOwn(req, await readable(req))),
 
   create: async (req, res) => {

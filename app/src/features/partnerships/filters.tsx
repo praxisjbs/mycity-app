@@ -1,6 +1,8 @@
+import type { OwnerOption } from "@mycity/contract/contract.gen.ts";
+import type { ReactNode } from "react";
 import { useApi } from "@/api/hooks";
-import { DesktopOnly, FilterSelect } from "@mycity/ui";
-import { SCOPES, useCategoryOptions, useOwnerOptions, useStages } from "./lib";
+import { DesktopOnly, FilterSelect, Pill } from "@mycity/ui";
+import { SCOPES, useCategoryOptions, useOwners, useStages } from "./lib";
 
 /**
  * The filters Pipeline, Partners and Leads share on desktop (docs/guides/partnerships.md §2, §10.1):
@@ -41,11 +43,23 @@ export function filterQuery(v: RecordFilterValue, withCustom = true) {
   };
 }
 
+/** One person in the Owner filter: a leaver who still owns records carries a Left tag (QA F06e). */
+export function ownerOption(o: OwnerOption): readonly [string, ReactNode] {
+  if (!o.left) return [o.employee_id, o.display_name];
+  return [
+    o.employee_id,
+    <span key={o.employee_id} className="inline-flex items-center gap-2">
+      {o.display_name}
+      <Pill tone="neutral">Left</Pill>
+    </span>,
+  ];
+}
+
 /** The filter row, one line above the list (§10), desktop only. `kind` names whose filterable custom fields join it; Pipeline passes none. */
 export function RecordFilters({ value, onChange, kind }: { value: RecordFilterValue; onChange: (v: RecordFilterValue) => void; kind?: "lead" | "partner" }) {
   const { stages } = useStages();
   const categories = useCategoryOptions();
-  const owners = useOwnerOptions();
+  const owners = useOwners();
   const defs = useApi("GET /api/v1/partnerships/fields", { query: { applies_to: kind ?? "lead", active: "true" }, enabled: Boolean(kind) });
   const filterable = kind ? (defs.data?.data ?? []).filter((d) => d.filterable && ["pick", "multi_pick", "yes_no"].includes(d.field_type)) : [];
   const set = (k: Exclude<keyof RecordFilterValue, "custom">) => (v: string) => onChange({ ...value, [k]: v });
@@ -55,7 +69,7 @@ export function RecordFilters({ value, onChange, kind }: { value: RecordFilterVa
         <FilterSelect label="Stage" value={value.stage} onChange={set("stage")} options={[["", "Every Stage"], ...stages.map((s) => [s.code, s.label] as [string, string])]} />
         <FilterSelect label="Category" value={value.partner_category_id} onChange={set("partner_category_id")} options={[["", "Every Category"], ...categories.options]} more={categories.more} onMore={categories.onMore} />
         <FilterSelect label="Region" value={value.region_scope} onChange={set("region_scope")} options={[["", "Every Region"], ...SCOPES]} />
-        <FilterSelect label="Owner" value={value.owner_id} onChange={set("owner_id")} options={[["", "Every Owner"], ...owners.options]} more={owners.more} onMore={owners.onMore} />
+        <FilterSelect label="Owner" value={value.owner_id} onChange={set("owner_id")} options={[["", "Every Owner"], ...owners.owners.map(ownerOption)]} more={owners.more} onMore={owners.onMore} />
         <FilterSelect
           label="Health"
           value={value.health}

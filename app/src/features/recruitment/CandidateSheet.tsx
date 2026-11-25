@@ -4,12 +4,12 @@
  * history, and what a recruiter does next: Score With AI, Send Assessment, Schedule Interview, Move
  * to a stage, Not Progressing, Reopen and Add to Pool. A score never moves anyone; a person does.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import candidateSchemas from "@mycity/contract/schemas/candidates.js";
 import assessmentSchemas from "@mycity/contract/schemas/assessments.js";
 import poolSchemas from "@mycity/contract/schemas/talent_pool.js";
 import type { ApplicationStage, CandidateDetail } from "@mycity/contract/contract.gen.ts";
-import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
+import { invalidate, refresh, useApi, useInfinite, useMutation } from "@/api/hooks";
 import { saveFile } from "@/api/download";
 import { useAiAvailable } from "@/auth/ai";
 import { useAuth } from "@/auth/AuthProvider";
@@ -56,6 +56,9 @@ const WEIGHTED_HELP = "From the parts scored so far, with this role's weights.";
 /** The stages a hire's onboarding case owns: not progressed there, a card is not reopened. */
 const PAST_OFFER: readonly string[] = ["documentation", "pre_onboarding", "onboarding"];
 const words = (s: string) => STAGE_LABEL[s as ApplicationStage] ?? (s === "not_progressed" ? "Not Progressing" : s);
+/** Score With AI only queues the read (the worker reads the CV): the sheet asks again this often, this many times, until it lands. */
+const READ_EVERY_MS = 2000;
+const READ_TRIES = 15;
 
 export function CandidateSheet({ id, close }: { id: string; close: () => void }) {
   const modal = useModal();
@@ -73,6 +76,23 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
   // M5's Offers screen, once it opens in this build (F14): a shortlisted card makes an offer, one at Offer or after opens it.
   const offers = useScreenState("recruitment", "offers").open;
   const { navigate } = useRouter();
+  // Asks left while a queued read is awaited; 0 when none is.
+  const [reading, setReading] = useState(0);
+  const screened = read.data?.screened_at ?? null;
+  useEffect(() => {
+    if (!reading) return undefined;
+    if (screened) {
+      // The read landed: the board and its figures show the score too, quietly.
+      setReading(0);
+      void refresh("/api/v1/recruitment/candidates");
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      void refresh(`/api/v1/recruitment/candidates/${id}`);
+      setReading((n) => n - 1);
+    }, READ_EVERY_MS);
+    return () => clearTimeout(timer);
+  }, [reading, screened, id]);
   const c = read.data;
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!c) return <LoadingRows count={8} />;
@@ -112,11 +132,13 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
   const main = choices.find((x): x is Act => Boolean(x)) ?? null;
   const rest: Act[] = [
     ...choices.filter((x): x is Act => Boolean(x) && x !== main),
-    ...(editing && mayScore ? [{ label: "Score With AI", icon: "spark" as IconName, onSelect: act(() => score.run({ params: { id }, body: {} }), "CV read") }] : []),
+    ...(editing && mayScore && !reading
+      ? [{ label: "Score With AI", icon: "spark" as IconName, onSelect: act(() => score.run({ params: { id }, body: {} }).then(() => setReading(READ_TRIES)), "Reading the CV") }]
+      : []),
     ...(editing
       ? [
           { label: "Send Assessment", icon: "send" as IconName, onSelect: () => modal.open({ title: "Send Assessment", body: () => <SendForm candidate={c} close={back} onSent={reload} /> }) },
-          { label: "Schedule Interview", icon: "calendar" as IconName, onSelect: () => modal.open({ title: "Schedule Interview", wide: true, body: () => <ScheduleForm applicationId={c.application_id} close={back} onSaved={reload} /> }) },
+          { label: "Schedule Interview", icon: "calendar" as IconName, onSelect: () => modal.open({ title: "Schedule Interview", wide: true, body: () => <ScheduleForm applicationId={c.application_id} stage={c.stage} close={back} onSaved={reload} /> }) },
           ...c.next_stages.filter((s) => s !== ahead).map(moveTo),
         ]
       : []),
@@ -168,7 +190,7 @@ export function CandidateSheet({ id, close }: { id: string; close: () => void })
                   </span>
                 ),
               ],
-              ["Read", c.screened_at ? formatDateTime(c.screened_at) : "Form only"],
+              ["Read", c.screened_at ? formatDateTime(c.screened_at) : reading ? "Being read" : "Form only"],
             ]}
           />
           {c.screening_summary && <p className="mt-2 text-sm" data-copy="content">{c.screening_summary}</p>}

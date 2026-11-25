@@ -615,8 +615,8 @@ async function assertReferences(client, body, employeeId = null) {
 
 /**
  * The order an employee's dates keep (the contract's employeeDateProblems, the same rule a form
- * checks as it is filled), and two that need today: a birthday and a probation confirmation are
- * never in the future. Applied to a whole record, so a correction is checked against what is stored.
+ * checks as it is filled, the start on or after the 18th birthday among them), and two that need
+ * today: a birthday and a probation confirmation are never in the future. Applied to a whole record, so a correction is checked against what is stored.
  */
 function assertDates(record, only = null) {
   const today = lagos.today();
@@ -726,7 +726,9 @@ async function updateEmployee(client, employeeId, patch, actor, { followHead = f
   }
   const given = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined && v !== ""));
   const dated = ["contract_ends_on", "confirmation_due_on", "confirmed_on", "date_of_birth"];
-  assertDates({ ...before, ...given }, "start_date" in given ? dated : dated.filter((k) => k in given));
+  const touched = "start_date" in given ? dated : dated.filter((k) => k in given);
+  // The age at the start (18, the contract's MINIMUM_START_AGE) lands on Start Date: answered when the start or the birthday moves.
+  assertDates({ ...before, ...given }, "start_date" in given || "date_of_birth" in given ? [...touched, "start_date"] : touched);
   const change = { ...patch };
   // The home address is a place (F27), kept through shared/places; the record keeps its line.
   if (patch.home_address !== undefined)
@@ -1144,6 +1146,15 @@ async function counts(client, scope, { today = lagos.today() } = {}) {
     attrition_90d: row.attrition,
     confirmations_due: row.probation_due,
   };
+}
+
+/**
+ * GET /employees/minimum-wage: the Minimum Wage in force today (Lagos), entered on Payroll · Configurations, so Add
+ * Employee and Edit Record warn on a Gross Monthly below it. A warning only: pay below it is still saved (§6.16).
+ */
+async function minimumWage(client) {
+  // Required here, not at the top, as the worksites service is: statutory reads no People code, and stays that way.
+  return require("../statutory/statutory.rates").minimumWageOn(client, lagos.today());
 }
 
 /** The counts above the register, the work-pattern strip, and what needs a decision. */
@@ -1730,6 +1741,7 @@ module.exports = {
   employmentStatusOf,
   counts,
   summary,
+  minimumWage,
   historyOf,
   seats,
   createSeat,

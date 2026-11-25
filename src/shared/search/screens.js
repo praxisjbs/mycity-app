@@ -194,6 +194,8 @@ function tabVisible(screen, reader) {
   // Announcements is for those who post them (`announcements.post`, as every route asks).
   if (module === "community" && tab === "announcements") return hasCapability(reader, "announcements.post");
   if (module === "queries" && !full) return tab === "queries";
+  // Expenses · Disbursements is for those who record payments (docs/guides/expenses.md §2; QA audit BG-019).
+  if (module === "expenses" && tab === "disbursements") return hasCapability(reader, "expenses.finance");
   if (module === "expenses" && !full)
     return ["approvals", "budgets"].includes(tab) && (tab !== "approvals" || reader.manages_people);
   if (module === "performance" && !full && !reader.manages_people) return tab !== "analytics";

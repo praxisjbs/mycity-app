@@ -406,6 +406,14 @@ describeDb("Praxis AI's Workspace cards against the real migrations", () => {
     expect(refused.status).toBe(403);
     expect(refused.body.error.fields).toEqual({ project_id: ["Not yours to change"] });
     expect(await one("SELECT name FROM project WHERE project_id = $1", [theirs.body.project_id])).toEqual({ name: "Ops Review" });
+
+    // Edit Project's Owner on the card (QA BG-029): named by name, picked from colleagues, saved through the page's own service.
+    const staff = h.people.staff.employee_id;
+    const handOn = await drawn("ops", "projects.edit", { project_id: theirs.body.project_id, owner_employee_id: staff }, "Give the Ops Review to Tunde.");
+    expect(handOn.names).toEqual(expect.arrayContaining([expect.objectContaining({ type: "employee", id: staff, label: "Tunde Ade" })]));
+    expect(handOn.fields.find((f) => f.name === "owner_employee_id")).toMatchObject({ label: "Owner", picks: "colleague" });
+    expect((await h.press("ops", handOn.ai_action_draft_id)).status).toBe(200);
+    expect(await one("SELECT owner_employee_id FROM project WHERE project_id = $1", [theirs.body.project_id])).toEqual({ owner_employee_id: staff });
   });
 
   test("calendar.edit: Save Event moves an event its maker made through Edit Event's own service, naming who comes; an attendee may not change it", async () => {

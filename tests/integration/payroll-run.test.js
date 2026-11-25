@@ -462,6 +462,36 @@ describeDb("a month's payroll run against the real migrations", () => {
     expect((await one("SELECT count(*)::int AS n FROM payslip WHERE employee_id = $1", [id])).n).toBe(0);
   });
 
+  test("anyone paid below the Minimum Wage in force is warned of, never blocked, and only while a version is in force", async () => {
+    const before = p.PayrollRun.parse((await as("ops").get(`/payroll/runs/${octoberRun}`)).body);
+    const below = async () =>
+      p.PayrollProblemPage.parse((await as("ops").get(`/payroll/runs/${octoberRun}/problems`)).body).data.filter((x) => x.code === "BELOW_MINIMUM_WAGE");
+    expect(await below()).toEqual([]);
+    // In force on the month's last day; a later version is not.
+    await q(
+      `INSERT INTO statutory_rate (item, kind, base, rate, flat_amount, effective_from, effective_to, source_title, source_section, source_checked_on)
+       VALUES ('minimum_wage', 'employee', 'gross', 0, 120000, '2026-01-01', '2026-12-01', 'Test Act', 's.1', '2026-01-01'),
+              ('minimum_wage', 'employee', 'gross', 0, 500000, '2026-12-01', NULL, 'Test Act', 's.1', '2026-01-01')`,
+    );
+    try {
+      const found = await below();
+      expect(found.map((x) => x.employee && x.employee.display_name)).toContain("Nobank Tester");
+      expect(found.map((x) => x.employee && x.employee.display_name)).not.toContain("Ada Tester");
+      expect(found.map((x) => x.employee && x.employee.display_name)).not.toContain("Nosalary Tester");
+      expect(found.every((x) => x.severity === "warning")).toBe(true);
+      expect(found.find((x) => x.employee.display_name === "Nobank Tester")).toMatchObject({
+        message: "Nobank Tester is paid below the minimum wage",
+        action: "Check their pay on People · Employees",
+      });
+      const run = p.PayrollRun.parse((await as("ops").get(`/payroll/runs/${octoberRun}`)).body);
+      expect(run.blocking_problems).toBe(before.blocking_problems);
+      expect(run.warnings).toBe(before.warnings + found.length);
+    } finally {
+      await q("DELETE FROM statutory_rate WHERE item = 'minimum_wage'");
+    }
+    expect(await below()).toEqual([]);
+  });
+
   /* ---------------------------------------------------------------- *
    * Submit
    * ---------------------------------------------------------------- */

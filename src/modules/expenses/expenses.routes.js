@@ -8,7 +8,8 @@
  *                                  before it is sent (guide §6.6 rule 3); a read, never a block
  *   POST  /mine                    `expenses` create: New Request (`submit` sends it at once)
  *   PATCH /mine/:id                `expenses` edit: a draft or sent-back request of their own
- *   POST  /mine/:id/submit         `expenses` create: Send Request, Send Again
+ *   POST  /mine/:id/submit         `expenses` create: Send Request, Send Again; 409
+ *                                  EXPENSE_POSSIBLE_DUPLICATE until `confirm_duplicate` (Send Anyway)
  *   POST  /mine/:id/cancel         `expenses` edit: Cancel Request, before Operations & People approve
  *   GET   /                        `expenses` view, within scope: the requests
  *   GET   /approvals, /summary     `expenses` approve: the requests waiting on the caller now
@@ -67,7 +68,7 @@ route(router, "patch", "/mine/:id",
   requirePermission("expenses", "edit"), controller.update);
 
 route(router, "post", "/mine/:id/submit",
-  { params: c.common.IdParams, body: c.common.EmptyBody, response: x.ExpenseRequest,
+  { params: c.common.IdParams, body: x.ExpenseSubmit, response: x.ExpenseRequest,
     summary: "Send a request of mine for approval" },
   requirePermission("expenses", "create"), controller.submit);
 

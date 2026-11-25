@@ -4,7 +4,9 @@
  * the real migrations, MyCity's real staff from 10_staff.js as the runner loads them, then the seed
  * twice. Through the services it shares a task with People and one with a Department, sets a
  * repeating task, two reminders and this week's Support Needed lines beside the board's work, and
- * the second run changes nothing.
+ * the second run changes nothing. A later deploy finds the board aged and puts it back (QA BG-026):
+ * the open tasks on their days from the deploy's day, each overdue one with its reason, the
+ * priorities spread, and an earlier week's weekly report done.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/workspace-staging-seed
  *
@@ -142,5 +144,52 @@ describeDb("My Workspace's staging seed against the real migrations", () => {
     const page = await workspace.teamWeeks(head, await scopeFor(head, "workspace", "view"), { page: 1 });
     const lines = page.data.filter((r) => r.support_needed).map((r) => r.support_needed);
     expect(lines).toContain("Sign-off on the MTN venue budget by Wednesday");
+  });
+
+  test("the open tasks' priorities are spread, not left at Normal", async () => {
+    const { rows } = await q("SELECT priority, count(*)::int AS n FROM task WHERE status NOT IN ('done', 'cancelled') GROUP BY priority");
+    const by = Object.fromEntries(rows.map((r) => [r.priority, r.n]));
+    for (const p of ["low", "normal", "high", "urgent"]) expect([p, (by[p] || 0) > 0]).toEqual([p, true]);
+    const open = rows.reduce((n, r) => n + r.n, 0);
+    expect(by.normal).toBeLessThan(open / 2);
+  });
+
+  // Last: it ages the board as weeks on staging would, then runs the seed as the next deploy does.
+  test("a later deploy moves the open tasks back to their days, each overdue one with its reason", async () => {
+    const day = (n) => lagos.addDays(lagos.today(), n);
+    const dayOf = async (title) => lagos.dateOf((await q("SELECT due_at FROM task WHERE title = $1 AND status <> 'done' ORDER BY created_at LIMIT 1", [title])).rows[0].due_at);
+    expect(await dayOf("Plan the Enugu launch week")).toBe(day(6));
+    // Three weeks pass: every open task drifts back, its priority and reason as a careless edit might leave them.
+    await q(
+      `UPDATE task SET due_at = due_at - interval '21 days', late_reason = NULL,
+                       priority = CASE WHEN title = 'Plan the Enugu launch week' THEN 'high' ELSE 'normal' END
+        WHERE status NOT IN ('done', 'cancelled') AND due_at IS NOT NULL`,
+    );
+    const later = [];
+    await runFile(seed, later);
+    expect(later.filter((m) => m.includes("skipped"))).toEqual([]);
+    expect(await dayOf("Plan the Enugu launch week")).toBe(day(6));
+    expect(await dayOf("Review the partnerships shortlist")).toBe(day(-2));
+    expect(await dayOf("Prepare the Q4 partner review")).toBe(day(4));
+    expect(await dayOf("Draft my notes for the team meeting")).toBe(day(1));
+    // Nothing open is left more than a day late without a reason (the seed's own overdue rows carry theirs).
+    const { rows: late } = await q(
+      `SELECT title, late_reason FROM task
+        WHERE status NOT IN ('done', 'cancelled') AND due_at < $1`,
+      [lagos.instant(lagos.today(), "00:00")],
+    );
+    expect(late.length).toBeGreaterThan(0);
+    for (const t of late) expect([t.title, Boolean(t.late_reason)]).toEqual([t.title, true]);
+    // A priority someone set on staging stays theirs; one left at Normal takes the plan's again.
+    const prio = async (title) => (await q("SELECT priority FROM task WHERE title = $1 ORDER BY created_at LIMIT 1", [title])).rows[0].priority;
+    expect(await prio("Plan the Enugu launch week")).toBe("high");
+    expect(await prio("Approve the October expense requests")).toBe("urgent");
+    // The weekly report from an earlier week was sent: done, so it is not left overdue.
+    const report = (await q("SELECT status, late_reason FROM task WHERE recurrence IS NOT NULL ORDER BY created_at LIMIT 1")).rows[0];
+    expect(report).toMatchObject({ status: "done", late_reason: "deprioritised" });
+    // And the deploy after that, the same day, changes nothing.
+    const now = await counts();
+    await runFile(seed, []);
+    expect(await counts()).toEqual(now);
   });
 });

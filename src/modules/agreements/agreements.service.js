@@ -244,7 +244,7 @@ async function moveToPartnerIn(client, leadId, partnerId) {
 /** An agreement's status and kind as a person reads them, in the lifecycle's order (§6.8). */
 const STATUS_WORDS = Object.freeze({
   draft: "Draft",
-  review: "In Review",
+  review: "In Approval (First Stage)",
   approval: "In Approval",
   sent: "Sent",
   viewed: "Viewed",

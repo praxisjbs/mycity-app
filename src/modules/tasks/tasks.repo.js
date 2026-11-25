@@ -322,7 +322,8 @@ function reachClause(reach, params) {
 
 /**
  * One page of the active people the caller may put on a task, by name (GET /tasks/people):
- * never `excludeId`, and only `query.department_id`'s people when it is given.
+ * never `excludeId`, and only `query.department_id`'s people when it is given. `has_login` says
+ * whether they can sign in yet: someone with none is set work they cannot see until invited.
  */
 function people(db, query, { reach, excludeId }) {
   const params = [excludeId || null, query.q || null, query.department_id || null];
@@ -330,7 +331,9 @@ function people(db, query, { reach, excludeId }) {
   return pageQuery(
     db,
     `SELECT e.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, e.job_title,
-            d.name AS department, ${photoUrlSql("e")} AS photo_url, ${TOTAL_COL}
+            d.name AS department, ${photoUrlSql("e")} AS photo_url,
+            EXISTS (SELECT 1 FROM app_user u WHERE u.employee_id = e.employee_id AND u.status = 'active') AS has_login,
+            ${TOTAL_COL}
        FROM employee e
        LEFT JOIN department d ON d.department_id = e.department_id
       WHERE e.status = 'active'

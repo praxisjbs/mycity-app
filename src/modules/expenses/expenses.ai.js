@@ -14,7 +14,9 @@
  * Cards the person confirms (praxis-ai.md §6.11, decision 33), each through the service function
  * New Request's and Edit's own buttons call: New Request (the request with its first line, sent at
  * once unless the person keeps a draft), Add Line (one more line on a draft or sent-back request),
- * Save Request (what changes on one) and Send Request (a draft sent). A draft's card offers Add
+ * Save Request (what changes on one) and Send Request (a draft sent). A request that may repeat
+ * another is refused until the person says Send Anyway (`confirm_duplicate`, guide §6.8 rule 2),
+ * as the form asks. A draft's card offers Add
  * Another Item and Send Request once pressed (`then`). Approve, Send Back and Reject are the
  * approvals' own card (approvals.decide).
  *
@@ -106,7 +108,7 @@ module.exports = defineManifest({
       permission: ["expenses", "create"],
       risk: "standard",
       form: "none: New Request's form holds many lines and its invoice; the card carries its first line flat (ExpenseRequestAdd) and Add Line the rest",
-      fields: ["purpose", "expense_category_id", "project_id", "department_id", "needed_on", "description", "quantity", "unit_price", "payee_type", "uses_profile_account", "payee_name", "bank_name", "account_name", "account_number", "submit"],
+      fields: ["purpose", "expense_category_id", "project_id", "department_id", "needed_on", "description", "quantity", "unit_price", "payee_type", "uses_profile_account", "payee_name", "bank_name", "account_name", "account_number", "submit", "confirm_duplicate"],
       picks: { project_id: "project", department_id: "department" },
       resolve: resolveCategory,
       names: (values, _actor, db) => service.cardNames(db, values),
@@ -122,7 +124,7 @@ module.exports = defineManifest({
       // The same function New Request calls: the category, the lines, the payee and the approval are its own.
       run: (values, actor) => service.createFromCard(actor, values),
       readback: service.readbackOf("saved"),
-      labels: { ...LABELS, description: "Item", quantity: "Quantity", unit_price: "Unit Price", submit: "Send Now" },
+      labels: { ...LABELS, description: "Item", quantity: "Quantity", unit_price: "Unit Price", submit: "Send Now", confirm_duplicate: "Send Anyway" },
     },
     {
       key: "my_expenses.from_invoice",
@@ -134,7 +136,7 @@ module.exports = defineManifest({
       form: "none: drawn from an invoice attached on Praxis AI, with every line and the file; New Request's own form takes the same fields (ExpenseCreate)",
       // The reader gives these from the file (praxis-ai.md decision 44): the card is drawn only from an attached invoice.
       from_file: { kind: "invoice", fills: ["purpose", "lines", "payee_type", "invoice_document_id"] },
-      fields: ["purpose", "expense_category_id", "project_id", "department_id", "needed_on", "lines", "payee_type", "payee_name", "bank_name", "account_name", "account_number", "invoice_document_id", "submit"],
+      fields: ["purpose", "expense_category_id", "project_id", "department_id", "needed_on", "lines", "payee_type", "payee_name", "bank_name", "account_name", "account_number", "invoice_document_id", "submit", "confirm_duplicate"],
       picks: { project_id: "project", department_id: "department" },
       resolve: { ...resolveCategory, project_id: (value, _actor, db) => service.projectIdOf(db, value) },
       names: (values, actor, db) => service.cardNames(db, values, actor),
@@ -143,7 +145,7 @@ module.exports = defineManifest({
       // The same function New Request calls: the category, the lines, the payee, the invoice's claim and the approval are its own.
       run: (values, actor) => service.createFromInvoice(actor, values),
       readback: service.readbackOf("saved"),
-      labels: { ...LABELS, lines: "Lines", invoice_document_id: "Invoice", submit: "Send Now" },
+      labels: { ...LABELS, lines: "Lines", invoice_document_id: "Invoice", submit: "Send Now", confirm_duplicate: "Send Anyway" },
     },
     {
       key: "my_expenses.add_line",
@@ -170,14 +172,14 @@ module.exports = defineManifest({
       permission: ["expenses", "create"],
       risk: "standard",
       form: "none: Send Request is a press on the request's own modal, with no form of its own",
-      fields: ["expense_request_id"],
+      fields: ["expense_request_id", "confirm_duplicate"],
       asks: [askRequest],
       records: (values, actor, db) => service.cardRequest(db, actor, values.expense_request_id),
       check: (client, values, actor) => service.assertCardEditable(client, actor, values.expense_request_id),
       // The same function the modal's Send Request calls: the approval opens in its transaction.
       run: (values, actor) => service.submitFromCard(actor, values),
       readback: service.readbackOf("sent"),
-      labels: { expense_request_id: "Request" },
+      labels: { expense_request_id: "Request", confirm_duplicate: "Send Anyway" },
     },
     {
       key: "my_expenses.edit",
