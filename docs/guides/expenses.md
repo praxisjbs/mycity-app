@@ -504,7 +504,7 @@ their list in a modal (the ESS rule); Average Turnaround and Rejected open nothi
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| ESS · My Requests | the four KPI cards two to a row, then request cards (purpose, amount, a stage pill) | Submitted date on the card | New Request, full width; the form is a full sheet, lines added one at a time | ESS tabs; bottom bar |
+| ESS · My Requests | the four KPI cards two to a row, then request cards (purpose, amount, a stage pill) | Submitted date on the card | New Request, full width; the form is a full sheet, lines added one at a time, with Save Draft and Send Request pinned in the sheet's footer (QA F70) | ESS tabs; bottom bar |
 | Expenses · Requisitions | approved request cards with a tick, Create Requisition pinned at the bottom once one is ticked | the requisitions' Approved date | Create Requisition; in the sheet Approve, full width; New Request from the floating button (second after Create Requisition, first for a reader without `expenses.finance`) | Expenses tabs scroll sideways |
 | Expenses · Approvals | the four KPI cards, then request cards with amount and requester | the requester's department | Approve, full width in the request's sheet, Send Back and Reject beside it; New Request, the floating button's action | Expenses tabs scroll sideways |
 | Expenses · Disbursements | Waiting to Pay cards, then Paid with the Reference Missing pill | the Paid On column | Record Disbursement, full width in the sheet | Expenses tabs scroll sideways |
@@ -550,6 +550,7 @@ None.
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · §10.2: on a phone, New Request's Save Draft and Send Request stay pinned in the sheet's footer, as every form in a sheet now does (`docs/FRONTEND_GUIDE.md` §8.4; QA audit BG-021).
 - 24/11/2026 · JP · QA audit BG-007 (F56b): Over Budget was flagged to the approvers but the requester saw nothing before Send Request. New Request now shows Budget Left, Department Left and the Over Budget pill once a category is picked, from the new read `GET /expenses/mine/budget-check` (`ExpenseBudgetCheckQuery`, `ExpenseBudgetCheck`; `expenses.budget-check.js` `estimate`, the same count as sending). Still a warning, never a block (§3 step 7, §5, §6.6 rule 3, §10.1, §11). `budgets.test.js`, `Expenses.test.tsx`.
 - 24/11/2026 · JP · From the 23/11 staging faults brief (fault #5, `PAYEE_INCOMPLETE` at `POST /expenses/mine/:id/submit`) and JBS Praxis's answer: Send Request on a draft with a blank payee was refused after the press, the form having already saved its edit. `expenses.payeeProblems` in the contract is the one rule; the form marks Payee Name, Bank, Account Name and Account Number before it saves, and the window's Send Request opens Edit Request with them marked (§6 rule 2). `Expenses.test.tsx`, `expenses.test.js`.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Read Invoice, Suggest Category and Check Duplicate; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
