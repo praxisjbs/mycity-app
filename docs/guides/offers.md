@@ -10,7 +10,7 @@
 | Capabilities | none; who approves an offer is the `recruitment.offer` flow on Settings · Approvals, not a capability |
 | Screens (PROGRESS.md rows) | #42 Offers, #43 Onboarding; public #84 Sign Offer, #85 Verify Document, #112 Upload Documents (added with PR 6a; `new:screen` makes staff-app tabs only); changes to #39 Candidates (the Offer column, GE), People · Employee 360 (a Documents tab), Settings · Approvals (#72) |
 | Status | Built |
-| Last changed | 24/11/2026 |
+| Last changed | 25/11/2026 |
 
 The public pages (`public-app/src/pages/SignOffer.tsx`, `Verify.tsx`) joined **Frontend paths** with
 PR 4, which wired them; Upload Documents with PR 7. The People 360 Documents tab joined with PR 7 as
@@ -65,7 +65,8 @@ the candidate (on `go.mycityapp.io`) and anyone verifying a document.
    for the company on the offer, already signed in, with no email code.
 3. **Send.** Once the company has signed, Send Offer starts the expiry (`valid_days`, 15 by
    default; refused with `START_PAST` once the start date has passed, as an approved offer cannot be
-   edited: it is withdrawn and made again), makes the candidate's link (`signatures.issueLinks`) and emails `offer-sent` with it
+   edited: it is withdrawn and made again; warned, and still sent, when the offer would start before
+   it expires, §6), makes the candidate's link (`signatures.issueLinks`) and emails `offer-sent` with it
    after commit: the link is never stored and never sits in the outbox. In the same transaction it
    calls `candidates.advanceIn(client, actor, applicationId, "offer")` (GE's), so the card moves to
    the Offer column. `offer-sent` is worded on Candidate Emails with M4's other mails; its variables
@@ -296,6 +297,14 @@ employee record (masked, never sent to an AI model).
   reads *The start date has passed. Change it in Edit Offer.*; at Send, *The start date has passed.
   Withdraw it and make a new offer.*, since an approved offer is not edited. The screen shows either
   on the line under the record's buttons (QA audit BG-008, 24/11/2026).
+- **Starts before the offer expires** (QA audit BG-031, decided by JBS Praxis 25/11/2026: warn, never
+  refuse). An offer expires Days to Sign (`valid_days`) after it is sent, so one whose start date
+  falls on or before the day it would expire if sent today could begin before the candidate must
+  reply. New Offer and Edit Offer (the Terms step, as the start date and Days to Sign are filled) and
+  the record beside Send Offer show *Starts before the offer expires: use a shorter Days to Sign or a
+  later start.* Send Offer still sends: the API refuses nothing for it. The screen works it out from
+  the offer's `start_date` and `valid_days` and today in Lagos (`startsBeforeExpiry`,
+  `OfferForm.tsx`).
 - The letter words each employment type: `OfferLetterVars` carries `is_employee` (`full_time`,
   `part_time`), `is_contractor`, `is_consultant` and `is_intern`, each a boolean, all false while a
   draft has no type, so the standard wording branches with `{{#if}}` (the template language compares
@@ -402,7 +411,7 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list across the page (number, candidate, role, start date, annual compensation with Outside Range, status, sent, expiry); a pressed row opens the offer in a wide dialog (F31 as amended 08/11/2026): the offer's summary with Signers under its details in the same card, beside Monthly Pay with Approval under the pay in the same card, then History across it, and Close at its foot; the offer's summary, Monthly Pay with Outside Range and its reason (and No Basic Salary with Why No Basic Salary for an intern at ₦0), Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates); the expiry, as Expires while the offer is with the candidate and Expired On once it lapsed (an offer accepted, declined or withdrawn shows none); View Letter beside Withdraw Offer, which opens the letter in a dialog of its own: the PDF with Open in Tab and Download PDF once it is made (as a query's letter, M3), the wording on paper before; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings; a refused Submit, Send or Resend on the line under the buttons; in the form, Enter an amount on the Basic Salary line and Why No Basic Salary for an intern at ₦0 | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
+| Recruitment · Offers | the figures (With Approval with the drafts, To Send, With Candidates, Accepted This Month); the offers list across the page (number, candidate, role, start date, annual compensation with Outside Range, status, sent, expiry); a pressed row opens the offer in a wide dialog (F31 as amended 08/11/2026): the offer's summary with Signers under its details in the same card, beside Monthly Pay with Approval under the pay in the same card, then History across it, and Close at its foot; the offer's summary, Monthly Pay with Outside Range and its reason (and No Basic Salary with Why No Basic Salary for an intern at ₦0), Approval (stages, moves, Approve Offer and Reject Offer for whom it waits on), Signers, History (from the offer's dates); the expiry, as Expires while the offer is with the candidate and Expired On once it lapsed (an offer accepted, declined or withdrawn shows none); View Letter beside Withdraw Offer, which opens the letter in a dialog of its own: the PDF with Open in Tab and Download PDF once it is made (as a query's letter, M3), the wording on paper before; New Offer, Edit Offer, Submit for Approval, Sign for Company, Send Offer, Resend Offer, Withdraw Offer, Offer Settings; a refused Submit, Send or Resend on the line under the buttons; beside Send Offer, and on the form's Terms step, *Starts before the offer expires: use a shorter Days to Sign or a later start.* when the start date falls on or before the day it would expire; in the form, Enter an amount on the Basic Salary line and Why No Basic Salary for an intern at ₦0 | help on Score: the weighted total when the offer was made; help on Vacancy Range; help on Additional Terms and Schedule A in the form; help on Wording in the letter editor | the approval snapshot rule, the two hashes: §6 here, the manual |
 | Recruitment · Onboarding | the figures (Documentation with the documents to verify, Pre-Onboarding, Onboarding with the steps overdue, Hired This Month); the cases list across the page (hire, role, department, start date, outstanding, status); a pressed row opens the case in the wide dialog (F31 as amended 11/11/2026): the case (role, department, start date, Pre-Onboarding with what it waits on, BVN and Home Address entered or not, the privacy notice, Send Reminder, Withdraw Hire, Complete Onboarding), Documents (each item's state, View File, Verify, Reject with the reason), Guarantors (each one's check, date of birth, both addresses, Convicted, Recommends, View Form, View ID, Record Check), Contract (the signers, Download PDF, Sign for Company, Resend Contract, Reissue Contract) two by two, then Onboarding Plan across it (owner, due day, SOP, Overdue, Mark Step Done); Onboarding Settings (Checklist, Onboarding Plans, Standard Contract), shown to whom `can_configure` names. Verify, Reject, Record Check, Send Reminder, Complete Onboarding and Withdraw Hire show only for `can_check`, `can_complete` and `can_withdraw` | help on Pre-Onboarding: what the gate needs; help on BVN: where it is entered and that it is never shown | why documentation comes first: §3 here |
 | Public · Sign Offer | the letter, Signers, the three steps (Read the Letter, Confirm Your Email, Sign Below), Send Code, the code, full name, title, Draw or Type, Agree to Sign Electronically, Accept and Sign, Decline the Offer, the outcome | help on Email Code | "this document is locked and verifiable" reassurance: never shown |
 | Public · Upload Documents | the role and start date with how many documents are sent; the privacy notice to accept first; then Your Documents (each item with its state, a rejection's reason, Choose a File or the value), Your Guarantors (two, each with its check: name, relationship, phone, date of birth, Contact Address and Residential Address picked, Ever Convicted with What Happened, Recommends You, the Guarantor Form and the ID Copy), Your Address (Home Address, picked; Change Address), Your BVN (Change BVN); Documents Complete once documentation is done | help on BVN; help on Guarantor Form; help on ID Copy | how the files are stored: the manual |
@@ -420,6 +429,13 @@ signer evidence (IP, device) on the offer's detail only. No capability is needed
 
 - A token opened twice: the second Accept and Sign returns the signed state, not an error.
 - `/sign` with no token shows the guidance screen (Use Your Offer Email), never Not Found (GE, #82).
+- A reference typed on Verify Document whose document is not signed by everyone yet (or was never
+  issued): the API answers 404 ("No signed document has this reference"), and the page says *Not
+  Found*, *No signed document has this reference.*, with the note *A document can be checked once
+  everyone has signed it. Check the reference and try again.* (QA audit BG-032), so a genuine letter
+  still being signed never reads as forged.
+- The start date falls before the offer would expire: Send Offer warns and still sends (§6); the
+  case that follows waits at documentation if the day comes first (below).
 - The candidate declines after accepting: not possible; a signed offer is locked.
 - The vacancy is closed while an offer is open: the offer stands; Not Progress All skips it.
 - The hire's email bounces: when the mail server refuses the candidate's address for good after the
@@ -594,6 +610,7 @@ Decided 12/11/2026 (AJ), found filming the Milestone 5 video:
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · QA audit BG-031 and BG-032 (JBS Praxis's decisions, §3 step 3, §6, §10.1, §11): an offer that would start on or before the day it expires warns on New Offer, Edit Offer and beside Send Offer, *Starts before the offer expires: use a shorter Days to Sign or a later start.*, and still sends; Verify Document's not found reads *No signed document has this reference.* with the note that a document can be checked once everyone has signed it.
 - 24/11/2026 · JP · QA audit fixes (JBS Praxis's decisions, §3 steps 1 to 3, §6, §10, §13): BG-001, Basic Salary above ₦0 at New Offer, Edit and Submit, no pay line below zero, an intern at ₦0 with `zero_basic_reason` shown to the approvers, the draft's Basic Salary empty with no range (`OfferDraftPayLine`), the card's basic salary above ₦0; BG-008, Submit and Send refuse a start date that has passed (`START_PAST`), said under the record's buttons; BG-009, `is_employee`, `is_contractor`, `is_consultant`, `is_intern` in `OfferLetterVars` and the shipped wording's drafted contractor, consultant and intern clauses (employee wording unchanged).
 
 - 16/11/2026 · TB · §9: the Document Centre's Library lists the letter an offer holds and the contract a hire holds, the sealed copy once signed (`offers.library.js`, `employment_contracts.library.js`; `document-centre.md` §6.2), by the vault's default rule. Nothing on Offers or Onboarding changed.

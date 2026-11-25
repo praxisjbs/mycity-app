@@ -43,6 +43,8 @@ changes again.
 3. Read **Staff in Run**, **Gross**, **Deductions** and **Net** on the run's card.
 4. Press **Compute Run** again whenever something changes: a salary set, a fine accepted, a
    day waived. Adjustments and the people left out stay as they are.
+5. If the card says "Records changed since Compute", someone joined or a record the run reads changed
+   after it was computed. Press **Compute Run** beside it to bring the figures up to date.
 
 ### Deal with problems {#payroll-runs-problems needs="payroll edit"}
 

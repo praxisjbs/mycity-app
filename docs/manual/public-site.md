@@ -421,7 +421,9 @@ whether it is genuine and unchanged, never what it says. A training certificate 
 4. **Content Hash** and **Artifact Hash** each read **Matches** or **Differs**. *Not This Document*
    says which was altered: the record, the stored file, or both.
 
-A reference nobody issued shows *Not Found*.
+A reference with no signed document shows *Not Found* and *No signed document has this reference.*
+A document can be checked once everyone has signed it, so a letter still being signed shows this
+too. Check the reference on the document and try again.
 
 ### Check an agreement {#public-verify-agreement}
 

@@ -147,7 +147,8 @@ A card shows the task's title, small pills and the round initials of the person 
 4. Leave **Type** on **Individual** for a task one person does. For work shared by several
    people, read [Share a task](#workspace-share).
 5. {needs="team"} To set the task for someone you set work for, search for them in **Assign To** and
-   pick them. Leave it empty to keep the task for yourself.
+   pick them. Leave it empty to keep the task for yourself. **No Login Yet** beside a name means
+   they cannot sign in yet: the task saves, and they see it once they are invited.
 6. To have colleagues follow the task, pick them in **Watchers**. They can open it and hear how it
    goes, but it is not their work (see [Watch a task](#workspace-watch)).
 7. {needs="people view"} To have a whole department follow it, pick it in **Watching Department**.
@@ -222,7 +223,8 @@ everyone.
 4. In **People**, search for each person and pick them. You may pick colleagues in your own
    department, and anyone you set work for.
 5. {needs="team"} Choose the **Lead** in its list: **You**, or one of the people you picked whom you
-   set work for. For a **Department**, pick the lead from that department's people.
+   set work for. For a **Department**, pick the lead from that department's people. **No Login Yet**
+   beside a name means they cannot sign in yet.
 6. Fill in the rest as for any task, and press **Create Task**. The hub says how many people now
    share it.
 
@@ -564,7 +566,8 @@ everyone can see the list. A project never shows you a task you could not alread
 
 1. Open [My Workspace · Projects](/workspace?tab=projects).
 2. The list shows each **Project** with its number, its **Owner**, when it is **Due**, and how
-   many of its tasks you can see are **Open** and **Done**. Press the **Project** or **Due** heading
+   many of its tasks you can see are **Open** and **Done**. **Left** beside an owner means they have
+   left MyCity, and the project waits to be handed on. Press the **Project** or **Due** heading
    to sort by it.
 3. Press **Completed** to see finished projects, and **Active** to come back.
 4. Type in **Search projects** to find one by number or name.
@@ -578,6 +581,8 @@ cards. With none, the list says **No Projects Yet**.
 1. Press **New Project** at the top right of [My Workspace · Projects](/workspace?tab=projects).
    On a phone it is on the round button with a plus.
 2. Type its **Name**, such as `Lekki Launch`. Add **Notes** and a **Due** date if you like.
+   If an active project already has that name, the form says *Already a project* with its number.
+   Open that one instead, or change the name; the hub still lets you create it.
 3. Press **Create Project**. The hub gives it a number, says it started, and opens its page.
 
 You own the projects you start.
@@ -609,9 +614,13 @@ Management.
 
 1. Open the project and press **Edit Project**. Change the **Name**, **Notes** or **Due** and press
    **Save Project**. The hub says **Project saved**.
-2. When the work is over, press **Complete Project**. It shows **Completed** and takes no new
+2. To hand the project to someone else, remove the name in **Owner**, search for the new owner,
+   pick them and press **Save Project**. A project whose owner has left shows **Owner Left** under
+   its name; Management or Operations & People hand it on this way. **Not on the staff** on
+   **Owner** means that person has left too: pick someone else.
+3. When the work is over, press **Complete Project**. It shows **Completed** and takes no new
    tasks. Its open tasks stay where they are. The hub says its name and *completed*.
-3. To bring it back, open it under **Completed** and press **Reopen Project**. The hub says its name
+4. To bring it back, open it under **Completed** and press **Reopen Project**. The hub says its name
    and *reopened*.
 
 ## Calendar {#workspace-calendar screen=workspace/calendar icon=calendar}

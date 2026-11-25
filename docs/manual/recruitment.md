@@ -757,7 +757,9 @@ Only a candidate at **Shortlist** can get an offer, and only one open offer at a
    it. For an **Intern**, the basic salary can be ₦0: type **Why No Basic Salary**, which the
    approvers read too. Press **Next**.
 7. Pick the **Start Date**. **Days to Sign** is how long the candidate has once it is sent, 15 unless
-   you change it. Fill in the rest that applies, then press **Next**.
+   you change it. If the job would start before the candidate must reply, the form says *Starts
+   before the offer expires*: give fewer **Days to Sign** or a later **Start Date**. Fill in the
+   rest that applies, then press **Next**.
 8. Type any **Additional Terms** for this offer alone. **Schedule A** is the job description printed
    at the end; change it if this role differs.
 9. Press **Draft Offer**. It shows as **Draft**.
@@ -818,6 +820,9 @@ When they sign, it shows as **Accepted** and both of you get the signed copy by 
 decline, or it expires, their card goes back to **Shortlist** and you can make another offer.
 
 An offer cannot be sent to someone already on MyCity's staff: a move inside MyCity goes through People.
+
+If the job would start before the offer expires, the offer says *Starts before the offer expires*
+above **Send Offer**. You can still send it; the candidate then has until the expiry to reply.
 
 If the start date has passed by the time the offer is signed, **Send Offer** says so on the line under
 the buttons and nothing is sent. An approved offer cannot change, so
