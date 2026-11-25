@@ -16,6 +16,7 @@ export const DEMO_LINKS: Array<[string, string]> = [
   ["Apply", "/apply/k7Qm2TxV9pLa"],
   ["Apply, no link", "/apply"],
   ["Apply, portfolio question", "/apply/Bv3nQ8sLp2Wd"],
+  ["Apply, no questions", "/apply/Cp7rD4nWq9Xs"],
   ["Expired apply link", "/apply/Wn4cR8yHj2Zs"],
   ["Assessment, no link", "/assess"],
   ["Assessment, not started", "/assess/Px2mL9vQe4Ty"],

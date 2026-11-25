@@ -56,11 +56,13 @@ describe("Verify", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Not This Document" })).toBeTruthy();
   });
 
-  it("a reference nobody issued is Not Found, with what one looks like", async () => {
+  it("a reference with no signed document is Not Found, saying a document is checked once everyone has signed (BG-032)", async () => {
     draw("OFF-0099");
     expect(await screen.findByRole("heading", { level: 2, name: "Not Found" })).toBeTruthy();
     expect(row("Reference")).toBe("OFF-0099");
-    expect(screen.getByText("Check the reference on the document and try again. It looks like OFF-0018.")).toBeTruthy();
+    expect(screen.getByText("No signed document has this reference.")).toBeTruthy();
+    expect(screen.getByText("A document can be checked once everyone has signed it. Check the reference and try again.")).toBeTruthy();
+    expect(screen.queryByText("No document has this reference.")).toBeNull();
   });
 
   it("by its QR, the record and the document itself, with its download", async () => {

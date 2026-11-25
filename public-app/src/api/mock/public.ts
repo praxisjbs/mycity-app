@@ -351,6 +351,8 @@ const LINKS = new Map<string, Link>([
   ["Bv3nQ8sLp2Wd", { slug: "graphics-and-motion-designer-lagos", expires_at: inDays(2), receipt: null, email: null }],
   ["Wn4cR8yHj2Zs", { slug: "studio-assistant-lagos", expires_at: inDays(-1), receipt: null, email: null }],
   ["Hq5tN2wPz8Kc", { slug: "head-sales-revenue-lagos", expires_at: inDays(2), receipt: null, email: null }],
+  // A role with no Apply questions: its second step is Your CV alone.
+  ["Cp7rD4nWq9Xs", { slug: "content-producer-lagos", expires_at: inDays(2), receipt: null, email: null }],
 ]);
 /**
  * Who has applied for which role, by role slug and email: a repeat is told it applied. Chiamaka

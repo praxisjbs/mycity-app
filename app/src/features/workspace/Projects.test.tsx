@@ -166,7 +166,10 @@ describe("projects, late reasons and the live board", () => {
     const form = await screen.findByRole("dialog", { name: "Edit Project" });
     await within(form).findByRole("button", { name: /Remove Cynthia/ }, { timeout: 5000 });
     fireEvent.change(within(form).getByPlaceholderText("Search staff"), { target: { value: tolu.first_name } });
-    fireEvent.click(await within(form).findByRole("option", { name: new RegExp(tolu.display_name) }, { timeout: 5000 }));
+    // The search narrows the list as it lands: pick once the list holds only her.
+    await waitFor(() => expect(within(form).getAllByRole("option").map((o) => o.textContent)).toEqual([expect.stringContaining(tolu.display_name)]), { timeout: 5000 });
+    fireEvent.click(within(form).getByRole("option", { name: new RegExp(tolu.display_name) }));
+    await within(form).findByRole("button", { name: `Remove ${tolu.display_name}` });
     fireEvent.click(within(form).getByRole("button", { name: "Save Project" }));
     await closed("Edit Project");
     const read = await api.call("GET /api/v1/projects/:id", { params: { id: sid("project:2") } });

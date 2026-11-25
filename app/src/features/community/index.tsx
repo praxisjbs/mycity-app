@@ -35,9 +35,9 @@ function ThreadHead({ children, onBack, backLabel }: { children: ReactNode; onBa
 
 const WHO_POSTS: Record<Channel["post_policy"], string> = { everyone: "Every Member", admins: "Admins Only", people_ceo: "People and the CEO" };
 
-/** The departments, for whole-department chips. */
+/** The current departments, for whole-department chips; a retired one is never offered (QA audit BG-017). */
 function DepartmentChips({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
-  const departments = useApi("GET /api/v1/departments", { query: {} });
+  const departments = useApi("GET /api/v1/departments", { query: { active: "true" } });
   return (
     <div className="flex flex-wrap gap-1.5" role="group" aria-label="Departments">
       {(departments.data?.data ?? []).map((d) => {
@@ -971,12 +971,13 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
 }
 
 /** New Announcement, or with `edit` the same form filled in for a scheduled one. */
-function NewAnnouncement({ close, done, edit }: { close: () => void; done: () => void; edit?: Announcement }) {
+export function NewAnnouncement({ close, done, edit }: { close: () => void; done: () => void; edit?: Announcement }) {
   const [when, setWhen] = useState<"now" | "later">(edit ? "later" : "now");
   const [kind, setKind] = useState<"all" | "departments">(edit?.audience.kind ?? "all");
   const [urgency, setUrgency] = useState<Announcement["urgency"]>(edit?.urgency ?? "normal");
   const [depts, setDepts] = useState<string[]>(edit?.audience.department_ids ?? []);
-  const [deptsBad, setDeptsBad] = useState(false);
+  // The Departments field's error: none chosen here, or the server's (nobody in them, or one no longer active).
+  const [deptsBad, setDeptsBad] = useState<string | null>(null);
   const f = useContractForm({ title: edit?.title ?? "", body: edit?.body ?? "", date: edit?.publish_at ? todayIso(new Date(edit.publish_at)) : "" }, { title: atLeast4("Add a headline"), body: atLeast4("Write the message") });
   const save = useMutation("POST /api/v1/community/announcements");
   const change = useMutation("PUT /api/v1/community/announcements/:id");
@@ -984,7 +985,7 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
     const noDate = when === "later" && !f.values.date;
     if (noDate) f.setServerErrors({ date: ["Not a real date"] });
     const noDepts = kind === "departments" && !depts.length;
-    setDeptsBad(noDepts);
+    setDeptsBad(noDepts ? "Choose a department" : null);
     if (!f.check() || noDate || noDepts) return;
     const audience = { kind, department_ids: kind === "departments" ? depts : [] };
     const publish_at = `${f.values.date}T09:00:00+01:00`;
@@ -1001,6 +1002,7 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
     } catch (e) {
       const fields = e instanceof ApiError ? e.fields : {};
       // A refusal no field shows (cancelled meanwhile, too many requests, a lost connection) is said.
+      if (fields["audience.department_ids"]) setDeptsBad(fields["audience.department_ids"][0] ?? null);
       if (Object.keys(fields).length) f.setServerErrors({ ...fields, ...(fields.publish_at ? { date: fields.publish_at } : {}) });
       else toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
     }
@@ -1014,8 +1016,8 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
       </Field>
       <Field label="Audience"><ChoiceField value={kind} onChange={setKind} options={[["all", "All Staff"], ["departments", "Departments"]]} /></Field>
       {kind === "departments" && (
-        <Field label="Departments" state={deptsBad ? "bad" : undefined} message={deptsBad ? "Choose a department" : undefined}>
-          <DepartmentChips value={depts} onChange={(v) => (setDepts(v), setDeptsBad(false))} />
+        <Field label="Departments" state={deptsBad ? "bad" : undefined} message={deptsBad ?? undefined}>
+          <DepartmentChips value={depts} onChange={(v) => (setDepts(v), setDeptsBad(null))} />
         </Field>
       )}
       {!edit && <Field label="When"><ChoiceField value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>}

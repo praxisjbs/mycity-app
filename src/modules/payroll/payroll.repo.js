@@ -17,6 +17,7 @@
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
 const { scopeClause } = require("../../shared/rbac/scope");
+const { BUILD_TEAM_ROLE } = require("./payroll.inputs");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -699,6 +700,65 @@ async function problemCounts(db, runIds) {
   return new Map(rows.map((r) => [r.payroll_run_id, { blocking: r.blocking, warnings: r.warnings }]));
 }
 
+/**
+ * Which of these runs are Computed with figures out of date (§6.9, QA F02e): a record the run reads changed
+ * after its Compute. The people are those it pays now (§6.1 rule 1, so a joiner counts) and those it holds a
+ * payslip for; for them, the employee record itself, a pay item dated up to the month's end, unpaid leave or a
+ * suspension touching the month, and a deduction with an instalment due by the month, or that instalment. Compute's own writes share its
+ * `computed_at` (one transaction), so only a later change counts. Submit computes again whatever this says.
+ * @returns {Promise<Set<string>>}
+ */
+async function changedSinceCompute(db, runIds) {
+  if (!runIds.length) return new Set();
+  const { rows } = await db.query(
+    `WITH runs AS (
+       SELECT r.payroll_run_id, r.period, (r.period + interval '1 month - 1 day')::date AS last, r.computed_at
+         FROM payroll_run r
+        WHERE r.payroll_run_id = ANY($1::uuid[]) AND r.status = 'computed' AND r.computed_at IS NOT NULL
+     ),
+     paid AS (
+       SELECT ru.payroll_run_id, e.employee_id
+         FROM runs ru
+         JOIN employee e ON (e.start_date IS NULL OR e.start_date <= ru.last)
+                        AND (e.left_on IS NULL OR e.left_on >= ru.period)
+                        AND e.status IN ('active', 'suspended', 'left')
+                        AND (e.status <> 'left' OR e.left_on IS NOT NULL)
+        WHERE NOT EXISTS (SELECT 1 FROM app_user u
+                            JOIN user_role ur ON ur.user_id = u.user_id
+                            JOIN role ro ON ro.role_id = ur.role_id
+                           WHERE u.employee_id = e.employee_id AND ro.code = $2)
+     ),
+     people AS (
+       SELECT payroll_run_id, employee_id FROM paid
+       UNION
+       SELECT ps.payroll_run_id, ps.employee_id FROM payslip ps JOIN runs ru ON ru.payroll_run_id = ps.payroll_run_id
+     )
+     SELECT ru.payroll_run_id
+       FROM runs ru
+      WHERE EXISTS (SELECT 1 FROM paid p
+                     WHERE p.payroll_run_id = ru.payroll_run_id
+                       AND NOT EXISTS (SELECT 1 FROM payslip ps WHERE ps.payroll_run_id = ru.payroll_run_id AND ps.employee_id = p.employee_id))
+         OR EXISTS (SELECT 1 FROM people p JOIN employee e ON e.employee_id = p.employee_id
+                     WHERE p.payroll_run_id = ru.payroll_run_id AND GREATEST(e.created_at, e.updated_at) > ru.computed_at)
+         OR EXISTS (SELECT 1 FROM people p JOIN attendance_pay_item pi ON pi.employee_id = p.employee_id
+                     WHERE p.payroll_run_id = ru.payroll_run_id AND pi.work_date <= ru.last
+                       AND GREATEST(pi.created_at, pi.updated_at) > ru.computed_at)
+         OR EXISTS (SELECT 1 FROM people p JOIN leave_request lr ON lr.employee_id = p.employee_id
+                     WHERE p.payroll_run_id = ru.payroll_run_id AND lr.starts_on <= ru.last AND lr.ends_on >= ru.period
+                       AND GREATEST(lr.created_at, lr.updated_at) > ru.computed_at)
+         OR EXISTS (SELECT 1 FROM people p JOIN sanction sa ON sa.employee_id = p.employee_id
+                     WHERE p.payroll_run_id = ru.payroll_run_id AND sa.effective_on <= ru.last
+                       AND COALESCE(sa.ends_on, sa.effective_on) >= ru.period
+                       AND GREATEST(sa.created_at, sa.updated_at) > ru.computed_at)
+         OR EXISTS (SELECT 1 FROM people p JOIN payroll_deduction d ON d.employee_id = p.employee_id
+                     JOIN payroll_deduction_instalment i ON i.payroll_deduction_id = d.payroll_deduction_id
+                     WHERE p.payroll_run_id = ru.payroll_run_id AND i.period <= ru.period
+                       AND GREATEST(d.created_at, d.updated_at, i.created_at, i.updated_at) > ru.computed_at)`,
+    [runIds, BUILD_TEAM_ROLE],
+  );
+  return new Set(rows.map((r) => r.payroll_run_id));
+}
+
 /* ------------------------------------------------------------------ *
  * Reads the service needs
  * ------------------------------------------------------------------ */
@@ -716,6 +776,7 @@ function approverOf(db, instanceId) {
 
 module.exports = {
   listRuns,
+  changedSinceCompute,
   monthGroups,
   trendOf,
   getRun,

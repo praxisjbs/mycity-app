@@ -126,6 +126,23 @@ describe("Queries & Sanctions · the person's standing on the card (BG-014)", ()
   }, 30000);
 });
 
+describe("Queries & Sanctions · a rule under Raised By (BG-052)", () => {
+  // QRY-0014 was raised by the attendance rule, not a person.
+  const BASHIR = sid("qry:14");
+
+  it("names a rule as a rule in the list", async () => {
+    await signedInAs("cynthia@mycityapp.io", "queries");
+    const cell = await screen.findByText("Rule: Attendance Policy", undefined, { timeout: 8000 });
+    expect(cell.closest("tr")?.textContent).toContain("3 late arrivals this month");
+  }, 30000);
+
+  it("names a rule as a rule on the query's card", async () => {
+    await signedInAs("cynthia@mycityapp.io", "queries", BASHIR);
+    await screen.findByText("3 late arrivals this month", undefined, { timeout: 8000 });
+    expect(screen.getAllByText("Rule: Attendance Policy").length).toBeGreaterThan(0);
+  }, 30000);
+});
+
 describe("Queries & Sanctions · Rules", () => {
   it("opens a rule for Edit Rule; the form counts no lateness and has no Measure", async () => {
     await signedInAs("cynthia@mycityapp.io", "rules");

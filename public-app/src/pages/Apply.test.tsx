@@ -128,6 +128,27 @@ describe("Apply", () => {
     expect((screen.getByLabelText("Years of Experience") as HTMLInputElement).value).toBe("1");
   });
 
+  it("a role with no questions names its second step Your CV and promises none", async () => {
+    const { container } = draw("Cp7rD4nWq9Xs");
+    const aside = screen.getByRole("complementary", { name: "Apply" });
+    expect(await within(aside).findByText("Content Producer")).toBeTruthy();
+    expect(within(aside).getByText(/^Your CV and why this role\. This link works until \d{2}\/\d{2}\/\d{4}\.$/)).toBeTruthy();
+    expect(within(aside).queryByText(/a few questions/)).toBeNull();
+    expect(within(aside).getByText("Your CV")).toBeTruthy();
+    expect(within(aside).queryByText("CV and Questions")).toBeNull();
+    await step("About You");
+    type("Full Name", "Bola Ogunleye");
+    type("Email", "bola.ogunleye@example.com");
+    type("Phone", "803 123 4567");
+    type("Years of Experience", "2");
+    next();
+    await step("Your CV");
+    // The picker offers PDF and Word (.docx) only: the server refuses an old .doc CV.
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    expect(input.accept).toBe(".pdf,.docx");
+    expect(screen.getByText(/PDF or Word \(\.docx\)/)).toBeTruthy();
+  });
+
   it("an expired link says it does not open, with the way back to the roles", async () => {
     draw("Wn4cR8yHj2Zs");
     expect(await screen.findByRole("heading", { name: "This Link Does Not Open" })).toBeTruthy();

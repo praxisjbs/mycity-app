@@ -9,6 +9,9 @@ import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
+import type { Me } from "@/api/types/identity";
+import { visibleTabs } from "@/shell/access";
+import { MODULES } from "@/shell/catalogue";
 import Expenses from "./index";
 import { MyRequestsPage } from "./MyRequests";
 
@@ -291,4 +294,50 @@ describe("New Request · the budget before Send Request (BG-007)", () => {
     fireEvent.change(within(form).getAllByRole("textbox", { name: "Unit Price" })[0], { target: { value: "5,000" } });
     expect(await within(form).findByText("Over Budget", {}, { timeout: 5000 })).toBeTruthy();
   }, 40000);
+});
+
+describe("Expenses · Disbursements in the tabs (BG-019)", () => {
+  it("shows only to those who record payments: Management, with Settings but no expenses.finance, is not offered it", () => {
+    const expenses = MODULES.find((m) => m.key === "expenses")!;
+    const tabs = (extra: Partial<Me>) => visibleTabs({ grants: { expenses: ["view"], settings: ["view"] }, capabilities: [], is_ceo: false, manages_people: false, ...extra } as Me, expenses).map((t) => t.slug);
+    expect(tabs({})).not.toContain("disbursements");
+    expect(tabs({})).toContain("requisitions");
+    expect(tabs({ capabilities: ["expenses.finance"] })).toContain("disbursements");
+    expect(tabs({ is_ceo: true })).toContain("disbursements");
+  });
+});
+
+describe("Send Request on a possible duplicate (BG-020) and Name Differs (BG-018)", () => {
+  it("asks Possible Duplicate naming the earlier request; Go Back sends nothing, Send Anyway sends it and the modal says so", async () => {
+    await as("chidera@mycityapp.io", <MyRequestsPage />, "My Requests");
+    const cats = await api.call("GET /api/v1/expense-categories", { query: { active: "true" } as never });
+    const fields = { expense_category_id: cats.data[0]!.expense_category_id, lines: [{ description: "Canopies", quantity: "1", unit_price: "27350.00" }], payee_type: "vendor" as const, uses_profile_account: false, payee_name: "Canopy Hire", bank_name: "Zenith Bank", account_name: "Bayo Adeyemi", account_number: "2034567811" };
+    const first = await api.call("POST /api/v1/expenses/mine", { body: { ...fields, purpose: "Yaba canopies", submit: true } as never });
+    const draft = await api.call("POST /api/v1/expenses/mine", { body: { ...fields, purpose: "Yaba canopies again", submit: false } as never });
+    invalidate("/api/v1/expenses");
+    fireEvent.click(await screen.findByText(draft.number, {}, { timeout: 5000 }));
+    let dialog = await screen.findByRole("dialog", { name: "Expense Request" }, { timeout: 5000 });
+    // The account name does not hold the payee's: the modal flags it.
+    expect(await within(dialog).findByText("Name Differs", {}, { timeout: 5000 })).toBeTruthy();
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Send Request" }, { timeout: 5000 }));
+    let ask = await screen.findByRole("alertdialog", { name: "Possible Duplicate" }, { timeout: 5000 });
+    expect(within(ask).getByText(new RegExp(`Same amount as ${first.number}`))).toBeTruthy();
+    fireEvent.click(within(ask).getByRole("button", { name: "Go Back" }));
+    await new Promise((r) => setTimeout(r, 300));
+    expect((await api.call("GET /api/v1/expenses/:id", { params: { id: draft.expense_request_id } })).status).toBe("draft");
+
+    dialog = await screen.findByRole("dialog", { name: "Expense Request" }, { timeout: 5000 });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Send Request" }));
+    ask = await screen.findByRole("alertdialog", { name: "Possible Duplicate" }, { timeout: 5000 });
+    fireEvent.click(within(ask).getByRole("button", { name: "Send Anyway" }));
+    expect(await screen.findByText(`${draft.number} sent`, {}, { timeout: 5000 })).toBeTruthy();
+    const sent = await api.call("GET /api/v1/expenses/:id", { params: { id: draft.expense_request_id } });
+    expect([sent.status, Boolean(sent.duplicate_confirmed_at)]).toEqual(["submitted", true]);
+
+    invalidate("/api/v1/expenses");
+    fireEvent.click(await screen.findByText(draft.number, {}, { timeout: 5000 }));
+    dialog = await screen.findByRole("dialog", { name: "Expense Request" }, { timeout: 5000 });
+    expect(await within(dialog).findByText("Sent despite a possible duplicate", {}, { timeout: 5000 })).toBeTruthy();
+    expect(within(dialog).getByText("Possible Duplicate")).toBeTruthy();
+  }, 60000);
 });

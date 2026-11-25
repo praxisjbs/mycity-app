@@ -36,8 +36,11 @@ type Values = Record<string, string | boolean>;
 const qKey = (id: string) => `q_${id}`;
 const ABOUT_YOU = ["full_name", "email", "phone", "years_experience"];
 const WHY = ["cover_letter", "consent"];
-/** The three steps, named once for the wizard and the steps in the aside. */
-const STEPS = ["About You", "CV and Questions", "Why This Role"] as const;
+/**
+ * The three steps, named once for the wizard and the steps in the aside. The second promises
+ * questions only when the role asks some.
+ */
+const stepsOf = (asks: boolean) => ["About You", asks ? "CV and Questions" : "Your CV", "Why This Role"] as const;
 
 /** The form as the API takes it: years as a number, the answers given keyed by question. */
 function bodyOf(v: Values, questions: ApplyQuestion[]) {
@@ -84,7 +87,7 @@ function applySchema(questions: ApplyQuestion[]): ContractSchema {
  * Apply (#82): reached by a one-time token, from Apply for This Role or an invitation. Write only:
  * the candidate sends an application and never reads one back, so there is no score and no stage.
  * The split layout: the role and the link's last day in the aside with the three steps (About You;
- * CV and Questions; Why This Role), the form on its Panel, then the receipt with the reference, or
+ * CV and Questions, or Your CV for a role with no questions; Why This Role), the form on its Panel, then the receipt with the reference, or
  * You Have Already Applied with the first application's reference when this email had applied for the role.
  */
 export function Apply({ token }: { token: string }) {
@@ -94,6 +97,7 @@ export function Apply({ token }: { token: string }) {
   const { navigate } = useRouter();
   if (link.error && !sent) return <LinkProblem error={link.error} title="Apply" retry={link.reload} />;
   const d = link.data;
+  const asks = (d?.questions.length ?? 0) > 0;
   return (
     <Page
       title="Apply"
@@ -101,8 +105,8 @@ export function Apply({ token }: { token: string }) {
       name={d?.vacancy_title}
       line={d ? [d.vacancy_department, d.vacancy_location].filter(Boolean).join(", ") || undefined : undefined}
       text="Your application, in three steps."
-      paragraph={d ? `Your CV, a few questions and why this role. This link works until ${formatDate(d.expires_at)}.` : undefined}
-      steps={{ items: STEPS, at: step, complete: sent != null }}
+      paragraph={d ? `${asks ? "Your CV, a few questions and why this role." : "Your CV and why this role."} This link works until ${formatDate(d.expires_at)}.` : undefined}
+      steps={{ items: stepsOf(asks), at: step, complete: sent != null }}
     >
       {sent?.receipt.already_applied ? (
         <Panel bare>
@@ -164,6 +168,7 @@ function ApplyForm({
   onGone: () => unknown;
 }) {
   const questions = link.questions;
+  const titles = stepsOf(questions.length > 0);
   const [schema] = useState(() => applySchema(questions));
   const initial: Values = { full_name: "", email: "", phone: "", years_experience: "", cv_document_id: "", cover_letter: "", consent: false };
   for (const q of questions) initial[qKey(q.vacancy_question_id)] = "";
@@ -204,7 +209,7 @@ function ApplyForm({
       onFinish={f.submit((body) => send(body as unknown as ApplicationSubmit))}
       steps={[
         {
-          title: STEPS[0],
+          title: titles[0],
           check: () => f.check(ABOUT_YOU),
           body: (
             <div className="flex flex-col gap-1.5">
@@ -224,7 +229,7 @@ function ApplyForm({
           ),
         },
         {
-          title: STEPS[1],
+          title: titles[1],
           check: () => f.check(["cv_document_id", ...qKeys]),
           body: (
             <div className="flex flex-col gap-3">
@@ -264,7 +269,7 @@ function ApplyForm({
           ),
         },
         {
-          title: STEPS[2],
+          title: titles[2],
           check: () => f.check(WHY),
           body: (
             <div className="flex flex-col gap-3">
@@ -282,7 +287,10 @@ function ApplyForm({
   );
 }
 
-/** The CV, sent on the strength of the link's own token: a PDF or Word file of up to 10 MB. */
+/**
+ * The CV, sent on the strength of the link's own token: a PDF or a Word file (.docx) of up to 10 MB. The
+ * server takes no old Word (.doc) for a CV (shared/files/mime-policy.js), so the picker never offers one.
+ */
 function UploadCv({ token, onUploaded }: { token: string; onUploaded: (doc: DocumentRef) => void }) {
   return (
     <UploadField
@@ -291,8 +299,8 @@ function UploadCv({ token, onUploaded }: { token: string; onUploaded: (doc: Docu
       purpose="cv"
       upload={upload}
       multiple={false}
-      accept=".pdf,.doc,.docx"
-      kinds="PDF or Word"
+      accept=".pdf,.docx"
+      kinds="PDF or Word (.docx)"
       maxBytes={10 * 1024 * 1024}
       label="Choose Your CV"
       onUploaded={(docs) => docs[0] && onUploaded(docs[0] as DocumentRef)}

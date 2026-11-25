@@ -132,6 +132,22 @@ function future(at) {
   return when;
 }
 
+/**
+ * An audience someone is in (QA audit BG-016, BG-017): every department chosen is a current one,
+ * and the audience reaches at least one active login now, or the announcement is refused on
+ * Departments (422), never published to nobody as "0 of 0 read".
+ */
+async function assertAudience(client, audience) {
+  const field = "audience.department_ids";
+  if (audience && audience.kind === "departments") {
+    const retired = await repo.departmentsNotActive(client, audience.department_ids || []);
+    if (retired.length)
+      throw new AppError("AUDIENCE_DEPARTMENT_INACTIVE", "Choose departments that are still active", 422, { [field]: ["Department no longer active"] });
+  }
+  if (!(await repo.audienceUsers(client, audience)).length)
+    throw new AppError("AUDIENCE_EMPTY", "No one is in this audience", 422, { [field]: ["No one in this audience"] });
+}
+
 /** A scheduled announcement, locked, or the reason it cannot be changed. */
 async function scheduled(client, id) {
   const a = await repo.lockForUpdate(client, id);
@@ -145,6 +161,7 @@ async function scheduled(client, id) {
 async function create(body, user) {
   const when = body.publish_at ? future(body.publish_at) : null;
   const id = await tx(async (client) => {
+    await assertAudience(client, body.audience);
     const made = await repo.insert(client, {
       title: body.title,
       body: body.body,
@@ -175,6 +192,7 @@ async function update(id, body, user) {
   const when = future(body.publish_at);
   await tx(async (client) => {
     const before = await scheduled(client, id);
+    await assertAudience(client, body.audience);
     const after = await repo.updateScheduled(client, id, {
       title: body.title,
       body: body.body,

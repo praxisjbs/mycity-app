@@ -110,6 +110,25 @@ describe("Recruitment · Candidates", () => {
     expect(await moreActions(dialog())).not.toContain("Score With AI");
   }, 60000);
 
+  it("Schedule Interview warns, never refuses, when the candidate already has an open offer", async () => {
+    const kunle = app("Kunle");
+    try {
+      kunle.stage = "offer";
+      await openAs("cynthia@mycityapp.io", `/recruitment?tab=candidates&id=${kunle.application_id}`);
+      await choose(await screen.findByRole("dialog"), "Schedule Interview");
+      const form = dialog();
+      expect(within(form).getByText("This candidate has an open offer.")).toBeTruthy();
+      expect(within(form).getByRole("button", { name: "Schedule Interview" })).toBeTruthy();
+    } finally {
+      kunle.stage = "shortlist";
+    }
+    cleanup();
+    // A candidate before Offer is not warned.
+    await openAs("cynthia@mycityapp.io", `/recruitment?tab=candidates&id=${kunle.application_id}`);
+    await choose(await screen.findByRole("dialog"), "Schedule Interview");
+    expect(within(dialog()).queryByText("This candidate has an open offer.")).toBeNull();
+  }, 60000);
+
   it("Move To on the board offers only the moves the server allows: ahead, or one back", async () => {
     await openAs("cynthia@mycityapp.io", "/recruitment?tab=candidates");
     const card = (await screen.findAllByText("Kunle Afolabi"))[0]!.closest("li")!;

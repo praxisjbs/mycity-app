@@ -570,6 +570,36 @@ describeDb("a month's payroll run against the real migrations", () => {
     expect((await slip(octoberRun, "ada")).net_pay).toBe("362576.93");
   });
 
+  test("a record the run reads changed after Compute shows on the run until Compute runs again (QA F02e)", async () => {
+    const read = async () => p.PayrollRun.parse((await as("ops").get(`/payroll/runs/${octoberRun}`)).body);
+    const listed = async () => p.PayrollRunPage.parse((await as("ops").get("/payroll/runs")).body).data.find((r) => r.payroll_run_id === octoberRun);
+    expect((await as("ops").post(`/payroll/runs/${octoberRun}/compute`)).status).toBe(200);
+    expect((await read()).changed_since_compute).toBe(false);
+    expect((await listed()).changed_since_compute).toBe(false);
+
+    // A joiner hired after Compute has no payslip yet: the run says its figures are out of date.
+    await hire("octoberjoiner", { gross: "300000.00", start: "2026-10-20" });
+    expect((await read()).changed_since_compute).toBe(true);
+    expect((await listed()).changed_since_compute).toBe(true);
+    await q("UPDATE employee SET status = 'archived', updated_at = now() WHERE employee_id = $1", [employeeId("octoberjoiner")]);
+    expect((await read()).changed_since_compute).toBe(false);
+
+    // A person's record edited (as the People screens save it), and a pay item added for the month.
+    await q("UPDATE employee SET job_title = 'Senior Officer', updated_at = now() WHERE employee_id = $1", [employeeId("ada")]);
+    expect((await read()).changed_since_compute).toBe(true);
+    expect((await as("ops").post(`/payroll/runs/${octoberRun}/compute`)).status).toBe(200);
+    expect((await read()).changed_since_compute).toBe(false);
+    await item("ada", "2026-10-28", "late", "500.00", { minutes: 5 });
+    expect((await read()).changed_since_compute).toBe(true);
+    await q("DELETE FROM attendance_pay_item WHERE employee_id = $1 AND work_date = '2026-10-28'", [employeeId("ada")]);
+    // A deduction recorded for a later month leaves this one as it is.
+    expect((await as("ops").post(`/payroll/runs/${octoberRun}/compute`)).status).toBe(200);
+    await deduct("ada", { source: "salary_advance", total: "30000.00", months: 1, from: "2026-12-01" });
+    expect((await read()).changed_since_compute).toBe(false);
+    await q("DELETE FROM payroll_deduction WHERE employee_id = $1 AND start_period = '2026-12-01'", [employeeId("ada")]);
+    expect((await read()).changed_since_compute).toBe(false);
+  });
+
   test("a changed total is a 409 RUN_CHANGED with the totals that now stand, nothing frozen, and the recompute kept", async () => {
     // Pay changed after the screen showed it: Joiner's gross is raised, so Submit's recompute differs.
     const shown = p.PayrollRun.parse((await as("ops").get(`/payroll/runs/${octoberRun}`)).body);

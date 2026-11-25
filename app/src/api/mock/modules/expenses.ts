@@ -11,6 +11,7 @@ import type {
   Requisition,
 } from "@mycity/contract/contract.gen.ts";
 import { at, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
+import type { RawResponse } from "../../client";
 import { byKey, refKey, SIGN_INS, teamOf } from "../data/people";
 import { CATEGORY_NAMES, PROJECT_NAMES, SEED, type SeedRequest } from "../data/expenses";
 import { UPLOADS } from "../uploads";
@@ -32,6 +33,7 @@ interface Req {
   invoice: ExpenseRequest["invoice"]; wid: string | null; stage: Stage | null; requisition_id: string | null; over_budget: boolean;
   submitted_at: string | null; approved_at: string | null; authorised_at: string | null; disbursed_at: string | null;
   rejected_at: string | null; cancelled_at: string | null; created_at: string; trail: ExpenseHistoryEntry[];
+  duplicate_confirmed_at: string | null;
 }
 interface Req2 { id: string; number: string; by: string; status: Requisition["status"]; wid: string; submitted_at: string; approved_at: string | null; rejected_at: string | null }
 interface Pay extends Omit<Disbursement, "request_number" | "purpose" | "reference_missing"> { by: string }
@@ -111,16 +113,38 @@ function projectName(id: string): string | null {
 const deciderOf = (r: Req): string | null =>
   r.status === "submitted" ? (r.stage === "line_manager" ? byKey(r.requester)?.manager ?? "ifeoma" : "cynthia") : r.status === "in_requisition" ? "ifeoma" : null;
 const sees = (u: string, r: Req) => r.requester === u || finance(u) || byKey(r.requester)?.manager === u || deciderOf(r) === u;
+/**
+ * Requests `r` may repeat (docs/guides/expenses.md §6.8): sent within 30 days of `when`, by the same
+ * requester or to the same account, for the same amount, and not cancelled or rejected.
+ */
+const duplicatesOf = (r: Req, when: string) =>
+  REQS.filter((o) => o !== r && o.submitted_at && o.amount === r.amount && !["draft", "cancelled", "rejected"].includes(o.status)
+    && (o.requester === r.requester || (!!r.account_number && o.account_number === r.account_number))
+    && Math.abs(Date.parse(o.submitted_at) - Date.parse(when)) <= 30 * 86400000).slice(0, 5);
+/** The account name does not hold the payee's name, case, accents and punctuation set aside (Name Differs). */
+const fold = (v: string | null) => (v ?? "").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const nameDiffers = (payee: string | null, account: string | null) => !!fold(payee) && !!fold(account) && !` ${fold(account)} `.includes(` ${fold(payee)} `);
+/** Send Request's refusal while a possible duplicate is found and Send Anyway was not pressed. */
+function duplicateRefusal(r: Req, u: string, confirm: boolean): RawResponse | null {
+  const found = duplicatesOf(r, now());
+  r.duplicate_confirmed_at = found.length && confirm ? now() : null;
+  if (!found.length || confirm) return null;
+  const named = found.filter((o) => o.requester === u || deciderOf(o) === u).map((o) => o.number);
+  const hidden = found.length - named.length;
+  const names = [...named, ...(hidden ? [hidden === 1 ? "1 request you cannot open" : `${hidden} requests you cannot open`] : [])];
+  return fail(409, "EXPENSE_POSSIBLE_DUPLICATE", `Possible duplicate of ${names.join(", ")}`, { confirm_duplicate: names });
+}
 function detail(r: Req, u: string): ExpenseRequest {
   const left = remainingOf(r);
   const own = r.requester === u;
-  const all = REQS.filter((o) => o !== r && o.status !== "draft" && r.status !== "draft" && o.amount === r.amount && (o.account_number ?? o.payee_name) === (r.account_number ?? r.payee_name) && o.submitted_at && Math.abs(Date.parse(o.submitted_at) - Date.parse(r.submitted_at ?? now())) <= 30 * 86400000).slice(0, 5);
+  const all = r.status === "draft" ? [] : duplicatesOf(r, r.submitted_at ?? now());
   // The server names only the requests this reader could open; the rest are a count (audit F8).
   const dupes = all.filter((o) => o.requester === u || finance(u) || deciderOf(o) === u);
   return {
     ...row(r), expense_category_id: r.category_id, project_id: r.project_id, department_id: deptId(r.department), department: r.department, currency: "NGN",
     lines: r.lines.map((l, i) => ({ expense_request_line_id: l.id, position: i + 1, description: l.description, quantity: l.quantity, unit_price: l.unit_price, amount: l.amount })),
-    payee_name: r.payee_name, bank_name: r.bank_name, account_name: r.account_name,
+    payee_name: r.payee_name, bank_name: r.bank_name, account_name: r.account_name, account_name_differs: nameDiffers(r.payee_name, r.account_name),
+    duplicate_confirmed_at: r.duplicate_confirmed_at,
     account_number: own || finance(u) || !r.account_number ? r.account_number : `••••••${r.account_number.slice(-4)}`,
     uses_profile_account: r.uses_profile_account, invoice: r.invoice, needed_on: null, requisition_id: r.requisition_id, requisition_number: reqnOf(r)?.number ?? null,
     workflow_instance_id: r.wid, budget_remaining: left.line === null ? null : m(left.line), department_remaining: left.dept === null ? null : m(left.dept),
@@ -167,7 +191,7 @@ function raise(seed: SeedRequest) {
     amount: "0.00", status: "draft", payee_type: seed.payee, uses_profile_account: seed.payee === "staff", payee_name: seed.payee === "staff" ? name(seed.by) : seed.name,
     bank_name: seed.bank, account_name: seed.payee === "staff" ? name(seed.by) : seed.name, account_number: seed.account, invoice: null, wid: null, stage: null,
     requisition_id: null, over_budget: false, submitted_at: null, approved_at: null, authorised_at: null, disbursed_at: null, rejected_at: null, cancelled_at: null,
-    created_at: at(seed.ago + 1, "09:00"), trail: [],
+    created_at: at(seed.ago + 1, "09:00"), trail: [], duplicate_confirmed_at: null,
   };
   r.amount = m(r.lines.reduce((a, l) => a + k(l.amount), 0));
   if (seed.invoice) r.invoice = { document_id: sid(`invoice:${seed.purpose}`), file_name: `${r.number.toLowerCase()}-invoice.pdf`, size_bytes: 412 * 1024, mime_type: "application/pdf" };
@@ -346,7 +370,7 @@ route("GET /api/v1/expenses/:id/history", (req) => {
   return r && sees(req.user!, r) ? paged(r.trail, req) : notFound();
 });
 
-type Body = { purpose?: string; expense_category_id?: string; project_id?: string | null; department_id?: string | null; lines?: Array<{ description: string; quantity?: string; unit_price: string }>; payee_type?: ExpenseRow["payee_type"]; uses_profile_account?: boolean; payee_name?: string | null; bank_name?: string | null; account_name?: string | null; account_number?: string | null; invoice_document_id?: string | null; submit?: boolean };
+type Body = { purpose?: string; expense_category_id?: string; project_id?: string | null; department_id?: string | null; lines?: Array<{ description: string; quantity?: string; unit_price: string }>; payee_type?: ExpenseRow["payee_type"]; uses_profile_account?: boolean; payee_name?: string | null; bank_name?: string | null; account_name?: string | null; account_number?: string | null; invoice_document_id?: string | null; submit?: boolean; confirm_duplicate?: boolean };
 function check(b: Body) {
   const f: Record<string, string[]> = {};
   if (!b.purpose?.trim()) f.purpose = ["Required"];
@@ -355,6 +379,7 @@ function check(b: Body) {
   else if (!c.active) f.expense_category_id = ["Not offered"];
   if (!b.lines?.length) f.lines = ["Add a line"];
   if (!b.payee_type) f.payee_type = ["Required"];
+  if (b.account_number && /^(\d)\1{9}$/.test(b.account_number)) f.account_number = ["Not a real number"];
   return f;
 }
 function fill(r: Req, b: Body, u: string) {
@@ -384,7 +409,12 @@ route("POST /api/v1/expenses/mine", (req) => {
   fill(r, b, req.user!);
   if (b.submit) {
     const missing = payeeMissing(r);
-    if (Object.keys(missing).length) return invalid(missing);
+    // Refused as the server refuses it: nothing is saved (the draft goes with the refusal).
+    const refusal = Object.keys(missing).length ? invalid(missing) : duplicateRefusal(r, req.user!, b.confirm_duplicate === true);
+    if (refusal) {
+      REQS.splice(REQS.indexOf(r), 1);
+      return refusal;
+    }
     send(r, req.user!);
   }
   return created(detail(r, req.user!));
@@ -406,6 +436,8 @@ route("POST /api/v1/expenses/mine/:id/submit", (req) => {
   if (r.status !== "draft" && r.status !== "sent_back") return fail(409, "EXPENSE_ALREADY_SENT", "This request was already sent");
   const missing = payeeMissing(r);
   if (Object.keys(missing).length) return invalid(missing);
+  const refusal = duplicateRefusal(r, req.user!, (req.body as { confirm_duplicate?: boolean } | undefined)?.confirm_duplicate === true);
+  if (refusal) return refusal;
   send(r, req.user!);
   return ok(detail(r, req.user!));
 });
