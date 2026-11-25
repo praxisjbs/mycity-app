@@ -47,6 +47,8 @@ describe("Tabs", () => {
     installOverlayTestEnv();
     render(<Tabs label="People" value="employees" items={[{ value: "leave", label: "Leave", count: 3, tone: "primary", countWords: "3 unread notices" }]} />);
     const tab = screen.getByRole("tab", { name: "Leave 3 unread notices" });
+    // The words are in the tab's name, never written inside it: its text stays "Leave 3" (gate 8 reads it).
+    expect(tab.textContent).toBe("Leave 3");
     await userEvent.hover(tab.querySelector<HTMLElement>("[data-count]")!);
     expect(await screen.findByRole("tooltip")).toHaveTextContent("3 unread notices");
   });

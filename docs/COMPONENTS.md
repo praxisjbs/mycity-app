@@ -1065,6 +1065,7 @@ A small round number: how many unread, waiting or new things sit behind a tab, a
 | `label` | `string` |  | What is counted, lower case, for assistive technology ("unread messages"). |
 | `words` | `string` |  | The count said in full, in place of the number and `label` ("21 unread notices", from unreadNotices). |
 | `tip` | `boolean` |  | Desktop: show the words (`words`, else the count and `label`) in a Tooltip on hover. Nothing on a phone, where they stay in the accessible name. |
+| `named` | `boolean` |  | The host already says the words in its own accessible name (an aria-label): none are written inside the badge, so the host's text stays its label and count. `tip` still shows them on hover. |
 | `showZero` | `boolean` |  | Draw a zero rather than nothing. |
 | `className` | `string` |  | Layout classes only (spacing, position). |
 

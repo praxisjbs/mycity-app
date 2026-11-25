@@ -34,13 +34,15 @@ export interface CountBadgeProps {
   words?: string;
   /** Desktop: show the words (`words`, else the count and `label`) in a Tooltip on hover. Nothing on a phone, where they stay in the accessible name. */
   tip?: boolean;
+  /** The host already says the words in its own accessible name (an aria-label): none are written inside the badge, so the host's text stays its label and count. `tip` still shows them on hover. */
+  named?: boolean;
   /** Draw a zero rather than nothing. */
   showZero?: boolean;
   /** Layout classes only (spacing, position). */
   className?: string;
 }
 
-export function CountBadge({ count, max = 99, tone = "primary", label, words, tip, showZero, className }: CountBadgeProps) {
+export function CountBadge({ count, max = 99, tone = "primary", label, words, tip, named, showZero, className }: CountBadgeProps) {
   if (count <= 0 && !showZero) return null;
   const shown = count > max ? `${formatCount(max)}+` : formatCount(Math.max(0, count));
   const spoken = words ?? (label ? `${formatCount(count)} ${label}` : count > max ? formatCount(count) : undefined);
@@ -49,9 +51,9 @@ export function CountBadge({ count, max = 99, tone = "primary", label, words, ti
       data-count={count}
       className={cn("relative inline-flex h-4.5 min-w-4.5 flex-none items-center justify-center rounded-full px-1.5 text-2xs leading-none font-strong tabular-nums", TONE[tone], className)}
     >
-      <span aria-hidden={spoken ? true : undefined}>{shown}</span>
+      <span aria-hidden={spoken || named ? true : undefined}>{shown}</span>
       {/* The badge is the words' containing block, so a badge in a sideways-scrolling strip keeps them inside it and never widens the page. */}
-      {spoken && <span className="sr-only">{spoken}</span>}
+      {spoken && !named && <span className="sr-only">{spoken}</span>}
     </span>
   );
   return tip && spoken ? <Tooltip label={spoken}>{badge}</Tooltip> : badge;

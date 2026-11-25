@@ -147,14 +147,15 @@ export function Tabs({ items, value, onValueChange, label, children, activation 
   }, [value]);
 
   // `tip`: the strip's own tabs say their count's words on hover; the unseen ruler and the More Tabs menu do not.
-  const bodyOf = (item: TabItem, tip = false) => (
+  // `named`: a strip tab says its count's words in its own aria-label (nameOf), so its text stays its label and count.
+  const bodyOf = (item: TabItem, tip = false, named = false) => (
     <>
       {item.icon && <Icon name={item.icon} />}
       {item.label}
       {item.count != null && (
         <>
           {" "}
-          <CountBadge count={item.count} tone={item.tone ?? "neutral"} words={item.countWords} tip={tip} />
+          <CountBadge count={item.count} tone={item.tone ?? "neutral"} words={item.countWords} tip={tip} named={named} />
         </>
       )}
     </>
@@ -175,7 +176,8 @@ export function Tabs({ items, value, onValueChange, label, children, activation 
         )}
         <Radix.List ref={list} aria-label={label} className="no-scrollbar -mb-px flex max-w-full min-w-0 flex-1 gap-0.5 overflow-x-auto">
           {items.filter((_, i) => shown.has(i)).map((item) => {
-            const body = bodyOf(item, true);
+            const named = item.count != null && !!item.countWords && typeof item.label === "string";
+            const body = bodyOf(item, true, named);
             return (
               <Radix.Trigger
                 key={item.value}
@@ -184,6 +186,7 @@ export function Tabs({ items, value, onValueChange, label, children, activation 
                 asChild={!!item.href}
                 data-ui="button"
                 className={TAB}
+                aria-label={named ? `${item.label} ${item.countWords}` : undefined}
                 // A bare strip over a routed screen has no panel here to point at.
                 {...(panels ? {} : { "aria-controls": undefined })}
               >
