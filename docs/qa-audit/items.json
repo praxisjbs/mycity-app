@@ -280,7 +280,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "LA",
-   "mycity": "The hours are correct: an automatic clock-out counts only to the end of the shift, and the person can press Give Real Time. We will add that explanation on the day itself."
+   "mycity": "Fixed 25/11/2026 (#174): A System Clock-Out day's Hours now carries help saying it was counted to the shift's end. The hours are correct: an automatic clock-out counts only to the end of the shift, and the person can press Give Real Time. We will add that explanation on the day itself.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-016",
@@ -376,7 +379,10 @@
    "milestone": "M8",
    "effort": "M",
    "owner": "AJ",
-   "mycity": "The buttons work and are thumb-sized, but on long forms you have to scroll to reach them. We will pin them to the bottom of the screen on phones, starting with New Request."
+   "mycity": "Fixed 25/11/2026 (#174): On a phone, every form in a sheet now keeps its buttons pinned at the bottom. The buttons work and are thumb-sized, but on long forms you have to scroll to reach them. We will pin them to the bottom of the screen on phones, starting with New Request.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-022",
@@ -392,7 +398,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "The headcounts differ because each answers a different question (expected today, on the staff list, on the register this month, with a login). We will label each one so the difference is clear."
+   "mycity": "Fixed 25/11/2026 (#174): Home's figures now say whom they count and what they are out of, for example 22 clocked in, of 25 expected today; the Scorecards tile says it counts every status. The headcounts differ because each answers a different question (expected today, on the staff list, on the register this month, with a login). We will label each one so the difference is clear.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-023",
@@ -408,7 +417,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "Confirmed: the caption is fixed text, so it can disagree with what the chart shows. We will remove it or show it only when the data bears it out."
+   "mycity": "Fixed 25/11/2026 (#174): The fixed Saturday caption on Home's attendance chart is removed. Confirmed: the caption is fixed text, so it can disagree with what the chart shows. We will remove it or show it only when the data bears it out.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-024",
@@ -424,7 +436,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "We will name the record in each waiting-approval alert (for example its number), so two alerts for one person can be told apart."
+   "mycity": "Fixed 25/11/2026 (#174): Approval alerts now name the waiting record by its reference. We will name the record in each waiting-approval alert (for example its number), so two alerts for one person can be told apart.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-025",
@@ -440,7 +455,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "Home shows overdue tasks for everyone you can see, while My Workspace shows only yours. We will label the Home card so the difference is clear; you can also pick the My Overdue Tasks card on Home."
+   "mycity": "Fixed 25/11/2026 (#174): Overdue Tasks on Home now has help: Overdue tasks of everyone you can see. Home shows overdue tasks for everyone you can see, while My Workspace shows only yours. We will label the Home card so the difference is clear; you can also pick the My Overdue Tasks card on Home.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-026",
@@ -520,7 +538,10 @@
    "milestone": "M0",
    "effort": "M",
    "owner": "TB",
-   "mycity": "The Goals tab makes one small request per objective to show unread dots. It works correctly but is wasteful; we will log it as a performance improvement."
+   "mycity": "Fixed 25/11/2026 (#174): Unread marks are now asked for once per screen, not once per list. The Goals tab makes one small request per objective to show unread dots. It works correctly but is wasteful; we will log it as a performance improvement.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-031",
@@ -696,7 +717,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "An open role added by mistake can only be removed through the assistant today. We will add a Close Role button."
+   "mycity": "Fixed 25/11/2026 (#174): Edit Open Role now has Close Role, refused while anyone reports to the role. An open role added by mistake can only be removed through the assistant today. We will add a Close Role button.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-042",
@@ -712,7 +736,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "The Implementation department is ours, holding only our build account. We will give it a short code and remove it at handover."
+   "mycity": "Fixed 25/11/2026 (#174): The build account's department is now coded IMP and is retired at handover. The Implementation department is ours, holding only our build account. We will give it a short code and remove it at handover.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-043",
@@ -776,7 +803,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "Changes made just after midnight showed the previous day. We will fix it so History shows Lagos date and time."
+   "mycity": "Fixed 25/11/2026 (#174): History now shows Lagos time, with the time, here and on every date shown from a timestamp. Changes made just after midnight showed the previous day. We will fix it so History shows Lagos date and time.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-047",
@@ -792,7 +822,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "The assistant read the stored employment status, while the People screen shows probation from the probation dates. We will give the assistant the same status the screen shows."
+   "mycity": "Fixed 25/11/2026 (#174): Praxis AI now reads the same status the People screen shows, On Probation included. The assistant read the stored employment status, while the People screen shows probation from the probation dates. We will give the assistant the same status the screen shows.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-048",
@@ -808,7 +841,10 @@
    "milestone": "M0",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "The numbers on the menu are unread notifications waiting in that area, not tasks or totals. We will label them so hovering or a screen reader says so."
+   "mycity": "Fixed 25/11/2026 (#174): Every count on the menus and tabs now says it is unread notices. The numbers on the menu are unread notifications waiting in that area, not tasks or totals. We will label them so hovering or a screen reader says so.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-049",
@@ -824,7 +860,10 @@
    "milestone": "M0",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Confirmed in part: the first search after the system restarts takes longer while it prepares; later searches answer in about a quarter of a second. We will do that preparation at start-up so the first person does not wait."
+   "mycity": "Fixed 25/11/2026 (#174): Search is now warmed when the server starts, so the first search is as fast as later ones. Confirmed in part: the first search after the system restarts takes longer while it prepares; later searches answer in about a quarter of a second. We will do that preparation at start-up so the first person does not wait.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-050",
@@ -840,7 +879,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "TB",
-   "mycity": "Confirmed in part: a policy past its due date comes back on every page refresh rather than once per sign-in. We will make it appear once per sign-in, as agreed."
+   "mycity": "Fixed 25/11/2026 (#174): The overdue policy sheet now shows once per sign-in, not on every reload. Confirmed in part: a policy past its due date comes back on every page refresh rather than once per sign-in. We will make it appear once per sign-in, as agreed.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-051",
@@ -856,7 +898,10 @@
    "milestone": "M10",
    "effort": "M",
    "owner": "TB",
-   "mycity": "The figure is what the current design costs: each question carries everything the person is allowed to ask about. We will look at trimming it for simple how-to questions."
+   "mycity": "Fixed 25/11/2026 (#174): A how-to question to Praxis AI now starts from the User Guide alone, about a tenth of the context a data question reads. The figure is what the current design costs: each question carries everything the person is allowed to ask about. We will look at trimming it for simple how-to questions.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-052",
@@ -968,7 +1013,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "A person's own profile used a stricter rule than the employee list, so the two disagreed. We will make both read the same status."
+   "mycity": "Fixed 25/11/2026 (#174): My Profile now uses the same probation rule as People. A person's own profile used a stricter rule than the employee list, so the two disagreed. We will make both read the same status.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-059",
@@ -984,7 +1032,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "A cancelled request said Withdrawn in one column and Cancelled in the next. We will show it once."
+   "mycity": "Fixed 25/11/2026 (#174): A cancelled leave request now leaves Approver empty. A cancelled request said Withdrawn in one column and Cancelled in the next. We will show it once.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-060",
@@ -1000,7 +1051,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "Confirmed: some entries in Record History show a system name instead of words. We will word every entry and leave reminders out of the record's history."
+   "mycity": "Fixed 25/11/2026 (#174): Record History now words every event, reminders included, never a raw key. Confirmed: some entries in Record History show a system name instead of words. We will word every entry and leave reminders out of the record's history.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-061",
@@ -1016,7 +1070,10 @@
    "milestone": "M1",
    "effort": "S",
    "owner": "AJ",
-   "mycity": "The server's check is right; the form just waits for Send to show it. We will show the day count and remaining balance as soon as the dates are picked."
+   "mycity": "Fixed 25/11/2026 (#174): Request Leave now shows the working days and what would be left before Send. The server's check is right; the form just waits for Send to show it. We will show the day count and remaining balance as soon as the dates are picked.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-062",
@@ -1032,7 +1089,10 @@
    "milestone": "M9",
    "effort": "S",
    "owner": "TB",
-   "mycity": "Some Partnerships entries in the Audit Log showed an internal code instead of the record's number or name. We will make every entry name its record."
+   "mycity": "Fixed 25/11/2026 (#174): The Audit Log now names partners, leads, deals and proposals by number and title. Some Partnerships entries in the Audit Log showed an internal code instead of the record's number or name. We will make every entry name its record.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-063",
@@ -1048,7 +1108,10 @@
    "milestone": "M9",
    "effort": "S",
    "owner": "TB",
-   "mycity": "The count shows people who can use the role; the list also showed someone who has left, marked Left. We will make the two read the same way."
+   "mycity": "Fixed 25/11/2026 (#174): A role's People tab now opens on active logins, so its count and list agree. The count shows people who can use the role; the list also showed someone who has left, marked Left. We will make the two read the same way.",
+   "done": "✓",
+   "pr": "#174",
+   "fixed_on": "2026-11-25"
   },
   {
    "ref": "BG-064",
@@ -2534,7 +2597,7 @@
   "subtitle": "JBS Praxis response to MyCity's QA audit of staging (16 and 17/11/2026, findings F01 to F83). Every finding was tested or read against the code on main (697f1db) on 24/11/2026.",
   "howto": [
    "Bugs & Gaps is the fix tracker: only verified bugs, gaps, improvements and seed-data fixes. JBS Praxis ticks Fixed ✓ with the PR and date as each fix merges; MyCity records its retest.",
-   "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them. Every High and Medium item was fixed in #173 (24/11/2026); its note for MyCity starts with what changed.",
+   "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them. Every High and Medium item was fixed in #173 (24/11/2026), and the Low items in #174 and the PR after it; each fixed row's note for MyCity starts with what changed.",
    "To be Discussed (Change Report) holds requests outside the signed milestones, or that change a decision already agreed. Nothing there is built until a change request is agreed.",
    "MyCity Actions are setup, data and policy tasks the hub already supports and MyCity does itself.",
    "Audit Reconciliation shows every one of the 83 findings, our verdict and the sheet it went to."
