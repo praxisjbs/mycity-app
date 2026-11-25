@@ -80,14 +80,20 @@ function useUnreadRows(keys: readonly string[]): ReadonlySet<string> {
  * One request of the screen's batch: up to 25 of its ids. A read like any other (useApi), so a read
  * mark, the pull and the refresh button ask it again with the rest of the screen.
  */
-function UnreadBatch({ module, tab, ids, onAnswer }: { module: string; tab: string; ids: string; onAnswer: (ids: string, found: readonly string[] | null) => void }) {
+function UnreadBatch({ module, tab, ids, onAnswer }: { module: string; tab: string; ids: string; onAnswer: (screen: string, ids: string, found: readonly string[]) => void }) {
   const { data } = useApi("GET /api/v1/notifications/unread-records", { query: { module, tab, ids } });
   useEffect(() => {
-    if (data) onAnswer(ids, data.ids);
-  }, [data, ids, onAnswer]);
-  useEffect(() => () => onAnswer(ids, null), [ids, onAnswer]);
+    if (data) onAnswer(`${module}/${tab}`, ids, data.ids);
+  }, [data, module, tab, ids, onAnswer]);
   return null;
 }
+
+/** What the screen's answers say about each record id it asked for, for one screen. */
+interface Known {
+  screen: string;
+  unread: ReadonlyMap<string, boolean>;
+}
+const FORGOTTEN: Known = { screen: "", unread: new Map() };
 
 /** The ids every list on the screen hands over, gathered once they settle: sorted, each once, in batches of 25. */
 function useScreenIds() {
@@ -177,24 +183,28 @@ export function RecordMarks({ module, tab, count, children }: { module: string |
 
   // Every list's ids, asked for together: one batch for the screen, 25 ids a request.
   const { register, batches } = useScreenIds();
-  const [answers, setAnswers] = useState<ReadonlyMap<string, readonly string[]>>(() => new Map());
-  const answer = useCallback((ids: string, found: readonly string[] | null) => {
-    setAnswers((was) => {
-      if (found === null && !was.has(ids)) return was;
-      const next = new Map(was);
-      if (found === null) next.delete(ids);
-      else next.set(ids, found);
-      return next;
+  // Each answer is kept by record, so a list joining the screen (its batches re-cut) never makes the
+  // others' dots blink while the new batches are asked; a new screen starts afresh.
+  const [known, setKnown] = useState<Known>(FORGOTTEN);
+  const answer = useCallback((screen: string, ids: string, found: readonly string[]) => {
+    setKnown((was) => {
+      const hit = new Set(found);
+      const next = new Map(was.screen === screen ? was.unread : []);
+      for (const id of ids.split(",")) next.set(id, hit.has(id));
+      return { screen, unread: next };
     });
   }, []);
+  // Nothing waits on the tab any more: forget, so a later notice never shows an old dot first.
+  useEffect(() => {
+    if (!waiting) setKnown(FORGOTTEN);
+  }, [waiting]);
   const asking = !!module && !!tab && waiting;
   const unread = useMemo(() => {
-    if (!asking) return NONE;
-    const asked = new Set(batches);
+    if (!asking || known.screen !== `${module}/${tab}`) return NONE;
     const out = new Set<string>();
-    for (const [ids, found] of answers) if (asked.has(ids)) for (const id of found) out.add(id);
+    for (const [id, on] of known.unread) if (on) out.add(id);
     return out;
-  }, [asking, batches, answers]);
+  }, [asking, known, module, tab]);
 
   const screen = useMemo(
     () => (module && tab ? { module, tab, count, opened, views, unread, register } : null),

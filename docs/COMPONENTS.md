@@ -1047,7 +1047,7 @@ A small round number: how many unread, waiting or new things sit behind a tab, a
 | Use | Beside a tab label, a More tile, a nav item, an icon button (unread messages, approvals waiting). |
 | Avoid | A status (use Pill); a figure that matters on its own (use a KPI); a zero, which draws nothing unless showZero. |
 | Phone | The same size; it rides on its tile or tab and is never a tap target. |
-| Accessibility | With label it says the whole thing ("3 approvals waiting") to assistive technology; without one the number is read as it is. Counts above max read as max+ on screen and in full to a screen reader. |
+| Accessibility | With label it says the whole thing ("3 approvals waiting") to assistive technology, or `words` says it in full ("21 unread notices"); without either the number is read as it is. Counts above max read as max+ on screen and in full to a screen reader. With `tip` the same words show in a Tooltip on hover on desktop; a phone has no hover, so there they are in the accessible name only. |
 | Status | stable |
 | Exports | `CountBadge` |
 | Import | `import { CountBadge } from "@mycity/ui";` |
@@ -1063,12 +1063,15 @@ A small round number: how many unread, waiting or new things sit behind a tab, a
 | `max` | `number` |  | Above this it shows as max+ (99+). |
 | `tone` | `"primary" \| "err" \| "neutral"` |  | `primary` (yellow, the default), `err` for something overdue, `neutral` for a quiet total. |
 | `label` | `string` |  | What is counted, lower case, for assistive technology ("unread messages"). |
+| `words` | `string` |  | The count said in full, in place of the number and `label` ("21 unread notices", from unreadNotices). |
+| `tip` | `boolean` |  | Desktop: show the words (`words`, else the count and `label`) in a Tooltip on hover. Nothing on a phone, where they stay in the accessible name. |
 | `showZero` | `boolean` |  | Draw a zero rather than nothing. |
 | `className` | `string` |  | Layout classes only (spacing, position). |
 
 ```tsx
 <CountBadge count={3} label="approvals waiting" />
 <CountBadge count={120} tone="err" />
+<CountBadge count={21} words={unreadNotices(21)} tip />
 ```
 
 ### Countdown
@@ -2749,7 +2752,7 @@ The module's tab strip: one row of tabs under the page header, one of them activ
 | Use | Sibling views of one module or record (Register, Field Assignments, Location Requests). Controlled by value, so the router drives it from ?tab=; give each tab an href so it opens in a new tab and survives a reload. |
 | Avoid | Two or three views of one list in a toolbar (use SegmentedControl); filtering a list (use Chips); steps of a form (use Wizard); more than one strip on a screen. |
 | Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). A count's `tone` reads the same on both: yellow for what waits on the reader, red when it is urgent. |
-| Accessibility | A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing. |
+| Accessibility | A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing. A count with `countWords` is read after the label ("Leave 3 unread notices") and shown in a Tooltip on hover on desktop; a phone has no hover, so there the words are in the name only. |
 | Status | stable |
 | Exports | `Tabs`, `TabPanel` |
 | Import | `import { Tabs, TabPanel } from "@mycity/ui";` |
@@ -3834,8 +3837,8 @@ The one <form>: Enter submits, the browser's own bubbles are off, and a save it 
 |---|---|
 | Use | Around every set of fields; onSubmit comes from the form hook (form.submit(save) or a handler that calls form.check()). Return the save's promise and the form refuses another submit until it settles, its submit button spins and its other buttons wait (F26). |
 | Avoid | A <form> written anywhere else (gate 12); text in a footer (buttons only); a disabled submit button. |
-| Phone | FormFooter puts the primary button full width at the bottom and the others above it. |
-| Accessibility | A real form element, so Enter submits and assistive technology announces it; FormFooter keeps the primary last in the tab order. While a save runs the submit button says aria-busy and stays focusable. |
+| Phone | In a sheet (a Modal, SidePanel or Sheet on a phone) FormFooter pins its buttons in the sheet's own footer, as ModalFooter does, so Save is in thumb reach however long the form: full width, the primary at the bottom and the others above it, still one group (F26). On a page they sit full width at the form's foot. Desktop is unchanged: the buttons sit at the form's foot. |
+| Accessibility | A real form element, so Enter submits and assistive technology announces it; FormFooter keeps the primary last in the tab order. Pinned to a sheet's footer, its submit button names the form with form=, so pressing it or Enter in a field still submits it. While a save runs the submit button says aria-busy and stays focusable. |
 | Status | stable |
 | Exports | `Form`, `FormFooter` |
 | Import | `import { Form, FormFooter } from "@mycity/ui";` |
@@ -3858,7 +3861,7 @@ The one <form>: Enter submits, the browser's own bubbles are off, and a save it 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `children` | `ReactNode` | yes | Buttons only: Cancel first, the primary (Verb Noun, the only filled one) last. |
-| `className` | `string` |  | Layout classes only. |
+| `className` | `string` |  | Layout classes only, for the footer at the form's foot (on a phone sheet the buttons sit in the sheet's footer instead). |
 
 ```tsx
 <Form onSubmit={form.submit(save)}>…<FormFooter><Button>Cancel</Button><Button variant="primary" type="submit">Create Rule</Button></FormFooter></Form>
@@ -6074,7 +6077,7 @@ The phone's bottom bar: Home, Workspace, Community, Self-Service and More, each 
 | Use | Once, in PhoneShell's bottom bar slot. The same five for everyone; More is a button that opens MoreSheet, the others are links. |
 | Avoid | Desktop (the Rail; the screen gates fail a bottom bar on desktop); more than five items; a second row. |
 | Phone | The whole point: fixed at the foot, above the home indicator, each item at least 52 px tall; a count shows on the icon. |
-| Accessibility | The Main navigation landmark; the current item is aria-current="page"; More says it opens a dialog (aria-haspopup) and whether it is open. |
+| Accessibility | The Main navigation landmark; the current item is aria-current="page"; More says it opens a dialog (aria-haspopup) and whether it is open. A count is said after the word, as unread notices ("Workspace 4 unread notices"); a phone has no hover, so the words are in the accessible name only. |
 | Status | stable |
 | Exports | `BottomBar` |
 | Import | `import { BottomBar } from "@mycity/ui";` |
@@ -6274,7 +6277,7 @@ The phone's More: a launcher in a bottom sheet with the person's row, a search b
 | Use | Opened by the bottom bar's More. Tiles come from the module catalogue filtered by the person's grants, grouped Work, People, Business and System, each one word with its count. |
 | Avoid | Desktop (the Rail and the account menu); actions inside a module (Menu); settings that need a form (Settings). |
 | Phone | The whole point: up to 90% of the height, closed by dragging down, tapping the scrim or Esc; every tile and button a 44 px target. |
-| Accessibility | A dialog named More. The person's row and the groups are labelled; each tile is a link named by its word and its count; the current module is aria-current="page". |
+| Accessibility | A dialog named More. The person's row and the groups are labelled; each tile is a link named by its word and its count as unread notices ("Mailbox 12 unread notices"; a phone has no hover, so the words are in the accessible name only); the current module is aria-current="page". |
 | Status | stable |
 | Exports | `MoreSheet` |
 | Import | `import { MoreSheet } from "@mycity/ui";` |
@@ -6589,7 +6592,7 @@ The desktop navigation: the pin and name, the modules the person may open groupe
 | Use | Once, in DesktopShell's rail slot. Items come from the module catalogue filtered by the person's grants; it collapses to icons (66 px) when the person asks, remembered per device by the app. |
 | Avoid | A phone (BottomBar and MoreSheet are the phone's navigation, gate 11); tabs inside a module (Tabs); actions (the top bar). |
 | Phone | Never shown on a phone; its items are still 44 px targets so the gallery's phone view passes. |
-| Accessibility | The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); with `homeHref` the pin is a link Home, and with `onBrandHold` a hold or the menu key on it opens the trail (F29); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu. |
+| Accessibility | The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); with `homeHref` the pin is a link Home, and with `onBrandHold` a hold or the menu key on it opens the trail (F29); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. A count says what it is: "21 unread notices" in the link's name and, on hover, in a Tooltip (collapsed, the item's own tooltip adds it to the name). The account button opens a Menu. |
 | Status | stable |
 | Exports | `Rail` |
 | Import | `import { Rail } from "@mycity/ui";` |
@@ -7238,6 +7241,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `initials` | `lib/format.ts` | Initials for an avatar: "Cynthia Osakunih" → "CO". |
 | `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB", "23.4 GB", "1.25 TB" from a byte count. |
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |
+| `unreadNotices` | `lib/format.ts` | A menu, More tile or tab count in words: the reader's unread notices that open there. |
 | `formatPhone` | `lib/format.ts` | A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. |
 | `formatPhoneLocal` | `lib/format.ts` | A stored number as a person types it at home, for a field to start from: "0803 123 4567". |
 | `HistoryChange` (type) | `lib/history.ts` | What changed in the window's history. |
