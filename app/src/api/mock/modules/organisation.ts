@@ -302,8 +302,9 @@ route("GET /api/v1/employees/:id", (req) => {
 route("GET /api/v1/employees/:id/history", (req) => {
   const p = mine(req);
   if (!p) return notFound();
+  // The first change just after midnight in Lagos, which the UTC day would date a day early.
   const entries = [
-    { event_id: uuid(), occurred_at: at(2, "11:20"), action: "employee.updated", actor_name: "Cynthia Osakunih", changed_fields: ["job_title"], summary: "Record changed: Job Title" },
+    { event_id: uuid(), occurred_at: at(2, "00:45"), action: "employee.updated", actor_name: "Cynthia Osakunih", changed_fields: ["job_title"], summary: "Record changed: Job Title" },
     { event_id: uuid(), occurred_at: at(40, "09:05"), action: "employee.reporting_line_changed", actor_name: "Cynthia Osakunih", changed_fields: ["line_manager_id"], summary: "Reporting line changed" },
     { event_id: uuid(), occurred_at: at(200, "09:00"), action: "employee.created", actor_name: "System", changed_fields: [], summary: "Record created" },
   ];
@@ -727,6 +728,12 @@ route("PATCH /api/v1/org-seats/:id", (req) => {
   const seat = SEATS.find((s) => s.org_seat_id === req.params.id);
   if (!seat) return notFound();
   const b = req.body as { title?: string; status?: "vacant" | "closed"; line_manager_id?: string | null };
+  // Close Role, refused while anyone reports to it or it heads a department (organogram.md §6).
+  if (b.status === "closed" && seat.status === "vacant") {
+    const under = PEOPLE.filter((p) => statusOf(p) === "active" && managerRef(p)?.org_seat_id === seat.org_seat_id).length;
+    if (under) return fail(409, "SEAT_HAS_REPORTS", `${under} ${under === 1 ? "person reports" : "people report"} here.`);
+    if (DEPTS.some((d) => d.active && d.head_seat_id === seat.org_seat_id)) return fail(409, "SEAT_HEADS_DEPARTMENT", "Heads a department. Set another head first.");
+  }
   if (b.title) seat.title = b.title;
   if (b.status) seat.status = b.status;
   if ("line_manager_id" in b) seat.manager_key = b.line_manager_id ? (byId(b.line_manager_id)?.user_key ?? null) : null;

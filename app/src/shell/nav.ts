@@ -1,4 +1,4 @@
-import type { BottomBarItem, LauncherGroup, RailItem, TabItem } from "@mycity/ui";
+import { unreadNotices, type BottomBarItem, type LauncherGroup, type RailItem, type TabItem } from "@mycity/ui";
 import type { NavBadges } from "@/api/types/identity";
 import { hrefFor } from "@/lib/routes";
 import { AREAS, BOTTOM_BAR, type ModuleDef, type TabDef } from "./catalogue";
@@ -48,12 +48,13 @@ export function moreGroups(modules: ModuleDef[], badges: ModuleCounts | undefine
 
 /**
  * A module's tabs, each with what waits on the reader there: the badges' count for the tab (a
- * module's tabs add up to its count), red while an urgent notice opens on it.
+ * module's tabs add up to its count), red while an urgent notice opens on it, said in words
+ * ("3 unread notices") for a screen reader and the tab's tooltip.
  */
 export function tabItems(moduleKey: string, tabs: TabDef[], badges: NavBadges | undefined, urgent: Set<string> = new Set()): TabItem[] {
   return tabs.map((t) => {
     const isUrgent = urgent.has(`${moduleKey}/${t.slug}`);
     const count = Math.max(badges?.tabs[moduleKey]?.[t.slug] ?? 0, isUrgent ? 1 : 0);
-    return { value: t.slug, label: t.label, href: hrefFor(moduleKey, t.slug), count, tone: isUrgent ? "err" : "primary" };
+    return { value: t.slug, label: t.label, href: hrefFor(moduleKey, t.slug), count, tone: isUrgent ? "err" : "primary", countWords: unreadNotices(count, isUrgent) };
   });
 }

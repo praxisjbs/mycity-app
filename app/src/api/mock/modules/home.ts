@@ -331,7 +331,7 @@ const CARDS: MockCard[] = [
     records: { title: "Clocked In Today", columns: ROSTER_COLUMNS, groups: ROSTER_GROUPS, rows: (u) => rosterRecords(rosterOf(u)) },
     figure: rosterFigure,
     caption: (f) => (Number(f.extra.late) > 0 ? `${f.extra.late} late` : null),
-    summary: (f) => `${f.value} of ${f.denominator} clocked in`,
+    summary: (f) => `${f.value} clocked in, of ${f.denominator} expected today`,
   },
   {
     key: "leave_pending",
@@ -508,7 +508,7 @@ const CARDS: MockCard[] = [
           : key === "team_flags"
             ? (f) => (Number(f.value) > 0 ? `${f.extra.late} late, ${f.extra.no_clock_out_yesterday} no clock-out` : null)
             : undefined,
-      summary: key === "team_present" ? (f) => `${f.value} of ${f.denominator} in today` : undefined,
+      summary: key === "team_present" ? (f) => `${f.value} in today, of ${f.denominator} expected` : undefined,
     }),
   ),
   /* Work */

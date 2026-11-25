@@ -350,8 +350,10 @@ Everyone gets their access from their roles.
 3. **Details** shows what the role is for, its **Home**, the **Sensitive Fields** (**Salary and
    pay**, **Bank details**, **Personal details**, **Tax and pension numbers**) as **Visible** or
    **Masked**, and each of its **Capabilities** as **Held** or **Not Held**.
-4. **People** lists who holds it. Press a person to open their login on
-   [Settings · Users](/settings?tab=users), where roles are given. **Nobody Holds It** means none.
+4. **People** lists the active logins that hold it, the people its count counts. Press
+   **Invited**, **Suspended** or **Left** to see those logins instead, and **Active** to come back.
+   Press a person to open their login on [Settings · Users](/settings?tab=users), where roles are
+   given. **Nobody Holds It** means no active login does; **Nobody Here** means none with that status.
 5. On a computer, press **Matrix** at the top. **Permission Matrix** shows every role against every
    module, with the letters **T**, **O**, **A** and **X**. Press a role's name at the top of its
    column to open it. **Roles** goes back.

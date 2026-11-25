@@ -19,6 +19,7 @@ const { AppError } = require("../../shared/errors");
 const repo = require("./organisation.repo");
 const { PHOTO_VARIANTS, photoPath } = require("../../shared/db/person");
 const { employeeFieldNames } = require("@mycity/contract/schemas/organisation");
+const events = require("../../shared/events/catalogue");
 
 const day = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : (v ?? null));
 const at = (v) => (v instanceof Date ? v.toISOString() : (v ?? null));
@@ -105,19 +106,48 @@ async function history(client, employeeId, query) {
   };
 }
 
+/**
+ * What each event on an employee record reads as in Record History (People's History tab and My
+ * Profile's), in plain words. Every key emitted on the employee entity is here, reminders included
+ * (JBS Praxis, 25/11/2026: kept, each in words), and employee-360.test.js holds the list to the source.
+ */
+const HISTORY_WORDS = Object.freeze({
+  "employee.created": "Record created",
+  "employee.updated": "Record changed",
+  "employee.archived": "Record archived",
+  "employee.restored": "Record restored",
+  "employee.reporting_line_changed": "Reporting line changed",
+  "employee.bank_details_changed": "Bank details changed",
+  "employee.photo_updated": "Photo changed",
+  "employee.data_export_requested": "Copy of data requested",
+  "employee.rent_declared": "Rent declared",
+  "employee.rent_declaration_removed": "Rent declaration removed",
+  "employee.probation_ending": "Probation end reminder sent",
+  "attendance.schedule_set": "Work schedule set",
+  "leave_balance.set": "Leave allowance set",
+  "document.requested": "Document requested",
+  "document.verified": "Document verified",
+  "payslip.export_requested": "Payslips downloaded",
+  "commitments.due": "Reminded to send commitments",
+  "review.leaver_due": "Open reviews withdrawn on leaving",
+  "week.summary_saved": "Week summary saved",
+});
+
+/**
+ * The words for an event key: its own words above, else the event catalogue's summary (every
+ * declared key has one), else "Record changed". A key is never shown as it is stored.
+ */
+function wordsFor(action) {
+  if (HISTORY_WORDS[action]) return HISTORY_WORDS[action];
+  const entry = events.get(action);
+  return entry ? entry.summary.replace(/\.$/, "") : "Record changed";
+}
+
 /** The line the History tab shows: what was done, and to which fields, in the record's own words. */
 function summaryOf(row) {
   const fields = employeeFieldNames(row.changed_fields);
-  const said = {
-    "employee.created": "Record created",
-    "employee.updated": "Record changed",
-    "employee.archived": "Record archived",
-    "employee.restored": "Record restored",
-    "employee.reporting_line_changed": "Reporting line changed",
-    "attendance.schedule_set": "Work schedule set",
-  }[row.action];
-  const what = said || row.action.replace(/^employee\./, "").replace(/_/g, " ");
+  const what = wordsFor(row.action);
   return fields.length ? `${what}: ${fields.join(", ")}` : what;
 }
 
-module.exports = { get, history, summaryOf };
+module.exports = { get, history, summaryOf, HISTORY_WORDS };

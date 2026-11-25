@@ -170,7 +170,8 @@ export function TaskForm({
   const initial = {
     title: task?.title ?? filled.title ?? "",
     cadence: task?.cadence ?? filled.cadence ?? "",
-    due_on: task?.due_at ? task.due_at.slice(0, 10) : (dueOn ?? filled.due_on ?? ""),
+    // The day it is due in Lagos, as the server reads it (a UTC slice is a day early after 23:00 UTC).
+    due_on: task?.due_at ? todayIso(new Date(task.due_at)) : (dueOn ?? filled.due_on ?? ""),
     priority: (task?.priority ?? filled.priority ?? "normal") as string,
     description: task?.description ?? filled.description ?? "",
     is_commitment: task?.is_commitment ?? commitment,

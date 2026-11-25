@@ -516,6 +516,24 @@ A refused read is not an error: it becomes an answer that says the information i
 3. **Tools**: `authorise.allowedReads(actor)`, one tool per read the person may run (its key,
    description and its contract schema as JSON Schema, `services/ai/structured.js`). A read the
    person may not run is never offered. Tool names are the read key with `.` as `__`.
+   **A how-to question starts narrower** (JBS Praxis, 25/11/2026; QA BG-051). A question asking how
+   to do something in the hub ("How do I request leave?", "Where can I change my PIN?", "Which screen
+   shows payslips?"; `orchestrator.isHowTo`, never "how many", "how much" or "how long") is offered
+   `guide.search` alone and the engine's `more_reads`, and its system turn keeps the prompt, who is
+   asking, today, the screens and the routes but holds the actions back (one line says to call
+   `more_reads` for them). The guide and the screen list answer it in two small rounds. When the
+   guide is not enough (the question needs the person's records or figures, or a change), the model
+   calls `more_reads`: from the next round every read and summary is offered and the full system
+   turn is back. `more_reads` is not a read and is not one of the five; a call to a read held back
+   widens the offer the same way and runs with the person's rights, as any read does. Not narrowed:
+   a question with a document to read, the reply to a question that is gathering a card, a person
+   without `guide.search`. The prefix stays stable within each kind of start (decision 24); the round
+   after `more_reads` pays for the whole prefix once. The job stays Default (Data Answers).
+   Measured without a model (`tests/unit/foundation/ai-assistant.test.js`, the CEO's whole catalogue
+   from the full screen, which draws cards and the pane, on 25/11/2026): the first round of "How do I
+   request leave?" is 18,685 characters with 2 tools, against 188,468 characters with 148 tools for a
+   data question, about a tenth; both its rounds together are a fifth of one data round. No staging
+   figure was taken: the build session reaches no model.
 4. **The loop**: the chain of Data Answers (`ai-control.md` §6.1; Gemini's Flash first, its Pro
    second) answers with read calls or its answer. Each call runs (§6.3) and its result goes back.
    After 5 reads, a repeated read, or 8 rounds, the model is told to answer with what it has: the
@@ -757,7 +775,8 @@ that module's guide changed):
 - **User Guide** (built): `guide.search` (`PageQuery`), how to do something in the hub: the
   sections and tasks of the guide the asker may read that answer `q`, ranked by the guide's own
   search, a page of 25, each row citing its section (`guide_section`, opening the guide at it)
-  (`user-guide.md` §6.8, §9). "How do I request leave?" is answered from the guide, never guessed.
+  (`user-guide.md` §6.8, §9). "How do I request leave?" is answered from the guide, never guessed,
+  and is offered this read alone until the model asks for more (§6.1 step 3).
 
 The six target questions of MILESTONES §15 answer as their modules land: overdue tasks (M2,
 `tasks.list` today), expenses awaiting approval (M8), due for confirmation (people), inactive
@@ -1403,7 +1422,8 @@ name the summary, the figures and the chart, and which chart suits a group (bar,
 ### 6.14 The engine boundary (decision 17; PR1)
 
 `src/services/ai/engine/` is the part that would travel: `turn.js` (the rounds with the model, the
-read cap, the forced answer, the correction and the rescue), `cards.js` (the draft rules, the
+read cap, the forced answer, the correction, the rescue and a narrower start widened by
+`more_reads`, §6.1 step 3), `cards.js` (the draft rules, the
 states, the expiry, the confirm classes), `pane.js` (Sources, Table, Overview from a turn),
 `content.js` (what of a read goes back to the model), `matrix.js` (the test cases a registry
 implies) and `errors.js`. It requires nothing of MyCity: `createEngine(deps)` takes the pieces
@@ -2655,6 +2675,7 @@ area and guides from B.4:
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · A how-to question starts from the User Guide (QA BG-051, JBS Praxis 25/11/2026; §6.1 step 3, §6.9): `guide.search` and the engine's `more_reads` alone, the actions held back from the system turn, until the model calls `more_reads` (or a read held back), when every read, summary and action is offered from the next round. `engine/turn.js` takes a narrower `start`; `orchestrator.isHowTo` decides. A unit test measures the first round at about a tenth of a data question's for the CEO's catalogue; the evaluation set gains `guide.how-to`. The job stays Default; no staging measurement.
 - 17/11/2026 · JP · Leave's relief officer and handover note (`docs/guides/ess.md` §6, §9; TB 17/11/2026): `my_leave.request` carries the relief officer (`AiCardPicks` and the manifest's picks gain `relief_officer`, Request Leave's own list; a name matched among the people it offers) and never a file: a request whose type and days need a handover note is refused at the press with `HANDOVER_NOTE_NEEDED`, whose Add Handover Note opens Request Leave filled with the card's values; `LeaveRequestPrefill` carries the relief officer. Add Type and Save Type carry each type's rule (`handover_every_request`, `handover_over_days`). Catalogue snapshot regenerated (four entries).
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Praxis AI itself: the menu, the top bar's button, the floating button's, ⌘K's screens, New Conversation and conversations; a link to it lands on the first screen the person may open; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 17/11/2026 · TB · The Document Centre joins the assistant (`document-centre.md` §9, its PR 2): the read `documents.find` (the library by the asker's own rights, the words found inside a file never returned), the summary `documents.summary` (the Library's four figures), the cards `documents.edit_details`, `documents.category_create` and `documents.category_edit`, and four routes to Document Centre · Library and Categories. No file's contents reach a model (D12); no new model call, so no new AI job.

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { GalleryEntry } from "../testing/gallery";
+import { unreadNotices } from "../lib/format";
 import { TabPanel, Tabs, type TabItem } from "./Tabs";
 
 const MODULE: TabItem[] = [
@@ -41,10 +42,10 @@ function Waiting() {
       value={tab}
       onValueChange={setTab}
       items={[
-        { value: "employees", label: "Employees", count: 2, tone: "primary" },
+        { value: "employees", label: "Employees", count: 2, tone: "primary", countWords: unreadNotices(2) },
         { value: "organogram", label: "Organogram" },
-        { value: "attendance", label: "Attendance", count: 4, tone: "primary" },
-        { value: "leave", label: "Leave", count: 3, tone: "err" },
+        { value: "attendance", label: "Attendance", count: 4, tone: "primary", countWords: unreadNotices(4) },
+        { value: "leave", label: "Leave", count: 3, tone: "err", countWords: unreadNotices(3, true) },
         { value: "devices", label: "Devices" },
         { value: "worksites", label: "Worksites" },
       ]}

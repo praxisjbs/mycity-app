@@ -400,7 +400,7 @@ describe("shapes on the wire", () => {
   test("the chips are counted from the figure, an absent count is 0, and the line needs a figure", () => {
     const att = kpi.BY_ID.get("attendance_today");
     const meta = kpi.metaOf(att, { value: 2, denominator: 3, groups: { on_site: 1, late: 1 } });
-    expect(meta.summary).toBe("2 of 3 clocked in");
+    expect(meta.summary).toBe("2 clocked in, of 3 expected today");
     expect(meta.groups.map((g) => [g.value, g.count])).toEqual([
       ["on_site", 1],
       ["remote", 0],

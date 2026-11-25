@@ -125,7 +125,7 @@ function Declared({ declaration: d, canEdit, onChange }: { declaration: RentDecl
           ["Landlord", [d.landlord_name, landlordId].filter(Boolean).join(" · ")],
           ["Property", notRecorded(d.property_address)],
           ["Evidence", d.evidence_document_id ? "On File" : "None"],
-          ["Entered", `${d.entered_by_name ?? "System"} · ${formatDate(d.updated_at.slice(0, 10))}`],
+          ["Entered", `${d.entered_by_name ?? "System"} · ${formatDate(d.updated_at)}`],
         ]}
       />
       {canEdit && (

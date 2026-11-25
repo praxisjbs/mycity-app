@@ -177,14 +177,22 @@ describe("Home · Overview, by Home view", () => {
   it("Operations: the greeting and date, its cards, the attendance chart and On Time, Need You, the pipeline, goals, activity and the week", async () => {
     await overviewAs("cynthia@mycityapp.io");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Good Morning, Cynthia");
-    expect(document.querySelector('[data-ui="page-subtitle"]')?.textContent).toMatch(/^Monday 19\/10\/2026 · \d+ of \d+ clocked in$/);
+    expect(document.querySelector('[data-ui="page-subtitle"]')?.textContent).toMatch(/^Monday 19\/10\/2026 · \d+ clocked in, of \d+ expected today$/);
     // Operations & People's own cards, Clocked In Today locked first.
     expect(cardTitles()).toEqual(["Clocked In Today", "Overdue Tasks", "Expenses Awaiting Approval", "Active Partnerships"]);
     const h = headings();
     for (const title of ["Attendance, 14 Working Days", "On Time", "Partnership Pipeline", "Need You", "Goals This Quarter", "Activity Today", "Your Week"]) expect(h).toContain(title);
     for (const title of ["My Goals This Quarter", "Upcoming Leave", "Organisational Goals", "Org KPI", "Monthly Signed Value"]) expect(h).not.toContain(title);
     expect(screen.queryByRole("list", { name: "Your Day" })).toBeNull();
-    expect(screen.getByText("Dips are Saturdays, a half day")).toBeTruthy();
+    // The chart carries no fixed caption: a sentence about the data that the data may not bear out.
+    expect(screen.queryByText(/Saturdays/)).toBeNull();
+    // Each count names whom it counts: Clocked In Today's help says what it is out of, Overdue Tasks' whose.
+    const helpOf = (card: string) => {
+      const about = screen.getByRole("button", { name: `About ${card}` });
+      return document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent;
+    };
+    expect(helpOf("Clocked In Today")).toMatch(/^People you can see clocked in today, of those expected in\. Expected means/);
+    expect(helpOf("Overdue Tasks")).toBe("Overdue tasks of everyone you can see.");
     // Need You: the leave requests waiting on Cynthia as line manager, a table on desktop.
     expect(await screen.findByRole("cell", { name: "Bashir Lawal" })).toBeTruthy();
     expect(copyProblems()).toEqual([]);
@@ -349,7 +357,7 @@ describe("the records behind a card", () => {
     await overviewAs("cynthia@mycityapp.io");
     fireEvent.click(screen.getByRole("button", { name: /^Clocked In Today/ }));
     const sheet = await screen.findByRole("dialog", { name: "Clocked In Today" });
-    expect(await within(sheet).findByText(/^\d+ of \d+ clocked in$/)).toBeTruthy();
+    expect(await within(sheet).findByText(/^\d+ clocked in, of \d+ expected today$/)).toBeTruthy();
     const page = dashboard.HomeKpiDetailPage.parse(await api.call("GET /api/v1/home/kpi/:key", { params: { key: "attendance_today" } }));
     const meta = dashboard.HomeKpiDetailMeta.parse(await api.call("GET /api/v1/home/kpi/:key/meta", { params: { key: "attendance_today" } }));
     // Someone with no clock-out yesterday is also on site today: the groups overlap, so All is the list's total.
@@ -461,7 +469,7 @@ describe("on a phone", () => {
     expect(screen.getByRole("button", { name: "More Actions" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /^Clocked In Today/ }));
     const sheet = await screen.findByRole("dialog", { name: "Clocked In Today" });
-    await within(sheet).findByText(/^\d+ of \d+ clocked in$/);
+    await within(sheet).findByText(/^\d+ clocked in, of \d+ expected today$/);
     expect(sheet.querySelector("table")).toBeNull();
   }, 30000);
 

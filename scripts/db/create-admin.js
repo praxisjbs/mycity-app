@@ -249,6 +249,14 @@ const BUILD_ACCOUNT = Object.freeze({
 });
 
 /** The build account's payload with the email typed at the terminal, as work and personal email. */
+/**
+ * Short codes for the departments this script makes, as MyCity's own carry (GM, TBO, BM, PG, PC):
+ * the build account's Implementation department is IMP, never the IMPLEMENTATION its name would
+ * give (QA BG-042). It retires with the account at handover (docs/runbooks/first-accounts.md §5).
+ * Any other department named here takes its code from its name.
+ */
+const DEPARTMENT_CODES = Object.freeze({ Implementation: "IMP" });
+
 function buildAccount(email) {
   return {
     role_code: BUILD_ACCOUNT.role_code,
@@ -410,7 +418,10 @@ async function createAdmin(client, input, password, opts = {}) {
     if (!department)
       department = await organisation.createDepartment(
         client,
-        { name: e.department_name },
+        {
+          name: e.department_name,
+          ...(DEPARTMENT_CODES[e.department_name] ? { code: DEPARTMENT_CODES[e.department_name] } : {}),
+        },
         ACTOR,
       );
 

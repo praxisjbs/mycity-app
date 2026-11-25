@@ -147,8 +147,9 @@ If the hub cannot be reached, a line above the buttons says
 6. **Login** shows **Sign In**: whether they can sign in, the email they use, their **Roles** and
    when they last signed in.
 7. **Documents** lists what is held on them. See [Someone's documents](#people-documents).
-8. **History** lists every change under **What**, **Who** and **When**. **System** means the hub
-   made the change.
+8. **History** lists every change under **What**, **Who** and **When**, in plain words with the
+   date and time it happened, such as *Record changed: Phone*. Reminders show too, such as
+   *Reminded to send commitments*. **System** means the hub made the change.
 9. **Tax and Pension** holds their tax and pension numbers, whether they contribute to NHF and the
    State they live in, and under **Rent Relief** the rent they declared for each year. It shows
    only if your role sees tax and pension. See [Declare someone's rent](#people-rent).
@@ -458,12 +459,19 @@ that match; tap one to focus it. **No Match** means nothing matched.
    ![Add Open Role](shot:people-add-role)
 3. To correct an open role, press **Edit Role** on its card. **Edit Open Role** opens with the same
    fields. Press **Save Role**. The message names it, such as *Head of Sales saved*.
+4. To remove an open role added by mistake or no longer wanted, press **Edit Role** on its card,
+   then **Close Role**, and **Close Role** again to confirm. It leaves the chart, and the message
+   names it, such as *Head of Sales closed*. A role someone reports to cannot close: give them
+   another manager first.
 
 | Message | What it means | What to do |
 |---|---|---|
 | **Name the role** | **Role Title** is empty | Type the role's title |
 | **Pick a department** | No department picked | Pick the department it sits in |
 | *That would make a loop in the reporting line.*, or another reason | The move or the role was refused, and the message says why | Pick another manager, or check who it **Reports To** |
+| **Move its reports first** | Someone or an open role reports to the role you are closing | Drag them to another manager, or use **Change Manager** |
+| **Heads a department. Set another head first.** | The open role is a department's head | Give the department another head on [Departments](/people?tab=departments), then close the role |
+| **Not closed. Try again.** | The hub could not be reached | Check your connection and press again |
 | **Not moved. Try again.** or **Not saved. Try again.** | The hub could not be reached | Check your connection and press again |
 | **That file could not be made. Try again.** | The PDF failed | Press **Download PDF** again |
 | **That file is taking too long. Try again.** | It was not ready in five minutes | Press **Download PDF** again |
@@ -601,6 +609,7 @@ at the clock) or **Rejected** (People rejected it). **Source** reads **Clock**, 
 To see every day of one person, search their name with ⌘K and press the last row of
 **Attendance Days**, such as *All Days of Ada Obi*. A panel with their name lists their days of
 this month, newest first, with **Date**, **Clock In**, **Clock Out**, **Hours** and **Status**.
+After a System Clock-Out, point at **Hours** (tap it on a phone): it counted only to the shift's end.
 Choose another month at the top. Press a day to open its evidence over the panel; close it to come
 back to their days.
 
@@ -1070,7 +1079,6 @@ crop: modal
 marks:
   1: label "Department" | Pick the department
   2: label "Start Date" | Their first day
-  3: label "Worksite" | Their office
 ```
 
 ```shot people-record

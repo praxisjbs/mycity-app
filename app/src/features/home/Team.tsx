@@ -160,6 +160,7 @@ export function Team() {
       <Chips label="Status" value={chip} onChange={setChip} options={CHIPS} />
       <DataView
         title="Team Roster"
+        help="Active staff you can see, and anyone with a record today. Someone with no login reads Day Off."
         list={roster}
         search="Search People"
         rowKey={(r) => r.employee.employee_id}
@@ -172,6 +173,7 @@ export function Team() {
       <DataView
         className="mt-3"
         title="Attendance This Month"
+        help="Everyone on the register this month, leavers included."
         list={month}
         rowKey={(r) => r.employee.employee_id}
         noun="person"

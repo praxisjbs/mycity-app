@@ -665,6 +665,9 @@ describeDb("identity against the real migrations", () => {
         gross_monthly: null,
         department: "Implementation",
       });
+      // QA BG-042: its department carries a short code like MyCity's own, never IMPLEMENTATION.
+      const dept = await one(`SELECT d.code::text AS code FROM employee e JOIN department d USING (department_id) WHERE e.employee_id = $1`, [made.employee.employee_id]);
+      expect(dept.code).toBe("IMP");
       const { res } = await signIn("build@mycity.test", "Implement#2026x");
       expect(res.status).toBe(200);
       expect(res.body.user.roles).toEqual([expect.objectContaining({ code: "implementation" })]);

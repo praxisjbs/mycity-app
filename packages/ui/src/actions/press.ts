@@ -105,6 +105,20 @@ const subscribe = (l: () => void) => {
   };
 };
 
+/**
+ * The form a submit button belongs to when it is drawn outside the <form> element: a FormFooter
+ * pinned to a phone sheet's footer gives its form's id here, and a Button, IconButton or BigButton
+ * of type submit under it names that form with form= (unless it names one itself), so pressing it,
+ * or Enter in a field, still submits the form.
+ */
+export const SubmitOwnerContext = createContext<string | undefined>(undefined);
+
+/** The form= a button carries: its own, else the form around its pinned footer for a submit button. */
+export function useSubmitOwner(type: string | undefined, form: string | undefined): string | undefined {
+  const owner = useContext(SubmitOwnerContext);
+  return form ?? (type === "submit" ? owner : undefined);
+}
+
 /** Marks a form's submit button busy until the function it returns is called. */
 export function markSubmitting(el: Element | null): () => void {
   if (!el) return () => undefined;

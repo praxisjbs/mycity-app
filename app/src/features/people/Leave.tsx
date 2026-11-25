@@ -415,6 +415,15 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
   const needed = !onBehalf && spanSet && Boolean(check.data?.handover_needed);
   // The year the First Day falls in: what is left of it shows beside each type on My Leave.
   const year = Number((f.values.starts_on || todayIso()).slice(0, 4));
+  /*
+   * The working days the span holds and what the type's year would have left, under Last Day before
+   * Send (ess.md §10); past the allowance, Last Day is marked as Send's refusal would mark it.
+   */
+  const balances = useApi("GET /api/v1/ess/leave/balances", { query: { year }, enabled: !onBehalf });
+  const left = balances.data?.balances.find((b) => b.leave_type_id === v.leave_type_id)?.remaining ?? null;
+  const days = !onBehalf && spanSet ? (check.data?.days ?? null) : null;
+  const over = days !== null && left !== null && days > left;
+  const span = days === null ? null : `${days} working ${days === 1 ? "day" : "days"}`;
   const ask = useMutation("POST /api/v1/ess/leave");
   const recordIt = useMutation("POST /api/v1/leave/requests");
   const busy = ask.pending || recordIt.pending;
@@ -422,7 +431,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
   const submit = async () => {
     const missing = onBehalf && !who.length;
     setWhoError(missing ? "Pick someone" : null);
-    if (!f.check() || missing) return;
+    if (!f.check() || missing || over) return;
     // Needed and not given: marked on the fields as Send would, before it is sent.
     const gaps = needed
       ? Object.fromEntries((["relief_employee_id", "handover_document_id"] as const).filter((k) => !f.values[k]).map((k) => [k, ["Required"]]))
@@ -478,8 +487,9 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
       <Field label="First Day" {...f.field("starts_on")}>
         <DateField {...f.field("starts_on")} min={onBehalf ? undefined : todayIso()} />
       </Field>
-      <Field label="Last Day" {...f.field("ends_on")}>
+      <Field label="Last Day" {...f.field("ends_on")} {...(over && span ? { state: "bad" as const, message: `${span}, ${Math.max(left ?? 0, 0)} left` } : {})}>
         <DateField {...f.field("ends_on")} min={f.values.starts_on || undefined} />
+        {span && !over && <Sub as="p" className="mt-1">{left === null || days === null ? span : `${span}, ${left - days} left after`}</Sub>}
       </Field>
       {!onBehalf && (
         <>

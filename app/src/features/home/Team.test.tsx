@@ -174,6 +174,11 @@ describe("Home · Team, by scope", () => {
     expect(namesIn(rosterTable(), page.data.map((r) => r.employee.display_name))).toHaveLength(24);
     expect(headers(rosterTable())).toEqual(["Employee", "Department", "Status", "Clock-In", "KPI", "Open Tasks"]);
     expect(headers(monthTable())).toEqual(["Employee", "On Time", "Late", "Absent", "On Leave"]);
+    // Each count says whom it counts, so the roster, the month and Present Today never read as one headcount.
+    const help = [...document.querySelectorAll('[data-ui="help"]')].map((n) => n.textContent);
+    expect(help).toContain("Everyone on the register this month, leavers included.");
+    expect(help).toContain("Active staff you can see, and anyone with a record today. Someone with no login reads Day Off.");
+    expect(help.some((t) => t?.startsWith("People on this roster in today, of those expected in."))).toBe(true);
     expect(copyProblems()).toEqual([]);
   }, 30000);
 
@@ -204,7 +209,7 @@ describe("Home · Team, by scope", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Present Today/ }));
     await settled();
     const sheet = screen.getByRole("dialog", { name: "Present Today" });
-    expect(within(sheet).getByText(`${present.value} of ${present.denominator} in today`)).toBeTruthy();
+    expect(within(sheet).getByText(`${present.value} in today, of ${present.denominator} expected`)).toBeTruthy();
     fireEvent.keyDown(sheet, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 

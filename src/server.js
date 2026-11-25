@@ -12,8 +12,10 @@
  *   3. Redis             reachable; then rate limits move from memory to Redis
  *   4. app               every module mounted (a module that fails is skipped and
  *                        reported by /api/health/ready, which the deploy gates on)
- *   5. realtime          Socket.io on the same server, staff host only (realtime/socket.js)
- *   6. listen
+ *   5. search warmed     the User Guide's chapters indexed, a connection opened, pg_trgm looked
+ *                        up (shared/search/warm.js); never stops the boot, waits 10 s at most
+ *   6. realtime          Socket.io on the same server, staff host only (realtime/socket.js)
+ *   7. listen
  *
  * Shutdown on SIGTERM/SIGINT: close the sockets and stop accepting, let in-flight
  * requests finish (up to 10 seconds), flush error reports, close Redis and the pool, exit.
@@ -26,7 +28,7 @@
 const http = require("node:http");
 const { config } = require("./config/env");
 const { logger } = require("./config/logger");
-const { checkDatabase, closeDb } = require("./config/db");
+const { pool, checkDatabase, closeDb } = require("./config/db");
 const { initRedis, closeRedis } = require("./config/redis");
 const { initRateLimitStore } = require("./middleware/rate-limit");
 const { report, flush } = require("./shared/observability/error-reporter");
@@ -78,6 +80,8 @@ async function start() {
     },
     "AI manifests and search providers loaded",
   );
+  // The first search finds its work done: logged, bounded, and never a reason to stay down.
+  await require("./shared/search/warm").warm({ db: pool });
 
   const server = http.createServer(app);
   // Longer than the proxy's keep-alive, so the proxy never reuses a socket Node just closed.

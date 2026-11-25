@@ -60,6 +60,8 @@ const CASES = Object.freeze([
   // "Absent" in the person's sense: everyone expected who has not clocked in, named (praxis-ai.md §6.2).
   { id: "attendance.absent", as: "operations_people", question: "Who was absent today? Report it with their names.", reads: ["attendance.register"], table: "names" },
   { id: "leave.waiting", as: "operations_people", question: "Which leave requests are waiting for a decision?", reads: ["leave.requests", "approvals.mine"] },
+  // A how-to question starts from the User Guide alone, the catalogue held back (praxis-ai.md §6.1 step 3; QA BG-051).
+  { id: "guide.how-to", as: "employee", question: "How do I request leave?", reads: ["guide.search"], shows: ["cards", "pane"] },
   { id: "leave.balance", as: "employee", question: "How many annual leave days do I have left?", reads: ["my_leave.balances"] },
   { id: "tasks.overdue", as: "employee", question: "Which of my tasks are overdue?", reads: ["tasks.list"] },
   { id: "people.confirmation", as: "operations_people", question: "Who is due for confirmation this month?", reads: ["employees.list"] },

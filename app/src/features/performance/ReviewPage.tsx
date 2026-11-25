@@ -310,7 +310,7 @@ function MonthCard({ r }: { r: ReviewDetail }) {
           columns={[
             { key: "task", label: "Task", render: (t) => `${t.number} · ${t.title}` },
             { key: "bucket", label: "When", render: (t) => BUCKET[t.bucket] },
-            { key: "due", label: "Due", render: (t) => (t.due_at ? formatDate(t.due_at.slice(0, 10)) : "–"), desktop: true },
+            { key: "due", label: "Due", render: (t) => (t.due_at ? formatDate(t.due_at) : "–"), desktop: true },
           ]}
         />
       )}

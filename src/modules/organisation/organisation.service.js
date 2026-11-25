@@ -977,13 +977,29 @@ async function createSeat(client, input, actor) {
  * Edit Role, and the line or department a head change or a merge gives a seat. An open head role's
  * line decides who acts as head, so the heads' roles are worked out again (syncHeadRoles).
  */
-async function updateSeat(client, seatId, patch, actor) {
-  const seat = await changeSeat(client, seatId, patch, actor);
+async function updateSeat(client, seatId, patch, actor, opts = {}) {
+  const seat = await changeSeat(client, seatId, patch, actor, opts);
   await syncHeadRoles(client, actor);
   return seat;
 }
 
-async function changeSeat(client, seatId, patch, actor) {
+/**
+ * Close Role (organogram.md §6): an open role closes only while nobody answers to it, so no line is
+ * left pointing at a role that is gone, and while it heads no department in use. A staff import
+ * that is reverted closes the seats it made with their reports (`withReports`), since it undoes
+ * those lines itself.
+ */
+async function assertNothingUnder(client, seatId) {
+  const { people, seats: roles } = await repo.reportsOfSeat(client, seatId);
+  if (people.length || roles.length) {
+    const one = people.length + roles.length === 1;
+    throw new AppError("SEAT_HAS_REPORTS", `${stillHere({ people: people.length, open_roles: roles.length })} ${one ? "reports" : "report"} here.`, 409);
+  }
+  if (await repo.departmentHeadedBySeat(client, seatId))
+    throw new AppError("SEAT_HEADS_DEPARTMENT", "Heads a department. Set another head first.", 409);
+}
+
+async function changeSeat(client, seatId, patch, actor, opts = {}) {
   const before = await repo.findSeatById(client, seatId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
   if (patch.line_manager_seat_id && patch.line_manager_seat_id === seatId)
@@ -992,6 +1008,7 @@ async function changeSeat(client, seatId, patch, actor) {
     });
   if (before.status === "filled" && patch.status)
     throw new AppError("SEAT_FILLED", "This seat is filled; archive the person instead.", 422);
+  if (patch.status === "closed" && before.status !== "closed" && !opts.withReports) await assertNothingUnder(client, seatId);
   /* A seat reports to a person or to another seat, never both: naming one clears the
      other, exactly as setting an employee's line does. */
   const change = { ...patch };
@@ -1079,6 +1096,23 @@ async function findOrCreateSeat(client, { title, department_id: departmentId }, 
  * ------------------------------------------------------------------ */
 
 const list = (client, query, scope) => repo.list(client, query, scope);
+
+/**
+ * Where someone stands, in the words People's screens show on the status pill
+ * (docs/guides/foundation.md §10.1; app/src/features/people/status.ts says the same): the stored
+ * status, with On Probation drawn from the two probation dates rather than stored twice. Praxis AI
+ * reads it beside the stored status, so it never calls someone on probation Active.
+ * @param {{status: string, confirmation_due_on?: string|null, confirmed_on?: string|null}} e
+ * @returns {"Active"|"On Probation"|"Suspended"|"Left"|"Archived"}
+ */
+function employmentStatusOf(e) {
+  if (e.status === "archived") return "Archived";
+  if (e.status === "suspended") return "Suspended";
+  if (e.status === "left") return "Left";
+  if (e.confirmation_due_on && !e.confirmed_on) return "On Probation";
+  return "Active";
+}
+
 async function departments(client, query) {
   const page = await repo.departments(client, query);
   const used = await repo.usedDepartmentIds(client, page.data.map((d) => d.department_id));
@@ -1693,6 +1727,7 @@ module.exports = {
   setReportingLine,
   advanceStaffNumbers,
   list,
+  employmentStatusOf,
   counts,
   summary,
   historyOf,

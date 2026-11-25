@@ -11,7 +11,7 @@ import { chooseOption, installMatchMedia, optionLabels } from "@mycity/ui/testin
  * (fault #1, 21/10/2026: LEAVE_SPANS_YEARS came back from the server). The clock is 21/10/2026.
  */
 
-const m = vi.hoisted(() => ({ run: vi.fn(async (): Promise<unknown> => ({})), years: [] as Array<number | undefined>, pickerFilters: [] as unknown[], needed: false }));
+const m = vi.hoisted(() => ({ run: vi.fn(async (): Promise<unknown> => ({})), years: [] as Array<number | undefined>, pickerFilters: [] as unknown[], needed: false, days: 2 as number | null }));
 vi.mock("@/api/hooks", () => {
   const annual = "11111111-1111-4111-8111-111111111111";
   const unpaid = "22222222-2222-4222-8222-222222222222";
@@ -29,7 +29,7 @@ vi.mock("@/api/hooks", () => {
     useApi: (key: string, opts: { query?: { year?: number }; enabled?: boolean } = {}) => {
       if (opts.enabled === false) return { data: undefined, error: null, loading: false, reload: () => undefined };
       // Whether the type and the days ask for a relief officer and a handover note (ess.md §6).
-      if (key === "GET /api/v1/ess/leave/check") return { data: { days: 2, handover_needed: m.needed }, error: null, loading: false, reload: () => undefined };
+      if (key === "GET /api/v1/ess/leave/check") return { data: { days: m.days, handover_needed: m.needed }, error: null, loading: false, reload: () => undefined };
       m.years.push(opts.query?.year);
       const balances = [
         { leave_type_id: annual, code: "annual", name: "Annual", entitled: 20, taken: 3, booked: 0, pending: 5, remaining: 12 },
@@ -84,6 +84,7 @@ afterEach(() => {
   m.years.length = 0;
   m.pickerFilters.length = 0;
   m.needed = false;
+  m.days = 2;
 });
 
 describe("Request Leave", () => {
@@ -149,6 +150,37 @@ describe("Request Leave", () => {
     expect(screen.queryByText("Check this value")).toBeNull();
     expect((screen.getByLabelText("First Day") as HTMLInputElement).value).toBe("02/11/2026");
     expect((screen.getByLabelText("Last Day") as HTMLInputElement).value).toBe("15/12/2026");
+  });
+
+  // QA BG-061: the working days and the balance showed only after Send.
+  it("says under Last Day how many working days the span holds and what would be left, before Send", async () => {
+    const user = userEvent.setup();
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
+    await chooseOption(screen.getByRole("combobox", { name: "Leave Type" }), "Annual · 12 days left");
+    await user.type(screen.getByLabelText("First Day"), "02/11/2026");
+    await user.type(screen.getByLabelText("Last Day"), "03/11/2026");
+    expect(await screen.findByText("2 working days, 10 left after")).toBeTruthy();
+  });
+
+  it("names only the working days for a type with no allowance", async () => {
+    const user = userEvent.setup();
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
+    await chooseOption(screen.getByRole("combobox", { name: "Leave Type" }), "Unpaid");
+    await user.type(screen.getByLabelText("First Day"), "02/11/2026");
+    await user.type(screen.getByLabelText("Last Day"), "03/11/2026");
+    expect(await screen.findByText("2 working days")).toBeTruthy();
+  });
+
+  it("marks Last Day past the allowance before Send, as Send's refusal would, and sends nothing", async () => {
+    const user = userEvent.setup();
+    m.days = 15;
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
+    await chooseOption(screen.getByRole("combobox", { name: "Leave Type" }), "Annual · 12 days left");
+    await user.type(screen.getByLabelText("First Day"), "02/11/2026");
+    await user.type(screen.getByLabelText("Last Day"), "20/11/2026");
+    expect(await screen.findByText("15 working days, 12 left")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Send Request" }));
+    expect(m.run).not.toHaveBeenCalled();
   });
 
   // OBS-05: the message named the line manager whoever the request went to.

@@ -767,6 +767,35 @@ describeDb("the organisation module against the real migrations", () => {
         expect((await asOps()(request(app).patch(`/api/v1/org-seats/${id}`)).send({ status: "closed" })).status).toBe(200);
     });
 
+    // QA BG-041: Close Role on an open role's Edit Open Role, refused while anyone answers to it.
+    test("an open role closes only once nobody reports to it and it heads no department", async () => {
+      const close = (id) => asOps()(request(app).patch(`/api/v1/org-seats/${id}`)).send({ status: "closed" });
+      // Head of Trading carries a person (the test above).
+      const withPerson = await close(seatId);
+      expect(withPerson.status).toBe(409);
+      expect(withPerson.body.error).toMatchObject({ code: "SEAT_HAS_REPORTS", message: "1 person reports here." });
+      expect((await one("SELECT status FROM org_seat WHERE org_seat_id = $1", [seatId])).status).toBe("vacant");
+
+      const top = await asOps()(request(app).post("/api/v1/org-seats")).send({ title: "Head of Reconciliation", department_id: people.delivery.department_id });
+      const under = await asOps()(request(app).post("/api/v1/org-seats")).send({
+        title: "Reconciliation Clerk",
+        department_id: people.delivery.department_id,
+        line_manager_seat_id: top.body.org_seat_id,
+      });
+      expect((await close(top.body.org_seat_id)).body.error).toMatchObject({ code: "SEAT_HAS_REPORTS", message: "1 open role reports here." });
+      expect((await close(under.body.org_seat_id)).status).toBe(200);
+
+      // An open head role waits for another head.
+      const dept = await asOps()(request(app).post("/api/v1/departments")).send({ name: "Reconciliation Desk", code: "RCN" });
+      await asOps()(request(app).patch(`/api/v1/org-seats/${top.body.org_seat_id}`)).send({ department_id: dept.body.department_id });
+      expect((await asOps()(request(app).patch(`/api/v1/departments/${dept.body.department_id}`)).send({ head_seat_id: top.body.org_seat_id })).status).toBe(200);
+      expect((await close(top.body.org_seat_id)).body.error).toMatchObject({ code: "SEAT_HEADS_DEPARTMENT" });
+      await asOps()(request(app).patch(`/api/v1/departments/${dept.body.department_id}`)).send({ head_seat_id: null });
+      const closed = await close(top.body.org_seat_id);
+      expect(closed.status).toBe(200);
+      expect(closed.body.status).toBe("closed");
+    });
+
     test("the whole tree is one read, seats included, and every member of staff may read it", async () => {
       const res = await asManager()(request(app).get("/api/v1/org-chart?view=viewer"));
       expect(res.status).toBe(200);

@@ -19,7 +19,7 @@ import { LoaderCircle } from "lucide-react";
 import { cn } from "../lib/cn";
 import { Icon, type IconName } from "../icons/Icon";
 import { Tooltip } from "../overlay/Tooltip";
-import { pressState, useElementRef, usePress } from "./press";
+import { pressState, useElementRef, usePress, useSubmitOwner } from "./press";
 
 export type ButtonVariant = "default" | "primary" | "ghost" | "danger" | "line" | "solid" | "glass";
 
@@ -72,11 +72,12 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "default", icon, iconRight, size = "md", block, busy: busyProp, asChild, className, children, type, onClick, ...rest },
+  { variant = "default", icon, iconRight, size = "md", block, busy: busyProp, asChild, className, children, type, form, onClick, ...rest },
   ref,
 ) {
   const [el, setEl] = useElementRef(ref);
   const { busy, waiting, press } = usePress(onClick, busyProp, el);
+  const owner = useSubmitOwner(asChild ? undefined : (type ?? "button"), form);
   const Comp = asChild ? Slot : "button";
   // The spinner takes the place of the leading icon, else the trailing one; a button with neither
   // spins over its label, which stays (unseen, still its name) so the button keeps its width.
@@ -88,6 +89,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <Comp
       ref={setEl}
       type={asChild ? undefined : (type ?? "button")}
+      form={owner}
       data-ui="button"
       data-variant={variant}
       data-press={pressState({ busy, waiting })}
@@ -131,16 +133,18 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
 
 /** A square icon-only button (top bar, panel headers). Its label is required: it is the accessible name. */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { icon, label, size = "md", dot, busy: busyProp, className, type = "button", onClick, ...rest },
+  { icon, label, size = "md", dot, busy: busyProp, className, type = "button", form, onClick, ...rest },
   ref,
 ) {
   const [el, setEl] = useElementRef(ref);
   const { busy, waiting, press } = usePress(onClick, busyProp, el);
+  const owner = useSubmitOwner(type, form);
   return (
     <Tooltip label={label}>
       <button
         ref={setEl}
         type={type}
+        form={owner}
         aria-label={label}
         data-ui="button"
         data-press={pressState({ busy, waiting })}
@@ -173,15 +177,17 @@ export interface BigButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElem
 
 /** The big yellow call to action, full width (Sign In, Clock In). */
 export const BigButton = forwardRef<HTMLButtonElement, BigButtonProps>(function BigButton(
-  { className, children, icon, busy: busyProp, type = "button", onClick, ...rest },
+  { className, children, icon, busy: busyProp, type = "button", form, onClick, ...rest },
   ref,
 ) {
   const [el, setEl] = useElementRef(ref);
   const { busy, waiting, press } = usePress(onClick, busyProp, el);
+  const owner = useSubmitOwner(type, form);
   return (
     <button
       ref={setEl}
       type={type}
+      form={owner}
       data-ui="button"
       data-press={pressState({ busy, waiting })}
       aria-busy={busy || undefined}

@@ -387,6 +387,63 @@ describe("the turn loop (engine/turn.js)", () => {
     await expect(engine.turn.runTurn({ talk, messages: [], tools: [], output: {}, runTool: async () => ({ kind: "ok" }), parse, rescue: async () => null, limits: { ...limits, deadlineMs: 10 }, now: () => (t += 100) })).rejects.toMatchObject({ code: "AI_UNAVAILABLE" });
     expect(talk.sent).toEqual([]);
   });
+
+  describe("a narrower start (praxis-ai.md §6.1 step 3; QA BG-051)", () => {
+    const guide = { type: "function", function: { name: "guide__search", description: "g", parameters: {} } };
+    const all = [guide, ...tools];
+    const full = { role: "system", content: "everything" };
+    const start = { tools: [guide], system: { role: "system", content: "the guide first" }, more: "ask for more", given: "all offered" };
+    const names = (sent) => sent.tools.map((t) => t.function.name);
+
+    test("the first rounds offer the start's tools and more_reads with the start's first message; an answer from them never widens", async () => {
+      const talk = talkOf([{ calls: [call("guide__search", { q: "request leave" })] }, draft({ text: "Open My Leave." })]);
+      const runTool = async () => ({ kind: "ok", content: "{}" });
+      const out = await engine.turn.runTurn({ talk, messages: [full, { role: "user", content: "How do I request leave?" }], tools: all, start, output: {}, runTool, parse, rescue: async () => null, limits });
+      expect(out).toEqual({ draft: { text: "Open My Leave." }, attempts: 1 });
+      for (const sent of talk.sent) {
+        expect(names(sent)).toEqual(["guide__search", engine.turn.MORE]);
+        expect(sent.messages[0]).toBe(start.system);
+      }
+      expect(talk.sent[0].tools[1].function).toMatchObject({ name: "more_reads", description: "ask for more", parameters: { type: "object" } });
+    });
+
+    test("more_reads offers every tool from the next round and puts the first message back; it is not a read, and a second call is already_offered", async () => {
+      const talk = talkOf([{ calls: [call(engine.turn.MORE, { needs: "figures" }, "m1")] }, { calls: [call(engine.turn.MORE, {}, "m2"), call("things__list", {}, "t1")] }, draft({ text: "Two." })]);
+      const ran = [];
+      const runTool = async (key) => {
+        ran.push(key);
+        return { kind: "ok", content: "{}" };
+      };
+      const out = await engine.turn.runTurn({ talk, messages: [full, { role: "user", content: "How do I see pending leave?" }], tools: all, start, output: {}, runTool, parse, rescue: async () => null, limits });
+      expect(ran).toEqual(["things.list"]);
+      expect(out.attempts).toBe(1);
+      expect(JSON.parse(talk.sent[1].messages.at(-1).content)).toEqual({ key: "more_reads", ok: true, message: "all offered" });
+      expect(names(talk.sent[1])).toEqual(["guide__search", "things__list", "more_reads"]);
+      expect(talk.sent[1].messages[0]).toBe(full);
+      const results = talk.sent[2].messages.filter((m) => m.role === "tool").slice(1).map((m) => JSON.parse(m.content).error || "ok");
+      expect(results).toEqual(["already_offered", "ok"]);
+    });
+
+    test("a tool held back, called anyway, widens the offer and runs with the adapter's rights", async () => {
+      const talk = talkOf([{ calls: [call("things__list", {}, "t1")] }, draft({ text: "One." })]);
+      const ran = [];
+      const runTool = async (key) => {
+        ran.push(key);
+        return { kind: "ok", content: "{}" };
+      };
+      await engine.turn.runTurn({ talk, messages: [full], tools: all, start, output: {}, runTool, parse, rescue: async () => null, limits });
+      expect(ran).toEqual(["things.list"]);
+      expect(names(talk.sent[1])).toEqual(["guide__search", "things__list", "more_reads"]);
+      expect(talk.sent[1].messages[0]).toBe(full);
+    });
+
+    test("without a start more_reads is never offered, and a call to it is not_available", async () => {
+      const talk = talkOf([{ calls: [call(engine.turn.MORE, {}, "m1")] }, draft({ text: "ok" })]);
+      await engine.turn.runTurn({ talk, messages: [full], tools: all, output: {}, runTool: async () => ({ kind: "ok", content: "{}" }), parse, rescue: async () => null, limits });
+      expect(talk.sent[0].tools).toBe(all);
+      expect(JSON.parse(talk.sent[1].messages.at(-1).content)).toEqual({ key: "more_reads", error: "not_available" });
+    });
+  });
 });
 
 describe("cards (engine/cards.js)", () => {

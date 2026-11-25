@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { Chips } from "@mycity/ui";
 import { installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { api } from "@/api/client";
 import { mockSession } from "@/api/mock/core";
 import { RouterProvider } from "@/lib/router";
 import { RecordMarks, useOpenWhereNews, useViewNews, withNews } from "./marks";
@@ -39,10 +40,12 @@ function Screen({ count, start }: { count: number; start: Status }) {
 const pressed = (name: string) => screen.getByRole("button", { name }).getAttribute("aria-pressed");
 
 describe("where it waits inside a tab", () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     mockSession.set("cynthia");
     installMatchMedia();
     setViewport(1440);
+    // Load the mock once, so the first test does not spend its wait on the import.
+    await api.call("GET /api/v1/notifications/badges");
   });
   afterEach(cleanup);
 

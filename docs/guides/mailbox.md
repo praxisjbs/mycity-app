@@ -604,6 +604,7 @@ interface copy; the copy rules apply to the chrome around them.
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · QA BG-046 sweep: the toast after scheduling a mail ("Scheduled for 26/11/2026 08:00") is drawn with the shared `formatDateTime`, in Lagos time, rather than cut from the timestamp's text (`Composer.tsx`). It reads the same; nothing else changed.
 - 24/11/2026 · JP · From the 23/11 staging faults brief (fault #1, `MAIL_AUTH_FAILED: password` at `POST /mailbox/connection`): a password the mail server refuses is answered on the field as before and no longer recorded on System Health, in Connect Mailbox and wherever the mail errors are read (§11). `mailbox.test.js`.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Write With AI (with Tidy Email and Dictate) in the composer and Summarise Thread; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 08/11/2026 · JP · M7 PR 8 (`docs/guides/partnerships.md` §6.15): Link to Partner. `mailbox/binding/`

@@ -687,6 +687,7 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · QA BG-046 sweep: Edit Task opens with the Due date as the Lagos day of `due_at`, not the timestamp's UTC day (`TaskForms.tsx`). No rule changed.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Tidy With AI on Support Needed; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 14/11/2026 · JP · §9: `projects.summary` and `calendar.summary`, Projects and the person's month in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8); Calendar's month and its summary read one list of items (`calendar.repo` `ITEMS`). Nothing on screen changes.
 - 11/11/2026 · TB · M10 PR 3 (`knowledge.md` §6.7): a task may name a `training_enrolment` (migration `10420`, `TaskEntityType`); the training module sets "Complete <course>" for each assigned person through `create`, and the new `completeForRecord` moves a record's open tasks to Done when its course completes, as `cancelForRecord` cancels them. Nothing on My Workspace's screens changes: such a task opens My Training.

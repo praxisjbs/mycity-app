@@ -64,7 +64,9 @@ const EssProfile = z
     job_title: z.string(),
     department: z.string().nullable(),
     status: EmployeeStatus,
-    confirmed: z.boolean(),
+    /** Probation, as People's register reads it: On Probation while due and not yet confirmed (foundation.md §10.1). */
+    confirmation_due_on: isoDate.nullable(),
+    confirmed_on: isoDate.nullable(),
     employment_type: EmploymentType,
     work_pattern: WorkPattern,
     start_date: isoDate.nullable(),
@@ -256,7 +258,6 @@ const TABLES = {
       home_address_place: "the home address as a place, from place (owner employee.home_address)",
       display_name: "first and last name together",
       department: "department.name",
-      confirmed: "employee.confirmed_on is set",
       line_manager: "the line manager or vacant seat, from employee and org_seat",
       account_last4: "the last four digits of employee.account_number",
       photo_url: "the shown size of employee.photo_document_id (organisation.photo.js)",

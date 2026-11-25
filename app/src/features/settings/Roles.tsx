@@ -43,6 +43,7 @@ import {
   Button,
   CardHeader,
   CheckboxField,
+  Chips,
   ChoiceField,
   cn,
   CountBadge,
@@ -431,7 +432,7 @@ function RoleView({ cat, d, base, fresh, editing, tab, setTab, onBack, onEdit, o
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {tab === "access" && <AccessPanel cat={cat} d={d} editing={editing} fallback={fallback} onGrant={setGrant} sheet={sheet} onSheet={setSheet} />}
         {tab === "details" && <DetailsPanel cat={cat} d={d} editing={editing} nameError={nameError} onName={(name) => (setNameError(null), onDraft?.({ ...d, name }))} onDraft={(next) => onDraft?.(next)} />}
-        {tab === "people" && (d.code && !fresh ? <PeoplePanel code={d.code} /> : <p className="py-6 text-center text-xs text-subtle-foreground">Nobody holds it yet.</p>)}
+        {tab === "people" && (d.code && !fresh ? <PeoplePanel code={d.code} active={d.users} /> : <p className="py-6 text-center text-xs text-subtle-foreground">Nobody holds it yet.</p>)}
       </div>
 
       {editing ? (
@@ -767,25 +768,41 @@ const USER_STATUS: Record<UserRow["status"], { tone: "ok" | "warn" | "err" | "ne
   left: { tone: "neutral", text: "Left" },
 };
 
-/** Who holds the role, 25 a page; a person opens their login on Settings · Users, where roles are given. */
-function PeoplePanel({ code }: { code: string }) {
+/** The People tab's status chips, Active first: the role's count counts active logins only. */
+const HOLDER_STATUS: ReadonlyArray<UserRow["status"]> = ["active", "invited", "suspended", "left"];
+
+/**
+ * Who holds the role, 25 a page; a person opens their login on Settings · Users, where roles are
+ * given. It opens on the active logins, the people the tab's count and "Reaches N people" count
+ * (docs/guides/foundation.md §10); an invited, suspended or closed login sits behind its status chip.
+ */
+function PeoplePanel({ code, active }: { code: string; active: number }) {
   const { navigate } = useRouter();
-  const list = usePaged("GET /api/v1/users", { filters: { role: code } });
+  const [status, setStatus] = useState<UserRow["status"]>("active");
+  const list = usePaged("GET /api/v1/users", { filters: { role: code, status } });
   const photo = usePhotos(list.rows.map((u) => u.photo_url));
   return (
-    <DataView
-      bare
-      list={list}
-      rowKey={(u) => u.user_id}
-      noun="person"
-      nounPlural="people"
-      onRowClick={(u: UserRow) => navigate(hrefFor("settings", "users", { id: u.user_id }))}
-      empty={{ title: "Nobody Holds It", text: "Roles are given on Users." }}
-      columns={[
-        { key: "u", label: "Person", render: (u) => <Who name={u.display_name} sub={u.email} src={photo(u.photo_url)} /> },
-        { key: "s", label: "Status", render: (u) => <Pill tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].text}</Pill> },
-      ]}
-    />
+    <>
+      <Chips
+        label="Status"
+        value={status}
+        onChange={setStatus}
+        options={HOLDER_STATUS.map((s) => ({ value: s, label: USER_STATUS[s].text, count: s === "active" ? active : undefined }))}
+      />
+      <DataView
+        bare
+        list={list}
+        rowKey={(u) => u.user_id}
+        noun="person"
+        nounPlural="people"
+        onRowClick={(u: UserRow) => navigate(hrefFor("settings", "users", { id: u.user_id }))}
+        empty={status === "active" ? { title: "Nobody Holds It", text: "Roles are given on Users." } : { title: "Nobody Here", text: "Try another status." }}
+        columns={[
+          { key: "u", label: "Person", render: (u) => <Who name={u.display_name} sub={u.email} src={photo(u.photo_url)} /> },
+          { key: "s", label: "Status", render: (u) => <Pill tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].text}</Pill> },
+        ]}
+      />
+    </>
   );
 }
 

@@ -116,6 +116,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 25/11/2026 · JP · Forms, shell counts, unread marks and search, QA audit Low items BG-021, BG-030, BG-048, BG-049: on a phone every form in a sheet pins its buttons in the sheet's footer (still one press group, F26); every count on the rail, bottom bar, More tiles and tabs says *21 unread notices* (a tooltip on desktop, the accessible name on both shells); unread row marks are asked once per screen, 25 ids a request; ⌘K search is warmed at boot within 10 seconds, logged, never stopping a boot. Tests: `Form.test.tsx`, `CountBadge.test.tsx`, `Rail.test.tsx`, `Tabs.test.tsx`, `marks.test.tsx`, `search-warm.test.js`, `server-boot.test.js`. No tick changed. Left: the `/search` p95 from staging's request log after a deploy.
 - 24/11/2026 · JP · Forms (packages/ui), QA audit BG-013 (F55b): every form in a modal, side panel or phone sheet, wizards included, asks before Esc, the scrim, the close button or a drag discards its entries. `useContractForm` reports its own changes to the overlay and a successful save clears them (`useContractForm.test.tsx`). No tick changed. Left: a form outside the modal it renders cannot reach the question (none in the app today).
 - 24/11/2026 · JP · Sign-in and sessions, from the 23/11 System Health brief (fault #14, `WEAK_PASSWORD` on `POST /auth/reset`, back after it was marked fixed): the earlier fix stopped recording only a password found in a breach, while the reset and invitation page still checked the contract's shape alone, so *Contains your email name* and a minimum raised on Settings · Security reached the API as refusals. Both rules now live once in the contract (`identity.passwordProblem`), which `identity.password-policy.js` applies and the page marks as the password is typed; `POST /auth/link` carries `password_min_length`. My Security's Change Password marks the email rule too. Tests: `Login.test.tsx`, `tests/integration/identity.test.js`. No tick changed. Left: My Security does not know a raised minimum before the press (the API still marks it).
 - 14/11/2026 · JP · Milestones 0 and 1 training videos, parts 1, 2, 3 and 5 of 5 made (`docs/runbooks/training-videos.md` §8; `scripts/video/scenes/m01-*.js`): Signing In, Safer Sign-In, Finding Your Way and Community and Mail, MyCity's real staff by name. Found filming and fixed on the sign-in screen (`app/src/auth/Login.tsx`): a refused password emptied the Password field and also marked it **Enter your password** under the real reason; an empty **Confirm Password** on Set Your Password and New Password read **Does not match** where the User Guide promises **Enter it again**. Test: `Login.test.tsx`. The Getting Started chapter now says the password rules show once you move on, as the screen does. No tick changed. Left: part 4 (Home and Attendance), to film on a working morning; all five to upload to Drive.
@@ -686,13 +687,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
-| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Overview (#1), Alerts (#2) and Team (#86), QA audit Low items BG-022, BG-023, BG-024, BG-025: every card and Team list says whom it counts (help terms), Clocked In Today and the date line name what they are out of (*22 clocked in, of 25 expected today*), Overdue Tasks reads *Overdue tasks of everyone you can see.*, the fixed Saturday caption is gone, and an approval alert names the waiting record by its reference. Tests: `Overview.test.tsx`, `Team.test.tsx`, `dashboard.test.js`, `home-alerts.test.js`. No tick changed. Left: a leave request has no reference, so two for one person read alike.
 - 16/11/2026 · JP · Overview (#1), the Staff day strip: Shift Today read the person's schedule in force, so a schedule People changed after the clock-in showed the new hours while the clock and the register kept the hours the day was judged against (attendance.md §6.4, a day is judged once). It now reads today as the clock does (`dashboard.layout.js` `dayStrip`, `reconcile.judgedOn`; `docs/guides/home.md` §3, §6). Found filming the Milestones 0 and 1 videos, part 4 (`docs/runbooks/training-videos.md` §7). Test: `home-overview.test.js`. No tick changed. Left: nothing.
 - 14/11/2026 · JP · Overview (#1) on staging read "22 of 17 clocked in": the attendance seed punched every active employee, the payroll seed's invented ones too, whom the register never expects (no login), so present outran expected (`docs/guides/home.md` §11). The seed now punches only people with a login (`seeds/staging/lib/attendance.js`); `home-staging-seed.test.js` suspends one login and finds them never punched, and holds present to expected. Found filming the Milestones 0 and 1 videos (`docs/runbooks/training-videos.md` §7). No tick changed. Left: nothing.
 - 14/11/2026 · JP · Overview (#1), Alerts (#2) and Reports (#3) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 8, §6.13 Workspace, Knowledge Hub, Community, Home and Settings; `docs/guides/home.md` §9): `activity.summary` (Activity Today in figures for a day or a period, by kind, module, person or day, by hour, within the reader's scope on each module; it carries a matrix probe), `alerts.summary` (the alerts the reader may clear, by category stacked by severity, by rule or age, raised by day; none without `alerts.clear`) and `runs.summary` (the report files received, by status, report stacked, format, month; none without `home.reports`), each one SQL; `activity.list`, `alerts.mine` and `runs.mine` name them. No ticks change; nothing on screen changes. Left: nothing.
@@ -846,23 +848,24 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 24/11/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☑ | ☑ | ☑ | Built | 13/11/2026 |
-| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/11/2026 |
+| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 56 | My Requests | `my-requests` | M8 | AJ | ☑ | ☑ | ☑ | Built | 24/11/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 24/11/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 | 110 | My Training | `my-training` | M10 | TB | ☑ | ☑ | ☑ | Built | 13/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · My Profile (#8), My Attendance (#9), My Leave (#12) and Policy Updates (#89), QA audit Low items BG-015, BG-050, BG-058, BG-059, BG-060, BG-061: My Profile's status pill uses People's probation rule; Record History words every event, reminders included, never a raw key, in Lagos time; a System Clock-Out day's Hours carries help; a cancelled request's Approver is empty; Request Leave shows the working days and what would be left before Send; the overdue policy sheet shows once per sign-in. Tests: `Profile.test.tsx`, `Leave.test.tsx`, `EssAttendance.test.tsx`, `AcknowledgeSheet.test.tsx`, `ess-profile.test.js`, `organisation.test.js`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · My Performance (#10), QA audit BG-012 (F77b): the Rating tile shows how much of the scorecard the score rests on (*32.5 of 100 scored*) as its caption, its meaning behind Rating's help. No tick changed. Left: retake the pictures with the Performance chapter's.
 - 24/11/2026 · JP · My Requests (#56), QA audit BG-007 (F56b): New Request shows **Budget Left**, **Department Left** and the Over Budget pill once a category is picked, from the new read `GET /expenses/mine/budget-check` (the same count as sending). A warning, never a block. Tests: `budgets.test.js`, `Expenses.test.tsx`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · My Requests (#56), from the 23/11 System Health brief (fault #5, `PAYEE_INCOMPLETE` on `POST /expenses/mine/:id/submit`), with JBS Praxis's answer: Send Request marks a blank payee's **Payee Name**, **Bank**, **Account Name** and **Account Number** before anything is saved, and a draft's own Send Request opens Edit Request with them marked; one rule in the contract (`expenses.payeeProblems`) for the form, the request's window and the service. My Security (#90): Change Password marks *Contains your email name* as it is typed (fault #14). Tests: `Expenses.test.tsx`, `expenses.test.js`. No tick changed. Left: nothing.
@@ -1051,16 +1054,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 24/11/2026 |
-| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 24/11/2026 |
-| 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/11/2026 |
+| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 25/11/2026 |
+| 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 24/11/2026 |
+| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 103 | Departments | `departments` | M2 | TB | ☑ | ☑ | ☑ | Built | 27/10/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Employees (#24), Attendance (#25), Leave (#26) and Organogram (#92), QA audit Low items BG-041, BG-042, BG-046, BG-047: History reads in Lagos time with the time (and every other date shown from a timestamp); Edit Open Role has Close Role, refused while anyone reports to the role or it heads a department; the build account's department is coded IMP and retired at handover; Praxis AI's `employees.list` gives each row the status People see (On Probation). Tests: `Employee360.test.tsx`, `OrgTree.test.tsx`, `organisation.test.js`, `identity.test.js`, `assistant.test.js`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · Attendance (#25), QA audit BG-006 (F66a): an unregistered device opens one exception per person, device and work date; later punches from it that day attach to it and are decided with it (`migrations/1465`, `attendance_exception_punch`). Employees (#24): the staff seed names Obianuju Nwoye (00038) as Operations & People Lead in place of Cynthia Osakunih, who has left (BG-004); the loader leaves staging's on-screen record and the leaver's archived record alone. Organogram (#92): a request whose line manager has left goes to the next active manager above, or the CEO (BG-005, `migrations/1161`). Tests: `attendance.test.js`, `organisation.test.js`, `staff-nomenclature.test.js`, `workflow.test.js`. No tick changed. Left: requests already waiting on someone who leaves are reassigned by hand.
 - 24/11/2026 · JP · Employees (#24) and Organogram (#92), from the 23/11 System Health brief (faults #3 and #4), with JBS Praxis's answer (no screen change): `REPORTS_TO_SELF` and `REPORTING_LOOP` are answered on the field as before and never recorded on System Health, on Change Manager, a drag on the chart, an employee's own record and a seat. Test: `tests/integration/organisation.test.js`. No screen changed. Left: nothing.
 - 17/11/2026 · JP · Leave (#26), relief officer and handover note (`docs/guides/ess.md` §6, §8, §10): a request's record shows its Relief Officer and Handover Note with Open Note, so its approvers read both where they decide; the leave flow on Settings · Approvals is unchanged. The note opens for the person, the relief officer, whoever may read the request's approval and People within their scope (`vault.defineAccess("leave_request")`), anyone else a 404. Leave Types gains Handover (Every Request, Over N Days, Never) and Handover Needed with Longer Than (Days) on each type's form; Add Type and Save Type cards carry it. ⌘K finds a request by its relief officer's name. Record Leave takes neither field. Status and ticks unchanged. Left: nothing.
@@ -1156,7 +1160,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 02/11/2026 |
-| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 24/11/2026 |
+| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 28/10/2026 |
 | 32 | Reviews | `reviews` | M2 | TB | ☑ | ☑ | ☑ | Built | 24/11/2026 |
 | 33 | Analytics | `analytics` | M2 | TB | ☑ | ☑ | ☑ | Built | 28/10/2026 |
@@ -1174,6 +1178,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 25/11/2026 · JP · Scorecards (#30), QA audit BG-022: the Scorecards tile's help says it counts every status of the quarter. No tick changed. Left: nothing.
 - 24/11/2026 · JP · Scorecards (#30) and Reviews (#32), QA audit BG-012 (F77b): every score to date carries its coverage (weight of the lines scored, of the weight of every line), written when a review closes (`migrations/2330`, which fills reviews already closed) and shown as *32.5 of 100 scored* beside Score and Rating on the review, the scorecard, My Performance and the review PDF. The rating rules are unchanged (P16). Test: `performance-review-coverage.test.js`. No tick changed. Left: nothing.
 - 13/11/2026 · JP · Scorecards (#30) and KPIs (#31) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 7, §6.13 People, performance and queries; `docs/guides/performance.md` §9): `kpis.summary` (by function stacked by latest result, met as a per cent by month), `scorecards.summary` (by status and rating, the average score to date by department or reviewer) and `commitments.summary` (by state, by department or person stacked, the on-time rate, by week), within the reader's reach and scope. No screen changed; nothing left.
 - 02/11/2026 · JP · Goals (#29) and Scorecards (#30), target changes tell the people they concern (JBS Praxis, 02/11/2026, from staging: "when the CEO changes a target, no notification is shown about a target change"; `docs/guides/performance.md` §6.7, §7, §14, guide first): the fan-out left out whoever acted, and a change the CEO asks for waits on the CEO alone, so the engine's Approval needed never reached them and the bell held only the 3 day reminder and the overdue notice. Now the engine tells the CEO of a request they opened themself (`include_actor` may be a function; true only for the CEO, the one person `approvers.canAct` lets decide their own); whoever asks is told **Target change sent** (not the CEO, who has the notice above); an approved change tells a line's employee **Your target changed** (`scorecard.line_target_changed` had no notice) and a key result's accountable and co-accountable people **Target change approved**; each names the key result or line, the new target and its month (`changeLabel`, which also reads *October 2026*, not `2026-10`, and 2, not 2.0000). A refusal tells only whoever asked. No migration, no contract change, no screen change. Tests: `workflow.test.js`, `performance-plan.test.js` (3 new, 1 extended; they fail on the old code), `events-workflow.test.js`. The Performance chapter (Change a target, Change a line's target, Decide a plan) and `notifications.md` §6, §11, `foundation.md` §7 follow. Left: every other approval the CEO opens and decides themself now tells them (a plan they send, a policy, their own leave), by decision; the engine's Approval needed for a stage nobody can be told of is GE's (guide §13)
@@ -1490,11 +1495,12 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 67 | Ask | `ask` | M10 | TB | ☑ | ☑ | ☑ | Built | 14/11/2026 |
+| 67 | Ask | `ask` | M10 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 68 | History | `history` | M10 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Ask (#67), QA audit BG-051: a how-to question starts from the User Guide alone (`guide.search` and the engine's `more_reads`), the full read catalogue offered only when the model asks for more; its first round is about a tenth of a data question's for the CEO's catalogue, measured without a model. The AI job is unchanged (Default). Tests: `ai-engine.test.js`, `ai-assistant.test.js`. No tick changed. Left: a token measurement on staging.
 - 17/11/2026 · JP · Ask and History leave the hub while AI is switched off on AI Control or the month's cap on all AI is reached (`Me.ai_available`): the menu, the top bar's button, the floating button's and ⌘K's screens, New Conversation and conversations; a link lands on the first screen the person may open (`docs/guides/ai-control.md` §6.7). Left: nothing.
 - 14/11/2026 · JP · Ask (#67), charts in the Overview PR 8 built (`docs/guides/praxis-ai.md` §6.13 Workspace, Knowledge Hub, Community, Home and Settings, §6.8, §6.19 items 3 and 9, Appendix B): ten summaries answer their twelve reads, so every read names its summary or why it needs none; `scripts/check/ai-summary-gaps.json` is deleted and gate 23 rule 9 runs with no list. Try Asking offers a chart question for each area by its summary, two of its six (rule 5 holds each chart to a summary that exists); the User Guide's See figures as a chart gives an example for each area. Ten evaluation cases; `tests/integration/ai-summaries-close.test.js`. Left of Appendix B: PR 3 (the Overview's foot and Download PDF) and the check on staging.
 - 14/11/2026 · JP · Ask (#67), charts in the Overview PR 3 built (`docs/guides/praxis-ai.md` §6.19 items 7 and 8, Appendix B): a charted answer keeps its words, its button, From and Open Figures in the chat, its table and paging on the pane's Table; under the chart, View Data opens Table (for an answer from a summary alone, the chart's figures with a Total for a stacked bar) and Download PDF saves the Overview as a PDF on the letterhead, drawn in the worker with the asker's rights at the build (`POST /ai/answers/:id/overview/export`, `ai_answer_overview`, `templates/documents/ai-overview.html`, `src/shared/documents/chart.js`); a summary's chart reads naira when its values are amounts; a release carries `tokens.css` for the chart's colours. Tests: `tests/integration/ai-overview-export.test.js` (5), `tests/unit/foundation/ai-overview-pdf.test.js` (12), `OverviewPane.test.tsx` (3 new), `Assistant.test.tsx` (3 new). User Guide: Read an answer and Read the pane, their pictures retaken. Left: PR 7 and PR 8 of Appendix B; on staging, the budget question's PDF.
@@ -1602,7 +1608,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 96 | Performance | `performance` | M9 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 97 | Faults | `faults` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 70 | Users | `users` | M9 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 71 | Roles & Permissions | `roles-and-permissions` | M9 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 71 | Roles & Permissions | `roles-and-permissions` | M9 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 72 | Approvals | `approvals` | M9 | TB | ☑ | ☑ | ☑ | Built | 29/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | LA | ☑ | ☑ | ☑ | Dropped | 20/10/2026 |
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
@@ -1610,11 +1616,12 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 78 | Security | `security` | M9 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 79 | Audit Log | `audit-log` | M9 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 79 | Audit Log | `audit-log` | M9 | TB | ☑ | ☑ | ☑ | Built | 25/11/2026 |
 | 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 07/11/2026 |
 
 **Notes**
 
+- 25/11/2026 · JP · Roles & Permissions (#71) and Audit Log (#79), QA audit BG-062, BG-063: a role's People tab opens on active logins, closed ones behind its status chips, so the count and the list agree; the Audit Log names partners, leads, deals and proposals from their own rows. Tests: `Roles.test.tsx`, `audit-record-names.test.js`. No tick changed. Left: nothing.
 - 24/11/2026 · JP · Status (#95), from the staging Status brief of 24/11: Events degraded by events that failed for good reads **N failed** with where to look for that, not "0 waiting" and "the worker is behind or down"; the Status brief names each failed event (event, record type, tries, handlers done, scrubbed error, outbox id) and reads its last 24 hours from Settings · Performance's day (it had read *Could not be read* since 20/10: a call to the removed `performance()`). `docs/runbooks/system-health.md` §7.4 says how to retry one. Tests: `system_health.test.js`, `tests/integration/system-health.test.js`. No tick changed. Left: on staging, retry the two failed rows once their causes are fixed.
 - 14/11/2026 · TB · Found filming the Milestone 9 videos (`docs/runbooks/training-videos.md` §7): Users (#70) read Not Sent after Invite All Pending until a reload, since the links are minted by the worker; a login now reads Invited from the request, and a second press sends nobody a second link (`users.repo.js`, `logins.test.js`). Audit Log (#79) named a record by eight characters of its id and showed a role's grants as JSON; `AuditEntry.record_name` names the person, role, number or title, values read one line a key (`auditValues.ts`), and the export gains Record beside Record ID (`audit.test.js`, `settings.test.js`). Roles & Permissions (#71): a custom role viewing People over everyone found no Employees tab, which only Settings holders saw; `/auth/me` gains `scopes` and the tab follows `people` view over `all` (`access.test.ts`, `screens.test.js`, `identity.test.js`). Faults (#97): a database outage was never recorded, the reporter dropping what the database refused; it now holds and retries (`observability.test.js`). Left: a Redis outage makes requests wait rather than fail (for GE).
 - 14/11/2026 · JP · Imports (#93) in Praxis AI (`docs/guides/praxis-ai.md` Appendix B PR 8, §6.13 Workspace, Knowledge Hub, Community, Home and Settings; `docs/guides/foundation.md` §9): `imports.summary`, every import by status, the rows imported and refused by importer stacked, by month; `imports.history` names it. No ticks change; nothing on screen changes. Left: nothing.

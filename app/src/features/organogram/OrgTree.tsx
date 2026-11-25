@@ -34,6 +34,7 @@ import {
   SegmentedControl,
   TextField,
   toast,
+  useConfirm,
   useIsPhone,
   useModal,
   Who,
@@ -104,7 +105,15 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   const editRole = (n: OrgNode) =>
     modal.open({
       title: "Edit Open Role",
-      body: (close) => <SeatForm close={close} onSaved={reload} seat={n} manager={n.manager_node_id ? byId.get(n.manager_node_id) : undefined} />,
+      body: (close) => (
+        <SeatForm
+          close={close}
+          onSaved={reload}
+          seat={n}
+          manager={n.manager_node_id ? byId.get(n.manager_node_id) : undefined}
+          reports={(children.get(n.node_id)?.length ?? 0) + (dottedReports.get(n.node_id)?.length ?? 0)}
+        />
+      ),
     });
   useScreenAction(adds ? { label: "Add Role", onSelect: addRole } : null);
 
@@ -806,7 +815,7 @@ function PersonSheet({
  * The same form adds one and corrects one, including who the seat itself reports to,
  * which is how a seat the sheet left at the top of the tree gets its line.
  */
-function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSaved: () => void; seat?: OrgNode; manager?: OrgNode }) {
+function SeatForm({ close, onSaved, seat, manager, reports = 0 }: { close: () => void; onSaved: () => void; seat?: OrgNode; manager?: OrgNode; reports?: number }) {
   // The seat's department as it stands, found by its name among the departments in use.
   const named = useApi("GET /api/v1/departments", { query: { q: seat?.department ?? "", active: "true" }, enabled: Boolean(seat?.department) });
   const [title, setTitle] = useState(seat?.display_name ?? "");
@@ -820,6 +829,8 @@ function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSave
   const add = useMutation("POST /api/v1/org-seats");
   const edit = useMutation("PATCH /api/v1/org-seats/:id");
   const save = seat ? edit : add;
+  const confirm = useConfirm();
+  const shut = useMutation("PATCH /api/v1/org-seats/:id");
   const current = named.data?.data.find((d) => d.name === seat?.department);
   const departmentValue = department.length ? department : current ? [current] : [];
   const chosen = departmentValue[0]?.department_id ?? "";
@@ -843,6 +854,24 @@ function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSave
       toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Not saved. Try again.");
     }
   };
+  /*
+   * Close Role: a role added by mistake, or no longer wanted, leaves the structure (organogram.md §6).
+   * Refused while anyone reports to it, here and by the server, which also refuses a department's head role.
+   */
+  const closeRole = async () => {
+    if (!seat) return;
+    if (reports > 0) return toast.error("Move its reports first");
+    if (!(await confirm({ title: "Close Role", body: `${seat.display_name} leaves the structure.`, destructive: true }))) return;
+    try {
+      await shut.run({ params: { id: seat.node_id }, body: { status: "closed" } });
+      invalidate("/api/v1/org-chart", "/api/v1/org-seats");
+      onSaved();
+      close();
+      toast(`${seat.display_name} closed`);
+    } catch (e) {
+      toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Not closed. Try again.");
+    }
+  };
   return (
     <>
       <Field label="Role Title" state={tried ? (bad.title ? "bad" : "good") : undefined} message="Name the role">
@@ -855,6 +884,11 @@ function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSave
         <EmployeePicker value={reportsTo} onChange={setReportsTo} placeholder="Manager's name" />
       </Field>
       <FormFooter>
+        {seat && (
+          <Button variant="danger" onClick={closeRole}>
+            Close Role
+          </Button>
+        )}
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={() => submit()}>
           {seat ? "Save Role" : "Add Role"}

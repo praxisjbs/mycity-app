@@ -57,7 +57,7 @@ const APPLICANTS_HELP = "Everyone who applied to an open or paused role, whateve
 const SCORECARD_HELP = "Switch off a part this role skips. The parts left on add up to 100.";
 
 const closesOn = (v: Pick<Vacancy, "closes_at" | "past_closing">) =>
-  v.closes_at ? <span className={v.past_closing ? "text-destructive font-semibold" : undefined}>{formatDate(v.closes_at.slice(0, 10))}</span> : "–";
+  v.closes_at ? <span className={v.past_closing ? "text-destructive font-semibold" : undefined}>{formatDate(v.closes_at)}</span> : "–";
 const statusOf = (v: Pick<Vacancy, "status">) => (v.status === "paused" ? <HelpTerm help={PAUSED_HELP}>{pill(VACANCY_STATUS.paused)}</HelpTerm> : pill(VACANCY_STATUS[v.status]));
 
 export function Vacancies() {

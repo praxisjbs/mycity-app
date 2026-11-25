@@ -22,8 +22,9 @@ const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--inp
 const headline = (balances: LeaveBalance[]) =>
   balances.find((b) => b.code === "annual") ?? balances.find((b) => b.entitled !== null) ?? null;
 
-/** Who a request waits on, or who settled it. */
-const approverOf = (r: LeaveRequest) => waitingOnOf(r) ?? (r.recorded ? "People" : r.status === "cancelled" ? "Withdrawn" : "Decided");
+/** Who a request waits on, or who settled it; nobody for a cancelled one, whose state Status already reads (the empty marker). */
+export const approverOf = (r: LeaveRequest): string | null =>
+  r.status === "cancelled" ? null : (waitingOnOf(r) ?? (r.recorded ? "People" : "Decided"));
 
 export function MyLeavePage({ id = null }: { id?: string | null }) {
   const me = useMe();
@@ -84,7 +85,7 @@ export function MyLeavePage({ id = null }: { id?: string | null }) {
                   ["From", formatDate(r.starts_on)],
                   ["To", formatDate(r.ends_on)],
                   ["Days", dayCount(r.days)],
-                  ...(covering ? [] : ([["Approver", approverOf(r)]] as Array<[string, string]>)),
+                  ...(covering ? [] : ([["Approver", approverOf(r)]] as Array<[string, string | null]>)),
                   ["Status", statusPill(r)],
                   ...coverRows(r),
                   ...(r.reason ? ([["Note", r.reason]] as Array<[string, string]>) : []),

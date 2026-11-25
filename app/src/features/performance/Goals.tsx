@@ -683,7 +683,7 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
           rowKey={(t) => t.task_id}
           columns={[
             { key: "t", label: "Task", render: (t) => t.title },
-            { key: "d", label: "Due", render: (t) => (t.due_at ? formatDate(t.due_at.slice(0, 10)) : "–") },
+            { key: "d", label: "Due", render: (t) => (t.due_at ? formatDate(t.due_at) : "–") },
           ]}
         />
       )}

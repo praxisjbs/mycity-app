@@ -167,7 +167,7 @@ function ScorecardsView() {
       <KpiTiles
         mobileCols={2}
         items={[
-          { label: "Scorecards", value: String(all.page?.total ?? 0) },
+          { label: "Scorecards", value: String(all.page?.total ?? 0), help: "Every scorecard this quarter: Draft, Awaiting Agreement, Agreed and Closed." },
           { label: "Agreed", value: String(agreed.page?.total ?? 0), tone: "ok" },
           { label: "Awaiting Agreement", value: String(waiting.page?.total ?? 0), tone: waiting.page?.total ? "warn" : undefined },
           { label: "Below Meets", value: String(below.page?.total ?? 0), tone: below.page?.total ? "err" : undefined },

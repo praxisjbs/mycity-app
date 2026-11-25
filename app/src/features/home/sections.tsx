@@ -50,7 +50,6 @@ export function MainChart({ chart }: { chart: HomeChart }) {
           labels={chart.days.map((d) => formatDate(d.date).slice(0, 5))}
           values={chart.days.map((d) => d.present)}
           format={(v) => `${formatCount(v)} in`}
-          caption="Dips are Saturdays, a half day"
         />
       );
     case "goals":

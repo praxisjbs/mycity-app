@@ -16,8 +16,9 @@ const ENTITY_UUID = `CASE WHEN a.entity_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]
 
 /**
  * What a person calls the record: a login or an employee by the person's name, a role by its name,
- * anything else by the number, name or title its own entry recorded. NULL when it recorded none;
- * the screen then shows the id.
+ * a partner, a lead, a deal or a proposal by its own row (their status, health and stage changes
+ * record only the field that changed), anything else by the number, name or title its own entry
+ * recorded. NULL when none of those names it; the screen then shows the id.
  */
 const RECORD_NAME = `COALESCE(
     CASE WHEN a.entity_type IN ('app_user', 'account') THEN
@@ -27,6 +28,14 @@ const RECORD_NAME = `COALESCE(
       (SELECT r.name FROM role r WHERE r.role_id = ${ENTITY_UUID}) END,
     CASE WHEN a.entity_type = 'employee' THEN
       (SELECT concat_ws(' ', e.first_name, e.last_name) FROM employee e WHERE e.employee_id = ${ENTITY_UUID}) END,
+    CASE WHEN a.entity_type = 'partner' THEN
+      (SELECT p.name FROM partner p WHERE p.partner_id = ${ENTITY_UUID}) END,
+    CASE WHEN a.entity_type = 'lead' THEN
+      (SELECT l.name FROM lead l WHERE l.lead_id = ${ENTITY_UUID}) END,
+    CASE WHEN a.entity_type = 'partner_deal' THEN
+      (SELECT concat_ws(' ', o.number, o.title) FROM partnership_opportunity o WHERE o.partnership_opportunity_id = ${ENTITY_UUID}) END,
+    CASE WHEN a.entity_type = 'partnership_proposal' THEN
+      (SELECT pp.number FROM partnership_proposal pp WHERE pp.partnership_proposal_id = ${ENTITY_UUID}) END,
     NULLIF(COALESCE(a.after, a.before) ->> 'number', ''),
     NULLIF(COALESCE(a.after, a.before) ->> 'name', ''),
     NULLIF(COALESCE(a.after, a.before) ->> 'title', ''),

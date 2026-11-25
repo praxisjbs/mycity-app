@@ -46,7 +46,7 @@ left alone.
 | Turn-on notice (`ShellNotice`) | Foot of the shell on Home only, any tab, once per device | Everyone, until answered | One line and two buttons | Turn On, Not Now |
 | Phone or computer notification | The device's own notification shade, lock screen and badge | The person, on every device with notifications on, app open or closed (the device in hand shows it beside the banner) | Title (with how many are new when grouped), text, the sender's initials or the app icon, the MyCity pin, the count on the app icon; an urgent notice again every 30 minutes of the working day until it is dealt with | Tap to open the record (through sign-in when the session ended), Mark Read |
 | Mailbox (`inbox` and the other folders) | Staff app | The mailbox owner | Unchanged | Reading a conversation marks its notices read |
-| Counts on the menu and the tabs | The rail, the bottom bar and More's tiles; each module's tab strip, both shells | Everyone, for the screens they may open | Beside a module, how many unread notices open in it; beside each of its tabs, how many open on that tab (they add up to the module's). Yellow, red while an urgent notice opens there | Press the tab to go where they are |
+| Counts on the menu and the tabs | The rail, the bottom bar and More's tiles; each module's tab strip, both shells | Everyone, for the screens they may open | Beside a module, how many unread notices open in it; beside each of its tabs, how many open on that tab (they add up to the module's). Yellow, red while an urgent notice opens there. Each says what it is, "21 unread notices": on hover on desktop (the rail and the tabs), and to a screen reader on both shells | Press the tab to go where they are |
 | Counts inside a tab | A screen's switch (`SegmentedControl`) and chips (`Chips`), both shells | Everyone, on the screens they may open | Beside each side of a switch and each chip, how many of the tab's unread notices are about records it shows, in the same yellow (red while urgent); the screen opens on the side and chip holding them when the one it would open on holds none | Press the side or chip to see the records; their rows are dotted |
 | Unread rows | Every list on a screen (`DataView`), both shells | Everyone | A yellow dot before a row and a soft tint on it (a phone's card likewise) while an unread notice of theirs is about that record and opens on this screen | Open the row (or the record by its link): its notices are read, and the dot, the tab's count, the module's and the bell's drop together |
 
@@ -86,9 +86,12 @@ left alone.
    an app comes to the front it closes any notification in its shade that is already read.
 7. **Where it waits** (JBS Praxis, 26/10/2026). The badges count each unread notice where it opens
    for its reader (§6, Where a notice opens): per module for the menu, and per tab for the module's
-   tab strip. On the screen, a list asks which of the rows on its page carry an unread notice that
-   opens there (`GET /notifications/unread-records`, only while that tab counts something) and marks
-   them. Opening one, by its row or by its address (`?id=`, or a record's own key such as
+   tab strip. Each count says what it is, "21 unread notices" (`unreadNotices`): in its accessible
+   name, and in a tooltip on hover on desktop (QA audit F16a, 25/11/2026). On the screen, every list
+   hands over the rows on its page and the screen asks once, for all of them, which carry an unread
+   notice that opens there (`GET /notifications/unread-records`, 25 ids a request, only while that
+   tab counts something); each list marks its own (QA audit F25b, 25/11/2026: a Goals tab asked
+   once per objective card). Opening one, by its row or by its address (`?id=`, or a record's own key such as
    `?home=`), sends `POST /notifications/read-record`: the person's unread notices about that record
    that open on that screen are read, each emitting `notification.read`, so every tab and device
    drops the dot and the counts together. Inside the tab, the screen asks where those notices wait
@@ -432,7 +435,7 @@ listed here as tier 1 or tier 2.
 | In-app banner | The notice's title and two lines of text, avatar or glyph, Dismiss (×); red when urgent, amber when important | None | How every device is alerted: §3 |
 | Urgent bar | The newest open urgent notice's title; "1 of 3" when more are open; Acknowledge (an urgent announcement) or Open; the arrows to step through them on desktop | None | The repeat schedule and what closes a notice: §6 |
 | Turn-on notice | "Get notified of new mail and approvals"; Not Now, Turn On | None | Why the browser's own prompt is not used: §6 |
-| Counts on the tabs | Beside each tab of a module, its count of unread notices, yellow (red while an urgent one opens there); nothing for none | None | How a count is worked out: §3, §6 |
+| Counts on the tabs | Beside each tab of a module, its count of unread notices, yellow (red while an urgent one opens there); nothing for none. The same beside each module in the rail, the bottom bar and More | Desktop, hover a count in the rail or on a tab: "21 unread notices" ("1 unread notice, urgent"); a screen reader hears the same words after the module's or tab's name on both shells, a phone has no tooltip | How a count is worked out: §3, §6 |
 | Unread rows | A yellow dot before a row and a soft tint on it; screen readers hear "Unread" before its first value | None | When a row is marked and what reads it: §6 |
 | Counts inside a tab | Beside each side of a screen's switch, each chip and each board column, its share of the tab's unread notices, in the same yellow (red while urgent); nothing for none; the screen opens on the one holding them; a board card new to the reader has a row's dot and tint | None | How each record is placed: §3, §6 |
 
@@ -541,6 +544,8 @@ The design choices of Settings · Notifications (copies only on notices about so
 channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5, open to TB.
 
 ## 14 · Change log
+
+- 25/11/2026 · JP · QA audit F16a and F25b (BG-048, BG-030; `docs/qa-audit/LOW-ITEMS-PLAN.md` PR 1). Every count on the rail, the bottom bar, More's tiles and a module's tabs says what it is, "21 unread notices" (", urgent" when one is): in its accessible name on both shells, and in a tooltip on hover on desktop (`unreadNotices` in `@mycity/ui`; `CountBadge` `words` and `tip`; `countWords` on a tab, set by `shell/nav.ts` `tabItems`). Unread rows: `RecordMarks` gathers every list's page ids on the screen and asks once, 25 ids a request, instead of a request per list, so a Goals tab of 25 objective cards sends one or two requests, not 25; each list marks its own rows from the one answer (§3 step 7, §2, §10.1). Left: nothing.
 
 - 17/11/2026 · TB · A new notice, Document Expiring (`company_document.expiring`, category System), from the reminder engine 60, 30 and 7 days before a Document Centre company document expires and on the day, once each, to its uploader and the holders of `documents.manage`; it opens the Library on the document and is changed on Settings · Notifications like any other (`document-centre.md` §6.9, §7).
 

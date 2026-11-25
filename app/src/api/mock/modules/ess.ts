@@ -40,7 +40,9 @@ function profile(key: string): EssProfile {
     job_title: p.job_title,
     department: p.department,
     status: p.status === "suspended" ? "suspended" : "active",
-    confirmed: p.status !== "probation",
+    // On probation in the mock's roster: due in 18 days, not confirmed (as People · Employees reads it).
+    confirmation_due_on: p.status === "probation" ? isoDaysAhead(18) : null,
+    confirmed_on: p.status === "probation" ? null : p.start_date,
     employment_type: TYPES.includes(p.employment_type as EssProfile["employment_type"]) ? (p.employment_type as EssProfile["employment_type"]) : "full_time",
     work_pattern: p.work_pattern,
     start_date: p.start_date,

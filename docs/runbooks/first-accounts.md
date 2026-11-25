@@ -30,7 +30,7 @@ script refuses if it is not this `.env`'s `APP_ENV`.
 
 The whole employee record is in the script (`BUILD_ACCOUNT` in `scripts/db/create-admin.js`):
 JBS Praxis Implementation Team (known as JBS Praxis), Implementation Partner in the Implementation
-department, consultant, remote, on a contract from 09/10/2026 to 09/12/2026, confirmed from the
+department (made by the script with the short code IMP, like MyCity's own GM or TBO), consultant, remote, on a contract from 09/10/2026 to 09/12/2026, confirmed from the
 start (a consultant has no probation), with phone 0802 749 2738, date of birth and next of kin.
 Every field is filled except the home address (an address is picked on screen, never typed into a
 script, F27), the worksite and managers, which a remote first account has none of, the leaving date,
@@ -119,6 +119,13 @@ list, count or run as one of MyCity's staff:
    login stops working at once.
 3. Open Settings · Users and check the build account reads Suspended or Left. If it still reads
    Active, press **Suspend** with the reason.
+4. Retire its department. On People · Departments, open **Implementation**, press **More Actions**,
+   then **Retire Department**, and confirm. With the record archived nobody works in it, so it
+   retires; it then leaves every department list and filter. If the screen says *Still has* someone,
+   that record is still active: archive it first.
 
-Archiving ends every session and refuses sign-in; the employee record and the audit history stay.
-Nothing is deleted.
+Archiving ends every session and refuses sign-in; the employee record, the department and the audit
+history stay. Nothing is deleted.
+
+A server whose build account was made before 25/11/2026 has the department coded IMPLEMENTATION. It
+retires at handover the same way; until then, **Edit Department** can set its **Code** to IMP.

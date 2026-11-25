@@ -7,7 +7,7 @@ import { createContext, useContext } from "react";
  * opened. Without a provider (the gallery, a test, the public site) nothing is marked.
  */
 export interface RowMarks {
-  /** Which of these row keys to mark. A hook: every list calls it once on each render, with its page's keys. */
+  /** Which of these row keys to mark. A hook: every list calls it once on each render, with its page's keys; the provider may gather every list's keys and ask once for the screen. */
   useMarked: (keys: readonly string[]) => ReadonlySet<string>;
   /** A marked row was opened, so what marked it is read. */
   opened: (key: string) => void;

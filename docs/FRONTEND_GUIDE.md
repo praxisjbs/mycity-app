@@ -362,7 +362,8 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   button above it), on desktop and phone (F31 amended 16/11/2026, TB; `docs/guides/partnerships.md` §10).
   So does the Document Centre: a document (its preview beside its details) and a category open as their own pages
   (F31 amended 17/11/2026, TB; `docs/guides/document-centre.md` §10).
-- **The main action within thumb reach**: at the bottom of the screen or the sheet, full width.
+- **The main action within thumb reach**: at the bottom of the screen or the sheet, full width. A
+  form in a sheet keeps its buttons pinned in the sheet's footer, however long it is (§8.4).
 - **Tap targets at least 44 × 44 px.** Inline help terms inside a sentence or heading are the only
   exception.
 - **No sideways scrolling of the page**, ever. A wide chart scrolls inside its own card.
@@ -461,6 +462,12 @@ element outside the form components (§8.6).
 
 - **A footer carries buttons only.** Desktop: Cancel on the left, the primary on the right. Phone:
   the primary is full width at the bottom, the others above it.
+- **On a phone, a form in a sheet pins its buttons** (JBS Praxis, 25/11/2026). Inside a `Modal`,
+  `SidePanel` or `Sheet` on a phone, `FormFooter` draws its buttons in the sheet's own footer, as
+  `ModalFooter` does, so Save and Send stay in thumb reach while the fields scroll; they are still
+  one group (F26), and a submit button there names its form (`form=`), so pressing it or Enter in a
+  field still submits. Nothing for a screen to do: every form built with `Form` and `FormFooter`
+  does it. Desktop is unchanged, and so is a form on a page or in a `PhonePage`.
 - **The primary is Verb Noun** (§5.4) and is the only filled button in the footer.
 - **Destructive actions** are red and confirm in the shared modal, naming the thing ("Delete
   Rule"), never `confirm()`.
@@ -1126,10 +1133,14 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
 - **Where it waits** (JBS Praxis, 26/10/2026; notifications.md §3 step 7, §6): the badges
   (`GET /api/v1/notifications/badges`, `{ modules, tabs }`) count on the rail, the bottom bar and
   More by module, and on each module's tab strip by tab (`tabItems` in `shell/nav.ts`: yellow, red
-  while an urgent notice opens there). `features/notifications/marks.tsx` (`RecordMarks`, around
-  every screen) gives `RowMarksContext` from `@mycity/ui`: every `DataView` on the screen asks which
-  of its page's rows carry an unread notice that opens there (`GET .../unread-records`, only while
-  the tab counts something) and draws a yellow dot and a soft tint on them; opening one, by its row
+  while an urgent notice opens there). Each count says what it is, "21 unread notices"
+  (`unreadNotices` from `@mycity/ui`): in its accessible name everywhere, and in a `Tooltip` on
+  hover on desktop (the rail and the tabs; `countWords` on a tab). `features/notifications/marks.tsx` (`RecordMarks`, around
+  every screen) gives `RowMarksContext` from `@mycity/ui`: every `DataView` and board stage on the
+  screen hands it its page's row ids, and it asks once for the whole screen which of them carry an
+  unread notice that opens there (`GET .../unread-records`, 25 ids a request, only while the tab
+  counts something), so a screen of many lists (Performance · Goals) sends one batch, not a
+  request per list; each list draws a yellow dot and a soft tint on its own; opening one, by its row
   or by its address, reads them (`POST .../read-record`) and the dot goes at once. A screen does
   nothing for it: a list keyed by its records' ids is marked by itself.
 - **Where it waits, inside a tab** (JBS Praxis, 26/10/2026): the tab's count splits by the screen's

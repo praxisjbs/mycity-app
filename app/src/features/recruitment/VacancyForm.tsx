@@ -148,7 +148,7 @@ function valuesOf(vacancy: VacancyDetail): Values {
     work_pattern_note: vacancy.work_pattern_note ?? "",
     location: placeValue(vacancy.location_place),
     working_days: vacancy.working_days ?? "",
-    closes_on: vacancy.closes_at?.slice(0, 10) ?? inDays(30),
+    closes_on: vacancy.closes_at ? todayIso(new Date(vacancy.closes_at)) : inDays(30),
     target_start_on: vacancy.target_start_on ?? "",
     probation_months: text(vacancy.probation_months),
     description: vacancy.description,
@@ -194,7 +194,7 @@ function newValues(seat: SeatSuggestion | undefined, filled: Filled): Values {
  * answers and draft count as unsaved words, so closing asks first).
  */
 function VacancyFormBody({ vacancy, seat, filled, close, onSaved, start, gathered = false }: Props & { filled: Filled; start: Values; gathered?: boolean }) {
-  const edit: Before | null = vacancy ? { location: placeValue(vacancy.location_place), closes_on: vacancy.closes_at?.slice(0, 10) ?? "" } : null;
+  const edit: Before | null = vacancy ? { location: placeValue(vacancy.location_place), closes_on: vacancy.closes_at ? todayIso(new Date(vacancy.closes_at)) : "" } : null;
   // The seat named by the address stays the vacancy's even when the lookup finds it taken (the save says so).
   const seatId = vacancy ? null : (seat?.org_seat_id ?? filled.org_seat_id ?? null);
   const schema = vacancy ? vacancySchemas.VacancyEdit : vacancySchemas.VacancyCreate;

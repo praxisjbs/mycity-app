@@ -404,7 +404,7 @@ defineImporter({
       return;
     }
     if (await repo.findSeatById(client, id))
-      await service.updateSeat(client, id, { status: "closed" }, ctx.actor);
+      await service.updateSeat(client, id, { status: "closed" }, ctx.actor, { withReports: true });
   },
 
   /**

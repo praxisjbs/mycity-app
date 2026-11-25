@@ -269,7 +269,9 @@ POST /ai/ask { question, ai_conversation_id?, context?, shows? }
                  fields from the input schema), the answer's JSON Schema; built once, fixed order,
                  marked cacheable where the vendor takes a mark
   tools          one per read and per summary the person may run (authorise.allowedReads,
-                 allowedSummaries); nothing else
+                 allowedSummaries); nothing else. A how-to question starts with guide.search
+                 and more_reads alone, its actions held back, until the model asks for more
+                 (praxis-ai.md §6.1 step 3, 25/11/2026)
   loop           engine/turn.js: rounds, at most 5 reads, a repeat or the limit forces the answer,
                  one correction, then the plain-words rescue (as today, moved behind the boundary)
   draft          AiAnswerDraft: text, table, route, prefill, more, and now action { key, values,
@@ -873,6 +875,16 @@ open is the check on staging above, once these PRs reach it.
 
 ## 8 · Log
 
+- 25/11/2026 · JP · QA BG-051 (JBS Praxis, 25/11/2026; `praxis-ai.md` §6.1 step 3): a how-to question
+  starts from the User Guide. `engine/turn.js` takes a narrower `start` (its tools, its first message,
+  and the engine's own `more_reads`, which is not a read and never counts as one); calling it, or a
+  read held back, offers every tool from the next round and puts the full system turn back. The
+  adapter (`orchestrator.isHowTo`) starts a how-to question with `guide.search` alone and no actions,
+  except with a document to read or while a card is gathered. Gates 19, 23 and 24 pass; the engine
+  still requires only its siblings. Tests: `tests/unit/foundation/ai-engine.test.js` (the start's
+  rules) and `ai-assistant.test.js` (the first round of "How do I request leave?" 18,685 characters
+  and 2 tools against 188,468 and 148 for a data question, the CEO's catalogue). The evaluation set
+  gains `guide.how-to`. No staging measurement: the build session reaches no model.
 - 14/11/2026 · JP · Charts in the Overview, PR 8 built (§6.12), and §6.12 closed, PR 3 having merged first: ten
   summaries (`projects`, `calendar`, `training`, `policies`, `sops`, `announcements`, `activity`, `alerts`,
   `runs`, `imports`), each one SQL with its list's own reach; their twelve reads named, so every read names

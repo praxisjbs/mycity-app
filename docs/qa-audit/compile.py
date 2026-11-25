@@ -526,6 +526,31 @@ FIXED_NOW = {k: ("#173", "2026-11-24", v) for k, v in {
     "F33b": "Approvers now see the person's sanctions in force and the next step, and a proposal "
             "below it is marked Below Next Step.",
 }.items()}
+FIXED_NOW.update({k: ("#174", "2026-11-25", v) for k, v in {
+    "F42": "A System Clock-Out day's Hours now carries help saying it was counted to the shift's end.",
+    "F70": "On a phone, every form in a sheet now keeps its buttons pinned at the bottom.",
+    "F12a": "Home's figures now say whom they count and what they are out of, for example 22 clocked "
+            "in, of 25 expected today; the Scorecards tile says it counts every status.",
+    "F18": "The fixed Saturday caption on Home's attendance chart is removed.",
+    "F19c": "Approval alerts now name the waiting record by its reference.",
+    "F27": "Overdue Tasks on Home now has help: Overdue tasks of everyone you can see.",
+    "F25b": "Unread marks are now asked for once per screen, not once per list.",
+    "F37b": "Edit Open Role now has Close Role, refused while anyone reports to the role.",
+    "F38b": "The build account's department is now coded IMP and is retired at handover.",
+    "F76d": "History now shows Lagos time, with the time, here and on every date shown from a timestamp.",
+    "F82d": "Praxis AI now reads the same status the People screen shows, On Probation included.",
+    "F16a": "Every count on the menus and tabs now says it is unread notices.",
+    "F50": "Search is now warmed when the server starts, so the first search is as fast as later ones.",
+    "F15b": "The overdue policy sheet now shows once per sign-in, not on every reload.",
+    "F34b": "A how-to question to Praxis AI now starts from the User Guide alone, about a tenth of the "
+            "context a data question reads.",
+    "F30a": "My Profile now uses the same probation rule as People.",
+    "F30b": "A cancelled leave request now leaves Approver empty.",
+    "F41": "Record History now words every event, reminders included, never a raw key.",
+    "F60a": "Request Leave now shows the working days and what would be left before Send.",
+    "F69": "The Audit Log now names partners, leads, deals and proposals by number and title.",
+    "F75b": "A role's People tab now opens on active logins, so its count and list agree.",
+}.items()})
 
 # ---------------------------------------------------------------- compile
 SEV_ORDER = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
@@ -641,7 +666,8 @@ meta = dict(
         "Bugs & Gaps is the fix tracker: only verified bugs, gaps, improvements and seed-data fixes. "
         "JBS Praxis ticks Fixed ✓ with the PR and date as each fix merges; MyCity records its retest.",
         "Items fixed after the audit are already ticked, with the PR that fixed them, so MyCity can retest them. "
-        "Every High and Medium item was fixed in #173 (24/11/2026); its note for MyCity starts with what changed.",
+        "Every High and Medium item was fixed in #173 (24/11/2026), and the Low items in #174 and the PR after it; "
+        "each fixed row's note for MyCity starts with what changed.",
         "To be Discussed (Change Report) holds requests outside the signed milestones, or that change a "
         "decision already agreed. Nothing there is built until a change request is agreed.",
         "MyCity Actions are setup, data and policy tasks the hub already supports and MyCity does itself.",

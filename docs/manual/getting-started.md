@@ -235,8 +235,8 @@ you can do on one you can do on the other.
    Self-Service first, then the rest grouped under Work, People, Business and System. Press one
    to open it.
 2. Each module's screens are tabs along the top of the page. Press a tab to open that screen.
-3. A number beside a module counts what waits for you there. It turns red when something urgent
-   waits.
+3. A number beside a module counts your unread notifications there. Point at it to read it in
+   words, such as *21 unread notices*. It turns red when something urgent waits.
 4. Each tab of the module shows its share of that number, so you see which screen it waits on (see
    [See where something waits](#start-where-it-waits)).
 5. The MyCity App logo at the top of the menu goes back to Home.
@@ -265,7 +265,7 @@ you can do on one you can do on the other.
    other module as a tile, **Install App** and **Sign Out**. Tiles use short names: **Knowledge**
    is the Knowledge Hub, **Assistant** is Praxis AI.
 3. The module's screens are tabs under its name. Swipe them sideways to see them all. A number on
-   a tab counts what waits for you on that screen.
+   a tab counts your unread notifications on that screen.
 4. The icons at the top right are **Search**, **Notifications** and **Your Account**, your picture,
    which opens More too. The MyCity App logo at the top left goes Home.
 5. Press **Quick Actions**, the round button with a plus at the bottom right. It holds the screen's
@@ -276,6 +276,8 @@ you can do on one you can do on the other.
 7. **Hide Here** tucks the round button away on this page. It comes back when you return to the
    page.
 8. Your phone's own Back gesture goes back a screen and closes any sheet first.
+9. A form that opens in a sheet keeps its buttons at the foot of the sheet, so you reach them
+   without scrolling past its fields.
 
 > **Tip:** Pull the page down from the top to refresh it. Keep pulling past the second notch to
 > reload the whole app. In the installed app, hold the logo to see your **Trail** of recent places.
@@ -621,7 +623,7 @@ sources:
   - app/src/shell/nav.ts
   - packages/ui/src/data/DataView.tsx
 marks:
-  1: tab "Leave 1" | What waits on this screen
+  1: tab "Leave 1 unread notice" | What waits on this screen
   2: css :is(tr, li):has([data-unread]) | A request with something new
 ```
 

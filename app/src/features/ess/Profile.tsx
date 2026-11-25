@@ -8,11 +8,11 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
 import { useAuth } from "@/auth/AuthProvider";
 import { PLACE } from "@/features/attendance/labels";
-import { employmentType, workPattern } from "@/features/people/status";
+import { employmentStatus, employmentType, workPattern } from "@/features/people/status";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { lineOf, places, placeValue } from "@/features/shared/places";
 import { hrefFor, useRouter } from "@/lib/router";
-import { ActionGroup, AddressField, Banner, Button, Card, Icon, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, UploadField, useConfirm, useContractForm, useModal, Wizard, type PlaceValue } from "@mycity/ui";
+import { ActionGroup, AddressField, Banner, Button, Card, Icon, CardHeader, DesktopOnly, ErrorState, Field, formatDate, formatDateTime, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, UploadField, useConfirm, useContractForm, useModal, Wizard, type PlaceValue } from "@mycity/ui";
 
 /**
  * ESS · My Profile (#8, `my-profile`): the caller's own record (docs/guides/ess.md §10).
@@ -44,6 +44,8 @@ export function MyProfilePage() {
   const edit = () => modal.open({ title: "Edit Profile", body: (close) => <EditProfile p={p} close={close} /> });
   const changePhoto = () => modal.open({ title: "Profile Photo", body: (close) => <PhotoForm has={Boolean(p.photo_url)} photo={photo} name={p.display_name} close={close} /> });
   const manager = p.line_manager ? p.line_manager.display_name : null;
+  // The same pill People's register shows, from the record's status and its two probation dates (foundation.md §10.1).
+  const standing = employmentStatus(p);
 
   const personal = (
     <Card>
@@ -74,7 +76,7 @@ export function MyProfilePage() {
           ["Start Date", p.start_date ? formatDate(p.start_date) : "Not given"],
           ["Employment Type", employmentType(p.employment_type)],
           ["Work Arrangement", workPattern(p.work_pattern)],
-          ["Status", <Pill tone={p.confirmed ? "ok" : "warn"}>{p.confirmed ? "Confirmed" : "On Probation"}</Pill>],
+          ["Status", <Pill tone={standing.tone}>{standing.text}</Pill>],
         ]}
       />
       {schedule}
@@ -95,7 +97,7 @@ export function MyProfilePage() {
   const trail = (
     <Card>
       <CardHeader title="Record History" />
-      <Timeline items={history.rows.map((h) => ({ title: h.summary, when: formatDate(h.occurred_at.slice(0, 10)), text: h.actor_name ?? undefined }))} />
+      <Timeline items={history.rows.map((h) => ({ title: h.summary, when: formatDateTime(h.occurred_at), text: h.actor_name ?? undefined }))} />
       <Pager page={history.page} onPage={history.setPage} noun="change" />
     </Card>
   );
@@ -119,7 +121,7 @@ export function MyProfilePage() {
           <h2 data-copy="content" className="text-xl tracking-tight">{p.display_name}</h2>
           <div className="mt-0.5 text-sm text-muted-foreground">{p.job_title}{p.department ? ` · ${p.department}` : ""}</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <Pill tone={p.confirmed ? "ok" : "warn"}>{p.confirmed ? "Confirmed" : "On Probation"}</Pill>
+            <Pill tone={standing.tone}>{standing.text}</Pill>
             <Pill tone="neutral">{workPattern(p.work_pattern)}</Pill>
             {manager && <Pill tone="neutral">{`Reports to ${manager}`}</Pill>}
           </div>

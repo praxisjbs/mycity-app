@@ -5,13 +5,14 @@
  * @use Once, in DesktopShell's rail slot. Items come from the module catalogue filtered by the person's grants; it collapses to icons (66 px) when the person asks, remembered per device by the app.
  * @avoid A phone (BottomBar and MoreSheet are the phone's navigation, gate 11); tabs inside a module (Tabs); actions (the top bar).
  * @phone Never shown on a phone; its items are still 44 px targets so the gallery's phone view passes.
- * @a11y The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); with `homeHref` the pin is a link Home, and with `onBrandHold` a hold or the menu key on it opens the trail (F29); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu.
+ * @a11y The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); with `homeHref` the pin is a link Home, and with `onBrandHold` a hold or the menu key on it opens the trail (F29); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. A count says what it is: "21 unread notices" in the link's name and, on hover, in a Tooltip (collapsed, the item's own tooltip adds it to the name). The account button opens a Menu.
  * @status stable
  * @example <Rail items={items} current="people" onNavigate={navigate} account={{ name: "Cynthia Osakunih", subtitle: "Operations Manager", menu }} />
  */
 import { forwardRef, type HTMLAttributes, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cn } from "../lib/cn";
+import { formatCount, unreadNotices } from "../lib/format";
 import { useHold } from "../lib/hold";
 import { Icon, type IconName } from "../icons/Icon";
 import { Avatar } from "../display/Avatar";
@@ -31,7 +32,7 @@ export interface RailItem {
   href: string;
   /** The area heading it sits under (Work, People, Business, System); none for the first items. */
   group?: string;
-  /** Things waiting in it; nothing is drawn for 0. */
+  /** The reader's unread notices that open in it; nothing is drawn for 0. Said and shown on hover as "21 unread notices". */
   count?: number;
   /** Something urgent waits in it: its count shows red, at least 1. */
   urgent?: boolean;
@@ -125,6 +126,8 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
           const head = item.group && item.group !== lastGroup ? item.group : null;
           lastGroup = item.group;
           const on = item.key === current;
+          const count = Math.max(item.count ?? 0, item.urgent ? 1 : 0);
+          const words = count > 0 ? unreadNotices(count, item.urgent) : null;
           return (
             <div key={item.key} className="contents">
               {head && (
@@ -132,7 +135,7 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
                   {head}
                 </div>
               )}
-              <Tip label={collapsed ? item.label : null}>
+              <Tip label={collapsed ? (words ? `${item.label}, ${words}` : item.label) : null}>
                 <a
                   href={item.href}
                   aria-current={on ? "page" : undefined}
@@ -151,17 +154,22 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
                   <span data-ui="nav-label" className={cn(collapsed && "sr-only")}>
                     {item.label}
                   </span>
-                  {(!!item.count || item.urgent) && (
-                    <span
-                      data-urgent={item.urgent ? "" : undefined}
-                      className={cn(
-                        "ml-auto rounded-full px-1.5 text-2xs leading-5 font-strong tabular-nums",
-                        item.urgent ? "bg-destructive text-background" : on ? "bg-on-primary-badge" : "bg-sidebar-badge",
-                        collapsed && "sr-only",
-                      )}
-                    >
-                      {Math.max(item.count ?? 0, item.urgent ? 1 : 0)}
-                    </span>
+                  {/* A space, so the link's name reads "Mailbox 12 unread notices"; a flex row draws none. */}
+                  {words && " "}
+                  {words && (
+                    <Tip label={collapsed ? null : words}>
+                      <span
+                        data-urgent={item.urgent ? "" : undefined}
+                        className={cn(
+                          "ml-auto rounded-full px-1.5 text-2xs leading-5 font-strong tabular-nums",
+                          item.urgent ? "bg-destructive text-background" : on ? "bg-on-primary-badge" : "bg-sidebar-badge",
+                          collapsed && "sr-only",
+                        )}
+                      >
+                        <span aria-hidden="true">{formatCount(count)}</span>
+                        <span className="sr-only">{words}</span>
+                      </span>
+                    </Tip>
                   )}
                 </a>
               </Tip>

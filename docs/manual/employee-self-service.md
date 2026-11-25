@@ -23,7 +23,9 @@ schedule, your bank details and your next of kin.
 ### Read your record {#ess-profile-read}
 
 1. Open [My Profile](/ess?tab=my-profile). Your name, job and department are at the top, with
-   **Confirmed** or **On Probation**, how you work (such as **Remote**) and who you report to.
+   your status, how you work (such as **Remote**) and who you report to. Your status reads as People
+   see it on their register: **Active**, or **On Probation** while your confirmation is due and not
+   yet made.
 2. **Personal** holds your **Full Name**, **Date of Birth**, **Phone**, **Work Email** and
    **Address**.
 3. **Employment** holds your **Job Title**, **Department**, **Line Manager**, **Start Date**,
@@ -33,7 +35,9 @@ schedule, your bank details and your next of kin.
 5. **Bank Details** shows your bank and the last four digits of your account. Expense refunds are
    paid into it.
 6. **Next of Kin** shows who to call in an emergency.
-7. **Record History** lists every change to your record, when, and who made it.
+7. **Record History** lists every change to your record in plain words, such as
+   *Record changed: Phone* or *Reminded to send commitments*, with the date and time it happened and
+   who made it.
 
 On a phone, each part is a card. Tap a card to open it.
 
@@ -277,7 +281,8 @@ If the card reads **Rejected**, People's reason is beside it. Put right what the
 4. The four figures count the month. **Days Present** includes late days. **Late Days** says what
    share of your days present were late. **Absent** counts working days with no clock-in.
    **Hours Worked** runs from each first clock-in to the last clock-out; a System Clock-Out counts
-   only to your shift's end.
+   only to your shift's end. On such a day, point at **Hours** (tap it on a phone) to read
+   *Counted to the shift's end*.
 5. Press **Days Present**, **Late Days** or **Absent** to list those days: **Date**, **Clock In**,
    **Clock Out**, **Hours** and **Status**. **No Days** means there were none that month.
    **Hours Worked** does not open.
@@ -491,9 +496,10 @@ of its buttons.
 2. Read it. The list under its version says what changed since the version you last acknowledged.
 3. Press **Acknowledge**. The message names the policy, such as *Data Protection acknowledged*.
 
-**Later** puts it off until tomorrow. It is offered only until the due date. After that the
-**Due** line reads *Overdue since 20/10/2026*, and the sheet returns at every sign-in until you
-acknowledge.
+Each policy shows once each time you sign in. Reloading the page or opening another screen does
+not bring it back; signing in again does, while it still waits for you. **Later** puts it off until
+tomorrow. It is offered only until the due date. After that the **Due** line reads
+*Overdue since 20/10/2026*, and the sheet returns at every sign-in until you acknowledge.
 
 On a phone the **Policy Update** sheet rises from the bottom and cannot be swiped away: press
 **Acknowledge**, **Read Full Policy** or **Later**.
@@ -626,7 +632,9 @@ opens your next booked leave. Below them, tap **My Requests** or **Entitlement**
    *Annual · 12 days left*.
 3. Choose the **First Day** and the **Last Day**. The hub counts MyCity's working days between
    them, both included. Days off in the working week, such as Sunday, and public holidays are left
-   out. Saturday counts when it is a working day.
+   out. Saturday counts when it is a working day. Under **Last Day** it shows the count and what
+   you would have left, such as *5 working days, 15 left after*. If you do not have enough days
+   left, **Last Day** is marked, such as *32 working days, 19 left*, before you send.
 4. Pick your **Relief Officer**, the colleague who covers your work while you are away. The list
    offers everyone who works here now, a page at a time as you scroll, and leaves out anyone away on
    the days you picked.
@@ -650,7 +658,7 @@ manager by name, then **Operations & People** for long leave. You are told when 
 | **Pending** | Waiting for a decision. **Approver** names who it waits on |
 | **Approved** | Granted. It counts against your allowance |
 | **Rejected** | Refused by the approver. **Approver** then reads **Decided** |
-| **Cancelled** | You cancelled it, or People cancelled it. **Approver** reads **Withdrawn** |
+| **Cancelled** | You cancelled it, or People cancelled it. **Approver** is left empty |
 
 Leave People recorded for you reads **People** under **Approver**.
 
@@ -664,7 +672,7 @@ Leave People recorded for you reads **People** under **Approver**.
 | **Ends in another year** | The leave runs past 31 December | Make two requests, one for each year |
 | **No working days** | Every day picked is a day off or a public holiday | Pick days you would be working |
 | **Overlaps other leave** | You already asked for leave on some of those days | Change the days, or cancel the other request |
-| *32 working days, 19 left* | The working days you asked for, then the days you have left this year | Ask for fewer days, or another type |
+| *32 working days, 19 left* | The working days you asked for, then the days you have left this year. It shows before you send | Ask for fewer days, or another type |
 | **Not offered** | People stopped offering that type while you filled the form | Pick another **Leave Type** |
 | **Required** on **Relief Officer** or **Handover Note** | This leave needs both | Pick a colleague and add your note |
 | **Pick someone else** | You picked yourself as relief officer | Pick a colleague |

@@ -181,7 +181,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
       await api.call("POST /api/v1/mailbox/messages", { body: { ...payload(), subject: subject.trim(), mail_draft_id: draftId, ...(release_at && { release_at }) }, idempotencyKey: sendKey });
       invalidate("/api/v1/mailbox");
       close();
-      toast(release_at ? (release_at === init.scheduled?.release_at ? "Scheduled mail updated" : `Scheduled for ${formatDate(release_at.slice(0, 10))} ${release_at.slice(11, 16)}`) : `Sent to ${to.join(", ")}`);
+      toast(release_at ? (release_at === init.scheduled?.release_at ? "Scheduled mail updated" : `Scheduled for ${formatDateTime(release_at)}`) : `Sent to ${to.join(", ")}`);
     } catch (e) {
       setBusy(false);
       const f = e instanceof ApiError ? e.fields : {};

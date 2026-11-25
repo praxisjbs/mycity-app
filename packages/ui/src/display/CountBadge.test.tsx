@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
+import { setViewport } from "../testing/viewport";
+import { installOverlayTestEnv } from "../overlay/test-env";
+import { unreadNotices } from "../lib/format";
 import { CountBadge } from "./CountBadge";
 
 describe("CountBadge", () => {
@@ -10,10 +14,36 @@ describe("CountBadge", () => {
     expect(screen.getByText("3 approvals waiting")).toHaveClass("sr-only");
   });
 
+  it("holds its words inside itself, so a badge in a scrolling tab strip never widens a phone's page", () => {
+    // An absolute sr-only span escapes a scroller whose nearest positioned ancestor sits outside it.
+    render(<CountBadge count={4} words={unreadNotices(4)} />);
+    expect(screen.getByText("4 unread notices").parentElement).toHaveClass("relative");
+    render(<CountBadge count={2} words={unreadNotices(2)} className="absolute" />);
+    expect(screen.getByText("2 unread notices").parentElement).toHaveClass("absolute");
+    expect(screen.getByText("2 unread notices").parentElement).not.toHaveClass("relative");
+  });
+
   it("caps at max on screen but says the full count", () => {
     render(<CountBadge count={1200} />);
     expect(screen.getByText("99+")).toBeInTheDocument();
     expect(screen.getByText("1,200")).toHaveClass("sr-only");
+  });
+
+  it("says its words in full, and shows them in a tooltip on hover on desktop", async () => {
+    installOverlayTestEnv();
+    render(<CountBadge count={21} words={unreadNotices(21)} tip />);
+    expect(screen.getByText("21 unread notices")).toHaveClass("sr-only");
+    await userEvent.hover(screen.getByText("21").parentElement!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("21 unread notices");
+  });
+
+  it("keeps the words in the accessible name only on a phone", async () => {
+    setViewport(390);
+    render(<CountBadge count={1} words={unreadNotices(1, true)} tip tone="err" />);
+    expect(screen.getByText("1 unread notice, urgent")).toHaveClass("sr-only");
+    await userEvent.hover(screen.getByText("1").parentElement!);
+    await new Promise((r) => setTimeout(r, 400));
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
   it("draws nothing for zero unless asked", () => {

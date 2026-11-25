@@ -238,6 +238,7 @@ mycity-app/
 │   ├── qa-audit/             MyCity's QA audit of staging (16-17/11/2026) and our response:
 │   │                         MyCity-QA-Audit-Response.xlsx (the fix tracker shared with MyCity),
 │   │                         README.md (where it stands), BRIEF.md (how a finding is verified),
+│   │                         LOW-ITEMS-PLAN.md (the two PRs that clear the Low items),
 │   │                         source/ (MyCity's tracker), groups/, verdicts/ (one block per finding),
 │   │                         compile.py (verdicts to items.json) and build.py (items.json to the workbook)
 │   └── manual/               the User Guide (Knowledge Hub · User Guide, docs/guides/user-guide.md): one
@@ -326,7 +327,7 @@ src/
 │   │                  daily limit as a hard stop) · refusals (the addresses the mail server refused)
 │   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms;
 │   │                  screens.test: which tabs a reader sees) · actions (⌘K actions: each screen's
-│   │                  New action, Clock In, Request Leave)
+│   │                  New action, Clock In, Request Leave) · warm (readies search at boot)
 │   ├── ai/            manifest (reads, summaries, actions and routes, checked at load) · registry · catalogue-sync ·
 │   │                  authorise (a read, a summary or an action with the person's rights, inside a 3 second
 │   │                  statement timeout) · summary (the shape of a summary's figures, groups, series and

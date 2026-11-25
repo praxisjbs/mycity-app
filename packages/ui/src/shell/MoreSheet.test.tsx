@@ -44,6 +44,13 @@ describe("MoreSheet", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("names each tile by its word and its count as unread notices", () => {
+    setViewport(390);
+    render(sheet({}));
+    expect(screen.getByRole("link", { name: "Mailbox 12 unread notices" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Queries 2 unread notices" })).toBeInTheDocument();
+  });
+
   it("signs out and opens search", async () => {
     setViewport(390);
     const onSignOut = vi.fn();

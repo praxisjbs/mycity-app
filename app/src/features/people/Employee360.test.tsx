@@ -2,10 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { ModalProvider } from "@mycity/ui";
+import { formatDateTime, ModalProvider } from "@mycity/ui";
 import { installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { invalidate } from "@/api/hooks";
-import { mockSession } from "@/api/mock/core";
+import { at, mockSession } from "@/api/mock/core";
 import { byKey } from "@/api/mock/data/people";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
@@ -83,5 +83,18 @@ describe("the record's Documents tab", () => {
     expect(screen.queryByRole("dialog", { name: "Proof of residential address" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Verify Document" }));
     await waitFor(() => expect(screen.getAllByText("Verified").length).toBeGreaterThan(1));
+  }, 30000);
+});
+
+// QA BG-046: History dated a change by its UTC day, so one at 00:45 in Lagos read the day before.
+describe("the record's History tab", () => {
+  it("dates each change in Lagos time, with its time", async () => {
+    await signedInAs("cynthia@mycityapp.io", <Employee360 id={byKey("chidera")!.employee_id} />);
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "History" }));
+    const when = at(2, "00:45");
+    const lagos = formatDateTime(when);
+    expect(lagos.endsWith(" 00:45")).toBe(true);
+    expect(lagos.slice(0, 10)).not.toBe(when.slice(0, 10).split("-").reverse().join("/"));
+    expect((await screen.findAllByText(lagos)).length).toBeGreaterThan(0);
   }, 30000);
 });

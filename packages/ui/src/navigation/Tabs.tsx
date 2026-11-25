@@ -5,7 +5,7 @@
  * @use Sibling views of one module or record (Register, Field Assignments, Location Requests). Controlled by value, so the router drives it from ?tab=; give each tab an href so it opens in a new tab and survives a reload.
  * @avoid Two or three views of one list in a toolbar (use SegmentedControl); filtering a list (use Chips); steps of a form (use Wizard); more than one strip on a screen.
  * @phone One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). A count's `tone` reads the same on both: yellow for what waits on the reader, red when it is urgent.
- * @a11y A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing.
+ * @a11y A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing. A count with `countWords` is read after the label ("Leave 3 unread notices") and shown in a Tooltip on hover on desktop; a phone has no hover, so there the words are in the name only.
  * @status stable
  * @exports TabPanel
  * @example <Tabs label="Attendance" value={tab} onValueChange={(t) => navigate(`/attendance?tab=${t}`)} items={[{ value: "register", label: "Register", href: "/attendance?tab=register" }]} />
@@ -31,6 +31,8 @@ export interface TabItem {
   count?: number;
   /** The count's colour: `neutral` (the default) for a quiet total, `primary` for what waits on the reader (unread notifications), `err` when something urgent does. */
   tone?: "neutral" | "primary" | "err";
+  /** The count said in full ("3 unread notices", from unreadNotices): read after the label, and in a Tooltip on hover on desktop. Without it the number is read as it is. */
+  countWords?: string;
   /** Where the tab lives, so it can be opened in a new browser tab; a plain click still goes through onValueChange. */
   href?: string;
   /** A glyph before the label. */
@@ -144,14 +146,16 @@ export function Tabs({ items, value, onValueChange, label, children, activation 
     else if (right > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = right - strip.clientWidth + 16;
   }, [value]);
 
-  const bodyOf = (item: TabItem) => (
+  // `tip`: the strip's own tabs say their count's words on hover; the unseen ruler and the More Tabs menu do not.
+  // `named`: a strip tab says its count's words in its own aria-label (nameOf), so its text stays its label and count.
+  const bodyOf = (item: TabItem, tip = false, named = false) => (
     <>
       {item.icon && <Icon name={item.icon} />}
       {item.label}
       {item.count != null && (
         <>
           {" "}
-          <CountBadge count={item.count} tone={item.tone ?? "neutral"} />
+          <CountBadge count={item.count} tone={item.tone ?? "neutral"} words={item.countWords} tip={tip} named={named} />
         </>
       )}
     </>
@@ -172,7 +176,8 @@ export function Tabs({ items, value, onValueChange, label, children, activation 
         )}
         <Radix.List ref={list} aria-label={label} className="no-scrollbar -mb-px flex max-w-full min-w-0 flex-1 gap-0.5 overflow-x-auto">
           {items.filter((_, i) => shown.has(i)).map((item) => {
-            const body = bodyOf(item);
+            const named = item.count != null && !!item.countWords && typeof item.label === "string";
+            const body = bodyOf(item, true, named);
             return (
               <Radix.Trigger
                 key={item.value}
@@ -181,6 +186,7 @@ export function Tabs({ items, value, onValueChange, label, children, activation 
                 asChild={!!item.href}
                 data-ui="button"
                 className={TAB}
+                aria-label={named ? `${item.label} ${item.countWords}` : undefined}
                 // A bare strip over a routed screen has no panel here to point at.
                 {...(panels ? {} : { "aria-controls": undefined })}
               >

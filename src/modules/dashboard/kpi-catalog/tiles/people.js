@@ -412,7 +412,7 @@ const ENTRIES = [
     caption: (f) => (f.late > 0 ? `${f.late} late` : null),
     detail: {
       title: "Clocked In Today",
-      summary: (f) => `${f.value} of ${f.denominator} clocked in`,
+      summary: (f) => `${f.value} clocked in, of ${f.denominator} expected today`,
       columns: ROSTER_COLUMNS,
       groups: ROSTER_GROUPS,
       list: rosterList("people"),
@@ -714,7 +714,7 @@ const ENTRIES = [
     caption: (f) => (f.on_leave > 0 ? `${f.on_leave} on leave` : null),
     detail: {
       title: "Present Today",
-      summary: (f) => `${f.value} of ${f.denominator} in today`,
+      summary: (f) => `${f.value} in today, of ${f.denominator} expected`,
       columns: ROSTER_COLUMNS,
       groups: ROSTER_GROUPS,
       list: rosterList("home"),
