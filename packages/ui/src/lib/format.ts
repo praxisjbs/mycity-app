@@ -198,6 +198,12 @@ export function formatBytes(bytes: number | null | undefined): string {
 /** Plural with count: plural(3, "employee") → "3 employees". */
 export const plural = (n: number, one: string, many = `${one}s`) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
+/**
+ * A menu, More tile or tab count in words: the reader's unread notices that open there.
+ * unreadNotices(21) → "21 unread notices"; unreadNotices(1, true) → "1 unread notice, urgent".
+ */
+export const unreadNotices = (n: number, urgent = false) => `${plural(n, "unread notice")}${urgent ? ", urgent" : ""}`;
+
 const NIGERIAN = /^\+234(\d{3})(\d{3})(\d{4})$/;
 
 /** A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. */

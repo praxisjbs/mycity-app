@@ -194,6 +194,24 @@ describeDb("My Profile against the real migrations", () => {
     expect(await told("ops")).toHaveLength(1);
   });
 
+  // QA BG-060: an event with no words of its own read as its key ("employee.bank_details_changed").
+  test("Record History names every event in words, never as its key", async () => {
+    const history = await as("staff").get("/ess/profile/history");
+    const said = history.body.data.map((r) => r.summary);
+    expect(said).toContain("Bank details changed");
+    for (const line of said) expect(line).not.toMatch(/[a-z]\.[a-z]|_/);
+  });
+
+  // QA BG-058: My Profile said On Probation whenever no confirmation date was set; People's register says Active.
+  test("the probation dates come as they are, so the pill reads as People's register does", async () => {
+    expect((await as("staff").get("/ess/profile")).body).toMatchObject({ status: "active", confirmation_due_on: null, confirmed_on: null });
+    await q("UPDATE employee SET confirmation_due_on = '2027-01-05' WHERE employee_id = $1", [people.staff.employee.employee_id]);
+    const p = (await as("staff").get("/ess/profile")).body;
+    expect(p).toMatchObject({ status: "active", confirmation_due_on: "2027-01-05", confirmed_on: null });
+    expect(p).not.toHaveProperty("confirmed");
+    await q("UPDATE employee SET confirmation_due_on = NULL WHERE employee_id = $1", [people.staff.employee.employee_id]);
+  });
+
   test("each person reads only their own record", async () => {
     const mine = await as("manager").get("/ess/profile");
     expect(mine.body.display_name).toBe("Kemi Alade");

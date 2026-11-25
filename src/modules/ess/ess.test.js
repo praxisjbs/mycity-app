@@ -59,7 +59,14 @@ describe("My Profile", () => {
     const p = profileOf({ employee_id: "e1", account_number: "0123456789", confirmed_on: null }, []);
     expect(p.account_last4).toBe("6789");
     expect(JSON.stringify(p)).not.toContain("0123456789");
-    expect(p.confirmed).toBe(false);
+    expect(p.confirmed_on).toBeNull();
+  });
+
+  // QA BG-058: the pill is drawn from the same two dates as People's register, so both are sent.
+  test("the probation dates go as they are, for the pill People's register draws", () => {
+    const p = profileOf({ employee_id: "e1", status: "active", confirmation_due_on: "2027-01-09", confirmed_on: null }, []);
+    expect(p).toMatchObject({ status: "active", confirmation_due_on: "2027-01-09", confirmed_on: null });
+    expect(p).not.toHaveProperty("confirmed");
   });
 
   test("no account, no digits", () => {

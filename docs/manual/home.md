@@ -23,15 +23,17 @@ week. What it shows depends on your role, so two colleagues see different Overvi
 ### Read your Overview {#home-overview-read}
 
 1. Open [Home · Overview](/home?tab=overview). It greets you by your first name, with today's date
-   under it on a computer. On Operations' Overview the line also says how many are in, such as
-   *22 of 25 clocked in*.
+   under it on a computer. On Operations' Overview the line also says how many are in, out of those
+   expected today, such as *22 clocked in, of 25 expected today*.
 2. If you are a member of staff, **Your Day** comes first: **Shift Today**, **Clock-In**,
    **Worksite**, **Status** and **Hours Today**. On a phone it shows the first, second and fourth.
    **Day Off** under Shift Today means today is not one of your working days.
 3. Under it are your four cards, each a number that matters to your role, such as
    **My Attendance** or **My Overdue Tasks**. A dash means there is nothing to measure yet. A card
    for a module that is still [Coming Soon](#start-coming-soon), such as Expenses, shows once that
-   module opens.
+   module opens. Some cards have a small i in a circle in the corner: press it to read whom the card
+   counts. **Overdue Tasks** counts the overdue tasks of everyone you can see; **My Overdue Tasks**
+   counts only yours. **Clocked In Today** counts the people in, out of those expected today.
 4. Read the sections under the cards. Which ones you see depends on your role (see the table
    below).
 5. **Need You** lists the requests waiting for your decision, oldest first: **From**, **Request**,
@@ -54,9 +56,6 @@ week. What it shows depends on your role, so two colleagues see different Overvi
 | The CEO | **Organisational Goals**, the **Org KPI** ring with each department's score, **Partnership Pipeline** |
 
 On a computer, **Partnership Pipeline** also says how many partners have had no contact in 30 days.
-
-> **Tip:** On the Operations chart, the dips are Saturdays. Saturday is a half day, from 09:00 to
-> 15:00.
 
 On your first sign-in of a working day, the hub asks you to clock in before you see the Overview.
 Your attendance is on [My Attendance](/ess?tab=my-attendance).
@@ -198,7 +197,8 @@ report to them, directly or further down. Operations and People and the CEO see 
 1. Open [Home · Team](/home?tab=team). On a computer, the line under the title says whose roster it
    is: **Your Team**, **The Whole Organisation** or **Just You**.
 2. The four cards count today's people: **Present Today** (in, out of those expected),
-   **On Site**, **Remote** and **Flags** (late today, or no clock-out yesterday).
+   **On Site**, **Remote** and **Flags** (late today, or no clock-out yesterday). Press the small
+   i in a circle on a card to read whom it counts.
 3. Press a status chip to see only those people: **On Site**, **Remote**, **Field**, **Late**,
    **Not In**, **On Leave** or **No Clock-Out Yesterday**. **Everyone** shows them all.
    **Nobody Matches** means no one fits: try another chip, department or search.
@@ -208,7 +208,9 @@ report to them, directly or further down. Operations and People and the CEO see 
 6. Read the **Team Roster**: each person's status today, their **Clock-In** time, their **KPI**
    score and their **Open Tasks**. A dash means there is nothing to show yet.
 7. Under it, **Attendance This Month** shows each person's month so far: days **On Time** out of the
-   days expected, **Late**, **Absent** and **On Leave**.
+   days expected, **Late**, **Absent** and **On Leave**. It lists everyone on the register this
+   month, including anyone who has left, so it can hold more people than the roster. Press its title
+   to read this.
 
 To order the roster, press the **Employee**, **Department** or **Clock-In** heading on a computer. On
 a phone, press **Sort** and choose an order. On a phone, each person is a card: their name with
@@ -263,7 +265,7 @@ alert about themselves.
 
 | Column | What it shows |
 |---|---|
-| **Alert** | What it is about, such as a person's late arrivals this month |
+| **Alert** | What it is about, such as a person's late arrivals this month. A request waiting too long names its number, such as *Requisition REQ-2026-0004: waiting 10 days* |
 | **Trigger** | What raised it, such as the days they were late |
 | **Who Can Clear** | Whose role clears it, such as **People Approvers** |
 | **Age** | How long it has been open: **Today**, or a number of days |

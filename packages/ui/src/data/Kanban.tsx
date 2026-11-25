@@ -148,7 +148,7 @@ const held = (busy: boolean) =>
       }
     : {};
 
-/** A stage's cards new to the reader (RowMarksContext), each stage asking for its own: a hook per stage. */
+/** A stage's cards new to the reader (RowMarksContext): a hook per stage, each handing over its cards; the app asks for the whole screen at once. */
 function Marked({ cards, children }: { cards: KanbanCard[]; children: (marks: { marked: ReadonlySet<string>; opened: (key: string) => void }) => ReactNode }) {
   return <>{children(useRowMarks(cards.map((c) => c.key)))}</>;
 }

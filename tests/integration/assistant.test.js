@@ -210,6 +210,19 @@ describeDb("Praxis AI against the real migrations", () => {
     expect(res.body).toMatchObject({ declined: "not_available", citations: [], citations_total: 0, table: null });
   });
 
+  // QA BG-047: the read carried the stored status alone, so the assistant called someone on probation Active.
+  test("employees.list gives each row the status People see, On Probation drawn from the two dates", async () => {
+    await pool.query("UPDATE employee SET confirmation_due_on = '2027-01-05', confirmed_on = NULL WHERE employee_id = $1", [people.staff.employee_id]);
+    try {
+      const read = await authorise.runRead(pool, userOf("ops"), "employees.list", {});
+      const byName = Object.fromEntries(read.data.map((r) => [r.display_name, r]));
+      expect(byName["Tunde Ade"]).toMatchObject({ status: "active", employment_status: "On Probation" });
+      expect(byName["Ada Obi"]).toMatchObject({ status: "active", employment_status: "Active" });
+    } finally {
+      await pool.query("UPDATE employee SET confirmation_due_on = NULL WHERE employee_id = $1", [people.staff.employee_id]);
+    }
+  });
+
   test("asked for a change, the answer offers the owning screen with its prefill checked, and nothing is written", async () => {
     const before = (await one("SELECT count(*)::int AS n FROM employee")).n;
     script(say({ text: "Add her on Employees.", route: "add an employee", prefill: { first_name: "Kemi", last_name: "Bello", gross_monthly: "1000000.00", account_number: "0123456789", action: "delete" } }));

@@ -289,6 +289,67 @@ describe("the History tab's line", () => {
       employee360.summaryOf({ action: "employee.reporting_line_changed", changed_fields: [] }),
     ).toBe("Reporting line changed");
   });
+
+  /*
+   * QA BG-060 (JBS Praxis, 25/11/2026): Record History keeps reminders, each in plain words, and never
+   * shows an event key as it is stored. Every key emitted on the employee entity has its own words.
+   */
+  describe("every event on an employee record reads in plain words", () => {
+    const catalogue = require("../../shared/events/catalogue");
+    const SRC = path.join(__dirname, "..", "..");
+    const jsFiles = (dir, out = []) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) jsFiles(full, out);
+        else if (e.name.endsWith(".js") && !e.name.endsWith(".test.js")) out.push(full);
+      }
+      return out;
+    };
+    // Every module's events file, so the catalogue holds every key the system declares.
+    for (const f of jsFiles(path.join(SRC, "modules"))) if (f.endsWith(".events.js")) require(f);
+    const keyOfConstant = new Map(catalogue.all().map((e) => [catalogue.constantOf(e.key), e.key]));
+
+    /** The keys of every emit() whose entity is an employee, read from the source. */
+    const emittedOnEmployee = () => {
+      const keys = new Set();
+      for (const file of jsFiles(SRC)) {
+        const text = fs.readFileSync(file, "utf8");
+        const start = /emit\(\s*\w+\s*,\s*\{/g;
+        let m;
+        while ((m = start.exec(text))) {
+          let i = m.index + m[0].length;
+          for (let depth = 1; depth && i < text.length; i++) depth += text[i] === "{" ? 1 : text[i] === "}" ? -1 : 0;
+          const call = text.slice(m.index, i);
+          if (!/entity:\s*\{\s*type:\s*["']employee["']/.test(call)) continue;
+          const key = /key:\s*(?:\w+\.)?([A-Z][A-Z0-9_]+)\b/.exec(call);
+          if (!key) throw new Error(`${path.relative(SRC, file)}: an emit on an employee whose key this test cannot read`);
+          keys.add(keyOfConstant.get(key[1]) || key[1]);
+        }
+      }
+      return keys;
+    };
+    /* Reminders fire through the reminder engine, which emits on the entity their check returns: these three return the employee. */
+    const REMINDERS_ON_EMPLOYEE = ["commitments.due", "review.leaver_due", "employee.probation_ending"];
+
+    test("each key emitted on the employee entity, reminders included, has its own words", () => {
+      const keys = [...emittedOnEmployee(), ...REMINDERS_ON_EMPLOYEE];
+      expect(keys.length).toBeGreaterThan(15);
+      for (const key of keys) {
+        expect(catalogue.has(key)).toBe(true);
+        expect([key, employee360.HISTORY_WORDS[key]]).toEqual([key, expect.any(String)]);
+      }
+      expect(employee360.summaryOf({ action: "commitments.due", changed_fields: [] })).toBe("Reminded to send commitments");
+    });
+
+    test("no declared key, and no unknown one, is ever shown as it is stored", () => {
+      for (const { key } of catalogue.all()) {
+        const said = employee360.summaryOf({ action: key, changed_fields: [] });
+        expect([key, said]).not.toEqual([key, key]);
+        expect([key, /[a-z]\.[a-z]|_/.test(said)]).toEqual([key, false]);
+      }
+      expect(employee360.summaryOf({ action: "nothing.declared_here", changed_fields: [] })).toBe("Record changed");
+    });
+  });
 });
 
 describe("Download PDF's drawing", () => {

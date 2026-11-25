@@ -25,6 +25,7 @@ import {
   Form,
   FormFooter,
   formatDate,
+  formatDateTime,
   Grid,
   HelpTerm,
   KeyValue,
@@ -311,7 +312,7 @@ function Job({ employee: e }: { employee: Record360 }) {
             ["Confirmed", e.confirmed_on ? formatDate(e.confirmed_on) : "Not yet"],
             ["Contract ends", e.contract_ends_on ? formatDate(e.contract_ends_on) : "None"],
             ["Status", <Pill key="s" tone={status.tone}>{status.text}</Pill>],
-            ...(e.archived_at ? ([["Archived", `${formatDate(e.archived_at.slice(0, 10))} · ${e.archive_reason ?? ""}`]] as Array<[string, string]>) : []),
+            ...(e.archived_at ? ([["Archived", `${formatDate(e.archived_at)} · ${e.archive_reason ?? ""}`]] as Array<[string, string]>) : []),
           ]}
         />
       </Card>
@@ -414,7 +415,7 @@ function Login({ employee: e, onChanged }: { employee: Record360; onChanged: () 
           items={[
             ["Signs in as", e.login.email ?? "No login yet"],
             ["Roles", e.login.roles.length ? e.login.roles.map((r) => r.name).join(", ") : "None"],
-            ["Last signed in", e.login.last_sign_in_at ? formatDate(e.login.last_sign_in_at.slice(0, 10)) : "Never"],
+            ["Last signed in", e.login.last_sign_in_at ? formatDate(e.login.last_sign_in_at) : "Never"],
           ]}
         />
         {me.grants.settings?.includes("edit") && e.login.state === "invited" && e.status === "active" && (
@@ -462,7 +463,7 @@ function History({ id }: { id: string }) {
       columns={[
         { key: "w", label: "What", render: (r) => r.summary },
         { key: "a", label: "Who", render: (r) => r.actor_name ?? "System" },
-        { key: "d", label: "When", render: (r) => formatDate(r.occurred_at.slice(0, 10)) },
+        { key: "d", label: "When", render: (r) => formatDateTime(r.occurred_at) },
       ]}
     />
   );

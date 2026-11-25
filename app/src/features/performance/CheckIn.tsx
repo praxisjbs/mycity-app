@@ -205,7 +205,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
         ]}
       />
       {c.returned_reason && <Banner className="mt-3" tone="err">{c.returned_reason}</Banner>}
-      {!open && c.check_in_submitted_at && <Banner className="mt-3" tone="ok">{`Sent ${formatDate(c.check_in_submitted_at.slice(0, 10))}.`}</Banner>}
+      {!open && c.check_in_submitted_at && <Banner className="mt-3" tone="ok">{`Sent ${formatDate(c.check_in_submitted_at)}.`}</Banner>}
       {own.map((i) => {
         const id = i.performance_review_item_id;
         const r = rows[id];

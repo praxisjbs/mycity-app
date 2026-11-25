@@ -275,10 +275,13 @@ module.exports = defineManifest({
       key: "employees.list",
       summary: "employees.summary",
       description:
-        "List staff, by department, status, work arrangement, employment type or line manager",
+        "List staff, by department, status, work arrangement, employment type or line manager; employment_status is the status People see (Active, On Probation, Suspended, Left, Archived)",
       params: c.organisation.EmployeeListQuery,
       permission: ["people", "view"],
-      run: (client, params, actor) => repo.list(client, params, actor.scope),
+      run: async (client, params, actor) => {
+        const page = await repo.list(client, params, actor.scope);
+        return { ...page, data: page.data.map((row) => ({ ...row, employment_status: service.employmentStatusOf(row) })) };
+      },
       cite: (row) => ({ type: "employee", id: row.employee_id, label: row.display_name }),
       matrix: probe,
     },

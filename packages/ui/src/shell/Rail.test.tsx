@@ -28,6 +28,27 @@ describe("Rail", () => {
     expect(link.querySelector("[data-urgent]")).not.toBeNull();
   });
 
+  it("says a count is unread notices, in the link's name and in a tooltip on hover", async () => {
+    render(<Rail items={RAIL_ITEMS} current="home" />);
+    const link = screen.getByRole("link", { name: "Mailbox 12 unread notices" });
+    const badge = link.querySelector<HTMLElement>("[data-urgent], .ml-auto")!;
+    await userEvent.hover(badge);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("12 unread notices");
+    expect(badge).not.toHaveAttribute("title");
+  });
+
+  it("says urgent in an urgent module's count", () => {
+    const items = RAIL_ITEMS.map((i) => (i.key === "community" ? { ...i, urgent: true } : i));
+    render(<Rail items={items} current="home" />);
+    expect(screen.getByRole("link", { name: "Staff Community 3 unread notices, urgent" })).toBeInTheDocument();
+  });
+
+  it("collapsed, puts the count's words in the item's own tooltip", async () => {
+    render(<Rail items={RAIL_ITEMS} current="home" collapsed />);
+    await userEvent.hover(screen.getByRole("link", { name: /^Mailbox/ }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Mailbox, 12 unread notices");
+  });
+
   it("navigates through the app on a plain click, and leaves a modified click to the browser", async () => {
     const onNavigate = vi.fn();
     render(<Rail items={RAIL_ITEMS} current="home" onNavigate={onNavigate} />);

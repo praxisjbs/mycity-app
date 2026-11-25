@@ -186,6 +186,47 @@ describe("People · Organogram on desktop", () => {
   }, 30000);
 });
 
+// QA BG-041: a role added by mistake could not be removed with a button.
+describe("People · Organogram's Close Role", () => {
+  it("closes an open role nobody reports to, after asking; one with reports is refused without asking", async () => {
+    setViewport(1440);
+    await organogramAsOperations();
+    const departments = await api.call("GET /api/v1/departments");
+    await act(async () => {
+      await api.call("POST /api/v1/org-seats", { body: { title: "Head of Mistakes", department_id: departments.data[0].department_id } });
+      invalidate("/api/v1/org-chart");
+    });
+    await settled();
+    const editOn = async (title: string) => {
+      fireEvent.click(within(screen.getByText(title).closest(".og-card") as HTMLElement).getByRole("button", { name: "Edit Role" }));
+      await settled();
+    };
+    const closes = () =>
+      vi.mocked(dispatch).mock.calls.map(([req]) => req).filter((req) => req.method === "PATCH" && req.path.startsWith("/api/v1/org-seats/") && (req.body as { status?: string })?.status === "closed");
+
+    /* Head of Finance has a person under it: nothing is asked and nothing is sent. */
+    vi.mocked(dispatch).mockClear();
+    await editOn("Head of Finance");
+    fireEvent.click(within(sheet()).getByRole("button", { name: "Close Role" }));
+    await settled();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(closes()).toHaveLength(0);
+    fireEvent.click(within(sheet()).getByRole("button", { name: "Cancel" }));
+    await settled();
+
+    await editOn("Head of Mistakes");
+    fireEvent.click(within(sheet()).getByRole("button", { name: "Close Role" }));
+    await settled();
+    const ask = screen.getByRole("alertdialog");
+    expect(within(ask).getByText("Head of Mistakes leaves the structure.")).toBeTruthy();
+    fireEvent.click(within(ask).getByRole("button", { name: "Close Role" }));
+    await settled();
+    expect(closes()).toHaveLength(1);
+    expect(screen.queryByText("Head of Mistakes")).toBeNull();
+    expect(copyProblems()).toEqual([]);
+  }, 30000);
+});
+
 describe("People · Organogram's Head marks", () => {
   it("marks each department's head and open head role, and Acting Head with its code above an open one, as the read says", async () => {
     setViewport(1440);

@@ -703,6 +703,48 @@ describeDb("Home · Alerts against the real migrations", () => {
       const handler = require("../../src/jobs/handlers/home-alert-sweeps");
       expect(await handler({ data: { date: today } })).toMatchObject({ raised: 0, refreshed: 31, failed: 0 });
     });
+
+    test("an approval alert names the record waiting by its reference, so two requests about one person never read alike", async () => {
+      const { workflow_definition_id: flow } = await one(
+        "SELECT workflow_definition_id FROM workflow_definition WHERE key = 'performance.commitments' AND version = 1",
+      );
+      const tasks = [];
+      for (const number of ["TSK-0041", "TSK-0042"])
+        tasks.push(
+          (
+            await one("INSERT INTO task (title, number, created_by) VALUES ('Print the festival banners', $1, $2) RETURNING task_id", [
+              number,
+              people.ops.user.user_id,
+            ])
+          ).task_id,
+        );
+      const entered = new Date(Date.now() - 5 * DAY_MS);
+      const instances = [];
+      for (const task of tasks)
+        instances.push(
+          (
+            await one(
+              `INSERT INTO workflow_instance (workflow_definition_id, definition_key, module_key, entity_type, entity_id,
+                                              subject_employee_id, current_stage, state, stage_entered_at, opened_at)
+               VALUES ($1, 'performance.commitments', 'performance', 'task', $2, $3, 'reviewer', 'pending', $4, $4)
+               RETURNING workflow_instance_id`,
+              [flow, task, ids.staff, entered],
+            )
+          ).workflow_instance_id,
+        );
+      try {
+        // The metric's own read, as the sweep makes it: no alert is raised, so the counts above stand.
+        const { readings } = await require("../../src/modules/alerts/alerts.metrics").METRICS.approval_ageing.evaluate(pool, { threshold: "3" }, { today });
+        const titleOf = (id) => readings.find((r) => r.subject.id === id).title;
+        expect(titleOf(tasks[0])).toBe("Monthly Commitments TSK-0041 for Musa Danjuma: waiting 5 days");
+        expect(titleOf(tasks[1])).toBe("Monthly Commitments TSK-0042 for Musa Danjuma: waiting 5 days");
+        // A record its module cannot name (gone, or never there) keeps the flow's name and the person's.
+        expect(titleOf(leaveRequest)).toBe("Leave Request for Musa Danjuma: waiting 5 days");
+      } finally {
+        await q("DELETE FROM workflow_instance WHERE workflow_instance_id = ANY($1::uuid[])", [instances]);
+        await q("DELETE FROM task WHERE task_id = ANY($1::uuid[])", [tasks]);
+      }
+    });
   });
 
   /* ---------------------------------------------------------------- *

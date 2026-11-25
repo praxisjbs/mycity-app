@@ -191,14 +191,32 @@ export function MyAttendancePage() {
   );
 }
 
-/** A day's columns, as My Days, a figure's days and People · Attendance's All Days show them. */
-export const DAY_COLUMNS: Array<{ key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode }> = [
+/**
+ * A day's hours. After a System Clock-Out they count only to the shift's end (attendance.md §6.4), so
+ * the figure carries a help term saying so: to the person, that they can give their real time; to People, that the person can.
+ */
+const SYSTEM_OUT_HELP = {
+  own: "Counted to the shift's end. Give your real time if you left later.",
+  people: "Counted to the shift's end. The person can give their real time if they left later.",
+} as const;
+function hoursOf(d: AttendanceDay, whose: keyof typeof SYSTEM_OUT_HELP): ReactNode {
+  if (!d.worked_minutes) return null;
+  return d.clock_out_automatic ? <HelpTerm help={SYSTEM_OUT_HELP[whose]}>{hours(d.worked_minutes)}</HelpTerm> : hours(d.worked_minutes);
+}
+
+type DayColumn = { key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode };
+const dayColumns = (whose: keyof typeof SYSTEM_OUT_HELP): DayColumn[] => [
   { key: "attendance_date", label: "Date", sortable: true, render: (d) => formatDate(d.attendance_date) },
   { key: "i", label: "Clock In", render: (d) => (d.first_clock_in_at ? formatTime(d.first_clock_in_at) : null) },
   { key: "o", label: "Clock Out", render: (d) => clockOutOf(d.last_clock_out_at, d.clock_out_automatic) },
-  { key: "h", label: "Hours", align: "n", render: (d) => (d.worked_minutes ? hours(d.worked_minutes) : null) },
+  { key: "h", label: "Hours", align: "n", render: (d) => hoursOf(d, whose) },
   { key: "s", label: "Status", render: (d) => <Pill tone={dayStatus(d).tone}>{dayStatus(d).text}</Pill> },
 ];
+
+/** A day's columns, as My Days and a figure's days show them. */
+export const DAY_COLUMNS = dayColumns("own");
+/** The same columns on People · Attendance's All Days, whose help speaks of the person. */
+export const PEOPLE_DAY_COLUMNS = dayColumns("people");
 
 type FigureStatus = "present" | "late" | "absent";
 const FIGURE: Record<FigureStatus, string> = { present: "Days Present", late: "Late Days", absent: "Absent Days" };
@@ -222,7 +240,7 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
         <KeyValue
           items={[
             ["Status", <Pill key="s" tone={dayStatus(day).tone}>{dayStatus(day).text}</Pill>],
-            ["Hours", day.worked_minutes ? hours(day.worked_minutes) : null],
+            ["Hours", hoursOf(day, "own")],
             ...(day.late_minutes ? ([["Late By", lateBy(day.late_minutes)]] as Array<[string, string]>) : []),
             ...(day.early_minutes ? ([["Left Early By", lateBy(day.early_minutes)]] as Array<[string, string]>) : []),
             ...(day.overtime_minutes ? ([["Overtime", lateBy(day.overtime_minutes)]] as Array<[string, string]>) : []),

@@ -38,8 +38,8 @@ describe("shell navigation", () => {
     const items = tabItems("people", people.tabs, counts, new Set(["people/leave", "people/devices"]));
     const of = (slug: string) => items.find((i) => i.value === slug)!;
     expect(of("employees")).toMatchObject({ label: "Employees", href: "/people?tab=employees", count: 2, tone: "primary" });
-    expect(of("attendance")).toMatchObject({ count: 4, tone: "primary" });
-    expect(of("leave")).toMatchObject({ count: 3, tone: "err" });
+    expect(of("attendance")).toMatchObject({ count: 4, tone: "primary", countWords: "4 unread notices" });
+    expect(of("leave")).toMatchObject({ count: 3, tone: "err", countWords: "3 unread notices, urgent" });
     // Something urgent there with nothing unread (an announcement opened, not yet acknowledged): at least 1.
     expect(of("devices")).toMatchObject({ count: 1, tone: "err" });
     expect(of("organogram").count).toBe(0);

@@ -56,6 +56,7 @@ const c = require("@mycity/contract");
 const lagos = require("../../shared/time/lagos");
 const { formatDate } = require("../../shared/time/day-first");
 const { formatNaira } = require("../../shared/money/money");
+const { logger } = require("../../config/logger");
 const { stageByKey } = require("../../shared/workflow/conditions");
 const partners = require("../dashboard/sources/partners.source");
 const budgets = require("../dashboard/sources/budgets.source");
@@ -96,9 +97,48 @@ const batchOf = (rows, cursor, read) => ({
  * ------------------------------------------------------------------ */
 
 /**
+ * What a person calls each record a batch of requests waits on, by the owning module's own words
+ * for it: its search provider's reference ("REQ-2026-0004"), the result ⌘K shows
+ * (shared/search/provider.js names). Keyed `<entity_type>:<entity_id>`. A type with no provider,
+ * or one whose read fails, is left unnamed: the alert is still raised, under the flow's name.
+ */
+async function recordNames(client, rows) {
+  // Required here, not at the top: the providers load every module's search file, Home's own among them.
+  const registry = require("../../shared/search/registry");
+  const byType = new Map();
+  for (const r of rows) {
+    if (!byType.has(r.entity_type)) byType.set(r.entity_type, []);
+    byType.get(r.entity_type).push(r.entity_id);
+  }
+  const named = new Map();
+  for (const [type, ids] of byType) {
+    const provider = registry.providers().find((p) => p.type === type);
+    if (!provider) continue;
+    try {
+      for (const [id, name] of await provider.names(client, ids)) named.set(`${type}:${id}`, name);
+    } catch (err) {
+      logger.warn({ err, entity_type: type }, "an approval alert's records could not be named");
+    }
+  }
+  return named;
+}
+
+/**
+ * The record a request waits on, in a few words beside the flow's name: its reference, else its
+ * title when that is more than the name of the person the alert already names. Null when neither.
+ */
+function recordLabel(name, who) {
+  if (!name) return null;
+  if (name.ref) return name.ref;
+  return name.title && name.title !== who ? name.title : null;
+}
+
+/**
  * Pending requests that have waited at their current stage for the rule's whole days or
  * more. An alert is about the record waiting (a leave request), so it opens where the
- * request does, and about the person the request is for.
+ * request does, and about the person the request is for. Its title names the record
+ * ("Requisition REQ-2026-0004: waiting 10 days"), so two requests about one person, or a
+ * request about nobody, never read alike; a sweep refreshes the title of an alert already open.
  */
 async function approvalAgeing(client, rule, { today, after = null }) {
   const days = wholeDays(rule);
@@ -114,6 +154,7 @@ async function approvalAgeing(client, rule, { today, after = null }) {
       LIMIT $3 -- pagination:batch the requests one step of a sweep raises ageing alerts for`,
     [reachedBy(today, days), after, BATCH],
   );
+  const names = await recordNames(client, rows);
   return batchOf(
     rows,
     (r) => r.workflow_instance_id,
@@ -122,11 +163,12 @@ async function approvalAgeing(client, rule, { today, after = null }) {
       const waited = lagos.daysBetween(entered, today);
       const stage = stageByKey({ stages: r.stages }, r.current_stage);
       const who = nameOf(r.first_name, r.last_name);
+      const label = recordLabel(names.get(`${r.entity_type}:${r.entity_id}`), who);
       return {
         subject: { type: r.entity_type, id: r.entity_id },
         subject_employee_id: r.subject_employee_id,
         value: waited,
-        title: `${r.definition_name}${who ? ` for ${who}` : ""}: waiting ${counted(waited, "day")}`,
+        title: `${r.definition_name}${label ? ` ${label}` : ""}${who ? ` for ${who}` : ""}: waiting ${counted(waited, "day")}`,
         trigger: `At ${stage ? stage.name : r.current_stage} since ${formatDate(entered)}`,
         since: r.stage_entered_at,
       };

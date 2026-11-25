@@ -24,6 +24,28 @@ export function figureOf(card: HomeKpiCard): ReactNode {
   }
 }
 
+/** Expected in today, as the attendance register counts it: the same words on every attendance card. */
+const EXPECTED = "Expected means an active login, a working day of their schedule and not on leave.";
+
+/**
+ * Help on a card whose figure could be read as another screen's count (docs/guides/home.md §10.1):
+ * who it counts, and for a part of a whole what the whole is. Headcount, Clocked In Today, Team
+ * and Attendance This Month each count a different set of people, so each says which.
+ */
+export const CARD_HELP: Readonly<Record<string, string>> = {
+  headcount: "Active staff on the register you can see, with or without a login.",
+  attendance_today: `People you can see clocked in today, of those expected in. ${EXPECTED}`,
+  my_attendance_30d: "Your days on time in the last 30 days, of the working days you were expected in.",
+  team_present: `People on this roster in today, of those expected in. ${EXPECTED}`,
+  team_on_site: "People on this roster in on time at their office today.",
+  team_remote: "People on this roster in on time and working remotely today.",
+  team_flags: "People on this roster late today or with no clock-out on their last working day, each counted once.",
+  tasks_overdue: "Overdue tasks of everyone you can see.",
+  my_tasks_overdue: "Your own overdue tasks.",
+  goals_on_track: "Key results you can see on track or done this quarter, of all of them.",
+  my_targets_on_track: "Your scored lines at Meets or above, of all your scored lines.",
+};
+
 export interface CardRowProps {
   /** The cards, in the order the server sent them. */
   cards: HomeKpiCard[];
@@ -43,6 +65,7 @@ export function CardRow({ cards, onOpen }: CardRowProps) {
           caption={card.caption ?? undefined}
           tone={card.tone ?? undefined}
           trend={card.trend ?? undefined}
+          help={CARD_HELP[card.key]}
           onOpen={card.opens ? () => onOpen(card) : undefined}
         />
       ))}

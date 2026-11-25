@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { setViewport } from "../testing/viewport";
+import { installOverlayTestEnv } from "../overlay/test-env";
 import { TabPanel, Tabs, visibleTabs, type TabItem } from "./Tabs";
 
 const ITEMS: TabItem[] = [
@@ -40,6 +41,23 @@ describe("Tabs", () => {
     expect(badge("Employees 2").className).toContain("bg-primary");
     expect(badge("Leave 1").className).toContain("bg-destructive");
     expect(badge("Devices 4").className).toContain("bg-muted");
+  });
+
+  it("says a count in words after the label, and in a tooltip on hover on desktop", async () => {
+    installOverlayTestEnv();
+    render(<Tabs label="People" value="employees" items={[{ value: "leave", label: "Leave", count: 3, tone: "primary", countWords: "3 unread notices" }]} />);
+    const tab = screen.getByRole("tab", { name: "Leave 3 unread notices" });
+    await userEvent.hover(tab.querySelector<HTMLElement>("[data-count]")!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("3 unread notices");
+  });
+
+  it("on a phone says the count's words in the name only, with no tooltip", async () => {
+    setViewport(390);
+    render(<Tabs label="People" value="employees" items={[{ value: "leave", label: "Leave", count: 1, tone: "err", countWords: "1 unread notice, urgent" }]} />);
+    const tab = screen.getByRole("tab", { name: "Leave 1 unread notice, urgent" });
+    await userEvent.hover(tab.querySelector<HTMLElement>("[data-count]")!);
+    await new Promise((r) => setTimeout(r, 400));
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
   it("routes a plain click through onValueChange instead of reloading", async () => {

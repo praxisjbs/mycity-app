@@ -12,7 +12,7 @@ import { useOpenWhereNews, useViewNews, withNews } from "@/features/notification
 import { useScreenAction } from "@/shell/screen-action";
 import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, SelectField, SidePanel, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, locationShown, PATTERN, PUNCH_STATE, REGISTER_STATUS, UNCLEAR_HELP, VERDICT } from "./labels";
-import { DAY_COLUMNS } from "./EssAttendance";
+import { PEOPLE_DAY_COLUMNS } from "./EssAttendance";
 import { DayRoute } from "./TemporarySites";
 import { ApproveOvertimeForm, PayItemsView } from "./PayItems";
 
@@ -148,7 +148,7 @@ function PersonDays({ employeeId, name, openDay }: { employeeId: string; name: s
         onRowClick={(d) => openDay(employeeId, name, d.attendance_date)}
         noun="day"
         empty={{ icon: "clock", title: "No Days This Month" }}
-        columns={[...DAY_COLUMNS, { key: "r", label: "Review", desktop: true, render: (d) => (d.open_exceptions ? <Pill tone="warn">{`${d.open_exceptions} Open`}</Pill> : null) }]}
+        columns={[...PEOPLE_DAY_COLUMNS, { key: "r", label: "Review", desktop: true, render: (d) => (d.open_exceptions ? <Pill tone="warn">{`${d.open_exceptions} Open`}</Pill> : null) }]}
       />
     </>
   );

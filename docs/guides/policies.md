@@ -10,7 +10,7 @@
 | Capabilities | `policies.manage` (write, publish, withdraw and archive policies, and see who has acknowledged them; Knowledge Hub · Policies) |
 | Screens (PROGRESS.md rows) | #62 Policies, #89 Policy Updates; the acknowledge sheet over any screen; #73 Settings · Attendance Policy is dropped, its worksheet is the Attendance policy here |
 | Status | Built |
-| Last changed | 14/11/2026 |
+| Last changed | 25/11/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): TB's decisions of 20/10/2026 (§1.1), which
 bring Knowledge Hub · Policies forward from M10 and retire Settings · Attendance Policy (MILESTONES
@@ -247,7 +247,12 @@ removed with Settings · Attendance Policy; what the clock reads is unchanged (�
   clock-in, or, on a day the person does not clock in, once the sign-in prompt is closed or there was
   none. Before the due date, Later (`POST .../later`) closes it until the next day; after the due
   date Later is gone and the sheet returns at every sign-in, until acknowledged. It never opens over
-  the clock panel or a dialog, and never stops the person clocking in or out.
+  the clock panel or a dialog, and never stops the person clocking in or out. Each version shows once
+  per sign-in: the app keeps what it showed in the tab's session storage under the session's id (the
+  access token's `sid` claim), so a reload, a typed address or a link opened in the tab shows nothing
+  again until the person signs in afresh; Read Full Policy closes it like any other button. A browser
+  that refuses storage keeps the list in memory while the page is open
+  (`app/src/features/policies/AcknowledgeSheet.tsx`).
 - Acknowledging is a record, never a gate on the clock or on any rule: a rules policy applies to
   everyone it covers from its first day either way.
 - **The reminder** (`policy_unacknowledged`, the reminder engine): from 3 days after a version is
@@ -407,6 +412,7 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · QA Low item BG-050 (audit F15b): the acknowledge sheet shows each version once per sign-in, as §6.7 always said, rather than on every page load. What it showed is kept in the tab's session storage under the session (the access token's `sid`), read in try/catch, with the page's memory as the fallback. Nothing on the server changed.
 - 17/11/2026 · JP · While AI is switched off on AI Control, or the month's cap on all AI is reached (`Me.ai_available` false), the hub hides Tidy With AI on a policy's text, and its mention in the Policy Text help; the form beside it is how the work is done (`ai-control.md` decisions 36 to 38, §6.7).
 - 14/11/2026 · JP · §9: `policies.summary`, the policies and their acknowledgements in figures for Praxis AI's Overview (`praxis-ai.md` Appendix B PR 8), for `policies.manage` alone. Nothing on screen changes.
 - 08/11/2026 · TB · `RichTextBlock` (`policies.js`) gains a `table` block (a header row and its rows), for an agreement's options table (M7 PR 6, `docs/guides/partnerships.md` §13.2); `markdownToBlocks` keeps tables. A policy's text never holds one, so its screens are unchanged.

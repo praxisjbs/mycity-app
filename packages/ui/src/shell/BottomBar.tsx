@@ -5,12 +5,13 @@
  * @use Once, in PhoneShell's bottom bar slot. The same five for everyone; More is a button that opens MoreSheet, the others are links.
  * @avoid Desktop (the Rail; the screen gates fail a bottom bar on desktop); more than five items; a second row.
  * @phone The whole point: fixed at the foot, above the home indicator, each item at least 52 px tall; a count shows on the icon.
- * @a11y The Main navigation landmark; the current item is aria-current="page"; More says it opens a dialog (aria-haspopup) and whether it is open.
+ * @a11y The Main navigation landmark; the current item is aria-current="page"; More says it opens a dialog (aria-haspopup) and whether it is open. A count is said after the word, as unread notices ("Workspace 4 unread notices"); a phone has no hover, so the words are in the accessible name only.
  * @status stable
  * @example <BottomBar current="home" onNavigate={navigate} items={[{ key: "home", label: "Home", icon: "home", href: "/home" }, { key: "more", label: "More", icon: "grid", onSelect: openMore }]} />
  */
 import type { MouseEvent } from "react";
 import { cn } from "../lib/cn";
+import { unreadNotices } from "../lib/format";
 import { Icon, type IconName } from "../icons/Icon";
 import { CountBadge } from "../display/CountBadge";
 
@@ -26,7 +27,7 @@ export interface BottomBarItem {
   href?: string;
   /** What it does instead of going somewhere (More). */
   onSelect?: () => void;
-  /** Things waiting behind it; nothing is drawn for 0. */
+  /** The reader's unread notices that open behind it; nothing is drawn for 0. Said as "4 unread notices". */
   count?: number;
   /** Something urgent waits behind it: its count shows red, at least 1. */
   urgent?: boolean;
@@ -53,15 +54,22 @@ export function BottomBar({ items, current, onNavigate, label = "Main" }: Bottom
     <nav data-ui="phone-nav" aria-label={label} className="on-dark flex flex-none border-t border-sidebar-border bg-sidebar px-1 pt-1 pb-safe text-sidebar-foreground">
       {items.map((item) => {
         const on = item.key === current;
+        const count = Math.max(item.count ?? 0, item.urgent ? 1 : 0);
         const body = (
           <>
             <span className="relative">
               <Icon name={item.icon} size="l" />
-              {(!!item.count || item.urgent) && (
-                <CountBadge count={Math.max(item.count ?? 0, item.urgent ? 1 : 0)} tone={item.urgent ? "err" : "primary"} className="absolute -top-1.5 -right-2.5" />
+              {/* The badge is seen; its words follow the label for a screen reader, so the name reads word first. */}
+              {count > 0 && (
+                <span aria-hidden="true">
+                  <CountBadge count={count} tone={item.urgent ? "err" : "primary"} className="absolute -top-1.5 -right-2.5" />
+                </span>
               )}
             </span>
             <span data-ui="nav-label">{item.label}</span>
+            {/* A space, so the name reads "Workspace 4 unread notices"; a flex column draws none. */}
+            {count > 0 && " "}
+            {count > 0 && <span className="sr-only">{unreadNotices(count, item.urgent)}</span>}
           </>
         );
         const look = cn(ITEM, on ? "text-primary" : "text-sidebar-muted");

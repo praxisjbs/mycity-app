@@ -104,7 +104,7 @@ const REQUIRED = [
 /**
  * @param {object} spec  see the header
  * @returns {{type: string, module: string, label: string, words: string[], scoped: boolean, owned: boolean,
- *            cap: number|null, lead: boolean, columns: string[], search: Function}}
+ *            cap: number|null, lead: boolean, columns: string[], search: Function, names: Function}}
  */
 function recordProvider(spec) {
   for (const k of REQUIRED)
@@ -242,8 +242,25 @@ function recordProvider(spec) {
     };
   }
 
+  /**
+   * What a person calls each of `ids`, in the words its search result uses: the reference
+   * ("REQ-2026-0004") and the title. For the system naming a record it already holds (an approval
+   * alert's title, home.md §6 Alerts), so it reads the record whatever its state and whoever asks;
+   * never a list a person reads. `ids` are a batch the caller holds, never a page. A record not
+   * found is left out of the map.
+   * @param {{query: Function}} c
+   * @param {string[]} ids
+   * @returns {Promise<Map<string, {ref: string|null, title: string|null}>>}
+   */
+  async function names(c, ids) {
+    if (!ids.length) return new Map();
+    const { rows } = await c.query(`SELECT ${spec.select} FROM ${spec.from} WHERE ${spec.key}::text = ANY($1::text[])`, [ids.map(String)]);
+    return new Map(rows.map((r) => [String(r.id), { ref: r.ref ? String(r.ref) : null, title: r.title ? String(r.title) : null }]));
+  }
+
   return Object.freeze({
     type: spec.type,
+    names,
     // Every type its rows carry: its own, and its `more` rows'.
     types: Object.freeze([spec.type, ...(spec.more ? [spec.more.type] : [])]),
     module: spec.module,

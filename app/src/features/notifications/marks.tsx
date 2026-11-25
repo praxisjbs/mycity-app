@@ -11,7 +11,10 @@ import { useRouter } from "@/lib/router";
  * by its address (`?id=` or a record's own key), reads those notices: the dot goes at once, and
  * the tab's count, the module's and the bell follow, on every device (`notification_read`).
  *
- * A list asks only while its tab counts something, for the ids on its page (at most 25).
+ * The screen asks once for every list on it, not once per list (a Goals tab with an objective
+ * card per list asked about 25 times): each list hands its page's ids to RecordMarks, which asks
+ * for all of them together, 25 ids a request (the server's cap and the pagination rule), and only
+ * while the tab counts something. Each list then marks its own rows from the one answer.
  *
  * Inside the tab, its switch and chips carry their share too (`GET /notifications/views`, each
  * record placed by its module where the screen's own filters find it), and the screen opens on
@@ -32,6 +35,10 @@ interface Screen {
   count: number;
   /** Rows opened here whose read is on its way: unmarked meanwhile. */
   opened: ReadonlySet<string>;
+  /** The records on this screen with an unread notice that opens here, from the screen's one batch. */
+  unread: ReadonlySet<string>;
+  /** A list hands over its page's record ids; the function it returns takes them back. */
+  register: (list: object, ids: string) => () => void;
   /** What waits in each inner view, by path ("temporary/cancelled"); undefined until read, and while nothing waits. */
   views: Readonly<Record<string, ViewNews>> | undefined;
 }
@@ -47,17 +54,79 @@ export type NewsAt = (path: string) => ViewNews | undefined;
 
 const ScreenContext = createContext<Screen | null>(null);
 
+const NONE: ReadonlySet<string> = new Set();
+
+/** Ids a request carries at most: the server's cap, the pagination rule's 25. */
+const BATCH = 25;
+/** How long the screen waits for its lists to settle before it asks, so lists that load together ask together. */
+const SETTLE_MS = 30;
+
 /** The rows of a list on this screen with something unread about them. RowMarks' hook: one for every list. */
 function useUnreadRows(keys: readonly string[]): ReadonlySet<string> {
   const screen = useContext(ScreenContext);
-  const ids = keys.filter((k) => UUID.test(k)).slice(0, 25);
-  const enabled = !!screen && screen.count > 0 && ids.length > 0;
-  const { data } = useApi("GET /api/v1/notifications/unread-records", {
-    query: { module: screen?.module ?? "", tab: screen?.tab ?? "", ids: ids.join(",") },
-    enabled,
-  });
+  const ids = keys.filter((k) => UUID.test(k)).join(",");
+  const [list] = useState(() => ({}));
+  const register = screen?.register;
+  useEffect(() => (register && ids ? register(list, ids) : undefined), [register, list, ids]);
+  const unread = screen?.unread;
   const opened = screen?.opened;
-  return useMemo(() => new Set(enabled ? (data?.ids ?? []).filter((id) => !opened?.has(id)) : []), [enabled, data, opened]);
+  return useMemo(() => {
+    if (!ids || !unread?.size) return NONE;
+    return new Set(ids.split(",").filter((id) => unread.has(id) && !opened?.has(id)));
+  }, [ids, unread, opened]);
+}
+
+/**
+ * One request of the screen's batch: up to 25 of its ids. A read like any other (useApi), so a read
+ * mark, the pull and the refresh button ask it again with the rest of the screen.
+ */
+function UnreadBatch({ module, tab, ids, onAnswer }: { module: string; tab: string; ids: string; onAnswer: (ids: string, found: readonly string[] | null) => void }) {
+  const { data } = useApi("GET /api/v1/notifications/unread-records", { query: { module, tab, ids } });
+  useEffect(() => {
+    if (data) onAnswer(ids, data.ids);
+  }, [data, ids, onAnswer]);
+  useEffect(() => () => onAnswer(ids, null), [ids, onAnswer]);
+  return null;
+}
+
+/** The ids every list on the screen hands over, gathered once they settle: sorted, each once, in batches of 25. */
+function useScreenIds() {
+  const lists = useRef(new Map<object, string>());
+  const [wanted, setWanted] = useState("");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gather = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      const all = new Set<string>();
+      for (const ids of lists.current.values()) for (const id of ids.split(",")) all.add(id);
+      setWanted([...all].sort().join(","));
+    }, SETTLE_MS);
+  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  const register = useCallback(
+    (list: object, ids: string) => {
+      lists.current.set(list, ids);
+      gather();
+      return () => {
+        lists.current.delete(list);
+        gather();
+      };
+    },
+    [gather],
+  );
+  const batches = useMemo(() => {
+    const ids = wanted ? wanted.split(",") : [];
+    const out: string[] = [];
+    for (let i = 0; i < ids.length; i += BATCH) out.push(ids.slice(i, i + BATCH).join(","));
+    return out;
+  }, [wanted]);
+  return { register, batches };
 }
 
 /** Around every screen of the shell: the screen in view and how many unread notices open on it. */
@@ -106,10 +175,35 @@ export function RecordMarks({ module, tab, count, children }: { module: string |
   });
   const views = waiting ? placed?.views : undefined;
 
-  const screen = useMemo(() => (module && tab ? { module, tab, count, opened, views } : null), [module, tab, count, opened, views]);
+  // Every list's ids, asked for together: one batch for the screen, 25 ids a request.
+  const { register, batches } = useScreenIds();
+  const [answers, setAnswers] = useState<ReadonlyMap<string, readonly string[]>>(() => new Map());
+  const answer = useCallback((ids: string, found: readonly string[] | null) => {
+    setAnswers((was) => {
+      if (found === null && !was.has(ids)) return was;
+      const next = new Map(was);
+      if (found === null) next.delete(ids);
+      else next.set(ids, found);
+      return next;
+    });
+  }, []);
+  const asking = !!module && !!tab && waiting;
+  const unread = useMemo(() => {
+    if (!asking) return NONE;
+    const asked = new Set(batches);
+    const out = new Set<string>();
+    for (const [ids, found] of answers) if (asked.has(ids)) for (const id of found) out.add(id);
+    return out;
+  }, [asking, batches, answers]);
+
+  const screen = useMemo(
+    () => (module && tab ? { module, tab, count, opened, views, unread, register } : null),
+    [module, tab, count, opened, views, unread, register],
+  );
   const marks = useMemo<RowMarks>(() => ({ useMarked: useUnreadRows, opened: read }), [read]);
   return (
     <ScreenContext.Provider value={screen}>
+      {asking && module && tab ? batches.map((ids) => <UnreadBatch key={`${module}/${tab}/${ids}`} module={module} tab={tab} ids={ids} onAnswer={answer} />) : null}
       <RowMarksContext.Provider value={marks}>{children}</RowMarksContext.Provider>
     </ScreenContext.Provider>
   );

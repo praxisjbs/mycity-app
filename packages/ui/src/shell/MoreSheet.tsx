@@ -5,12 +5,13 @@
  * @use Opened by the bottom bar's More. Tiles come from the module catalogue filtered by the person's grants, grouped Work, People, Business and System, each one word with its count.
  * @avoid Desktop (the Rail and the account menu); actions inside a module (Menu); settings that need a form (Settings).
  * @phone The whole point: up to 90% of the height, closed by dragging down, tapping the scrim or Esc; every tile and button a 44 px target.
- * @a11y A dialog named More. The person's row and the groups are labelled; each tile is a link named by its word and its count; the current module is aria-current="page".
+ * @a11y A dialog named More. The person's row and the groups are labelled; each tile is a link named by its word and its count as unread notices ("Mailbox 12 unread notices"; a phone has no hover, so the words are in the accessible name only); the current module is aria-current="page".
  * @status stable
  * @example <MoreSheet open={open} onClose={close} person={{ name: "Cynthia Osakunih", subtitle: "Operations Manager" }} groups={groups} onSearch={openSearch} onSignOut={signOut} />
  */
 import type { MouseEvent, ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { unreadNotices } from "../lib/format";
 import { Icon, type IconName } from "../icons/Icon";
 import { Avatar } from "../display/Avatar";
 import { CountBadge } from "../display/CountBadge";
@@ -27,7 +28,7 @@ export interface LauncherTile {
   icon: IconName;
   /** Its address. */
   href: string;
-  /** Things waiting in it; nothing is drawn for 0. */
+  /** The reader's unread notices that open in it; nothing is drawn for 0. Said as "12 unread notices". */
   count?: number;
 }
 
@@ -137,11 +138,18 @@ export function MoreSheet({ open, onClose, person, personActions, onSearch, grou
                         >
                           <span className={cn("relative flex size-12 items-center justify-center rounded-card", on ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}>
                             <Icon name={t.icon} size="l" />
-                            {!!t.count && <CountBadge count={t.count} className="absolute -top-1 -right-1" />}
+                            {!!t.count && (
+                              <span aria-hidden="true">
+                                <CountBadge count={t.count} className="absolute -top-1 -right-1" />
+                              </span>
+                            )}
                           </span>
                           <span data-ui="nav-label" className="w-full truncate text-center text-xs font-medium">
                             {t.label}
                           </span>
+                          {/* A space, so the name reads "Mailbox 12 unread notices"; a flex column draws none. */}
+                          {!!t.count && " "}
+                          {!!t.count && <span className="sr-only">{unreadNotices(t.count)}</span>}
                         </a>
                       </li>
                     );

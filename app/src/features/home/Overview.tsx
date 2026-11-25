@@ -44,10 +44,13 @@ export function greetingOf(now = new Date()): string {
   return hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
 }
 
-/** The line under the greeting, desktop only: the date, and for Operations who is in. */
+/**
+ * The line under the greeting, desktop only: the date, and for Operations who is in, out of whom
+ * ("22 clocked in, of 25 expected today"), so the figure names what it is out of.
+ */
 export function dateLineOf(o: Pick<HomeOverview, "date" | "clocked_in">): string {
   const day = `${weekdayOf(o.date)} ${formatDate(o.date)}`;
-  return o.clocked_in ? `${day} · ${formatCount(o.clocked_in.present)} of ${formatCount(o.clocked_in.expected)} clocked in` : day;
+  return o.clocked_in ? `${day} · ${formatCount(o.clocked_in.present)} clocked in, of ${formatCount(o.clocked_in.expected)} expected today` : day;
 }
 
 /** At most one read of the Overview in this long for other people's punches (the morning's arrivals). */

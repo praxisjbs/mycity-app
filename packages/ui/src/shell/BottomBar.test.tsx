@@ -23,6 +23,16 @@ describe("BottomBar", () => {
     expect(screen.getByRole("link", { name: /Community/ })).toHaveTextContent("1");
   });
 
+  it("says each count as unread notices after the word, in the accessible name only", () => {
+    setViewport(390);
+    const items = BOTTOM_ITEMS(() => undefined).map((i) => (i.key === "more" ? { ...i, count: 1, urgent: true } : i));
+    render(<BottomBar items={items} current="home" />);
+    expect(screen.getByRole("link", { name: "Workspace 4 unread notices" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More 1 unread notice, urgent" })).toBeInTheDocument();
+    // The seen badge is not read twice.
+    expect(screen.getByRole("link", { name: /Workspace/ }).querySelector("[data-count]")?.closest("[aria-hidden]")).not.toBeNull();
+  });
+
   it("navigates on a tap, and More opens its sheet", async () => {
     setViewport(390);
     const onNavigate = vi.fn();

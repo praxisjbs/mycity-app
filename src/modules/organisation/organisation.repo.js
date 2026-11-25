@@ -1275,6 +1275,11 @@ async function reportsOfSeat(db, seatId) {
   return { people, seats: roles.map((r) => r.org_seat_id) };
 }
 
+/** Whether a seat is the head role of a department in use (Close Role waits for another head). */
+async function departmentHeadedBySeat(db, seatId) {
+  return Boolean(await one(db, "SELECT 1 AS x FROM department WHERE head_seat_id = $1 AND active LIMIT 1", [seatId]));
+}
+
 /**
  * Whether MyCity's names at this checksum were applied (organisation.service.recordNamesApplied);
  * with no checksum, whether any version ever was.
@@ -1504,6 +1509,7 @@ module.exports = {
   updateSeat,
   fillSeat,
   reportsOfSeat,
+  departmentHeadedBySeat,
   tree,
   departmentHeads,
   highestStaffNumberSeq,
