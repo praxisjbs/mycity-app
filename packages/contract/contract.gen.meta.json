@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "03cee7805f262572f504ce5e0ebb746e8efe991511a491e2b0231de1d1ff831a",
+  "source_hash": "d59ee1090bbe6069d01861e8b1b15689cd36abe3ecea022de8b84290ebb07147",
   "schemas": 2335,
   "endpoints": 1049,
   "inputs": {
@@ -49,7 +49,7 @@
     "packages/contract/schemas/partner_pipeline.js": "5a026d3b27d0965b7208d69dc0c99ee7fa6072113c61081fbb38972bf694eaf9",
     "packages/contract/schemas/partners.js": "2813b4a16d772636ede43e6c7b75a6448ae1af2db9204be7ccac1e45b2c85167",
     "packages/contract/schemas/partnership_analytics.js": "eb19230f5db9c5e8ab71e858635906a56c69ad25de87474ee033aa605382972a",
-    "packages/contract/schemas/payroll.js": "870a179a0af5e640376c6b19905ed27ca2d7fc2506eb7d09afbafc5e9cf34c00",
+    "packages/contract/schemas/payroll.js": "a78dbf4edd2b9e9cfd1d2508bc3a2d1495f0de6395c41de31a75fb18c9daf0aa",
     "packages/contract/schemas/payslips.js": "59e7a0f179f05657e8ce46300163c2f7d3a7bca14fc9bc579377fd192143055e",
     "packages/contract/schemas/policies.js": "13ee0c6146c8eccf5c8afab4330b276ca695f71a67431dd4867727ea78f4bdbe",
     "packages/contract/schemas/projects.js": "189b82f4704a2f6122a35069678fec01fadea872e150af16574be6927366d515",

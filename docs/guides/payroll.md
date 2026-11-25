@@ -885,7 +885,7 @@ taxable pay, tested without a database, and every line it can produce traces to 
 | ITF (`itf`) | employer | `annual_payroll` (the month's gross) | one row: `rate` | ITF |
 | NSITF (`nsitf`) | employer | `annual_payroll` (the month's gross) | one row: `rate` | NSITF |
 | Rent relief (`rent_relief`, no line) | employee | `rent` | one row: `rate` of the year's rent and its cap in `flat_amount` | Rent relief |
-| Minimum wage (`minimum_wage`, no line) | employee | `gross` (the person's monthly gross) | one row: a month's `flat_amount` | PAYE, the minimum-wage exemption |
+| Minimum wage (`minimum_wage`, no line) | employee | `gross` (the person's monthly gross) | one row: a month's `flat_amount` | PAYE, the minimum-wage exemption; also, in either mode, the run's `BELOW_MINIMUM_WAGE` warning (§6.15) and People's warning on Gross Monthly (`docs/guides/foundation.md` §6.16) |
 
 The old `relief` item (a flat amount plus a percentage of gross) is retired (§13.1 item 41, rule 15): refused on save,
 never listed or computed.
@@ -905,7 +905,8 @@ never listed or computed.
    confirmed against current law, before M6 is demonstrated.
 6. **The statutory report** (`templates/documents/statutory-report.html`, doc type `statutory_report`, an export
    made from the run's lines) lists, per item and per employee, the base and the amount, the employee and employer
-   totals, and the people's tax and pension numbers (`employee.statutory`; a missing number prints Not Set). Since PR 10
+   totals, and the people's tax and pension numbers (`employee.statutory`; a missing number prints Not Set; a pension PIN is
+   "PEN" then digits and a Tax ID has no prescribed format, `docs/guides/foundation.md` §6.16, QA BG-045). Since PR 10
    each item also prints its legal source as the run's snapshot holds it (the instrument and section, the day checked
    and the link, or No Legal Source with its reason), and so does the relief when the run had one; a snapshot taken
    before sources were kept prints No Legal Source, "Entered before sources were required", as `6040` marked the rows.
@@ -1119,6 +1120,7 @@ is still 450,000.00 (s.120), and the net is 450,000.00 less 90,200.00, **₦359,
 | `OVERTIME_WAITING` | Warning | Pending overtime items exist for the period | Ask the line manager to decide them |
 | `NO_BANK` | Warning, or Blocking with Bank Details Required on | A person has no bank name or account number | Add them on People · Employees |
 | `CONTRACT_ENDED` | Warning | An active person's contract ended before the period's last day | Check the person, exclude if needed |
+| `BELOW_MINIMUM_WAGE` | Warning | A person's monthly gross is below the Minimum Wage version in force on the period's last day, in either mode (QA BG-044, JBS Praxis 25/11/2026); none while no version is in force. "… is paid below the minimum wage" | Check their pay on People · Employees |
 | `NO_PAY_SPLIT` | Warning | Advanced mode and no pay components for a person | Set the split on Configurations |
 | `FINE_WAITING` | Warning | A pending fine exists (any month) | Accept, spread or waive it on Deductions |
 | `ADVANCE_NOT_TAKEN` | Warning | A person left out of the run or with no pay has an advance's instalment due this month (a leaver: any still owed); "Salary Advance Repayment not taken for …", with how many | Include them, or it moves to their next paid month (§6.6 rule 10) |
@@ -2401,6 +2403,7 @@ Schemas are in `packages/contract/schemas/<module>.js`, each with a `TABLES` ent
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · QA BG-044 and BG-045 (audit F58b, F58c; JBS Praxis decisions of 25/11/2026). §6.15: a run warns, never blocks, for each person whose monthly gross is below the Minimum Wage in force on its month's last day (`BELOW_MINIMUM_WAGE` in the contract's `ProblemCode`, `payroll.repo.js` PROBLEMS, read live while the run is a Draft or Computed one), in simple and advanced mode alike; §6.12's minimum wage row. People · Employees warns on Gross Monthly the same way (`statutory.rates.minimumWageOn`, `GET /employees/minimum-wage`; `docs/guides/foundation.md` §6.16). §6.12 rule 6: the pension PIN the statutory report prints is "PEN" then digits; the Tax ID keeps no format. Test: `tests/integration/payroll-run.test.js`.
 - 24/11/2026 · LA · QA audit fixes, decided by JBS Praxis on 24/11/2026 (§13.1 items 47 to 49). BG-002: an instalment a
   run cannot take (its person excluded or with no pay) is the new warning `ADVANCE_NOT_TAKEN` or `FINE_NOT_TAKEN` on the
   run (contract `ProblemCode`, §6.15), and the lock moves it, with the deduction's later instalments, a month on when the

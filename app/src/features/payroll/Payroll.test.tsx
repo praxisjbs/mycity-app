@@ -4,11 +4,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import type { ReactNode } from "react";
 import payroll from "@mycity/contract/schemas/payroll.js";
 import payslips from "@mycity/contract/schemas/payslips.js";
-import { formatMonth, ModalProvider, todayIso, Toaster } from "@mycity/ui";
+import { formatMonth, ModalProvider, toast, todayIso, Toaster } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
+import { markOpenRunChanged } from "@/api/mock/modules/payroll";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import { ScreenActionProvider } from "@/shell/screen-action";
@@ -154,6 +155,25 @@ describe("Payroll · Payroll Runs", () => {
     const added = payroll.PayrollAdjustmentPage.parse(await api.call("GET /api/v1/payroll/runs/:id/adjustments", { params: { id: run.payroll_run_id }, query: {} }));
     expect(added.data[0]).toMatchObject({ label: "October bonus", pay_amount: "15000.00", kind: "earning" });
     expect(run.status).toBe("draft");
+  }, 40000);
+
+  it("a record changed since Compute shows on the run card with Compute Run beside it, until it is pressed (QA F02e)", async () => {
+    const run = (await summary()).current!;
+    await api.call("POST /api/v1/payroll/runs/:id/compute", { params: { id: run.payroll_run_id }, body: {} });
+    markOpenRunChanged();
+    await open("payroll-runs");
+    await card();
+    await screen.findByText("Records changed since Compute", {}, { timeout: 5000 });
+    // The notice's own Compute Run comes first; the footer keeps its own.
+    const computes = screen.getAllByRole("button", { name: "Compute Run" });
+    expect(computes).toHaveLength(2);
+    fireEvent.click(computes[0]!);
+    await screen.findByText("Run computed");
+    await waitFor(() => expect(screen.queryByText("Records changed since Compute")).toBeNull());
+    expect((await summary()).current).toMatchObject({ changed_since_compute: false });
+    // The toasts are one store for the file: the next test waits for its own Run computed.
+    act(() => toast.dismiss());
+    await waitFor(() => expect(screen.queryByText("Run computed")).toBeNull(), { timeout: 5000 });
   }, 40000);
 
   it("Compute Run, then Submit for Approval: the run is Submitted and waits on the CEO", async () => {

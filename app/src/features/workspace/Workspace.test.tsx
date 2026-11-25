@@ -502,7 +502,8 @@ describe("my workspace", () => {
     const people = within(form).getByRole("listbox", { name: "People" });
     fireEvent.click(await within(people).findByRole("option", { name: /Damilola Eke/ }, { timeout: 5000 }));
     fireEvent.click(within(people).getByRole("option", { name: /Musa Olawale/ }));
-    await waitFor(async () => expect(await optionLabels(lead())).toEqual(["You", "Damilola Eke", "Musa Olawale"]));
+    // Musa has no login on the mock yet, and Lead says so (QA BG-028).
+    await waitFor(async () => expect(await optionLabels(lead())).toEqual(["You", "Damilola Eke", "Musa Olawale, No Login Yet"]));
     await chooseOption(lead(), "Damilola Eke");
     expect(lead().textContent).toContain("Damilola Eke");
     fireEvent.click(within(form).getByRole("button", { name: "Remove Damilola Eke" }));

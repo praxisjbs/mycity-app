@@ -146,6 +146,7 @@ Every list pages at 25 through `shared/http/paged.js`. Every route has a contrac
 |---|---|
 | `GET /employees` (search, department, status, work pattern, employment type; sort; `exclude_self=true` leaves the caller out, for a form that may not name them, Raise a Query) | `people` view |
 | `GET /employees/summary` | `people` view |
+| `GET /employees/minimum-wage` (the Minimum Wage in force today, or nulls; for the Gross Monthly warning, §6.16) | `people` view |
 | `GET /employees/:id` (the 360: profile, job, reporting line, login, documents, history; masked per viewer) | `people` view |
 | `POST /employees`, `PATCH /employees/:id`, `POST /employees/:id/archive`, `POST /employees/:id/restore` | `people` create, edit, delete |
 | `PATCH /employees/:id/line-manager` (a person or a vacant seat; dotted line) | `people` edit |
@@ -895,6 +896,38 @@ happened. Edit failed the same way. These are the rules now, each held by a test
   and a minus typed or pasted into it (or any `MoneyField`) stays on the field and reads Not below
   zero, never dropped (-100 once became 100); an empty optional reference (line manager, worksite,
   staff number) is not given.
+- **Legal rules on the record, each with its source** (QA BG-043, BG-044, BG-045; JBS Praxis, 25/11/2026;
+  `docs/qa-audit/LOW-ITEMS-PLAN.md`, Research for PR 2; checked 25/11/2026 from the primary texts):
+  - *Nobody starts before their 18th birthday.* The Child's Rights Act 2003, s.28(1)(b): "no child shall
+    be ... employed to work in any capacity except where he is employed by a member of his family on light
+    work of an agricultural, horticultural or domestic character"; s.277: "'child' means, a person under
+    the age of eighteen years" (PLAC copy, https://placng.org/lawsofnigeria/laws/C50.pdf). Lagos State's
+    Child's Right Law, Cap. C7, s.25(1)(b) says the same and s.261 defines a child as "a person under the
+    age of eighteen (18) years"
+    (https://sabilaw.org/wp-content/uploads/2022/04/Childs-Right-Law-of-Lagos-State-2007-1.pdf). The
+    Labour Act, Cap. L1, s.59 could not be read (the online copy refused automated reads); the Act's
+    s.28 is the stricter rule. So a start date before the person's 18th birthday is refused on Start
+    Date, "Under 18 at start" (`employeeDateProblems`, `MINIMUM_START_AGE`), on Add Employee, Edit
+    Record (a moved start or a corrected birthday), create-admin, the importer and Praxis AI's cards; a
+    record with no date of birth is not checked. Someone born on 29 February turns 18 on 1 March in a
+    common year.
+  - *Pension PIN: "PEN" then digits.* PenCom's Revised Guidelines for Retirement Savings Account
+    Registration 2019, §5.3.13 and its sample file, show every RSA PIN as "PEN" followed by digits
+    (https://www.pencom.gov.ng/wp-content/uploads/2019/06/REVISED-RSA-REGISTRATION-GUIDELINES.pdf) and
+    publish no length, so none is enforced beyond the field's 30 characters. A lower-case "pen" is read
+    as "PEN"; anything else is refused "PEN then digits" (`pensionPin`).
+  - *Tax ID: no format check, because the law gives none.* The Nigeria Tax Administration Act 2025
+    (Official Gazette No. 117, 26/06/2025; https://gazettengr.com/wp-content/uploads/NIGERIA-TAX-ADMINISTRATION-ACT-2025.pdf),
+    ss.4, 7 and 8, requires a Tax ID and says how it is issued and used, but prescribes no format. The
+    field keeps today's rule: letters, digits and hyphens, at most 30 (`statutoryNumber`, as the NHF
+    number does, which no research was asked for).
+  - *Gross Monthly below the minimum wage is warned of, never refused.* While a Minimum Wage version is
+    in force (Payroll · Configurations, `docs/guides/payroll.md` §6.12, with its own source), Add
+    Employee and Edit Record show "Below the minimum wage of ₦…" under Gross Monthly
+    (`GET /employees/minimum-wage`, `people` view; `statutory.rates.minimumWageOn`) and save it all the
+    same; a payroll run then warns for each person paid below it (`BELOW_MINIMUM_WAGE`, payroll §6.15).
+    With no version in force nothing is said. MyCity staff seeded from `seeds/staff/` carry no Tax ID,
+    pension PIN or year of birth, so none of these rules touches the roster load.
 - Someone who works On Site or Hybrid names their worksite (`EmployeeAdd`, the route's body; JBS
   Praxis, 25/10/2026), so they can clock in on day one. A roster load and create-admin use
   `EmployeeCreate`, which does not ask: people arrive before any worksite exists. Edit asks only
@@ -1237,6 +1270,7 @@ screen.
 
 ## 14 · Change log
 
+- 25/11/2026 · JP · QA BG-043, BG-044, BG-045 (audit F58a to F58c; JBS Praxis decisions and research of 25/11/2026). §6.16: a start before the 18th birthday is refused on Start Date ("Under 18 at start"; Child's Rights Act 2003 s.28(1)(b) and s.277, Lagos Child's Right Law Cap. C7 s.25(1)(b) and s.261); a pension PIN is "PEN" then digits with no length (PenCom's 2019 RSA Registration Guidelines §5.3.13); the Tax ID keeps letters, digits and hyphens since the Nigeria Tax Administration Act 2025 prescribes no format; Gross Monthly below the Minimum Wage in force is warned of on Add Employee and Edit Record (`GET /employees/minimum-wage`) and on the payroll run (`BELOW_MINIMUM_WAGE`). Tests: `tests/integration/organisation.test.js`, `tests/integration/payroll-run.test.js`, `app/src/features/people/EmployeeForm.test.tsx`.
 - 25/11/2026 · JP · QA Low items BG-062 and BG-063 (audit F69, F75b; `docs/qa-audit/LOW-ITEMS-PLAN.md`). §8: the Audit Log names a partner, a lead, a deal and a proposal from its own row (`audit.repo.js` `RECORD_NAME`), so a deal's health change reads "Partner deal · DEAL-0007 Festival Sponsorship", never the id's first eight characters. §10: a role's People tab opens on its active logins, the ones its count counts, with Invited, Suspended and Left behind the status chips, so the count and the list agree. `shared/search/provider.js` gains `names(c, ids)`, a record's reference and title in its search result's words, which Home's approval alerts read (`docs/guides/home.md` §6 Alerts).
 - 25/11/2026 · JP · QA BG-058, BG-060, BG-046, BG-047, BG-042 (JBS Praxis decisions, 25/11/2026). One employment status rule: People · Employees, ESS · My Profile (`docs/guides/ess.md` §10) and Praxis AI's `employees.list` read Active, On Probation, Suspended, Left or Archived from the record's status and two probation dates (`status.ts` on screen; `organisation.service.employmentStatusOf` beside each row the read gives the assistant, `employment_status`; §10.1, `docs/guides/organogram.md` §9). History and Record History word every event, reminders included, and date it in Lagos time (§6.16). The build account's department is made with the code IMP and retired at handover (§6.1, `docs/runbooks/first-accounts.md`). Tests: `src/modules/organisation/organisation.test.js`, `tests/integration/assistant.test.js`, `tests/integration/identity.test.js`, `app/src/features/people/Employee360.test.tsx`.
 - 25/11/2026 · JP · QA BG-049. §6.7: search is warmed at boot before the API listens (`shared/search/warm.js`; the User Guide's chapters indexed, a connection opened, pg_trgm looked up and loaded), bounded at 10 seconds and logged, never stopping a boot. Tests: `tests/unit/foundation/search-warm.test.js`, `tests/integration/server-boot.test.js`.

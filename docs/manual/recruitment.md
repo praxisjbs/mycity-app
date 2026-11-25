@@ -292,9 +292,12 @@ with a virus never opens, and the sheet says so.
 ### Score one candidate with AI {#recruitment-candidates-score needs="recruitment edit"}
 
 1. Open the candidate on [Recruitment · Candidates](/recruitment?tab=candidates).
-2. Press **More Actions**, then **Score With AI**.
+2. Press **More Actions**, then **Score With AI**. The message says *Reading the CV*, and **Read** on
+   the **Screening** card says *Being read*.
 3. AI reads the CV, the cover letter and the answers against the role and its must-meet conditions.
-4. The score, from 0 to 100, and a short summary replace the estimate. **Provisional** goes.
+   This takes a few seconds; keep the candidate open and the sheet shows the result when it lands.
+4. The score, from 0 to 100, and a short summary replace the estimate. **Provisional** goes. If you
+   closed the sheet, open the candidate again to see it.
 
 **Score With AI** shows only while the CV is ready and the candidate has no AI score. A candidate is
 read once.
@@ -582,6 +585,9 @@ A candidate at the **Interview** stage shows here only once an interview is sche
 6. Pick the **Panel**. Only people who hold Recruitment are offered; if someone cannot sit, the form
    names them.
 7. Press **Schedule Interview**.
+
+If the candidate already has an open offer, the form says *This candidate has an open offer.* You can
+still schedule the interview: check with the hiring manager first.
 
 The candidate moves to **Interview** and gets an email with a calendar file. Each panelist gets a
 calendar invite, also on [My Workspace · Calendar](/workspace?tab=calendar).

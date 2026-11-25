@@ -59,6 +59,8 @@ interface RunRow {
   payment_reference: string | null;
   paid_by: string | null;
   returned_reason: string | null;
+  /** A record the run reads changed after its Compute (QA F02e); Compute clears it. */
+  changed?: boolean;
 }
 interface AdjustmentRow {
   payroll_adjustment_id: string;
@@ -109,6 +111,11 @@ const periods = () => [...RUNS.keys()].sort().reverse();
 const runByWid = (wid: string) => [...RUNS.values()].find((r) => wfOf(r.period) === wid && r.status !== "draft" && r.status !== "computed");
 /** A month's run status, or null for a month with no run. */
 export const runStatusOf = (period: string): Status6 | null => RUNS.get(period)?.status ?? null;
+/** The mock keeps no record of what a Compute read: a test says a record of this month's run changed after it (QA F02e). */
+export function markOpenRunChanged() {
+  const run = RUNS.get(thisPeriod());
+  if (run) run.changed = true;
+}
 const isOpen = (r: RunRow) => r.status === "draft" || r.status === "computed";
 const lastDay = (period: string) => payDateOf(period, 31);
 
@@ -208,6 +215,7 @@ function runOf(period: string, user: string, withChain = false): PayrollRun {
     chain: withChain ? chainOf(r) : [],
     blocking_problems: problems.filter((p) => p.severity === "blocking").length,
     warnings: problems.filter((p) => p.severity === "warning").length,
+    changed_since_compute: r.status === "computed" && Boolean(r.changed),
     can_compute: open && edit,
     can_submit: r.status === "computed" && edit,
     can_decide: r.status === "submitted" && isCeo(user) && r.submitted_by !== user,
@@ -277,7 +285,7 @@ route("POST /api/v1/payroll/runs/:id/compute", (req) => {
   const x = theRun(req);
   if (refused(x)) return x;
   if (!isOpen(x.run)) return notEditable();
-  Object.assign(x.run, { status: "computed", computed_at: now() });
+  Object.assign(x.run, { status: "computed", computed_at: now(), changed: false });
   return ok(runOf(x.period, req.user!, true));
 });
 route("GET /api/v1/payroll/runs/:id/problems", (req) => {

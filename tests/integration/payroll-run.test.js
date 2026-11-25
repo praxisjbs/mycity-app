@@ -581,7 +581,7 @@ describeDb("a month's payroll run against the real migrations", () => {
     await hire("octoberjoiner", { gross: "300000.00", start: "2026-10-20" });
     expect((await read()).changed_since_compute).toBe(true);
     expect((await listed()).changed_since_compute).toBe(true);
-    await q("UPDATE employee SET status = 'archived', updated_at = now() WHERE employee_id = $1", [employeeId("octoberjoiner")]);
+    await q("DELETE FROM employee WHERE employee_id = $1", [employeeId("octoberjoiner")]);
     expect((await read()).changed_since_compute).toBe(false);
 
     // A person's record edited (as the People screens save it), and a pay item added for the month.

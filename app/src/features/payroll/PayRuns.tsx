@@ -63,6 +63,7 @@ import { amount, failed, landed, RUN_STATUSES, RUN_WORDS, runPill, usePayrollGra
 
 const STATUS_HELP = "Draft and Computed can still change. Submitted waits on the CEO. Approved is locked and its payslips are published. Paid means the money was sent.";
 const BLOCKING_HELP = "A blocking problem stops Submit for Approval until it is fixed. Warnings never stop it.";
+const CHANGED_HELP = "A person, a pay item or a deduction this run reads changed after it was computed. Submit for Approval computes again.";
 const ADJUSTMENT_HELP = "A one-off earning or deduction for one person in this run. A correction to a locked month goes into the next run.";
 const SEND_BACK_HELP = "Returns the run to Draft with your reason and releases everything it froze.";
 
@@ -243,11 +244,46 @@ function RunCard({ id, gone }: { id: string; gone: () => void }) {
       <div className="mt-3">
         <KeyValue items={facts} />
       </div>
+      <ChangedLine run={r} />
       <ProblemLine run={r} />
       <Adjustments run={r} />
       {open && <LeftOut run={r} />}
       <RunActions run={r} gone={gone} />
     </Card>
+  );
+}
+
+/** Compute Run's press: the run computed again and read back. */
+function useComputeRun(id: string) {
+  const compute = useMutation("POST /api/v1/payroll/runs/:id/compute");
+  return async () => {
+    try {
+      refresh(await compute.run({ params: { id }, body: {} }));
+      toast("Run computed");
+    } catch (e) {
+      failed(e, "Run not computed");
+    }
+  };
+}
+
+/** A Computed run whose figures are out of date (QA F02e): a record it reads changed after Compute, with Compute Run beside it. */
+function ChangedLine({ run }: { run: PayrollRun }) {
+  const computeRun = useComputeRun(run.payroll_run_id);
+  if (!run.changed_since_compute) return null;
+  return (
+    <Banner
+      className="mt-3"
+      tone="warn"
+      action={
+        run.can_compute ? (
+          <Button size="sm" icon="rotate" onClick={computeRun}>
+            Compute Run
+          </Button>
+        ) : undefined
+      }
+    >
+      <HelpTerm help={CHANGED_HELP}>Records changed since Compute</HelpTerm>
+    </Banner>
   );
 }
 
@@ -395,7 +431,7 @@ function RunActions({ run, gone }: { run: PayrollRun; gone: () => void }) {
   const confirm = useConfirm();
   const mayEdit = usePayrollGrant("edit");
   const mayExport = usePayrollGrant("export");
-  const compute = useMutation("POST /api/v1/payroll/runs/:id/compute");
+  const computeRun = useComputeRun(run.payroll_run_id);
   const submit = useMutation("POST /api/v1/payroll/runs/:id/submit");
   const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
   const discard = useMutation("DELETE /api/v1/payroll/runs/:id");
@@ -405,14 +441,6 @@ function RunActions({ run, gone }: { run: PayrollRun; gone: () => void }) {
   const out = run.status === "approved" || run.status === "paid";
   const open = run.status === "draft" || run.status === "computed";
 
-  const computeRun = async () => {
-    try {
-      refresh(await compute.run({ params: { id }, body: {} }));
-      toast("Run computed");
-    } catch (e) {
-      failed(e, "Run not computed");
-    }
-  };
   const submitRun = async () => {
     try {
       refresh(await submit.run({ params: { id }, body: run.net_pay ? { expected_net_total: run.net_pay } : {} }));

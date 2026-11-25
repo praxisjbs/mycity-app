@@ -71,7 +71,9 @@ when you press **Add Employee**; the form then goes back to the step with the fi
 6. If you know them, set **Contract Ends**, **Probation Ends** and the **Line Manager**. Press
    **Next**.
 7. On **Pay and Bank**, enter **Gross Monthly**, **Bank** and the ten-digit **Account Number** if
-   you have them. Press **Next**.
+   you have them. If the pay is below the minimum wage set on Payroll · Configurations, a line under
+   **Gross Monthly** says so. It is a warning only: check the amount, and you can still go on. Press
+   **Next**.
 8. On **Tax and Pension**, enter **Tax ID**, **Pension PIN**, **Pension Administrator** and
    **NHF Number** if you have them. Tick **Contributes to NHF** only if the person has chosen to
    contribute to the National Housing Fund, and pick their **State of Residence**. Press **Next**.
@@ -87,12 +89,13 @@ The staff number is given by the hub, in order. You never type it.
 | **Work Email** | Their address at MyCity, such as `ada@mycityapp.io`. It becomes their sign-in email | Yes |
 | **Phone** | Their mobile, any way you write it: `0803 123 4567` or `+234 803 123 4567` | Yes |
 | **Date of Birth** | A date before their start date | No |
-| **Start Date** | Their first working day | Yes |
+| **Start Date** | Their first working day, on or after their 18th birthday | Yes |
 | **Worksite** | The office they clock in at | For On Site and Hybrid |
 | **Contract Ends**, **Probation Ends** | On or after the start date | No |
 | **Line Manager** | Someone on the active staff | No |
 | **Account Number** | Exactly ten digits | No |
-| **Tax ID**, **Pension PIN**, **NHF Number** | As printed on their card or letter, letters and digits | No |
+| **Tax ID**, **NHF Number** | As printed on their card or letter, letters and digits | No |
+| **Pension PIN** | As on their pension letter: PEN then digits, such as `PEN100123456789` | No |
 | **Contributes to NHF** | Ticked only when the person has chosen to contribute | No |
 | **State of Residence** | The State they live in, where their tax is paid | No |
 
@@ -112,7 +115,8 @@ The form marks a field as soon as you leave it, and the mark goes the moment it 
 | **Check the email** | Not an email address | Check the spelling, with one @ |
 | **Not a phone number** | Not a Nigerian mobile, or a foreign number with its country code | Type it as `0803 123 4567` |
 | **Ten digits** | The account number is not ten digits | Type all ten digits |
-| **Letters and digits** | A tax or pension number holds a space or a sign other than - or / | Type it as it is printed |
+| **Letters and digits** | A Tax ID or NHF number holds a space or a sign other than - or / | Type it as it is printed |
+| **PEN then digits** | The **Pension PIN** does not start with PEN, or has more than digits after it | Type it as it is printed, such as `PEN100123456789` |
 | **Not below zero** | **Gross Monthly** has a minus | Type the amount without it. Zero is allowed |
 | **Check the amount** or **Two decimals at most** | **Gross Monthly** has a second point, a comma out of place, or more than two decimals | Type it as `350,000` or `350000.50` |
 | *At most 100 characters*, or another number | A name, job title, bank or next of kin is longer than the field holds | Shorten it |
@@ -120,6 +124,7 @@ The form marks a field as soon as you leave it, and the mark goes the moment it 
 | **Not a worksite** | The worksite was retired while the form was open | Pick another worksite |
 | **Not before the start** | A contract or probation end before the start date | Correct the date |
 | **Before the start date** | A date of birth on or after the start date | Correct the date |
+| **Under 18 at start** | On the **Start Date** the person is not yet 18. Nigerian law lets nobody under 18 be employed | Check the date of birth and the start date |
 | **Already in use** | Another employee has this work email | Use the person's own address, or open the other record |
 | **Archived record** | An archived record has this work email | Restore that record instead of adding a new one |
 | **Used by a login** | Somebody else's login signs in with this email | Ask an administrator on Settings · Users |
@@ -171,7 +176,8 @@ tax and pension. If you may see queries, it also has **Queries** and **Sanctions
 2. {needs="people edit"} Press **Edit Record**. **Edit Employee** opens, with the fields of Add
    Employee on one form, except **Line Manager**. Change a manager on **Reporting Line**.
 3. {needs="people edit"} Change what is wrong and press **Save Record**. Empty a field to remove what
-   it held. Moving someone to **On Site** or **Hybrid** asks for their **Worksite**. The message
+   it held. Moving someone to **On Site** or **Hybrid** asks for their **Worksite**. A **Gross Monthly**
+   below the minimum wage is warned of under the field, as on Add Employee, and still saved. The message
    names them, such as *Ada Okafor saved*. If you changed nothing, the form just closes.
 
 ### Someone's documents {#people-documents}
@@ -235,6 +241,8 @@ take away one made in error, press **Remove Rent** and confirm with **Remove Dec
 | **Pick a worksite** | On Site or Hybrid with no worksite | Pick one, or choose Remote |
 | **Not before the start** | A contract or probation end before the start date | Correct the date |
 | **Before the start date** | A date of birth on or after the start date | Correct the date |
+| **Under 18 at start** | The start date, or a corrected date of birth, makes the person under 18 on their first day | Check both dates |
+| **PEN then digits** | The **Pension PIN** is not PEN then digits | Type it as it is printed |
 | **Already in use**, **Archived record**, **Used by a login** | The work email is someone else's | Use the person's own address |
 
 If a line above the buttons says **Check the dates.**, the new Start Date is after the day their
