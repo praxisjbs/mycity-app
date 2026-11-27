@@ -14,6 +14,7 @@ MILESTONES §16: a restore rehearsed from the backup into a scratch database).
 | Offsite copy: a mirror of all of `/srv/mycity/backups` | same run, once §2 is done | the host in `/etc/mycity/backup.env` | as on the server |
 | Pre-deploy dump | every staging deploy and production promote, before migrations (`deploy-gate`) | `/srv/mycity/backups/<env>/predeploy-<time>-<sha>.dump` | last 10 per environment |
 | Restore drill (§4) | Sundays 04:00 Lagos, `mycity-restore-drill.timer` | report in `/srv/mycity/backups/drills.jsonl` | every run |
+| Security updates (not a backup; kept clear of both) | Daily 05:00 to 05:20 Lagos, `apt-daily-upgrade.timer` (`docs/runbooks/server-setup.md` §3) | `/var/log/apt/history.log` | may restart PostgreSQL and Redis for a few seconds |
 | Secrets (database passwords, encryption keys) | once, at provisioning | `/root/mycity-secrets/` | **never in the backups**: keep a copy yourself (§2) |
 
 A failed backup or drill alerts production's channels (WhatsApp, `docs/runbooks/monitoring.md` §2) and leaves its unit failed
