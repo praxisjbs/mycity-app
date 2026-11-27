@@ -432,6 +432,10 @@ seed guard.
   newest nightly restored into a scratch database, which must hold exactly the row counts the
   backup recorded; it fails when the newest nightly is over 36 hours old. Timed and logged, so the
   M11 rehearsal (MILESTONES §16) is a record, not an event.
+- **Security updates.** Unattended, daily at 05:00 to 05:20 Lagos (`apt-daily-upgrade.timer`,
+  moved from Ubuntu's 07:00 to 08:00 Lagos by provisioning): replacing a library PostgreSQL or
+  Redis uses restarts them for a few seconds, for both environments, so it runs after the backup
+  and the Sunday drill and before the working day (JBS Praxis, 27/11/2026).
 - **Uptime.** `ops/monitoring/uptime-probe.js` from outside the server (`.github/workflows/uptime.yml`
   every 10 minutes): both production hosts over HTTPS, `/api/health/ready`, the environment header
   and the certificate's days left. Errors, backup, drill and probe all alert through one sender

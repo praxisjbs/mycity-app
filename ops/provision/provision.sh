@@ -98,6 +98,20 @@ cat >/etc/apt/apt.conf.d/20auto-upgrades <<'CONF'
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
 CONF
+# A security update that replaces a library PostgreSQL or Redis uses restarts them (needrestart),
+# for both environments at once: a few seconds without a database (26/11/2026, 07:39 Lagos, a
+# Kerberos update). Ubuntu runs it 06:00 to 07:00 UTC, which is 07:00 to 08:00 Lagos as people
+# clock in. Run it 05:00 to 05:20 Lagos instead: after the 02:30 backup and the Sunday 04:00
+# restore drill, before the first morning job at 05:23 (JBS Praxis, 27/11/2026).
+install -d /etc/systemd/system/apt-daily-upgrade.timer.d
+cat >/etc/systemd/system/apt-daily-upgrade.timer.d/mycity.conf <<'CONF'
+[Timer]
+OnCalendar=
+OnCalendar=*-*-* 05:00:00 Africa/Lagos
+RandomizedDelaySec=20m
+CONF
+systemctl daemon-reload
+systemctl restart apt-daily-upgrade.timer
 install -d /etc/systemd/journald.conf.d
 cat >/etc/systemd/journald.conf.d/mycity.conf <<'CONF'
 [Journal]

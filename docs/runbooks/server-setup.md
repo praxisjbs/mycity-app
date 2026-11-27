@@ -49,7 +49,7 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
 
 | Step | Result |
 |---|---|
-| Base | Updates, `ufw`, `fail2ban`, unattended security upgrades, 4 GB swap if none, journald capped at 2 GB |
+| Base | Updates, `ufw`, `fail2ban`, unattended security upgrades at 05:00 to 05:20 Lagos (`apt-daily-upgrade.timer.d/mycity.conf`: a library update restarts PostgreSQL and Redis for a few seconds, so never as people clock in; Ubuntu's own window is 07:00 to 08:00 Lagos), 4 GB swap if none, journald capped at 2 GB |
 | Node | Node 20 (at least 20.19, `package.json` engines) from NodeSource |
 | Packages | PostgreSQL 16 + pgvector, Redis 7, ffmpeg, ClamAV (signatures fetched first), nginx, certbot, fonts; Geist from `assets/fonts` when it is there |
 | Chrome | `google-chrome-stable` for PDFs (`CHROMIUM_PATH`). Ubuntu's own Chromium is a snap, which cannot run as a service user under `/srv` |
